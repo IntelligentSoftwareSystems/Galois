@@ -172,7 +172,7 @@ public:
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
 
-  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, loopname, args);
+  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
   Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
 
 
