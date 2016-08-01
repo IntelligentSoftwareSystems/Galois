@@ -641,6 +641,9 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
     //T_comm_bag.start();
     dbag.set(bag);
+#ifdef __GALOIS_DEBUG_WORKLIST__
+    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+#endif
     dbag.sync();
     bag.clear();
     //T_comm_bag.stop();
@@ -672,6 +675,9 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
       //T_comm_bag.start();
       dbag.set(bag);
+#ifdef __GALOIS_DEBUG_WORKLIST__
+      std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+#endif
       dbag.sync();
       bag.clear();
       //T_comm_bag.stop();
