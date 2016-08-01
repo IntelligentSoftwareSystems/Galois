@@ -90,7 +90,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<unsigned> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
+static cll::opt<double> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
 #endif
 
 
@@ -386,6 +386,9 @@ struct PageRank {
     		T_comm_syncGraph.stop();
     		T_comm_bag.start();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
+        #ifdef __GALOIS_DEBUG_WORKLIST__
+    		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
+        #endif
     		dbag.sync();
     		cuda_wl.num_out_items = 0;
     		T_comm_bag.stop();
@@ -404,6 +407,9 @@ struct PageRank {
     		T_comm_syncGraph.stop();
     		T_comm_bag.start();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
+        #ifdef __GALOIS_DEBUG_WORKLIST__
+    		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
+        #endif
     		dbag.sync();
     		cuda_wl.num_out_items = 0;
     		T_comm_bag.stop();

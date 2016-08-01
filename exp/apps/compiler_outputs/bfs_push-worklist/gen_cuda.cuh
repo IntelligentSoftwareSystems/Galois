@@ -174,7 +174,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 	return true;
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, unsigned wl_dup_factor, MarshalGraph &g, unsigned num_hosts) {
+void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, double wl_dup_factor, MarshalGraph &g, unsigned num_hosts) {
 	CSRGraphTy &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
@@ -212,8 +212,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, unsigne
 	}
 	graph.copy_to_gpu(ctx->gg);
 	ctx->dist_current.alloc(graph.nnodes);
-	ctx->in_wl = Worklist2(wl_dup_factor*graph.nnodes);
-	ctx->out_wl = Worklist2(wl_dup_factor*graph.nnodes);
+	ctx->in_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);
+	ctx->out_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);
 	wl->num_in_items = -1;
 	wl->num_out_items = -1;
 	wl->in_items = ctx->in_wl.wl;
@@ -221,6 +221,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, unsigne
 	ctx->shared_wl = wl;
 	ctx->p_retval = Shared<int>(1);
 	printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
+	printf("[%d] load_graph_GPU: worklist size %d\n", ctx->id, (size_t)wl_dup_factor*graph.nnodes);
 	reset_CUDA_context(ctx);
 }
 
