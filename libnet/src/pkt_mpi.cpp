@@ -60,15 +60,15 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
   
   std::pair<int, int> initMPI() {
     int provided;
-    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
-    if(!(provided >= MPI_THREAD_FUNNELED)){
-      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
+    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_MULTIPLE, &provided));
+    if(!(provided >= MPI_THREAD_MULTIPLE)){
+      //std::cerr << " MPI_THREAD_MULTIPLE not supported\n Abort\n";
       abort();
     }
     else{
-      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
+      //std::cerr << " MPI_THREAD_MULTIPLE supported : MPI_THREAD_MULTIPLE val : " << MPI_THREAD_MULTIPLE <<" , provided : " << provided  <<"\n";
     }
-    assert(provided >= MPI_THREAD_FUNNELED);
+    assert(provided >= MPI_THREAD_MULTIPLE);
     return std::make_pair(getID(), getNum());
   }
 
@@ -120,7 +120,7 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
       //check for new messages
       int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
-      if (flag) {
+      if (flag && (status.MPI_TAG != 32767)) {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
