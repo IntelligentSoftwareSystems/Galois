@@ -289,6 +289,8 @@ Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
