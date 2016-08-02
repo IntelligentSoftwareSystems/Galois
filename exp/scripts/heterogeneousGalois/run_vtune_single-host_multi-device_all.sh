@@ -1,5 +1,5 @@
 #!/bin/sh
-# assumes 3 GPU devices available
+# assumes 2 GPU devices available
 
 MPI=mpiexec
 EXEC=$1
@@ -9,43 +9,52 @@ execname=$(basename "$EXEC" "")
 inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
 extension=gr
-if [[ $EXEC == *"cc"* ]]; then
+
+FLAGS=
+if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
+  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  fi
+fi
+if [[ $execname == *"worklist"* ]]; then
+  FLAGS+=" -cuda_wl_dup_factor=10"
+fi
+
+source_file=${inputdirname}/source
+if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
-elif [[ $EXEC == *"pull"* ]]; then
+elif [[ $execname == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
   extension=tgr
 fi
+grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
-FLAGS=
-
 SET=
-if [[ $EXEC == *"vertex-cut"* ]]; then
-  if [[ $INPUT == *"road"* ]]; then
+if [[ $execname == *"vertex-cut"* ]]; then
+  if [[ $inputname == *"road"* ]]; then
     exit
   fi
-  # assumes 3 GPU devices available
-  SET="gc,2,2 cg,2,2 gg,2,2 gggc,4,1"
+  # assumes 2 GPU devices available
+  SET="gg,2,2 gc,2,2 cg,2,2"
 else
-  # assumes 3 GPU devices available
-  SET="c,1,4 g,1,4 gc,2,2 cg,2,2 gg,2,2"
+  # assumes 2 GPU devices available
+  SET="g,1,4 gg,2,2 c,1,4 gc,2,2 cg,2,2"
 fi
 
 for task in $SET; do
   IFS=",";
   set $task;
   PFLAGS=$FLAGS
-  if [[ $EXEC == *"vertex-cut"* ]]; then
+  if [[ $execname == *"vertex-cut"* ]]; then
     PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
-  else
-    if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
-      PFLAGS+=" -scalegpu=3"
-    fi
+  elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
+    PFLAGS+=" -scalegpu=3"
   fi
   set -x #echo on
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect general-exploration -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_exploration $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect advanced_hotspots -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_hotspots $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect general-exploration -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_exploration $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -noverify -runs=1 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect advanced_hotspots -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_hotspots $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -noverify -runs=1 |& tee ${execname}_${inputname}_${1}.out"
   set +x #echo off
 done
 

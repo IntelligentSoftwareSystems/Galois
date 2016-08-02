@@ -13,58 +13,6 @@ import numpy
 ######## NOTES:
 # All time values are in sec by default.
 
-#CommandLine : /work/02982/ggill0/Distributed_latest/build_dist_hetero/release_new_gcc/exp/apps/hsssp/bfs_gen /work/02982/ggill0/Distributed_latest/inputs/pagerank/Galois/scalefree/NEW/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr -maxIterations=10000 -srcNodeId=0 -verify=0 -t=15
-
-#Hostname : c453-401.stampede.tacc.utexas.edu
-
-#Threads : 15
-
-#Hosts : 32
-
-#Runs : 3
-
-#[31]STATTYPE,LOOP,CATEGORY,n,sum,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14
-#[31]STAT,(NULL),RecvBytes,15,402945176,402945176,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),RecvNum,15,2480,2480,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_0_1,15,4614,4614,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_0_2,15,4629,4629,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_0_3,15,4616,4616,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_0_4,15,4619,4619,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_1_1,15,4623,4623,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_1_2,15,4617,4617,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_1_3,15,4612,4612,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_1_4,15,4624,4624,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_2_1,15,4625,4625,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_2_2,15,4633,4633,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_2_3,15,4631,4631,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_BFS_2_4,15,4626,4626,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_InitializeGraph_0_1,15,160818,160818,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PULL_InitializeGraph_1_1,15,4656,4656,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_0_1,15,10967,10967,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_0_2,15,9759,9759,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_0_3,15,9766,9766,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_0_4,15,9763,9763,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_1_1,15,10953,10953,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_1_2,15,9774,9774,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_1_3,15,9760,9760,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_1_4,15,9772,9772,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_2_1,15,10956,10956,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_2_2,15,9762,9762,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_2_3,15,9756,9756,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SYNC_PUSH_BFS_2_4,15,9755,9755,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SendBytes,15,223858996,223858996,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),SendNum,15,2108,2108,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_0,15,58743,58743,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_1,15,58745,58745,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_2,15,58751,58751,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_GRAPH_INIT,15,156169,156169,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_HG_INIT,15,17422,17422,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[31]STAT,(NULL),TIMER_TOTAL,15,359146,359146,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-#[13]STAT,PageRank,Commits,15,6377945,277895,324235,482281,296898,572496,295661,311751,434026,421630,445072,711824,444553,408666,535821,415136
-#[13]STAT,PageRank,Conflicts,15,3167,196,281,296,210,438,288,203,304,135,128,213,111,106,152,106
-#[13]STAT,PageRank,Iterations,15,6381112,278091,324516,482577,297108,572934,295949,311954,434330,421765,445200,712037,444664,408772,535973,415242
-#[13]STAT,PageRank,Pushes,15,26999,3263,1940,2700,3747,2227,1977,2536,2264,694,895,720,1220,864,1006,946
 
 def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
 
@@ -85,8 +33,9 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
     divisor = 1000
   else:
     divisor = 1
-
-  timer_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_(\d*),' + re.escape(numThreads) + r',(\d*),(\d*).*')
+  #e2901bc2-f648-4ff4-9976-ac3b4c794a6a,(NULL),0 , TIMER_2,7,0,79907
+  timer_regex = re.compile(r'.*,\(NULL\),0\s,\sTIMER_(\d*),' + re.escape(forHost) + r',(\d*),(\d*)')
+  #timer_regex = re.compile(r'.*,\(NULL\),0\s,\sTIMER_(\d*),7,\d*,(\d*)')
 
   log_data = open(fileName).read()
 
@@ -99,7 +48,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
   if(len(timers) > 0):
     mean_time /= len(timers)
     mean_time /= divisor
-    mean_time = round(mean_time, 0)
+    mean_time = round(mean_time, 3)
 
   print "Mean time: ", mean_time
 
@@ -201,11 +150,6 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
     total_time /= divisor
     total_time = round(total_time, 0)
 
-  #[13]STAT,PageRank,Commits,15,6377945,277895,324235,482281,296898,572496,295661,311751,434026,421630,445072,711824,444553,408666,535821,415136
-  #[13]STAT,PageRank,Conflicts,15,3167,196,281,296,210,438,288,203,304,135,128,213,111,106,152,106
-  #[13]STAT,PageRank,Iterations,15,6381112,278091,324516,482577,297108,572934,295949,311954,434330,421765,445200,712037,444664,408772,535973,415242
-  #[13]STAT,PageRank,Pushes,15,26999,3263,1940,2700,3747,2227,1977,2536,2264,694,895,720,1220,864,1006,946
-
   ## Get Commits, Conflicts, Iterations, Pushes for worklist versions:
   commits_search = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,(?i)' + re.escape(benchmark) + '\w*,Commits,' + re.escape(numThreads) + r',(\d*),(\d*).*').search(log_data)
   conflicts_search = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,(?i)' + re.escape(benchmark) + r'\w*,Conflicts,' + re.escape(numThreads) + r',(\d*),(\d*).*').search(log_data)
@@ -230,8 +174,10 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
     pushes /= int(numRuns)
 
 
+  print mean_time
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
-  return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
+  #return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
+  return mean_time
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -262,49 +208,6 @@ def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
 
 
 
-#6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_1,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_2,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_3,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_4,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-#[7]STAT,(NULL),GhostNodes_from_0,15,35892,35892,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_1,15,18635,18635,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_2,15,18743,18743,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_3,15,10125,10125,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_4,15,18842,18842,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_5,15,10230,10230,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_6,15,10163,10163,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),GhostNodes_from_7,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),RecvBytes,15,22083788,22083788,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),RecvNum,15,392,392,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_InitializeGraph_0_1,15,2943792,2943792,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_InitializeGraph_1_1,15,1471896,1471896,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_0_1,15,525,525,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_0_2,15,152,152,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_0_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_0_4,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_1_1,15,539,539,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_1_2,15,153,153,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_1_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_1_4,15,341,341,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_2_1,15,539,539,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_2_2,15,152,152,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_2_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_BFS_2_4,15,341,341,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_InitializeGraph_0_1,15,23082,23082,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-#[7]STAT,(NULL),SYNC_PULL_InitializeGraph_1_1,15,47,47,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
   sendBytes_total_list = [0]*256 #Max host number is 256
   sendBytes_pull_sync_list = [0]*256 #Max host number is 256
@@ -367,14 +270,16 @@ def build_master_ghost_matrix(fileName, benchmark, partition, total_hosts, numRu
   if partition == "edge-cut":
     GhostNodes_array = numpy.zeros((int(total_hosts), int(total_hosts)))
     for host in range(0, int(total_hosts)):
-      ghost_from_re = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),GhostNodes_from_(\d*),\d*,(\d*),.*')
+      #(NULL),0 , GhostNodes_from_1,3,0,45865
+      #ghost_from_re = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),GhostNodes_from_(\d*),\d*,(\d*),.*')
+      ghost_from_re = re.compile(r'\(NULL\),\d* , GhostNodes_from_(\d*),' + re.escape(str(host)) + r',\d*,(\d*)')
       ghost_from_lines = re.findall(ghost_from_re, log_data)
       if(len(ghost_from_lines) > 0):
         for line in ghost_from_lines:
           GhostNodes_array[host][int(line[0])] = int(line[1])
     return GhostNodes_array
   #[1]STAT,(NULL),SLAVE_NODES_FROM_0,15,21693895,21693895,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-  elif partition == "vertex-cut":
+  elif partition == "vertex-cut" or partition == "vertex-cut-balanced":
     SlaveNodes_array = numpy.zeros((int(total_hosts), int(total_hosts)))
     for host in range(0, int(total_hosts)):
       slave_from_re = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SLAVE_NODES_FROM_(\d*),\d*,(\d*),.*')
@@ -425,12 +330,17 @@ def time_at_barrier(fileName, benchmark, total_hosts, numRuns, numThreads):
   print sync_pull_avg_time_total
 
 
+#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , CommandLine,0,0,/work/02982/ggill0/Distributed_latest/build_dist_hetero/release_new_gcc/exp/apps/compiler_outputs/bfs_push-topological_edge-cut /scratch/01131/rashid/inputs/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.rgr -srcNodeId=155526494 -maxIterations=10000 -verify=0 -t=15
+#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Threads,0,0,15
+#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Hosts,0,0,4
+#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Runs,0,0,3
+
 def get_basicInfo(fileName, get_devices):
 
-  hostNum_regex = re.compile(r'Hosts\s:\s(\d*)')
-  cmdLine_regex = re.compile(r'CommandLine\s:\s(.*)')
-  threads_regex = re.compile(r'Threads\s:\s(\d*)')
-  runs_regex = re.compile(r'Runs\s:\s(\d*)')
+  hostNum_regex = re.compile(r'.*,\(NULL\),0\s,\sHosts,0,0,(\d*)')
+  cmdLine_regex = re.compile(r'.*,\(NULL\),0\s,\sCommandLine,0,0,(.*)')
+  threads_regex = re.compile(r'.*,\(NULL\),0\s,\sThreads,0,0,(\d*)')
+  runs_regex = re.compile(r'.*,\(NULL\),0\s,\sRuns,0,0,(\d*)')
 
   log_data = open(fileName).read()
 
@@ -519,6 +429,7 @@ def main(argv):
     sys.exit(2)
 
   print 'Input file is : ', inputFile
+  print 'Output file is : ', outputFile
   print 'Data for host : ', forHost
 
   hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices = get_basicInfo(inputFile, get_devices)
@@ -532,15 +443,15 @@ def main(argv):
     input_graph = "rmat25"
   elif input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr" or input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.gr":
     input_graph = "rmat24"
-
+  elif input_graph == "rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.trgr" or input_graph == "rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.rgr":
+    input_graph = "rmat28"
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
   if get_devices:
     print 'Devices : ', devices
-
   data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit)
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
-  total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
+  #total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
 
   output_str = benchmark + ',' + 'abelian'  + ','
@@ -549,7 +460,7 @@ def main(argv):
   else:
     output_str += hostNum  + ',' + threads  + ','
   output_str += input_graph  + ',' + algo_type  + ',' + cut_type
-  time_at_barrier(inputFile, benchmark, forHost, runs, threads)
+  #time_at_barrier(inputFile, benchmark, forHost, runs, threads)
 
   #output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
 
@@ -564,11 +475,11 @@ def main(argv):
     header_csv_str += "devices,"
   else:
     header_csv_str += "host,threads,"
-  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
-  for i in range(0,256):
-    header_csv_str += ","
-    header_csv_str += ("SB_" + str(i))
+  #for i in range(0,256):
+    #header_csv_str += ","
+    #header_csv_str += ("SB_" + str(i))
 
   header_csv_list = header_csv_str.split(',')
   #if outputFile is empty add the header to the file
@@ -584,15 +495,15 @@ def main(argv):
   except OSError:
     print "Error in outfile opening\n"
 
-  data_list = list(data)
-  data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
-  complete_data = output_str.split(",") + data_list + list(sendBytes_list)
+  data_list = [data] #list(data)
+  #data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
+  complete_data = output_str.split(",") + data_list #+ list(sendBytes_list)
   fd_outputFile = open(outputFile, 'a')
   wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
   wr.writerow(complete_data)
   fd_outputFile.close()
 
-
+'''
   ## Write ghost and slave nodes to a file.
   ghost_array = build_master_ghost_matrix(inputFile, benchmark, cut_type, hostNum, runs, threads)
   ghostNodes_file = outputFile + "_" + cut_type
@@ -602,7 +513,7 @@ def main(argv):
   numpy.savetxt(fd_ghostNodes_file, ghost_array, delimiter=',', fmt='%d')
   fd_ghostNodes_file.write("\n--------------------------------------------------------------\n")
   fd_ghostNodes_file.close()
-
+'''
 
 if __name__ == "__main__":
   main(sys.argv[1:])

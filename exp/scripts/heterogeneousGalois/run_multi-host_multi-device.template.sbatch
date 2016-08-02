@@ -1,6 +1,4 @@
 #!/bin/bash
-#SBATCH -J het_auto_gen
-#SBATCH -o het_auto_gen_%j.out
 #SBATCH --mail-user=roshan@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
@@ -8,45 +6,51 @@ PSET=$3
 
 EXEC=$1
 INPUT=$2
-inputdirname=$SCRATCH/inputs
+execname=$(basename "$EXEC" "")
 #inputdirname=$(dirname "$INPUT")
-inputname=$(basename "$INPUT" ".gr")
+inputdirname=$SCRATCH/dist-inputs
+#inputname=$(basename "$INPUT" ".gr")
+inputname=$INPUT
 extension=gr
-if [[ $EXEC == *"cc"* ]]; then
+
+FLAGS=
+if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
+  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  fi
+fi
+if [[ $execname == *"worklist"* ]]; then
+  FLAGS+=" -cuda_wl_dup_factor=10"
+fi
+
+source_file=${inputdirname}/source
+if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
-elif [[ $EXEC == *"pull"* ]]; then
+elif [[ $execname == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
   extension=tgr
 fi
+grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
-
-FLAGS=""
-if [[ $EXEC == *"vertex-cut"* ]]; then
+if [[ $execname == *"vertex-cut"* ]]; then
   FLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
-else
-  if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
-    FLAGS+=" -scalegpu=3"
-  fi
+elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
+  FLAGS+=" -scalegpu=3"
 fi
 
-THREADS=15
-if [[ $SLURM_QUEUE == "normal" ]]; then
-  THREADS=16
-fi
+THREADS=16
 
 RUN=ibrun
 
+export MV2_USE_LAZY_MEM_UNREGISTER=0
 export MV2_ENABLE_AFFINITY=0
-export MV2_USE_SHARED_MEM=1
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 set -x #echo on
-GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${inputdirname}/${INPUT} -noverify -pset=$PSET -t=$THREADS $FLAGS
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS $FLAGS -noverify
 set +x #echo off
-
-execname=$(basename "$EXEC" "")
 
 echo "Algorithm: " $execname
 echo "Input: " $INPUT

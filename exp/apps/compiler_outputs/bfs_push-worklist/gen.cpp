@@ -88,6 +88,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
+static cll::opt<bool> single_node("single_node", cll::desc("Single physical node with multiple devices: detect GPU to use for each host/process automatically"), cll::init(false));
 static cll::opt<double> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
 #endif
 
@@ -348,6 +349,8 @@ struct BFS {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
@@ -374,14 +377,12 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
-#ifdef __GALOIS_SINGLE_HOST_MULTIPLE_GPUS__
-      if (gpu_device == -1) {
+      if (single_node && (gpu_device == -1)) {
         gpu_device = 0;
         for (unsigned i = 0; i < my_host_id; ++i) {
           if (personality_set.c_str()[i] != 'c') ++gpu_device;
         }
       }
-#endif
       for (unsigned i=0; i<personality_set.length(); ++i) {
         if (personality_set.c_str()[i] == 'c') 
           scalefactor.push_back(scalecpu);
