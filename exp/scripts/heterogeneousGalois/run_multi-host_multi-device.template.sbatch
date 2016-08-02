@@ -1,6 +1,4 @@
 #!/bin/bash
-#SBATCH -J het_auto_gen
-#SBATCH -o het_auto_gen_%j.out
 #SBATCH --mail-user=roshan@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
