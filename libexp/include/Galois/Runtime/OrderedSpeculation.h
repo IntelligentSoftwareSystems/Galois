@@ -98,60 +98,51 @@ const char* ContextStateNames[] = {
     "RECLAIM",
 };
 
-template <typename Ctxt, typename CtxtCmp>
-struct OptimNItemBase: public OrdLocBase<OptimNItemBase<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
+template <typename NItem, typename Ctxt, typename CtxtCmp>
+struct OptimNItemFunctions {
 
-  using Base = OrdLocBase<OptimNItemBase, Ctxt, CtxtCmp>;
-
-  const CtxtCmp& ctxtCmp;
-  
-  OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): 
-    Base (l), 
-    ctxtCmp (ctxtCmp)
-  {}
-
-  void addToHistory (Ctxt* ctxt) {
+  static void addToHistory (NItem* ni, Ctxt* ctxt) {
 
     assert (ctxt && ctxt->isSrc() && ctxt->hasState (ContextState::READY_TO_COMMIT));
-    assert (std::find (histList.begin(), histList.end(), ctxt) == histList.end());
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) == ni->histList.end());
 
-    if (!histList.empty()) {
-      assert (histList.back()->hasState (ContextState::READY_TO_COMMIT));
+    if (!ni->histList.empty()) {
+      assert (ni->histList.back()->hasState (ContextState::READY_TO_COMMIT));
     }
-    histList.push_back (ctxt);
+    ni->histList.push_back (ctxt);
   }
 
-  Ctxt* getHistHead (void) const {
+  static Ctxt* getHistHead (const NItem* ni) {
 
-    if (histList.empty()) {
+    if (ni->histList.empty()) {
       return nullptr;
 
     } else {
-      return histList.front();
+      return ni->histList.front();
     }
   }
 
-  Ctxt* getHistTail (void) const {
+  static Ctxt* getHistTail (const NItem* ni) {
     
-    if (histList.empty()) {
+    if (ni->histList.empty()) {
       return nullptr;
 
     } else { 
-      return histList.back();
+      return ni->histList.back();
 
     }
   }
 
   template <typename WL>
-  void findAborts (Ctxt* ctxt, WL& abortRoots) {
+  static void findAborts (NItem* ni, Ctxt* ctxt, WL& abortRoots) {
 
-    assert (getMin() == ctxt);
+    assert (ni->getMin() == ctxt);
 
     Ctxt* next = nullptr;
 
-    for (auto i = histList.end(), beg_i = histList.begin(); beg_i != i; ) {
+    for (auto i = ni->histList.end(), beg_i = ni->histList.begin(); beg_i != i; ) {
       --i;
-      if (ctxtCmp (ctxt, *i)) {
+      if (ni->ctxtCmp (ctxt, *i)) {
         dbg::print (ctxt, " causing sharer to abort ", *i);
         next = *i;
         // (*i)->markForAbortRecursive (abortRoots);
@@ -170,15 +161,15 @@ struct OptimNItemBase: public OrdLocBase<OptimNItemBase<Ctxt, CtxtCmp>, Ctxt, Ct
 
   //! mark all histList later than ctxt for abort
   template <typename WL>
-  void markForAbort (Ctxt* ctxt, WL& abortRoots) {
+  static void markForAbort (NItem* ni, Ctxt* ctxt, WL& abortRoots) {
 
-    assert (std::find (histList.begin(), histList.end(), ctxt) != histList.end());
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) != ni->histList.end());
 
     bool succ = false;
 
     Ctxt* next = nullptr;
 
-    for (auto i = histList.end(), beg_i = histList.begin(); beg_i != i; ) {
+    for (auto i = ni->histList.end(), beg_i = ni->histList.begin(); beg_i != i; ) {
       --i;
       if (ctxt == *i) {
         succ = true;
@@ -200,63 +191,67 @@ struct OptimNItemBase: public OrdLocBase<OptimNItemBase<Ctxt, CtxtCmp>, Ctxt, Ct
   }
 
   // TODO: re-implement
-  void removeAbort (Ctxt* ctxt) {
+  static void removeAbort (NItem* ni, Ctxt* ctxt) {
 
-    assert (!histList.empty());
-    assert (std::find (histList.begin(), histList.end(), ctxt) != histList.end());
+    assert (!ni->histList.empty());
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) != ni->histList.end());
 
     assert (ctxt->hasState (ContextState::ABORTING));
 
-    if (histList.back() != ctxt) { 
+    if (ni->histList.back() != ctxt) { 
       GALOIS_DIE ("invalid state");
     }
 
-    assert (histList.back() == ctxt);
-    histList.pop_back();
+    assert (ni->histList.back() == ctxt);
+    ni->histList.pop_back();
 
-    assert (std::find (histList.begin(), histList.end(), ctxt) == histList.end());
-
-  }
-
-  void removeCommit (Ctxt* ctxt) {
-
-
-    assert (!histList.empty());
-    assert (std::find (histList.begin(), histList.end(), ctxt) != histList.end());
-    assert (histList.front() == ctxt);
-
-    histList.pop_front();
-
-    assert (std::find (histList.begin(), histList.end(), ctxt) == histList.end());
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) == ni->histList.end());
 
   }
 
-  void detectAborts (Ctxt* ctxt) {
+  static void removeCommit (NItem* ni, Ctxt* ctxt) {
+
+
+    assert (!ni->histList.empty());
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) != ni->histList.end());
+    assert (ni->histList.front() == ctxt);
+
+    ni->histList.pop_front();
+
+    assert (std::find (ni->histList.begin(), ni->histList.end(), ctxt) == ni->histList.end());
+
+  }
+
+  static void detectAborts (NItem* ni, Ctxt* ctxt) {
     // ctxt is the winner, we check for aborts
-    Ctxt* t = Base::getHistTail();
-    if (t && ctxtCmp (ctxt, t)) {
-      ctxt->addAbortLocation (this);
+    Ctxt* t = ni->getHistTail();
+    if (t && ni->ctxtCmp (ctxt, t)) {
+      ctxt->addAbortLocation (ni);
     }
   }
 
 };
 
 template <typename Ctxt, typename CtxtCmp>
-struct OptimNhoodItem: public OptimNItemBase<Ctxt, CtxtCmp> {
+struct OptimNItem: public OrdLocBase<OptimNItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
 
-  using Base = OptimNItemBase<Ctxt, CtxtCmp>;
-  using Factory = OrdLocFactoryBase<OptimNhoodItem, Ctxt, CtxtCmp>;
+  using Base = OrdLocBase<OptimNItem, Ctxt, CtxtCmp>;
 
+  using Factory = OrdLocFactoryBase<OptimNItem, Ctxt, CtxtCmp>;
   using HistList = Galois::gstl::List<Ctxt*>;
   using Lock_ty = Galois::Substrate::SimpleLock;
+  using NF = OptimNItemFunctions<OptimNItem, Ctxt, CtxtCmp>;
 
 
-  GAtomic<Ctxt*> minCtxt;
+  const CtxtCmp& ctxtCmp;
   HistList histList;
+  GAtomic<Ctxt*> minCtxt;
 
 
-  OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): 
-    Base (l, ctxtCmp), 
+  OptimNItem (Lockable* l, const CtxtCmp& ctxtCmp): 
+    Base (l),
+    ctxtCmp (ctxtCmp),
+    histList(),
     minCtxt (nullptr)
   {}
 
@@ -276,7 +271,7 @@ struct OptimNhoodItem: public OptimNItemBase<Ctxt, CtxtCmp> {
 
       if (other) {
 
-        if (Base::ctxtCmp (other, ctxt)) {
+        if (ctxtCmp (other, ctxt)) {
 
           ctxt->disableSrc();
           return false;
@@ -289,7 +284,7 @@ struct OptimNhoodItem: public OptimNItemBase<Ctxt, CtxtCmp> {
       other->disableSrc();
     }
 
-    Base::detectAborts (ctxt);
+    detectAborts (ctxt);
 
     return true;
   }
@@ -304,6 +299,39 @@ struct OptimNhoodItem: public OptimNItemBase<Ctxt, CtxtCmp> {
     minCtxt = nullptr;
   }
 
+  void addToHistory (Ctxt* ctxt) {
+    NF::addToHistory (this, ctxt);
+  }
+
+  Ctxt* getHistHead (void) const {
+    return NF::getHistHead (this);
+  }
+
+  Ctxt* getHistTail (void) const {
+    return NF::getHistTail (this);
+  }
+
+  template <typename WL>
+  void findAborts (Ctxt* ctxt, WL& abortRoots) {
+    NF::findAborts (this, ctxt, abortRoots);
+  }
+
+  template <typename WL>
+  void markForAbort (Ctxt* ctxt, WL& abortRoots) {
+    NF::markForAbort (this, ctxt, abortRoots);
+  }
+
+  void removeAbort (Ctxt* ctxt) {
+    NF::removeAbort (this, ctxt);
+  }
+
+  void removeCommit (Ctxt* ctxt) {
+    NF::removeCommit (this, ctxt);
+  }
+
+  void detectAborts (Ctxt* ctxt) {
+    NF::detectAborts (this, ctxt);
+  }
 };
 
 
@@ -368,82 +396,35 @@ struct SpecContextBase: public OrderedContextBase<T> {
   }
 };
 
-template <typename T, typename Cmp, typename Exec, typename Der,
-         template <typename _u, typename _v> class NItemClass> 
-struct OptimContextBase: public SpecContextBase {
+template <typename Ctxt, typename NItem>
+struct OptimContextFunctions {
 
-  using Base = SpecContextBase<T, Cmp, Exec>;
-  using Ctxt = Der;
-  using CtxtCmp = typename Base::CtxtCmp;
+  static void addChild (Ctxt* c, Ctxt* child) {
 
-  using NItem = NItemClass<Ctxt, CtxtCmp>;
-  using NhoodList = typename gstl::Vector<NItem*>;
-  using ChildList = typename gstl::Vector<Ctxt*>;
+    assert (std::find (c->children.begin(), c->children.end(), child) == c->children.end());
 
-  Galois::GAtomic<bool> onWL;
-  bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
-  NhoodList nhood;
+    dbg::print (c, " creating child ", child);
 
-  // TODO: avoid using UserContextAccess and per-iteration allocator
-  // use Pow of 2 block allocator instead. 
-  ChildList children;
-
-
-  explicit OptimContextBase (const T& x, const ContextState& s, Exec& exec)
-  :
-    Base (x, s, exec), 
-    onWL (false),
-    addBack (true)
-  {}
-
-
-  void schedule (void) {
-    Base::schedule();
-    onWL = false;
-    addBack = true;
-    nhood.clear();
-    children.clear();
-  }
-
-  void publishChanges (void) {
-
-
-    // for (auto i = userHandle.getPushBuffer().begin(), 
-        // end_i = userHandle.getPushBuffer().end(); i != end_i; ++i) {
-// 
-      // OptimContext* child = exec.push (*i);
-      // dbg::print (this, " creating child ", child);
-// 
-      // children.push_back (child);
-    // }
-  }
-
-  void addChild (Ctxt* child) {
-
-    assert (std::find (children.begin(), children.end(), child) == children.end());
-
-    dbg::print (this, " creating child ", child);
-
-    children.push_back (child);
+    c->children.push_back (child);
 
   }
 
-  void doCommit() {
+  static void doCommit(Ctxt* c) {
 
-    assert (Base::hasState (ContextState::COMMITTING));
+    assert (c->hasState (ContextState::COMMITTING));
 
-    dbg::print (this, " committing with item ", this->getActive());
+    dbg::print (c, " committing with item ", c->getActive());
 
-    Base::userHandle.commit(); // TODO: rename to retire
+    c->userHandle.commit(); // TODO: rename to retire
 
-    for (NItem* n: nhood) {
-      n->removeCommit (this);
+    for (NItem* n: c->nhood) {
+      n->removeCommit (c);
     }
 
-    Base::setState (ContextState::COMMIT_DONE);
+    c->setState (ContextState::COMMIT_DONE);
   }
 
-  void doAbort() {
+  static void doAbort(Ctxt* c) {
     // this can be in states READY_TO_COMMIT, ABORT_SELF
     // children can be in UNSCHEDULED, READY_TO_COMMIT, ABORT_DONE
 
@@ -451,33 +432,33 @@ struct OptimContextBase: public SpecContextBase {
     // then abort self.
     //
 
-    assert (Base::hasState (ContextState::ABORTING));
+    assert (c->hasState (ContextState::ABORTING));
 
-    dbg::print (this, " aborting with item ", this->getActive());
+    dbg::print (c, " aborting with item ", c->getActive());
 
-    Base::userHandle.rollback();
+    c->userHandle.rollback();
 
-    for (NItem* ni: nhood) {
-      ni->removeAbort (this);
+    for (NItem* ni: c->nhood) {
+      ni->removeAbort (c);
     }
 
-    if (this->addBack) {
+    if (c->addBack) {
 
-      Base::setState (ContextState::ABORT_DONE);
-      Base::exec.push_abort (this);
+      c->setState (ContextState::ABORT_DONE);
+      c->exec.push_abort (c);
 
     } else {
       // is an aborted child whose parent also aborted
-      Base::setState (ContextState::ABORTED_CHILD);
+      c->setState (ContextState::ABORTED_CHILD);
     }
 
   }
 
-  bool isCommitSrc (void) const {
+  static bool isCommitSrc (const Ctxt* c) {
 
-    for (const NItem* ni: nhood) {
+    for (const NItem* ni: c->nhood) {
 
-      if (ni->getHistHead() != this) {
+      if (ni->getHistHead() != c) {
         return false;
       }
     }
@@ -486,14 +467,14 @@ struct OptimContextBase: public SpecContextBase {
   }
 
   template <typename WL>
-  void findCommitSrc (const Ctxt* gvt, WL& wl) const {
+  static void findCommitSrc (const Ctxt* ctxt, const Ctxt* gvt, WL& wl) {
 
-    for (const NItem* ni: nhood) {
+    for (const NItem* ni: ctxt->nhood) {
 
       Ctxt* c = ni->getHistHead();
-      assert (c != this);
+      assert (c != ctxt);
 
-      if (c && (!gvt || Base::exec.ctxtCmp (c, gvt)) 
+      if (c && (!gvt || ctxt->exec.getCtxtCmp() (c, gvt)) 
           && c->isCommitSrc() 
           && c->onWL.cas (false, true)) {
         wl.push (c);
@@ -501,15 +482,15 @@ struct OptimContextBase: public SpecContextBase {
     }
   }
 
-  bool isAbortSrc (void) const {
+  static bool isAbortSrc (const Ctxt* c) {
 
-    if (!Base::hasState (ContextState::READY_TO_ABORT)) {
+    if (!c->hasState (ContextState::READY_TO_ABORT)) {
       return false;
     }
 
-    for (const NItem* ni: nhood) {
+    for (const NItem* ni: c->nhood) {
 
-      if (ni->getHistTail() != this) {
+      if (ni->getHistTail() != c) {
         return false;
       }
     }
@@ -518,14 +499,14 @@ struct OptimContextBase: public SpecContextBase {
   }
 
   template <typename WL>
-  void findAbortSrc (WL& wl) const {
+  static void findAbortSrc (const Ctxt* ctxt, WL& wl) {
 
     // XXX: if a task has children that don't share neighborhood with
     // it, should it be an abort source? Yes, because the end goal in 
     // finding abort sources is that tasks may abort and restore state
     // in isolation. 
     
-    for (const NItem* ni: nhood) {
+    for (const NItem* ni: ctxt->nhood) {
 
       Ctxt* c = ni->getHistTail();
 
@@ -535,11 +516,11 @@ struct OptimContextBase: public SpecContextBase {
     }
   }
 
-  bool isSrcSlowCheck (void) const {
+  static bool isSrcSlowCheck (const Ctxt* c) {
     
-    for (const NItem* ni: nhood) {
+    for (const NItem* ni: c->nhood) {
 
-      if (ni->getMin() != this) {
+      if (ni->getMin() != c) {
         return false;
       }
     }
@@ -547,10 +528,10 @@ struct OptimContextBase: public SpecContextBase {
     return true;
   }
 
-  void addAbortLocation (NItem* ni) {
+  static void addAbortLocation (Ctxt* c, NItem* ni) {
     assert (ni);
-    assert (std::find (nhood.begin(), nhood.end(), ni) != nhood.end());
-    exec.abortLocations.push (ni);
+    assert (std::find (c->nhood.begin(), c->nhood.end(), ni) != c->nhood.end());
+    c->exec.addAbortLocation (ni);
   }
 
   /*
@@ -571,55 +552,67 @@ struct OptimContextBase: public SpecContextBase {
 
 
   template <typename WL>
-  void markForAbortRecursive (WL& abortRoots) {
-    if (Base::casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+  static void markForAbortRecursive (Ctxt* ctxt, WL& abortRoots) {
+    if (ctxt->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
 
-      for (NItem* ni: nhood) {
-        ni->markForAbort (this, abortRoots);
+      for (NItem* ni: ctxt->nhood) {
+        ni->markForAbort (ctxt, abortRoots);
       }
 
-      if (isAbortSrc() && onWL.cas (false, true)) {
-        abortRoots.push (this);
+      if (ctxt->isAbortSrc() && ctxt->onWL.cas (false, true)) {
+        abortRoots.push (ctxt);
       }
 
-      for (Ctxt* c: children) {
-        dbg::print (this, " causing abort on child ", c);
+      for (Ctxt* c: ctxt->children) {
+        dbg::print (ctxt, " causing abort on child ", c);
         c->markForAbortRecursive (abortRoots);
         c->addBack = false;
       }
 
-    } else if (Base::casState (ContextState::SCHEDULED, ContextState::ABORTED_CHILD)) {
+    } else if (ctxt->casState (ContextState::SCHEDULED, ContextState::ABORTED_CHILD)) {
       // a SCHEDULED task can only be aborted recursively if it's a child
 
-    } else if (Base::casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD)) {
+    } else if (ctxt->casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD)) {
 
     } else {
-      assert (Base::hasState (ContextState::READY_TO_ABORT) || Base::hasState (ContextState::ABORTED_CHILD));
+      assert (ctxt->hasState (ContextState::READY_TO_ABORT) || ctxt->hasState (ContextState::ABORTED_CHILD));
     }
 
-    assert (Base::hasState (ContextState::READY_TO_ABORT) || Base::hasState (ContextState::ABORTED_CHILD));
+    assert (ctxt->hasState (ContextState::READY_TO_ABORT) || ctxt->hasState (ContextState::ABORTED_CHILD));
 
   }
 
-  void addToHistory (void) {
+  static void addToHistory (Ctxt* c) {
 
-    for (NItem* ni: nhood) {
-      ni->addToHistory (this);
+    for (NItem* ni: c->nhood) {
+      ni->addToHistory (c);
     }
   }
 };
 
 template <typename T, typename Cmp, typename Exec>
-struct OptimContext: public OptimContextBase<T, Cmp, Exec, 
-                      OptimContext<T, Cmp, Exec>, OptimNhoodItem> {
+struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
 
-  using Base = OptimContextBase<T, Cmp, Exec, OptimContext, OptimNhoodItem>;
-  using NItem = typename Base::NItem;
+  using Base = SpecContextBase<T, Cmp, Exec>;
 
+  using CtxtCmp = typename Base::CtxtCmp;
+  using NItem = OptimNItem<OptimContext, CtxtCmp>;
+  using NhoodMgr = PtrBasedNhoodMgr<NItem>;
+  using NhoodList = typename gstl::Vector<NItem*>;
+  using ChildList = typename gstl::Vector<OptimContext*>;
+
+  using CF = OptimContextFunctions<OptimContext, NItem>;
+
+  Galois::GAtomic<bool> onWL;
+  bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
+  NhoodList nhood;
+  ChildList children;
 
   explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
   :
-    Base (x, s, exec)
+    Base (x, s, exec),
+    onWL (false),
+    addBack (true)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -634,6 +627,14 @@ struct OptimContext: public OptimContextBase<T, Cmp, Exec,
     }
   }
 
+  void schedule (void) {
+    Base::schedule();
+    onWL = false;
+    addBack = true;
+    nhood.clear();
+    children.clear();
+  }
+
   void resetMarks (void) {
 
     for (NItem* ni: nhood) {
@@ -643,6 +644,53 @@ struct OptimContext: public OptimContextBase<T, Cmp, Exec,
     }
   }
 
+  
+  void addChild (OptimContext* child) {
+    CF::addChild (this, child);
+  }
+
+  void doCommit (void) {
+    CF::doCommit (this);
+  }
+
+  void doAbort (void) {
+    CF::doAbort (this);
+  }
+
+  bool isCommitSrc (void) const {
+    return CF::isCommitSrc (this);
+  }
+
+  template <typename WL>
+  void findCommitSrc (const OptimContext* gvt, WL& wl) const {
+    CF::findCommitSrc (this, gvt, wl);
+  }
+
+  bool isAbortSrc (void) const {
+    return CF::isAbortSrc (this);
+  }
+
+  template <typename WL>
+  void findAbortSrc (WL& wl) const {
+    CF::findAbortSrc (this, wl);
+  }
+
+  bool isSrcSlowCheck (void) const {
+    return CF::isSrcSlowCheck (this);
+  }
+
+  void addAbortLocation (NItem* ni) {
+    CF::addAbortLocation (this, ni);
+  }
+
+  template <typename WL>
+  void markForAbortRecursive (WL& abortRoots) {
+    CF::markForAbortRecursive (this, abortRoots);
+  }
+
+  void addToHistory (void) {
+    CF::addToHistory (this);
+  }
 
 };
 
@@ -730,6 +778,23 @@ public:
 
   }
 
+
+  void push_abort (Ctxt* ctxt) {
+    assert (ctxt);
+    assert (ctxt->hasState (ContextState::ABORT_DONE));
+
+    ctxt->setState (ContextState::UNSCHEDULED);
+
+    updateCurrMinPending (ctxt);
+    Base::getNextWL().push (ctxt);
+
+    Ctxt* m = getMinWinWL();
+    if (m) {
+      assert (Base::ctxtCmp (ctxt, m));
+    }
+  }
+
+
 protected:
 
   void dumpParaMeterStats (void) {
@@ -815,23 +880,6 @@ protected:
 
     return c;
   }
-
-
-  void push_abort (Ctxt* ctxt) {
-    assert (ctxt);
-    assert (ctxt->hasState (ContextState::ABORT_DONE));
-
-    ctxt->setState (ContextState::UNSCHEDULED);
-
-    updateCurrMinPending (ctxt);
-    Base::getNextWL().push (ctxt);
-
-    Ctxt* m = getMinWinWL();
-    if (m) {
-      assert (Base::ctxtCmp (ctxt, m));
-    }
-  }
-
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound() {
 
@@ -989,9 +1037,21 @@ public:
   {
   }
 
+  NhoodMgr& getNhoodMgr (void) {
+    return nhmgr;
+  }
+
+  void addAbortLocation (NItem* ni) {
+    assert (ni);
+    abortLocations.push (ni);
+  }
+
   void quickAbort (Ctxt* c) {
     assert (c);
-    bool b= c->hasState (ContextState::SCHEDULED) || c->hasState (ContextState::ABORTED_CHILD) || c->hasState (ContextState::ABORT_DONE);
+    bool b= c->hasState (ContextState::SCHEDULED) 
+      || c->hasState (ContextState::UNSCHEDULED)
+      || c->hasState (ContextState::ABORTED_CHILD) 
+      || c->hasState (ContextState::ABORT_DONE);
 
     assert (b);
 
@@ -999,9 +1059,7 @@ public:
       Base::push_abort (c);
       dbg::print("Quick Abort c: ", c, ", with active: ", c->getActive());
 
-    } else {
-      assert (c->hasState (ContextState::ABORTED_CHILD)); 
-    }
+    } 
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void serviceAborts (void) {
@@ -1042,8 +1100,9 @@ public:
         },
         std::make_tuple (
           Galois::loopname ("handle-aborts"),
-          Galois::does_not_need_aborts_tag(),
-          Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
+          Galois::does_not_need_aborts<>(),
+          Galois::combine_stats_by_name<>(),
+          Galois::wl<Galois::WorkList::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
 
 
     Galois::Runtime::on_each_impl(
@@ -1129,7 +1188,6 @@ public:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits() {
 
-    commitRoots.clear_all_parallel();
 
     Ctxt* gvt = Base::getMinPending();
 
@@ -1145,6 +1203,7 @@ public:
     }
 
 
+    assert (commitRoots.empty_all());
 
     Galois::do_all_choice (makeLocalRange (Base::commitQ),
         [this, gvt] (Ctxt* c) {
@@ -1191,9 +1250,11 @@ public:
         },
         std::make_tuple (
           Galois::loopname ("retire"),
-          Galois::does_not_need_aborts_tag(),
-          Galois::wl<Galois::WorkList::dChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
+          Galois::does_not_need_aborts<>(),
+          Galois::combine_stats_by_name<>(),
+          Galois::wl<Galois::WorkList::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
 
+    commitRoots.clear_all_parallel();
   }
 
   void freeCtxt (Ctxt* ctxt) {
@@ -1327,18 +1388,23 @@ public:
 private:
 
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (CtxtWL& sources) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
 
     if (Base::HAS_EXEC_FUNC) {
 
 
-      Galois::do_all_choice (makeLocalRange (sources),
+      Galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
         [this] (Ctxt* ctxt) {
-          assert (ctxt->isSrc());
-          assert (!ctxt->hasState (ContextState::RECLAIM));
-          assert (!ctxt->hasState (ContextState::ABORTED_CHILD));
+          bool _x = ctxt->hasState (ContextState::ABORTED_CHILD) 
+                 || ctxt->hasState (ContextState::SCHEDULED)
+                 || ctxt->hasState (ContextState::UNSCHEDULED);
 
-          Base::exFunc (ctxt->getActive(), ctxt->userHandle);
+          assert (_x);
+
+          assert (ctxt);
+          if (ctxt->isSrc () && ctxt->hasState (ContextState::SCHEDULED)) {
+            Base::exFunc (ctxt->getActive(), ctxt->userHandle);
+          }
         },
         std::make_tuple (
           Galois::loopname ("executeSources"),
@@ -1351,74 +1417,76 @@ private:
 
     Ctxt* minWinWL = Base::getMinWinWL();
 
+    // Ctxt in currWL can be in SCHEDULED, UNSCHEDULED (after having been aborted),
+    // ABORTED_CHILD
 
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
         [this, minWinWL] (Ctxt* c) {
 
+          bool _x = c->hasState (ContextState::ABORTED_CHILD) 
+                 || c->hasState (ContextState::SCHEDULED)
+                 || c->hasState (ContextState::UNSCHEDULED);
+
+          assert (_x);
+
+          if (c->hasState (ContextState::SCHEDULED)) {
 
 
-          if (c->isSrc() && !c->hasState (ContextState::ABORTED_CHILD)) {
-            assert (c->isSrc());
-            assert (!c->hasState (ContextState::RECLAIM));
-            assert (!c->hasState (ContextState::ABORTED_CHILD));
+            if (c->isSrc ()) {
+              bool commit = c->isSrc ();
 
-            bool commit = true;
-            typename Base::UserCtxt& uhand = c->userHandle;
+              typename Base::UserCtxt& uhand = c->userHandle;
+              if (Base::OPERATOR_CAN_ABORT) {
+                runCatching (Base::opFunc, c, uhand);
+                commit = c->isSrc(); // in case opFunc signalled abort
 
-            if (Base::OPERATOR_CAN_ABORT) {
-              runCatching (Base::opFunc, c, uhand);
-              commit = c->isSrc(); // in case opFunc signalled abort
+              } else {
+                Base::opFunc (c->getActive(), uhand);
+                commit = true;
+              }
 
-            } else {
-              Base::opFunc (c->getActive(), uhand);
-              commit = true;
-            }
+              if (commit) {
+                if (Base::NEEDS_PUSH) {
 
-            if (commit) {
+                  for (auto i = uhand.getPushBuffer().begin()
+                      , endi = uhand.getPushBuffer().end(); i != endi; ++i) {
 
-              if (Base::NEEDS_PUSH) {
+                    Ctxt* child = Base::push_commit (*i, minWinWL);
+                    c->addChild (child);
 
-                for (auto i = uhand.getPushBuffer().begin()
-                    , endi = uhand.getPushBuffer().end(); i != endi; ++i) {
+                  }
+                } else {
 
-                  Ctxt* child = Base::push_commit (*i, minWinWL);
-                  c->addChild (child);
-
+                  assert (uhand.getPushBuffer().begin() == uhand.getPushBuffer().end());
                 }
-              } else {
 
-                assert (uhand.getPushBuffer().begin() == uhand.getPushBuffer().end());
-              }
+                bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
 
-              bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
+                assert (b && "CAS shouldn't have failed");
+                Base::roundCommits += 1;
 
-              assert (b && "CAS shouldn't have failed");
-              Base::roundCommits += 1;
+                c->addToHistory();
+                Base::commitQ.get().push_back (c);
 
-              c->publishChanges();
-              c->addToHistory();
-              Base::commitQ.get().push_back (c);
+                if (Base::ENABLE_PARAMETER) {
+                  c->markExecRound (Base::rounds);
+                }
 
-              if (Base::ENABLE_PARAMETER) {
-                c->markExecRound (Base::rounds);
-              }
+              } else  if (c->casState (ContextState::SCHEDULED, ContextState::ABORTING)) {
+                  uhand.rollback();
+                  Base::quickAbort (c);
+              } // end if commit                
 
-            } else {
-
-              if (c->casState (ContextState::SCHEDULED, ContextState::ABORTING)) {
-                c->doAbort();
-
-              } else {
-                assert (c->hasState (ContextState::ABORTING) || c->hasState (ContextState::ABORT_DONE));
-              }
-            } 
+            } else { // if !isSrc
+              Base::quickAbort (c);
+            }
           } else if (c->hasState (ContextState::ABORTED_CHILD)) {
 
             Base::commitQ.get().push_back (c); // for reclaiming memory 
 
           } else {
-            assert (!c->hasState (ContextState::ABORTED_CHILD));
-            Base::quickAbort (c);
+            assert (c->hasState (ContextState::UNSCHEDULED));
+            // do nothing. UNSCHEDULED was reached because c was aborted in serviceAborts
           }
 
           c->resetMarks();

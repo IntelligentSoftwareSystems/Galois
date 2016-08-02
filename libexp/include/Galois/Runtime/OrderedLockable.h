@@ -315,17 +315,15 @@ public:
   }
 
 protected:
-  struct Reset {
-    PtrBasedNhoodMgr* self; 
-    void operator()(NItem* ni) const {
-      ni->clearMapping();
-      self->destroy(ni);
-    }
-  };
-
   void resetAllNItems() {
-    Reset fn {this};
-    do_all_impl(makeLocalRange(allNItems), fn);
+    do_all_choice(makeLocalRange(allNItems), 
+        [this] (NItem* ni) {
+          ni->clearMapping();
+          destroy(ni);
+        },
+        std::make_tuple (
+          Galois::loopname ("resetNItems"), 
+          Galois::chunk_size<16>()));
   }
 };
 
@@ -457,6 +455,7 @@ protected:
     if (!loopname) { loopname = "Ordered"; }
   }
 
+public:
   const Cmp& getItemCmp () const { return cmp; }
 
   const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
