@@ -1,6 +1,6 @@
 #!/bin/sh
 # executes only on single machine
-# assumes only one GPU device available
+# assumes 2 GPU devices available (if heterogeneous)
 
 MPI=mpiexec
 EXEC=$1
@@ -12,10 +12,21 @@ execname=$(basename "$EXEC" "")
 inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
 extension=gr
-if [[ $EXEC == *"cc"* ]]; then
+
+FLAGS=
+if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
+  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  fi
+fi
+if [[ $execname == *"worklist"* ]]; then
+  FLAGS+=" -cuda_wl_dup_factor=10"
+fi
+
+if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
-elif [[ $EXEC == *"pull"* ]]; then
+elif [[ $execname == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
   extension=tgr
 fi
@@ -28,25 +39,23 @@ checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
 
 hostname=`hostname`
 
-FLAGS=
-
 SET=
-if [[ $EXEC == *"vertex-cut"* ]]; then
-  if [[ $INPUT == *"road"* ]]; then
+if [[ $execname == *"vertex-cut"* ]]; then
+  if [[ $inputname == *"road"* ]]; then
     exit
   fi
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
     # assumes only one GPU device available
-    SET="cc,2,2 gc,2,2 cg,2,2 cccc,4,1 gccc,4,1"
+    SET="cc,2,2 gg,2,2 gc,2,2 cg,2,2"
   else
-    SET="cc,2,2 cccc,4,1"
+    SET="cc,2,2 cccc,4,2 cccccccc,8,2"
   fi
 else
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
     # assumes only one GPU device available
-    SET="c,1,4 g,1,4 cc,2,2 gc,2,2 cg,2,2 cccc,4,1 gccc,4,1"
+    SET="c,1,4 g,1,4 cc,2,2 gg,2,2 gc,2,2 cg,2,2"
   else
-    SET="c,1,4 cc,2,2 cccc,4,1"
+    SET="c,1,4 cc,2,2 cccc,4,2 cccccccc,8,2"
   fi
 fi
 
@@ -56,16 +65,14 @@ for task in $SET; do
   IFS=",";
   set $task;
   PFLAGS=$FLAGS
-  if [[ $EXEC == *"vertex-cut"* ]]; then
+  if [[ $execname == *"vertex-cut"* ]]; then
     PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
-  else
-    if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
-      PFLAGS+=" -scalegpu=3"
-    fi
+  elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
+    PFLAGS+=" -scalegpu=3"
   fi
   rm -f output_*.log
-  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG 2>&1
+  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -verify -runs=1" >>$LOG
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -verify -runs=1" >>$LOG 2>&1
   outputs="output_${hostname}_0.log"
   i=1
   while [ $i -lt $2 ]; do
