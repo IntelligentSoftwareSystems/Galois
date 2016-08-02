@@ -49,9 +49,8 @@ export MV2_ENABLE_AFFINITY=0
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 set -x #echo on
-GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${inputdirname}/${INPUT} -pset=$PSET -t=$THREADS $FLAGS -noverify
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS $FLAGS -noverify
 set +x #echo off
-
 
 echo "Algorithm: " $execname
 echo "Input: " $INPUT
