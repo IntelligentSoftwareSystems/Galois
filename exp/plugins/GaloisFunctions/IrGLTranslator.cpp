@@ -583,7 +583,7 @@ public:
     header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
     header << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
     if (requiresWorklist) {
-      header << "struct CUDA_Worklist *wl, unsigned wl_dup_factor, ";
+      header << "struct CUDA_Worklist *wl, double wl_dup_factor, ";
     }
     header << "MarshalGraph &g, unsigned num_hosts);\n\n";
     header << "void reset_CUDA_context(struct CUDA_Context *ctx);\n";
@@ -790,7 +790,7 @@ public:
     cuheader << "}\n\n";
     cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
     if (requiresWorklist) {
-      cuheader << "struct CUDA_Worklist *wl, unsigned wl_dup_factor, ";
+      cuheader << "struct CUDA_Worklist *wl, double wl_dup_factor, ";
     }
     cuheader << "MarshalGraph &g, unsigned num_hosts) {\n";
     cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
@@ -842,8 +842,8 @@ public:
     }
     if (requiresWorklist) {
       // Assuming at the most an average duplicaton of 4 in the worklist
-      cuheader << "\tctx->in_wl = Worklist2(wl_dup_factor*graph.nnodes);\n";
-      cuheader << "\tctx->out_wl = Worklist2(wl_dup_factor*graph.nnodes);\n";
+      cuheader << "\tctx->in_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);\n";
+      cuheader << "\tctx->out_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);\n";
       cuheader << "\twl->num_in_items = -1;\n";
       cuheader << "\twl->num_out_items = -1;\n";
       cuheader << "\twl->in_items = ctx->in_wl.wl;\n";
@@ -852,6 +852,7 @@ public:
     }
     cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);\n"; 
+    cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
     cuheader << "\treset_CUDA_context(ctx);\n";
     cuheader << "}\n\n";
     cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";

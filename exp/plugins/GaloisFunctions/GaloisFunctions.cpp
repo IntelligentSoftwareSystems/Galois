@@ -436,6 +436,9 @@ namespace {
             cudaKernelCall << "\t\tT_comm_syncGraph.stop();\n";
             cudaKernelCall << "\t\tT_comm_bag.start();\n";
             cudaKernelCall << "\t\tdbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);\n";
+            cudaKernelCall << "\t\t#ifdef __GALOIS_DEBUG_WORKLIST__\n";
+            cudaKernelCall << "\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
+            cudaKernelCall << "\t\t#endif\n";
             cudaKernelCall << "\t\tdbag.sync();\n";
             cudaKernelCall << "\t\tcuda_wl.num_out_items = 0;\n";
             cudaKernelCall << "\t\tT_comm_bag.stop();\n";
