@@ -23,6 +23,7 @@ if [[ $execname == *"worklist"* ]]; then
   FLAGS+=" -cuda_wl_dup_factor=10"
 fi
 
+source_file=${inputdirname}/source
 if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
@@ -30,6 +31,7 @@ elif [[ $execname == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
   extension=tgr
 fi
+grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
 if [[ $execname == *"vertex-cut"* ]]; then
