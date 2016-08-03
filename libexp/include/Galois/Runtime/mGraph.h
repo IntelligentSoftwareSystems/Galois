@@ -629,12 +629,12 @@ public:
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    void simulate_communication() {
      for (int i = 0; i < 10; ++i) {
-     simulate_sync_pull();
-     simulate_sync_push();
+     simulate_sync_pull("");
+     simulate_sync_push("");
 
 #ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
-     simulate_bare_mpi_sync_pull();
-     simulate_bare_mpi_sync_push();
+     simulate_bare_mpi_sync_pull("");
+     simulate_bare_mpi_sync_push("");
 #endif
      }
    }
@@ -773,10 +773,18 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_pull(bool mem_copy = false) {
+   void simulate_bare_mpi_sync_pull(std::string loopName, bool mem_copy = false) {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
-      Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
+      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
+      Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
+      std::string timer_str("SIMULATE_MPI_SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
+      std::string timer_barrier_str("SIMULATE_MPI_SYNC_PULL_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimerBarrier_syncPull(timer_barrier_str.c_str());
+      std::string extract_timer_str("SIMULATE_MPI_SYNC_PULL_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+      std::string set_timer_str("SIMULATE_MPI_SYNC_PULL_SET_" + loopName +"_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
@@ -797,6 +805,9 @@ public:
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+
+         StatTimer_extract.start();
+
          sb[x].resize(num);
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -828,6 +839,8 @@ public:
            bs[x].resize(size);
            memcpy(bs[x].data(), sb[x].data(), size);
          }
+
+         StatTimer_extract.stop();
 
          SyncPull_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
@@ -862,12 +875,17 @@ public:
            MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
+      StatTimerBarrier_syncPull.start();
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
+      StatTimerBarrier_syncPull.stop();
 
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+
+         StatTimer_set.start();
+
          //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
          if (mem_copy) memcpy(rb[x].data(), b[x].data(), b[x].size());
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -890,6 +908,8 @@ public:
                }, Galois::loopname("SYNC_PULL_SET"));
           }
 #endif
+
+         StatTimer_set.stop();
       }
 
       //std::cerr << "[" << id << "]" << "pull mpi done\n";
@@ -899,10 +919,18 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_push(bool mem_copy = false) {
+   void simulate_bare_mpi_sync_push(std::string loopName, bool mem_copy = false) {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
-      Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
+      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
+      std::string timer_str("SIMULATE_MPI_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
+      std::string timer_barrier_str("SIMULATE_MPI_SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
+      std::string extract_timer_str("SIMULATE_MPI_SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+      std::string set_timer_str("SIMULATE_MPI_SYNC_PUSH_SET_" + loopName +"_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
@@ -923,6 +951,9 @@ public:
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+
+         StatTimer_extract.start();
+
          sb[x].resize(num);
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -957,6 +988,8 @@ public:
            memcpy(bs[x].data(), sb[x].data(), size);
          }
 
+         StatTimer_extract.stop();
+
          SyncPush_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          if (mem_copy)
@@ -990,12 +1023,17 @@ public:
            MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
+      StatTimerBarrier_syncPush.start();
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
+      StatTimerBarrier_syncPush.stop();
 
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+
+         StatTimer_set.start();
+
          //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
          if (mem_copy) memcpy(rb[x].data(), b[x].data(), b[x].size());
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1017,6 +1055,8 @@ public:
                }, Galois::loopname("SYNC_PUSH_SET"));
          }
 #endif
+
+         StatTimer_set.stop();
       }
       
       //std::cerr << "[" << id << "]" << "push mpi done\n";
@@ -1319,7 +1359,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_sync_pull() {
+   void simulate_sync_pull(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       void (mGraph::*fn)(Galois::Runtime::RecvBuffer&) = &mGraph::syncRecvApplyPull<FnTy>;
 #else
@@ -1380,7 +1420,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_sync_push() {
+   void simulate_sync_push(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       void (mGraph::*fn)(Galois::Runtime::RecvBuffer&) = &mGraph::syncRecvApplyPush<FnTy>;
 #else
@@ -1447,10 +1487,10 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_sync_push<FnTy>();
+        simulate_sync_push<FnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_sync_push<FnTy>();
+        simulate_bare_mpi_sync_push<FnTy>(loopName);
         return;
       }
 #endif
@@ -1514,10 +1554,10 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_sync_pull<FnTy>();
+        simulate_sync_pull<FnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_sync_pull<FnTy>();
+        simulate_bare_mpi_sync_pull<FnTy>(loopName);
         return;
       }
 #endif
