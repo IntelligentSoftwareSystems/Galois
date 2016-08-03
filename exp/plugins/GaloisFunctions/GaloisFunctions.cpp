@@ -450,6 +450,10 @@ namespace {
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
             kernelBefore << "\t\t++num_iter;\n";
             kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
+            kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
+            kernelBefore << "\t\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
+            kernelBefore << "\t\t\texit(1);\n";
+            kernelBefore << "\t\t}\n";
             kernelBefore << "\t\t//std::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
             kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
             kernelBefore << "\t\tT_compute.start();\n";

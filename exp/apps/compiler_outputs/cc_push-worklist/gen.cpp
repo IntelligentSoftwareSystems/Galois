@@ -302,6 +302,10 @@ struct ConnectedComp {
     		while (!dbag.canTerminate()) {
     		++num_iter;
     		cuda_wl.num_in_items = local_wl.size();
+        if (cuda_wl.num_in_items > cuda_wl.max_size) {
+          std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] ERROR - worklist size insufficent; size : " << cuda_wl.max_size << " , expected : " << cuda_wl.num_in_items << "\n";
+          exit(1);
+        }
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		T_compute.start();
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);

@@ -577,6 +577,7 @@ public:
       header << "\tint num_in_items;\n";
       header << "\tint *out_items;\n";
       header << "\tint num_out_items;\n";
+      header << "\tint max_size;\n";
       header << "};\n";
     }
     header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
@@ -842,8 +843,9 @@ public:
     }
     if (requiresWorklist) {
       // Assuming at the most an average duplicaton of 4 in the worklist
-      cuheader << "\tctx->in_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);\n";
-      cuheader << "\tctx->out_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);\n";
+      cuheader << "\twl->max_size = wl_dup_factor*graph.nnodes*num_hosts/2;\n";
+      cuheader << "\tctx->in_wl = Worklist2((size_t)wl->max_size);\n";
+      cuheader << "\tctx->out_wl = Worklist2((size_t)wl->max_size);\n";
       cuheader << "\twl->num_in_items = -1;\n";
       cuheader << "\twl->num_out_items = -1;\n";
       cuheader << "\twl->in_items = ctx->in_wl.wl;\n";

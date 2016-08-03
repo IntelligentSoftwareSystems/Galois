@@ -212,8 +212,9 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, double 
 	}
 	graph.copy_to_gpu(ctx->gg);
 	ctx->comp_current.alloc(graph.nnodes);
-	ctx->in_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);
-	ctx->out_wl = Worklist2((size_t)wl_dup_factor*graph.nnodes);
+  wl->max_size = wl_dup_factor*graph.nnodes*num_hosts/2;
+	ctx->in_wl = Worklist2((size_t)wl->max_size);
+	ctx->out_wl = Worklist2((size_t)wl->max_size);
 	wl->num_in_items = -1;
 	wl->num_out_items = -1;
 	wl->in_items = ctx->in_wl.wl;
