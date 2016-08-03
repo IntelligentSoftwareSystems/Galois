@@ -702,9 +702,9 @@ public:
       unsigned num_requests = 0;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      std::vector<typename FnTy::ValTy> sb[net.Num];
+      static std::vector<typename FnTy::ValTy> sb[net.Num];
 #else
-      std::vector<uint64_t> sb[net.Num];
+      static std::vector<uint64_t> sb[net.Num];
 #endif
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -757,9 +757,9 @@ public:
       }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      std::vector<typename FnTy::ValTy> rb[net.Num];
+      static std::vector<typename FnTy::ValTy> rb[net.Num];
 #else
-      std::vector<uint64_t> rb[net.Num];
+      static std::vector<uint64_t> rb[net.Num];
 #endif
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -848,9 +848,9 @@ public:
       unsigned num_requests = 0;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      std::vector<typename FnTy::ValTy> sb[net.Num];
+      static std::vector<typename FnTy::ValTy> sb[net.Num];
 #else
-      std::vector<uint64_t> sb[net.Num];
+      static std::vector<uint64_t> sb[net.Num];
 #endif
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -905,9 +905,9 @@ public:
       }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      std::vector<typename FnTy::ValTy> rb[net.Num];
+      static std::vector<typename FnTy::ValTy> rb[net.Num];
 #else
-      std::vector<uint64_t> rb[net.Num];
+      static std::vector<uint64_t> rb[net.Num];
 #endif
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
