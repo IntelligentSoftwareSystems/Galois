@@ -638,10 +638,11 @@ public:
       unsigned num_requests = 0;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      static std::vector<typename FnTy::ValTy> sb[net.Num];
+      static std::vector< std::vector<typename FnTy::ValTy> > sb;
 #else
-      static std::vector<uint64_t> sb[net.Num];
+      static std::vector< std::vector<uint64_t> > sb;
 #endif
+      sb.resize(net.Num);
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
@@ -693,10 +694,11 @@ public:
       }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      static std::vector<typename FnTy::ValTy> rb[net.Num];
+      static std::vector< std::vector<typename FnTy::ValTy> > rb;
 #else
-      static std::vector<uint64_t> rb[net.Num];
+      static std::vector< std::vector<uint64_t> > rb;
 #endif
+      rb.resize(net.Num);
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
@@ -784,10 +786,11 @@ public:
       unsigned num_requests = 0;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      static std::vector<typename FnTy::ValTy> sb[net.Num];
+      static std::vector< std::vector<typename FnTy::ValTy> > sb;
 #else
-      static std::vector<uint64_t> sb[net.Num];
+      static std::vector< std::vector<uint64_t> > sb;
 #endif
+      sb.resize(net.Num);
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
@@ -841,10 +844,11 @@ public:
       }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      static std::vector<typename FnTy::ValTy> rb[net.Num];
+      static std::vector< std::vector<typename FnTy::ValTy> > rb;
 #else
-      static std::vector<uint64_t> rb[net.Num];
+      static std::vector< std::vector<uint64_t> > rb;
 #endif
+      rb.resize(net.Num);
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
