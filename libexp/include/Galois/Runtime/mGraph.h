@@ -1722,6 +1722,9 @@ public:
       num_iter_push = 0;
       num_run = runNum;
    }
+   uint32_t get_run_num() {
+     return num_run;
+   }
 
 };
 #endif//_GALOIS_DIST_mGraph_H

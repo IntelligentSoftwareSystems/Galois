@@ -38,6 +38,7 @@ class DGBag {
   Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
 
   const FunctionTy &helper_fn;
+  std::string loopName;
   bool didWork;
   std::vector<std::vector<ValueTy>> bagItems_vec;
 
@@ -67,11 +68,14 @@ class DGBag {
   }
 
 public: 
-  DGBag(const FunctionTy &fn) : helper_fn(fn) {
+  DGBag(const FunctionTy &fn, std::string name) : helper_fn(fn), loopName(name) {
     bagItems_vec.resize(net.Num);
   }
 
   void set(InsertBag<ValueTy> &bag) {
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    Galois::StatTimer StatTimer_init(init_str.c_str());
+    StatTimer_init.start();
     init_sync();
     didWork = !bag.empty();
     for(auto ii = bag.begin(); ii != bag.end(); ++ii)
@@ -79,18 +83,27 @@ public:
       //helper_fn get the hostID for this node.
       bagItems_vec[helper_fn((*ii))].push_back((*ii));
     }
+    StatTimer_init.stop();
   }
 
   void set_local(int* array, size_t size) {
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    Galois::StatTimer StatTimer_init(init_str.c_str());
+    StatTimer_init.start();
     init_sync();
     didWork = (size > 0);
     for (auto i = 0; i < size; ++i) {
       ValueTy ii = helper_fn.getGNode(array[i]);
       bagItems_vec[helper_fn(ii)].push_back(ii);
     }
+    StatTimer_init.stop();
   }
 
   void sync() {
+    std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    Galois::StatTimer StatTimer_sync(sync_str.c_str());
+    StatTimer_sync.start();
+
     //send things to other hosts.
     for(auto x = 0; x < net.Num; ++x){
       if(x == net.ID)
@@ -111,6 +124,8 @@ public:
     for(auto x = 0; x < net.Num; ++x){
       bagItems_vec[x].clear();
     }
+
+    StatTimer_sync.stop();
   }
 
   static const std::vector<ValueTy> &get() {

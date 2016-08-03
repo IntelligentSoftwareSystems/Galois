@@ -611,7 +611,6 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
 
-     //Galois::Timer T_compute, T_comm_syncGraph, T_bag_extraWork, T_comm_bag;
     typedef typename BaseWorkListTy::value_type value_type_base;
     /** Construct new worklist **/
     typedef Galois::InsertBag<value_type> Bag;
@@ -620,35 +619,28 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<Galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
-    //T_compute.start();
     Runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(ztpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
-    //T_compute.stop();
-    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] 1st Iter : T_compute : " << T_compute.get() << "(msec)\n";
 
     int num_iter = 1;
     typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
-    DBag dbag(helper_fn);
+    std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
+    DBag dbag(helper_fn, loopName);
     auto &local_wl = DBag::get();
 
     // Sync
-    //T_comm_syncGraph.start();
     helper_fn.sync_graph();
-    //T_comm_syncGraph.stop();
 
-    //T_comm_bag.start();
     dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
     std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
     dbag.sync();
     bag.clear();
-    //T_comm_bag.stop();
 
-    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : 0 T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
 
     /** loop while work in the worklist **/
     while(!dbag.canTerminate()) {
@@ -657,33 +649,23 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
       // call for_each again.
       if(!local_wl.empty()){
-        //T_compute.start();
-
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
-
-        //T_compute.stop();
       }
 
       // Sync
-      //T_comm_syncGraph.start();
       helper_fn.sync_graph();
-      //T_comm_syncGraph.stop();
 
-      //T_comm_bag.start();
       dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
       std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
       dbag.sync();
       bag.clear();
-      //T_comm_bag.stop();
 
-      //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << "  T_compute : " << T_compute.get() << "(msec)  T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
-      //Galois::Runtime::printOutput("Iter Num : % , T_compute : % (msec) , T_comm_syncGraph : % (msec), T_comm_bag : % (msec) \n", num_iter,T_compute.get(), T_comm_syncGraph.get(), T_comm_bag.get());
       num_iter++;
     }
 

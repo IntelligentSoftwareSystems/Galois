@@ -350,8 +350,11 @@ struct Get_info_functor : public Galois::op_tag {
 		return graph.getLID(n);
 	}
 	void sync_graph(){
-		 sync_graph_static(graph);
+		sync_graph_static(graph);
 	}
+  uint32_t get_run_num() const {
+    graph.get_run_num();
+  }
 	void static sync_graph_static(Graph& _graph) {
 
 		_graph.sync_push<Syncer_0>("PageRank");
@@ -370,30 +373,22 @@ struct PageRank {
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		Galois::Timer T_compute, T_comm_syncGraph, T_comm_bag;
     		unsigned num_iter = 0;
     		auto __sync_functor = Get_info_functor<Graph>(_graph);
     		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
-    		DBag dbag(__sync_functor);
+    		DBag dbag(__sync_functor, "BFS");
     		auto &local_wl = DBag::get();
-    		T_compute.start();
     		cuda_wl.num_in_items = _graph.getNumOwned();
     		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
-    		T_compute.stop();
-    		T_comm_syncGraph.start();
     		__sync_functor.sync_graph();
-    		T_comm_syncGraph.stop();
-    		T_comm_bag.start();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
         #ifdef __GALOIS_DEBUG_WORKLIST__
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
         #endif
     		dbag.sync();
     		cuda_wl.num_out_items = 0;
-    		T_comm_bag.stop();
-    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
     		while (!dbag.canTerminate()) {
     		++num_iter;
     		cuda_wl.num_in_items = local_wl.size();
@@ -402,23 +397,16 @@ struct PageRank {
           exit(1);
         }
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
-    		T_compute.start();
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
-    		T_compute.stop();
-    		T_comm_syncGraph.start();
     		__sync_functor.sync_graph();
-    		T_comm_syncGraph.stop();
-    		T_comm_bag.start();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
         #ifdef __GALOIS_DEBUG_WORKLIST__
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
         #endif
     		dbag.sync();
     		cuda_wl.num_out_items = 0;
-    		T_comm_bag.stop();
-    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
     		}
     	} else if (personality == CPU)
     #endif
