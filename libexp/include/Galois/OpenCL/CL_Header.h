@@ -55,7 +55,6 @@ namespace Galois{
 namespace OpenCL{
 CLContext * getCLContext(){
    static CLContext ctx;
-//   ctx.initialize();
    return &ctx;
 }
 /*
