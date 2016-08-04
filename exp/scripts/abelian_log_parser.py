@@ -373,7 +373,8 @@ def get_basicInfo(fileName):
   benchmark, algo_type, cut_type =  split_cmdLine_algo
 
   split_cmdLine_input = cmdLine.split()[1].split("/")
-  input_graph = split_cmdLine_input[-1]
+  input_graph_name = split_cmdLine_input[-1]
+  input_graph = input_graph_name.split(".")[0]
 
   devices = str(hostNum) + " CPU"
   deviceKind = "CPU"
