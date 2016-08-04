@@ -20,7 +20,7 @@ if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   fi
 fi
 if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=10"
+  FLAGS+=" -cuda_wl_dup_factor=3"
 fi
 
 source_file=${inputdirname}/source
@@ -49,7 +49,7 @@ export MV2_ENABLE_AFFINITY=0
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 set -x #echo on
-GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS $FLAGS -noverify
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS $FLAGS -comm_mode=2 -noverify
 set +x #echo off
 
 echo "Algorithm: " $execname

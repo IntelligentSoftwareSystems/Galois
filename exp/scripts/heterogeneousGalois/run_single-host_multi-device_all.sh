@@ -17,7 +17,7 @@ if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   fi
 fi
 if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=10"
+  FLAGS+=" -cuda_wl_dup_factor=3"
 fi
 
 source_file=${inputdirname}/source
