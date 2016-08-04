@@ -335,7 +335,7 @@ def time_at_barrier(fileName, benchmark, total_hosts, numRuns, numThreads):
 #63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Hosts,0,0,4
 #63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Runs,0,0,3
 
-def get_basicInfo(fileName, get_devices):
+def get_basicInfo(fileName):
 
   hostNum_regex = re.compile(r'.*,\(NULL\),0\s,\sHosts,0,0,(\d*)')
   cmdLine_regex = re.compile(r'.*,\(NULL\),0\s,\sCommandLine,0,0,(.*)')
@@ -368,28 +368,31 @@ def get_basicInfo(fileName, get_devices):
   runs_search    = runs_regex.search(log_data)
   if runs_search is not None:
     runs = runs_search.group(1)
-
+ 
   split_cmdLine_algo = cmdLine.split()[0].split("/")[-1].split("_")
   benchmark, algo_type, cut_type =  split_cmdLine_algo
 
   split_cmdLine_input = cmdLine.split()[1].split("/")
   input_graph = split_cmdLine_input[-1]
 
-  devices = ''
-  if get_devices:
-    split_cmdLine_devices = cmdLine.split()[3].split("=")
+  devices = str(hostNum) + " CPU"
+  deviceKind = "CPU"
+  for index in range(2, len(cmdLine.split())):
+    split_cmdLine_devices = cmdLine.split()[index].split("=")
     if split_cmdLine_devices[0] == '-pset':
-      devices = split_cmdLine_devices[-1]
-      cpus = devices.count('c')
-      gpus = devices.count('g')
-      if gpus == 0:
-        devices = str(cpus) + " CPU"
-      elif cpus == 0:
-        devices = str(gpus) + " GPU"
-      else:
-        devices = str(cpus) + " CPU + " + str(gpus) + " GPU"
+      devices_str = split_cmdLine_devices[-1]
+      cpus = devices_str.count('c')
+      gpus = devices_str.count('g')
+      if str(cpus + gpus) == hostNum and gpus > 0:
+        if cpus == 0:
+          devices = str(gpus) + " GPU"
+          deviceKind = "GPU"
+        else:
+          devices = str(cpus) + " CPU + " + str(gpus) + " GPU"
+          deviceKind = "CPU+GPU"
+      break
 
-  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices
+  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices, deviceKind
 
 def format_str(col):
   max_len = 0
@@ -403,15 +406,14 @@ def main(argv):
   forHost = '0'
   outputFile = 'LOG_output.csv'
   time_unit = 'seconds'
-  get_devices = False
   try:
-    opts, args = getopt.getopt(argv,"hi:n:o:md",["ifile=","node=","ofile=","milliseconds","devices"])
+    opts, args = getopt.getopt(argv,"hi:n:o:md",["ifile=","node=","ofile=","milliseconds"])
   except getopt.GetoptError:
-    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
+    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds]'
     sys.exit(2)
   for opt, arg in opts:
     if opt == '-h':
-      print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
+      print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds]'
       sys.exit()
     elif opt in ("-i", "--ifile"):
       inputFile = arg
@@ -421,18 +423,16 @@ def main(argv):
       outputFile = arg
     elif opt in ("-m", "--milliseconds"):
       time_unit = 'milliseconds'
-    elif opt in ("-d", "--devices"):
-      get_devices = True
 
   if inputFile == '':
-    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
+    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds]'
     sys.exit(2)
 
   print 'Input file is : ', inputFile
   print 'Output file is : ', outputFile
   print 'Data for host : ', forHost
 
-  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices = get_basicInfo(inputFile, get_devices)
+  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices, deviceKind = get_basicInfo(inputFile)
 
   #shorten the graph names:
   if input_graph == "twitter-ICWSM10-component_withRandomWeights.transpose.gr" or input_graph == "twitter-ICWSM10-component-transpose.gr" or input_graph == "twitter-ICWSM10-component_withRandomWeights.gr" or input_graph == "twitter-ICWSM10-component.gr":
@@ -447,18 +447,14 @@ def main(argv):
     input_graph = "rmat28"
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
-  if get_devices:
-    print 'Devices : ', devices
+  print 'Devices : ', devices
   data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit)
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
   #total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
 
-  output_str = benchmark + ',' + 'abelian'  + ','
-  if get_devices:
-    output_str += devices  + ','
-  else:
-    output_str += hostNum  + ',' + threads  + ','
+  output_str = benchmark + ',' + 'abelian' + ',' + hostNum  + ',' + threads  + ','
+  output_str += deviceKind  + ',' + devices  + ','
   output_str += input_graph  + ',' + algo_type  + ',' + cut_type
   #time_at_barrier(inputFile, benchmark, forHost, runs, threads)
 
@@ -470,11 +466,8 @@ def main(argv):
   print output_str
 
 
-  header_csv_str = "benchmark,platform,"
-  if get_devices:
-    header_csv_str += "devices,"
-  else:
-    header_csv_str += "host,threads,"
+  header_csv_str = "benchmark,platform,host,threads,"
+  header_csv_str += "deviceKind,devices,"
   header_csv_str += "input,variant,partition,mean_time" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   #for i in range(0,256):
