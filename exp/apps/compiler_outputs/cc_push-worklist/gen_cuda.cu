@@ -4,7 +4,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_COMP_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
@@ -52,11 +52,13 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
       old_dist = atomicMin(&p_comp_current[dst], new_dist);
       if (old_dist > new_dist)
       {
-        (out_wl).push(dst);
+        index_type _start_31;
+        _start_31 = (out_wl).setup_push_warp_one();;
+        (out_wl).do_push(_start_31, 0, dst);
       }
     }
   }
-  // FP: "19 -> 20;
+  // FP: "21 -> 22;
 }
 void InitializeGraph_cuda(struct CUDA_Context * ctx)
 {
