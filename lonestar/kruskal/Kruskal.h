@@ -47,6 +47,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
+#include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
@@ -71,6 +72,8 @@ static cll::opt<unsigned> numPages (
     cll::init (32));
 
 namespace kruskal {
+
+typedef Galois::GAccumulator<size_t> Accumulator;
 
 typedef unsigned Weight_ty;
 typedef std::vector<int> VecRep;
@@ -230,6 +233,8 @@ public:
   typedef std::vector<Edge> VecEdge;
 
   typedef std::unordered_set<InEdge, InEdge::Hash> SetInEdge;
+
+  static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
 protected:
 

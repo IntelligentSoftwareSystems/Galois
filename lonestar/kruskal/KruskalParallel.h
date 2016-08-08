@@ -29,7 +29,6 @@
 #define KRUSKAL_PARALLEL_H
 
 #include "Galois/Atomic.h"
-#include "Galois/Accumulator.h"
 #include "Galois/PerThreadContainer.h"
 #include "Galois/DynamicArray.h"
 
@@ -49,7 +48,6 @@ typedef Galois::PerThreadVector<Edge> EdgeWL;
 typedef Galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
 typedef Galois::FixedSizeAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
-typedef Galois::GAccumulator<size_t> Accumulator;
 
 // typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
 typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
@@ -525,7 +523,7 @@ struct UnionFindWindow {
       prevWindowSize = currWL->size_all ();
       numCommits = prevWindowSize - nextWL->size_all ();
       std::swap (nextWL, currWL);
-      nextWL->clear_all ();
+      nextWL->clear_all_parallel ();
 
 
       // size_t s = lowThreshSize - currWL->size_all () + 1;
@@ -844,7 +842,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
 
 
   // reuse lighter for filterWL
-  lighter.clear_all ();
+  lighter.clear_all_parallel ();
 
   filterTimer.start ();
   Galois::do_all_local (heavier,
@@ -870,12 +868,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
 
   Galois::Substrate::ThreadPool::getThreadPool().beKind();
 }
-
-
-
-
 }// end namespace kruskal
-
 
 
 #endif //  KRUSKAL_PARALLEL_H
