@@ -49,6 +49,8 @@
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
+#include <iostream>
+
 namespace Galois {
 
 namespace Runtime {
@@ -386,6 +388,10 @@ struct SpecContextBase: public OrderedContextBase<T> {
     return source; 
   }
 
+  void enableSrc (void) {
+    source = true;
+  }
+
   void schedule (void) {
     source = true;
 
@@ -625,6 +631,12 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
       nhood.push_back (&nitem);
       nitem.markMin (this);
     }
+  }
+
+  virtual bool owns (Lockable* l, MethodFlag m) const {
+    NItem& nitem = Base::exec.getNhoodMgr().getNhoodItem (l);
+    assert (NItem::getOwner (l) == &nitem);
+    return (nitem.getMin () ==  this);
   }
 
   void schedule (void) {
@@ -1042,8 +1054,10 @@ public:
   }
 
   void addAbortLocation (NItem* ni) {
-    assert (ni);
-    abortLocations.push (ni);
+    if (!Base::NEEDS_CUSTOM_LOCKING) {
+      assert (ni);
+      abortLocations.push (ni);
+    }
   }
 
   void quickAbort (Ctxt* c) {
@@ -1432,11 +1446,12 @@ private:
           if (c->hasState (ContextState::SCHEDULED)) {
 
 
-            if (c->isSrc ()) {
+            if (Base::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
               bool commit = c->isSrc ();
 
               typename Base::UserCtxt& uhand = c->userHandle;
-              if (Base::OPERATOR_CAN_ABORT) {
+              if (Base::NEEDS_CUSTOM_LOCKING) {
+                c->enableSrc ();
                 runCatching (Base::opFunc, c, uhand);
                 commit = c->isSrc(); // in case opFunc signalled abort
 
@@ -1472,8 +1487,8 @@ private:
                   c->markExecRound (Base::rounds);
                 }
 
-              } else  if (c->casState (ContextState::SCHEDULED, ContextState::ABORTING)) {
-                  uhand.rollback();
+              } else {
+                  // uhand.rollback();
                   Base::quickAbort (c);
               } // end if commit                
 
@@ -1567,6 +1582,10 @@ public:
     return true;
   }
 
+  virtual bool owns (Lockable* l, MethodFlag m) const {
+    return static_cast<PessimOrdContext*> (Base::getOwner (l)) == this;
+  }
+
   // TODO: Refactor common code with TwoPhaseContext::subAcquire
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
@@ -1648,6 +1667,7 @@ protected:
   using CtxtWL = typename Base::CtxtWL;
 
   CtxtWL abortRoots;
+  CtxtWL freeWL;
 
   TimeAccumulator t_executeSources;
   TimeAccumulator t_applyOperator;
@@ -1761,12 +1781,13 @@ public:
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
         [this] (Ctxt* c) {
 
-          if (c->isSrc()) {
+          if (Base::NEEDS_CUSTOM_LOCKING || c->isSrc()) {
             typename Base::UserCtxt& uhand = c->userHandle;
 
             bool commit = true;
 
-            if (Base::OPERATOR_CAN_ABORT) {
+            if (Base::NEEDS_CUSTOM_LOCKING) {
+              c->enableSrc ();
               runCatching (Base::opFunc, c, uhand);
               commit = c->isSrc(); // in case opFunc signalled abort
 
@@ -1854,7 +1875,6 @@ public:
     Ctxt* minPending = Base::getMinPending();
 
 
-    CtxtWL freeWL;
 
     while (!commitMetaPQ.empty()) { 
 
@@ -1921,12 +1941,13 @@ public:
     // memory is returned to owner thread, thus thread 0 doesn't accumulate all 
     // the feed blocks
     on_each_impl (
-        [this, &freeWL] (const unsigned tid, const unsigned numT) {
+        [this] (const unsigned tid, const unsigned numT) {
           for (auto i = freeWL.get().begin()
               , end_i = freeWL.get().end(); i != end_i; ++i) {
 
             Base::freeCtxt (*i);
           }
+          freeWL.get().clear();
         });
           
   } // end performCommits

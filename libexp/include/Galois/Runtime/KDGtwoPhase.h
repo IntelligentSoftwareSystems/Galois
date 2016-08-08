@@ -291,9 +291,10 @@ protected:
           typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
           uhand.reset ();
 
-          if (c->isSrc ()) {
+          if (Base::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
             // opFunc (c->active, uhand);
-            if (Base::OPERATOR_CAN_ABORT) {
+            if (Base::NEEDS_CUSTOM_LOCKING) {
+              c->enableSrc();
               runCatching (Base::opFunc, c, uhand);
               commit = c->isSrc (); // in case opFunc signalled abort
 

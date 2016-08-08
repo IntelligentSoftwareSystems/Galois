@@ -265,6 +265,7 @@ protected:
   template <typename WinWL, typename WL>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void refillRound (WinWL& winWL, WL& wl) {
 
+
     if (targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
       size_t prevWindowSize = roundTasks.reduceRO ();
@@ -287,6 +288,13 @@ protected:
     ++rounds;
     totalCommits += roundCommits.reduceRO ();
     totalTasks += roundTasks.reduceRO ();
+
+    if (roundTasks.reduceRO () > 0) {
+      assert (roundCommits.reduceRO() > 0 && "No commits this round, No progress");
+    }
+
+    std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
+        rounds, roundTasks.reduceRO (), roundCommits.reduceRO ());
   }
 
   // TODO: for debugging only
@@ -305,7 +313,7 @@ protected:
           }
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMinCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
@@ -337,7 +345,7 @@ protected:
           } 
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMaxCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;

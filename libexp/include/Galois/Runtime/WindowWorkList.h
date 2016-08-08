@@ -65,12 +65,14 @@ public:
 
     GAccumulator<size_t> count;
 
-    Galois::Runtime::do_all_impl (range,
+    Galois::do_all_choice (range,
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
-        }
-        , "initfill");
+        }, 
+        std::make_tuple (
+        Galois::loopname ("initfill"),
+        Galois::chunk_size<16> ()));
 
     init_sz = count.reduce ();
 
@@ -230,11 +232,13 @@ public:
   template <typename R>
   void initfill (const R& range) {
 
-    Galois::Runtime::do_all_impl (range,
+    Galois::do_all_choice (range,
         [this] (const T& x) {
           push (x);
-        }
-        , "initfill");
+        }, 
+        std::make_tuple (
+          Galois::loopname ("initfill"),
+          Galois::chunk_size<16> ()));
 
   }
 

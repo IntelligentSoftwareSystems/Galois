@@ -134,18 +134,19 @@ public:
   // TODO: fix visibility below
 public:
   // FIXME: nhood should be a set instead of list
-  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
-  AtomicBool onWL;
+  // AtomicBool onWL;
   NhoodMgr& nhmgr;
   NhoodList nhood;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
+  AtomicBool onWL;
 
 public:
 
   KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
     : 
       OrderedContextBase<T> (active), // to make acquire call virtual function sub_acquire
-      onWL (false),
-      nhmgr (nhmgr) 
+      nhmgr (nhmgr),
+      onWL (false)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -651,6 +652,8 @@ void for_each_ordered_ar_impl (const R& range, const Cmp& cmp, const NhFunc& nhF
   typedef typename Ctxt::CtxtCmp  CtxtCmp;
 
   using Exec =  Executor<T, Cmp, NhFunc, OpFunc, ST, ArgsT, Ctxt>;
+
+  std::cout << "sizeof(KDGaddRemContext) == " << sizeof(Ctxt) << std::endl;
 
   CtxtCmp ctxtcmp (cmp);
   typename NItem::Factory factory(ctxtcmp);
