@@ -260,7 +260,11 @@ struct BFS {
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
+          std::string comp_str("CUDA_IMPL_BFS_" + std::to_string(_graph.get_run_num()));
+          Galois::StatTimer StatTimer_comp(comp_str.c_str());
+          StatTimer_comp.start();
       		BFS_cuda(__retval, cuda_ctx);
+          StatTimer_comp.stop();
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif

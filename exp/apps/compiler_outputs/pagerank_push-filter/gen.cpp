@@ -341,7 +341,11 @@ void static go(Graph& _graph) {
 #endif
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
+    std::string comp_str("CUDA_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
+    Galois::StatTimer StatTimer_comp(comp_str.c_str());
+    StatTimer_comp.start();
 		FirstItr_PageRank_cuda(alpha, tolerance, cuda_ctx);
+    StatTimer_comp.stop();
 	} else if (personality == CPU)
 #endif
 Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
@@ -467,7 +471,11 @@ struct PageRank {
      #ifdef __GALOIS_HET_CUDA__
      	if (personality == GPU_CUDA) {
      		int __retval = 0;
-     		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+        std::string comp_str("CUDA_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
+        Galois::StatTimer StatTimer_comp(comp_str.c_str());
+        StatTimer_comp.start();
+        PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+        StatTimer_comp.stop();
      		DGAccumulator_accum += __retval;
      	} else if (personality == CPU)
      #endif

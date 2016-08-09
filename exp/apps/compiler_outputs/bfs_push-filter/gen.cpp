@@ -253,7 +253,11 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
+    std::string comp_str("CUDA_IMPL_BFS_" + std::to_string(_graph.get_run_num()));
+    Galois::StatTimer StatTimer_comp(comp_str.c_str());
+    StatTimer_comp.start();
 		FirstItr_BFS_cuda(cuda_ctx);
+    StatTimer_comp.stop();
 	} else if (personality == CPU)
 #endif
 Galois::do_all(_graph.begin(), _graph.end(), FirstItr_BFS{&_graph}, Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
@@ -371,7 +375,11 @@ struct BFS {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		int __retval = 0;
-    		BFS_cuda(__retval, cuda_ctx);
+        std::string comp_str("CUDA_IMPL_BFS_" + std::to_string(_graph.get_run_num()));
+        Galois::StatTimer StatTimer_comp(comp_str.c_str());
+        StatTimer_comp.start();
+        BFS_cuda(__retval, cuda_ctx);
+        StatTimer_comp.stop();
     		DGAccumulator_accum += __retval;
     	} else if (personality == CPU)
     #endif

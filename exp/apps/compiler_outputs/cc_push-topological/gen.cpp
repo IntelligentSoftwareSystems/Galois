@@ -253,7 +253,11 @@ struct ConnectedComp {
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
-      		ConnectedComp_cuda(__retval, cuda_ctx);
+          std::string comp_str("CUDA_IMPL_CC_" + std::to_string(_graph.get_run_num()));
+          Galois::StatTimer StatTimer_comp(comp_str.c_str());
+          StatTimer_comp.start();
+          ConnectedComp_cuda(__retval, cuda_ctx);
+          StatTimer_comp.stop();
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif

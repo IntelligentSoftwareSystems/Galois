@@ -347,7 +347,11 @@ struct PageRank {
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
-      		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+          std::string comp_str("CUDA_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
+          Galois::StatTimer StatTimer_comp(comp_str.c_str());
+          StatTimer_comp.start();
+          PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+          StatTimer_comp.stop();
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
