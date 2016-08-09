@@ -276,6 +276,7 @@ struct Get_info_functor : public Galois::op_tag {
 
 struct BFS {
   Graph* graph;
+  typedef int tt_does_not_need_aborts;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -320,7 +321,7 @@ struct BFS {
     		}
     	} else if (personality == CPU)
     #endif
-    Galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), Galois::workList_version(), Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"), Get_info_functor<Graph>(_graph));
+    Galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), Galois::workList_version(), Galois::loopname("bfs"), Galois::does_not_need_aborts<>(), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {

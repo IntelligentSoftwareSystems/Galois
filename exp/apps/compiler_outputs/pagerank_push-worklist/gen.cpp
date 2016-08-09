@@ -368,6 +368,7 @@ struct PageRank {
   const float &local_alpha;
   cll::opt<float> &local_tolerance;
   Graph* graph;
+  typedef int tt_does_not_need_aborts;
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g): local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
@@ -410,7 +411,7 @@ struct PageRank {
     		}
     	} else if (personality == CPU)
     #endif
-    Galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::workList_version(), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));
+    Galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::workList_version(), Galois::loopname("PageRank"), Galois::does_not_need_aborts<>(), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
