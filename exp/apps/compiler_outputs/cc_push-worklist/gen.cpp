@@ -284,10 +284,14 @@ struct ConnectedComp {
     		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
     		DBag dbag(__sync_functor, "BFS");
     		auto &local_wl = DBag::get();
+        std::string comp_str("CUDA_IMPL_CC_" + std::to_string(_graph.get_run_num()));
+        Galois::StatTimer StatTimer_comp(comp_str.c_str());
+        StatTimer_comp.start();
     		cuda_wl.num_in_items = _graph.getNumOwned();
     		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
     		if (cuda_wl.num_in_items > 0)
     			ConnectedComp_cuda(cuda_ctx);
+        StatTimer_comp.stop();
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
         #ifdef __GALOIS_DEBUG_WORKLIST__
@@ -303,9 +307,11 @@ struct ConnectedComp {
           exit(1);
         }
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
+        StatTimer_comp.start();
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		if (cuda_wl.num_in_items > 0)
     			ConnectedComp_cuda(cuda_ctx);
+        StatTimer_comp.stop();
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
         #ifdef __GALOIS_DEBUG_WORKLIST__

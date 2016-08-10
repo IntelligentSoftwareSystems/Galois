@@ -253,7 +253,11 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
+    std::string comp_str("CUDA_IMPL_SSSP_" + std::to_string(_graph.get_run_num()));
+    Galois::StatTimer StatTimer_comp(comp_str.c_str());
+    StatTimer_comp.start();
 		FirstItr_SSSP_cuda(cuda_ctx);
+    StatTimer_comp.stop();
 	} else if (personality == CPU)
 #endif
 Galois::do_all(_graph.begin(), _graph.end(), FirstItr_SSSP{&_graph}, Galois::loopname("sssp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
@@ -371,7 +375,11 @@ struct SSSP {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		int __retval = 0;
+        std::string comp_str("CUDA_IMPL_SSSP_" + std::to_string(_graph.get_run_num()));
+        Galois::StatTimer StatTimer_comp(comp_str.c_str());
+        StatTimer_comp.start();
     		SSSP_cuda(__retval, cuda_ctx);
+        StatTimer_comp.stop();
     		DGAccumulator_accum += __retval;
     	} else if (personality == CPU)
     #endif
