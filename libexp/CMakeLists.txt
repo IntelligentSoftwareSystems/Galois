@@ -2,6 +2,7 @@ set(sources
         src/DoAllWrap.cpp
         src/ParaMeter.cpp
         src/Queue.cpp
+        src/cuda_device.cpp
 )
 
 add_library(galois_exp STATIC ${sources})
