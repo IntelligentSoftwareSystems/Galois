@@ -14,7 +14,7 @@ import numpy
 # All time values are in sec by default.
 
 
-def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
+def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, total_hosts):
 
   mean_time = 0.0;
   recvNum_total = 0
@@ -52,8 +52,47 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
 
   print "Mean time: ", mean_time
 
+
+  #TOTAL_DO_ALL_IMPL all hosts
+  #414c1fb5-0df1-4741-a0ee-cee82f2fc83b,(NULL),0 , DO_ALL_IMPL_bfs,0,0,389
+  total_do_all_impl = 0.0
+  total_send_bytes = 0;
+  '''
+  for host in range(0,int(total_hosts)):
+    do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'\w*,' + re.escape(str(host)) + r',\d*,(\d*)')
+    do_all_impl_host = do_all_impl_regex.search(log_data)
+    if do_all_impl_host is not None:
+      print("->", do_all_impl_host.group(1))
+      total_do_all_impl += float(do_all_impl_host.group(1))
+
+  total_do_all_impl /= int(numRuns)
+  total_do_all_impl /= divisor
+  total_do_all_impl = round(total_do_all_impl, 3)
+
+
+  #48409c5e-9c41-4830-8c4d-347a9f2b6551,(NULL),0 , SEND_BYTES_SYNC_PUSH_BFS_0,0,0,1340025160
+
   if(benchmark == "cc"):
     benchmark = "ConnectedComp"
+
+  for host in range(0,int(total_hosts)):
+    print("host : ", host)
+    send_bytes_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_(?i)' + re.escape(benchmark) + r'_0,' + re.escape(str(host)) + r',\d*,(\d*)')
+    send_bytes_firstItr_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_FirstItr_(?i)' + re.escape(benchmark) + r'_0,' + re.escape(str(host)) + r',\d*,(\d*)')
+    #send_bytes_host = send_bytes_regex.search(log_data)
+    #send_bytes_firstItr_host = send_bytes_firstItr_regex.search(log_data)
+
+    send_bytes_host = re.findall(send_bytes_regex, log_data)
+    send_bytes_firstItr_host = re.findall(send_bytes_firstItr_regex, log_data)
+
+    for byte in send_bytes_host:
+      total_send_bytes += (int(byte[1]))
+      #print("->", byte[0], " , " , byte[1])
+      #print("->", byte_firstItr[0], " , " , byte_firstItr[1])
+
+    for byte_firstItr in send_bytes_firstItr_host:
+      total_send_bytes += int(byte_firstItr[1])
+      '''
 
   ## SYNC_PULL and SYNC_PUSH total average over runs.
   num_iterations = 0
@@ -177,7 +216,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
   print mean_time
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
   #return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
-  return mean_time
+  return mean_time,total_do_all_impl,total_send_bytes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -449,7 +488,7 @@ def main(argv):
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
   print 'Devices : ', devices
-  data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit)
+  data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit, hostNum)
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
   #total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
@@ -469,7 +508,7 @@ def main(argv):
 
   header_csv_str = "benchmark,platform,host,threads,"
   header_csv_str += "deviceKind,devices,"
-  header_csv_str += "input,variant,partition,mean_time" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time,total_comp_time,total_bytes_sent" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   #for i in range(0,256):
     #header_csv_str += ","
@@ -489,7 +528,7 @@ def main(argv):
   except OSError:
     print "Error in outfile opening\n"
 
-  data_list = [data] #list(data)
+  data_list = list(data) #[data] #list(data)
   #data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
   complete_data = output_str.split(",") + data_list #+ list(sendBytes_list)
   fd_outputFile = open(outputFile, 'a')
