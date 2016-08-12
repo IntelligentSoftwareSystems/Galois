@@ -430,6 +430,7 @@ def get_basicInfo(fileName):
         else:
           devices = str(cpus) + " CPU + " + str(gpus) + " GPU"
           deviceKind = "CPU+GPU"
+          hostNum = str(int(hostNum) - cpus)
       break
 
   return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices, deviceKind

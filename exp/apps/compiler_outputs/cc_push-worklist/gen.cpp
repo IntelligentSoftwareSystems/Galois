@@ -42,6 +42,7 @@
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/DistBag.h"
+#include "Galois/Runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 struct CUDA_Worklist cuda_wl;
@@ -87,7 +88,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<bool> single_node("single_node", cll::desc("Single physical node with multiple devices: detect GPU to use for each host/process automatically"), cll::init(false));
+static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
 static cll::opt<double> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
 #endif
 
@@ -370,11 +371,8 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
-      if (single_node && (gpu_device == -1)) {
-        gpu_device = 0;
-        for (unsigned i = 0; i < my_host_id; ++i) {
-          if (personality_set.c_str()[i] != 'c') ++gpu_device;
-        }
+      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
+        gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
       for (unsigned i=0; i<personality_set.length(); ++i) {
         if (personality_set.c_str()[i] == 'c') 
