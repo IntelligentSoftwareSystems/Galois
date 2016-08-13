@@ -1504,7 +1504,11 @@ public:
 
             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                 uint32_t localID = masterNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+                auto val = FnTy::extract((localID), clGraph.getDataR(localID));
+#else
                 auto val = FnTy::extract((localID), getData(localID));
+#endif
                 val_vec[n] = val;
                 }, Galois::loopname(doall_str.c_str()));
           }
