@@ -184,7 +184,7 @@ struct CLContext {
 
    void build_string_source(const char * src, const char * flags, CL_Device* device_id) {
       std::string compiler_flags(flags);
-      compiler_flags += device_id->get_platrform()->get_cl_compiler_flags();
+      compiler_flags += device_id->get_platform()->get_cl_compiler_flags();
       compiler_flags += " ";
       compiler_flags += build_args;
 //   fprintf(stderr, "Compiling with flags :%s \n", compiler_flags.c_str());
@@ -232,7 +232,7 @@ struct CLContext {
    void build_program_source(const char * file_name, const char * _flags, CL_Device * device_id) {
       cl_int err;
       std::string compiler_flags(_flags);
-      compiler_flags += device_id->get_platrform()->get_cl_compiler_flags();
+      compiler_flags += device_id->get_platform()->get_cl_compiler_flags();
       compiler_flags += " ";
       compiler_flags += build_args;
       fprintf(stderr, "Compiling device : %s, flags : %s, filename : %s \n", device_id->name().c_str(), compiler_flags.c_str(), file_name);
@@ -344,11 +344,6 @@ struct CLContext {
     *
     *
     **********************************************************************/
-
-   /**********************************************************************
-    *
-    *
-    **********************************************************************/
    cl_kernel load_kernel_string(const char * src, const char * kernel_method_name, CL_Device * device) {
       build_string_source(src, "", device);
       int err;
@@ -374,7 +369,7 @@ struct CLContext {
     *
     **********************************************************************/
    size_t workgroup_size(cl_kernel kernel, CL_Device * device) {
-#ifdef _ALTERA_EMULATOR_USE_
+#ifdef _ALTERA_FPGA_USE_
       return 4096;
 #else
       size_t work_group_size;
@@ -388,7 +383,7 @@ struct CLContext {
     *
     **********************************************************************/
    size_t workgroup_size(cl_kernel kernel, cl_device_id id) {
-#ifdef _ALTERA_EMULATOR_USE_
+#ifdef _ALTERA_FPGA_USE_
       return 4096;
 #else
       size_t work_group_size;

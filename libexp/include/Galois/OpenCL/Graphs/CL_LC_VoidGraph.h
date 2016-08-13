@@ -7,7 +7,7 @@
 #include "Galois/OpenCL/CL_Header.h"
 #include "Galois/OpenCL/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
-#include "Galois/Runtime/hGraph.h"
+//#include "Galois/Runtime/hGraph.h"
 #ifndef _GDIST_CL_LC_VOID_Graph_H_
 #define _GDIST_CL_LC_VOID_Graph_H_
 
@@ -278,7 +278,7 @@ namespace Galois {
                gpu_struct_ptr = gpu_meta= nullptr;
 
             }
-//            template<typename HGraph>
+            template<typename HGraph>
             CL_LC_Graph(std::string filename, unsigned myid, unsigned numHost) :
             SizeEdgeData(0), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
                //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
@@ -288,8 +288,8 @@ namespace Galois {
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
                gpu_struct_ptr = gpu_meta= nullptr;
-               hGraph<NodeDataType, void> g(filename, myid, numHost);
-//               HGraph g(filename, myid, numHost);
+//               hGraph<NodeDataType, void> g(filename, myid, numHost);
+               HGraph g(filename, myid, numHost);
                fprintf(stderr, "Loading from hgraph\n");
                load_from_galois(g);
             }

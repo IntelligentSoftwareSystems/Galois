@@ -251,6 +251,12 @@ struct CL_Kernel {
    /*************************************************************************
     *
     *************************************************************************/
+   void set_arg_raw(size_t idx, const cl_mem val) {
+      Galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(kernel, idx, sizeof(cl_mem), &val), "Arg-index, is NOT set!");
+   }
+   /*************************************************************************
+    *
+    *************************************************************************/
    void set_arg_list_raw(const cl_mem val) {
       Galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(cl_mem), &val), "Arg-1, is NOT set!");
    }

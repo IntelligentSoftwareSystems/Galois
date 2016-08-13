@@ -18,59 +18,169 @@ namespace Galois {
       /*####################################################################################################################################################*/
       template<typename DataType>
       struct BufferWrapperImpl{
-         typedef std::pair<int, DataType> MessageType;
-         std::vector<MessageType *> messageBuffers;
-         std::vector<cl_mem> gpuMessageBuffer;
+         typedef DataType MessageType;
+         typedef size_t LocalIDType;
+         std::vector<std::vector<MessageType>> inMessageBuffers;
+         std::vector<std::vector<MessageType>> outMessageBuffers;
+         std::vector<std::vector<LocalIDType>> inMessageIDs;
+         std::vector<std::vector<LocalIDType>> outMessageIDs;
+         std::vector<cl_mem> devInMessageBuffers;
+         std::vector<cl_mem> devOutMessageBuffers;
+         std::vector<cl_mem> devInMessageIDs;
+         std::vector<cl_mem> devOutMessageIDs;
+
          int num_hosts;
-         int num_ghosts;
          struct BufferWrapperGPU{
-            cl_mem counters;
-            cl_mem messages;
+            cl_mem counters; //how many entries per peer
+            cl_mem messages; // space for messages
+            cl_mem localIDs; // localIDs for messages
             int numHosts;
-            cl_mem buffer_ptr;
+            cl_mem buffer_ptr; // pointer for self/structure
          };
-         BufferWrapperGPU gpu_impl;
-         BufferWrapperImpl(int nh, int ng):num_hosts(nh), num_ghosts(ng){
+         BufferWrapperGPU inMessages, outMessages;
+         CL_Kernel inMsgApply, outMsgGen;
+         BufferWrapperImpl():num_hosts(0){
+            auto * ctx = Galois::OpenCL::getCLContext();
+            inMsgApply.init(ctx->get_default_device(), "buffer_wrapper.cl", "recvApply");
+            outMsgGen.init(ctx->get_default_device(), "buffer_wrapper.cl", "prepSend");
+         }
+         /*
+          * hGraph - slaveNodes - nodes on other hosts that have a master here. Hence, outMessageIDs
+          * hGraph - masterNodes - nodes on othor hosts that are slaves here. Hence, inMessageIDs
+          * */
+         void init(int nh, std::vector<std::vector<size_t>> slaveNodes, std::vector<std::vector<size_t>> masterNodes ){
+            num_hosts = nh;
+            inMessageBuffers.resize(num_hosts);
+            outMessageBuffers.resize(num_hosts);
+            inMessageIDs.resize(num_hosts);
+            outMessageIDs.resize(num_hosts);
+            for(size_t h = 0;  h < num_hosts; ++h){
+               for(auto val : masterNodes[h]){
+                  inMessageIDs[h].push_back(val);
+               }
+               for(auto val : slaveNodes[h]){
+                  outMessageIDs[h].push_back(val);
+               }
+               inMessageBuffers[h].resize(masterNodes[h].size());
+               outMessageBuffers[h].resize(slaveNodes[h].size());
+            }
             allocate();
+         }
+         template<typename GraphType, typename Fn>
+         void sync_outgoing(GraphType & g){
+            //void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvApply<FnTy>;
+            auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+            for(size_t h = 0 ; h < num_hosts; ++h){
+               for(size_t i=0; i< outMessageIDs[h].size(); ++i){
+                  //static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+                  outMessageBuffers[h][i]=Fn::extract(outMessageIDs[h][i], g.getData(outMessageIDs[h][i]));
+               }
+               //TODO RK - send messages.
+            }
+         }
+
+         template<typename GraphType, typename Fn>
+         void sync_incoming(GraphType & g, std::vector<std::vector<unsigned int>> & incomingMessages){
+            auto& net = Galois::Runtime::getSystemNetworkInterface();
+            cl_int err;
+            auto * ctx = Galois::OpenCL::getCLContext();
+            cl_command_queue queue = ctx->get_default_device()->command_queue();
+            //
+            for(size_t h = 0 ; h < num_hosts; ++h){
+               //err = clEnqueueWriteBuffer(queue, devInMessageBuffers[h], CL_TRUE, 0, sizeof(unsigned int)*(incomingMessages[h],size()), incomingMessages[h].data(), 0, NULL, NULL);
+               /*for(size_t i=0; i< outMessageIDs[h].size(); ++i){
+                  //      static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
+                  Fn::setVal(inMessageIDs[h][i], g.getData(inMessageIDs[h][i]), inMessageBuffers[h][i]);
+               }*/
+               //TODO RK - send messages.
+            }//end for host
+            this->inMsgApply();
          }
 
          void allocate(){
             auto * ctx = Galois::OpenCL::getCLContext();
-            cl_int err;
-            gpu_impl.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
-            gpu_impl.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
-            gpu_impl.buffer_ptr= clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(BufferWrapperGPU), 0, &err);
-            CL_Kernel initBuffer;
-            initBuffer.init("buffer_wrapper.cl", "initBufferWrapper");
-            initBuffer.set_arg(0, gpu_impl.buffer_ptr);
-            initBuffer.set_arg(1, gpu_impl.counters);
-            initBuffer.set_arg(2, num_hosts);
-            initBuffer.run_task();
+            cl_command_queue queue = ctx->get_default_device()->command_queue();
 
-            CL_Kernel registerBuffer;
-            registerBuffer.init("buffer_wrapper.cl", "registerBuffer");
-            registerBuffer.set_arg(0, gpu_impl.buffer_ptr);
-            for(int i=0; i < num_hosts; ++i){
-               MessageType * host_msg_buffer = new MessageType[num_ghosts];
-               messageBuffers.push_back(host_msg_buffer);
-               cl_mem msg_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (num_ghosts), 0, &err);
-               messageBuffers.push_back(msg_buffer);
-               registerBuffer.set_arg(1, msg_buffer);
-               registerBuffer.set_arg(2, i);
-               registerBuffer.run_task();
+            assert(ctx!=nullptr && "CL Context should be non-null");
+            cl_int err;
+            CL_Kernel initBuffer(getCLContext()->get_default_device(),"buffer_wrapper.cl", "initBufferWrapper", false);
+            CL_Kernel registerBuffer(getCLContext()->get_default_device(),"buffer_wrapper.cl", "registerBuffer",false);
+            {
+               inMessages.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
+               inMessages.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_mem) *( num_hosts), 0, &err);
+               inMessages.localIDs= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_mem) *( num_hosts), 0, &err);
+               inMessages.buffer_ptr= clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(BufferWrapperGPU), 0, &err);
+               initBuffer.set_arg_raw(0, inMessages.buffer_ptr);
+               initBuffer.set_arg_raw(1, inMessages.counters);
+               initBuffer.set_arg_raw(2, inMessages.messages);
+               initBuffer.set_arg_raw(3, inMessages.localIDs);
+//               initBuffer.set_arg(4, num_hosts);
+//               Galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(cl_mem), &val), "Arg-1, is NOT set!");
+               clSetKernelArg(initBuffer.kernel, 4, sizeof(cl_int), &num_hosts);
+               initBuffer.run_task();
+
+               registerBuffer.set_arg_raw(0, inMessages.buffer_ptr);
+               for(int i=0; i < num_hosts; ++i){
+                  cl_mem msg_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (inMessageIDs[i].size()), 0, &err);
+                  cl_mem id_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (inMessageIDs[i].size()), 0, &err);
+                  err = clEnqueueWriteBuffer(queue, id_buffer, CL_TRUE, 0, sizeof(unsigned int)*(inMessageIDs[i].size()), inMessageIDs[i].data(), 0, NULL, NULL);
+
+                  devInMessageBuffers.push_back(msg_buffer);
+                  devInMessageIDs.push_back(id_buffer);
+
+                  registerBuffer.set_arg_raw(1, id_buffer);
+                  registerBuffer.set_arg_raw(2, msg_buffer);
+//                  registerBuffer.set_arg(3, i);
+                  clSetKernelArg(registerBuffer.kernel, 3, sizeof(cl_int), &i);
+                  size_t numItems = inMessageIDs[i].size();
+                  clSetKernelArg(registerBuffer.kernel, 4, sizeof(cl_int), &numItems);
+                  registerBuffer.run_task();
+               }
+               // TODO resume here
+               //inMsgApply.set_arg(???GRAPH, inMessages);
+            }
+            {
+               outMessages.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
+               outMessages.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_mem) *( num_hosts), 0, &err);
+               outMessages.localIDs= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_mem) *( num_hosts), 0, &err);
+               outMessages.buffer_ptr= clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(BufferWrapperGPU), 0, &err);
+               initBuffer.set_arg_raw(0, outMessages.buffer_ptr);
+               initBuffer.set_arg_raw(1, outMessages.counters);
+               initBuffer.set_arg_raw(2, outMessages.messages);
+               initBuffer.set_arg_raw(3, outMessages.localIDs);
+//               initBuffer.set_arg(4, num_hosts);
+               clSetKernelArg(initBuffer.kernel, 4, sizeof(cl_int), &num_hosts);
+               initBuffer.run_task();
+
+               registerBuffer.set_arg_raw(0, inMessages.buffer_ptr);
+               for(int i=0; i < num_hosts; ++i){
+                  cl_mem msg_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (outMessageIDs[i].size()), 0, &err);
+                  cl_mem id_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (outMessageIDs[i].size()), 0, &err);
+                  err = clEnqueueWriteBuffer(queue, id_buffer, CL_TRUE, 0, sizeof(unsigned int)*(outMessageIDs[i].size()), outMessageIDs[i].data(), 0, NULL, NULL);
+
+                  devOutMessageBuffers.push_back(msg_buffer);
+                  devOutMessageIDs.push_back(id_buffer);
+
+                  registerBuffer.set_arg_raw(1, id_buffer);
+                  registerBuffer.set_arg_raw(2, msg_buffer);
+//                  registerBuffer.set_arg(3, i);
+                  clSetKernelArg(registerBuffer.kernel, 3, sizeof(cl_int), &i);
+                  registerBuffer.run_task();
+               }
             }
 
          }
          void deallocate(){
-            for(auto b : gpuMessageBuffer){
+            for(auto b : devInMessageBuffers){
                clReleaseMemObject(b);
             }
-            for(auto b : messageBuffers){
-               delete [] b;
+            for(auto b : devInMessageIDs){
+               clReleaseMemObject(b);
             }
-            clReleaseMemObject(gpu_impl.counters);
-            clReleaseMemObject(gpu_impl.messages);
-            clReleaseMemObject(gpu_impl.buffer_ptr);
+            clReleaseMemObject(inMessages.counters);
+            clReleaseMemObject(inMessages.messages);
+            clReleaseMemObject(inMessages.buffer_ptr);
          }
          /*
 template<typename FnTy>
@@ -152,6 +262,7 @@ template<typename FnTy>
   }
 
           */
+/*
          template<typename GraphType>
          void prepRecv(GraphType & g, Galois::Runtime::RecvBuffer& buffer){
             CL_Kernel applyKernel;
@@ -172,6 +283,7 @@ template<typename FnTy>
                applyKernel();
 
          }//End prepSend
+*/
       };
       /*####################################################################################################################################################*/
                enum GRAPH_FIELD_FLAGS {
@@ -297,6 +409,7 @@ template<typename FnTy>
             unsigned int * neighbors;
             NodeDataType * node_data;
             EdgeDataType * edge_data;
+            //BufferWrapperImpl<unsigned int> bufferWrapper;
 
             std::vector<UserNodeDataType * > dirtyData;
             //GPU Data
@@ -304,10 +417,6 @@ template<typename FnTy>
             _CL_LC_Graph_GPU gpu_wrapper;
             cl_mem gpu_meta;
 
-
-//            NodeDataType * getData() {
-//               return node_data;
-//            }
             //Read a single node-data value from the device.
             //Blocking call.
             void read_node_data_impl(NodeIterator & it, NodeDataType & data){
@@ -315,7 +424,7 @@ template<typename FnTy>
                auto id = *it;
                cl_command_queue queue = ctx->get_default_device()->command_queue();
                err = clEnqueueReadBuffer(queue, gpu_wrapper.node_data, CL_TRUE, sizeof(NodeDataType)*(id), sizeof(NodeDataType), &data, 0, NULL, NULL);
-//               fprintf(stderr,  "Data read[%d], offset=%d :: val=%d \n", id, sizeof(NodeDataType) * id, data.dist_current);
+               fprintf(stderr,  "Data read[%d], offset=%d :: val=%d \n", id, sizeof(NodeDataType) * id, data.dist_current);
                CHECK_CL_ERROR(err, "Error reading node-data 0\n");
 
             }
@@ -325,11 +434,9 @@ template<typename FnTy>
                int err;
                cl_command_queue queue = ctx->get_default_device()->command_queue();
                err = clEnqueueWriteBuffer(queue, gpu_wrapper.node_data, CL_TRUE, sizeof(NodeDataType)*(*it), sizeof(NodeDataType), &data, 0, NULL, NULL);
+               fprintf(stderr,  "Data read[%d], offset=%d :: val=%d \n", *it, sizeof(NodeDataType) * (*it), data.dist_current);
                CHECK_CL_ERROR(err, "Error writing node-data 0\n");
             }
-
-
-
          public:
             /*
              * Go over all the wrapper instances created and write them to device.
@@ -441,8 +548,15 @@ template<typename FnTy>
                fprintf(stderr, "Nodes :: %d, Owned,  %zu, Counter %d \n", gg_num_nodes, _num_owned, node_counter);
                assert(edge_counter == gg_num_edges && "Failed to add all edges.");
                init_graph_struct();
+               initialize_sync_buffers(ggraph);
                fprintf(stderr, "Loaded from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu, Owned=%lu, Offset=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), sizeof(EdgeDataType), _num_owned, _global_offset);
             }
+            template<typename HGraph>
+            void initialize_sync_buffers(HGraph & hgraph){
+               //bufferWrapper.init(Galois::Runtime::NetworkInterface::Num, hgraph.masterNodes, hgraph.slaveNodes);
+            }
+            /*
+             * */
             template<typename GaloisGraph>
             void writeback_from_galois(GaloisGraph & ggraph) {
                typedef typename GaloisGraph::GraphNode GNode;
@@ -599,9 +713,10 @@ template<typename FnTy>
 #if !PRE_INIT_STRUCT_ON_DEVICE
                this->copy_to_device();
                CL_Kernel init_kernel(getCLContext()->get_default_device());
-               size_t kernel_len = strlen(cl_wrapper_str_CL_LC_Graph) + strlen(init_kernel_str_CL_LC_Graph) + 1;
-               char * kernel_src = new char[kernel_len];
-               sprintf(kernel_src, "%s\n%s", cl_wrapper_str_CL_LC_Graph, init_kernel_str_CL_LC_Graph);
+               //TODO RK - cleanup this place. We are generating the code, so we do not need to 'build' kernels here.
+//               size_t kernel_len = strlen(cl_wrapper_str_CL_LC_Graph) + strlen(init_kernel_str_CL_LC_Graph) + 1;
+//               char * kernel_src = new char[kernel_len];
+//               sprintf(kernel_src, "%s\n%s", cl_wrapper_str_CL_LC_Graph, init_kernel_str_CL_LC_Graph);
 //               init_kernel.init_string(kernel_src, "initialize_graph_struct");
                init_kernel.init("app_header.h", "initialize_graph_struct");
 //               init_kernel.set_arg_list(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors, gpu_wrapper.edge_data);
@@ -614,6 +729,8 @@ template<typename FnTy>
             //TODO RK - complete these.
             template<typename FnTy>
              void sync_push() {
+               //bufferWrapper.sync_outgoing(*this);
+
 #if 0
                char * synKernelString=" ";
                typedef std::pair<unsigned, typename FnTy::ValTy> MsgType;

@@ -104,7 +104,7 @@ public:
    ~CL_Device() {
       fprintf(stderr, "Released device :: %s \n", name().c_str());
    }
-   const CL_Platform* get_platrform() {
+   const CL_Platform* get_platform() {
 //      fprintf(stderr, "Getting platform for %s\n", name().c_str());
       return platform;
    }
