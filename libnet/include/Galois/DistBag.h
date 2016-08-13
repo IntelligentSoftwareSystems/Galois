@@ -119,6 +119,9 @@ public:
 
     workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
     std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
+    std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    Galois::Statistic num_work_items(work_item_str.c_str());
+    num_work_items += workItem_recv_vec.size();
 
     assert((hosts_didWork_vec.size() == (net.Num - 1)));
     for(auto x = 0; x < net.Num; ++x){
