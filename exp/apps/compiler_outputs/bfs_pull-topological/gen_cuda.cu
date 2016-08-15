@@ -4,10 +4,11 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['wp', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_DIST_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
+static const int __tb_BFS = TB_SIZE;
 __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
 {
   unsigned tid = TID_1D;
@@ -28,34 +29,150 @@ __global__ void BFS(CSRGraph graph, unsigned int nowned, unsigned int * p_dist_c
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
+  const unsigned __kernel_tb_size = __tb_BFS;
   index_type src_end;
+  index_type src_rup;
   // FP: "1 -> 2;
+  const int _NP_CROSSOVER_WP = 32;
+  const int _NP_CROSSOVER_TB = __kernel_tb_size;
+  // FP: "2 -> 3;
+  const int BLKSIZE = __kernel_tb_size;
+  const int ITSIZE = BLKSIZE * 8;
+  // FP: "3 -> 4;
+
+  typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
+  typedef union np_shared<BlockScan::TempStorage, index_type, struct empty_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
+
+  // FP: "4 -> 5;
+  __shared__ npsTy nps ;
+  // FP: "5 -> 6;
   src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_rup = (roundup((nowned), (blockDim.x)));
+  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
   {
-    unsigned int current_min;
-    index_type jj_end;
-    current_min = p_dist_current[src];
-    jj_end = (graph).getFirstEdge((src) + 1);
-    for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
+    multiple_sum<2, index_type> _np_mps;
+    multiple_sum<2, index_type> _np_mps_total;
+    // FP: "6 -> 7;
+    bool pop  = src < nowned;;
+    // FP: "7 -> 8;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "8 -> 9;
+    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    // FP: "9 -> 10;
+    _np_closure[threadIdx.x].src = src;
+    // FP: "10 -> 11;
+    if (pop)
     {
-      index_type dst;
-      unsigned int new_dist;
-      dst = graph.getAbsDestination(jj);
-      new_dist = p_dist_current[dst] + 1;
-      if (current_min > new_dist)
+      _np.size = (graph).getOutDegree(src);
+      _np.start = (graph).getFirstEdge(src);
+    }
+    // FP: "13 -> 14;
+    // FP: "14 -> 15;
+    _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
+    _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
+    // FP: "15 -> 16;
+    BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
+    // FP: "16 -> 17;
+    if (threadIdx.x == 0)
+    {
+    }
+    // FP: "18 -> 19;
+    __syncthreads();
+    // FP: "19 -> 20;
+    {
+      const int warpid = threadIdx.x / 32;
+      // FP: "20 -> 21;
+      const int _np_laneid = cub::LaneId();
+      // FP: "21 -> 22;
+      while (__any(_np.size >= _NP_CROSSOVER_WP))
       {
-        current_min = new_dist;
+        if (_np.size >= _NP_CROSSOVER_WP)
+        {
+          nps.warp.owner[warpid] = _np_laneid;
+        }
+        if (nps.warp.owner[warpid] == _np_laneid)
+        {
+          nps.warp.start[warpid] = _np.start;
+          nps.warp.size[warpid] = _np.size;
+          nps.warp.src[warpid] = threadIdx.x;
+          _np.start = 0;
+          _np.size = 0;
+        }
+        index_type _np_w_start = nps.warp.start[warpid];
+        index_type _np_w_size = nps.warp.size[warpid];
+        assert(nps.warp.src[warpid] < __kernel_tb_size);
+        src = _np_closure[nps.warp.src[warpid]].src;
+        for (int _np_ii = _np_laneid; _np_ii < _np_w_size; _np_ii += 32)
+        {
+          index_type jj;
+          jj = _np_w_start +_np_ii;
+          {
+            index_type dst;
+            unsigned int new_dist;
+            unsigned int old_dist;
+            dst = graph.getAbsDestination(jj);
+            new_dist = p_dist_current[dst] + 1;
+            old_dist = atomicMin(&p_dist_current[src], new_dist);
+            if (old_dist > new_dist)
+            {
+              any_retval.return_( 1);
+            }
+          }
+        }
       }
+      // FP: "44 -> 45;
+      __syncthreads();
+      // FP: "45 -> 46;
     }
-    if (p_dist_current[src] > current_min)
+
+    // FP: "46 -> 47;
+    __syncthreads();
+    // FP: "47 -> 48;
+    _np.total = _np_mps_total.el[1];
+    _np.offset = _np_mps.el[1];
+    // FP: "48 -> 49;
+    while (_np.work())
     {
-      p_dist_current[src] = current_min;
-      any_retval.return_( 1);
+      // FP: "49 -> 50;
+      int _np_i =0;
+      // FP: "50 -> 51;
+      _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
+      // FP: "51 -> 52;
+      __syncthreads();
+      // FP: "52 -> 53;
+
+      // FP: "53 -> 54;
+      for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
+      {
+        index_type jj;
+        assert(nps.fg.src[_np_i] < __kernel_tb_size);
+        src = _np_closure[nps.fg.src[_np_i]].src;
+        jj= nps.fg.itvalue[_np_i];
+        {
+          index_type dst;
+          unsigned int new_dist;
+          unsigned int old_dist;
+          dst = graph.getAbsDestination(jj);
+          new_dist = p_dist_current[dst] + 1;
+          old_dist = atomicMin(&p_dist_current[src], new_dist);
+          if (old_dist > new_dist)
+          {
+            any_retval.return_( 1);
+          }
+        }
+      }
+      // FP: "67 -> 68;
+      _np.execute_round_done(ITSIZE);
+      // FP: "68 -> 69;
+      __syncthreads();
+      // FP: "69 -> 49;
     }
+    // FP: "70 -> 71;
+    assert(threadIdx.x < __kernel_tb_size);
+    src = _np_closure[threadIdx.x].src;
+    // FP: "71 -> 6;
   }
-  // FP: "18 -> 19;
+  // FP: "72 -> 73;
 }
 void InitializeGraph_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
 {
@@ -84,7 +201,7 @@ void BFS_cuda(int & __retval, struct CUDA_Context * ctx)
   // FP: "5 -> 6;
   ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  BFS <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->dist_current.gpu_wr_ptr(), ctx->any_retval);
+  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->nowned, ctx->dist_current.gpu_wr_ptr(), ctx->any_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;
