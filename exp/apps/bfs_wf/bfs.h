@@ -36,8 +36,8 @@
 #include <set>
 #include "Galois/Graphs/LC_InlineEdge_Graph.h"
 
-#define GALOIS_USE_MIC_CSR_IMPL
-// #undef GALOIS_USE_MIC_CSR_IMPL
+// #define GALOIS_USE_MIC_CSR_IMPL
+#undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
   #include "Galois/Graphs/LC_CSR_MIC_Graph.h"

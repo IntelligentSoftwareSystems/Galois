@@ -293,8 +293,8 @@ protected:
       assert (roundCommits.reduceRO() > 0 && "No commits this round, No progress");
     }
 
-    std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
-        rounds, roundTasks.reduceRO (), roundCommits.reduceRO ());
+    // std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
+        // rounds, roundTasks.reduceRO (), roundCommits.reduceRO ());
   }
 
   // TODO: for debugging only

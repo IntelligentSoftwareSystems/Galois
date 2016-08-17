@@ -526,7 +526,7 @@ struct OptimContextFunctions {
     
     for (const NItem* ni: c->nhood) {
 
-      if (ni->getMin() != c) {
+      if (!ni->isMin(c)) {
         return false;
       }
     }
@@ -1470,6 +1470,7 @@ private:
                     c->addChild (child);
 
                   }
+                  uhand.getPushBuffer().clear();
                 } else {
 
                   assert (uhand.getPushBuffer().begin() == uhand.getPushBuffer().end());
@@ -1641,9 +1642,10 @@ private:
   void releaseLocks() {
     for (Lockable* l: nhood) {
       assert (l != nullptr);
-      if (Base::getOwner (l) == this) {
+      if (static_cast<PessimOrdContext*> (Base::getOwner (l)) == this) {
         dbg::print (this, " releasing lock ", l);
-        Base::tryLock (l); // release requires having had the lock
+        bool b = Base::tryLock (l); // release requires having had the lock
+        assert (b);
         Base::release (l);
       }
     }
@@ -1907,6 +1909,7 @@ public:
                   minPending = child;
                 }
               }
+              uhand.getPushBuffer().clear();
             }
 
             c->doCommit();
