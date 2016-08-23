@@ -2,16 +2,21 @@
 # executes only on single machine
 # assumes 2 GPU devices available (if heterogeneous)
 
-MPI=mpiexec
-EXEC=$1
-INPUT=$2
-OUTPUT=$3
-LOG=.verify_log
+execdirname="."
+execname=$1
+EXEC=${execdirname}/${execname}
 
-execname=$(basename "$EXEC" "")
-inputdirname=$(dirname "$INPUT")
-inputname=$(basename "$INPUT" ".gr")
+inputdirname=/workspace/dist-inputs
+inputname=$2
 extension=gr
+
+outputdirname=/workspace/dist-outputs
+IFS='_' read -ra EXECP <<< "$execname"
+problem=${EXECP[0]}
+OUTPUT=${outputdirname}/${inputname}.${problem}
+
+MPI=mpiexec
+LOG=.verify_log
 
 FLAGS=
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -73,8 +78,8 @@ for task in $SET; do
     PFLAGS+=" -scalegpu=3"
   fi
   rm -f output_*.log
-  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -verify -runs=1" >>$LOG
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -comm_mode=2 -verify -runs=1" >>$LOG 2>&1
+  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG 2>&1
   outputs="output_${hostname}_0.log"
   i=1
   while [ $i -lt $2 ]; do
