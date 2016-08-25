@@ -172,6 +172,7 @@ void go(std::istream& input) {
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   //  std::ios_base::sync_with_stdio(false);
+  std::cout << "Data will be " << (useSmallData ? 4 : 8) << " Bytes\n";
 
   std::ifstream infile(inputFilename, std::ios_base::in);
   if (!infile) {

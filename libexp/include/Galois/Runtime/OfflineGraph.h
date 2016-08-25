@@ -246,7 +246,7 @@ class OfflineGraphWriter {
 
 
 public:
-  OfflineGraphWriter(const std::string& name, bool use64) :file(name, std::ios_base::in | std::ios_base::out | std::ios_base::binary | std::ios_base::trunc), numNodes(0), numEdges(0) {
+OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::ios_base::in | std::ios_base::out | std::ios_base::binary | std::ios_base::trunc), numNodes(0), numEdges(0), smallData(use32) {
     if (!file.is_open() || !file.good()) throw "Bad filename";
     uint64_t ver = 1;
     uint64_t etSize = smallData ? sizeof(float) : sizeof(double);
