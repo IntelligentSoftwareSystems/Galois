@@ -20,7 +20,8 @@ Kernel("BFS", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dis
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("bool", "pop", " = src < nowned;")]),
+CDecl([("unsigned int", "current_min", "")]),
+CBlock(["current_min = p_dist_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -28,14 +29,17 @@ CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
 CBlock(["new_dist = p_dist_current[dst] + 1"]),
-CDecl([("unsigned int", "old_dist", "")]),
-CBlock(["old_dist = atomicMin(&p_dist_current[src], new_dist)"]),
-If("old_dist > new_dist",
+If("current_min > new_dist",
 [
-CBlock(["any_retval.return_( 1)"]),
+CBlock(["current_min = new_dist"]),
 ]),
 ]),
 ),
+If("p_dist_current[src] > current_min",
+[
+CBlock(["p_dist_current[src] = current_min"]),
+CBlock(["any_retval.return_( 1)"]),
+]),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('const unsigned int &', 'local_infinity'), ('unsigned int', 'local_src_node'), ('struct CUDA_Context *', 'ctx')],

@@ -72,12 +72,12 @@ namespace Galois {
 namespace Graph {
 
 //File format V1:
-//version (1) {uint64_t LE}
+//version (1 or 2) {uint64_t LE}
 //EdgeType size {uint64_t LE}
 //numNodes {uint64_t LE}
 //numEdges {uint64_t LE}
 //outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint32_t LE}
+//outedges[numEdges] {uint32_t LE or uint64_t LE for ver == 2}
 //potential padding (32bit max) to Re-Align to 64bits
 //EdgeType[numEdges] {EdgeType size}
 
@@ -133,7 +133,7 @@ void FileGraph::move_assign(FileGraph&& o) {
   std::swap(edgeOffset, o.edgeOffset);
 }
 
-  void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset, uint64_t lenlimit) {
+void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset, uint64_t lenlimit) {
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = convert_le64toh(*fptr++);
   if (version != 1)
@@ -146,10 +146,8 @@ void FileGraph::move_assign(FileGraph&& o) {
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
-  outs = fptr32; 
-  fptr32 += numEdges;
-  if (numEdges % 2)
-    fptr32 += 1;
+  outs = fptr32;
+  fptr32 += numEdges + numEdges % 2;
   if (!lenlimit || lenlimit > numEdges + ((char*)fptr32 - (char*)m))
     edgeData = (char*)fptr32;
   else

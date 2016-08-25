@@ -94,7 +94,7 @@ const unsigned int infinity = std::numeric_limits<unsigned int>::max()/4;
 unsigned iteration;
 
 struct NodeData {
-  std::atomic<unsigned int> dist_current;
+  unsigned int dist_current;
 };
 
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
@@ -285,17 +285,21 @@ struct BFS {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
+    unsigned int current_min = snode.dist_current;
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist;
       new_dist = dnode.dist_current + 1;
-      auto old_dist = Galois::atomicMin(snode.dist_current, new_dist);
-      if(old_dist > new_dist){
-        DGAccumulator_accum += 1;
+      if(current_min > new_dist){
+        current_min = new_dist;
       }
     }
 
+    if(snode.dist_current > current_min){
+      snode.dist_current = current_min;
+      DGAccumulator_accum += 1;
+    }
   }
 };
 Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;

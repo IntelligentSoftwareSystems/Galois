@@ -2,15 +2,14 @@
 #SBATCH --mail-user=roshan@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
+#SBATCH -A Galois
 PSET=$3
 
 EXEC=$1
-INPUT=$2
 execname=$(basename "$EXEC" "")
-#inputdirname=$(dirname "$INPUT")
+
+inputname=$2
 inputdirname=$SCRATCH/dist-inputs
-#inputname=$(basename "$INPUT" ".gr")
-inputname=$INPUT
 extension=gr
 
 FLAGS=
@@ -41,15 +40,16 @@ elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
 fi
 
 THREADS=16
+if [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
+  THREADS=14
+fi
 
 RUN=ibrun
 
-export MV2_USE_LAZY_MEM_UNREGISTER=0
-export MV2_ENABLE_AFFINITY=0
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 set -x #echo on
-GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS $FLAGS -comm_mode=2 -noverify
+MV2_USE_LAZY_MEM_UNREGISTER=0 MV2_ENABLE_AFFINITY=0 GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS -num_nodes=$SLURM_NNODES $FLAGS
 set +x #echo off
 
 echo "Algorithm: " $execname
