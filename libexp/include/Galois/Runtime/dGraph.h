@@ -39,8 +39,8 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "Galois/Runtime/dGraph_vertexCut.h"
-#include "Galois/Runtime/dGraph_edgeCut.h"
+//#include "Galois/Runtime/dGraph_vertexCut.h"
+//#include "Galois/Runtime/dGraph_edgeCut.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_mtypes.h"
@@ -59,9 +59,10 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
-template<typename NodeTy, typename EdgeTy, bool PartitionTy = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
 
+  public:
    typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
    typedef typename std::conditional<BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
@@ -73,12 +74,22 @@ class hGraph: public GlobalObject {
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
+   const uint32_t numHosts;
    //ghost cell ID translation
 
   //memoization optimization
   std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
 
+
+  /****** VIRTUAL FUNCTIONS *********/
+  virtual uint32_t G2L(uint64_t) const = 0 ;
+  virtual uint64_t L2G(uint32_t) const = 0;
+  virtual bool is_vertex_cut() const = 0;
+  virtual std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t) const = 0;
+  virtual std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t) const = 0;
+  virtual unsigned getHostID(uint64_t) const = 0;
+  virtual bool isOwned(uint64_t) const = 0;
 
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -97,8 +108,8 @@ class hGraph: public GlobalObject {
    Galois::Statistic statGhostNodes;
 
   // Select from edgeCut or vertexCut
-  typedef typename std::conditional<PartitionTy, DS_vertexCut ,DS_edgeCut>::type DS_type;
-  DS_type DS;
+  //typedef typename std::conditional<PartitionTy, DS_vertexCut ,DS_edgeCut>::type DS_type;
+  //DS_type DS;
 
 
    template<bool en, typename std::enable_if<en>::type* = nullptr>
@@ -280,32 +291,10 @@ public:
    typedef typename GraphTy::const_local_iterator const_local_iterator;
    typedef typename GraphTy::edge_iterator edge_iterator;
 
-#if 0
-   //template<bool PartTy, typename std::enable_if<!std::integral_constant<bool, PartTy>::value>::type* = nullptr>
-   //template<bool PartTy, typename std::enable_if<std::integral_constant<bool, PartTy>::value>::type* = nullptr>
-   //void hGraph_w(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()){
-template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()); 
-   template<>
-   void hGraph_w<true>(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()){
-    std::cout << "false edge cut\n";
-   }
 
-   //template<bool PartTy, typename std::enable_if<!std::integral_constant<bool, PartTy>::value>::type* = nullptr>
-   //void hGraph_w(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()){
-   template<>
-   void hGraph_w<false>(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()){
-    std::cout << "true vertex cut\n";
-   }
-
-   //hGraph construction is collective
-   hGraph(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
-         GlobalObject(this), id(host), round(false),statGhostNodes("TotalGhostNodes") {
-    hGraph_w<PartitionTy>(filename, host, numHosts, scalefactor);
-   }
-#endif
-
-   hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
-         GlobalObject(this), id(host), round(false),statGhostNodes("TotalGhostNodes") {
+   //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
+   hGraph(unsigned host, unsigned numHosts) :
+         GlobalObject(this), id(host), numHosts(numHosts), round(false),statGhostNodes("TotalGhostNodes") {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       comm_mode = 0;
@@ -317,114 +306,19 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       num_iter_push = 0;
       num_iter_pull = 0;
       num_run = 0;
- 
+
+      //uint32_t numNodes;
+      //uint64_t numEdges;
 #if 0
-      OfflineGraph g(filename);
-      //std::cerr << "Offline Graph Done\n";
-
-      masterNodes.resize(numHosts);
-      slaveNodes.resize(numHosts);
-      num_recv_expected = 0;
-      num_iter_push = 0;
-      num_iter_pull = 0;
-      num_run = 0;
-      totalNodes = g.size();
-      std::cerr << "Total nodes : " << totalNodes << "\n";
-      std::cerr << "Total edges : " << g.sizeEdges() << "\n";
-      //compute owners for all nodes
-      if (scalefactor.empty() || (numHosts == 1)) {
-         for (unsigned i = 0; i < numHosts; ++i)
-            DS.gid2host.push_back(Galois::block_range(0U, (unsigned) g.size(), i, numHosts));
-      } else {
-         assert(scalefactor.size() == numHosts);
-         unsigned numBlocks = 0;
-         for (unsigned i = 0; i < numHosts; ++i)
-            numBlocks += scalefactor[i];
-         std::vector<std::pair<uint64_t, uint64_t>> blocks;
-         for (unsigned i = 0; i < numBlocks; ++i)
-            blocks.push_back(Galois::block_range(0U, (unsigned) g.size(), i, numBlocks));
-         std::vector<unsigned> prefixSums;
-         prefixSums.push_back(0);
-         for (unsigned i = 1; i < numHosts; ++i)
-            prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-         for (unsigned i = 0; i < numHosts; ++i) {
-            unsigned firstBlock = prefixSums[i];
-            unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
-            DS.gid2host.push_back(std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
-         }
-      }
-
-      numOwned = DS.gid2host[id].second - DS.gid2host[id].first;
-      globalOffset = DS.gid2host[id].first;
-      std::cerr << "[" << id << "] Owned nodes: " << numOwned << "\n";
-
-      uint64_t numEdges = g.edge_begin(DS.gid2host[id].second) - g.edge_begin(DS.gid2host[id].first); // depends on Offline graph impl
-      std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
-
-      std::vector<bool> ghosts(g.size());
-#if 0
-      for (auto n = DS.gid2host[id].first; n < DS.gid2host[id].second; ++n){
-         for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii){
-            ghosts[g.getEdgeDst(ii)] = true;
-         }
-      }
-#endif
-      auto ee = g.edge_begin(DS.gid2host[id].first);
-      for (auto n = DS.gid2host[id].first; n < DS.gid2host[id].second; ++n) {
-         auto ii = ee;
-         ee = g.edge_end(n);
-         for (; ii < ee; ++ii) {
-            ghosts[g.getEdgeDst(ii)] = true;
-         }
-      }
-      std::cerr << "[" << id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
-
-      for (uint64_t x = 0; x < g.size(); ++x)
-         if (ghosts[x] && !isOwned(x))
-            DS.ghostMap.push_back(x);
-      std::cerr << "[" << id << "] Ghost nodes: " << DS.ghostMap.size() << "\n";
-
-      DS.hostNodes.resize(numHosts, std::make_pair(~0, ~0));
-      for (unsigned ln = 0; ln < DS.ghostMap.size(); ++ln) {
-         unsigned lid = ln + numOwned;
-         auto gid = DS.ghostMap[ln];
-         bool found = false;
-         for (auto h = 0; h < DS.gid2host.size(); ++h) {
-            auto& p = DS.gid2host[h];
-            if (gid >= p.first && gid < p.second) {
-               DS.hostNodes[h].first = std::min(DS.hostNodes[h].first, lid);
-               DS.hostNodes[h].second = lid + 1;
-               found = true;
-               break;
-            }
-         }
-         assert(found);
-      }
-
-      for(unsigned h = 0; h < DS.hostNodes.size(); ++h){
-        std::string temp_str = ("GhostNodes_from_" + std::to_string(h));
-        Galois::Statistic temp_stat_ghosNode(temp_str);
-        uint32_t start, end;
-        std::tie(start, end) = DS.nodes_by_host(h);
-        temp_stat_ghosNode += (end - start);
-        statGhostNodes += (end - start);
-      }
-      //std::cerr << "hostNodes Done\n";
-
-      uint32_t numNodes = numOwned + DS.ghostMap.size();
-      assert((uint64_t )numOwned + (uint64_t )DS.ghostMap.size() == (uint64_t )numNodes);
-#endif
-      uint32_t numNodes;
-      uint64_t numEdges;
-      std::string part_fileName = DS.getPartitionFileName(filename,partitionFolder,id,numHosts);
-      OfflineGraph g(part_fileName);
-      DS.hGraph(g,filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
+      std::string part_fileName = getPartitionFileName(filename,partitionFolder,id,numHosts);
+      //OfflineGraph g(part_fileName);
+      hGraph(filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
       graph.allocateFrom(numNodes, numEdges);
       //std::cerr << "Allocate done\n";
 
       graph.constructNodes();
       //std::cerr << "Construct nodes done\n";
-      DS.loadEdges(graph, g);
+      loadEdges(graph, g);
       std::cerr << "Edges loaded \n";
       //testPart<PartitionTy>(g);
 
@@ -440,18 +334,19 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       simulate_communication();
 #endif
 #endif
+#endif
    }
    void setup_communication() {
       Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
       Galois::Runtime::getHostBarrier().wait();
       StatTimer_comm_setup.start();
 
-      DS.fill_slaveNodes(slaveNodes);
+      //fill_slaveNodes(slaveNodes);
 
 #if 0
-      for(uint32_t h = 0; h < DS.hostNodes.size(); ++h){
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
         uint32_t start, end;
-        std::tie(start, end) = DS.nodes_by_host(h);
+        std::tie(start, end) = nodes_by_host(h);
         for(; start != end; ++start){
           slaveNodes[h].push_back(L2G(start));
         }
@@ -464,14 +359,14 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       for(uint32_t h = 0; h < masterNodes.size(); ++h){
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
              [&](uint32_t n){
-             masterNodes[h][n] = DS.G2L(masterNodes[h][n]);
+             masterNodes[h][n] = G2L(masterNodes[h][n]);
              }, Galois::loopname("MASTER_NODES"));
       }
 
       for(uint32_t h = 0; h < slaveNodes.size(); ++h){
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
              [&](uint32_t n){
-             slaveNodes[h][n] = DS.G2L(slaveNodes[h][n]);
+             slaveNodes[h][n] = G2L(slaveNodes[h][n]);
              }, Galois::loopname("SLAVE_NODES"));
       }
 
@@ -506,6 +401,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #endif
 #endif
 
+#if 0
    template<bool PartTy, typename std::enable_if<!std::integral_constant<bool, PartTy>::value>::type* = nullptr>
    void testPart(OfflineGraph& g){
        std::cout << "False type... edge partition\n";
@@ -515,6 +411,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
    void testPart(OfflineGraph& g){
        std::cout << "true type... vertex partition\n";
    }
+#endif
 
 #if 0
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
@@ -527,8 +424,8 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       g.num_seeks();
       g.reset_seek_counters();
       timer.start();
-      auto ee = g.edge_begin(DS.gid2host[id].first);
-      for (auto n = DS.gid2host[id].first; n < DS.gid2host[id].second; ++n) {
+      auto ee = g.edge_begin(gid2host[id].first);
+      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
          auto ii = ee;
          ee=g.edge_end(n);
          for (; ii < ee; ++ii) {
@@ -549,7 +446,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
    void loadEdges(OfflineGraph & g) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
       uint64_t cur = 0;
-      for (auto n = DS.gid2host[id].first; n < DS.gid2host[id].second; ++n) {
+      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
          for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             decltype(gdst) ldst = G2L(gdst);
@@ -1530,14 +1427,16 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
    }
 
    uint64_t getGID(uint32_t nodeID) const {
-      return DS.L2G(nodeID);
+      return L2G(nodeID);
    }
    uint32_t getLID(uint64_t nodeID) const {
-      return DS.G2L(nodeID);
+      return G2L(nodeID);
    }
+#if 0
    unsigned getHostID(uint64_t gid) {
-     DS.getHostID(gid);
+     getHostID(gid);
    }
+#endif
    uint32_t getNumOwned() const {
       return numOwned;
    }
@@ -1598,9 +1497,9 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       m.nedges = edge_counter;
 
       // copy memoization meta-data
-      m.num_master_nodes = (unsigned int *) calloc(DS.hostNodes.size(), sizeof(unsigned int));;
-      m.master_nodes = (unsigned int **) calloc(DS.hostNodes.size(), sizeof(unsigned int *));;
-      for(uint32_t h = 0; h < DS.hostNodes.size(); ++h){
+      m.num_master_nodes = (unsigned int *) calloc(hostNodes.size(), sizeof(unsigned int));;
+      m.master_nodes = (unsigned int **) calloc(hostNodes.size(), sizeof(unsigned int *));;
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
         m.num_master_nodes[h] = masterNodes[h].size();
         if (masterNodes[h].size() > 0) {
           m.master_nodes[h] = (unsigned int *) calloc(masterNodes[h].size(), sizeof(unsigned int));;
@@ -1609,9 +1508,9 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
           m.master_nodes[h] = NULL;
         }
       }
-      m.num_slave_nodes = (unsigned int *) calloc(DS.hostNodes.size(), sizeof(unsigned int));;
-      m.slave_nodes = (unsigned int **) calloc(DS.hostNodes.size(), sizeof(unsigned int *));;
-      for(uint32_t h = 0; h < DS.hostNodes.size(); ++h){
+      m.num_slave_nodes = (unsigned int *) calloc(hostNodes.size(), sizeof(unsigned int));;
+      m.slave_nodes = (unsigned int **) calloc(hostNodes.size(), sizeof(unsigned int *));;
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
         m.num_slave_nodes[h] = slaveNodes[h].size();
         if (slaveNodes[h].size() > 0) {
           m.slave_nodes[h] = (unsigned int *) calloc(slaveNodes[h].size(), sizeof(unsigned int));;
@@ -1661,8 +1560,5 @@ public:
     statGhostNodes.report();
    }
 
-   bool is_vertex_cut() const {
-    return DS.is_vertex_cut();
-   }
 };
 #endif//_GALOIS_DIST_HGRAPH_H
