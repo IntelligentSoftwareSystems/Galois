@@ -31,8 +31,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Substrate/PageAlloc.h"
-#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Runtime/PageAlloc.h"
+#include "Galois/Runtime/SimpleLock.h"
 #include "Galois/Substrate/gio.h"
 
 #include <mutex>
@@ -45,7 +45,7 @@
 //figure this out dynamically
 const size_t hugePageSize = 2*1024*1024;
 //protect mmap, munmap since linux has issues
-static Galois::Substrate::SimpleLock allocLock;
+static Galois::Runtime::SimpleLock allocLock;
 
 
 static void* trymmap(size_t size, int flag) {
@@ -82,11 +82,11 @@ static const int _MAP_HUGE = _MAP;
 #endif
 
 
-size_t Galois::Substrate::allocSize() {
+unsigned Galois::Runtime::allocSize() {
   return hugePageSize;
 }
 
-void* Galois::Substrate::allocPages(unsigned num, bool preFault) {
+void* Galois::Runtime::allocPages(unsigned num, bool preFault) {
   void* ptr = trymmap(num*hugePageSize, preFault ? _MAP_HUGE_POP : _MAP_HUGE);
   if (!ptr) {
     gWarn("Huge page alloc failed, falling back");
@@ -100,51 +100,9 @@ void* Galois::Substrate::allocPages(unsigned num, bool preFault) {
   return ptr;
 }
 
-void Galois::Substrate::freePages(void* ptr, unsigned num) {
+void Galois::Runtime::freePages(void* ptr, unsigned num) {
   std::lock_guard<SimpleLock> lg(allocLock);
   if (munmap(ptr, num*hugePageSize) != 0)
     GALOIS_SYS_DIE("Unmap failed");
 }
-
-
-/*
-
-class PageSizeConf {
-#ifdef MAP_HUGETLB
-  void checkHuge() {
-    std::ifstream f("/proc/meminfo");
-
-    if (!f) 
-      return;
-
-    char line[2048];
-    size_t hugePageSizeKb = 0;
-    while (f.getline(line, sizeof(line)/sizeof(*line))) {
-      if (strstr(line, "Hugepagesize:") != line)
-        continue;
-      std::stringstream ss(line + strlen("Hugepagesize:"));
-      std::string kb;
-      ss >> hugePageSizeKb >> kb;
-      if (kb != "kB")
-        Galois::Substrate::gWarn("error parsing meminfo");
-      break;
-    }
-    if (hugePageSizeKb * 1024 != Galois::Runtime::hugePageSize)
-      Galois::Substrate::gWarn("System HugePageSize does not match compiled HugePageSize");
-  }
-#else
-  void checkHuge() { }
-#endif
-
-public:
-  PageSizeConf() {
-#ifdef _POSIX_PAGESIZE
-    Galois::Runtime::pageSize = _POSIX_PAGESIZE;
-#else
-    Galois::Runtime::pageSize = sysconf(_SC_PAGESIZE);
-#endif
-    checkHuge();
-  }
-};
-*/
 

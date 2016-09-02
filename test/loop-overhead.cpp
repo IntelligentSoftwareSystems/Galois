@@ -58,7 +58,7 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
 unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th); //Galois::Runtime::LL::getMaxThreads());
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    Galois::Substrate::ThreadPool::getThreadPool().burnPower(th);
    
   Galois::Timer t;
   t.start();
@@ -71,7 +71,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
 unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th);
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    Galois::Substrate::ThreadPool::getThreadPool().burnPower(th);
   
   Galois::Timer t;
   t.start();

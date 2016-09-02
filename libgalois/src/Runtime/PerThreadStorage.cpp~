@@ -27,11 +27,29 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
-//#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
 #include <mutex>
+
+
+thread_local uint64_t* Galois::Runtime::detail::PerThreadStorageBase::storage;
+std::vector<uint64_t*> Galois::Runtime::detail::PerThreadStorageBase::heads;
+std::bitset<Galois::Runtime::detail::PerThreadStorageBase::PTSSize> Galois::Runtime::detail::PerThreadStorageBase::mask;
+unsigned Galois::Runtime::detail::PerThreadStorageBase::next;
+
+unsigned Galois::Runtime::detail::PerThreadStorageBase::alloc(unsigned bytes) {
+  unsigned num = (bytes + sizeof(uint64_t) - 1) / sizeof(uint64_t);
+  for (unsigned x = 0; x < PTSSize; ++x) {
+    for (unsigned y = 0; y < num; ++y) 
+  }
+}
+
+void Galois::Runtime::detail::PerThreadStorageBase::dealloc(unsigned offset, unsigned bytes) {
+  unsigned b = offset;
+  unsigned e = offset + (bytes + sizeof(uint64_t) - 1) / sizeof(uint64_t);
+  while (b != e)
+    mask[b++] = false;
+}
 
 __thread char* Galois::Substrate::ptsBase;
 

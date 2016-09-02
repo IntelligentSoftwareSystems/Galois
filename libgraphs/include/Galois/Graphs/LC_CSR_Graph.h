@@ -136,7 +136,7 @@ protected:
   uint64_t numNodesWithEdgesSortedByDst; 
 
   typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
- 
+
   edge_iterator raw_begin(GraphNode N) const {
     return edge_iterator((N == 0) ? 0 : edgeIndData[N-1]);
   }

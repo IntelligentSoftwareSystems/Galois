@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -29,14 +29,14 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Context.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/CacheLineStorage.h"
+#include "Galois/Runtime/SyncContext.h"
+#include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/CacheLineStorage.h"
 
 #include <stdio.h>
 
 //! Global thread context for each active thread
-static __thread Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
+static thread_local Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
 
 
 void Galois::Runtime::signalFailSafe(void) {
@@ -52,7 +52,7 @@ Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
 }
 
 void Galois::Runtime::signalConflict(Lockable* lockable) {
-  throw Galois::Runtime::CONFLICT; // Conflict
+  throw conflict_t{lockable};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -105,12 +105,13 @@ void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* l
 
 unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
   unsigned numLocks = 0;
-  while (locks) {
-    //ORDER MATTERS!
-    Lockable* lockable = locks;
-    locks = lockable->next;
-    lockable->next = 0;
-    Substrate::compilerBarrier();
+  Lockable* _locks = locks;
+  locks = nullptr;
+  while (_locks) {
+    Lockable* lockable = _locks;
+    //    _locks = lockable->next.exchange(nullptr, std::memory_order_relaxed);
+    _locks = lockable->next;
+    lockable->next = nullptr;
     release(lockable);
     ++numLocks;
   }
@@ -123,6 +124,6 @@ unsigned Galois::Runtime::SimpleRuntimeContext::cancelIteration() {
 }
 
 void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable, Galois::MethodFlag) {
-  GALOIS_DIE("Shouldn't get here");
+  gDie("Shouldn't get here");
 }
 

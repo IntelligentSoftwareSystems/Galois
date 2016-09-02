@@ -1,4 +1,4 @@
-/** Numa-aware Page Allocators -*- C++ -*-
+/** Barriers -*- C++ -*-
  * @file
  * @section License
  *
@@ -7,8 +7,8 @@
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,34 +21,44 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
  *
- * Numa small(page) allocations
+ * Public API for interacting with barriers
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#ifndef GALOIS_SUBSTRATE_PAGEALLOC_H
-#define GALOIS_SUBSTRATE_PAGEALLOC_H
+#ifndef GALOIS_RUNTIME_BARRIER_H
+#define GALOIS_RUNTIME_BARRIER_H
 
-#include <cstddef>
+#include <memory>
 
 namespace Galois {
-namespace Substrate {
+namespace Runtime {
 
-//size of pages
-size_t allocSize();
+class Barrier {
+public:
+  virtual ~Barrier();
 
-//allocate contiguous pages, optionally faulting them in
-void* allocPages(unsigned num, bool preFault);
+  //not safe if any thread is in wait
+  virtual void reinit(unsigned val) = 0;
 
-//free page range
-void freePages(void* ptr, unsigned num);
+  //Wait at this barrier
+  virtual void wait() = 0;
 
-} // namespace Substrate
-} // namespace Galois
+  //wait at this barrier
+  void operator()(void) { wait(); }
 
-#endif //GALOIS_SUBSTRATE_PAGEALLOC_H
+  //barrier type.
+  virtual const char* name() const = 0;
+};
+
+std::unique_ptr<Barrier> createBarrier(unsigned);
+
+} // end namespace Runtime
+} // end namespace Galois
+
+#endif

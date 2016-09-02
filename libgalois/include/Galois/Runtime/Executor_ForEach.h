@@ -349,7 +349,7 @@ protected:
   ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
     barrier(getBarrier(activeThreads)),
-    wl(wargs...),
+    wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
     broke(false) {
@@ -531,7 +531,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
     Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl, 
+        std::tuple_cat(xtpl,
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));

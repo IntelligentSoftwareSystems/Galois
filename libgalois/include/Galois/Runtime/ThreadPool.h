@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -31,39 +31,21 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef GALOIS_SUBSTRATE_THREADPOOL_H
-#define GALOIS_SUBSTRATE_THREADPOOL_H
+#ifndef GALOIS_RUNTIME_THREADPOOL_H
+#define GALOIS_RUNTIME_THREADPOOL_H
 
-#include "CacheLineStorage.h"
 #include "HWTopo.h"
 
 #include <condition_variable>
 #include <thread>
 #include <functional>
 #include <atomic>
-#include <vector>
+//#include <vector>
 #include <cassert>
-#include <cstdlib>
+//#include <cstdlib>
 
 namespace Galois {
-namespace Substrate {
-
-namespace detail {
-
-template<typename tpl, int s, int r>
-struct ExecuteTupleImpl {
-  static inline void execute(tpl& cmds) {
-    std::get<s>(cmds)();
-    ExecuteTupleImpl<tpl,s+1,r-1>::execute(cmds);
-  }
-};
-
-template<typename tpl, int s>
-struct ExecuteTupleImpl<tpl, s, 0> {
-  static inline void execute(tpl& f) { }
-};
-
-}
+namespace Runtime {
 
 class ThreadPool {
 protected:
@@ -81,32 +63,14 @@ protected:
     std::atomic<int> fastRelease;
     threadTopoInfo topo;
 
-    void wakeup(bool fastmode) {
-      if (fastmode) {
-        done = 0;
-        fastRelease = 1;
-      } else {
-        std::lock_guard<std::mutex> lg(m);
-        done = 0;
-        cv.notify_one();
-      //start.release();
-      }
-    }
-
-    void wait(bool fastmode) {
-      if (fastmode) {
-        while(!fastRelease.load(std::memory_order_relaxed)) { asmPause(); }
-        fastRelease = 0;
-      } else {
-        std::unique_lock<std::mutex> lg(m);
-        cv.wait(lg, [=] { return !done; });
-        //start.acquire();
-      }
-    }
+    void wakeup(bool fastmode);
+    void wait(bool fastmode);
   };
 
   thread_local static per_signal my_box;
 
+  bool no_bind;
+  bool no_bind_main;
   machineTopoInfo mi;
   std::vector<per_signal*> signals;
   std::vector<std::thread>  threads;
@@ -132,35 +96,13 @@ protected:
   //! spin down after run
   void decascade();
 
-  //! execute work on num threads
-  void runInternal(unsigned num);
-
-  ThreadPool();
+  ThreadPool(bool _no_bind, bool _no_bind_main);
 
 public:
   ~ThreadPool();
 
-  //! execute work on all threads
-  //! a simple wrapper for run
-  template<typename... Args>
-  void run(unsigned num, Args&&... args) {
-    struct ExecuteTuple {
-      using Ty = std::tuple<Args...>;
-      Ty cmds;
-
-      void operator()(){
-        detail::ExecuteTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(this->cmds);
-      }
-      ExecuteTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
-    };
-    //paying for an indirection in work allows small-object optimization in std::function
-    //to kick in and avoid a heap allocation
-    ExecuteTuple lwork(std::forward<Args>(args)...);
-    work = std::ref(lwork);
-    //work = std::function<void(void)>(ExecuteTuple(std::forward<Args>(args)...));
-    assert(num <= getMaxThreads());
-    runInternal(num);
-  }
+  //! execute work on num threads
+  void run(unsigned num, std::function<void(void)>&& fn);
 
   //! run function in a dedicated thread until the threadpool exits
   void runDedicated(std::function<void(void)>& f);
@@ -201,7 +143,7 @@ public:
   static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
-  static ThreadPool& getThreadPool();
+  static ThreadPool& getThreadPool(bool no_bind=false, bool no_bind_main=false);
 };
 
 } //Substrate

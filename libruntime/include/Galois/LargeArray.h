@@ -120,6 +120,13 @@ public:
     destroy();
     deallocate();
   }
+
+  friend void swap(LargeArray& lhs, LargeArray& rhs) {
+    std::swap(lhs.m_data, rhs.m_data);
+    std::swap(lhs.m_size, rhs.m_size);
+    std::swap(lhs.allocated, rhs.allocated);
+  }
+
   
   const_reference at(difference_type x) const { return m_data[x]; }
   reference at(difference_type x) { return m_data[x]; }
@@ -199,6 +206,8 @@ public:
   LargeArray(const LargeArray&) = delete;
   LargeArray& operator=(const LargeArray&) = delete;
 
+  friend void swap(LargeArray&, LargeArray&) {}
+
   typedef void raw_value_type;
   typedef void* value_type;
   typedef size_t size_type;
@@ -217,7 +226,8 @@ public:
   const_reference at(difference_type x) const { return 0; }
   reference at(difference_type x) { return 0; }
   const_reference operator[](size_type x) const { return 0; }
-  void set(difference_type x, const_reference v) { }
+  template<typename AnyTy>
+  void set(difference_type x, AnyTy v) { }
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }

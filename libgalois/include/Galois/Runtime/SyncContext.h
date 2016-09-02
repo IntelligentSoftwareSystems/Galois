@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -32,8 +32,8 @@
 #define GALOIS_RUNTIME_CONTEXT_H
 
 #include "Galois/MethodFlags.h"
-#include "Galois/Substrate/PtrLock.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/PtrLock.h"
+#include "Galois/Runtime/ErrorFeedBack.h"
 
 #include <boost/utility.hpp>
 
@@ -50,7 +50,6 @@ enum ConflictFlag {
   BREAK = 2
 };
 
-
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
@@ -61,14 +60,14 @@ class LockManagerBase;
  * Lockable. 
  */
 class Lockable {
-  Substrate::PtrLock<LockManagerBase> owner;
+  PtrLock<LockManagerBase> owner;
   //! Use an intrusive list to track neighborhood of a context without allocation overhead.
   //! Works for cases where a Lockable needs to be only in one context's neighborhood list
-  Lockable* next;
+  std::atomic<Lockable*> next;
   friend class LockManagerBase;
   friend class SimpleRuntimeContext;
 public:
-  Lockable() :next(0) {}
+  Lockable() :next(nullptr) {}
 };
 
 class LockManagerBase: private boost::noncopyable {
@@ -77,8 +76,10 @@ protected:
     FAIL, NEW_OWNER, ALREADY_OWNER
   };
 
+  //Acquire lock
   AcquireStatus tryAcquire(Lockable* lockable);
 
+  //Don't use unless you are Donald
   inline bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
     assert(lockable != nullptr);
     return lockable->owner.stealing_CAS(other, this);
@@ -119,6 +120,7 @@ class SimpleRuntimeContext: public LockManagerBase {
 
 protected:
   friend void doAcquire(Lockable*, Galois::MethodFlag);
+  friend void doAcquire(Lockable*, SimpleRuntimeContext*, Galois::MethodFlag);
 
   static SimpleRuntimeContext* getOwner(Lockable* lockable) {
     LockManagerBase* owner = LockManagerBase::getOwner(lockable);
@@ -182,6 +184,11 @@ inline void doAcquire(Lockable* lockable, Galois::MethodFlag m) {
     ctx->acquire(lockable, m);
 }
 
+inline void doAcquire(Lockable* lockable, SimpleRuntimeContext* ctx, Galois::MethodFlag m) {
+  assert(ctx);
+  ctx->acquire(lockable, m);
+}
+
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
@@ -189,6 +196,13 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
     doAcquire(lockable, m);
 }
 
+inline void acquire(Lockable* lockable, SimpleRuntimeContext* ctx, Galois::MethodFlag m) {
+  if (shouldLock(m))
+    doAcquire(lockable, ctx, m);
+}
+
+#if 0
+//lambdas should make these unecessary
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
     doAcquire(lockable, Galois::MethodFlag::WRITE);
@@ -202,10 +216,16 @@ struct CheckedLockObj {
     acquire(lockable, m);
   }
 };
+#endif
 
 void signalConflict(Lockable* = nullptr);
 
 void signalFailSafe(void);
+
+//This is thrown from signalConflict
+struct conflict_t {
+  Lockable* obj;
+};
 
 }
 } // end namespace Galois
