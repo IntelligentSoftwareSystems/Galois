@@ -207,7 +207,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
       for(auto info : localToGlobalMap_meta){
-        assert(info.owner_id >= 0 && info.owner_id < numHosts);
+        assert(info.owner_id >= 0 && info.owner_id < base_hGraph::numHosts);
         slaveNodes[info.owner_id].push_back(info.global_id);
 
         GlobalVec.push_back(info.global_id);

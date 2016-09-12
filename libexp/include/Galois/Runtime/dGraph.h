@@ -38,6 +38,7 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
+#include <iostream>
 
 //#include "Galois/Runtime/dGraph_vertexCut.h"
 //#include "Galois/Runtime/dGraph_edgeCut.h"
@@ -1347,6 +1348,56 @@ public:
       StatTimer_syncPush.stop();
 
    }
+
+  template <typename FnTy>
+  void checkpoint(std::string loopName) {
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    std::string doall_str("LAMBDA::CHECKPOINT_" + loopName + "_" + std::to_string(num_run));
+    //checkpoint owned nodes.
+    std::vector<typename FnTy::ValTy> val_vec(numOwned);
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
+
+          auto val = FnTy::extract(n, getData(n));
+          val_vec[n] = val;
+        }, Galois::loopname(doall_str.c_str()));
+
+    //Write val_vec to disk.
+      for(auto k = 0; k < 10; ++k){
+        std::cout << "BEFORE : val_vec[" << k <<"] :" << val_vec[k] << "\n";
+      }
+
+    std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary);
+    chkPt_file.seekp(0);
+    chkPt_file.write(reinterpret_cast<char*>(&val_vec[0]), val_vec.size()*sizeof(uint32_t));
+    chkPt_file.close();
+
+  }
+
+  template<typename FnTy>
+    void checkpoint_apply(std::string loopName){
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      std::string doall_str("LAMBDA::CHECKPOINT_APPLY_" + loopName + "_" + std::to_string(num_run));
+      //checkpoint owned nodes.
+      std::vector<typename FnTy::ValTy> val_vec(numOwned);
+      //read val_vec from disk.
+      std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+      std::ifstream chkPt_file(chkPt_fileName, std::ios::in | std::ofstream::binary);
+      if(!chkPt_file.is_open()){
+        std::cout << "Unable to open checkpoint file " << chkPt_fileName << " ! Exiting!\n";
+        exit(1);
+      }
+      chkPt_file.read(reinterpret_cast<char*>(&val_vec[0]), numOwned*sizeof(uint32_t));
+
+      for(auto k = 0; k < 10; ++k){
+        std::cout << "AFTER : val_vec[" << k << "] : " << val_vec[k] << "\n";
+      }
+
+      Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
+
+          FnTy::setVal(n, getData(n), val_vec[n]);
+          }, Galois::loopname(doall_str.c_str()));
+    }
 
    template<typename FnTy>
    void sync_pull(std::string loopName) {
