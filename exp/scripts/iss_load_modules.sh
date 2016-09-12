@@ -6,15 +6,15 @@ if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
 fi
 
 # first up remove everything
-#module purge
+module purge
+
+module use /opt/apps/ossw/modulefiles/
 
 if [ $(lsb_release -si) = "CentOS" ] ; then
     module load c7
 else
     module load sl6
 fi
-
-module use /opt/apps/ossw/modulefiles/
 
 if [ $(lsb_release -si) == "CentOS" ] ; then
     module load c7
@@ -43,7 +43,6 @@ module load boost
 module load eigen
 module load neon
 if [ "$SYSTEMTYPE" == "c7" ] ; then
-  module load module-git
   module load serf
 else
   module load git
