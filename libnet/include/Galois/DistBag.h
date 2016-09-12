@@ -104,12 +104,15 @@ public:
     Galois::StatTimer StatTimer_sync(sync_str.c_str());
     StatTimer_sync.start();
 
+    std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    Galois::Statistic num_work_bytes(work_bytes_str.c_str());
     //send things to other hosts.
     for(auto x = 0; x < net.Num; ++x){
       if(x == net.ID)
         continue;
       Galois::Runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
+      num_work_bytes += b.size();
       net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
