@@ -14,7 +14,7 @@ import numpy
 # All time values are in sec by default.
 
 
-def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, total_hosts):
+def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, total_hosts, partition):
 
   mean_time = 0.0;
   recvNum_total = 0
@@ -57,30 +57,66 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   #414c1fb5-0df1-4741-a0ee-cee82f2fc83b,(NULL),0 , DO_ALL_IMPL_bfs,0,0,389
   total_do_all_impl = 0.0
   total_send_bytes = 0;
-  '''
-  for host in range(0,int(total_hosts)):
-    do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'\w*,' + re.escape(str(host)) + r',\d*,(\d*)')
-    do_all_impl_host = do_all_impl_regex.search(log_data)
-    if do_all_impl_host is not None:
-      print("->", do_all_impl_host.group(1))
-      total_do_all_impl += float(do_all_impl_host.group(1))
+  max_do_all_impl = 0.0;
+  #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,5145
+  #35537c51-6ba3-47aa-afa0-72edec803b75,(NULL),0 , DO_ALL_IMPL_bfs,3,0,41104
+  if(partition == "vertex-cut"):
+    do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'.*,\d*,\d*,(\d*)')
+    do_all_impl_all = re.findall(do_all_impl_regex, log_data)
+    #print do_all_impl_all
+    for do_all_time in do_all_impl_all:
+      #print("->", float(do_all_time))
+      if(max_do_all_impl < float(do_all_time)):
+        max_do_all_impl = float(do_all_time)
 
-  total_do_all_impl /= int(numRuns)
-  total_do_all_impl /= divisor
-  total_do_all_impl = round(total_do_all_impl, 3)
+      total_do_all_impl += float(do_all_time)
+
+    total_do_all_impl /= int(numRuns)
+    total_do_all_impl /= divisor
+    total_do_all_impl = round(total_do_all_impl, 3)
+
+    max_do_all_impl /= int(numRuns)
+    max_do_all_impl /= divisor
+    max_do_all_impl = round(max_do_all_impl, 3)
+
+    print total_do_all_impl
+    print "max : ", max_do_all_impl
+
+  if(partition == "edge-cut"):
+    #0d0cd9b5-f61d-4bd7-963d-f5d129cd711e,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,8007
+    for host in range(0,int(total_hosts)):
+      do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0.*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+      do_all_impl_per_host = re.findall(do_all_impl_regex, log_data)
+      #print do_all_impl_all
+      time_per_host = 0.0
+      #print "----> ", do_all_impl_per_host
+      for do_all_time in do_all_impl_per_host:
+        time_per_host += float(do_all_time)
+        #print time_per_host
+
+      total_do_all_impl += time_per_host
+      if(max_do_all_impl < time_per_host):
+        max_do_all_impl = time_per_host
+
+    total_do_all_impl /= divisor
+    total_do_all_impl = round(total_do_all_impl, 3)
+
+    max_do_all_impl /= divisor
+    max_do_all_impl = round(max_do_all_impl, 3)
+
+    print "total_do_all : ", total_do_all_impl
+    print "max : ", max_do_all_impl
 
 
-  #48409c5e-9c41-4830-8c4d-347a9f2b6551,(NULL),0 , SEND_BYTES_SYNC_PUSH_BFS_0,0,0,1340025160
+
 
   if(benchmark == "cc"):
     benchmark = "ConnectedComp"
 
-  for host in range(0,int(total_hosts)):
-    print("host : ", host)
-    send_bytes_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_(?i)' + re.escape(benchmark) + r'_0,' + re.escape(str(host)) + r',\d*,(\d*)')
-    send_bytes_firstItr_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_FirstItr_(?i)' + re.escape(benchmark) + r'_0,' + re.escape(str(host)) + r',\d*,(\d*)')
-    #send_bytes_host = send_bytes_regex.search(log_data)
-    #send_bytes_firstItr_host = send_bytes_firstItr_regex.search(log_data)
+  #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,BFS,0 , SEND_BYTES_SYNC_PULL,0,0,4209914580
+  if(partition == "edge-cut"):
+    send_bytes_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_(?i)' + re.escape(benchmark) + r'.*,\d*,\d*,(\d*)')
+    send_bytes_firstItr_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_FirstItr_(?i)' + re.escape(benchmark) + r'.*,\d*,\d*,(\d*)')
 
     send_bytes_host = re.findall(send_bytes_regex, log_data)
     send_bytes_firstItr_host = re.findall(send_bytes_firstItr_regex, log_data)
@@ -92,7 +128,27 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
     for byte_firstItr in send_bytes_firstItr_host:
       total_send_bytes += int(byte_firstItr[1])
-      '''
+
+    total_send_bytes /= int(numRuns)
+
+  elif(partition == "vertex-cut"):
+    #35537c51-6ba3-47aa-afa0-72edec803b75,BFS,0 , SEND_BYTES_SYNC_PULL,0,0,4210027620
+    send_bytes_regex = re.compile(r'.*,(?i)' + re.escape(benchmark) + r',0\s,\sSEND_BYTES_SYNC_(PUSH|PULL),\d*,\d*,(\d*)')
+    send_bytes_firstItr_regex = re.compile(r'.*,FirstItr_(?i)' + re.escape(benchmark) + r',0\s,\sSEND_BYTES_SYNC_(PUSH|PULL),\d*,\d*,(\d*)')
+
+    send_bytes_host = re.findall(send_bytes_regex, log_data)
+    send_bytes_firstItr_host = re.findall(send_bytes_firstItr_regex, log_data)
+
+    print send_bytes_host
+    for byte in send_bytes_host:
+      total_send_bytes += (int(byte[1]))
+      #print("->", byte[0], " , " , byte[1])
+      #print("->", byte_firstItr[0], " , " , byte_firstItr[1])
+
+    for byte_firstItr in send_bytes_firstItr_host:
+      total_send_bytes += int(byte_firstItr[1])
+
+    total_send_bytes /= int(numRuns)
 
   ## SYNC_PULL and SYNC_PUSH total average over runs.
   num_iterations = 0
@@ -216,7 +272,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   print mean_time
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
   #return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
-  return mean_time,total_do_all_impl,total_send_bytes
+  return mean_time,total_do_all_impl,max_do_all_impl,total_send_bytes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -301,6 +357,41 @@ def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
   total_SendBytes = total_SendBytes_pull_sync + total_SendBytes_pull_reply + total_SendBytes_push_sync
 
   return total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_total_list
+
+
+
+def replication_factor(fileName, benchmark, partition, total_hosts, numRuns, numThreads, input_graph):
+  log_data = open(fileName).read()
+  total_nodes = 0
+  if(input_graph == "rmat28"):
+    total_nodes = 268435456
+  elif(input_graph == "twitter-ICWSM10-component"):
+    total_nodes = 51161011
+
+  print "total_nodes : ", total_nodes
+  if partition == "edge-cut":
+    total_ghost = 0
+    #7fee06cb-4c74-458f-a761-ddf6997a1edd,(NULL),0 , TotalGhostNodes,3,0,28215509
+    ghost_from_re = re.compile(r'.*,\(NULL\),0\s,\sTotalGhostNodes,(\d*),\d*,(\d*)')
+    ghost_from_lines = re.findall(ghost_from_re, log_data)
+    for line in ghost_from_lines:
+      #print int(line[1])
+      total_ghost += int(line[1])
+
+    rep_factor = float(total_nodes + total_ghost)/float(total_nodes)
+    return rep_factor
+  elif partition == "vertex-cut" or partition == "vertex-cut-balanced":
+    total_slave = 0
+    #8190584f-391e-45ca-9d3b-bf1d0d682fad,(NULL),0 , SLAVE_NODES_FROM_0,0,0,83207225
+    slave_from_re = re.compile(r'.*,\(NULL\),0\s,\sSLAVE_NODES_FROM_(\d*),(\d*),\d*,(\d*)')
+    slave_from_lines = re.findall(slave_from_re, log_data)
+    for line in slave_from_lines:
+      #print "v", int(line[2])
+      total_slave += int(line[2])
+
+    rep_factor = float(float(total_slave)/float(total_nodes))
+    return rep_factor
+
 
 
 def build_master_ghost_matrix(fileName, benchmark, partition, total_hosts, numRuns, numThreads):
@@ -489,7 +580,9 @@ def main(argv):
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
   print 'Devices : ', devices
-  data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit, hostNum)
+  data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit, hostNum, cut_type)
+  rep_factor = replication_factor(inputFile, benchmark, cut_type, hostNum, runs, threads, input_graph)
+  print "rep factor : " , rep_factor
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
   #total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
@@ -509,7 +602,7 @@ def main(argv):
 
   header_csv_str = "benchmark,platform,host,threads,"
   header_csv_str += "deviceKind,devices,"
-  header_csv_str += "input,variant,partition,mean_time,total_comp_time,total_bytes_sent" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time,total_comp_time,max_comp_time,total_bytes_sent,rep_factor" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   #for i in range(0,256):
     #header_csv_str += ","
@@ -531,7 +624,7 @@ def main(argv):
 
   data_list = list(data) #[data] #list(data)
   #data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
-  complete_data = output_str.split(",") + data_list #+ list(sendBytes_list)
+  complete_data = output_str.split(",") + data_list + [rep_factor]#+ list(sendBytes_list)
   fd_outputFile = open(outputFile, 'a')
   wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
   wr.writerow(complete_data)
