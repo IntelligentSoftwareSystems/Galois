@@ -36,109 +36,108 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
 #define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
-#include "Galois/gstl.h"
-#include "Galois/gtuple.h"
-#include "Galois/Traits.h"
-#include "Galois/Statistic.h"
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Range.h"
+//#include "Galois/gstl.h"
+//#include "Galois/gtuple.h"
+//#include "Galois/Traits.h"
+//#include "Galois/Statistic.h"
+//#include "Galois/Substrate/Barrier.h"
+//#include "Galois/Runtime/Support.h"
+//#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Sampling.h"
+#include "Galois/Runtime/Statistics.h"
+#include "Galois/Runtime/PtrLock.h"
+#include "Galois/Runtime/Blocking.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
-#include <algorithm>
-#include <mutex>
-#include <tuple>
+//#include <algorithm>
+//#include <mutex>
+//#include <tuple>
 
 namespace Galois {
 namespace Runtime {
 
-namespace detail {
-
-template<typename iterator>
-struct state {
-  iterator stealBegin;
-  iterator stealEnd;
-  Substrate::SimpleLock stealLock;
-  std::atomic<bool> avail;
-  
-  state(): avail(false) { stealLock.lock(); }
-  
-  void populateSteal(iterator& begin, iterator& end) {
-    std::lock_guard<SimpleLock> lg(stealLock);
-    if (std::distance(begin, end) > 1) {
-      avail = true;
-      stealEnd = end;
-      stealBegin = end = Galois::split_range(begin, end);
-    }
-  }
-  
-  bool doSteal(iterator& begin, iterator& end, int minSteal, unsigned long& num) {
-    if (avail) {
-      std::lock_guard<Substrate::SimpleLock> lg(stealLock);
-      if (!avail)
-        return false;
-      
-      if (stealBegin != stealEnd) {
-        begin = stealBegin;
-        if (std::distance(stealBegin, stealEnd) < 2*minSteal)
-          end = stealBegin = stealEnd;
-        else
-          end = stealBegin = Galois::split_range(stealBegin, stealEnd);
-        if (stealBegin == stealEnd)
-          avail = false;
-        if (begin != end) {
-          num += std::distance(begin, end);
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-};
-
-} // namespace detail
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
-// TODO: add loopname + stats
 template<class FunctionTy, class RangeTy>
 class DoAllExecutor {
   typedef typename RangeTy::local_iterator iterator;
   FunctionTy F;
   RangeTy range;
   const char* loopname;
+  unsigned activeThreads;
 
-  PerThreadStorage<detail::state<iterator> > TLDS;
+  /*
+    starving queue
+    threads without work go in it.  When all threads are in the queue, stop
+  */
 
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool trySteal(state& local, iterator& begin, iterator& end, int minSteal, unsigned long& num) {
-    //First try stealing from self
-    if (local.doSteal(begin, end, minSteal, num))
-      return true;
-    //Then try stealing from neighbors
-    unsigned myID = ThreadPool::getTID();
-    unsigned myPkg = ThreadPool::getPackage();
-    auto& tp = ThreadPool::getThreadPool();
-    //try package neighbors
-    for (unsigned x = 0; x < activeThreads; ++x) {
-      if (x != myID && tp.getPackage(x) == myPkg) {
-        if (TLDS.getRemote(x)->doSteal(begin, end, minSteal, num)) {
-          if (std::distance(begin, end) > minSteal) {
-            local.populateSteal(begin, end);
-          }
-          return true;
-        }
-      }
+  unsigned exec(iterator b, iterator e) {
+    unsigned n = 0;
+    while (b != e) {
+      ++n;
+      F(*b++);
     }
-    //try some random
-    // auto num = (activeThreads + 7) / 8;
-    // for (unsigned x = 0; x < num; ++x)
-    //   if (TLDS.getRemote()->doSteal(begin, end))
-    //     return true;
-    return false;
+    return n;
   }
 
+  struct msg {
+    std::atomic<bool> ready;
+    bool exit;
+    iterator b, e;
+    msg* next;
+  };
+  PtrLock<msg> head;
+  std::atomic<unsigned> waiting;
+  
+  bool wait(iterator& b, iterator& e) {
+    //else, add ourselves to the queue
+    msg self;
+    self.ready = false;
+    self.exit = false;
+    do {
+      self.next = head.getValue();
+    } while(head.CAS(self.next, &self));
+    auto old = waiting.fetch_add(1);
+    //we are the last, signal everyone to exit
+    if (old + 1 == activeThreads) {
+      msg* m = head.getValue();
+      while (m) {
+        auto mn = m->next;
+        m->exit = true;
+        m->next = nullptr;
+        m->ready = true;
+        m = mn;
+      }
+    }
+    //wait for signal
+    while(!self.ready) { asmPause(); }
+    if (self.exit)
+      return false;
+    b = self.b;
+    e = self.e;
+    return true;
+  }
+
+  unsigned tryDonate(iterator& b, iterator& e) {
+    if (!waiting)
+      return 0;
+    head.lock();
+    msg* other = head.getValue();
+    head.unlock_and_set(other->next);
+    --waiting;
+    other->next = nullptr;
+    auto mid = split_range(b,e);
+    other->b = mid;
+    other->e = e;
+    auto retval = std::distance(mid, e);
+    e = mid;
+    other->ready = true;
+    return retval;
+  }
+  
 public:
-  DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const char* ln)
-    :F(_F), range(r), loopname(ln)
+  DoAllExecutor(const FunctionTy& _F, const RangeTy& r, unsigned atv, const char* ln)
+    :F(_F), range(r), loopname(ln), activeThreads(atv)
   {
     reportLoopInstance(loopname);
   }
@@ -147,59 +146,47 @@ public:
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
     iterator end = range.local_end();
-
-    int minSteal = std::distance(begin,end) / 8;
-    state& tld = *TLDS.getLocal();
-    
-    tld.populateSteal(begin,end);
+        
     unsigned long stat_iterations = 0;
-    unsigned long stat_steals = 0;
+    unsigned long stat_donations = 0;
 
     do {
-      while (begin != end) {
-        ++count;
-        F(*begin++);
-      }
-    } while (steal && trySteal(tld, begin, end, minSteal, stat_steals));
-
-    reportStat(loopname, "Iterations", stat_iterations, 0);
+      do {
+        auto mid = split_range(begin,end);
+        stat_iterations += exec(begin, mid);
+        begin = mid;
+        stat_donations += tryDonate(begin,end);
+      } while (begin != end);
+    } while (wait(begin, end));
+    
+    reportStat(loopname, "Iterations", stat_iterations, ThreadPool::getTID());
+    reportStat(loopname, "Donations", stat_donations, ThreadPool::getTID());
   }
 };
 
 
 
 template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
+void do_all_impl(const RangeTy& range, const FunctionTy& f, unsigned activeThreads, const char* loopname = 0, bool steal = false) {
+  reportLoopInstance(loopname);
+  beginSampling(loopname);
   if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    DoAllExecutor<FunctionTy, RangeTy> W(f, range, activeThreads, loopname);
+    ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
   } else {
     FunctionTy f_cpy (f);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range, &loopname] () {
         auto begin = range.local_begin();
         auto end = range.local_end();
+        auto num = std::distance(begin,end);
         while (begin != end)
           f_cpy(*begin++);
+        reportState(loopname, "Iterations", num, ThreadPool::getTID());
       });
   }
+  endSampling();
 }
 
-template<typename RangeTy, typename FunctionTy, typename TupleTy>
-void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
-  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
-
-  auto dtpl = std::tuple_cat(tpl,
-      get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, do_all_steal<>{})));
-
-  do_all_impl(
-      r, fn,
-      get_by_supertype<loopname_tag>(dtpl).getValue(),
-      get_by_supertype<do_all_steal_tag>(dtpl).getValue());
-}
 
 
 } // end namespace Runtime

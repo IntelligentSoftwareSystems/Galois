@@ -32,10 +32,13 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Threads.h"
 #include "Galois/Version.h"
 
 #include <iostream>
 #include <sstream>
+
+#include <unistd.h>
 
 //! standard global options to the benchmarks
 llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));

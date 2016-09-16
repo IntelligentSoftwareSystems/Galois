@@ -187,10 +187,11 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        reportStat(loopname, "Conflicts", stat_conflicts, 0);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, 0);
-        reportStat(loopname, "Pushes", stat_pushes, 0);
-        reportStat(loopname, "Iterations", stat_iterations, 0);
+        auto ID = ThreadPool::getTID();
+        reportStat(loopname, "Conflicts", stat_conflicts, ID);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, ID);
+        reportStat(loopname, "Pushes", stat_pushes, ID);
+        reportStat(loopname, "Iterations", stat_iterations, ID);
       }
     }
   };

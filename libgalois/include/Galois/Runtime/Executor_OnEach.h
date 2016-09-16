@@ -1,4 +1,4 @@
-/** heap building blocks -*- C++ -*-
+/** Galois Simple Function Executor -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,39 +21,35 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
  *
- * Strongly inspired by heap layers:
- *  http://www.heaplayers.org/
- * FSB is modified from:
- *  http://warp.povusers.org/FSBAllocator/
+ * Simple wrapper for the thread pool
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_PAGEPOOL_H
-#define GALOIS_RUNTIME_PAGEPOOL_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_ONEACH_H
+#define GALOIS_RUNTIME_EXECUTOR_ONEACH_H
 
-#include <cstddef>
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/Sampling.h"
+#include "Galois/Runtime/Statistics.h"
 
 namespace Galois {
 namespace Runtime {
 
-//! Low level page pool (individual pages, use largeMalloc for large blocks)
-
-void* pagePoolAlloc();
-void pagePoolFree(void*);
-void pagePoolPreAlloc(unsigned);
-
-//Size of returned pages
-size_t pagePoolSize();
-
-//! Returns total large pages allocated by Galois memory management subsystem
-int numPagePoolAllocTotal();
-//! Returns total large pages allocated for thread by Galois memory management subsystem
-int numPagePoolAllocForThread(unsigned tid);
+template<typename FunctionTy>
+void on_each_impl(unsigned activeThreads, const FunctionTy& fn, const char* loopname = nullptr) {
+  reportLoopInstance(loopname);
+  beginSampling(loopname);
+  ThreadPool::getThreadPool().run(activeThreads,
+                                  [&fn, activeThreads] () {
+                                    fn(ThreadPool::getTID(), activeThreads);
+                                  });
+  endSampling();
+}
 
 } // end namespace Runtime
 } // end namespace Galois

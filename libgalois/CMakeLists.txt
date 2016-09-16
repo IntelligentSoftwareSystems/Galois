@@ -11,7 +11,10 @@ set(sources
         src/Runtime/EnvCheck.cpp
         src/Runtime/SyncContext.cpp
         src/Runtime/StatCollector.cpp
-)
+        src/Runtime/PagePool.cpp
+        src/Runtime/Support.cpp
+        src/Runtime/Sampling.cpp
+        )
 
 add_library(galois STATIC ${sources})
 target_include_directories(galois PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

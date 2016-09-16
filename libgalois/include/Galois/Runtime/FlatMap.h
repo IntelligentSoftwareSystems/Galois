@@ -21,14 +21,14 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_FLATMAP_H
-#define GALOIS_FLATMAP_H
+#ifndef GALOIS_RUNTIME_FLATMAP_H
+#define GALOIS_RUNTIME_FLATMAP_H
 
 #include <algorithm>
 #include <stdexcept>
@@ -36,6 +36,7 @@
 #include <vector>
 
 namespace Galois {
+namespace Runtime {
 
 //! Simple map data structure, based off a single array.
 template<
@@ -372,14 +373,15 @@ inline bool operator>=(const flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
   return !(__x < __y);
 }
 
-}
+} //namespace Runtime
+} //namespace Galois
 
 namespace std {
 
-/// See Galois::flat_map::swap().
+/// See Galois::Runtime::flat_map::swap().
 template<typename _Key, typename _Tp, typename _Compare, typename _Alloc>
-inline void swap(Galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
-		 Galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __y) {
+inline void swap(Galois::Runtime::flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
+		 Galois::Runtime::flat_map<_Key, _Tp, _Compare, _Alloc>& __y) {
   __x.swap(__y);
 }
 

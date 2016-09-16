@@ -1,10 +1,8 @@
-/** Galois Version -*- C++ -*-
+/** Implementation for various Functions -*- C++ -*-
  * @file
- * Version of galois accessors
- *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -23,27 +21,18 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
- * @author Andrew Lenharth <andrew@lenharth.org>
- *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_VERSION_H
-#define GALOIS_VERSION_H
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/PagePool.h"
+#include "Galois/Runtime/GaloisConfig.h"
 
-#include <string>
-
-namespace Galois {
-
-std::string getVersion();
-std::string getRevision();
-int getVersionMajor();
-int getVersionMinor();
-int getVersionPatch();
-int getCopyrightYear();
-
-} // end namespace Galois
-
-#endif
+void preAllocThreads(unsigned num, unsigned activeThreads) {
+  using namespace Galois::Runtime;
+  unsigned pagesPerThread = (num + activeThreads - 1) / activeThreads;
+  on_each_impl(activeThreads, [pagesPerThread] (unsigned,unsigned) {pagePoolPreAlloc(pagesPerThread);}, "prealloc");
+}

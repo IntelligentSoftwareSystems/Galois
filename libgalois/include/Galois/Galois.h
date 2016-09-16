@@ -23,7 +23,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  */
@@ -31,19 +31,19 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/Runtime/Executor_Deterministic.h"
-#include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/Executor_ForEach.h"
+#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/PagePool.h"
+#include "Galois/Runtime/GaloisImpl.h"
+
+//#include "Galois/Runtime/Executor_Deterministic.h"
+//#include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/Executor_OnEach.h"
-#include "Galois/Runtime/Executor_Ordered.h"
-#include "Galois/Runtime/Mem.h"
+//#include "Galois/Runtime/Executor_Ordered.h"
+//#include "Galois/Runtime/Mem.h"
 
-#include "Galois/WorkList/WorkList.h"
+//#include "Galois/WorkList/WorkList.h"
 
-#ifdef GALOIS_USE_EXP
-//#include "Galois/Runtime/Executor_BulkSynchronous.h"
-//#include "Galois/Runtime/Executor_ParaMeter.h"
-#endif
+#include "Galois/Threads.h"
 
 #include <utility>
 #include <tuple>
@@ -153,8 +153,8 @@ void on_each(const FunctionTy& fn, const Args&... args) {
  *
  * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
  */
-static inline void preAlloc(int num) {
-  Runtime::preAlloc_impl(num);
+static inline void preAlloc(unsigned num) {
+  Runtime::preAllocThreads(num, getActiveThreads());
 }
 
 /**
@@ -167,6 +167,7 @@ static inline void reportPageAlloc(const char* label) {
   Runtime::reportPageAlloc(label);
 }
 
+#if 0
 /**
  * Galois ordered set iterator for stable source algorithms.
  *
@@ -209,6 +210,7 @@ template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename
 void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
+#endif
 
 } //namespace Galois
 #endif
