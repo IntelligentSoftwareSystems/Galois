@@ -85,6 +85,12 @@ namespace Galois {
       return a;
     }
 
+  template<typename Ty>
+    const Ty set(std::atomic<Ty>& a, const Ty& b) {
+      a = b;
+      return a;
+    }
+
   /** Pair Wise Average function **/
   template<typename Ty>
   const Ty pairWiseAvg(Ty a, Ty b) {
