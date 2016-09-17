@@ -36,11 +36,8 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-#include "Galois/Runtime/vGraph.h"
-#else
-#include "Galois/Runtime/hGraph.h"
-#endif
+#include "Galois/Runtime/dGraph_edgeCut.h"
+#include "Galois/Runtime/dGraph_vertexCut.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/DistBag.h"
@@ -71,12 +68,13 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-#endif
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+
+static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -98,11 +96,12 @@ struct PR_NodeData {
 
 };
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-typedef vGraph<PR_NodeData, void> Graph;
-#else
 typedef hGraph<PR_NodeData, void> Graph;
-#endif
+typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
+
+typedef typename Graph::GraphNode GNode;
+
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
@@ -224,17 +223,20 @@ int main(int argc, char** argv) {
 #endif
 
     StatTimer_hg_init.start();
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-    Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
-#else
-    Graph hg(inputFile, net.ID, net.Num, scalefactor);
-#endif
+    Graph* hg;
+    if(enableVCut){
+      hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+    else {
+      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
-      MarshalGraph m = hg.getMarshalGraph(my_host_id);
+      MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, &cuda_wl, m, net.Num, cuda_wl_dup_factor);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
@@ -244,7 +246,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-      InitializeGraph::go(hg);
+      InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
     for(auto run = 0; run < numRuns; ++run){
@@ -252,17 +254,17 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-      hg.reset_num_iter(run);
+      (*hg).reset_num_iter(run);
 
       StatTimer_main.start();
-        PageRank::go(hg);
+        PageRank::go((*hg));
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
         Galois::Runtime::getHostBarrier().wait();
-        hg.reset_num_iter(run);
-        ResetGraph::go(hg);
-        InitializeGraph::go(hg);
+        (*hg).reset_num_iter(run);
+        ResetGraph::go((*hg));
+        InitializeGraph::go((*hg));
       }
     }
 
@@ -273,13 +275,13 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).value);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
         }
       }
 #endif
