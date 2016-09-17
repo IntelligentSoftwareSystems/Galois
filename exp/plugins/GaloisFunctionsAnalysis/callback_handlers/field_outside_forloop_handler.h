@@ -56,6 +56,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
@@ -65,6 +67,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
+              auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
 
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
@@ -133,9 +136,42 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 if(assignmentOP_vec) {
                   //assignmentOP_vec->dump();
                 }
-                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull_maybe";
-                  llvm::outs() << "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP => " << reduceOP_entry.FIELD_NAME << "\n";
+
+                  if(assignplusOP){
+                    reduceOP_entry.OPERATION_EXPR = "add";
+                    reduceOP_entry.RESETVAL_EXPR = "0";
+                  }
+                  else if(plusOP){
+                    reduceOP_entry.OPERATION_EXPR = "add";
+                    reduceOP_entry.RESETVAL_EXPR = "0";
+                  }
+                  else if(assignmentOP){
+                    reduceOP_entry.OPERATION_EXPR = "set";
+                    reduceOP_entry.RESETVAL_EXPR = "0";
+                  }
+                  else if(atomicAdd_op){
+                    reduceOP_entry.OPERATION_EXPR = "add";
+                    reduceOP_entry.RESETVAL_EXPR = "0";
+                  }
+                  else if(atomicMin_op){
+                    reduceOP_entry.OPERATION_EXPR = "min";
+                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+                  }
+                  else if(assignmentOP_vec){
+                    reduceOP_entry.OPERATION_EXPR = "set";
+                    reduceOP_entry.RESETVAL_EXPR =  "0;";
+                  }
+                  else if(plusOP_vec){
+                    string reduceOP, resetValExpr;
+                    // FIXME: do not pass entire string; pass only the command like add_vec
+                    reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
+                    resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
+                    reduceOP_entry.OPERATION_EXPR = reduceOP;
+                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+                  }
 
                   if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);

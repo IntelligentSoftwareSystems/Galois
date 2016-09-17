@@ -84,7 +84,7 @@ namespace {
       }
   };
 
-  struct Write_set_PUSH {
+  struct Write_set {
     string GRAPH_NAME;
     string NODE_TYPE;
     string FIELD_TYPE;
@@ -92,6 +92,7 @@ namespace {
     string REDUCE_OP_EXPR;
     string VAL_TYPE;
     string RESET_VAL_EXPR;
+    string SYNC_TYPE;
   };
 
   struct Write_set_PULL {
@@ -102,9 +103,9 @@ namespace {
     string VAL_TYPE;
   };
 
-  std::string getSyncer(unsigned counter, const Write_set_PUSH& i) {
+  std::string getSyncer(unsigned counter, const Write_set& i, std::string struct_type="") {
     std::stringstream s;
-    s << "\tstruct Syncer_" << counter << " {\n";
+    s << "\tstruct Syncer_" << struct_type << counter << " {\n";
     s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
@@ -147,9 +148,9 @@ namespace {
     return s.str();
   }
 
-  std::string getSyncerPull(unsigned counter, const Write_set_PULL& i) {
+  std::string getSyncerPull(unsigned counter, const Write_set& i, std::string struct_type="") {
     std::stringstream s;
-    s << "\tstruct SyncerPull_" << counter << " {\n";
+    s << "\tstruct SyncerPull_" << struct_type << counter << " {\n";
     s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
@@ -225,8 +226,8 @@ namespace {
           vector<string>write_setGNode_vec;
           string GraphNode;
 
-          vector<Write_set_PUSH> write_set_vec_PUSH;
-          vector<Write_set_PULL> write_set_vec_PULL;
+          vector<Write_set> write_set_vec_PUSH;
+          vector<Write_set> write_set_vec_PULL;
 
 
           for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
@@ -279,7 +280,7 @@ namespace {
                       Temp_vec_PUSH.push_back(temp_str);
 
                     }
-                    Write_set_PUSH WR_entry;
+                    Write_set WR_entry;
                     WR_entry.GRAPH_NAME = Temp_vec_PUSH[1];
                     WR_entry.NODE_TYPE = Temp_vec_PUSH[2];
                     WR_entry.FIELD_TYPE = Temp_vec_PUSH[3];
@@ -311,12 +312,14 @@ namespace {
                       Temp_vec_PULL.push_back(temp_str);
 
                     }
-                    Write_set_PULL WR_entry;
+                    Write_set WR_entry;
                     WR_entry.GRAPH_NAME = Temp_vec_PULL[1];
                     WR_entry.NODE_TYPE = Temp_vec_PULL[2];
                     WR_entry.FIELD_TYPE = Temp_vec_PULL[3];
                     WR_entry.FIELD_NAME = Temp_vec_PULL[4];
                     WR_entry.VAL_TYPE = Temp_vec_PULL[5];
+                    WR_entry.REDUCE_OP_EXPR = Temp_vec_PULL[6];
+                    WR_entry.RESET_VAL_EXPR = Temp_vec_PULL[7];
 
                     write_set_vec_PULL.push_back(WR_entry);
                   }
@@ -324,6 +327,34 @@ namespace {
                 }
               }
             }
+
+            /************************************
+             * Find unique one from push and pull
+             * sets to generate for vertex cut
+             * *********************************/
+
+            vector<Write_set> write_set_vec_PUSH_PULL;
+            for(auto i : write_set_vec_PUSH){
+              bool found = false;
+              for(auto j : write_set_vec_PULL){
+                if(i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE && i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME){
+                  found = true;
+                }
+              }
+              if(!found)
+                write_set_vec_PUSH_PULL.push_back(i);
+            }
+            for(auto i : write_set_vec_PULL){
+              bool found = false;
+              for(auto j : write_set_vec_PUSH){
+                if(i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE && i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME){
+                  found = true;
+                }
+              }
+              if(!found)
+                write_set_vec_PUSH_PULL.push_back(i);
+            }
+
 
             stringstream SSSyncer;
             unsigned counter = 0;
@@ -346,6 +377,25 @@ namespace {
               ++counter;
             }
 
+            // Addding additional structs for vertex cut
+            stringstream SSSyncer_vertexCut;
+            counter = 0;
+            for(auto i : write_set_vec_PUSH_PULL) {
+              if(i.SYNC_TYPE == "sync_push"){
+                SSSyncer_vertexCut << getSyncerPull(counter, i, "vertexCut_");
+                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                SSSyncer_vertexCut.str(string());
+                SSSyncer_vertexCut.clear();
+                ++counter;
+              }
+              else if(i.SYNC_TYPE == "sync_pull"){
+                SSSyncer_vertexCut << getSyncer(counter, i, "vertexCut_");
+                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                SSSyncer_vertexCut.str(string());
+                SSSyncer_vertexCut.clear();
+                ++counter;
+              }
+            }
 
             // Adding helper function
             SSHelperStructFunctions <<"\tGet_info_functor(GraphTy& _g): graph(_g){}\n"
@@ -373,10 +423,35 @@ namespace {
               SSAfter.str(string());
               SSAfter.clear();
             }
+
+            //For sync Pull and push for vertex cut
+            for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
+              if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_pull"){
+                SSAfter << "\n" << "if(_graph.is_vertex_cut()) {";
+                SSAfter <<"\n\t" << "_graph.sync_push<Syncer_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                SSAfter << "\n}\n";
+                rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              }
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+
             //For sync Pull
             for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
               SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+
+            //For sync Pull and push for vertex cut
+            for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
+              if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
+                SSAfter << "\n" << "if(_graph.is_vertex_cut()) {";
+                SSAfter <<"\n\t" << "_graph.sync_pull<SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                SSAfter << "\n}\n";
+                rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              }
               SSAfter.str(string());
               SSAfter.clear();
             }
@@ -497,8 +572,8 @@ namespace {
           vector<string>write_setGNode_vec;
           string GraphNode;
 
-          vector<Write_set_PUSH> write_set_vec_PUSH;
-          vector<Write_set_PULL> write_set_vec_PULL;
+          vector<Write_set> write_set_vec_PUSH;
+          vector<Write_set> write_set_vec_PULL;
 
           /*
              string str_first;
@@ -560,7 +635,7 @@ namespace {
                       Temp_vec_PUSH.push_back(temp_str);
 
                     }
-                    Write_set_PUSH WR_entry;
+                    Write_set WR_entry;
                     WR_entry.GRAPH_NAME = Temp_vec_PUSH[1];
                     WR_entry.NODE_TYPE = Temp_vec_PUSH[2];
                     WR_entry.FIELD_TYPE = Temp_vec_PUSH[3];
@@ -568,6 +643,7 @@ namespace {
                     WR_entry.VAL_TYPE = Temp_vec_PUSH[5];
                     WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
                     WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
+                    WR_entry.SYNC_TYPE = "sync_push";
 
                     write_set_vec_PUSH.push_back(WR_entry);
                   }
@@ -592,18 +668,48 @@ namespace {
                       Temp_vec_PULL.push_back(temp_str);
 
                     }
-                    Write_set_PULL WR_entry;
+                    Write_set WR_entry;
                     WR_entry.GRAPH_NAME = Temp_vec_PULL[1];
                     WR_entry.NODE_TYPE = Temp_vec_PULL[2];
                     WR_entry.FIELD_TYPE = Temp_vec_PULL[3];
                     WR_entry.FIELD_NAME = Temp_vec_PULL[4];
                     WR_entry.VAL_TYPE = Temp_vec_PULL[5];
+                    WR_entry.SYNC_TYPE = "sync_pull";
+                    WR_entry.REDUCE_OP_EXPR = Temp_vec_PULL[6];
+                    WR_entry.RESET_VAL_EXPR = Temp_vec_PULL[7];
 
                     write_set_vec_PULL.push_back(WR_entry);
                   }
                  }
                 }
               }
+            }
+
+            /************************************
+             * Find unique one from push and pull
+             * sets to generate for vertex cut
+             * *********************************/
+
+            vector<Write_set> write_set_vec_PUSH_PULL;
+            for(auto i : write_set_vec_PUSH){
+              bool found = false;
+              for(auto j : write_set_vec_PULL){
+                if(i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE && i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME){
+                  found = true;
+                }
+              }
+              if(!found)
+                write_set_vec_PUSH_PULL.push_back(i);
+            }
+            for(auto i : write_set_vec_PULL){
+              bool found = false;
+              for(auto j : write_set_vec_PUSH){
+                if(i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE && i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME){
+                  found = true;
+                }
+              }
+              if(!found)
+                write_set_vec_PUSH_PULL.push_back(i);
             }
 
             stringstream SSSyncer;
@@ -627,9 +733,29 @@ namespace {
               ++counter;
             }
 
+            // Addding additional structs for vertex cut
+            stringstream SSSyncer_vertexCut;
+            counter = 0;
+            for(auto i : write_set_vec_PUSH_PULL) {
+              if(i.SYNC_TYPE == "sync_push"){
+                SSSyncer_vertexCut << getSyncerPull(counter, i, "vertexCut_");
+                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                SSSyncer_vertexCut.str(string());
+                SSSyncer_vertexCut.clear();
+                ++counter;
+              }
+              else if(i.SYNC_TYPE == "sync_pull"){
+                SSSyncer_vertexCut << getSyncer(counter, i, "vertexCut_");
+                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                SSSyncer_vertexCut.str(string());
+                SSSyncer_vertexCut.clear();
+                ++counter;
+              }
+            }
+
             auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
             std::string className = recordDecl->getNameAsString();
-            
+
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
@@ -676,12 +802,38 @@ namespace {
               SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST, SSAfter.str(), true, true);
             }
+
+
+            //For sync Pull and push for vertex cut
+            for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
+              SSAfter.str(string());
+              SSAfter.clear();
+              if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_pull"){
+                SSAfter << "\n" << "if(_graph.is_vertex_cut()) {";
+                SSAfter <<"\n\t" << "_graph.sync_push<Syncer_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                SSAfter << "\n}\n";
+                rewriter.InsertText(ST, SSAfter.str(), true, true);
+              }
+            }
+
             //For sync Pull
             for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
               SSAfter.str(string());
               SSAfter.clear();
               SSAfter <<"\n" << "_graph.sync_pull<SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST, SSAfter.str(), true, true);
+            }
+
+            //For sync Pull and push for vertex cut
+            for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
+              SSAfter.str(string());
+              SSAfter.clear();
+              if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
+                SSAfter << "\n" << "if(_graph.is_vertex_cut()) {";
+                SSAfter <<"\n\t" << "_graph.sync_pull<SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                SSAfter << "\n}\n";
+                rewriter.InsertText(ST, SSAfter.str(), true, true);
+              }
             }
           }
         }
