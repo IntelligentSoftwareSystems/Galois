@@ -125,20 +125,15 @@ struct ConnectedComp {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    unsigned int current_min = snode.comp_current;
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist;
-      new_dist = dnode.comp_current;
-      if(current_min > new_dist){
-        current_min = new_dist;
+      unsigned int new_comp;
+      new_comp = dnode.comp_current;
+      auto old_comp = Galois::min(snode.comp_current, new_comp);
+      if (old_comp > new_comp){
+        DGAccumulator_accum += 1;
       }
-    }
-
-    if(snode.comp_current > current_min){
-      snode.comp_current = current_min;
-      DGAccumulator_accum += 1;
     }
   }
 };

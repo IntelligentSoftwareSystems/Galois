@@ -127,20 +127,15 @@ struct SSSP {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    unsigned int current_min = snode.dist_current;
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist;
       new_dist = dnode.dist_current + graph->getEdgeData(jj);
-      if(current_min > new_dist){
-        current_min = new_dist;
+      auto old_dist = Galois::min(snode.dist_current, new_dist);
+      if (old_dist > new_dist){
+        DGAccumulator_accum += 1;
       }
-    }
-
-    if(snode.dist_current > current_min){
-      snode.dist_current = current_min;
-      DGAccumulator_accum += 1;
     }
   }
 };

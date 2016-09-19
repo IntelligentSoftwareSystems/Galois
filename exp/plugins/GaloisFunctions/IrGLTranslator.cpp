@@ -182,6 +182,34 @@ public:
       }
       findAndReplace(text, "Galois::atomic", "atomic");
     }
+    {
+      std::size_t start = 0;
+      while (1) {
+        std::size_t found = text.find("Galois::min", start);
+        if (found != std::string::npos) {
+          std::size_t replace = text.find("(", start);
+          text.insert(replace+1, "&");
+          start = replace;
+        } else {
+          break;
+        }
+      }
+      findAndReplace(text, "Galois::min", "atomicMin");
+    }
+    {
+      std::size_t start = 0;
+      while (1) {
+        std::size_t found = text.find("Galois::add", start);
+        if (found != std::string::npos) {
+          std::size_t replace = text.find("(", start);
+          text.insert(replace+1, "&");
+          start = replace;
+        } else {
+          break;
+        }
+      }
+      findAndReplace(text, "Galois::add", "atomicAdd");
+    }
 
     {
       std::size_t found = text.find("ctx.push(");
