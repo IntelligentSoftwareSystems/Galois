@@ -383,7 +383,7 @@ public:
     std::string part_fileName = getPartitionFileName(partitionFolder,id,numHosts);
     std::string part_metaFile = getMetaFileName(partitionFolder, id, numHosts);
 
-    OfflineGraph g(part_fileName);
+    Galois::Graph::OfflineGraph g(part_fileName);
     num_iter_push = 0;
     num_iter_pull = 0;
     num_run = 0;
@@ -507,7 +507,7 @@ public:
 #endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-   void loadEdges(OfflineGraph & g) {
+   void loadEdges(Galois::Graph::OfflineGraph & g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
       uint64_t cur = 0;
       for (auto n = g.begin(); n != g.end(); ++n) {
@@ -520,7 +520,7 @@ public:
       }
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-   void loadEdges(OfflineGraph & g) {
+   void loadEdges(Galois::Graph::OfflineGraph & g) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
       uint64_t cur = 0;
      for(auto n = g.begin(); n != g.end(); ++n){
