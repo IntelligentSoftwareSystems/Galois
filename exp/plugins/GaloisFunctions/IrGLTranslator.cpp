@@ -65,7 +65,7 @@ private:
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
   std::string accumulatorName;
-  std::stringstream declString, bodyString;
+  std::stringstream declString, varDeclString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
@@ -76,6 +76,7 @@ private:
   std::set<std::string> &KernelsHavingReturnValue;
 
   unsigned conditional; // if (generated) code is enclosed within an if-condition
+  bool conditional_pop; // if (generated) code is enclosed within an (generated) if-condition for pop
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
@@ -91,7 +92,8 @@ public:
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
     KernelsHavingReturnValue(returnKernels),
-    conditional(0)
+    conditional(0),
+    conditional_pop(false)
   {}
   
   virtual ~IrGLOperatorVisitor() {}
@@ -263,6 +265,11 @@ public:
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
+      if (conditional_pop) {
+        bodyString << "]),\n"; // end If "pop" (no edge-iterator)
+        conditional_pop = false;
+      }
+      assert(conditional == 0);
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end Kernel
       std::vector<std::string> arguments, globalArguments;
@@ -284,6 +291,7 @@ public:
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
+      Output << varDeclString.str();
       Output << bodyString.str();
       Output.close();
     }
@@ -295,10 +303,13 @@ public:
     if (traverse && S) {
       if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
-        if (conditional == 0) bodyString << "),\n";
+        bodyString << "),\n"; // end ClosureHint
+        // FIXME: assert that there is no code after the edge-iterator
       } else if (isa<IfStmt>(S)) {
-        bodyString << "]),\n"; // end If
-        --conditional;
+        if (conditional > 0) {
+          bodyString << "]),\n"; // end If
+          --conditional;
+        }
       }
     }
     return traverse;
@@ -314,12 +325,16 @@ public:
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
       bodyString << "ForAll(\"" << vertexName << "\", G.nodes(None, \"nowned\"),\n[\n";
+      bodyString << "CDecl([(\"bool\", \"pop\", \" = " << vertexName << " < nowned\")]),\n"; // hack for IrGL compiler
+      bodyString << "If(\"pop\", [\n"; // hack to handle nested parallelism (should be handled by IrGL compiler in the future)
+      conditional_pop = true;
     } else {
       bodyString << "ForAll(\"wlvertex\", WL.items(),\n[\n";
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \"\")]),\n";
       bodyString << "WL.pop(\"pop\", \"wlvertex\", \"" << vertexName << "\"),\n";
       bodyString << "If(\"pop\", [\n"; // hack to handle unsuccessful pop (should be handled by IrGL compiler in the future)
+      conditional_pop = true;
     }
     symbolTable.insert(vertexName);
     return true;
@@ -345,8 +360,14 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!isTopological) bodyString << "]),\n"; // end If "pop"
-    if (conditional == 0) bodyString << "ClosureHint(\n";
+    while (conditional > 0) {
+      bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
+      --conditional;
+    }
+    bodyString << "]),\n"; // end If "pop"
+    conditional_pop = false;
+    bodyString << "UniformConditional(If(\"!pop\", [CBlock(\"continue\")]), uniform_only = False, _only_if_np = True),\n"; // hack to handle non-nested parallelism
+    bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -372,8 +393,14 @@ public:
       }
     }
     symbolTable.insert(variableName);
-    if (!isTopological) bodyString << "]),\n"; // end If "pop"
-    if (conditional == 0) bodyString << "ClosureHint(\n";
+    while (conditional > 0) {
+      bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
+      --conditional;
+    }
+    bodyString << "]),\n"; // end If "pop"
+    conditional_pop = false;
+    bodyString << "UniformConditional(If(\"!pop\", [CBlock(\"continue\")]), uniform_only = False, _only_if_np = True),\n"; // hack to handle non-nested parallelism
+    bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -394,8 +421,13 @@ public:
           }
           if (pos == std::string::npos) {
             std::string decl = varDecl->getType().getAsString();
-            bodyString << "CDecl([(\"" << FormatType(decl)
-              << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            if (conditional_pop) {
+              varDeclString << "CDecl([(\"" << FormatType(decl)
+                << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            } else {
+              bodyString << "CDecl([(\"" << FormatType(decl)
+                << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            }
 
             if (!initText.empty()) {
               WriteCBlock(varDecl->getNameAsString() + " = " + initText);
@@ -842,8 +874,7 @@ public:
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
     }
     if (requiresWorklist) {
-      // Assuming at the most an average duplicaton of 4 in the worklist
-      cuheader << "\twl->max_size = wl_dup_factor*graph.nnodes*num_hosts/2;\n";
+      cuheader << "\twl->max_size = wl_dup_factor*graph.nnodes;\n";
       cuheader << "\tctx->in_wl = Worklist2((size_t)wl->max_size);\n";
       cuheader << "\tctx->out_wl = Worklist2((size_t)wl->max_size);\n";
       cuheader << "\twl->num_in_items = -1;\n";
@@ -854,7 +885,9 @@ public:
     }
     cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);\n"; 
-    cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
+    if (requiresWorklist) {
+      cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
+    }
     cuheader << "\treset_CUDA_context(ctx);\n";
     cuheader << "}\n\n";
     cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";
