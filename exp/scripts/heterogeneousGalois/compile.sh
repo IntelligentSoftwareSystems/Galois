@@ -59,7 +59,7 @@ fi
 CXX_DEFINES="-DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_USE_EXP -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_LIMIT_MACROS"
 CXX_FLAGS="-g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libexp/include -I$MPI_INCLUDE -I$TBB_INCLUDE -I$BOOST_INCLUDE -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include -std=gnu++11"
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-  GGC_FLAGS="--cuda-worklist basic --cuda-graph basic"
+  GGC_FLAGS="--cuda-worklist basic --cuda-graph basic --opt parcomb --opt np --npf 8 "
   if [ -f "$OUTPUT_DIR/GGCFLAGS" ]; then
     GGC_FLAGS+=$(head -n 1 "$OUTPUT_DIR/GGCFLAGS")
   fi
