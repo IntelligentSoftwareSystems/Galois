@@ -1,4 +1,4 @@
-set (Sources dependTest.cpp Ball.cpp Table.cpp Cushion.cpp Sector.cpp FPutils.cpp GeomUtils.cpp) 
+set (Sources dependTest.cpp DefaultValues.cpp Ball.cpp Cushion.cpp Sector.cpp FPutils.cpp GeomUtils.cpp) 
 
 app (BilliardsSerialPQ BilliardsSerialPQ.cpp ${Sources} EXP_OPT)
 app (BilliardsSerialSectored BilliardsSerialSectored.cpp ${Sources} EXP_OPT)
