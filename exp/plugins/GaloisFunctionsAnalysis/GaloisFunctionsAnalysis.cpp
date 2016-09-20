@@ -707,7 +707,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
 
-
+#if 0
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
       for (auto i : info.reductionOps_map) {
         for(auto j : i.second) {
@@ -768,6 +768,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
         }
       }
 
+#endif
 
       for (auto i : info.fieldData_map) {
         for(auto j : i.second) {

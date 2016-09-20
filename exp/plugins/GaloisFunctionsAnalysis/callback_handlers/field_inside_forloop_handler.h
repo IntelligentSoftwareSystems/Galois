@@ -262,9 +262,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
                   /** Also needs sync pull for operator to terminate! **/
+#if 0
                   ReductionOps_entry reduceOP_entry_pull = reduceOP_entry;
                   reduceOP_entry_pull.SYNC_TYPE = "sync_pull";
                   info->reductionOps_map[i.first].push_back(reduceOP_entry_pull);
+#endif
 
                   break;
                 }
