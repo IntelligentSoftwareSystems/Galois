@@ -1590,9 +1590,9 @@ public:
       m.nedges = edge_counter;
 
       // copy memoization meta-data
-      m.num_master_nodes = (unsigned int *) calloc(hostNodes.size(), sizeof(unsigned int));;
-      m.master_nodes = (unsigned int **) calloc(hostNodes.size(), sizeof(unsigned int *));;
-      for(uint32_t h = 0; h < hostNodes.size(); ++h){
+      m.num_master_nodes = (unsigned int *) calloc(masterNodes.size(), sizeof(unsigned int));;
+      m.master_nodes = (unsigned int **) calloc(masterNodes.size(), sizeof(unsigned int *));;
+      for(uint32_t h = 0; h < masterNodes.size(); ++h){
         m.num_master_nodes[h] = masterNodes[h].size();
         if (masterNodes[h].size() > 0) {
           m.master_nodes[h] = (unsigned int *) calloc(masterNodes[h].size(), sizeof(unsigned int));;
@@ -1601,9 +1601,9 @@ public:
           m.master_nodes[h] = NULL;
         }
       }
-      m.num_slave_nodes = (unsigned int *) calloc(hostNodes.size(), sizeof(unsigned int));;
-      m.slave_nodes = (unsigned int **) calloc(hostNodes.size(), sizeof(unsigned int *));;
-      for(uint32_t h = 0; h < hostNodes.size(); ++h){
+      m.num_slave_nodes = (unsigned int *) calloc(slaveNodes.size(), sizeof(unsigned int));;
+      m.slave_nodes = (unsigned int **) calloc(slaveNodes.size(), sizeof(unsigned int *));;
+      for(uint32_t h = 0; h < slaveNodes.size(); ++h){
         m.num_slave_nodes[h] = slaveNodes[h].size();
         if (slaveNodes[h].size() > 0) {
           m.slave_nodes[h] = (unsigned int *) calloc(slaveNodes[h].size(), sizeof(unsigned int));;
