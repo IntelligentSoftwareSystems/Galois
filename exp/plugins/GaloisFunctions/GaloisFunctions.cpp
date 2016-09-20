@@ -408,7 +408,7 @@ namespace {
                                     <<"\tvoid sync_graph(){\n"
                                     <<"\t\tsync_graph_static(graph);\n\t}\n"
                                     <<"\tuint32_t get_run_num() const {\n"
-                                    <<"\t\tgraph.get_run_num();\n\t}\n"
+                                    <<"\t\treturn graph.get_run_num();\n\t}\n"
                                     <<"\tvoid static sync_graph_static(Graph& _graph) {\n";
 
             rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
