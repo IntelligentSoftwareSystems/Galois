@@ -36,18 +36,18 @@ module load tbb
 module load boost
 module load eigen
 module load neon
-module load subversion
-module load git
+#module load subversion
+#module load git
 
 if [ "$1" != "min" ]; then
   module load gdb
   module load mkl
   module load mpich2
-  module load gnuplot
-  module load doxygen
+#  module load gnuplot
+#  module load doxygen
   module load texlive
-  module load ghostscript
+#  module load ghostscript
   module load isspython
   # module load screen #disabling for now because screen was compiled without proper color support
-  module load valgrind
+#  module load valgrind
 fi
