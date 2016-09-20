@@ -57,7 +57,7 @@ class DGBag {
     gDeserialize(buf, x_ID, x_didWork, vec);
     workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
     hosts_didWork_vec.push_back(x_didWork);
-    num_Hosts_recvd++;
+    //num_Hosts_recvd++;
   }
 
   void init_sync() {
@@ -113,12 +113,27 @@ public:
       Galois::Runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
       num_work_bytes += b.size();
-      net.sendMsg(x, recv_BagItems, b);
+      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      //net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
-    while(num_Hosts_recvd < (net.Num - 1)){
-      net.handleReceives();
+
+    //receive
+    for(auto x = 0; x < net.Num; ++x) {
+      if(x == net.ID)
+        continue;
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      recv_BagItems(p->first, p->second);
     }
+    ++Galois::Runtime::evilPhase;
+
+    //while(num_Hosts_recvd < (net.Num - 1)){
+      //net.handleReceives();
+    //}
 
     workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
     std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
