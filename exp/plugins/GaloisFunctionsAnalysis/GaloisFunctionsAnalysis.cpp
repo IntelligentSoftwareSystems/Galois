@@ -351,6 +351,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
@@ -398,6 +399,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
                                                                       /** Atomic min **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
+                                                                      /** min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("min"))))), hasAnyArgument(LHS_memExpr)).bind(str_min),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp),
@@ -439,6 +442,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME + "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME + "_" + i.first;
@@ -494,6 +498,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
                                                                       /** Atomic min **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
+                                                                      /** min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("min"))))), hasAnyArgument(LHS_memExpr)).bind(str_min),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp)
@@ -707,7 +713,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
 
-#if 0
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
       for (auto i : info.reductionOps_map) {
         for(auto j : i.second) {
@@ -720,55 +725,56 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             /** Only need sync_pull if modified **/
               llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
-              StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
-              StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
-              StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
-              StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
+              if(j.SYNC_TYPE == "sync_pull_maybe"){
+                StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+                StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
+                StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
+                StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
 
-            /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+              /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
 #if 0
-              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
-                                                                                                  hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
-                                                                                                  memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
-                                                                                                  ),unless(stmt_reductionOp))),
-                                                                        hasAncestor(recordDecl(hasName(i.first)))
-                                                                    ).bind(str_syncPull_var);
+                DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                    hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
+                                                                                                    memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
+                                                                                                    ),unless(stmt_reductionOp))),
+                                                                          hasAncestor(recordDecl(hasName(i.first)))
+                                                                      ).bind(str_syncPull_var);
 #endif
 
-              /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
-              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
-                                                                                                  hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
-                                                                                                  unless(stmt_reductionOp))),
-                                                                                 hasAncestor(EdgeForLoopMatcher)
-                                                                    ).bind(str_syncPull_var);
+                /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
+                DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
+                                                                                                    hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
+                                                                                                    unless(stmt_reductionOp))),
+                                                                                   hasAncestor(EdgeForLoopMatcher)
+                                                                      ).bind(str_syncPull_var);
 
-              StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
-                                                                      anyOf(
-                                                                      /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
-                                                                      binaryOperator(hasOperatorName("="),
-                                                                                     hasLHS(LHS_varDecl),
-                                                                                     hasRHS(RHS_memExpr)),
+                StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
+                                                                        anyOf(
+                                                                        /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
+                                                                        binaryOperator(hasOperatorName("="),
+                                                                                       hasLHS(LHS_varDecl),
+                                                                                       hasRHS(RHS_memExpr)),
 
-                                                                      /** For builtInType : varname += NodeData.fieldName **/
-                                                                      binaryOperator(hasOperatorName("+="),
-                                                                                      hasLHS(LHS_varDecl),
-                                                                                      hasRHS(RHS_memExpr)),
+                                                                        /** For builtInType : varname += NodeData.fieldName **/
+                                                                        binaryOperator(hasOperatorName("+="),
+                                                                                        hasLHS(LHS_varDecl),
+                                                                                        hasRHS(RHS_memExpr)),
 
-                                                                      /** For builtInType : varname -= NodeData.fieldName **/
-                                                                      binaryOperator(hasOperatorName("-="),
-                                                                                      hasLHS(LHS_varDecl),
-                                                                                      hasRHS(RHS_memExpr))
+                                                                        /** For builtInType : varname -= NodeData.fieldName **/
+                                                                        binaryOperator(hasOperatorName("-="),
+                                                                                        hasLHS(LHS_varDecl),
+                                                                                        hasRHS(RHS_memExpr))
 
-                                                                      ),
-                                                                      hasAncestor(EdgeForLoopMatcher)
-                                                  ).bind(str_plusOp);
+                                                                        ),
+                                                                        hasAncestor(EdgeForLoopMatcher)
+                                                    ).bind(str_plusOp);
 
-              Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
-              Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+          }
         }
       }
 
-#endif
 
       for (auto i : info.fieldData_map) {
         for(auto j : i.second) {

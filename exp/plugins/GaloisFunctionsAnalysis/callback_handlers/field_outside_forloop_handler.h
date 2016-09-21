@@ -57,6 +57,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
@@ -68,6 +69,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
               auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
+              auto min_op = Results.Nodes.getNodeAs<clang::Stmt>(str_min);
 
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
@@ -136,7 +138,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 if(assignmentOP_vec) {
                   //assignmentOP_vec->dump();
                 }
-                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op) {
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull_maybe";
 
                   if(assignplusOP){
@@ -156,6 +158,11 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                     reduceOP_entry.RESETVAL_EXPR = "0";
                   }
                   else if(atomicMin_op){
+                    reduceOP_entry.OPERATION_EXPR = "min";
+                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+                  }
+                  else if(min_op){
                     reduceOP_entry.OPERATION_EXPR = "min";
                     string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                     reduceOP_entry.RESETVAL_EXPR = resetValExpr;
