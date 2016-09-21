@@ -103,7 +103,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"));
   }
 
   void operator()(GNode src) const {
@@ -121,7 +121,7 @@ struct SSSP {
     iteration = 0;
     do{
       DGAccumulator_accum.reset();
-      Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"));
+      Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("SSSP"));
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
   }

@@ -113,7 +113,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"));
   }
 
   void operator()(GNode src) const {
@@ -129,7 +129,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("InitializeGraph"));
   }
 
   void operator()(GNode src) const {
@@ -150,10 +150,11 @@ struct InitializeGraph {
 
 struct PageRank {
   Graph* graph;
+  typedef int tt_does_not_need_aborts;
 
   PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
-    Galois::for_each(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::workList_version(), Galois::loopname("PageRank"));
+    Galois::for_each(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("PageRank"));
   }
 
   void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
@@ -238,7 +239,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m, net.Num, cuda_wl_dup_factor);
+      load_graph_CUDA(cuda_ctx, &cuda_wl, cuda_wl_dup_factor, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }

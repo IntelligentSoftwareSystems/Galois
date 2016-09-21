@@ -106,7 +106,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"));
   }
 
   void operator()(GNode src) const {
@@ -117,12 +117,13 @@ struct InitializeGraph {
 
 struct SSSP {
   Graph* graph;
+  typedef int tt_does_not_need_aborts;
 
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("sssp"), Galois::workList_version());
+    Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
@@ -198,7 +199,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m, net.Num, cuda_wl_dup_factor);
+      load_graph_CUDA(cuda_ctx, &cuda_wl, cuda_wl_dup_factor, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
