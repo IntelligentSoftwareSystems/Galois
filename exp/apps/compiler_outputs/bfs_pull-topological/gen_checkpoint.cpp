@@ -298,11 +298,21 @@ struct BFS {
       std::string checkpoint_timer_str("TIME_CHKPNT_" + std::to_string(iteration));
       Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
       StatTimer_checkpoint.start();
-      _graph.checkpoint<Syncer_0>("BFS");
+      _graph.checkpoint_mem<Syncer_0>("BFS");
       StatTimer_checkpoint.stop();
+
+      if(Galois::Runtime::getSystemNetworkInterface().ID == 0){
+        if(recovery && iteration == 2){
+          std::cerr << "xxxxxxxxxxxxxxxxxxx CRASHED xxxxxxxxxxxxxxxxxxxxx\n";
+          _graph.recovery_send_help<Syncer_0>("BFS");
+          std::cerr << "xxxxxxxxxxxxxxxxxxx RECOVERED xxxxxxxxxxxxxxxxxxx\n";
+        }
+      }
 
      ++iteration;
 
+     if(recovery)
+       Galois::Runtime::getHostBarrier().wait();
 #if 0
      // fail after 15 iterations
      if(iteration == 15){
@@ -412,12 +422,14 @@ int main(int argc, char** argv) {
     InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
+#if 0
     if(recovery){
       Galois::StatTimer StatTimer_recover("TIME_TO_RECOVER");
       StatTimer_recover.start();
       (*hg).checkpoint_apply<Syncer_0>("BFS");
       StatTimer_recover.stop();
     }
+#endif
 
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "[" << net.ID << "] BFS::go run " << run << " called\n";
