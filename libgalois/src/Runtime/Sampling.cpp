@@ -57,6 +57,7 @@ static void beginPeriod() {
 
 #ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
+#include <map>
 
 namespace vtune {
 
@@ -69,7 +70,7 @@ static void begin(const char* loopname) {
     return;
   auto& pD = domains[loopname];
   if (!pD) {
-    pD = itt_domain_create(loopname);
+    pD = __itt_domain_create(loopname);
     pD->flags = 1; // enable domain
   }
   cur_pD = pD;

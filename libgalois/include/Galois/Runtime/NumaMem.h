@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -30,14 +30,14 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_SUBSTRATE_NUMAMEM
-#define GALOIS_SUBSTRATE_NUMAMEM
+#ifndef GALOIS_RUNTIME_NUMAMEM
+#define GALOIS_RUNTIME_NUMAMEM
 
 #include <cstddef>
 #include <memory>
 
 namespace Galois {
-namespace Substrate {
+namespace Runtime {
 
 namespace detail {
 struct largeFreer {
@@ -53,7 +53,7 @@ LAptr largeMallocFloating(size_t bytes); // leave numa mapping undefined
 LAptr largeMallocInterleaved(size_t bytes, unsigned numThreads); // fault in interleaved mapping
 LAptr largeMallocBlocked(size_t bytes, unsigned numThreads); // fault in block interleaved mapping
 
-} // namespace Substrate
+} // namespace Runtime
 } // namespace Galois
 
 #endif //GALOIS_SUBSTRATE_NUMAMEM

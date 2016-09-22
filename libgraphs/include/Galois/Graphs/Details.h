@@ -34,13 +34,13 @@
 #ifndef GALOIS_GRAPH_DETAILS_H
 #define GALOIS_GRAPH_DETAILS_H
 
-#include "Galois/LargeArray.h"
-#include "Galois/LazyObject.h"
-#include "Galois/NoDerefIterator.h"
+#include "Galois/Runtime/LargeArray.h"
+#include "Galois/Runtime/LazyObject.h"
+#include "Galois/Runtime/NoDerefIterator.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/Iterable.h"
-#include "Galois/Runtime/Context.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/SyncContext.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include <boost/mpl/if.hpp>
 #include <algorithm>
@@ -61,7 +61,7 @@ struct EdgeSortReference;
 
 //! Proxy object for {@link detail::EdgeSortIterator}
 template<typename GraphNode, typename EdgeTy>
-class EdgeSortValue: public StrictObject<EdgeTy> {
+class EdgeSortValue: public Runtime::StrictObject<EdgeTy> {
   template<typename, typename, typename, typename,typename>
   friend struct detail::EdgeSortReference;
 
@@ -69,7 +69,7 @@ class EdgeSortValue: public StrictObject<EdgeTy> {
 
 public:
   GraphNode dst;
-  typedef StrictObject<EdgeTy> Super;
+  typedef Runtime::StrictObject<EdgeTy> Super;
   typedef typename Super::value_type value_type;
 
   EdgeSortValue(GraphNode d, GraphNode rd, const value_type& v): Super(v), rawDst(rd), dst(d) { }
@@ -86,18 +86,18 @@ namespace detail {
 template<bool Enable>
 class LocalIteratorFeature {
   typedef std::pair<uint64_t,uint64_t> Range;
-  Substrate::PerThreadStorage<Range> localIterators;
+  Runtime::PerThreadStorage<Range> localIterators;
 public:
   uint64_t localBegin(uint64_t numNodes) const {
-    return std::min(localIterators.getLocal()->first, numNodes);
+    return std::min(localIterators->first, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
-    return std::min(localIterators.getLocal()->second, numNodes);
+    return std::min(localIterators->second, numNodes);
   }
 
   void setLocalRange(uint64_t begin, uint64_t end) { 
-    Range& r = *localIterators.getLocal();
+    Range& r = *localIterators;
     r.first = begin;
     r.second = end;
   }
@@ -106,14 +106,14 @@ public:
 template<>
 struct LocalIteratorFeature<false> {
   uint64_t localBegin(uint64_t numNodes) const {
-    unsigned int id = Substrate::ThreadPool::getTID();
+    unsigned int id = Runtime::ThreadPool::getTID();
     unsigned int num = Galois::getActiveThreads();
     uint64_t begin = (numNodes + num - 1) / num * id;
     return std::min(begin, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
-    unsigned int id = Substrate::ThreadPool::getTID();
+    unsigned int id = Runtime::ThreadPool::getTID();
     unsigned int num = Galois::getActiveThreads();
     uint64_t end = (numNodes + num - 1) / num * (id + 1);
     return std::min(end, numNodes);
@@ -243,7 +243,7 @@ struct NodeInfoBaseTypes<void, HasLockable> {
 //! Specializations for void node data
 template<typename NodeTy, bool HasLockable>
 class NodeInfoBase:
-  public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type,
+  public boost::mpl::if_c<HasLockable,Runtime::Lockable,NoLockable>::type,
   public NodeInfoBaseTypes<NodeTy, HasLockable> 
 {
   NodeTy data;
@@ -265,7 +265,7 @@ struct NodeInfoBase<void, HasLockable>:
 template<bool Enable>
 class OutOfLineLockableFeature {
   typedef NodeInfoBase<void,true> OutOfLineLock;
-  LargeArray<OutOfLineLock> outOfLineLocks;
+  Runtime::LargeArray<OutOfLineLock> outOfLineLocks;
 public:
   struct size_of_out_of_line {
     static const size_t value = sizeof(OutOfLineLock);
@@ -303,7 +303,7 @@ public:
 
 //! Edge specialization for void edge data
 template<typename NodeInfoPtrTy,typename EdgeTy>
-struct EdgeInfoBase: public LazyObject<EdgeTy> 
+struct EdgeInfoBase: public Runtime::LazyObject<EdgeTy> 
 {
   NodeInfoPtrTy dst;
 };
@@ -317,7 +317,7 @@ class EdgesIterator {
   typename GraphTy::edge_iterator ii, ee;
 
 public:
-  typedef NoDerefIterator<typename GraphTy::edge_iterator> iterator;
+  typedef Runtime::NoDerefIterator<typename GraphTy::edge_iterator> iterator;
 
   EdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f)
     : ii(g.edge_begin(n, f)), ee(g.edge_end(n,f)) {}
@@ -329,8 +329,8 @@ public:
 };
 
 template<typename ItTy>
-Runtime::iterable<NoDerefIterator<ItTy>> make_no_deref_range(ItTy ii, ItTy ee) {
-  return Runtime::make_iterable(make_no_deref_iterator(ii), make_no_deref_iterator(ee));
+Runtime::iterable<Runtime::NoDerefIterator<ItTy>> make_no_deref_range(ItTy ii, ItTy ee) {
+  return Runtime::make_iterable(Runtime::make_no_deref_iterator(ii), Runtime::make_no_deref_iterator(ee));
 }
 
 /**
@@ -343,7 +343,7 @@ class InEdgesIterator {
   typename GraphTy::GraphNode n;
   MethodFlag flag;
 public:
-  typedef NoDerefIterator<typename GraphTy::in_edge_iterator> iterator;
+  typedef Runtime::NoDerefIterator<typename GraphTy::in_edge_iterator> iterator;
 
   InEdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f): g(g), n(n), flag(f) { }
 
@@ -356,7 +356,7 @@ class EdgesWithNoFlagIterator {
   GraphTy& g;
   typename GraphTy::GraphNode n;
 public:
-  typedef NoDerefIterator<typename GraphTy::edge_iterator> iterator;
+  typedef Runtime::NoDerefIterator<typename GraphTy::edge_iterator> iterator;
 
   EdgesWithNoFlagIterator(GraphTy& g, typename GraphTy::GraphNode n): g(g), n(n) { }
 

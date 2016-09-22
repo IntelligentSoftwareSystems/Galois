@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -30,8 +30,8 @@
  */
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/HWTopo.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -44,15 +44,15 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
 
   std::mutex lock;
   std::condition_variable cond;
-  auto& tp = Substrate::ThreadPool::getThreadPool();
+  auto& tp = Runtime::ThreadPool::getThreadPool();
   unsigned maxPackages = tp.getMaxPackages();
   unsigned count = maxPackages;
 
   // Interleave across all NUMA nodes
   tp.run(tp.getMaxThreads(), [&]() {
       std::unique_lock<std::mutex> lk(lock);
-      if (Substrate::ThreadPool::isLeader()) {
-        pageInByNode(Substrate::ThreadPool::getPackage(), maxPackages, sizeofEdgeData);
+      if (Runtime::ThreadPool::isLeader()) {
+        pageInByNode(Runtime::ThreadPool::getPackage(), maxPackages, sizeofEdgeData);
         if (--count == 0)
           cond.notify_all();
       } else {

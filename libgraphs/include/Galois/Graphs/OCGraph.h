@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -32,9 +32,9 @@
 #ifndef GALOIS_GRAPH_OCGRAPH_H
 #define GALOIS_GRAPH_OCGRAPH_H
 
-#include "Galois/optional.h"
-#include "Galois/LazyObject.h"
-#include "Galois/LargeArray.h"
+#include "Galois/Runtime/optional.h"
+#include "Galois/Runtime/LazyObject.h"
+#include "Galois/Runtime/LargeArray.h"
 #include "Galois/Graphs/Details.h"
 
 #include <boost/iterator/counting_iterator.hpp>
@@ -106,11 +106,11 @@ public:
     return graph.edge_end(segment, N, mflag);
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
@@ -153,7 +153,7 @@ public:
 
   template<typename EdgeTy>
   struct EdgeReference { 
-    typedef typename LazyObject<EdgeTy>::reference type;
+    typedef typename Runtime::LazyObject<EdgeTy>::reference type;
   };
 
 private:
@@ -297,7 +297,7 @@ public:
 
 private:
   typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
-  typedef LargeArray<NodeInfo> NodeData;
+  typedef Runtime::LargeArray<NodeInfo> NodeData;
 
   NodeData nodeData;
   OCFileGraph outGraph;
@@ -341,7 +341,7 @@ public:
   };
 
 private:
-  Galois::optional<segment_type> memorySegment;
+  Galois::Runtime::optional<segment_type> memorySegment;
 
   segment_type computeSegment(size_t startNode, size_t numEdges) {
     typedef typename OCFileGraph::edge_offset_iterator edge_offset_iterator;
@@ -402,8 +402,8 @@ public:
   }
 
   void keepInMemory() {
-    memorySegment = Galois::optional<segment_type>(computeSegment(0, numEdges));
-    load(*memorySegment, LazyObject<EdgeTy>::size_of::value);
+    memorySegment = Galois::Runtime::optional<segment_type>(computeSegment(0, numEdges));
+    load(*memorySegment, Runtime::LazyObject<EdgeTy>::size_of::value);
   }
 
   /**
@@ -429,7 +429,7 @@ public:
     if (memorySegment)
       return;
 
-    load(seg, LazyObject<EdgeTy>::size_of::value);
+    load(seg, Runtime::LazyObject<EdgeTy>::size_of::value);
   }
 
   void unload(segment_type& seg) {
@@ -535,7 +535,7 @@ public:
     inGraphStorage.fromFile(transpose);
     numNodes = outGraph.size();
     if (numNodes != inGraphStorage.size())
-      GALOIS_DIE("graph does not have the same number of nodes as its transpose");
+      Runtime::gDie("graph does not have the same number of nodes as its transpose");
     numEdges = outGraph.sizeEdges();
     nodeData.create(numNodes);
     inGraph = &inGraphStorage;

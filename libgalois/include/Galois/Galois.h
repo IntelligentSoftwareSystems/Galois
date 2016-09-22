@@ -31,6 +31,9 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
+#include "Galois/Traits.h"
+#include "Galois/Threads.h"
+
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/PagePool.h"
 #include "Galois/Runtime/GaloisImpl.h"
@@ -43,7 +46,6 @@
 
 //#include "Galois/WorkList/WorkList.h"
 
-#include "Galois/Threads.h"
 
 #include <utility>
 #include <tuple>

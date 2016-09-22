@@ -2,34 +2,43 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a framework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
  *
  * Replacement for <code>boost::optional</code> using {@link Galois::LazyObject},
  * which conforms to a more strict aliasing policy.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_OPTIONAL_H
-#define GALOIS_OPTIONAL_H
+#ifndef GALOIS_RUNTIME_OPTIONAL_H
+#define GALOIS_RUNTIME_OPTIONAL_H
 
-#include "Galois/LazyObject.h"
+#include "Galois/Runtime/LazyObject.h"
 #include <cassert>
 
 namespace Galois {
+namespace Runtime {
 
 /**
  * Galois version of <code>boost::optional</code>.
@@ -137,6 +146,7 @@ public:
   operator unspecified_bool_type() const { return initialized_ ? &optional::is_initialized : 0; }
 };
 
-}
+} // namespace Runtime
+} // namespace Galois
 
 #endif

@@ -21,18 +21,18 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_LAZYOBJECT_H
-#define GALOIS_LAZYOBJECT_H
+#ifndef GALOIS_RUNTIME_LAZYOBJECT_H
+#define GALOIS_RUNTIME_LAZYOBJECT_H
 
-#include "Galois/Substrate/gio.h"
-#include "Galois/TypeTraits.h"
+//#include "Galois/Substrate/gio.h"
+//#include "Galois/TypeTraits.h"
 
 // For consistent name, use boost rather than C++11 std::is_trivially_constuctible
 #include <boost/type_traits/has_trivial_constructor.hpp>
@@ -41,6 +41,7 @@
 #include <utility>
 
 namespace Galois {
+namespace Runtime {
 
 /**
  * Single object with specialization for void type. To take advantage of empty
@@ -140,5 +141,6 @@ struct LazyObject<void> {
   const_reference get() const { return 0; }
 };
 
-}
+} // namespace Runtime
+} // namespace Galois
 #endif

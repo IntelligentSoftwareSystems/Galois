@@ -22,14 +22,16 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GTUPLE_H
-#define GALOIS_GTUPLE_H
+
+#ifndef GALOIS_RUNTIME_GTUPLE_H
+#define GALOIS_RUNTIME_GTUPLE_H
 
 #include <cstddef>
 #include <tuple>
 #include <cstring>
 
 namespace Galois {
+namespace Runtime {
 
 /** Is Derived a subtype of Base? */
 template<typename Base, typename Derived>
@@ -152,6 +154,14 @@ auto get_by_supertype(std::tuple<Ts...>&& tpl)
   return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
 }
 
+template<typename T, typename... Ts>
+auto get_by_supertype_or_default(std::tuple<Ts...>&& tpl, const T& def) 
+  -> typename std::tuple_element<subtype_index_nodup<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type&& 
+{
+  return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
+}
+
+
 template<typename... Ts, int... Is>
 auto get_by_indices(const std::tuple<Ts...>& tpl, int_seq<Is...>)
   -> typename tuple_elements<std::tuple<Ts...>, int_seq<Is...> >::type {
@@ -222,5 +232,7 @@ struct true_indices_impl<int_seq<I, Is...>, B, Bs...> {
 template<bool... Bs>
 struct true_indices: public HIDDEN::true_indices_impl<typename make_int_seq<sizeof...(Bs)>::type, Bs...> { };
 
-}
+} // namespace Runtime
+} // namespace Galois
+
 #endif

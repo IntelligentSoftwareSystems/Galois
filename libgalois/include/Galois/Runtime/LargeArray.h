@@ -32,18 +32,15 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
-#include "Galois/gstl.h"
-#include "Galois/Substrate/gio.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/NumaMem.h"
+//#include "Galois/gstl.h"
+//#include "Galois/Substrate/gio.h"
+//#include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/NumaMem.h"
 
 #include <utility>
 
 namespace Galois {
-
 namespace Runtime {
-extern unsigned activeThreads;
-} // end namespace Runtime
 
 /**
  * Large array of objects with proper specialization for void type and
@@ -53,15 +50,15 @@ extern unsigned activeThreads;
  */
 template<typename T>
 class LargeArray {
-  Substrate::LAptr m_realdata;
+  LAptr m_realdata;
   T* m_data;
-  size_t m_size;
+  std::size_t m_size;
 
 public:
   typedef T raw_value_type;
   typedef T value_type;
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
+  typedef std::size_t size_type;
+  typedef std::ptrdiff_t difference_type;
   typedef value_type& reference;
   typedef const value_type& const_reference;
   typedef value_type* pointer;
@@ -72,22 +69,22 @@ public:
 
   // Extra indirection to support incomplete T's
   struct size_of {
-    const static size_t value = sizeof(T);
+    const static size_type value = sizeof(T);
   };
 
 protected:
   enum AllocType {Blocked, Local, Interleaved};
-  void allocate(size_type n, AllocType t) {
+  void allocate(size_type n, unsigned numThreads, AllocType t) {
     assert(!m_data);
     m_size = n;
     switch(t) {
     case Blocked:
-      m_realdata = Substrate::largeMallocBlocked(n*sizeof(T), Runtime::activeThreads);
+      m_realdata = largeMallocBlocked(n*sizeof(T), numThreads);
       break;
     case Interleaved:
-      m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), Runtime::activeThreads);
+      m_realdata = largeMallocInterleaved(n*sizeof(T), numThreads);
     case Local:
-      m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
+      m_realdata = largeMallocLocal(n*sizeof(T));
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
@@ -96,7 +93,7 @@ public:
   /**
    * Wraps existing buffer in LargeArray interface.
    */
-  LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s) { }
+  LargeArray(void* d, size_type s): m_data(reinterpret_cast<T*>(d)), m_size(s) { }
 
   LargeArray(): m_data(0), m_size(0) { }
 
@@ -128,11 +125,11 @@ public:
   }
 
   
-  const_reference at(difference_type x) const { return m_data[x]; }
-  reference at(difference_type x) { return m_data[x]; }
-  const_reference operator[](size_type x) const { return m_data[x]; }
-  reference operator[](size_type x) { return m_data[x]; }
-  void set(difference_type x, const_reference v) { m_data[x] = v; }
+  const_reference at(difference_type x) const { assert(x < m_size); return m_data[x]; }
+  reference at(difference_type x) { assert(x < m_size); return m_data[x]; }
+  const_reference operator[](size_type x) const { assert(x < m_size);  return m_data[x]; }
+  reference operator[](size_type x) { assert(x < m_size); return m_data[x]; }
+  void set(difference_type x, const_reference v) { assert(x < m_size); m_data[x] = v; }
   size_type size() const { return m_size; }
   iterator begin() { return m_data; }
   const_iterator begin() const { return m_data; }
@@ -140,7 +137,7 @@ public:
   const_iterator end() const { return m_data + m_size; }
   
   //! Allocates interleaved across NUMA (memory) nodes.
-  void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
+  void allocateInterleaved(size_type n, unsigned numThreads) { allocate(n, numThreads, Interleaved); }
 
   /**
    * Allocates using default memory policy (usually first-touch) 
@@ -150,14 +147,14 @@ public:
    *                   thread. By default, true because concurrent page-faulting can be a
    *                   scalability bottleneck.
    */
-  void allocateBlocked(size_type n) { allocate(n, Blocked); }
+  void allocateBlocked(size_type n, unsigned numThreads) { allocate(n, numThreads, Blocked); }
 
   /**
    * Allocates using Thread Local memory policy
    *
    * @param  n         number of elements to allocate 
    */
-  void allocateLocal(size_type n) { allocate(n, Local); }
+  void allocateLocal(size_type n, unsigned numThreads) { allocate(n, numThreads, Local); }
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -201,7 +198,7 @@ public:
 template<>
 class LargeArray<void> {
 public:
-  LargeArray(void* d, size_t s) { }
+  LargeArray(void* d, std::size_t s) { }
   LargeArray() = default;
   LargeArray(const LargeArray&) = delete;
   LargeArray& operator=(const LargeArray&) = delete;
@@ -210,8 +207,8 @@ public:
 
   typedef void raw_value_type;
   typedef void* value_type;
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
+  typedef std::size_t size_type;
+  typedef std::ptrdiff_t difference_type;
   typedef value_type reference;
   typedef const value_type const_reference;
   typedef value_type* pointer;
@@ -220,7 +217,7 @@ public:
   typedef const_pointer const_iterator;
   const static bool has_value = false;
   struct size_of {
-    const static size_t value = 0;
+    const static std::size_t value = 0;
   };
 
   const_reference at(difference_type x) const { return 0; }
@@ -234,9 +231,9 @@ public:
   iterator end() { return 0; }
   const_iterator end() const { return 0; }
 
-  void allocateInterleaved(size_type n) { }
-  void allocateBlocked(size_type n) { }
-  void allocateLocal(size_type n, bool prefault = true) { }
+  void allocateInterleaved(size_type n, unsigned) { }
+  void allocateBlocked(size_type n, unsigned) { }
+  void allocateLocal(size_type n, unsigned, bool prefault = true) { }
   template<typename... Args> void construct(Args&&... args) { }
   template<typename... Args> void constructAt(size_type n, Args&&... args) { }
   template<typename... Args> void create(size_type n, Args&&... args) { }
@@ -249,6 +246,7 @@ public:
   pointer data() { return 0; }
 };
 
-}
+} // end namespace Runtime
+} // end namespace Galois
 #endif
 

@@ -38,13 +38,13 @@
 #ifndef GALOIS_GRAPH_FILEGRAPH_H
 #define GALOIS_GRAPH_FILEGRAPH_H
 
-#include "Galois/Endian.h"
+#include "Galois/Runtime/Endian.h"
 #include "Galois/MethodFlags.h"
-#include "Galois/LargeArray.h"
+#include "Galois/Runtime/LargeArray.h"
 #include "Galois/Graphs/Details.h"
-#include "Galois/Runtime/Context.h"
-#include "Galois/Substrate/CacheLineStorage.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Runtime/SyncContext.h"
+#include "Galois/Runtime/CacheLineStorage.h"
+#include "Galois/Runtime/CompilerSpecific.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -66,13 +66,13 @@ public:
 private:
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
     uint32_t operator()(uint32_t x) const {
-      return convert_le32toh(x);
+      return Runtime::convert_le32toh(x);
     }
   };
   
   struct Convert64: public std::unary_function<uint64_t,uint64_t> {
     uint64_t operator()(uint64_t x) const {
-      return convert_le64toh(x);
+      return Runtime::convert_le64toh(x);
     }
   };
 
@@ -159,11 +159,11 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N) {
     return detail::make_no_deref_range(edge_begin(N), edge_end(N));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> out_edges(GraphNode N) {
     return edges(N);
   }
 
@@ -172,8 +172,8 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
-    typedef LargeArray<GraphNode> EdgeDst;
-    typedef LargeArray<EdgeTy> EdgeData;
+    typedef Runtime::LargeArray<GraphNode> EdgeDst;
+    typedef Runtime::LargeArray<EdgeTy> EdgeData;
     typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
@@ -191,8 +191,8 @@ public:
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
 
-    typedef LargeArray<GraphNode> EdgeDst;
-    typedef LargeArray<EdgeTy> EdgeData;
+    typedef Runtime::LargeArray<GraphNode> EdgeDst;
+    typedef Runtime::LargeArray<EdgeTy> EdgeData;
     typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
@@ -408,7 +408,7 @@ public:
 template<typename EdgeTy>
 void makeSymmetric(FileGraph& in, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
+  typedef Runtime::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;
@@ -481,7 +481,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 template<typename EdgeTy,typename PTy>
 void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   typedef FileGraph::GraphNode GNode;
-  typedef LargeArray<EdgeTy> EdgeData;
+  typedef Runtime::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   FileGraphWriter g;

@@ -27,8 +27,8 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#ifndef GALOIS_ENDIAN_H
-#define GALOIS_ENDIAN_H
+#ifndef GALOIS_RUNTIME_ENDIAN_H
+#define GALOIS_RUNTIME_ENDIAN_H
 
 #include <cstdint>
 #ifndef _BSD_SOURCE
@@ -37,6 +37,7 @@
 #include <endian.h>
 
 namespace Galois {
+namespace Runtime {
 
 // NB: Wrap these standard functions with different names because
 // sometimes le64toh and such are implemented as macros and we don't
@@ -110,5 +111,7 @@ static inline uint64_t bswap64(uint64_t x) {
     ( (x >> 56) & 0x00000000000000ffUL );
 }
 
-}
+} // namespace Runtime
+} // namespace Galois
+
 #endif
