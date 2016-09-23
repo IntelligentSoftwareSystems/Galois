@@ -33,7 +33,7 @@
 #ifndef GALOIS_GRAPH_LC_LINEAR_GRAPH_H
 #define GALOIS_GRAPH_LC_LINEAR_GRAPH_H
 
-#include "Galois/LargeArray.h"
+#include "Galois/Runtime/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
 
@@ -90,7 +90,7 @@ public:
 protected:
   class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
-  typedef LargeArray<NodeInfo*> Nodes;
+  typedef Runtime::LargeArray<NodeInfo*> Nodes;
   typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
 
   class NodeInfo:
@@ -135,7 +135,7 @@ public:
   typedef int ReadGraphAuxData;
 
 protected:
-  LargeArray<char> data;
+  Runtime::LargeArray<char> data;
   uint64_t numNodes;
   uint64_t numEdges;
   Nodes nodes;
@@ -161,15 +161,15 @@ protected:
     return N->edgeEnd();
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       EdgeInfo* edge, typename std::enable_if<!_A1 || _A2>::type* = 0) {
-    typedef LargeArray<FileEdgeTy> FED;
+    typedef Runtime::LargeArray<FileEdgeTy> FED;
     if (EdgeInfo::has_value)
       edge->construct(graph.getEdgeData<typename FED::value_type>(nn));
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       EdgeInfo* edge, typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edge->construct();
@@ -244,11 +244,11 @@ public:
     return N->edgeEnd();
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
@@ -270,17 +270,17 @@ public:
     std::sort(N->edgeBegin(), N->edgeEnd(), comp);
   }
 
-  void allocateFrom(FileGraph& graph, const ReadGraphAuxData&) {
+  void allocateFrom(FileGraph& graph, unsigned numThreads, const ReadGraphAuxData&) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
-      data.allocateLocal(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
-      nodes.allocateLocal(numNodes);
-      this->outOfLineAllocateLocal(numNodes);
+      data.allocateLocal(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges, numThreads);
+      nodes.allocateLocal(numNodes, numThreads);
+      this->outOfLineAllocateLocal(numNodes, numThreads);
     } else {
-      data.allocateInterleaved(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges);
-      nodes.allocateInterleaved(numNodes);
-      this->outOfLineAllocateInterleaved(numNodes);
+      data.allocateInterleaved(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges, numThreads);
+      nodes.allocateInterleaved(numNodes, numThreads);
+      this->outOfLineAllocateInterleaved(numNodes, numThreads);
     }
   }
 

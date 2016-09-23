@@ -274,14 +274,14 @@ public:
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
     Galois::Runtime::acquire(&outOfLineLocks[n], mflag);
   }
-  void outOfLineAllocateLocal(size_t numNodes) {
-    outOfLineLocks.allocateLocal(numNodes);
+  void outOfLineAllocateLocal(size_t numNodes, unsigned numThreads) {
+    outOfLineLocks.allocateLocal(numNodes, numThreads);
   }
-  void outOfLineAllocateInterleaved(size_t numNodes) {
-    outOfLineLocks.allocateInterleaved(numNodes);
+  void outOfLineAllocateInterleaved(size_t numNodes, unsigned numThreads) {
+    outOfLineLocks.allocateInterleaved(numNodes, numThreads);
   }
-  void outOfLineAllocateBlocked(size_t numNodes) {
-    outOfLineLocks.allocateBlocked(numNodes);
+  void outOfLineAllocateBlocked(size_t numNodes, unsigned numThreads) {
+    outOfLineLocks.allocateBlocked(numNodes, numThreads);
   }
   void outOfLineConstructAt(size_t n) {
     outOfLineLocks.constructAt(n);

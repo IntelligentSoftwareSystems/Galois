@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -32,19 +32,20 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_BAG_H
-#define GALOIS_BAG_H
+#ifndef GALOIS_RUNTIME_BAG_H
+#define GALOIS_RUNTIME_BAG_H
 
-#include "Galois/gstl.h"
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Substrate/gio.h"
-#include "Galois/Runtime/Mem.h"
+//#include "Galois/gstl.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+//#include "Galois/Substrate/gio.h"
+//#include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <stdexcept>
 #include <algorithm>
 
 namespace Galois {
+namespace Runtime {
 
 /**
  * Unordered collection of elements. This data structure supports scalable
@@ -67,7 +68,7 @@ public:
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
+    PerThreadStorage<std::pair<header*,header*> >* hd;
     unsigned int thr;
     header* p;
     U* v;
@@ -121,7 +122,7 @@ public:
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
 
-    Iterator(Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
+    Iterator(PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
       hd(h), thr(t), p(0), v(0)
     {
       // find first valid item
@@ -131,8 +132,8 @@ public:
   };
 
 private:
-  Galois::Runtime::FixedSizeHeap heap;
-  Galois::Substrate::PerThreadStorage<PerThread> heads;
+  FixedSizeHeap heap;
+  PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
     PerThread& hpair = *heads.getLocal();
@@ -228,8 +229,8 @@ public:
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
   
-  local_iterator local_begin() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID()); }
-  local_iterator local_end() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID() + 1); }
+  local_iterator local_begin() { return local_iterator(&heads, ThreadPool::getTID()); }
+  local_iterator local_end() { return local_iterator(&heads, ThreadPool::getTID() + 1); }
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {
@@ -281,6 +282,7 @@ public:
   reference push_back(ItemTy&& val) { return emplace(std::forward<ItemTy>(val)); }
 };
 
-}
+} // namespace Runtime
+} // namespace Galois
 
 #endif

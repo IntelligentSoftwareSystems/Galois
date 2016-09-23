@@ -30,8 +30,8 @@
 #ifndef GALOIS_GRAPH_LC_MORPH_GRAPH_H
 #define GALOIS_GRAPH_LC_MORPH_GRAPH_H
 
-#include "Galois/Bag.h"
-#include "Galois/LargeArray.h"
+#include "Galois/Runtime/Bag.h"
+#include "Galois/Runtime/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
 
@@ -130,7 +130,7 @@ public:
 
 protected:
   Nodes nodes;
-  Galois::Substrate::PerThreadStorage<EdgeHolder*> edgesL;
+  PerThreadStorage<EdgeHolder*> edgesL;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
@@ -142,10 +142,10 @@ protected:
     this->outOfLineAcquire(getId(N), mflag);
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
-    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef typename Runtime::LargeArray<FileEdgeTy>::value_type FEDV;
     if (EdgeInfo::has_value) {
       addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
@@ -153,7 +153,7 @@ protected:
     }
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
     addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
@@ -352,7 +352,7 @@ public:
   
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename EdgeInfo::value_type value_type;
-    typedef LargeArray<FileEdgeTy> FED;
+    typedef Runtime::LargeArray<FileEdgeTy> FED;
     auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),

@@ -38,6 +38,7 @@
 #include "Galois/Runtime/NumaMem.h"
 
 #include <utility>
+#include <cassert>
 
 namespace Galois {
 namespace Runtime {

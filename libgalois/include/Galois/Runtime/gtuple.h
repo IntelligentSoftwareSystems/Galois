@@ -154,8 +154,9 @@ auto get_by_supertype(std::tuple<Ts...>&& tpl)
   return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
 }
 
-template<typename T, typename... Ts>
-auto get_by_supertype_or_default(std::tuple<Ts...>&& tpl, const T& def) 
+
+template<typename T, typename Tdef, typename... Ts>
+auto get_by_supertype_or_default(const std::tuple<Ts...>& tpl, const Tdef& def) 
   -> typename std::tuple_element<subtype_index_nodup<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type&& 
 {
   return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
