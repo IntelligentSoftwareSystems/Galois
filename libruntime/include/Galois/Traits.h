@@ -183,6 +183,14 @@ struct default_loopname: public loopname {
 };
 
 /**
+ * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}
+ */
+struct numrun_tag {};
+struct numrun: public trait_has_value<uint32_t>, numrun_tag {
+  numrun(uint32_t i = 0): trait_has_value<uint32_t>(0) { }
+};
+
+/**
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
  * argument to {@link do_all()} loops.
  */

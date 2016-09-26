@@ -175,11 +175,12 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, do_all_steal<>{})));
+        std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
-  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName);
+  uint32_t num_run = get_by_supertype<numrun_tag>(dtpl).value;
+  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + std::to_string(num_run));
 
   Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
   Timer_do_all_impl.start();

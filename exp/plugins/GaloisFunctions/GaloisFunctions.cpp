@@ -484,8 +484,12 @@ namespace {
             kernelBefore << "\t\tunsigned num_iter = 0;\n";
             kernelBefore << "\t\tauto __sync_functor = Get_info_functor<Graph>(_graph);\n";
             kernelBefore << "\t\ttypedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
-            kernelBefore << "\t\tDBag dbag(__sync_functor);\n";
+            kernelBefore << "\t\tDBag dbag(__sync_functor, \"" << className << "\");\n";
             kernelBefore << "\t\tauto &local_wl = DBag::get();\n";
+            kernelBefore << "\t\tstd::string impl_str(\"CUDA_FOR_EACH_IMPL_" 
+              << className << "_\" + std::to_string(_graph.get_run_num()));\n";
+            kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+            kernelBefore << "\t\tStatTimer_cuda.start();\n";
             kernelBefore << "\t\tcuda_wl.num_in_items = _graph.getNumOwned();\n";
             kernelBefore << "\t\tfor (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;\n";
             stringstream cudaKernelCall;
@@ -507,6 +511,7 @@ namespace {
             if (!accumulator.empty()) {
               cudaKernelCall << "\t\t" << accumulator << " += __retval;\n";
             }
+            cudaKernelCall << "\t\tStatTimer_cuda.stop();\n";
             cudaKernelCall << "\t\t__sync_functor.sync_graph();\n";
             cudaKernelCall << "\t\tdbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);\n";
             cudaKernelCall << "\t\t#ifdef __GALOIS_DEBUG_WORKLIST__\n";
@@ -517,6 +522,7 @@ namespace {
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
             kernelBefore << "\t\t++num_iter;\n";
+            kernelBefore << "\t\tStatTimer_cuda.start();\n";
             kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
             kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
             kernelBefore << "\t\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
@@ -761,6 +767,10 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            kernelBefore << "\t\tstd::string impl_str(\"CUDA_DO_ALL_IMPL_" 
+              << className << "_\" + std::to_string(_graph.get_run_num()));\n";
+            kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+            kernelBefore << "\t\tStatTimer_cuda.start();\n";
             std::string accumulator;
             for (auto decl : recordDecl->decls()) {
               auto var = dyn_cast<VarDecl>(decl);
@@ -789,6 +799,7 @@ namespace {
             if (!accumulator.empty()) {
               kernelBefore << "\t\t" << accumulator << " += __retval;\n";
             }
+            kernelBefore << "\t\tStatTimer_cuda.stop();\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);

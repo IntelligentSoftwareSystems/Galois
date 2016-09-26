@@ -104,7 +104,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()));
   }
 
   void operator()(GNode src) const {
@@ -216,8 +216,6 @@ int main(int argc, char** argv) {
       std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
-
-      (*hg).reset_num_iter(run);
 
       StatTimer_main.start();
         SSSP::go((*hg));
