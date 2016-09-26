@@ -288,6 +288,7 @@ namespace {
                     WR_entry.VAL_TYPE = Temp_vec_PUSH[5];
                     WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
                     WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
+                    WR_entry.SYNC_TYPE = "sync_push";
 
                     write_set_vec_PUSH.push_back(WR_entry);
                   }
@@ -320,6 +321,7 @@ namespace {
                     WR_entry.VAL_TYPE = Temp_vec_PULL[5];
                     WR_entry.REDUCE_OP_EXPR = Temp_vec_PULL[6];
                     WR_entry.RESET_VAL_EXPR = Temp_vec_PULL[7];
+                    WR_entry.SYNC_TYPE = "sync_pull";
 
                     write_set_vec_PULL.push_back(WR_entry);
                   }

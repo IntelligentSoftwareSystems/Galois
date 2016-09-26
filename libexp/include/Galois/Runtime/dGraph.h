@@ -108,6 +108,8 @@ class hGraph: public GlobalObject {
   //Stats: for rough estimate of sendBytes.
    Galois::Statistic statGhostNodes;
 
+   /****** checkpointing **********/
+   Galois::Runtime::RecvBuffer checkpoint_recvBuffer;
   // Select from edgeCut or vertexCut
   //typedef typename std::conditional<PartitionTy, DS_vertexCut ,DS_edgeCut>::type DS_type;
   //DS_type DS;
@@ -1438,6 +1440,9 @@ public:
   void checkpoint(std::string loopName) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::string doall_str("LAMBDA::CHECKPOINT_" + loopName + "_" + std::to_string(num_run));
+    std::string checkpoint_timer_str("TIME_CHKPNT_" + std::to_string(num_run));
+    Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    StatTimer_checkpoint.start();
     //checkpoint owned nodes.
     std::vector<typename FnTy::ValTy> val_vec(numOwned);
     Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
@@ -1456,7 +1461,7 @@ public:
     chkPt_file.seekp(0);
     chkPt_file.write(reinterpret_cast<char*>(&val_vec[0]), val_vec.size()*sizeof(uint32_t));
     chkPt_file.close();
-
+    StatTimer_checkpoint.stop();
   }
 
   template<typename FnTy>
@@ -1484,12 +1489,132 @@ public:
           }, Galois::loopname(doall_str.c_str()));
     }
 
+ /*************************************************
+  * Fault Tolerance
+  * 1. CheckPointing in the memory of another node
+  ************************************************/
+  template<typename FnTy>
+  void saveCheckPoint(Galois::Runtime::RecvBuffer& b){
+    checkpoint_recvBuffer = std::move(b);
+  }
+
+  template<typename FnTy>
+  void checkpoint_mem(std::string loopName) {
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    std::string doall_str("LAMBDA::CHECKPOINT_MEM_" + loopName + "_" + std::to_string(num_run));
+
+    std::string statChkPtBytes_str("CHECKPOINT_BYTES_" + loopName +"_" + std::to_string(num_run));
+    Galois::Statistic checkpoint_bytes(statChkPtBytes_str);
+
+    std::string checkpoint_timer_str("TIME_CHECKPOINT_MEM" + std::to_string(num_run));
+    Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    StatTimer_checkpoint.start();
+
+    //checkpoint owned nodes.
+    std::vector<typename FnTy::ValTy> val_vec(numOwned);
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
+
+          auto val = FnTy::extract(n, getData(n));
+          val_vec[n] = val;
+        }, Galois::loopname(doall_str.c_str()));
+
+    Galois::Runtime::SendBuffer b;
+    gSerialize(b, val_vec);
+
+    if(net.ID == 0 )
+      for(auto k = 0; k < 10; ++k){
+        std::cout << "before : val_vec[" << k << "] : " << val_vec[k] << "\n";
+      }
+    checkpoint_bytes += b.size();
+    //send to your neighbor on your left.
+    net.sendTagged((net.ID + 1)%net.Num, Galois::Runtime::evilPhase, b);
+
+
+    net.flush();
+
+    //receiving the checkpointed data.
+    decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+    do {
+      net.handleReceives();
+      p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+    } while (!p);
+    checkpoint_recvBuffer = std::move(p->second);
+
+    std::cerr << net.ID << " recvBuffer SIZE ::::: " << checkpoint_recvBuffer.size() << "\n";
+
+    ++Galois::Runtime::evilPhase;
+
+    StatTimer_checkpoint.start();
+  }
+
+    template<typename FnTy>
+    void checkpoint_mem_apply(Galois::Runtime::RecvBuffer& b){
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      std::string doall_str("LAMBDA::CHECKPOINT_MEM_APPLY_" + std::to_string(num_run));
+
+      std::string checkpoint_timer_str("TIME_CHECKPOINT_MEM_APPLY" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+      StatTimer_checkpoint.start();
+
+      uint32_t from_id;
+      Galois::Runtime::RecvBuffer recv_checkpoint_buf;
+      gDeserialize(b, from_id);
+      recv_checkpoint_buf = std::move(b);
+      std::cerr << net.ID << " : " << recv_checkpoint_buf.size() << "\n";
+      //gDeserialize(b, recv_checkpoint_buf);
+
+      std::vector<typename FnTy::ValTy> val_vec(numOwned);
+      gDeserialize(recv_checkpoint_buf, val_vec);
+
+    if(net.ID == 0 )
+      for(auto k = 0; k < 10; ++k){
+        std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
+      }
+      Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
+
+          FnTy::setVal(n, getData(n), val_vec[n]);
+          }, Galois::loopname(doall_str.c_str()));
+    }
+
+
+    template<typename FnTy>
+    void recovery_help_landingPad(Galois::Runtime::RecvBuffer& buff){
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::checkpoint_mem_apply<FnTy>;
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      uint32_t from_id;
+      std::string help_str;
+      gDeserialize(buff, from_id, help_str);
+
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, idForSelf(), fn, net.ID, checkpoint_recvBuffer);
+      net.sendMsg(from_id, syncRecv, b);
+
+      //send back the checkpointed nodes for from_id.
+
+    }
+
+
+    template<typename FnTy>
+    void recovery_send_help(std::string loopName){
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::recovery_help_landingPad<FnTy>;
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      Galois::Runtime::SendBuffer b;
+      std::string help_str = "recoveryHelp";
+
+      gSerialize(b, idForSelf(), fn, net.ID, help_str);
+
+      //send help message to the host that is keeping checkpoint for you.
+      net.sendMsg((net.ID + 1)%net.Num, syncRecv, b);
+    }
+
+
   /*****************************************************/
 
  /****************************************
   * Fault Tolerance
   * 1. Zorro
   ***************************************/
+#if 0
   void recovery_help_landingPad(Galois::Runtime::RecvBuffer& b){
     uint32_t from_id;
     std::string help_str;
@@ -1499,7 +1624,6 @@ public:
 
   }
 
-#if 0
   template<typename FnTy>
   void recovery_send_help(std::string loopName){
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::recovery_help<FnTy>;
