@@ -13,13 +13,20 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned in
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_comp_current[src] = graph.node_data[src]"]),
+]),
 ]),
 ]),
 Kernel("ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [

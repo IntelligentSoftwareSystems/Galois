@@ -108,7 +108,91 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph")), Galois::numrun(_graph.get_run_num());
+    	struct SyncerPull_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static bool extract_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				node.nout = y;
+    		}
+    		static bool setVal_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_set_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		typedef int ValTy;
+    	};
+    	struct Syncer_vertexCut_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static bool extract_reset_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_reset_node_nout_cuda(cuda_ctx, from_id, y, 0); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reduce (uint32_t node_id, struct PR_NodeData & node, int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{ Galois::set(node.nout, y); }
+    		}
+    		static bool reduce_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_set_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, 0);
+    			else if (personality == CPU)
+    		#endif
+    				{ node.nout = 0; }
+    		}
+    		typedef int ValTy;
+    	};
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + std::to_string(_graph.get_run_num()));
+    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		StatTimer_cuda.start();
+    		ResetGraph_cuda(cuda_ctx);
+    		StatTimer_cuda.stop();
+    	} else if (personality == CPU)
+    #endif
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int" , "set",  "0"));
+    if(_graph.is_vertex_cut()) {
+    	_graph.sync_push<Syncer_vertexCut_0>("ResetGraph");
+    }
+    
+    _graph.sync_pull<SyncerPull_0>("ResetGraph");
+    
   }
 
   void operator()(GNode src) const {
@@ -119,16 +203,101 @@ struct ResetGraph {
 };
 
 struct InitializeGraph {
+  const float &local_alpha;
   Graph* graph;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+  InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()));
+    	struct Syncer_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static bool extract_reset_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_reset_node_nout_cuda(cuda_ctx, from_id, y, 0); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reduce (uint32_t node_id, struct PR_NodeData & node, int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) add_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{ Galois::add(node.nout, y); }
+    		}
+    		static bool reduce_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_add_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, 0);
+    			else if (personality == CPU)
+    		#endif
+    				{ node.nout = 0; }
+    		}
+    		typedef int ValTy;
+    	};
+    	struct SyncerPull_vertexCut_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static bool extract_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				node.nout = y;
+    		}
+    		static bool setVal_batch(unsigned from_id, int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_set_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		typedef int ValTy;
+    	};
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
+    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		StatTimer_cuda.start();
+    		InitializeGraph_cuda(alpha, cuda_ctx);
+    		StatTimer_cuda.stop();
+    	} else if (personality == CPU)
+    #endif
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"));
+    _graph.sync_push<Syncer_0>("InitializeGraph");
+    
+    if(_graph.is_vertex_cut()) {
+    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
+    }
+    
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = alpha;
+    sdata.value = local_alpha;
     for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
@@ -142,6 +311,15 @@ struct PageRank_partial {
 
   PageRank_partial(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_partial_" + std::to_string(_graph.get_run_num()));
+    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		StatTimer_cuda.start();
+    		PageRank_partial_cuda(cuda_ctx);
+    		StatTimer_cuda.stop();
+    	} else if (personality == CPU)
+    #endif
     Galois::do_all(_graph.begin(), _graph.end(), PageRank_partial { &_graph }, Galois::loopname("PageRank_partial"), Galois::numrun(_graph.get_run_num()));
   }
 
@@ -160,15 +338,28 @@ struct PageRank_partial {
 };
 
 struct PageRank {
+  const float &local_alpha;
+  cll::opt<float> &local_tolerance;
   Graph* graph;
 
-  PageRank(Graph* _graph) : graph(_graph){}
+  PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _graph) : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
     iteration = 0;
     do{
       DGAccumulator_accum.reset();
       PageRank_partial::go(_graph);
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("PageRank")), Galois::numrun(_graph.get_run_num());
+      #ifdef __GALOIS_HET_CUDA__
+      	if (personality == GPU_CUDA) {
+      		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
+      		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      		StatTimer_cuda.start();
+      		int __retval = 0;
+      		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+      		DGAccumulator_accum += __retval;
+      		StatTimer_cuda.stop();
+      	} else if (personality == CPU)
+      #endif
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank")), Galois::numrun(_graph.get_run_num());
       ++iteration;
       if (maxIterations == 5) DGAccumulator_accum += 1;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
@@ -177,10 +368,10 @@ struct PageRank {
   static Galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
-    float pr_value = sdata.sum*(1.0 - alpha) + alpha;
+    float pr_value = sdata.sum*(1.0 - local_alpha) + local_alpha;
     float diff = std::fabs(pr_value - sdata.value);
 
-    if(diff > tolerance){
+    if(diff > local_tolerance){
       sdata.value = pr_value; 
       DGAccumulator_accum+= 1;
     }

@@ -8,7 +8,7 @@ struct CUDA_Worklist {
 	int num_in_items;
 	int *out_items;
 	int num_out_items;
-  int max_size;
+	int max_size;
 };
 
 struct CUDA_Context *get_CUDA_context(int id);

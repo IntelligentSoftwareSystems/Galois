@@ -13,13 +13,20 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const unsig
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
+]),
 ]),
 ]),
 Kernel("SSSP", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dist_current'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [

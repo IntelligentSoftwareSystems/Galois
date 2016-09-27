@@ -14,15 +14,22 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const unsig
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
 CBlock(["p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
+]),
 ]),
 ]),
 Kernel("FirstItr_BFS", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_dist_old[src] = p_dist_current[src]"]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -39,10 +46,16 @@ Kernel("BFS", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dis
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-If("p_dist_old[src] > p_dist_current[src]",
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+If("p_dist_current[src] > p_dist_current[src]",
 [
 CBlock(["p_dist_old[src] = p_dist_current[src]"]),
 CBlock(["any_retval.return_( 1)"]),
+], [ CBlock(["pop = false"]), ]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
+ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -51,7 +64,7 @@ CDecl([("unsigned int", "new_dist", "")]),
 CBlock(["new_dist = 1 + p_dist_current[src]"]),
 CBlock(["atomicMin(&p_dist_current[dst], new_dist)"]),
 ]),
-]),
+),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('const unsigned int &', 'local_infinity'), ('unsigned int', 'local_src_node'), ('struct CUDA_Context *', 'ctx')],

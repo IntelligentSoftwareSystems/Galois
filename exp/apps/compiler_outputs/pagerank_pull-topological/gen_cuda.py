@@ -14,15 +14,22 @@ Kernel("ResetGraph", [G.param(), ('unsigned int', 'nowned') , ('int *', 'p_nout'
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_value[src] = 0"]),
 CBlock(["p_nout[src] = 0"]),
+]),
 ]),
 ]),
 Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('int *', 'p_nout'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_value[src] = local_alpha"]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("nbr", G.edges("src"),
 [
@@ -35,10 +42,14 @@ CBlock(["atomicAdd(&p_nout[dst], 1)"]),
 ]),
 Kernel("PageRank", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('int *', 'p_nout'), ('float *', 'p_value'), ('Any', 'any_retval')],
 [
+CDecl([("float", "sum", "")]),
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("float", "sum", "")]),
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["sum = 0"]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("nbr", G.edges("src"),
 [

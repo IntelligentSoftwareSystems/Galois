@@ -14,15 +14,22 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned in
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_comp_current[src] = graph.node_data[src]"]),
 CBlock(["p_comp_old[src] = graph.node_data[src]"]),
+]),
 ]),
 ]),
 Kernel("FirstItr_ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_comp_old[src] = p_comp_current[src]"]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -39,10 +46,16 @@ Kernel("ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int 
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-If("p_comp_old[src] > p_comp_current[src]",
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+If("p_comp_current[src] > p_comp_current[src]",
 [
 CBlock(["p_comp_old[src] = p_comp_current[src]"]),
 CBlock(["any_retval.return_( 1)"]),
+], [ CBlock(["pop = false"]), ]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
+ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -51,7 +64,7 @@ CDecl([("unsigned int", "new_dist", "")]),
 CBlock(["new_dist = p_comp_current[src]"]),
 CBlock(["atomicMin(&p_comp_current[dst], new_dist)"]),
 ]),
-]),
+),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('struct CUDA_Context *', 'ctx')],

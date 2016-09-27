@@ -15,48 +15,57 @@ Kernel("ResetGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *',
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_value[src] = 0"]),
 CBlock(["p_nout[src] = 0"]),
 CBlock(["p_residual[src] = 0"]),
 ]),
 ]),
+]),
 Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
+CDecl([("float", "delta", "")]),
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_value[src] = local_alpha"]),
 CBlock(["p_nout[src] = graph.getOutDegree(src)"]),
 If("p_nout[src] > 0",
 [
-CDecl([("float", "delta", "")]),
 CBlock(["delta = p_value[src]*(1-local_alpha)/p_nout[src]"]),
+], [ CBlock(["pop = false"]), ]),
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
+ClosureHint(
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(nbr)"]),
 CBlock(["atomicAdd(&p_residual[dst], delta)"]),
 ]),
-]),
+),
 ]),
 ]),
 Kernel("PageRank", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
+CDecl([("float", "residual_old", "")]),
+CDecl([("float", "delta", "")]),
 ForAll("wlvertex", WL.items(),
 [
 CDecl([("int", "src", "")]),
 CDecl([("bool", "pop", "")]),
 WL.pop("pop", "wlvertex", "src"),
-CDecl([("float", "residual_old", "")]),
-CDecl([("float", "delta", "")]),
 If("pop", [
 CBlock(["residual_old = atomicExch(&p_residual[src], 0.0)"]),
 CBlock(["p_value[src] += residual_old"]),
-CBlock(["delta = 0"]),
 If("p_nout[src] > 0",
 [
 CBlock(["delta = residual_old*(1-local_alpha)/p_nout[src]"]),
+], [ CBlock(["pop = false"]), ]),
 ]),
-]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("nbr", G.edges("src"),
 [

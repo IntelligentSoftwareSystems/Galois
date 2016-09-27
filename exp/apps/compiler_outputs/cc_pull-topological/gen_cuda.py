@@ -13,33 +13,35 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned in
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_comp_current[src] = graph.node_data[src]"]),
+]),
 ]),
 ]),
 Kernel("ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "current_min", "")]),
-CBlock(["current_min = p_comp_current[src]"]),
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
-CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = p_comp_current[dst]"]),
-If("current_min > new_dist",
+CDecl([("unsigned int", "new_comp", "")]),
+CBlock(["new_comp = p_comp_current[dst]"]),
+CDecl([("unsigned int", "old_comp", "")]),
+CBlock(["old_comp = atomicMin(&p_comp_current[src], new_comp)"]),
+If("old_comp > new_comp",
 [
-CBlock(["current_min = new_dist"]),
+CBlock(["any_retval.return_( 1)"]),
 ]),
 ]),
 ),
-If("p_comp_current[src] > current_min",
-[
-CBlock(["p_comp_current[src] = current_min"]),
-CBlock(["any_retval.return_( 1)"]),
-]),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('struct CUDA_Context *', 'ctx')],

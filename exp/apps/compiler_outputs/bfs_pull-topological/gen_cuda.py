@@ -13,15 +13,20 @@ Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const unsig
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
 CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
+]),
 ]),
 ]),
 Kernel("BFS", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dist_current'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "current_min", "")]),
-CBlock(["current_min = p_dist_current[src]"]),
+CDecl([("bool", "pop", " = src < nowned")]),
+If("pop", [
+]),
+UniformConditional(If("!pop", [CBlock("continue")]), uniform_only = False, _only_if_np = True),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -29,17 +34,14 @@ CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
 CBlock(["new_dist = p_dist_current[dst] + 1"]),
-If("current_min > new_dist",
+CDecl([("unsigned int", "old_dist", "")]),
+CBlock(["old_dist = atomicMin(&p_dist_current[src], new_dist)"]),
+If("old_dist > new_dist",
 [
-CBlock(["current_min = new_dist"]),
+CBlock(["any_retval.return_( 1)"]),
 ]),
 ]),
 ),
-If("p_dist_current[src] > current_min",
-[
-CBlock(["p_dist_current[src] = current_min"]),
-CBlock(["any_retval.return_( 1)"]),
-]),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('const unsigned int &', 'local_infinity'), ('unsigned int', 'local_src_node'), ('struct CUDA_Context *', 'ctx')],
