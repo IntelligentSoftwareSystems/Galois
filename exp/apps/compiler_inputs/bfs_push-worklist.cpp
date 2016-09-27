@@ -123,7 +123,7 @@ struct BFS {
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("BFS"));
+    Galois::for_each(src_node, BFS (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("BFS"));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {

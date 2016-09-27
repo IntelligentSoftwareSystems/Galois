@@ -229,6 +229,26 @@ namespace {
           vector<Write_set> write_set_vec_PUSH;
           vector<Write_set> write_set_vec_PULL;
 
+          assert(callFS->getNumArgs() > 1);
+          string str_begin_arg;
+          llvm::raw_string_ostream s_begin(str_begin_arg);
+          callFS->getArg(0)->printPretty(s_begin, 0, Policy);
+          string begin = s_begin.str();
+          string str_end_arg;
+          llvm::raw_string_ostream s_end(str_end_arg);
+          callFS->getArg(1)->printPretty(s_end, 0, Policy);
+          string end = s_end.str();
+          string single_source;
+          // TODO: use type comparison instead
+          if (end.find(".end()") == string::npos) {
+            single_source = begin;
+            begin = "_graph.getLID(" + single_source + ")";
+            end = begin + "+1";
+            // use begin and end only if _graph_isOwned(single_source)
+          } else {
+            assert(begin.compare("_graph.begin()") == 0);
+            assert(end.compare("_graph.end()") == 0);
+          }
 
           for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
             string str_arg;
@@ -490,8 +510,16 @@ namespace {
               << className << "_\" + std::to_string(_graph.get_run_num()));\n";
             kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
-            kernelBefore << "\t\tcuda_wl.num_in_items = _graph.getNumOwned();\n";
-            kernelBefore << "\t\tfor (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;\n";
+            if (!single_source.empty()) {
+              kernelBefore << "\t\tif (_graph.isOwned(" << single_source << ")) {\n";
+              kernelBefore << "\t\t\tcuda_wl.num_in_items = 1;\n";
+              kernelBefore << "\t\t\tcuda_wl.in_items[0] = " << begin << ";\n";
+              kernelBefore << "\t\t} else\n";
+              kernelBefore << "\t\t\tcuda_wl.num_in_items = 0;\n";
+            } else {
+              kernelBefore << "\t\tcuda_wl.num_in_items = (*(" << end << ")-*(" << begin << "));\n";
+              kernelBefore << "\t\tfor (int __i = *(" << begin << "); __i < *(" << end << "); ++__i) cuda_wl.in_items[__i] = __i;\n";
+            }
             stringstream cudaKernelCall;
             if (!accumulator.empty()) {
               cudaKernelCall << "\t\tint __retval = 0;\n";
@@ -535,9 +563,26 @@ namespace {
             kernelBefore << "\t\t}\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
+            if (!single_source.empty()) {
+              kernelBefore << "\t{\n";
+              kernelBefore << "\t\tunsigned int __begin, __end;\n";
+              kernelBefore << "\t\tif (_graph.isOwned(" << single_source << ")) {\n";
+              kernelBefore << "\t\t\t__begin = " << begin << ";\n";
+              kernelBefore << "\t\t\t__end = __begin + 1;\n";
+              kernelBefore << "\t\t} else {\n";
+              kernelBefore << "\t\t\t__begin = 0;\n";
+              kernelBefore << "\t\t\t__end = 0;\n";
+              kernelBefore << "\t\t}\n";
+            }
             SourceLocation ST_before = callFS->getSourceRange().getBegin();
             rewriter.InsertText(ST_before, kernelBefore.str(), true, true);
 
+            if (!single_source.empty()) {
+              SourceLocation ST_forEach_start = callFS->getSourceRange().getBegin().getLocWithOffset(0);
+              string galois_foreach = "Galois::for_each(";
+              string iterator_range = "boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end)";
+              rewriter.ReplaceText(ST_forEach_start, galois_foreach.length() + single_source.length(), galois_foreach + iterator_range);
+            }
 
             //insert helperFunc in for_each call
             SourceLocation ST_forEach_end = callFS->getSourceRange().getEnd().getLocWithOffset(0);
@@ -546,6 +591,12 @@ namespace {
             //Assumption:: User will give worklist Galois::wl in for_each.
             SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph)";
             rewriter.InsertText(ST_forEach_end, SSHelperStructFunctions.str(), true, true);
+
+            if (!single_source.empty()) {
+              SourceLocation ST_forEach_end2 = callFS->getSourceRange().getEnd().getLocWithOffset(2);
+              string end_single_source = "\t}\n";
+              rewriter.InsertText(ST_forEach_end2, end_single_source, true, true);
+            }
           }
         }
   };
