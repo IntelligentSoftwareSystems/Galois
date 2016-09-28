@@ -192,14 +192,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.VAR_NAME = "DirectAssignment";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
-                  field_entry.RESET_VAL = "0";
 
 
                   string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-
-                  string resetValExpr = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //info->fieldData_map[i.first].push_back(field_entry);
@@ -219,8 +215,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   if(varCondRHS == varAssignRHS) {
                     string reduceOP = "min";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
-                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                     //varAssignRHS->dump();
 
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -233,8 +227,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //whileCAS_LHS->dump();
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //whileCAS_LHS->dump();
@@ -258,8 +250,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //atomicAdd_op->dump();
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
@@ -275,8 +265,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(min_op){
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
@@ -286,8 +274,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(assignmentOP_vec){
                   string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;

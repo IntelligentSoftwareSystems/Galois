@@ -151,7 +151,6 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   }
                   else if(assignmentOP){
                     reduceOP_entry.OPERATION_EXPR = "set";
-                    reduceOP_entry.RESETVAL_EXPR = "0";
                   }
                   else if(atomicAdd_op){
                     reduceOP_entry.OPERATION_EXPR = "add";
@@ -159,17 +158,12 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   }
                   else if(atomicMin_op){
                     reduceOP_entry.OPERATION_EXPR = "min";
-                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   }
                   else if(min_op){
                     reduceOP_entry.OPERATION_EXPR = "min";
-                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   }
                   else if(assignmentOP_vec){
                     reduceOP_entry.OPERATION_EXPR = "set";
-                    reduceOP_entry.RESETVAL_EXPR =  "0;";
                   }
                   else if(plusOP_vec){
                     string reduceOP, resetValExpr;

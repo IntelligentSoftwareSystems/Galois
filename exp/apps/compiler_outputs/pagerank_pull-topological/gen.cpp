@@ -179,7 +179,7 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_reset_node_nout_cuda(cuda_ctx, from_id, y, 0); return true; }
+    			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -199,11 +199,6 @@ struct ResetGraph {
     			return false;
     		}
     		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, 0);
-    			else if (personality == CPU)
-    		#endif
-    				{ node.nout = 0; }
     		}
     		typedef int ValTy;
     	};
@@ -217,7 +212,7 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, float *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_reset_node_value_cuda(cuda_ctx, from_id, y, 0); return true; }
+    			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -237,11 +232,6 @@ struct ResetGraph {
     			return false;
     		}
     		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, 0);
-    			else if (personality == CPU)
-    		#endif
-    				{ node.value = 0; }
     		}
     		typedef float ValTy;
     	};
@@ -254,7 +244,7 @@ struct ResetGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int" , "set",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  "0"));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int" , "set",  ""), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  ""));
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("ResetGraph");
     }
@@ -392,7 +382,7 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, float *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_reset_node_value_cuda(cuda_ctx, from_id, y, 0); return true; }
+    			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -412,11 +402,6 @@ struct InitializeGraph {
     			return false;
     		}
     		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, 0);
-    			else if (personality == CPU)
-    		#endif
-    				{ node.value = 0; }
     		}
     		typedef float ValTy;
     	};
@@ -429,7 +414,7 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  "0"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  ""));
     _graph.sync_push<Syncer_0>("InitializeGraph");
     
     if(_graph.is_vertex_cut()) {
@@ -507,7 +492,7 @@ struct PageRank {
       		}
       		static bool extract_reset_batch(unsigned from_id, float *y) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_value_cuda(cuda_ctx, from_id, y, 0); return true; }
+      			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
       			assert (personality == CPU);
       		#endif
       			return false;
@@ -527,11 +512,6 @@ struct PageRank {
       			return false;
       		}
       		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, 0);
-      			else if (personality == CPU)
-      		#endif
-      				{ node.value = 0; }
       		}
       		typedef float ValTy;
       	};
@@ -546,7 +526,7 @@ struct PageRank {
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  ""));
       if(_graph.is_vertex_cut()) {
       	_graph.sync_push<Syncer_vertexCut_0>("PageRank");
       }

@@ -113,14 +113,23 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n";
-    s << "\t\tstatic bool extract_reset_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_reset_node_" << i.FIELD_NAME 
-      <<  "_cuda(cuda_ctx, from_id, y, " << i.RESET_VAL_EXPR << "); return true; }\n"
-      << "\t\t\tassert (personality == CPU);\n"
-      << "\t\t#endif\n"
-      << "\t\t\treturn false;\n"
-      << "\t\t}\n";
+    s << "\t\tstatic bool extract_reset_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n";
+    if (!i.RESET_VAL_EXPR.empty()) {
+      s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_reset_node_" << i.FIELD_NAME 
+        <<  "_cuda(cuda_ctx, from_id, y, " << i.RESET_VAL_EXPR << "); return true; }\n"
+        << "\t\t\tassert (personality == CPU);\n"
+        << "\t\t#endif\n"
+        << "\t\t\treturn false;\n";
+    } else {
+      s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_node_" << i.FIELD_NAME 
+        <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+        << "\t\t\tassert (personality == CPU);\n"
+        << "\t\t#endif\n"
+        << "\t\t\treturn false;\n";
+    }
+    s << "\t\t}\n";
     s << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) " << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
@@ -136,13 +145,15 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\treturn false;\n"
       << "\t\t}\n";
-    s << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, " << i.RESET_VAL_EXPR << ");\n"
-      << "\t\t\telse if (personality == CPU)\n"
-      << "\t\t#endif\n"
-      << "\t\t\t\t{ node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n"
-      << "\t\t}\n";
+    s << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n";
+    if (!i.RESET_VAL_EXPR.empty()) {
+      s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+        << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, " << i.RESET_VAL_EXPR << ");\n"
+        << "\t\t\telse if (personality == CPU)\n"
+        << "\t\t#endif\n"
+        << "\t\t\t\t{ node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n";
+    }
+    s << "\t\t}\n";
     s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
     return s.str();
