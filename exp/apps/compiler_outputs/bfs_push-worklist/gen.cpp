@@ -312,6 +312,7 @@ struct BFS {
     			cuda_wl.in_items[0] = _graph.getLID(src_node);
     		} else
     			cuda_wl.num_in_items = 0;
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			BFS_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -321,7 +322,6 @@ struct BFS {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		while (!dbag.canTerminate()) {
     		++num_iter;
     		StatTimer_cuda.start();
@@ -332,6 +332,7 @@ struct BFS {
     		}
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			BFS_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -341,7 +342,6 @@ struct BFS {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		}
     	} else if (personality == CPU)
     #endif

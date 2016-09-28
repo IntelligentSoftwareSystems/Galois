@@ -535,6 +535,7 @@ namespace {
             if (!accumulator.empty()) {
               cudaKernelCall << "\t\tint __retval = 0;\n";
             }
+            cudaKernelCall << "\t\tcuda_wl.num_out_items = 0;\n";
             cudaKernelCall << "\t\tif (cuda_wl.num_in_items > 0)\n";
             cudaKernelCall << "\t\t\t" << className << "_cuda(";
             if (!accumulator.empty()) {
@@ -557,7 +558,6 @@ namespace {
             cudaKernelCall << "\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
             cudaKernelCall << "\t\t#endif\n";
             cudaKernelCall << "\t\tdbag.sync();\n";
-            cudaKernelCall << "\t\tcuda_wl.num_out_items = 0;\n";
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
             kernelBefore << "\t\t++num_iter;\n";
