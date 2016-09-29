@@ -654,6 +654,7 @@ public:
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
       header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i);\n";
       header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
       header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
@@ -676,6 +677,7 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "#include \"Galois/Runtime/Cuda/cuda_helpers.h\"\n";
     cuheader << "\n#ifdef __GALOIS_CUDA_CHECK_ERROR__\n";
     cuheader << "#define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());\n";
     cuheader << "#else\n";
@@ -722,104 +724,62 @@ public:
       cuheader << "\tif (" << var.first << "[LID] > v)\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", const " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_master_" << var.first << "[src] = p_" << var.first << "[LID];\n";
-      cuheader << "\t}\n";
-      cuheader << "}\n\n";
       cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
-      cuheader << "\tbatch_get_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_get_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_wr_ptr(true), "
                << "ctx->" << var.first << ".gpu_rd_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->master_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, " 
-               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ", " << var.second << " value) {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
-      cuheader << "\t\tp_slave_" << var.first << "[src] = p_" << var.first << "[LID];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = value;\n";
-      cuheader << "\t}\n";
+      cuheader << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tbatch_get_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+               << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_wr_ptr(true), "
+               << "ctx->" << var.first << ".gpu_rd_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
-      cuheader << "\tbatch_get_reset_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+      cuheader << "\tbatch_get_reset_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
                << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_wr_ptr(true), "
                << "ctx->" << var.first << ".gpu_rd_ptr(), i);\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, const " 
-               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = p_slave_" << var.first << "[src];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->slave_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
-      cuheader << "\tbatch_set_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+      cuheader << "\tbatch_set_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
                << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] += p_master_" << var.first << "[src];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
-      cuheader << "\tbatch_add_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_add_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = (p_" << var.first << "[LID] > p_master_" << var.first << "[src]) ? "
-               << "p_master_" << var.first << "[src] : p_" << var.first << "[LID];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
-      cuheader << "\tbatch_min_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_min_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";

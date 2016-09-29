@@ -123,7 +123,7 @@ namespace {
         << "\t\t\treturn false;\n";
     } else {
       s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_node_" << i.FIELD_NAME 
+        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_slave_node_" << i.FIELD_NAME 
         <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
         << "\t\t\tassert (personality == CPU);\n"
         << "\t\t#endif\n"
