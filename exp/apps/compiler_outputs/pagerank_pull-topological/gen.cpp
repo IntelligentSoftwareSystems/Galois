@@ -423,9 +423,7 @@ struct InitializeGraph {
     
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
     
-    if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
-    }
+    _graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
     
   }
 
