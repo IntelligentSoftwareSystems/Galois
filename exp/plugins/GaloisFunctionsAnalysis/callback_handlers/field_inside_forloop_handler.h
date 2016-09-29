@@ -121,7 +121,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
 
                 NodeField_entry field_entry;
-                ReductionOps_entry reduceOP_entry;
+                ReductionOps_entry reduceOP_entry, reduceOP_entry_pull_maybe;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
                 field_entry.IS_VEC = is_vector;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
@@ -158,7 +158,12 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  //info->fieldData_map[i.first].push_back(field_entry);
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
+
                   break;
                 }
                 else if(plusOP) {
@@ -182,7 +187,12 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  //info->fieldData_map[i.first].push_back(field_entry);
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
+
                   break;
 
                 }
@@ -198,7 +208,13 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  //info->fieldData_map[i.first].push_back(field_entry);
+
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
+
                   break;
                 }
                 else if(ifMinOp){
@@ -218,6 +234,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                     //varAssignRHS->dump();
 
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
+
+                    /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                    reduceOP_entry_pull_maybe = reduceOP_entry;
+                    reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                    info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   }
                   break;
 
@@ -229,6 +250,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   //whileCAS_LHS->dump();
                   break;
                 }
@@ -242,6 +268,12 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
+
                   break;
                 }
 
@@ -253,6 +285,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   /** Also needs sync pull for operator to terminate! **/
 #if 0
                   ReductionOps_entry reduceOP_entry_pull = reduceOP_entry;
@@ -267,6 +303,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
 
                   break;
                 }
@@ -276,6 +316,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   break;
                 }
                 else if(plusOP_vec){
@@ -286,6 +330,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   break;
 
                 }
@@ -300,6 +348,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.RESET_VALTYPE = field_entry.VAR_TYPE;
                   field_entry.SYNC_TYPE = "sync_push";
                   info->fieldData_map[i.first].push_back(field_entry);
+
+                  /** Adding sync_pull_maybe call to be see if this field is used anywhere. **/
+                  reduceOP_entry_pull_maybe = reduceOP_entry;
+                  reduceOP_entry_pull_maybe.SYNC_TYPE = "sync_pull_maybe";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull_maybe);
                   break;
                 }
               }

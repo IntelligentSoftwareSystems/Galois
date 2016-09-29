@@ -1349,8 +1349,6 @@ public:
 
    }
 
-
-
    template<typename FnTy>
    void sync_pull(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -1454,7 +1452,8 @@ public:
         std::cout << "BEFORE : val_vec[" << k <<"] :" << val_vec[k] << "\n";
       }
 
-    std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary);
     chkPt_file.seekp(0);
     chkPt_file.write(reinterpret_cast<char*>(&val_vec[0]), val_vec.size()*sizeof(uint32_t));
@@ -1469,7 +1468,8 @@ public:
       //checkpoint owned nodes.
       std::vector<typename FnTy::ValTy> val_vec(numOwned);
       //read val_vec from disk.
-      std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+      std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+      //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
       std::ifstream chkPt_file(chkPt_fileName, std::ios::in | std::ofstream::binary);
       if(!chkPt_file.is_open()){
         std::cout << "Unable to open checkpoint file " << chkPt_fileName << " ! Exiting!\n";
