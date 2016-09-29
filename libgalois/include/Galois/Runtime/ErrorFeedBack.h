@@ -33,15 +33,47 @@
 #ifndef GALOIS_RUNTIME_ERRORFEEDBACK_H
 #define GALOIS_RUNTIME_ERRORFEEDBACK_H
 
+#include <sstream>
+
 namespace Galois {
 namespace Runtime {
 
+namespace detail {
+void printFatal(const std::string&);
+void printWarning(const std::string&);
+void printTrace(const std::string&);
+} // namespace detail
+
 template<typename... Args>
-void gDie(Args&&... args);
+void gDie(Args&&... args) {
+  std::ostringstream os;
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  detail::printFatal(os.str());
+}
+
 template<typename... Args>
-void gWarn(Args&&... args);
+void gWarn(Args&&... args) {
+  std::ostringstream os;
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  detail::printWarning(os.str());
+}
 
 } // end namespace Runtime
 } // end namespace Galois
+
+#ifdef NDEBUG
+#define TRACE(...) do {} while(false)
+#else
+template<typename... Args>
+void TRACE(Args&&... args) {
+  std::ostringstream os;
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
+  //  os << "\n";
+  Galois::Runtime::detail::printTrace(os.str());
+}
+
+#define TRACE(...) do {} while (false)
+
+#endif
 
 #endif //_HWTOPO_H

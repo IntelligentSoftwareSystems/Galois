@@ -26,9 +26,9 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-//#include "Galois/Accumulator.h"
-//#include "Galois/Statistic.h"
-//#include "Galois/Timer.h"
+#include "Galois/Accumulator.h"
+#include "Galois/Statistic.h"
+#include "Galois/StatTimer.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
@@ -41,139 +41,208 @@ namespace cll = llvm::cl;
 static const char* name = "Breadth-first Search";
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
-  "graph using a modified Bellman-Ford algorithm";
+  "graph using a direction reversing algorithm";
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string> filename(cll::Positional, 
                                       cll::desc("<input graph>"), 
                                       cll::Required);
 
-static cll::opt<unsigned int> startNode("startNode",
-                                        cll::desc("Node to start search from"),
-                                        cll::init(0));
-static cll::opt<unsigned int> reportNode("reportNode", 
-                                         cll::desc("Node to report distance to"),
-                                         cll::init(1));
-static cll::opt<int> stepShift("delta",
-                               cll::desc("Shift value for the deltastep"),
-                               cll::init(10));
+static cll::opt<std::string> transposeGraphName(cll::Positional,
+                                                cll::desc("<transpose graph>"),
+                                                cll::Required);
 
-typedef Galois::Graph::LC_InlineEdge_Graph<std::atomic<unsigned int>,void>::with_no_lockable<true>::type::with_compressed_node_ptr<true>::type::with_numa_alloc<true>::type Graph;
+static cll::opt<unsigned int> source("startNode",
+                                     cll::desc("Node to start search from"),
+                                     cll::init(0));
 
-typedef Graph::GraphNode GNode;
+static cll::opt<bool> dumpResult("dump", 
+                                 cll::desc("Dump result"),
+                                 cll::init(false));
 
-static const bool trackWork = false;
-static Galois::Statistic* BadWork;
-static Galois::Statistic* WLEmptyWork;
+constexpr Galois::MethodFlag unflag = Galois::MethodFlag::UNPROTECTED;
 
-#include "Lonestar/BFS_SSSP.h"
+template<typename Graph, typename NodeBag>
+struct BackwardProcess {
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_push;
+  
+  using GNode = typename Graph::GraphNode;
 
-
-struct BFS {
   Graph& graph;
-  BFS(Graph& g) : graph(g) {}
-  void operator()(UpdateRequest& req,
-                  Galois::UserContext<UpdateRequest>& ctx) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
-    Dist sdist = graph.getData(req.n, flag);
-    
-    if (req.w != sdist) {
-      if (trackWork)
-        *WLEmptyWork += 1;
+  NodeBag& nextBag;
+  Galois::GAccumulator<size_t>& count;
+  unsigned newDist; 
+  BackwardProcess(Graph& g, NodeBag& n, Galois::GAccumulator<size_t>& c, int d): graph(g), nextBag(n), count(c), newDist(d) { }
+  
+  void operator()(const GNode& n) const {
+    auto& sdata = graph.getData(n, unflag);
+    if (sdata <= newDist)
       return;
-    }
     
-    for (auto ii : graph.edges(req.n, flag)) {
-      GNode dst = graph.getEdgeDst(ii);
-      auto& ddist  = graph.getData(dst, flag);
-      Dist newDist = sdist + 1;
-      Dist oldDist = ddist;
-      while (newDist < oldDist) {
-        if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-          if (trackWork && oldDist != DIST_INFINITY)
-            *BadWork += 1;
-          ctx.push(UpdateRequest(dst, newDist));
-        }
+    for (auto ii : graph.in_edges(n, unflag)) {
+      GNode dst = graph.getInEdgeDst(ii);
+      auto& ddata = graph.getData(dst, unflag);
+      
+      if (ddata + 1 == newDist) {
+        sdata = newDist;
+        nextBag.push(n);
+        count += 1
+          + std::distance(graph.edge_begin(n, unflag),
+                          graph.edge_end(n, unflag));
+        break;
       }
     }
   }
 };
 
-int main(int argc, char** argv) {
-  Galois::StatManager statManager;
-  LonestarStart(argc, argv, name, desc, url);
 
-  if (trackWork) {
-    BadWork     = new Galois::Statistic("BadWork");
-    WLEmptyWork = new Galois::Statistic("EmptyWork");
-  }
-
-  Galois::StatTimer T("OverheadTime");
-  T.start();
+template<typename Graph, typename NodeBag>
+struct ForwardProcess {
+  typedef int tt_does_not_need_aborts;
   
-  Graph graph;
-  GNode source, report;
-
-  Galois::Graph::readGraph(graph, filename); 
-  std::cout << "Read " << graph.size() << " nodes\n";
-
-  if (startNode >= graph.size() || reportNode >= graph.size()) {
-    std::cerr << "failed to set report: " << reportNode
-              << " or failed to set source: " << startNode << "\n";
-    assert(0);
-    abort();
-  }
-
-  auto it = graph.begin();
-  std::advance(it, startNode);
-  source = *it;
-  it = graph.begin();
-  std::advance(it, reportNode);
-  report = *it;
-
-  size_t approxNodeData = graph.size() * 64;
-  // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
-  // Graph::edge_data_type) * 2;
-  Galois::preAlloc(numThreads +
-                   approxNodeData / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
-
-  std::cout << "Running Asynch with CAS version\n";
-  std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
-  std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
-  std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  Galois::do_all_local(graph, 
-                       [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
-  graph.getData(source) = 0;
-  Galois::StatTimer Tmain;
-  Tmain.start();
-
-  using namespace Galois::WorkList;
-  typedef dChunkedFIFO<64> dChunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-  typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
-  Galois::for_each(UpdateRequest{source, 0}, BFS{graph}, Galois::wl<BSWL>(), Galois::does_not_need_aborts<>());
-  Tmain.stop();
-  T.stop();
-
-  Galois::reportPageAlloc("MeminfoPost");
-  Galois::Runtime::reportNumaAlloc("NumaPost");
+  Graph& graph;
+  NodeBag& nextBag;
+  Galois::GAccumulator<size_t>& count;
+  unsigned newDist;
   
-  std::cout << "Node " << reportNode << " has distance "
-            << graph.getData(report) << "\n";
-
-  if (!skipVerify) {
-    if (verify<true>(graph, source)) {
-      std::cout << "Verification successful.\n";
-    } else {
-      GALOIS_DIE("Verification failed");
+  using GNode = typename Graph::GraphNode;
+  
+  ForwardProcess(Graph& g, NodeBag& n, Galois::GAccumulator<size_t>& c, unsigned d):
+    graph(g), nextBag(n), count(c), newDist(d) { }
+  
+  void operator()(const GNode& n) {
+    for (auto ii : graph.edges(n, unflag))
+      (*this)(ii);
+  }
+  void operator()(typename Graph::edge_iterator ii) {
+    GNode dst = graph.getEdgeDst(ii);
+    auto& ddata = graph.getData(dst, unflag);
+    
+    unsigned oldDist;
+    while (true) {
+      oldDist = ddata;
+      if (oldDist <= newDist)
+        return;
+      if (__sync_bool_compare_and_swap(&ddata, oldDist, newDist)) {
+        nextBag.push(dst);
+        count += 1 
+          + std::distance(graph.edge_begin(dst, unflag),
+                          graph.edge_end(dst, unflag));
+        break;
+      }
     }
   }
+};
 
-  if (trackWork) {
-    delete BadWork;
-    delete WLEmptyWork;
+
+template<typename Graph, typename NodeBag>
+BackwardProcess<Graph, NodeBag> mkBackward(Graph& g, NodeBag& n, Galois::GAccumulator<size_t>& c, int d) {
+  return BackwardProcess<Graph, NodeBag>(g,n,c,d);
+}
+
+template<typename Graph, typename NodeBag>
+ForwardProcess<Graph, NodeBag> mkForward(Graph& g, NodeBag& n, Galois::GAccumulator<size_t>& c, int d) {
+  return ForwardProcess<Graph, NodeBag>(g,n,c,d);
+}
+
+
+int main(int argc, char** argv) {
+  //Galois::StatManager statManager;
+  LonestarStart(argc, argv, name, desc, url);
+
+  typedef typename Galois::Graph::LC_CSR_Graph<unsigned,void>
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type 
+    InnerGraph;
+  typedef typename Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename Graph::GraphNode GNode;
+  typedef Galois::Runtime::InsertBag<GNode> NodeBag;
+  typedef std::pair<GNode,unsigned> WorkItem;
+  typedef Galois::Runtime::InsertBag<WorkItem> WorkItemBag;
+
+  Graph graph;
+  int next = 0;
+  int newDist = 1;
+  int numForward = 0;
+  int numBackward = 0;
+  NodeBag bags[2];
+  Galois::GAccumulator<size_t> count;
+
+  {
+    Galois::StatTimer TL("LoadTime", Galois::start_now);
+    Galois::Graph::readGraph(graph, filename, transposeGraphName);
   }
 
-  return 0;
+  {
+    Galois::StatTimer TI("InitTime", Galois::start_now);
+    Galois::do_all_local(graph, [&graph] (GNode n) { graph.getData(n) = ~0; });
+    graph.getData(source) = 0;
+  }
+
+  {
+    Galois::StatTimer T("Time", Galois::start_now);
+    if (std::distance(graph.edge_begin(source), graph.edge_end(source)) + 1 > (long) graph.sizeEdges() / 20) {
+      Galois::do_all_local(graph, mkBackward(graph, bags[next], count, newDist), Galois::loopname("bfs_backward"), Galois::do_all_steal<true>());
+      numBackward += 1;
+    } else {
+      auto r = graph.out_edges(source);
+      Galois::do_all(r.begin(), r.end(), 
+                     mkForward(graph, bags[next], count, newDist), Galois::loopname("bfs_forward"), Galois::do_all_steal<true>());
+      numForward += 1;
+    }
+    
+    while (!bags[next].empty()) {
+      size_t nextSize = count.reduce();
+      count.reset();
+      int cur = next;
+      next ^= 1;
+      newDist++;
+      if (nextSize > graph.sizeEdges() / 20) {
+        //std::cout << "Dense " << nextSize << "\n";
+        Galois::do_all_local(graph, mkBackward(graph, bags[next], count, newDist), Galois::loopname("bfs_backward"), Galois::do_all_steal<true>());
+        numBackward += 1;
+      } else { //if (numForward < 10 && numBackward == 0) {
+        //std::cout << "Sparse " << nextSize << "\n";
+        Galois::do_all_local(bags[cur], mkForward(graph, bags[next], count, newDist), Galois::loopname("bfs_forward"), Galois::do_all_steal<true>());
+        numForward += 1;
+      } //else {
+      //   //std::cout << "Async " << nextSize << "\n";
+      //   WorkItemBag asyncBag;
+      //   Galois::do_all_local(bags[cur], [&asyncBag, newDist] (GNode n) { asyncBag.push(WorkItem(n, newDist)); } );
+      //   Galois::for_each_local(asyncBag, mkAsync(graph));
+      //   break;
+      // }
+      bags[cur].clear();
+    }
+    T.stop();
+    std::cout << "Runtime: " << T.get() << "ms\n";;
+  }
+  
+  int retval = 0;
+  if (!skipVerify) {
+    Galois::StatTimer TV("VerifyTime", Galois::start_now);
+    // if (verify<true>(graph, source)) {
+    //   std::cout << "Verification successful\n";
+    // } else {
+    //   std::cout << "Verification failed\n";
+    //   retval = 1;
+    // }
+  }
+
+  if (dumpResult) {
+    std::cout << "{\"source\": " << source << ", \"values\" : [";
+    bool first = true;
+    for (auto ii : graph) {
+      if (!first)
+        std::cout << ", ";
+      std::cout << graph.getData(ii);
+      first = false;
+    }
+    std::cout << "]}\n";
+  }
+
+  Galois::Runtime::printStats();
+
+  return retval;
 }

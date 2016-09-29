@@ -324,8 +324,8 @@ public:
   EdgesIterator(typename GraphTy::edge_iterator _ii, typename GraphTy::edge_iterator _ee)
     :ii(_ii), ee(_ee) {}
 
-  iterator begin() { return make_no_deref_iterator(ii); }
-  iterator end()   { return make_no_deref_iterator(ee); }
+  iterator begin() { return Runtime::make_no_deref_iterator(ii); }
+  iterator end()   { return Runtime::make_no_deref_iterator(ee); }
 };
 
 template<typename ItTy>
@@ -347,8 +347,8 @@ public:
 
   InEdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f): g(g), n(n), flag(f) { }
 
-  iterator begin() { return make_no_deref_iterator(g.in_edge_begin(n, flag)); }
-  iterator end() { return make_no_deref_iterator(g.in_edge_end(n, flag)); }
+  iterator begin() { return Runtime::make_no_deref_iterator(g.in_edge_begin(n, flag)); }
+  iterator end() { return Runtime::make_no_deref_iterator(g.in_edge_end(n, flag)); }
 };
 
 template<typename GraphTy>

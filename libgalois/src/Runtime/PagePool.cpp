@@ -105,6 +105,10 @@ public:
 };
 
 static Galois::Runtime::PerThreadStorage<PAState> PA;
+
+Galois::Runtime::SimpleLock PAState::lock;
+Galois::Runtime::flat_map<void*, unsigned> PAState::owners;
+
 } //end namespace ""
 
 std::vector<unsigned long> Galois::Runtime::numPagePoolAllocTotal() {

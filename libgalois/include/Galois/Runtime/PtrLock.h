@@ -70,14 +70,13 @@ protected:
   }
   
   inline uintptr_t _getValue() const {
-    return _lock.load(std::memory_order_relaxed) & ~(uintptr_t)1;
+    return _lock.load(std::memory_order_acquire) & ~(uintptr_t)1;
   }
 
   inline void _setValue(uintptr_t val) {
-    uintptr_t nval = (uintptr_t)val;
-    nval |= (_lock & 1);
+    val |= (_lock & 1);
     //relaxed OK since this doesn't clear lock
-    _lock.store(nval, std::memory_order_relaxed);
+    _lock.store(val, std::memory_order_relaxed);
   }
 
   //! CAS only works on unlocked values
@@ -100,7 +99,7 @@ public:
     uintptr_t oldval = _lock.load(std::memory_order_relaxed);
     if (oldval & 1)
       goto slow_path;
-    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+    if (1 & _lock.fetch_or(1, std::memory_order_acq_rel))
       goto slow_path;
     assert(is_locked());
     return;
@@ -111,7 +110,7 @@ public:
 
   inline void unlock() {
     assert(is_locked());
-    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1, std::memory_order_release);
+    _lock.fetch_xor(1, std::memory_order_relaxed);
   }
 
   inline void unlock_and_clear() {

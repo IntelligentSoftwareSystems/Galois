@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reser
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>

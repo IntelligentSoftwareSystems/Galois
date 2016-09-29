@@ -29,8 +29,10 @@
 
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/CompilerSpecific.h"
+#include "Galois/Runtime/ErrorFeedBack.h"
 
 #include <algorithm>
+#include <iostream>
 
 using namespace Galois::Runtime;
 
@@ -45,6 +47,7 @@ ThreadPool::ThreadPool(bool _no_bind, bool _no_bind_main)
     masterFastmode(false), 
     running(false)
 {
+  TRACE("Init Begin ThreadPool");
   signals.resize(mi.maxThreads);
   initThread(0);
 
@@ -57,16 +60,18 @@ ThreadPool::ThreadPool(bool _no_bind, bool _no_bind_main)
   while (std::any_of(signals.begin(), signals.end(), [](per_signal* p) { return !p || !p->done; })) {
     std::atomic_thread_fence(std::memory_order_seq_cst);
   }
+  TRACE("Init End ThreadPool");
 }
 
 ThreadPool::~ThreadPool() {
+  TRACE("Destroy Begin ThreadPool");
   destroyCommon();
   for(auto& t : threads)
     t.join();
+  TRACE("Destroy End ThreadPool");
 }
 
 void ThreadPool::destroyCommon() {
-  beKind(); // reset fastmode
   run(mi.maxThreads, []() { throw shutdown_ty(); });
 }
 
@@ -87,34 +92,6 @@ void ThreadPool::beKind() {
   }
 }
 
-//inefficient append
-template<typename T>
-static void atomic_append(std::atomic<T*>& headptr, T* newnode) {
-  T* n = nullptr;
-  if (!headptr.compare_exchange_strong(n, newnode))
-    atomic_append(headptr.load()->next, newnode);
-}
-
-//find id
-template<typename T> 
-static unsigned findID(std::atomic<T*>& headptr, T* node, unsigned off) {
-  T* n = headptr.load();
-  assert(n);
-  if (n == node)
-    return off;
-  else
-    return findID(n->next, node, off+1);
-}
-
-template<typename T>
-static T* getNth(std::atomic<T*>& headptr, unsigned off) {
-  T* n = headptr.load();
-  if (!off)
-    return n;
-  else
-    return getNth(n->next, off - 1);
-}
-
 void ThreadPool::initThread(unsigned tid) {
   signals[tid] = &my_box;
   my_box.topo = getHWTopo().second[tid];
@@ -132,20 +109,22 @@ void ThreadPool::threadLoop(unsigned tid) {
   do {
     me.wait(fastmode);
     cascade(fastmode);
+    std::atomic_thread_fence(std::memory_order_acquire);
     try {
       work();
     } catch (const shutdown_ty&) {
       return;
     } catch (const fastmode_ty& fm) {
       fastmode = fm.mode;
-    } catch (const dedicated_ty dt) {
+    } catch (const dedicated_ty& dt) {
       me.done = 1;
       dt.fn();
       return;
+    } catch (const std::bad_function_call& bfc) {
+      gDie("Thread Pool bad function call: ", bfc.what());
     } catch (const std::exception &exc) {
       // catch anything thrown within try block that derives from std::exception
-      //std::cerr << exc.what();
-      abort();
+      gDie("Thread Pool caught: ", exc.what());
     }
     catch (...) {
       abort();
@@ -199,7 +178,9 @@ void ThreadPool::cascade(bool fastmode) {
 }
 
 void ThreadPool::run(unsigned num, std::function<void(void)>&& fn) {
+  TRACE("Run Begin ThreadPool ", num);
   work = std::ref(fn);
+  std::atomic_thread_fence(std::memory_order_release);
 
   //sanitize num
   assert(num <= getMaxThreads() && "too many threads");
@@ -228,6 +209,7 @@ void ThreadPool::run(unsigned num, std::function<void(void)>&& fn) {
   // Clean up
   work = nullptr;
   running = false;
+  TRACE("Run End ThreadPool ", num);
 }
 
 void ThreadPool::runDedicated(std::function<void(void)>& f) {

@@ -79,9 +79,10 @@ class StatCollector {
     void print(std::ostream& out) const;
   };
 
-  //stats  HostID,ThreadID,loop,category,instance -> Record
-  
-  std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
+  // //stats  HostID,ThreadID,loop,category,instance -> Record
+  // std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
+  //stats  loop,category,instance,HostID,ThreadID -> Record
+  std::map<std::tuple<const std::string*, const std::string*,unsigned,unsigned,unsigned>, RecordTy> Stats;
   SimpleLock StatsLock;
 
 public:

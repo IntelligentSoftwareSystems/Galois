@@ -293,13 +293,13 @@ public:
       edgeIndData.allocateBlocked(numNodes, numThreads);
       edgeDst.allocateBlocked(numEdges, numThreads);
       edgeData.allocateBlocked(numEdges, numThreads);
-      this->outOfLineAllocateBlocked(numNodes, numThreads);
+      this->outOfLineAllocateBlocked(numNodes); //, numThreads);
     } else {
       nodeData.allocateInterleaved(numNodes, numThreads);
       edgeIndData.allocateInterleaved(numNodes, numThreads);
       edgeDst.allocateInterleaved(numEdges, numThreads);
       edgeData.allocateInterleaved(numEdges, numThreads);
-      this->outOfLineAllocateInterleaved(numNodes, numThreads);
+      this->outOfLineAllocateInterleaved(numNodes); //, numThreads);
     }
   }
 

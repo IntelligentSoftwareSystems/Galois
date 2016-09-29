@@ -1,4 +1,7 @@
 set(sources
+        src/Timer.cpp
+        src/Version.cpp
+        src/Threads.cpp
         src/Runtime/Barrier.cpp
         src/Runtime/Barrier_Topo.cpp
         src/Runtime/ThreadPool.cpp
@@ -14,6 +17,10 @@ set(sources
         src/Runtime/PagePool.cpp
         src/Runtime/Support.cpp
         src/Runtime/Sampling.cpp
+        src/Runtime/ErrorFeedBack.cpp
+        src/Runtime/GaloisConfig.cpp
+        src/Runtime/Statistics.cpp
+        src/Runtime/NumaMem.cpp
         )
 
 add_library(galois STATIC ${sources})

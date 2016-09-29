@@ -51,8 +51,10 @@ namespace Runtime {
  * Unordered collection of elements. This data structure supports scalable
  * concurrent pushes but reading the bag can only be done serially.
  */
-template<typename T, unsigned int BlockSize = 0>
+template<typename T>
 class InsertBag {
+
+  unsigned size;
 
   struct header {
     header* next;
@@ -60,8 +62,6 @@ class InsertBag {
     T* dend; //end of valid data
     T* dlast; //end of storage
   };
-
-  typedef std::pair<header*, header*> PerThread;
 
 public:
   template<typename U>
@@ -74,7 +74,7 @@ public:
     U* v;
 
     bool init_thread() {
-      p = thr < hd->size() ? hd->getRemote(thr)->first : 0;
+      p = thr < hd->size() ? hd->get(thr)->first : 0;
       v = p ? p->dbegin : 0;
       return p;
     }
@@ -132,11 +132,10 @@ public:
   };
 
 private:
-  FixedSizeHeap heap;
-  PerThreadStorage<PerThread> heads;
+  PerThreadStorage<std::pair<header*,header*> > heads;
 
   void insHeader(header* h) {
-    PerThread& hpair = *heads.getLocal();
+    auto& hpair = *heads.get();
     if (hpair.second) {
       hpair.second->next = h;
       hpair.second = h;
@@ -145,39 +144,29 @@ private:
     }
   }
 
-  header* newHeaderFromHeap(void *m, unsigned size) {
-    header* H = new (m) header();
+  header* newHeader() {
+    void* v = pagePoolAlloc();
+    header* h = new(v) header();
     int offset = 1;
     if (sizeof(T) < sizeof(header))
       offset += sizeof(header)/sizeof(T);
-    T* a = reinterpret_cast<T*>(m);
-    H->dbegin = &a[offset];
-    H->dend = H->dbegin;
-    H->dlast = &a[(size / sizeof(T))];
-    H->next = 0;
-    return H;
-  }
-
-  header* newHeader() {
-    if (BlockSize) {
-      return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
-    } else {
-      return newHeaderFromHeap(Galois::Runtime::pagePoolAlloc(), Galois::Runtime::pagePoolSize());
-    }
+    T* a = reinterpret_cast<T*>(v);
+    h->dbegin = &a[offset];
+    h->dend = h->dbegin;
+    h->dlast = &a[(size / sizeof(T))];
+    h->next = nullptr;
+    return h;
   }
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      PerThread& hpair = *heads.getRemote(x);
+      auto& hpair = *heads.get(x);
       header*& h = hpair.first;
       while (h) {
         uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
         h = h->next;
-        if (BlockSize)
-          heap.deallocate(h2);
-        else
-          Galois::Runtime::pagePoolFree(h2);
+        Galois::Runtime::pagePoolFree(h2);
       }
       hpair.second = 0;
     }
@@ -187,14 +176,12 @@ public:
   // static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
   //     "BlockSize should larger than sizeof(T) + O(1)");
 
-  InsertBag(): heap(BlockSize) { }
-  InsertBag(InsertBag&& o): heap(BlockSize) {
-    std::swap(heap, o.heap);
+  InsertBag() = default;
+  InsertBag(InsertBag&& o) {
     std::swap(heads, o.heads);
   }
 
   InsertBag& operator=(InsertBag&& o) {
-    std::swap(heap, o.heap);
     std::swap(heads, o.heads);
     return *this;
   }
@@ -211,7 +198,6 @@ public:
   }
 
   void swap(InsertBag& o) {
-    std::swap(heap, o.heap);
     std::swap(heads, o.heads);
   }
 
@@ -234,7 +220,7 @@ public:
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = heads.getRemote(x)->first;
+      header* h = heads.get(x)->first;
       if (h)
         return false;
     }
@@ -244,7 +230,7 @@ public:
   //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {
-    header* H = heads.getLocal()->second;
+    header* H = heads.get()->second;
     T* rv;
     if (!H || H->dend == H->dlast) {
       H = newHeader();
@@ -259,7 +245,7 @@ public:
   reference emplace_back(Args&&... args) {
     return emplace(std::forward<Args>(args)...);
   }
-
+  
   /**
    * Pop the last element pushed by this thread. The number of consecutive
    * pops supported without intevening pushes is implementation dependent. 

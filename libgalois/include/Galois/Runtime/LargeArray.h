@@ -36,6 +36,7 @@
 //#include "Galois/Substrate/gio.h"
 //#include "Galois/Runtime/Mem.h"
 #include "Galois/Runtime/NumaMem.h"
+#include "Galois/Runtime/stl_misc.h"
 
 #include <utility>
 #include <cassert>

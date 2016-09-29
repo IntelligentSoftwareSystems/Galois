@@ -33,7 +33,7 @@
 #include <mutex>
 
 
-thread_local uint64_t* Galois::Runtime::detail::PerThreadStorageBase::storage = nullptr;
+thread_local std::unique_ptr<uint64_t[]> Galois::Runtime::detail::PerThreadStorageBase::storage = nullptr;
 std::vector<uint64_t*> Galois::Runtime::detail::PerThreadStorageBase::heads;
 std::bitset<Galois::Runtime::detail::PerThreadStorageBase::PTSSize> Galois::Runtime::detail::PerThreadStorageBase::mask;
 std::atomic<bool> Galois::Runtime::detail::PerThreadStorageBase::initialized;
@@ -48,6 +48,8 @@ unsigned Galois::Runtime::detail::PerThreadStorageBase::alloc(unsigned bytes) {
     if (mask[x]) { // reset
       count = num;
       start = x + 1;
+    } else { // spot
+      --count;
     }
   }
   if (count) // no match
@@ -76,5 +78,7 @@ void Galois::Runtime::detail::PerThreadStorageBase::init(ThreadPool& tp) {
 }
 
 void Galois::Runtime::detail::PerThreadStorageBase::init_inner() {
-  heads[ThreadPool::getTID()] = storage = (uint64_t*)malloc(PTSSize * sizeof(uint64_t));
+  auto tmp =  new uint64_t[PTSSize];
+  heads[ThreadPool::getTID()] = tmp;
+  storage.reset(tmp);
 }

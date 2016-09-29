@@ -79,8 +79,6 @@ protected:
   bool running;
   std::function<void(void)> work;
 
-
-
   //!destroy all threads
   void destroyCommon();
 

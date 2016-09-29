@@ -132,7 +132,7 @@ void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&.
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
-void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
+void do_all_local(ConTy&& c, const FunctionTy& fn, const Args&... args) {
   Runtime::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
 

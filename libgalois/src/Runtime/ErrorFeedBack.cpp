@@ -1,4 +1,4 @@
-/** PtrLocks -*- C++ -*-
+/** Galois IO routines -*- C++ -*-
  * @file
  * @section License
  *
@@ -26,22 +26,34 @@
  *
  * @section Description
  *
- * This contains support for PtrLock support code.
- * See PtrLock.h.
+ * IO support for galois.  We use this to handle output redirection,
+ * and common formating issues.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
-*/
+ */
 
-#include "Galois/Runtime/PtrLock.h"
+#include "Galois/Runtime/ErrorFeedBack.h"
+#include "Galois/Runtime/SimpleLock.h"
 
-void Galois::Runtime::detail::PtrLockBase::slow_lock() const {
-  uintptr_t oldval;
-  do {
-    while (_lock.load(std::memory_order_acquire) & 1) {
-      asmPause();
-    }
-    oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
-  } while (oldval & 1);
-  assert(_lock);
+#include <cassert>
+#include <iostream>
+#include <mutex>
+
+static Galois::Runtime::SimpleLock plock;
+
+void Galois::Runtime::detail::printFatal(const std::string& s) {
+  plock.lock();
+  std::cerr << "ERROR: " << s << "\n";
+  plock.unlock();
+  assert(0 && "Fatal error");
+  abort();
 }
 
+void Galois::Runtime::detail::printWarning(const std::string& s) {
+  std::lock_guard<SimpleLock> lg(plock);
+  std::cerr << "WARNING: " << s << "\n";
+}
+void Galois::Runtime::detail::printTrace(const std::string& s) {
+  std::lock_guard<SimpleLock> lg(plock);
+  std::cerr << "TRACE: " << s << "\n";
+}

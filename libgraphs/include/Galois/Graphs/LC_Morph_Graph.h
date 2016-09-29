@@ -80,7 +80,7 @@ public:
 protected:
   class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
-  typedef Galois::InsertBag<NodeInfo> Nodes;
+  typedef Runtime::InsertBag<NodeInfo> Nodes;
   typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
   
   struct EdgeHolder {
@@ -126,11 +126,11 @@ public:
   typedef boost::transform_iterator<makeGraphNode,typename Nodes::const_iterator> const_iterator;
   typedef iterator local_iterator;
   typedef const_iterator const_local_iterator;
-  typedef LargeArray<GraphNode> ReadGraphAuxData;
+  typedef Runtime::LargeArray<GraphNode> ReadGraphAuxData;
 
 protected:
   Nodes nodes;
-  PerThreadStorage<EdgeHolder*> edgesL;
+  Runtime::PerThreadStorage<EdgeHolder*> edgesL;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
@@ -235,7 +235,7 @@ public:
     return N->edgeEnd;
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 

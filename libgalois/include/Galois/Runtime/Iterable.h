@@ -46,6 +46,7 @@ class iterable
 {
   It m_first, m_last;
 public:
+  using iterator = It;
   iterable() = default;
   iterable(It first, It last) :
     m_first(first), m_last(last) {}

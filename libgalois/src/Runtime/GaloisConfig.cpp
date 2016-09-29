@@ -1,14 +1,14 @@
-/** PtrLocks -*- C++ -*-
+/** Galois user interface -*- C++ -*-
  * @file
  * @section License
  *
- * This file is part of Galois.  Galois is a framework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, version 2.1 of the
- * License.
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,24 +24,12 @@
  * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
- * @section Description
- *
- * This contains support for PtrLock support code.
- * See PtrLock.h.
- *
- * @author Andrew Lenharth <andrew@lenharth.org>
-*/
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
 
-#include "Galois/Runtime/PtrLock.h"
+#include "Galois/Runtime/GaloisConfig.h"
 
-void Galois::Runtime::detail::PtrLockBase::slow_lock() const {
-  uintptr_t oldval;
-  do {
-    while (_lock.load(std::memory_order_acquire) & 1) {
-      asmPause();
-    }
-    oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
-  } while (oldval & 1);
-  assert(_lock);
+Galois::Runtime::GaloisConfig& Galois::Runtime::getGaloisConfig() {
+  static GaloisConfig g;
+  return g;
 }
-

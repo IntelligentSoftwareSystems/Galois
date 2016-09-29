@@ -52,7 +52,7 @@ namespace detail {
 
 class PerThreadStorageBase {
   static constexpr unsigned PTSSize = 4*1024*1024;
-  static thread_local uint64_t* storage;
+  static thread_local std::unique_ptr<uint64_t[]> storage;
   static std::vector<uint64_t*> heads;
   static std::bitset<PTSSize> mask;
   static std::atomic<bool> initialized;

@@ -154,14 +154,30 @@ auto get_by_supertype(std::tuple<Ts...>&& tpl)
   return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
 }
 
-
-template<typename T, typename Tdef, typename... Ts>
-auto get_by_supertype_or_default(const std::tuple<Ts...>& tpl, const Tdef& def) 
-  -> typename std::tuple_element<subtype_index_nodup<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type&& 
+/**
+ * Like \code std::get<T>(std::tuple<Types...> t) \endcode (C++14) except that
+ * it returns an element that is derived from T. And unlike std::get, this returns the first match when there are multipler
+ */
+template<typename T, typename... Ts>
+auto get_by_supertype_last(std::tuple<Ts...>& tpl) 
+  -> typename std::tuple_element<subtype_index<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type&
 {
-  return std::move(std::get<subtype_index_nodup<T, std::tuple<Ts...>>::value>(tpl));
+  return std::get<subtype_index<T, std::tuple<Ts...>>::value>(tpl);
 }
 
+template<typename T, typename... Ts>
+auto get_by_supertype_last(const std::tuple<Ts...>& tpl) 
+  -> typename std::tuple_element<subtype_index<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type const & 
+{
+  return std::get<subtype_index<T, std::tuple<Ts...>>::value>(tpl);
+}
+
+template<typename T, typename... Ts>
+auto get_by_supertype_last(std::tuple<Ts...>&& tpl) 
+  -> typename std::tuple_element<subtype_index<T, std::tuple<Ts...>>::value, std::tuple<Ts...>>::type&& 
+{
+  return std::move(std::get<subtype_index<T, std::tuple<Ts...>>::value>(tpl));
+}
 
 template<typename... Ts, int... Is>
 auto get_by_indices(const std::tuple<Ts...>& tpl, int_seq<Is...>)

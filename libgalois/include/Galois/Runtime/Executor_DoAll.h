@@ -52,6 +52,7 @@
 //#include <algorithm>
 //#include <mutex>
 //#include <tuple>
+#include <iostream>
 
 namespace Galois {
 namespace Runtime {
@@ -89,55 +90,61 @@ class DoAllExecutor {
   PtrLock<msg> head;
   std::atomic<unsigned> waiting;
   
+  //return true to continue, false to exit
   bool wait(iterator& b, iterator& e) {
     //else, add ourselves to the queue
     msg self;
-    self.ready = false;
+    self.b = b;
+    self.e = e;
     self.exit = false;
+    self.next = nullptr;
+    self.ready = false;
     do {
       self.next = head.getValue();
-    } while(head.CAS(self.next, &self));
-    auto old = waiting.fetch_add(1);
-    //we are the last, signal everyone to exit
-    if (old + 1 == activeThreads) {
-      msg* m = head.getValue();
-      while (m) {
-        auto mn = m->next;
-        m->exit = true;
-        m->next = nullptr;
-        m->ready = true;
-        m = mn;
-      }
-    }
+    } while(!head.CAS(self.next, &self));
+    ++waiting;
+
     //wait for signal
-    while(!self.ready) { asmPause(); }
-    if (self.exit)
-      return false;
+    while(!self.ready) {
+      //      std::cerr << waiting << "\n";
+      asmPause();
+      if(waiting == activeThreads)
+        return false;
+      asmPause();
+    }
+
     b = self.b;
     e = self.e;
     return true;
   }
 
   unsigned tryDonate(iterator& b, iterator& e) {
-    if (!waiting)
+    if (std::distance(b,e) < 2)
       return 0;
-    head.lock();
-    msg* other = head.getValue();
-    head.unlock_and_set(other->next);
-    --waiting;
-    other->next = nullptr;
-    auto mid = split_range(b,e);
-    other->b = mid;
-    other->e = e;
-    auto retval = std::distance(mid, e);
-    e = mid;
-    other->ready = true;
-    return retval;
+    if (!head.getValue())
+      return 0;
+    if (head.try_lock()) {
+      msg* other = head.getValue();
+      if (other) {
+        head.unlock_and_set(other->next);
+        --waiting;
+        other->next = nullptr;
+        auto mid = split_range(b,e);
+        auto retval = std::distance(mid, e);
+        other->b = mid;
+        other->e = e;
+        e = mid;
+        other->ready = true;
+        return retval;
+      }
+      head.unlock();
+    }
+    return 0;
   }
   
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, unsigned atv, const char* ln)
-    :F(_F), range(r), loopname(ln), activeThreads(atv)
+    :F(_F), range(r), loopname(ln), activeThreads(atv), waiting(0)
   {
     reportLoopInstance(loopname);
   }
@@ -181,7 +188,7 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, unsigned activeThrea
         auto num = std::distance(begin,end);
         while (begin != end)
           f_cpy(*begin++);
-        reportState(loopname, "Iterations", num, ThreadPool::getTID());
+        reportStat(loopname, "Iterations", num, ThreadPool::getTID());
       });
   }
   endSampling();

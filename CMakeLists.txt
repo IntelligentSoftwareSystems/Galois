@@ -78,6 +78,7 @@ endif()
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(USE_GOLD_LINKER "ON")
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto" CACHE STRING "" FORCE)
   if(CXX_TOOLCHAIN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()
@@ -93,6 +94,7 @@ endif()
 
 # check for incompatible GCC
 if(CMAKE_COMPILER_IS_GNUCC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto" CACHE STRING "" FORCE)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
   if(GCC_VERSION VERSION_LESS 4.7)

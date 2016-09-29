@@ -33,6 +33,8 @@
 #ifndef GALOIS_RUNTIME_RANGE_H
 #define GALOIS_RUNTIME_RANGE_H
 
+#include "Galois/Threads.h"
+
 #include "Galois/Runtime/Blocking.h"
 #include "Galois/Runtime/ThreadPool.h"
 
@@ -40,8 +42,6 @@
 
 namespace Galois {
 namespace Runtime {
-
-extern unsigned int activeThreads;
 
 // TODO(ddn): update to have better forward iterator behavor for blocked/local iteration
 
@@ -65,7 +65,7 @@ public:
   /* const */ T& get_container() const { return *container; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return block_range(begin(), end(), ThreadPool::getTID(), activeThreads);
+    return block_range(begin(), end(), ThreadPool::getTID(), getActiveThreads());
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -99,7 +99,7 @@ public:
   iterator end() const { return ei; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return block_range(ii, ei, ThreadPool::getTID(), activeThreads);
+    return block_range(ii, ei, ThreadPool::getTID(), getActiveThreads());
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {

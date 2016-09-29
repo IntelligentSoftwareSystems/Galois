@@ -95,21 +95,21 @@ Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.m
   switch(mode) {
   case 0: valueInt    = r.valueInt;    break;
   case 1: valueDouble = r.valueDouble; break;
-  case 2: valueStr    = r.valueStr;    break;
+  case 2: new(&valueStr) std::string(r.valueStr);    break;
   }
-}      
+}
 
 void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
   switch(mode) {
   case 0: out << valueInt;    break;
   case 1: out << valueDouble; break;
-  case 2: out << valueStr;    break;
+  case 2: out << '"' << valueStr << '"';    break;
   }
 }
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID) {
   std::lock_guard<SimpleLock> lg(StatsLock);
-  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  auto tpl = std::make_tuple(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), HostID, TID);
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 0);
@@ -119,7 +119,7 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID) {
   std::lock_guard<SimpleLock> lg(StatsLock);
-  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  auto tpl = std::make_tuple(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), HostID, TID);
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 1);
@@ -129,7 +129,7 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
   std::lock_guard<SimpleLock> lg(StatsLock);
-  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  auto tpl = std::make_tuple(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), HostID, TID);
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 2);
@@ -142,13 +142,13 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
   if (json)
     out << "[\n";
   else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
+    out << "LOOP,INSTANCE,CATEGORY,HOST,THREAD,VAL\n";
   std::lock_guard<SimpleLock> lg(StatsLock);
   for (auto& p : Stats) {
     if (json)
-      out << "{ \"LOOP\" : " << *std::get<2>(p.first) << " , \"INSTANCE\" : " << std::get<4>(p.first) << " , \"CATEGORY\" : " << *std::get<3>(p.first) << " , \"HOST\" : " << std::get<0>(p.first) << " , \"THREAD\" : " << std::get<1>(p.first) << " , \"VALUE\" : ";
+      out << "{ \"LOOP\" : " << *std::get<0>(p.first) << " , \"INSTANCE\" : " << std::get<2>(p.first) << " , \"CATEGORY\" : " << *std::get<1>(p.first) << " , \"HOST\" : " << std::get<3>(p.first) << " , \"THREAD\" : " << std::get<4>(p.first) << " , \"VALUE\" : ";
     else
-      out << *std::get<2>(p.first) << "," << std::get<4>(p.first) << " , " << *std::get<3>(p.first) << "," << std::get<0>(p.first) << "," << std::get<1>(p.first) << ",";
+      out << *std::get<0>(p.first) << ", " << std::get<2>(p.first) << ", " << *std::get<1>(p.first) << ", " << std::get<3>(p.first) << ", " << std::get<4>(p.first) << ", ";
     p.second.print(out);
     out << (json ? "}\n" : "\n");
   }
@@ -165,8 +165,8 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   //Find all loops and keys
   std::lock_guard<SimpleLock> lg(StatsLock);
   for (auto& p : Stats) {
-    auto& v = LKs[std::make_tuple(std::get<2>(p.first), std::get<4>(p.first), std::get<3>(p.first))];
-    auto tid = std::get<1>(p.first);
+    auto& v = LKs[std::make_tuple(std::get<0>(p.first), std::get<2>(p.first), std::get<1>(p.first))];
+    auto tid = std::get<3>(p.first);
     maxThreadID = std::max(maxThreadID, tid);
     if (v.size() <= tid)
       v.resize(tid+1);

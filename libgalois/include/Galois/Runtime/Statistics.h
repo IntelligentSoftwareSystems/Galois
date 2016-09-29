@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -38,16 +38,18 @@ namespace Galois {
 namespace Runtime {
 
 //! Begin a new loop instance
-void reportLoopInstance(const char* loopname);
-inline void reportLoopInstance(const std::string& loopname) {
-  reportLoopInstance(loopname.c_str());
-}
+void reportLoopInstance(const std::string& loopname);
 
 //! Reports stats for a given thread
-void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
-void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
+inline void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
+  reportStat(std::string(loopname), std::string(category), value, TID);
+}
+inline void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID) {
+  reportStat(std::string(loopname), std::string(category), value, TID);
+}
+
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
@@ -60,6 +62,12 @@ void reportStatGlobal(const std::string& category, unsigned long val);
 
 //! Prints all stats
 void printStats();
+
+//! set stat print location
+void setStatOutput(const std::string&);
+
+//! set stat formats
+void setStatFormat(bool R, bool json);
 
 }
 } // end namespace Galois

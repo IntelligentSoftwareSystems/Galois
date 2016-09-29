@@ -30,7 +30,7 @@
 #ifndef GALOIS_ACCUMULATOR_H
 #define GALOIS_ACCUMULATOR_H
 
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include <limits>
 
@@ -53,12 +53,12 @@ template<typename T, typename BinFunc>
 class GReducible {
 protected:
   BinFunc m_func;
-  Galois::Substrate::PerThreadStorage<T> m_data;
+  Runtime::PerThreadStorage<T> m_data;
   const T m_identity;
 
   void initialize (void) {
     for (unsigned i = 0; i < m_data.size (); ++i) {
-      *(m_data.getRemote (i)) = m_identity;
+      *(m_data.get(i)) = m_identity;
     }
   }
 
@@ -87,7 +87,7 @@ public:
    */
   template<typename T2>
   void update(const T2& rhs) {
-    T& lhs = *m_data.getLocal();
+    T& lhs = *m_data.get();
     m_func(lhs, rhs);
   }
 
@@ -95,9 +95,9 @@ public:
    * Returns the final reduction value. Only valid outside the parallel region.
    */
   T& reduce() {
-    T& d0 = *m_data.getLocal();
+    T& d0 = *m_data.get();
     for (unsigned int i = 1; i < m_data.size(); ++i) {
-      T& d = *m_data.getRemote(i);
+      T& d = *m_data.get(i);
       m_func(d0, d);
       d = m_identity;
     }
@@ -123,7 +123,7 @@ public:
    */
   void reset() {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
-      *m_data.getRemote(i) = m_identity;
+      *m_data.get(i) = m_identity;
     }
   }
 };

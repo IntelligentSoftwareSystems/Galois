@@ -62,7 +62,7 @@ struct ReadGraphConstructFrom {
   GraphTy& graph;
   FileGraph& f;
   ReadGraphConstructFrom(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
-  void operator()(unsigned tid, unsigned total) {
+  void operator()(unsigned tid, unsigned total) const {
     graph.constructFrom(f, tid, total);
   }
 };
@@ -92,7 +92,7 @@ struct ReadGraphConstructEdgesFrom {
   
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
-  graph.allocateFrom(f);
+  graph.allocateFrom(f, Galois::getActiveThreads());
 
   Galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
 }
