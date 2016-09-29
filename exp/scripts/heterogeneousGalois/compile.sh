@@ -1,4 +1,6 @@
 #!/bin/sh
+# Usage: ./compile.sh <SOURCE_INPUT_FILE> <GENERATED_OUTPUTD_DIR>
+# environment variables: ABELIAN_NON_HETEROGENEOUS ABELIAN_LLVM_BUILD ABELIAN_GALOIS_ROOT ABELIAN_GALOIS_BUILD ABELIAN_GGC_ROOT
 
 INPUT=$(cd $(dirname "$1") && pwd -P)/$(basename "$1")
 if [ -n "$2" ]; then
