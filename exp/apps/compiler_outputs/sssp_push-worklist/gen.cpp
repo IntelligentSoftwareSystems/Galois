@@ -149,7 +149,7 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -209,7 +209,7 @@ struct Get_info_functor : public Galois::op_tag {
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -312,6 +312,7 @@ struct SSSP {
     			cuda_wl.in_items[0] = _graph.getLID(src_node);
     		} else
     			cuda_wl.num_in_items = 0;
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -321,7 +322,6 @@ struct SSSP {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		while (!dbag.canTerminate()) {
     		++num_iter;
     		StatTimer_cuda.start();
@@ -332,6 +332,7 @@ struct SSSP {
     		}
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -341,7 +342,6 @@ struct SSSP {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		}
     	} else if (personality == CPU)
     #endif

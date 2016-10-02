@@ -154,7 +154,7 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, float *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_slave_node_residual_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -430,6 +430,7 @@ struct PageRank {
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = (*(_graph.end())-*(_graph.begin()));
     		for (int __i = *(_graph.begin()); __i < *(_graph.end()); ++__i) cuda_wl.in_items[__i] = __i;
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
     		StatTimer_cuda.stop();
@@ -439,7 +440,6 @@ struct PageRank {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		while (!dbag.canTerminate()) {
     		++num_iter;
     		StatTimer_cuda.start();
@@ -450,6 +450,7 @@ struct PageRank {
     		}
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
+    		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
     		StatTimer_cuda.stop();
@@ -459,7 +460,6 @@ struct PageRank {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
     		}
     	} else if (personality == CPU)
     #endif

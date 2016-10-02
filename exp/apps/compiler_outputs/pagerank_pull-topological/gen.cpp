@@ -179,7 +179,7 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_slave_node_nout_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -212,7 +212,7 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, float *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -382,7 +382,7 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, float *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -423,9 +423,7 @@ struct InitializeGraph {
     
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
     
-    if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
-    }
+    _graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
     
   }
 
@@ -492,7 +490,7 @@ struct PageRank {
       		}
       		static bool extract_reset_batch(unsigned from_id, float *y) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
+      			if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
       			assert (personality == CPU);
       		#endif
       			return false;
