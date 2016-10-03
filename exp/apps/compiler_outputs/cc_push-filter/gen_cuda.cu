@@ -258,7 +258,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
     // FP: "7 -> 8;
     if (pop)
     {
-      if (p_comp_current[src] > p_comp_current[src])
+      if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
         any_retval.return_( 1);

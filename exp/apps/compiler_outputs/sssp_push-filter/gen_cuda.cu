@@ -258,7 +258,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int nowned, unsigned int * p_dist_
     // FP: "7 -> 8;
     if (pop)
     {
-      if (p_dist_current[src] > p_dist_current[src])
+      if (p_dist_old[src] > p_dist_current[src])
       {
         p_dist_old[src] = p_dist_current[src];
         any_retval.return_( 1);

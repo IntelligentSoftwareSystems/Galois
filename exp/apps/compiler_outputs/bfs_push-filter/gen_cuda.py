@@ -48,7 +48,7 @@ ForAll("src", G.nodes(None, "nowned"),
 [
 CDecl([("bool", "pop", " = src < nowned")]),
 If("pop", [
-If("p_dist_current[src] > p_dist_current[src]",
+If("p_dist_old[src] > p_dist_current[src]",
 [
 CBlock(["p_dist_old[src] = p_dist_current[src]"]),
 CBlock(["any_retval.return_( 1)"]),

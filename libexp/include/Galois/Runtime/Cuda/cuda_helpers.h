@@ -53,7 +53,6 @@ __global__ void batch_min_subset(index_type subset_size, const unsigned int * __
 	index_type src_end = subset_size;
 	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
     unsigned index = indices[src];
-		array[index] += subset[src];
 		array[index] = (array[index] > subset[src]) ? subset[src] : array[index];
 	}
 }
@@ -65,7 +64,6 @@ __global__ void batch_max_subset(index_type subset_size, const unsigned int * __
 	index_type src_end = subset_size;
 	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
     unsigned index = indices[src];
-		array[index] += subset[src];
 		array[index] = (array[index] < subset[src]) ? subset[src] : array[index];
 	}
 }
