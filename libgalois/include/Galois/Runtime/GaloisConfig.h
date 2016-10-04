@@ -31,6 +31,8 @@
 #define GALOIS_RUNTIME_GALOISCONFIG_H
 
 #include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Termination.h"
 
 namespace Galois {
 namespace Runtime {
@@ -41,9 +43,11 @@ class GaloisConfig {
   StatCollector stat;
   bool stat_R, stat_json;
   std::string stat_file;
+  std::map<unsigned, std::unique_ptr<Barrier> > barrierMap;
+  std::unique_ptr<TerminationDetection> term;
 
 public:
-  GaloisConfig() : activeThreads(1), stat_R(false), stat_json(false) {}
+  GaloisConfig() : activeThreads(1), stat_R(false), stat_json(false), term(createTermination()) {}
 
   unsigned getActiveThreads() const noexcept {
     return activeThreads;
@@ -63,6 +67,19 @@ public:
   bool getStatJSON() { return stat_json; }
   void setStatLoc(const std::string& s) { stat_file = s; }
   std::string getStatLoc() { return stat_file; }
+
+  Barrier& getBarrier(unsigned num) {
+    auto& b = barrierMap[num];
+    if (!b)
+      b = createBarrier(num);
+    return *b;
+  }
+
+  TerminationDetection& getTermination(unsigned num) {
+    term->init(num);
+    return *term;
+  }
+
 };
 
 GaloisConfig& getGaloisConfig();

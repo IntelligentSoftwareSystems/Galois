@@ -34,7 +34,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/SmallAlloc.h"
 
 #include <map>
 #include <mutex>
@@ -63,7 +63,7 @@ SizedHeapFactory::getHeap(const size_t size) {
   typedef SizedHeapFactory::HeapMap HeapMap;
 
   if (!localHeaps) {
-    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
+    std::lock_guard<SimpleLock> ll(lock);
     localHeaps = new HeapMap;
     allLocalHeaps.push_front(localHeaps);
   }
@@ -73,7 +73,7 @@ SizedHeapFactory::getHeap(const size_t size) {
     return lentry;
 
   {
-    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
+    std::lock_guard<SimpleLock> ll(lock);
     auto& gentry = heaps[size];
     if (!gentry)
       gentry = new SizedHeap();

@@ -78,24 +78,16 @@ public:
 
 using Statistic = StatisticBase<unsigned long>;
 
-// /**
-//  * Controls lifetime of stats. Users usually instantiate in main to print out
-//  * statistics at program exit.
-//  */
-// class StatManager: private boost::noncopyable {
-//   std::deque<Statistic*> stats;
-
-// public:
-//   ~StatManager() {
-//     for(auto* s : stats)
-//       s->report();
-//     Galois::Runtime::printStats();
-//   }
-//   //! Statistics that are not lexically scoped must be added explicitly
-//   void push(Statistic& s) {
-//     stats.push_back(&s);
-//   }
-// };
+/**
+ * Controls lifetime of stats. Users usually instantiate in main to print out
+ * statistics at program exit.
+ */
+class StatManager: private boost::noncopyable {
+public:
+  ~StatManager() {
+    Galois::Runtime::printStats();
+  }
+};
 
 } // namespace Galois
 #endif

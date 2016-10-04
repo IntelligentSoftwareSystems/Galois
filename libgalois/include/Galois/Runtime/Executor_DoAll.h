@@ -145,9 +145,7 @@ class DoAllExecutor {
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, unsigned atv, const char* ln)
     :F(_F), range(r), loopname(ln), activeThreads(atv), waiting(0)
-  {
-    reportLoopInstance(loopname);
-  }
+  {  }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly

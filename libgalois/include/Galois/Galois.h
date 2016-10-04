@@ -39,7 +39,7 @@
 #include "Galois/Runtime/GaloisImpl.h"
 
 //#include "Galois/Runtime/Executor_Deterministic.h"
-//#include "Galois/Runtime/Executor_ForEach.h"
+#include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/Executor_OnEach.h"
 //#include "Galois/Runtime/Executor_Ordered.h"
 //#include "Galois/Runtime/Mem.h"
@@ -156,7 +156,7 @@ void on_each(const FunctionTy& fn, const Args&... args) {
  * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
  */
 static inline void preAlloc(unsigned num) {
-  Runtime::preAllocThreads(num, getActiveThreads());
+  Runtime::preAlloc_gen(num, getActiveThreads());
 }
 
 /**
@@ -166,7 +166,9 @@ static inline void preAlloc(unsigned num) {
  * @param label Label to associated with report at this program point
  */
 static inline void reportPageAlloc(const char* label) {
-  Runtime::reportPageAlloc(label);
+  auto p = Runtime::numPagePoolAllocTotal();
+  for (unsigned x = 0; x < p.size(); ++x)
+    Runtime::reportStat(label, "(GLOBAL)", p[x], x);
 }
 
 #if 0

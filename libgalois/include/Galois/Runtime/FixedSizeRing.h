@@ -21,18 +21,18 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_FIXEDSIZERING_H
-#define GALOIS_FIXEDSIZERING_H
+#ifndef GALOIS_RUNTIME_FIXEDSIZERING_H
+#define GALOIS_RUNTIME_FIXEDSIZERING_H
 
-#include "Galois/optional.h"
-#include "Galois/LazyArray.h"
+#include "Galois/Runtime/LazyArray.h"
 
+#include <boost/optional.hpp>
 #include <boost/mpl/if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
@@ -41,6 +41,7 @@
 #include <atomic>
 
 namespace Galois {
+namespace Runtime {
 
 //! Unordered collection of bounded size
 template<typename T, unsigned ChunkSize, bool Concurrent>
@@ -142,7 +143,7 @@ public:
 
   reference back() { return front(); }
   const_reference back() const { return front(); }
-  Galois::optional<value_type> extract_back() { return extract_front(); }
+  boost::optional<value_type> extract_back() { return extract_front(); }
 
   bool pop_back() {
     return pop_front();
@@ -159,13 +160,13 @@ public:
   }
 
   template<bool C = Concurrent>
-  auto extract_front() -> typename std::enable_if<!C, Galois::optional<value_type>>::type {
+  auto extract_front() -> typename std::enable_if<!C, boost::optional<value_type>>::type {
     if (!empty()) {
-      Galois::optional<value_type> retval(back());
+      boost::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return boost::optional<value_type>();
   }
 
   //! returns true if something was popped
@@ -395,13 +396,13 @@ public:
     return *at(start);
   }
 
-  Galois::optional<value_type> extract_front() {
+  boost::optional<value_type> extract_front() {
     if (!empty()) {
-      Galois::optional<value_type> retval(front());
+      boost::optional<value_type> retval(front());
       pop_front();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return boost::optional<value_type>();
   }
 
   void pop_front() {
@@ -424,13 +425,13 @@ public:
     return *at((start + count - 1) % ChunkSize); 
   }
 
-  Galois::optional<value_type> extract_back() {
+  boost::optional<value_type> extract_back() {
     if (!empty()) {
-      Galois::optional<value_type> retval(back());
+      boost::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return boost::optional<value_type>();
   }
 
   void pop_back() {
@@ -451,5 +452,6 @@ public:
   const_iterator rend() const { const_reverse_iterator(this->begin()); }
 };
  
-}
+} // namespace Runtime
+} // namespace Galois
 #endif

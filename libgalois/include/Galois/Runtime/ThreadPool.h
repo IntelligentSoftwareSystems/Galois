@@ -47,6 +47,8 @@
 namespace Galois {
 namespace Runtime {
 
+void initPTS(unsigned max);
+
 class ThreadPool {
 protected:
   struct shutdown_ty {}; //! type for shutting down thread

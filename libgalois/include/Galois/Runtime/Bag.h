@@ -37,6 +37,7 @@
 
 //#include "Galois/gstl.h"
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/stl_misc.h"
 //#include "Galois/Substrate/gio.h"
 //#include "Galois/Runtime/Mem.h"
 
@@ -53,8 +54,6 @@ namespace Runtime {
  */
 template<typename T>
 class InsertBag {
-
-  unsigned size;
 
   struct header {
     header* next;
@@ -153,7 +152,7 @@ private:
     T* a = reinterpret_cast<T*>(v);
     h->dbegin = &a[offset];
     h->dend = h->dbegin;
-    h->dlast = &a[(size / sizeof(T))];
+    h->dlast = &a[(pagePoolSize() / sizeof(T))];
     h->next = nullptr;
     return h;
   }

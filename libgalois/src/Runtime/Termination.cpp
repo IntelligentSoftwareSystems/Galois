@@ -69,7 +69,7 @@ class LocalTerminationDetection : public TerminationDetection {
 public:
   LocalTerminationDetection() {}
 
-  void init(unsigned aThreads) {
+  virtual void init(unsigned aThreads) {
     activeThreads = aThreads;
   }
 
@@ -225,7 +225,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<Galois::Runtime::TerminationDetection> Galois::Runtime::getTermination() {
+std::unique_ptr<Galois::Runtime::TerminationDetection> Galois::Runtime::createTermination() {
   std::unique_ptr<TerminationDetection> foo(new LocalTerminationDetection());
   return foo;
 }

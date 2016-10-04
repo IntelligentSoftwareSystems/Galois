@@ -38,7 +38,6 @@ using namespace Galois::Runtime;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
-
 ThreadPool::ThreadPool(bool _no_bind, bool _no_bind_main) 
   : no_bind(_no_bind),
     no_bind_main(_no_bind_main),
@@ -99,6 +98,9 @@ void ThreadPool::initThread(unsigned tid) {
   if (!no_bind)
     if (my_box.topo.tid != 0 || !no_bind_main)
       bindThreadSelf(my_box.topo.osContext);
+
+  initPTS(mi.maxThreads);
+
   my_box.done = true;
 }
 

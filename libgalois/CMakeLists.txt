@@ -21,6 +21,7 @@ set(sources
         src/Runtime/GaloisConfig.cpp
         src/Runtime/Statistics.cpp
         src/Runtime/NumaMem.cpp
+        src/Runtime/SmallAlloc.cpp
         )
 
 add_library(galois STATIC ${sources})

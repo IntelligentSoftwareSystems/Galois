@@ -72,6 +72,7 @@ void TRACE(Args&&... args) {
   Galois::Runtime::detail::printTrace(os.str());
 }
 
+//comment out to trace
 #define TRACE(...) do {} while (false)
 
 #endif

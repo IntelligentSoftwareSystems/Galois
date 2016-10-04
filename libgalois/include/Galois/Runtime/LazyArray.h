@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -33,10 +33,10 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_LAZYARRAY_H
-#define GALOIS_LAZYARRAY_H
+#ifndef GALOIS_RUNTIME_LAZYARRAY_H
+#define GALOIS_RUNTIME_LAZYARRAY_H
 
-#include "Galois/LazyObject.h"
+#include "Galois/Runtime/LazyObject.h"
 
 #include <iterator>
 #include <stdexcept>
@@ -46,6 +46,7 @@
 #include <type_traits>
 
 namespace Galois {
+namespace Runtime {
 
 /**
  * This is a container that encapsulates space for a constant size array.  The
@@ -128,5 +129,6 @@ public:
   void destroy(size_type __n) { (get(__n))->~_Tp(); }
 };
 
-}
-#endif // GALOIS_LAZYARRAY_H
+} // namespace Runtime
+} // namespace Galois
+#endif // GALOIS_RUNTIME_LAZYARRAY_H

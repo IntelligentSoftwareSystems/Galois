@@ -68,9 +68,14 @@ public:
   bool globalTermination() const {
     return globalTerm.data;
   }
+
+  /**
+   * prepare this term object to handle num threads
+   */
+  virtual void init(unsigned num) = 0;
 };
 
-std::unique_ptr<TerminationDetection> getTermination();
+std::unique_ptr<TerminationDetection> createTermination();
 
 } // end namespace Runtime
 } // end namespace Galois

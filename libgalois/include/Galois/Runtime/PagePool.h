@@ -51,9 +51,6 @@ unsigned long pagePoolSize();
 //! Returns total large pages allocated by Galois memory management subsystem
 std::vector<unsigned long> numPagePoolAllocTotal();
 
-//! allocate num pages split evenly over active threads
-void preAllocThreads(unsigned num, unsigned activeThreads);
-
 } // end namespace Runtime
 } // end namespace Galois
 

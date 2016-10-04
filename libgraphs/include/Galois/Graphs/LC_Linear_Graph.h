@@ -276,11 +276,11 @@ public:
     if (UseNumaAlloc) {
       data.allocateLocal(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges, numThreads);
       nodes.allocateLocal(numNodes, numThreads);
-      this->outOfLineAllocateLocal(numNodes, numThreads);
+      this->outOfLineAllocateLocal(numNodes);
     } else {
       data.allocateInterleaved(sizeof(NodeInfo) * numNodes * 2 + sizeof(EdgeInfo) * numEdges, numThreads);
       nodes.allocateInterleaved(numNodes, numThreads);
-      this->outOfLineAllocateInterleaved(numNodes, numThreads);
+      this->outOfLineAllocateInterleaved(numNodes);
     }
   }
 

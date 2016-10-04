@@ -37,9 +37,11 @@
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/HWTopo.h"
 #include "Galois/Runtime/SimpleLock.h"
+#include "Galois/Runtime/ErrorFeedBack.h"
+
+#include <boost/core/noncopyable.hpp>
 
 #include <cstddef>
-
 #include <cassert>
 #include <vector>
 #include <utility>
@@ -50,35 +52,42 @@ namespace Runtime {
 
 namespace detail {
 
-class PerThreadStorageBase {
-  static constexpr unsigned PTSSize = 4*1024*1024;
-  static thread_local std::unique_ptr<uint64_t[]> storage;
-  static std::vector<uint64_t*> heads;
-  static std::bitset<PTSSize> mask;
-  static std::atomic<bool> initialized;
-  static SimpleLock lock;
+class PerBackend : private boost::noncopyable{
+public:
+  static constexpr unsigned  PTSSize = 4*1024*1024;
+private:
+  std::vector<std::unique_ptr<uint64_t[]> > heads;
+  std::bitset<PTSSize> mask;
+  SimpleLock lock;
+public:
+  //Fixme: Do we need 16byte alignment (OSX, llvm)?
+  unsigned alloc(unsigned bytes);
+  void dealloc(unsigned offset, unsigned bytes);
 
-  void init_inner();
-  void init(ThreadPool& tp);
+  uint64_t* get(unsigned n) { return heads[n].get(); }
+  void set(unsigned n, uint64_t* ptr);
+};
+
+PerBackend& getPerBackend();
+
+class PerThreadStorageBase {
+  static thread_local uint64_t* storage;
+
+  static void init_inner(unsigned max);
+
+  friend void Galois::Runtime::initPTS(unsigned);
 
 protected:
-
   PerThreadStorageBase() : offset(~0) {
-    if (!initialized) {
-      //in case we make one of these before initializing the thread pool
-      //This will call initPTS for each thread if it hasn't already
-      auto& tp = ThreadPool::getThreadPool();
-    
-      init(tp);
-    }
+    ThreadPool::getThreadPool();
+    if (!storage)
+      gDie("Uninitialized PTS");
   }
+
   PerThreadStorageBase(PerThreadStorageBase&& rhs) : offset(rhs.offset) {
     rhs.offset = ~0;
   }
 
-  //Fixme: Do we need 16byte alignment (OSX, llvm)?
-  static unsigned alloc(unsigned bytes);
-  static void dealloc(unsigned offset, unsigned bytes);
 
   //per-object interface
   unsigned offset;  
@@ -88,7 +97,7 @@ protected:
   }
 
   void* _getRemote(unsigned id) const {
-    return &heads[id][offset];
+    return &getPerBackend().get(id)[offset];
   }
 
   explicit operator bool() const {
@@ -109,9 +118,9 @@ public:
 
   //construct on each thread
   template<typename... Args>
-  PerThreadStorage(Args&&... args) {
+  PerThreadStorage(Args&&... args) : PerThreadStorageBase() {
     auto& tp = ThreadPool::getThreadPool();
-    offset = alloc(sizeof(T));
+    offset = detail::getPerBackend().alloc(sizeof(T));
     for (unsigned n = 0; n < tp.getMaxThreads(); ++n)
       new (_getRemote(n)) T(std::forward<Args>(args)...);
   }
@@ -121,7 +130,7 @@ public:
   ~PerThreadStorage() {
     for (unsigned n = 0; n < ThreadPool::getThreadPool().getMaxThreads(); ++n)
       get(n)->~T();
-    dealloc(offset, sizeof(T));
+    detail::getPerBackend().dealloc(offset, sizeof(T));
     offset = ~0U;
   }
 
@@ -180,7 +189,7 @@ public:
   template<typename... Args>
   PerPackageStorage(Args&&... args) {
     auto& tp = ThreadPool::getThreadPool();
-    offset = alloc(sizeof(T));
+    offset = detail::getPerBackend().alloc(sizeof(T));
     for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
       new (_getRemote(tp.getLeaderForPackage(n))) T(std::forward<Args>(args)...);
   }
@@ -191,7 +200,7 @@ public:
     auto& tp = ThreadPool::getThreadPool();
     for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
       get(tp.getLeaderForPackage(n))->~T();
-    dealloc(offset, sizeof(T));
+    detail::getPerBackend().dealloc(offset, sizeof(T));
     offset = ~0U;
   }
 

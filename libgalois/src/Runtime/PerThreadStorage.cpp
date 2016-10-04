@@ -32,14 +32,9 @@
 
 #include <mutex>
 
+thread_local uint64_t* Galois::Runtime::detail::PerThreadStorageBase::storage;
 
-thread_local std::unique_ptr<uint64_t[]> Galois::Runtime::detail::PerThreadStorageBase::storage = nullptr;
-std::vector<uint64_t*> Galois::Runtime::detail::PerThreadStorageBase::heads;
-std::bitset<Galois::Runtime::detail::PerThreadStorageBase::PTSSize> Galois::Runtime::detail::PerThreadStorageBase::mask;
-std::atomic<bool> Galois::Runtime::detail::PerThreadStorageBase::initialized;
-Galois::Runtime::SimpleLock Galois::Runtime::detail::PerThreadStorageBase::lock;
-
-unsigned Galois::Runtime::detail::PerThreadStorageBase::alloc(unsigned bytes) {
+unsigned Galois::Runtime::detail::PerBackend::alloc(unsigned bytes) {
   std::lock_guard<SimpleLock> lg(lock);
   unsigned num = (bytes + sizeof(uint64_t) - 1) / sizeof(uint64_t);
   unsigned start = 0;
@@ -59,7 +54,7 @@ unsigned Galois::Runtime::detail::PerThreadStorageBase::alloc(unsigned bytes) {
   return start;
 }
 
-void Galois::Runtime::detail::PerThreadStorageBase::dealloc(unsigned offset, unsigned bytes) {
+void Galois::Runtime::detail::PerBackend::dealloc(unsigned offset, unsigned bytes) {
   std::lock_guard<SimpleLock> lg(lock);
   unsigned b = offset;
   unsigned e = offset + (bytes + sizeof(uint64_t) - 1) / sizeof(uint64_t);
@@ -67,18 +62,28 @@ void Galois::Runtime::detail::PerThreadStorageBase::dealloc(unsigned offset, uns
     mask[b++] = false;
 }
 
-void Galois::Runtime::detail::PerThreadStorageBase::init(ThreadPool& tp) {
+void Galois::Runtime::detail::PerBackend::set(unsigned n, uint64_t* ptr) {
   std::lock_guard<SimpleLock> lg(lock);
-  heads.resize(tp.getMaxThreads());
-  mask.reset();
-  if (!initialized) { 
-    tp.run(tp.getMaxThreads(), std::bind(&PerThreadStorageBase::init_inner, this));
-    initialized = true;
-  }
+  if (heads.size() <= n)
+    heads.resize(n+1);
+  heads.at(n).reset(ptr);
 }
 
-void Galois::Runtime::detail::PerThreadStorageBase::init_inner() {
-  auto tmp =  new uint64_t[PTSSize];
-  heads[ThreadPool::getTID()] = tmp;
-  storage.reset(tmp);
+void Galois::Runtime::detail::PerThreadStorageBase::init_inner(unsigned maxThreads) {
+  TRACE("Init PTS ", ThreadPool::getTID());
+  auto tmp =  new uint64_t[PerBackend::PTSSize];
+  auto& b = getPerBackend();
+  b.set(ThreadPool::getTID(), tmp);
+  storage = tmp;
+  TRACE("TMP ", ThreadPool::getTID(), " " , tmp);
 }
+
+Galois::Runtime::detail::PerBackend& Galois::Runtime::detail::getPerBackend() {
+  static PerBackend b;
+  return b;
+}
+
+void Galois::Runtime::initPTS(unsigned max) {
+  detail::PerThreadStorageBase::init_inner(max);
+}
+

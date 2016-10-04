@@ -21,15 +21,16 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_MEM_H
 #define GALOIS_MEM_H
 
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/SmallAlloc.h"
 
 namespace Galois {
 

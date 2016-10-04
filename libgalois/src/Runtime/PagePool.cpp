@@ -136,3 +136,4 @@ size_t Galois::Runtime::pagePoolSize() {
   return allocSize();
 }
 
+

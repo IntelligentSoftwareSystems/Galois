@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -36,49 +36,49 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
-#include "Galois/gtuple.h"
-#include "Galois/Mem.h"
-#include "Galois/Statistic.h"
-#include "Galois/Threads.h"
-#include "Galois/Traits.h"
-#include "Galois/Runtime/Substrate.h"
-#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/Support.h"
-#include "Galois/Substrate/Termination.h"
-#include "Galois/Substrate/ThreadPool.h"
+//#include "Galois/Mem.h"
+// #include "Galois/Statistic.h"
+// #include "Galois/Threads.h"
+// #include "Galois/Traits.h"
+// #include "Galois/Runtime/Substrate.h"
+#include "Galois/Runtime/SyncContext.h"
+// #include "Galois/Runtime/ForEachTraits.h"
+// #include "Galois/Runtime/Range.h"
+// #include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Termination.h"
+// #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/Statistics.h"
+#include "Galois/Runtime/GaloisConfig.h"
+
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/Simple.h"
 
-#include <algorithm>
-#include <functional>
-#include <memory>
-#include <utility>
+// #include <algorithm>
+// #include <functional>
+// #include <memory>
+// #include <utility>
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
-
-static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template<typename value_type>
 class AbortHandler {
   struct Item { value_type val;  int retries; };
 
   typedef WorkList::GFIFO<Item> AbortedList;
-  Substrate::PerThreadStorage<AbortedList> queues;
+  PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
   
   /**
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = ThreadPool::getThreadPool();
     unsigned package = tp.getPackage();
-    queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+    queues.get(tp.getLeaderForPackage(package / 2))->push(item);
   }
 
   /**
@@ -88,19 +88,19 @@ class AbortHandler {
   void doublePolicy(const Item& item) {
     int retries = item.retries - 1;
     if ((retries & 1) == 1) {
-      queues.getLocal()->push(item);
+      queues->push(item);
       return;
     } 
     
-    unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
-    unsigned package = Substrate::ThreadPool::getPackage();
-    unsigned leader = Substrate::ThreadPool::getLeader();
+    unsigned tid = ThreadPool::getTID();
+    auto& tp = ThreadPool::getThreadPool();
+    unsigned package = ThreadPool::getPackage();
+    unsigned leader = ThreadPool::getLeader();
     if (tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
-      queues.getRemote(next)->push(item);
+      queues.get(next)->push(item);
     } else {
-      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+      queues.get(tp.getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -111,19 +111,19 @@ class AbortHandler {
   void boundedPolicy(const Item& item) {
     int retries = item.retries - 1;
     if (retries < 2) {
-      queues.getLocal()->push(item);
+      queues->push(item);
       return;
     } 
     
-    unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
-    unsigned package = Substrate::ThreadPool::getPackage();
+    unsigned tid = ThreadPool::getTID();
+    auto& tp = ThreadPool::getThreadPool();
+    unsigned package = ThreadPool::getPackage();
     unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
-      queues.getRemote(next)->push(item);
+      queues.get(next)->push(item);
     } else {
-      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+      queues.get(tp.getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -131,13 +131,13 @@ class AbortHandler {
    * Retry locally only.
    */
   void eagerPolicy(const Item& item) {
-    queues.getLocal()->push(item);
+    queues->push(item);
   }
 
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = Substrate::ThreadPool::getThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = ThreadPool::getThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -145,7 +145,7 @@ public:
 
   void push(const value_type& val) {
     Item item = { val, 1 };
-    queues.getLocal()->push(item);
+    queues->push(item);
   }
 
   void push(const Item& item) {
@@ -156,19 +156,13 @@ public:
       doublePolicy(newitem);
   }
 
-  AbortedList* getQueue() { return queues.getLocal(); }
+  AbortedList* getQueue() { return queues.get(); }
 };
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
-template<class WorkListTy, class FunctionTy, typename ArgsTy>
+template<class WorkListTy, class FunctionTy, bool needsStats, bool needsPush, bool needsAborts, bool needsPia, bool needsBreak>
 class ForEachExecutor {
-public:
-  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type; 
@@ -200,8 +194,7 @@ protected:
   // members to give higher likelihood of reclaiming PerThreadStorage
 
   AbortHandler<value_type> aborted; 
-  Substrate::TerminationDetection& term;
-  Substrate::Barrier& barrier;
+  TerminationDetection& term;
 
   WorkListTy wl;
   FunctionTy origFunction;
@@ -251,7 +244,7 @@ protected:
   }
 
   void runQueueSimple(ThreadLocalData& tld) {
-    Galois::optional<value_type> p;
+    boost::optional<value_type> p;
     while ((p = wl.pop())) {
       doProcess(*p, tld);
     }
@@ -259,7 +252,7 @@ protected:
 
   template<int limit, typename WL>
   void runQueue(ThreadLocalData& tld, WL& lwl) {
-    Galois::optional<typename WL::value_type> p;
+    boost::optional<typename WL::value_type> p;
     int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
@@ -311,7 +304,7 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachExecutor::fastPushBack, this, std::placeholders::_1));
     unsigned long old_iterations = 0;
-    while (true) {
+    // while (true) {
       do {
         // Run some iterations
         if (couldAbort || needsBreak) {
@@ -329,52 +322,30 @@ protected:
 
         // Update node color and prop token
         term.localTermination(didWork);
-        Substrate::asmPause(); // Let token propagate
+        asmPause(); // Let token propagate
       } while (!term.globalTermination() && (!needsBreak || !broke));
 
-      if (checkEmpty(wl, tld, 0))
-        break;
-      if (needsBreak && broke)
-        break;
-      term.initializeThread();
-      barrier.wait();
-    }
+      // if (checkEmpty(wl, tld, 0))
+      //   break;
+      // if (needsBreak && broke)
+      //   break;
+    //   term.initializeThread();
+    //   barrier.wait();
+    // }
 
     if (couldAbort)
       setThreadContext(0);
   }
 
-  struct T1 {}; struct T2 {};
-
-  template<typename... WArgsTy>
-  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
-    term(Substrate::getSystemTermination(activeThreads)),
-    barrier(getBarrier(activeThreads)),
-    wl(std::forward<WArgsTy>(wargs)...),
-    origFunction(f),
-    loopname(get_by_supertype<loopname_tag>(args).value),
-    broke(false) {
-    reportLoopInstance(loopname);
-  }
-
-  template<typename WArgsTy, int... Is>
-  ForEachExecutor(T1, const FunctionTy& f, 
-                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<Is...>):
-    ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
-
-  template<typename WArgsTy>
-  ForEachExecutor(T1, const FunctionTy& f, 
-                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<>):
-    ForEachExecutor(T2{}, f, args) {}
-
 public:
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args):
-    ForEachExecutor(T1{}, f, args, 
-                    get_by_supertype<wl_tag>(args).args, 
-                    typename make_int_seq<std::tuple_size<decltype(get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
-  
-  template<typename RangeTy>
-  void init(const RangeTy&) { }
+  template<typename... WArgsTy>
+  ForEachExecutor(const FunctionTy& f, unsigned activeThreads, const char* loopname, std::tuple<WArgsTy...> wlargs)
+    : term(getGaloisConfig().getTermination(activeThreads)),
+      wl(wlargs),
+      origFunction(f),
+      loopname(loopname),
+      broke(false) 
+  {  }
 
   template<typename RangeTy>
   void initThread(const RangeTy& range) {
@@ -383,13 +354,12 @@ public:
   }
 
   void operator()() {
-    bool isLeader = Substrate::ThreadPool::isLeader();
-    bool couldAbort = needsAborts && activeThreads > 1;
-    if (couldAbort && isLeader)
+    bool isLeader = ThreadPool::isLeader();
+    if (needsAborts && isLeader)
       go<true, true>();
-    else if (couldAbort && !isLeader)
+    else if (needsAborts && !isLeader)
       go<true, false>();
-    else if (!couldAbort && isLeader)
+    else if (!needsAborts && isLeader)
       go<false, true>();
     else
       go<false, false>();
@@ -486,58 +456,70 @@ struct reiterator<WLTy, IterTy,
 //                             std::ref(W));
 // }
 
-//TODO(ddn): Think about folding in range into args too
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
+template<bool nStats, bool nPush, bool nAborts, bool nPia, bool nBreak>
+struct FEOpts {
+  constexpr static bool needsStats = nStats;
+  constexpr static bool needsPush = nPush;
+  constexpr static bool needsAborts = nAborts;
+  constexpr static bool needsPia = nPia;
+  constexpr static bool needsBreak = nBreak;
+};
+
+template<typename RangeTy, typename FunctionTy, typename BaseWorkListTy, typename... WLArgsTy, typename FEOpts>
+void for_each_impl(const RangeTy& range, const FunctionTy& fn, unsigned activeThreads, const char* loopname, s_wl<BaseWorkListTy, WLArgsTy...>& wl, FEOpts opts) {
+
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
-  typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
-  typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
-    ::template retype<value_type> WorkListTy;
-  typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
+  typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type::template retype<value_type> WorkListTy;
 
-  auto& barrier = getBarrier(activeThreads);
-  WorkTy W(fn, args);
-  W.init(range);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads,
-             [&W, &range]() { W.initThread(range); },
-             std::ref(barrier),
-             std::ref(W));
-  //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
+  reportLoopInstance(loopname);
+
+  typedef ForEachExecutor<WorkListTy, FunctionTy, 
+                          FEOpts::needsStats, FEOpts::needsPush,
+                          FEOpts::needsAborts, FEOpts::needsPia, 
+                          FEOpts::needsBreak> WorkTy;
+
+  auto& barrier = getGaloisConfig().getBarrier(activeThreads);
+  WorkTy W(fn, activeThreads, loopname, wl.args);
+  ThreadPool::getThreadPool().run(activeThreads,
+                                  [&W, &range, &barrier]() { 
+                                    W.initThread(range); 
+                                    barrier();
+                                    W();
+                                    barrier();
+                                  }
+                                  );
 }
 
-//! Normalize arguments to for_each
-template<typename RangeTy, typename FunctionTy, typename TupleTy>
-void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
-  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
+// //! Normalize arguments to for_each
+// template<typename RangeTy, typename FunctionTy, typename TupleTy>
+// void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
-  static const bool forceNew = false;
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
-  if (forceNew) {
-    auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl, 
-          get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>()))));
-  } else {
-    auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
-    auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
-    auto ttpl = get_default_trait_values(tpl, tags, values);
-    auto dtpl = std::tuple_cat(tpl, ttpl);
-    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl,
-          get_default_trait_values(dtpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>()))));
-  }
-}
+//   static const bool forceNew = false;
+//   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+//   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+//   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+//   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+//   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+//   if (forceNew) {
+//     auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+//     Runtime::for_each_impl(r, fn,
+//         std::tuple_cat(xtpl, 
+//           get_default_trait_values(tpl,
+//             std::make_tuple(loopname_tag {}, wl_tag {}),
+//             std::make_tuple(loopname {}, wl<defaultWL>()))));
+//   } else {
+//     auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
+//     auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
+//     auto ttpl = get_default_trait_values(tpl, tags, values);
+//     auto dtpl = std::tuple_cat(tpl, ttpl);
+//     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+//     Runtime::for_each_impl(r, fn,
+//         std::tuple_cat(xtpl,
+//           get_default_trait_values(dtpl,
+//             std::make_tuple(loopname_tag {}, wl_tag {}),
+//             std::make_tuple(loopname {}, wl<defaultWL>()))));
+//   }
+// }
 
 } // end namespace Runtime
 } // end namespace Galois
