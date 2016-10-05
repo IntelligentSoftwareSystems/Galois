@@ -58,10 +58,10 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
           auto syncPull_plusOp = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
           auto syncPull_binary_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_binaryOp_lhs);
 
-
           syncPull_var = (syncPull_var != NULL) ? syncPull_var : syncPull_binary_var;
 
           if(syncPull_var){
+            //syncPull_var->dumpColor();
 
             if(syncPull_var->isReferenced()){
 

@@ -724,8 +724,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
             /** Only need sync_pull if modified **/
+              llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
               if(j.SYNC_TYPE == "sync_pull_maybe"){
-                llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << ", Node_name : "<< j.NODE_NAME <<"\n";
                 StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
                 StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
                 StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
@@ -742,20 +742,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 #endif
 
                 /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
-#if 0
                 DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
                                                                                                     hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
                                                                                                     unless(stmt_reductionOp))),
                                                                                    hasAncestor(EdgeForLoopMatcher)
                                                                       ).bind(str_syncPull_var);
-#endif
-
-                DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
-                                                                                                    RHS_memExpr,
-                                                                                                    unless(stmt_reductionOp))),
-                                                                                   hasAncestor(EdgeForLoopMatcher)
-                                                                      ).bind(str_syncPull_var);
-
 
                 StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
                                                                         anyOf(
