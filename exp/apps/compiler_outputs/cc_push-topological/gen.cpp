@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
 
       if((run + 1) != numRuns){
         Galois::Runtime::getHostBarrier().wait();
-        (*hg).reset_num_iter(run);
+        (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
       }
     }
