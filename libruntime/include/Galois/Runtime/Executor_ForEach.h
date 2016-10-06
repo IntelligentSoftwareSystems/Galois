@@ -201,10 +201,11 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        reportStat(loopname, "Conflicts", stat_conflicts, 0);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, 0);
-        reportStat(loopname, "Pushes", stat_pushes, 0);
-        reportStat(loopname, "Iterations", stat_iterations, 0);
+        unsigned tid = Substrate::ThreadPool::getTID();
+        reportStat(loopname, "Conflicts", stat_conflicts, tid);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, tid);
+        reportStat(loopname, "Pushes", stat_pushes, tid);
+        reportStat(loopname, "Iterations", stat_iterations, tid);
       }
     }
   };
