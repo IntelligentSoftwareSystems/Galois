@@ -1,0 +1,45 @@
+add_library(galois_python SHARED 
+  PythonGraph.cpp 
+  $<TARGET_OBJECTS:gllvm_obj>
+  $<TARGET_OBJECTS:galois_substrate_obj>
+  $<TARGET_OBJECTS:galois_runtime_obj> 
+  $<TARGET_OBJECTS:galois_graphs_obj> 
+  $<TARGET_OBJECTS:galois_exp_obj>
+)
+target_include_directories(galois_python PUBLIC 
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_SOURCE_DIR}/libsubstrate/include
+  ${CMAKE_SOURCE_DIR}/libruntime/include
+  ${CMAKE_SOURCE_DIR}/libgraphs/include
+  ${CMAKE_SOURCE_DIR}/libexp/include
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
+set_target_properties (galois_python PROPERTIES 
+  INTERFACE_POSITION_INDEPENDENT_CODE On 
+  POSITION_INDEPENDENT_CODE On
+)
+target_link_libraries(galois_python ${VTune_LIBRARIES})
+
+if (CMAKE_HAVE_PTHREAD_H)
+   add_definitions(-DGALOIS_HAVE_PTHREAD)
+   target_link_libraries(galois_python Threads::Threads)
+endif()
+
+find_package(NUMA)
+if(NUMA_FOUND)
+  add_definitions(-DGALOIS_USE_NUMA)
+  target_link_libraries(galois_python ${NUMA_LIBRARY})
+else()
+  message(WARNING "No NUMA Support.  Likely poor performance")
+endif()
+
+app(python_graph_test test.cpp)
+target_include_directories(python_graph_test PUBLIC 
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_SOURCE_DIR}/libsubstrate/include
+  ${CMAKE_SOURCE_DIR}/libruntime/include
+  ${CMAKE_SOURCE_DIR}/libgraphs/include
+  ${CMAKE_SOURCE_DIR}/libexp/include
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_link_libraries(python_graph_test galois_python)
