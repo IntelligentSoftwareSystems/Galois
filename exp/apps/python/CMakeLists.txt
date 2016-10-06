@@ -18,7 +18,13 @@ set_target_properties (galois_python PROPERTIES
   INTERFACE_POSITION_INDEPENDENT_CODE On 
   POSITION_INDEPENDENT_CODE On
 )
-target_link_libraries(galois_python ${VTune_LIBRARIES})
+
+if (USE_VTUNE)
+  find_package(VTune)
+  if (VTune_FOUND)
+    target_link_libraries(galois_python ${VTune_LIBRARIES})
+  endif()
+endif()
 
 if (CMAKE_HAVE_PTHREAD_H)
    add_definitions(-DGALOIS_HAVE_PTHREAD)
