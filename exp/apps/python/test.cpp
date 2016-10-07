@@ -5,7 +5,6 @@
 
 int main(int argc, char *argv[]) {
   std::vector<GNode> nodes;
-  std::vector<edge_iterator> edges;
 
   Graph *g = createGraph();
 
@@ -16,30 +15,34 @@ int main(int argc, char *argv[]) {
   nodes.push_back(createNode(g));
   addNode(g, nodes[1]);
   addNodeAttr(g, nodes[1], "language", "english");
+  addNodeAttr(g, nodes[1], "garbage", "to_be_deleted");
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
-  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
-  addEdgeAttr(g, edges[0], "weight", "3.0");
+  removeNodeAttr(g, nodes[1], "garbage");
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
-  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
-  addEdgeAttr(g, edges[1], "place", "texas");
+  addMultiEdge(g, nodes[0], nodes[1], "n1n2e1");
+  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e1", "weight", "3.0");
 
-  for(auto n: nodes) {
-    for(auto i: g->getData(n)) {
-      std::cout << i.first << ": " << i.second << std::endl;
-    }
-  }
+  addMultiEdge(g, nodes[0], nodes[1], "n1n2e2");
+  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "place", "texas");
+  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "garbage", "discard");
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
-  for(auto e: edges) {
-    for(auto i: g->getEdgeData(e)) {
-      std::cout << i.first << ": " << i.second << std::endl;
-    }
-  }
+  removeEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "garbage");
+  removeEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "galois_id");
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
   analyzeBFS(g, 1);
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
   deleteGraph(g);
   nodes.clear();
-  edges.clear();
 
   return 0;
 }

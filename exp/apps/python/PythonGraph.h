@@ -43,22 +43,21 @@ typedef char * ValAltTy;
 
 typedef Galois::Graph::FirstGraph<Attr, Attr, true> Graph; // directed graph with nodes and edges of type Attr
 typedef Graph::GraphNode GNode;
-typedef Graph::edge_iterator edge_iterator;
 
 extern "C" {
 
 Graph *createGraph();
 void deleteGraph(Graph *g);
+void printGraph(Graph *g);
 
 GNode createNode(Graph *g);
-void addNode(Graph *g, const GNode& n);
+void addNode(Graph *g, const GNode n);
 void addNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
 
-edge_iterator addEdge(Graph *g, GNode src, GNode dst);
-edge_iterator addMultiEdge(Graph *g, GNode src, GNode dst);
-void addEdgeAttr(Graph *g, edge_iterator e, const KeyAltTy key, const ValAltTy val);
-void removeEdgeAttr(Graph *g, edge_iterator e, const KeyAltTy key);
+void addMultiEdge(Graph *g, GNode src, GNode dst, const ValAltTy id);
+void addEdgeAttr(Graph *g, GNode src, GNode dst, const ValAltTy id, const KeyAltTy key, const ValAltTy val);
+void removeEdgeAttr(Graph *g, GNode src, GNode dst, const ValAltTy id, const KeyAltTy key);
 
 void analyzeBFS(Graph* g, int numThreads);
 
