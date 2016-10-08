@@ -212,7 +212,7 @@ namespace {
         if(callFS){
 
           std::string OperatorStructName = callerFS->getNameAsString();
-          llvm::outs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
+          llvm::errs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
           llvm::errs() << "It is coming here for_Each \n" << callFS->getNumArgs() << "\n";
 
           SourceLocation ST_main = callerFS->getSourceRange().getBegin();
@@ -625,7 +625,7 @@ namespace {
         if(callFS){
 
           std::string OperatorStructName = callerStruct->getNameAsString();
-          llvm::outs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
+          llvm::errs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
 
           SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
@@ -652,6 +652,27 @@ namespace {
           //llvm::errs() << " //////// > " << s_first.str() << "\n";
           callFS->getArg(0)->dump();
           */
+
+          assert(callFS->getNumArgs() > 1);
+          string str_begin_arg;
+          llvm::raw_string_ostream s_begin(str_begin_arg);
+          callFS->getArg(0)->printPretty(s_begin, 0, Policy);
+          string begin = s_begin.str();
+          string str_end_arg;
+          llvm::raw_string_ostream s_end(str_end_arg);
+          callFS->getArg(1)->printPretty(s_end, 0, Policy);
+          string end = s_end.str();
+          string single_source;
+          // TODO: use type comparison instead
+          if (end.find(".end()") == string::npos) {
+            single_source = begin;
+            begin = "_graph.getLID(" + single_source + ")";
+            end = begin + "+1";
+            // use begin and end only if _graph_isOwned(single_source)
+          } else {
+            assert(begin.compare("_graph.begin()") == 0);
+            assert(end.compare("_graph.end()") == 0);
+          }
 
           for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
             string str_arg;
@@ -782,6 +803,19 @@ namespace {
                 write_set_vec_PUSH_PULL.push_back(i);
             }
 
+            if (!single_source.empty()) {
+              stringstream kernelBefore;
+              kernelBefore << "\t\tunsigned int __begin, __end;\n";
+              kernelBefore << "\t\tif (_graph.isOwned(" << single_source << ")) {\n";
+              kernelBefore << "\t\t\t__begin = " << begin << ";\n";
+              kernelBefore << "\t\t\t__end = __begin + 1;\n";
+              kernelBefore << "\t\t} else {\n";
+              kernelBefore << "\t\t\t__begin = 0;\n";
+              kernelBefore << "\t\t\t__end = 0;\n";
+              kernelBefore << "\t\t}\n";
+              rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
+            }
+
             stringstream SSSyncer;
             unsigned counter = 0;
             for(auto i : write_set_vec_PUSH) {
@@ -847,7 +881,12 @@ namespace {
             if (!accumulator.empty()) {
               kernelBefore << "\t\tint __retval = 0;\n";
             }
-            kernelBefore << "\t\t" << className << "_cuda(";
+            if (!single_source.empty()) {
+              kernelBefore << "\t\t" << className << "_cuda(";
+              kernelBefore << "__begin, __end, ";
+            } else {
+              kernelBefore << "\t\t" << className << "_all_cuda(";
+            }
             if (!accumulator.empty()) {
               kernelBefore << "__retval, ";
             }
@@ -865,6 +904,12 @@ namespace {
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
+
+            if (!single_source.empty()) {
+              string galois_doall = "Galois::do_all(";
+              string iterator_range = "boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end)";
+              rewriter.ReplaceText(ST_main, galois_doall.length() + single_source.length(), galois_doall + iterator_range);
+            }
 
             SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
 
@@ -932,9 +977,6 @@ namespace {
 
       /** for Galois::for_each. Needs different treatment. **/
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version"))))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop_forEach"), &forEachHandler);
-
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop"), &functionCallHandler);
-
 
     }
 

@@ -53,6 +53,7 @@
   struct FirstIter_struct_entry{
     //pair: type, varName
     vector<pair<string,string>> MEMBER_FIELD_VEC;
+    string OPERATOR_RANGE;
     string OPERATOR_ARG;
     string OPERATOR_BODY;
   };

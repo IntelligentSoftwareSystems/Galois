@@ -348,12 +348,13 @@ public:
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', 'nowned') ";
+    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', '__nowned')";
     // FIXME: assuming first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
-      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(None, \"nowned\"),\n[\n";
-      bodyString << "CDecl([(\"bool\", \"pop\", \" = " << vertexName << " < nowned\")]),\n"; // hack for IrGL compiler
+      declString << ", ('unsigned int', '__begin'), ('unsigned int', '__end')";
+      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(\"__begin\", \"__end\"),\n[\n";
+      bodyString << "CDecl([(\"bool\", \"pop\", \" = " << vertexName << " < __end\")]),\n"; // hack for IrGL compiler
       bodyString << "If(\"pop\", [\n"; // hack to handle nested parallelism (should be handled by IrGL compiler in the future)
       conditional_pop = true;
     } else {
@@ -599,7 +600,6 @@ private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool requiresWorklist; // shared across kernels
-  bool started; // to recognize CXXMethodDecl that is the top/entry point
   std::string accumulatorName;
   std::ofstream Output;
 
@@ -614,8 +614,7 @@ public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
     astContext(context),
     rewriter(R),
-    requiresWorklist(false),
-    started(false)
+    requiresWorklist(false)
   {}
   
   virtual ~IrGLOrchestratorVisitor() {}
@@ -951,52 +950,7 @@ public:
   }
 
   virtual bool TraverseDecl(Decl *D) {
-    CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
-    if (method && !started) {
-      started = true;
-      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
-      std::string kernelName = method->getParent()->getNameAsString();
-      Output << "Kernel(\"" << kernelName << "_cuda\", ";
-      Output << "[";
-      std::vector<std::string> arguments;
-      for (auto decl : method->getParent()->decls()) {
-        auto var = dyn_cast<VarDecl>(decl);
-        if (var && var->isStaticDataMember()) {
-          std::string type = var->getType().getAsString();
-          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
-            Output << "('int &', '__retval'), ";
-            arguments.push_back("int & __retval");
-            accumulatorName = var->getNameAsString();
-            break;
-          }
-        }
-      }
-      for (auto field : method->getParent()->fields()) {
-        std::string name = field->getNameAsString();
-        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
-          std::string type = FormatType(field->getType().getAsString());
-          Output << "('" << type << "', '" << name << "'), ";
-          arguments.push_back(type + " " + name);
-        } 
-      }
-      HostKernelsToArgumentsMap[kernelName] = arguments;
-      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
-    } else {
-      method = NULL;
-    }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
-    if (traverse && method) {
-      Output << "], host = True),\n"; // end Kernel
-      Output.close();
-      accumulatorName.clear();
-
-      std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
-      std::size_t found = fileName.rfind(".");
-      assert(found != std::string::npos);
-      FileNamePath = fileName.substr(0, found);
-
-      started = false;
-    }
     return traverse;
   }
 
@@ -1006,16 +960,26 @@ public:
     std::size_t begin = text.find("Galois::do_all");
     if (begin != 0) {
       begin = text.find("Galois::for_each");
-      if (text.find("Galois::workList_version") != std::string::npos)
-        isTopological = false;
+      isTopological = false;
     }
     if (begin == 0) {
       // generate kernel for operator
-      assert(callExpr->getNumArgs() > 1);
-      // FIXME: pick the right argument
-      Expr *op = callExpr->getArg(2);
-      RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
+      assert(callExpr->getNumArgs() > 2);
+      auto arg_type = callExpr->getArg(2)->getType();
+      assert(arg_type->isStructureType());
+      RecordDecl *record = arg_type->getAsStructureType()->getDecl();
       CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
+      // find if there are any accumulators being used
+      for (auto decl : cxxrecord->decls()) {
+        auto var = dyn_cast<VarDecl>(decl);
+        if (var && var->isStaticDataMember()) {
+          std::string type = var->getType().getAsString();
+          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+            accumulatorName = var->getNameAsString();
+            break;
+          }
+        }
+      }
       for (auto method : cxxrecord->methods()) {
         // FIXME: handle overloading/polymorphism
         if (method->getNameAsString().compare("operator()") == 0) {
@@ -1034,13 +998,59 @@ public:
         }
       }
 
+      std::string kernelName = cxxrecord->getNameAsString();
+
+      // kernel signature
+      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
+      std::stringstream Output_topo_all, Output_topo_all_body;
+      Output << "Kernel(\"" << kernelName << "_cuda\", [";
+      if (isTopological) {
+        Output_topo_all << "Kernel(\"" << kernelName << "_all_cuda\", [";
+        Output_topo_all_body << "CBlock([\"" << kernelName << "_cuda(";
+        Output_topo_all_body << "0, ctx->nowned, ";
+      }
+      std::vector<std::string> arguments, arguments_topo_all;
+      if (isTopological) {
+        Output << "('unsigned int ', '__begin'), ('unsigned int ', '__end'), ";
+        arguments.push_back("unsigned int __begin");
+        arguments.push_back("unsigned int __end");
+      }
+      if (!accumulatorName.empty()) {
+        Output << "('int &', '__retval'), ";
+        arguments.push_back("int & __retval");
+        if (isTopological) {
+          Output_topo_all << "('int &', '__retval'), ";
+          Output_topo_all_body << "__retval, ";
+          arguments_topo_all.push_back("int & __retval");
+        }
+      }
+      for (auto field : cxxrecord->fields()) {
+        std::string name = field->getNameAsString();
+        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+          std::string type = FormatType(field->getType().getAsString());
+          Output << "('" << type << "', '" << name << "'), ";
+          arguments.push_back(type + " " + name);
+          if (isTopological) {
+            Output_topo_all << "('" << type << "', '" << name << "'), ";
+            Output_topo_all_body << name << ", ";
+            arguments_topo_all.push_back(type + " " + name);
+          }
+        } 
+      }
+      HostKernelsToArgumentsMap[kernelName] = arguments;
+      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
+      if (isTopological) {
+        HostKernelsToArgumentsMap[kernelName + "_all"] = arguments_topo_all;
+        Output_topo_all << "('struct CUDA_Context *', 'ctx')],\n[\n";
+        Output_topo_all_body << "ctx)\"]),\n";
+      }
+
       // initialize blocks and threads
       Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
       Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
       Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
 
       // generate call to kernel
-      std::string kernelName = record->getNameAsString();
       bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
       if (!isTopological) {
         requiresWorklist = true;
@@ -1054,11 +1064,14 @@ public:
       }
       Output << "Invoke(\"" << kernelName << "\", ";
       Output << "(\"ctx->gg\", \"ctx->nowned\"";
-      auto& arguments = KernelToArgumentsMap[kernelName];
-      for (auto& argument : arguments.first) {
+      if (isTopological) {
+        Output << ", \"__begin\", \"__end\"";
+      }
+      auto& karguments = KernelToArgumentsMap[kernelName];
+      for (auto& argument : karguments.first) {
         Output << ", \"" << argument << "\"";
       }
-      for (auto& argument : arguments.second) {
+      for (auto& argument : karguments.second) {
         Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
       }
       if (hasAReturnValue) {
@@ -1077,6 +1090,22 @@ public:
         Output << "CBlock([\"ctx->out_wl.update_cpu()\"]),\n";
         Output << "CBlock([\"ctx->shared_wl->num_out_items = ctx->out_wl.nitems()\"]),\n";
       }
+
+      Output << "], host = True),\n"; // end Kernel
+
+      if (isTopological) {
+        Output << Output_topo_all.str();
+        Output << Output_topo_all_body.str();
+        Output << "], host = True),\n"; // end Kernel
+      }
+
+      Output.close();
+      accumulatorName.clear();
+
+      std::string fileName = rewriter.getSourceMgr().getFilename(cxxrecord->getLocStart()).str();
+      std::size_t found = fileName.rfind(".");
+      assert(found != std::string::npos);
+      FileNamePath = fileName.substr(0, found);
     }
     return true;
   }
