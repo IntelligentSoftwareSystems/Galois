@@ -5,6 +5,7 @@
 
 int main(int argc, char *argv[]) {
   std::vector<GNode> nodes;
+  std::vector<Edge> edges;
 
   Graph *g = createGraph();
 
@@ -23,17 +24,17 @@ int main(int argc, char *argv[]) {
   printGraph(g);
   std::cout << "=====" << std::endl;
 
-  addMultiEdge(g, nodes[0], nodes[1], "n1n2e1");
-  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e1", "weight", "3.0");
+  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
+  addEdgeAttr(g, edges[0], "weight", "3.0");
 
-  addMultiEdge(g, nodes[0], nodes[1], "n1n2e2");
-  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "place", "texas");
-  addEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "garbage", "discard");
+  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
+  addEdgeAttr(g, edges[1], "place", "texas");
+  addEdgeAttr(g, edges[1], "garbage", "discard");
   printGraph(g);
   std::cout << "=====" << std::endl;
 
-  removeEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "garbage");
-  removeEdgeAttr(g, nodes[0], nodes[1], "n1n2e2", "galois_id");
+  removeEdgeAttr(g, edges[1], "garbage");
+  removeEdgeAttr(g, edges[1], "galois_id");
   printGraph(g);
   std::cout << "=====" << std::endl;
 
@@ -43,6 +44,7 @@ int main(int argc, char *argv[]) {
 
   deleteGraph(g);
   nodes.clear();
+  edges.clear();
 
   return 0;
 }
