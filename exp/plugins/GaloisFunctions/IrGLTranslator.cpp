@@ -680,7 +680,7 @@ public:
     cuheader << "\n#ifdef __GALOIS_CUDA_CHECK_ERROR__\n";
     cuheader << "#define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());\n";
     cuheader << "#else\n";
-    cuheader << "#define check_cuda_kernel  \n";
+    cuheader << "#define check_cuda_kernel check_cuda(cudaGetLastError());\n";
     cuheader << "#endif\n";
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
