@@ -71,6 +71,24 @@ std::string center(const bool s, const int w) {
   return ss.str();
 }
 
+// finds and replaces all occurrences
+// ensures progress even if replaceWith contains toReplace
+void findAndReplace(std::string &str, 
+    const std::string &toReplace, 
+    const std::string &replaceWith) 
+{
+  std::size_t pos = 0;
+  while (1) {
+    std::size_t found = str.find(toReplace, pos);
+    if (found != std::string::npos) {
+      str = str.replace(found, toReplace.length(), replaceWith);
+      pos = found + replaceWith.length();
+    } else {
+      break;
+    }
+  }
+}
+
 
 
 
@@ -223,7 +241,10 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   /** Adding static go function **/
   //TODO: Assuming graph type is Graph
   string static_go = "void static go(Graph& _graph) {\n";
-  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}" + SS_write_set.str() + ");\n}\n";
+  static_go += "Galois::do_all(" + entry.OPERATOR_RANGE;
+  static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
+  static_go += "Galois::loopname(\"" + orig_functor_name + "\"), ";
+  static_go += "Galois::numrun(_graph.get_run_num())" + SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
   string operator_func = entry.OPERATOR_BODY + "\n";

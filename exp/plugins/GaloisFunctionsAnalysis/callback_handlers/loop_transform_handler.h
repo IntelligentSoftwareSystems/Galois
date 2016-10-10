@@ -47,22 +47,15 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
       clang::PrintingPolicy Policy(LangOpts);
       for(auto i : info->edgeData_map) {
         for(auto j : i.second) {
-          string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
-
           if(j.IS_REFERENCED && j.IS_REFERENCE){
             string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
-            string str_if_RHS_const = "if_RHS_const" + j.VAR_NAME + "_" + i.first;
-            string str_if_RHS_nonconst = "if_RHS_nonconst" + j.VAR_NAME + "_" + i.first;
             string str_main_struct = "main_struct_" + i.first;
             string str_forLoop_2LT = "forLoop_2LT_" + i.first;
             string str_method_operator  = "methodDecl_" + i.first;
             string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
             string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
 
-            auto ifGreater_2loopTrans = Results.Nodes.getNodeAs<clang::Stmt>(str_ifGreater_2loopTrans);
-            auto if_RHS_memExpr_const = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS_const);
-            auto if_RHS_memExpr_nonconst = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS_nonconst);
-            auto if_LHS_memExpr = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+            auto ifGreater_2loopTrans = Results.Nodes.getNodeAs<clang::IfStmt>(str_ifGreater_2loopTrans);
             if(ifGreater_2loopTrans){
               FirstIter_struct_entry first_itr_entry;
               SourceLocation if_loc = ifGreater_2loopTrans->getSourceRange().getBegin();
@@ -74,6 +67,14 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
               /**2: extract operator body without if statement (order matters) **/
               auto method_operator = Results.Nodes.getNodeAs<clang::CXXMethodDecl>(str_method_operator);
+              // remove UserContext : assuming it is 2nd argument
+              assert(method_operator->getNumParams() == 2);
+              auto OP_parm_itr = method_operator->param_begin();
+              auto first_op_length = (*OP_parm_itr)->getNameAsString().length();
+              auto first_end_loc = (*OP_parm_itr)->getSourceRange().getEnd();
+              auto first_end = first_end_loc.getRawEncoding();
+              auto second_end = method_operator->getParamDecl(1)->getSourceRange().getEnd().getRawEncoding();
+              rewriter.RemoveText(first_end_loc.getLocWithOffset(first_op_length), second_end - first_end);
               string operator_body = rewriter.getRewrittenText(method_operator->getSourceRange());
               first_itr_entry.OPERATOR_BODY = operator_body;
               
@@ -94,13 +95,13 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
               //TODO: change sdata_loc getLocWithOffset from 2 to total length of statement.
               SourceLocation sdata_loc = sdata_declStmt->getSourceRange().getEnd().getLocWithOffset(2);
-              string new_condition;
-              if(if_RHS_memExpr_const){
-                new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + split_dot(if_RHS_memExpr_const, 0) + "){\n";
-              }
-              else if(if_RHS_memExpr_nonconst){
-                new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + info->getData_map[i.first][0].VAR_NAME  + "." + split_dot(if_RHS_memExpr_nonconst, 1) + "){\n";
-              }
+              auto binary_op = dyn_cast<clang::BinaryOperator>(ifGreater_2loopTrans->getCond());
+              string str_binary_op_arg;
+              llvm::raw_string_ostream s_binary_op(str_binary_op_arg);
+              binary_op->printPretty(s_binary_op, 0, Policy);
+              string str_binary_op = s_binary_op.str();
+              findAndReplace(str_binary_op, j.VAR_NAME, info->getData_map[i.first][0].VAR_NAME);
+              string new_condition = "\nif(" + str_binary_op + "){\n";
               rewriter.InsertText(sdata_loc, new_condition, true, true);
 
               auto method_operator_loc = method_operator->getSourceRange().getEnd();
@@ -117,9 +118,19 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
               /**5: Store the first argument of the operator call **/
               //TODO: Assuming there is (src, context) in arguments
-              auto OP_parm_itr = method_operator->param_begin();
               string operator_arg = (*OP_parm_itr)->getType().getAsString() + "  " + (*OP_parm_itr)->getNameAsString();
               first_itr_entry.OPERATOR_ARG = operator_arg;
+
+              /**6: Get the range of the operator call **/
+              auto for_each_node = Results.Nodes.getNodeAs<clang::Stmt>(str_for_each);
+              string for_each_text_arg;
+              llvm::raw_string_ostream s_for_each_text(for_each_text_arg);
+              for_each_node->printPretty(s_for_each_text, 0, Policy);
+              string for_each_text = s_for_each_text.str();
+              size_t begin = for_each_text.find("(");
+              size_t end = for_each_text.find(i.first, begin);
+              string operator_range = for_each_text.substr(begin+1, end - begin - 1);
+              first_itr_entry.OPERATOR_RANGE = operator_range;
 
               info->FirstItr_struct_map[i.first].push_back(first_itr_entry);
 
@@ -129,10 +140,15 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               rewriter.InsertText(main_struct_loc_begin, firstItr_func, true, true);
 
               /**7: call functor for first iteration in the main functor and do while of for_each ***/
-              auto for_each_node = Results.Nodes.getNodeAs<clang::Stmt>(str_for_each);
               SourceLocation for_each_loc_begin = for_each_node->getSourceRange().getBegin();
               SourceLocation for_each_loc_end = for_each_node->getSourceRange().getEnd().getLocWithOffset(2);
               //TODO:: get _graph from go struct IMPORTANT
+              // change for_each to do_all
+              string galois_foreach = "Galois::for_each(";
+              string galois_doall = "Galois::do_all(_graph.begin(), _graph.end(), ";
+              rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
+              string num_run = ", Galois::numrun(_graph.get_run_num())";
+              rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
               string firstItr_func_call = "FirstItr_" + i.first + "::go(_graph);\n";
               string do_while = firstItr_func_call + "\n do { \n" + galois_distributed_accumulator_name + ".reset();\n";
               rewriter.InsertText(for_each_loc_begin, do_while, true, true);
