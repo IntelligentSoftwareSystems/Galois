@@ -632,7 +632,6 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
             std::make_tuple(loopname {}, wl<defaultWL>()))));
     Timer_for_each_impl.stop();
 
-    int num_iter = 1;
     typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
     DBag dbag(helper_fn, loopName);
     auto &local_wl = DBag::get();
@@ -648,9 +647,10 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
 
     /** loop while work in the worklist **/
+    int num_iterations = 1;
     while(!dbag.canTerminate()) {
 
-      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iter <<" Total items to work on : " << local_wl.size() << "\n";
+      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 
       // call for_each again.
       Timer_for_each_impl.start();
@@ -673,8 +673,9 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 #endif
       dbag.sync();
 
-      num_iter++;
+      ++num_iterations;
     }
+    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)num_iterations, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 

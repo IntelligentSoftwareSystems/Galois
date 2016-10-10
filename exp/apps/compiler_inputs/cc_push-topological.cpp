@@ -122,6 +122,7 @@ struct ConnectedComp {
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_num()));
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
+    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)iteration, 0);
   }
 
   void operator()(GNode src) const {

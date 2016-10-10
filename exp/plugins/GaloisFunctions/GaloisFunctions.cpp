@@ -512,7 +512,6 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-            kernelBefore << "\t\tunsigned num_iter = 0;\n";
             kernelBefore << "\t\tauto __sync_functor = Get_info_functor<Graph>(_graph);\n";
             kernelBefore << "\t\ttypedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
             kernelBefore << "\t\tDBag dbag(__sync_functor, \"" << className << "\");\n";
@@ -559,8 +558,8 @@ namespace {
             cudaKernelCall << "\t\t#endif\n";
             cudaKernelCall << "\t\tdbag.sync();\n";
             kernelBefore << cudaKernelCall.str();
+            kernelBefore << "\t\tunsigned _num_iterations = 1;\n";
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
-            kernelBefore << "\t\t++num_iter;\n";
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
             kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
             kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
@@ -571,7 +570,9 @@ namespace {
             kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
             kernelBefore << "\t\tstd::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);\n";
             kernelBefore << cudaKernelCall.str();
+            kernelBefore << "\t\t++_num_iterations;\n";
             kernelBefore << "\t\t}\n";
+            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"Num Iterations\", (unsigned long)_num_iterations, 0);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             if (!single_source.empty()) {

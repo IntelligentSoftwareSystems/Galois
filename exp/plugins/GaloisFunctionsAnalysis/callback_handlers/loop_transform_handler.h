@@ -149,12 +149,15 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
               string num_run = ", Galois::numrun(_graph.get_run_num())";
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
-              string firstItr_func_call = "FirstItr_" + i.first + "::go(_graph);\n";
-              string do_while = firstItr_func_call + "\n do { \n" + galois_distributed_accumulator_name + ".reset();\n";
+              string firstItr_func_call = "\nFirstItr_" + i.first + "::go(_graph);\n";
+              string iteration = "\nunsigned _num_iterations = 1;\n";
+              string do_while = firstItr_func_call + iteration + "do { \n" + galois_distributed_accumulator_name + ".reset();\n";
               rewriter.InsertText(for_each_loc_begin, do_while, true, true);
 
-              string while_conditional = "\n}while("+ galois_distributed_accumulator_name + ".reduce());\n";
-              rewriter.InsertText(for_each_loc_end, while_conditional, true, true);
+              string iteration_inc = "++_num_iterations;\n";
+              string while_conditional = "}while("+ galois_distributed_accumulator_name + ".reduce());\n";
+              string report_iteration = "Galois::Runtime::reportStat(\"(NULL)\", \"Num Iterations\", (unsigned long)_num_iterations, 0);\n";
+              rewriter.InsertText(for_each_loc_end, iteration_inc + while_conditional + report_iteration, true, true);
 
               /**8. Adding definition for static accumulator field name **/
               string galois_accumulator_def = "\n" + galois_distributed_accumulator_type + " " + i.first + "::" + galois_distributed_accumulator_name + ";\n";
