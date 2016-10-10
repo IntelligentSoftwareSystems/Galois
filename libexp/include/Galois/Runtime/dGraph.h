@@ -182,6 +182,37 @@ public:
 
 
    template<typename FnTy>
+     void syncRecvApply_ck(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
+       auto& net = Galois::Runtime::getSystemNetworkInterface();
+       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run));
+       std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
+       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
+       StatTimer_set.start();
+
+       uint32_t num = masterNodes[from_id].size();
+       std::vector<typename FnTy::ValTy> val_vec(num);
+       Galois::Runtime::gDeserialize(buf, val_vec);
+       if(num > 0){
+         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+               [&](uint32_t n){
+               uint32_t lid = masterNodes[from_id][n];
+#ifdef __GALOIS_HET_OPENCL__
+           CLNodeDataWrapper d = clGraph.getDataW(lid);
+           FnTy::reduce(lid, d, val_vec[n]);
+#else
+           FnTy::reduce(lid, getData(lid), val_vec[n]);
+#endif
+               }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+         }
+       }
+       if(net.ID == (from_id + 1)%net.Num){
+        checkpoint_recvBuffer = std::move(buf);
+       }
+       StatTimer_set.stop();
+   }
+
+   template<typename FnTy>
      void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
        auto& net = Galois::Runtime::getSystemNetworkInterface();
        std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run));
@@ -1267,6 +1298,7 @@ public:
 #endif
 
 
+
    template<typename FnTy>
    void sync_push(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -1342,6 +1374,118 @@ public:
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
         syncRecvApply<FnTy>(p->first, p->second, loopName);
+      }
+      ++Galois::Runtime::evilPhase;
+
+      StatTimer_syncPush.stop();
+
+   }
+
+   template<typename FnTy>
+   void sync_push_ck(std::string loopName) {
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      if (comm_mode == 1) {
+        simulate_sync_push<FnTy>(loopName);
+        return;
+      } else if (comm_mode == 2) {
+        simulate_bare_mpi_sync_push<FnTy>(loopName);
+        return;
+      }
+#endif
+#endif
+      ++num_iter_push;
+      std::string extract_timer_str("SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
+      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
+      Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
+      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+
+      std::string statChkPtBytes_str("CHECKPOINT_BYTES_SYNC_PUSH_" + loopName +"_" + std::to_string(num_run));
+      Galois::Statistic checkpoint_bytes(statChkPtBytes_str);
+
+      std::string checkpoint_timer_str("TIME_CHECKPOINT_SYNC_PUSH_MEM_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+
+
+      StatTimer_syncPush.start();
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = slaveNodes[x].size();
+         if((x == id))
+           continue;
+
+         Galois::Runtime::SendBuffer b;
+
+         StatTimer_extract.start();
+           std::vector<typename FnTy::ValTy> val_vec(num);
+
+         if(num > 0 ){
+           if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+                  uint32_t lid = slaveNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+                  CLNodeDataWrapper d = clGraph.getDataW(lid);
+                  auto val = FnTy::extract(lid, getData(lid, d));
+                  FnTy::reset(lid, d);
+#else
+                  auto val = FnTy::extract(lid, getData(lid));
+                  FnTy::reset(lid, getData(lid));
+#endif
+                  val_vec[n] = val;
+                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+           }
+
+        }
+
+           gSerialize(b, val_vec);
+      /*   }
+           else {
+           gSerialize(b, loopName);
+         }
+         */
+
+
+      SyncPush_send_bytes += b.size();
+      auto send_bytes = b.size();
+
+      StatTimer_checkpoint.start();
+         if(x == (net.ID + 1)%net.Num){
+           //checkpoint owned nodes.
+           std::vector<typename FnTy::ValTy> checkpoint_val_vec(numOwned);
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
+
+               auto val = FnTy::extract(n, getData(n));
+               checkpoint_val_vec[n] = val;
+               }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+         gSerialize(b, checkpoint_val_vec);
+         checkpoint_bytes += (b.size() - send_bytes);
+
+         }
+      StatTimer_checkpoint.stop();
+
+         StatTimer_extract.stop();
+
+         net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      }
+      //Will force all messages to be processed before continuing
+      net.flush();
+
+      //receive
+      for (unsigned x = 0; x < net.Num; ++x) {
+        if ((x == id))
+          continue;
+        decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+        do {
+          net.handleReceives();
+          p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        } while (!p);
+        syncRecvApply_ck<FnTy>(p->first, p->second, loopName);
       }
       ++Galois::Runtime::evilPhase;
 
