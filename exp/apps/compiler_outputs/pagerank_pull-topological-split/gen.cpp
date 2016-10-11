@@ -177,7 +177,7 @@ struct ResetGraph {
     		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		ResetGraph_cuda(cuda_ctx);
+    		ResetGraph_all_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
@@ -277,7 +277,7 @@ struct InitializeGraph {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		InitializeGraph_cuda(alpha, cuda_ctx);
+    		InitializeGraph_all_cuda(alpha, cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
@@ -311,7 +311,7 @@ struct PageRank_partial {
     		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_partial_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		PageRank_partial_cuda(cuda_ctx);
+    		PageRank_partial_all_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
@@ -349,15 +349,15 @@ struct PageRank {
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
       		int __retval = 0;
-      		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+      		PageRank_all_cuda(__retval, alpha, tolerance, cuda_ctx);
       		DGAccumulator_accum += __retval;
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank")), Galois::numrun(_graph.get_run_num());
       ++iteration;
-      if (maxIterations == 5) DGAccumulator_accum += 1;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
+    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)iteration, 0);
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;

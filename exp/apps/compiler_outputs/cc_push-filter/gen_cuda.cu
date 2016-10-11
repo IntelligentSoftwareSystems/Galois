@@ -11,7 +11,7 @@ unsigned int * P_COMP_OLD;
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
 static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -19,10 +19,10 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned in
   const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
-  src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     if (pop)
     {
       p_comp_current[src] = graph.node_data[src];
@@ -31,7 +31,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned in
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -53,14 +53,14 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsi
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "7 -> 8;
     if (pop)
     {
@@ -95,16 +95,22 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsi
     // FP: "26 -> 27;
     while (true)
     {
+      // FP: "27 -> 28;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "30 -> 31;
       __syncthreads();
+      // FP: "31 -> 32;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "32 -> 33;
         __syncthreads();
+        // FP: "33 -> 34;
         break;
       }
+      // FP: "35 -> 36;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -113,15 +119,20 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsi
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "38 -> 39;
       __syncthreads();
+      // FP: "39 -> 40;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "40 -> 41;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "43 -> 44;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
+      // FP: "44 -> 45;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -134,8 +145,8 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsi
           atomicMin(&p_comp_current[dst], new_dist);
         }
       }
+      // FP: "53 -> 54;
       __syncthreads();
-      // FP: "54 -> 27;
     }
     // FP: "55 -> 56;
 
@@ -216,16 +227,14 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsi
       _np.execute_round_done(ITSIZE);
       // FP: "97 -> 98;
       __syncthreads();
-      // FP: "98 -> 82;
     }
     // FP: "99 -> 100;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
-    // FP: "100 -> 6;
   }
   // FP: "101 -> 102;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old, Any any_retval)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -247,14 +256,14 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "7 -> 8;
     if (pop)
     {
@@ -297,16 +306,22 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
     // FP: "29 -> 30;
     while (true)
     {
+      // FP: "30 -> 31;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "33 -> 34;
       __syncthreads();
+      // FP: "34 -> 35;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "35 -> 36;
         __syncthreads();
+        // FP: "36 -> 37;
         break;
       }
+      // FP: "38 -> 39;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -315,15 +330,20 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "41 -> 42;
       __syncthreads();
+      // FP: "42 -> 43;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "43 -> 44;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "46 -> 47;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
+      // FP: "47 -> 48;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -336,8 +356,8 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
           atomicMin(&p_comp_current[dst], new_dist);
         }
       }
+      // FP: "56 -> 57;
       __syncthreads();
-      // FP: "57 -> 30;
     }
     // FP: "58 -> 59;
 
@@ -418,16 +438,14 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
       _np.execute_round_done(ITSIZE);
       // FP: "100 -> 101;
       __syncthreads();
-      // FP: "101 -> 85;
     }
     // FP: "102 -> 103;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
-    // FP: "103 -> 6;
   }
   // FP: "105 -> 106;
 }
-void InitializeGraph_cuda(struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -436,12 +454,18 @@ void InitializeGraph_cuda(struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void FirstItr_ConnectedComp_cuda(struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
+}
+void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -450,12 +474,18 @@ void FirstItr_ConnectedComp_cuda(struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr());
+  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void ConnectedComp_cuda(int & __retval, struct CUDA_Context * ctx)
+void FirstItr_ConnectedComp_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  FirstItr_ConnectedComp_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
+}
+void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -468,10 +498,16 @@ void ConnectedComp_cuda(int & __retval, struct CUDA_Context * ctx)
   // FP: "5 -> 6;
   ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr(), ctx->any_retval);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr(), ctx->any_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;
   __retval = *(ctx->p_retval.cpu_rd_ptr());
   // FP: "9 -> 10;
+}
+void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedComp_cuda(0, ctx->nowned, __retval, ctx);
+  // FP: "2 -> 3;
 }

@@ -13,7 +13,7 @@ float * P_VALUE;
 static const int __tb_FirstItr_PageRank = TB_SIZE;
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
-__global__ void ResetGraph(CSRGraph graph, unsigned int nowned, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -21,10 +21,10 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int nowned, unsigned int * p
   const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
-  src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     if (pop)
     {
       p_value[src] = 0;
@@ -34,7 +34,7 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int nowned, unsigned int * p
   }
   // FP: "9 -> 10;
 }
-__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -58,14 +58,14 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
   // FP: "6 -> 7;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "7 -> 8;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "8 -> 9;
     if (pop)
     {
@@ -109,16 +109,22 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
     // FP: "31 -> 32;
     while (true)
     {
+      // FP: "32 -> 33;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "35 -> 36;
       __syncthreads();
+      // FP: "36 -> 37;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "37 -> 38;
         __syncthreads();
+        // FP: "38 -> 39;
         break;
       }
+      // FP: "40 -> 41;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -127,15 +133,20 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "43 -> 44;
       __syncthreads();
+      // FP: "44 -> 45;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "45 -> 46;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "48 -> 49;
       assert(nps.tb.src < __kernel_tb_size);
       delta = _np_closure[nps.tb.src].delta;
+      // FP: "49 -> 50;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -146,8 +157,8 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
           atomicAdd(&p_residual[dst], delta);
         }
       }
+      // FP: "56 -> 57;
       __syncthreads();
-      // FP: "57 -> 32;
     }
     // FP: "58 -> 59;
 
@@ -224,16 +235,14 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
       _np.execute_round_done(ITSIZE);
       // FP: "96 -> 97;
       __syncthreads();
-      // FP: "97 -> 83;
     }
     // FP: "98 -> 99;
     assert(threadIdx.x < __kernel_tb_size);
     delta = _np_closure[threadIdx.x].delta;
-    // FP: "99 -> 7;
   }
   // FP: "101 -> 102;
 }
-__global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void FirstItr_PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -259,14 +268,14 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const flo
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   // FP: "7 -> 8;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "8 -> 9;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "9 -> 10;
     if (pop)
     {
@@ -310,16 +319,22 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const flo
     // FP: "32 -> 33;
     while (true)
     {
+      // FP: "33 -> 34;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "36 -> 37;
       __syncthreads();
+      // FP: "37 -> 38;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "38 -> 39;
         __syncthreads();
+        // FP: "39 -> 40;
         break;
       }
+      // FP: "41 -> 42;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -328,15 +343,20 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const flo
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "44 -> 45;
       __syncthreads();
+      // FP: "45 -> 46;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "46 -> 47;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "49 -> 50;
       assert(nps.tb.src < __kernel_tb_size);
       delta = _np_closure[nps.tb.src].delta;
+      // FP: "50 -> 51;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -348,8 +368,8 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const flo
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
         }
       }
+      // FP: "58 -> 59;
       __syncthreads();
-      // FP: "59 -> 33;
     }
     // FP: "60 -> 61;
 
@@ -428,16 +448,14 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int nowned, const flo
       _np.execute_round_done(ITSIZE);
       // FP: "100 -> 101;
       __syncthreads();
-      // FP: "101 -> 86;
     }
     // FP: "102 -> 103;
     assert(threadIdx.x < __kernel_tb_size);
     delta = _np_closure[threadIdx.x].delta;
-    // FP: "103 -> 8;
   }
   // FP: "105 -> 106;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Any any_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -463,14 +481,14 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   // FP: "7 -> 8;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "8 -> 9;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "9 -> 10;
     if (pop)
     {
@@ -522,16 +540,22 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
     // FP: "35 -> 36;
     while (true)
     {
+      // FP: "36 -> 37;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "39 -> 40;
       __syncthreads();
+      // FP: "40 -> 41;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "41 -> 42;
         __syncthreads();
+        // FP: "42 -> 43;
         break;
       }
+      // FP: "44 -> 45;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -540,15 +564,20 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "47 -> 48;
       __syncthreads();
+      // FP: "48 -> 49;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "49 -> 50;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "52 -> 53;
       assert(nps.tb.src < __kernel_tb_size);
       delta = _np_closure[nps.tb.src].delta;
+      // FP: "53 -> 54;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -560,8 +589,8 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
         }
       }
+      // FP: "61 -> 62;
       __syncthreads();
-      // FP: "62 -> 36;
     }
     // FP: "63 -> 64;
 
@@ -640,16 +669,14 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
       _np.execute_round_done(ITSIZE);
       // FP: "103 -> 104;
       __syncthreads();
-      // FP: "104 -> 89;
     }
     // FP: "105 -> 106;
     assert(threadIdx.x < __kernel_tb_size);
     delta = _np_closure[threadIdx.x].delta;
-    // FP: "106 -> 8;
   }
   // FP: "109 -> 110;
 }
-void ResetGraph_cuda(struct CUDA_Context * ctx)
+void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -658,12 +685,18 @@ void ResetGraph_cuda(struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
+void ResetGraph_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  ResetGraph_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
+}
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -672,12 +705,18 @@ void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void FirstItr_PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(0, ctx->nowned, local_alpha, ctx);
+  // FP: "2 -> 3;
+}
+void FirstItr_PageRank_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -686,12 +725,18 @@ void FirstItr_PageRank_cuda(const float & local_alpha, float local_tolerance, st
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_PageRank <<<blocks, __tb_FirstItr_PageRank>>>(ctx->gg, ctx->nowned, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  FirstItr_PageRank <<<blocks, __tb_FirstItr_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void PageRank_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+void FirstItr_PageRank_all_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  FirstItr_PageRank_cuda(0, ctx->nowned, local_alpha, local_tolerance, ctx);
+  // FP: "2 -> 3;
+}
+void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -704,10 +749,16 @@ void PageRank_cuda(int & __retval, const float & local_alpha, float local_tolera
   // FP: "5 -> 6;
   ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;
   __retval = *(ctx->p_retval.cpu_rd_ptr());
   // FP: "9 -> 10;
+}
+void PageRank_all_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  PageRank_cuda(0, ctx->nowned, __retval, local_alpha, local_tolerance, ctx);
+  // FP: "2 -> 3;
 }

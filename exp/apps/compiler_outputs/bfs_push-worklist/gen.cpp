@@ -177,7 +177,7 @@ struct InitializeGraph {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		InitializeGraph_cuda(infinity, src_node, cuda_ctx);
+    		InitializeGraph_all_cuda(infinity, src_node, cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
@@ -299,7 +299,6 @@ struct BFS {
     typedef dChunkedFIFO<64> dChunk;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		unsigned num_iter = 0;
     		auto __sync_functor = Get_info_functor<Graph>(_graph);
     		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
     		DBag dbag(__sync_functor, "BFS");
@@ -322,8 +321,8 @@ struct BFS {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
+    		unsigned _num_iterations = 1;
     		while (!dbag.canTerminate()) {
-    		++num_iter;
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = local_wl.size();
     		if (cuda_wl.num_in_items > cuda_wl.max_size) {
@@ -342,7 +341,9 @@ struct BFS {
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
+    		++_num_iterations;
     		}
+    		Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
     	{

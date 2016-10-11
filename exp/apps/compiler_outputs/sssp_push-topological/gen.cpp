@@ -174,7 +174,7 @@ struct InitializeGraph {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		InitializeGraph_cuda(infinity, src_node, cuda_ctx);
+    		InitializeGraph_all_cuda(infinity, src_node, cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
@@ -272,7 +272,7 @@ struct SSSP {
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
       		int __retval = 0;
-      		SSSP_cuda(__retval, cuda_ctx);
+      		SSSP_all_cuda(__retval, cuda_ctx);
       		DGAccumulator_accum += __retval;
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
@@ -286,6 +286,7 @@ struct SSSP {
       
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
+    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)iteration, 0);
   }
 
   void operator()(GNode src) const {

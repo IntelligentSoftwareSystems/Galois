@@ -28,6 +28,9 @@ void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_
 void batch_set_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_add_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_min_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
-void ConnectedComp_cuda(int & __retval, struct CUDA_Context *ctx);
-void FirstItr_ConnectedComp_cuda(struct CUDA_Context *ctx);
-void InitializeGraph_cuda(struct CUDA_Context *ctx);
+void ConnectedComp_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
+void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context *ctx);
+void FirstItr_ConnectedComp_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
+void FirstItr_ConnectedComp_all_cuda(struct CUDA_Context *ctx);
+void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
+void InitializeGraph_all_cuda(struct CUDA_Context *ctx);

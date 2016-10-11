@@ -9,7 +9,7 @@ unsigned int * P_COMP_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -17,10 +17,10 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned in
   const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
-  src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     if (pop)
     {
       p_comp_current[src] = graph.node_data[src];
@@ -28,7 +28,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned in
   }
   // FP: "7 -> 8;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, Worklist2 in_wl, Worklist2 out_wl)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int * p_comp_current, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -54,7 +54,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
   wlvertex_end = *((volatile index_type *) (in_wl).dindex);
-  wlvertex_rup = (roundup((*((volatile index_type *) (in_wl).dindex)), (blockDim.x)));
+  wlvertex_rup = ((0) + roundup(((*((volatile index_type *) (in_wl).dindex)) - (0)), (blockDim.x)));
   for (index_type wlvertex = 0 + tid; wlvertex < wlvertex_rup; wlvertex += nthreads)
   {
     int src;
@@ -64,7 +64,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
     // FP: "6 -> 7;
     // FP: "7 -> 8;
     // FP: "8 -> 9;
-    pop = (in_wl).pop_id_len(wlvertex, wlvertex_end, src);
+    pop = (in_wl).pop_id(wlvertex, src);
     // FP: "9 -> 10;
     if (pop)
     {
@@ -98,16 +98,22 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
     // FP: "27 -> 28;
     while (true)
     {
+      // FP: "28 -> 29;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "31 -> 32;
       __syncthreads();
+      // FP: "32 -> 33;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "33 -> 34;
         __syncthreads();
+        // FP: "34 -> 35;
         break;
       }
+      // FP: "36 -> 37;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -116,15 +122,20 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "39 -> 40;
       __syncthreads();
+      // FP: "40 -> 41;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "41 -> 42;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "44 -> 45;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
+      // FP: "45 -> 46;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -144,8 +155,8 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
           }
         }
       }
+      // FP: "60 -> 61;
       __syncthreads();
-      // FP: "61 -> 28;
     }
     // FP: "62 -> 63;
 
@@ -240,16 +251,14 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int 
       _np.execute_round_done(ITSIZE);
       // FP: "116 -> 117;
       __syncthreads();
-      // FP: "117 -> 95;
     }
     // FP: "118 -> 119;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
-    // FP: "119 -> 6;
   }
   // FP: "120 -> 121;
 }
-void InitializeGraph_cuda(struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -258,10 +267,16 @@ void InitializeGraph_cuda(struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
+}
+void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
 }
 void ConnectedComp_cuda(struct CUDA_Context * ctx)
 {

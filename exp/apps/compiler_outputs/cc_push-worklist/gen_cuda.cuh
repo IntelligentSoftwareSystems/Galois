@@ -9,7 +9,7 @@
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
 #define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());
 #else
-#define check_cuda_kernel  
+#define check_cuda_kernel check_cuda(cudaGetLastError());
 #endif
 
 struct CUDA_Context {

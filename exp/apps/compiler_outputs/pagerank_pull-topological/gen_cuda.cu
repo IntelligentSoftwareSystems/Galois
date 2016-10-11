@@ -10,7 +10,7 @@ float * P_VALUE;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_InitializeGraph = TB_SIZE;
-__global__ void ResetGraph(CSRGraph graph, unsigned int nowned, int * p_nout, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, int * p_nout, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -18,10 +18,10 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int nowned, int * p_nout, fl
   const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
-  src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     if (pop)
     {
       p_value[src] = 0;
@@ -30,7 +30,7 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int nowned, int * p_nout, fl
   }
   // FP: "8 -> 9;
 }
-__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float  local_alpha, int * p_nout, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, int * p_nout, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -52,14 +52,14 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = nowned;
-  src_rup = (roundup((nowned), (blockDim.x)));
-  for (index_type src = 0 + tid; src < src_rup; src += nthreads)
+  src_end = __end;
+  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
+  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     // FP: "6 -> 7;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     // FP: "7 -> 8;
     if (pop)
     {
@@ -93,16 +93,22 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
     // FP: "26 -> 27;
     while (true)
     {
+      // FP: "27 -> 28;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
+      // FP: "30 -> 31;
       __syncthreads();
+      // FP: "31 -> 32;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
+        // FP: "32 -> 33;
         __syncthreads();
+        // FP: "33 -> 34;
         break;
       }
+      // FP: "35 -> 36;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -111,14 +117,19 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
         _np.start = 0;
         _np.size = 0;
       }
+      // FP: "38 -> 39;
       __syncthreads();
+      // FP: "39 -> 40;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
+      // FP: "40 -> 41;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
+      // FP: "43 -> 44;
       assert(nps.tb.src < __kernel_tb_size);
+      // FP: "44 -> 45;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -129,8 +140,8 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
           atomicAdd(&p_nout[dst], 1);
         }
       }
+      // FP: "51 -> 52;
       __syncthreads();
-      // FP: "52 -> 27;
     }
     // FP: "53 -> 54;
 
@@ -205,15 +216,13 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float
       _np.execute_round_done(ITSIZE);
       // FP: "91 -> 92;
       __syncthreads();
-      // FP: "92 -> 78;
     }
     // FP: "93 -> 94;
     assert(threadIdx.x < __kernel_tb_size);
-    // FP: "94 -> 6;
   }
   // FP: "95 -> 96;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Any any_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -223,13 +232,13 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
   index_type src_end;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
-  src_end = nowned;
-  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
     index_type nbr_end;
     float pr_value;
     float diff;
-    bool pop  = src < nowned;
+    bool pop  = src < __end;
     if (pop)
     {
       sum = 0;
@@ -260,7 +269,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local
   }
   // FP: "28 -> 29;
 }
-void ResetGraph_cuda(struct CUDA_Context * ctx)
+void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -269,12 +278,18 @@ void ResetGraph_cuda(struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
+void ResetGraph_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  ResetGraph_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
+}
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -283,12 +298,18 @@ void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void PageRank_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(0, ctx->nowned, local_alpha, ctx);
+  // FP: "2 -> 3;
+}
+void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -301,10 +322,16 @@ void PageRank_cuda(int & __retval, const float & local_alpha, float local_tolera
   // FP: "5 -> 6;
   ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
+  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;
   __retval = *(ctx->p_retval.cpu_rd_ptr());
   // FP: "9 -> 10;
+}
+void PageRank_all_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  PageRank_cuda(0, ctx->nowned, __retval, local_alpha, local_tolerance, ctx);
+  // FP: "2 -> 3;
 }
