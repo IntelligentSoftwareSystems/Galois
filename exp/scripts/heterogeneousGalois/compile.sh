@@ -103,5 +103,5 @@ else
   echo "Generated files in $OUTPUT_DIR: gen.cpp" 
 fi
 
-rm -f Entry-*.dot
+rm -f *Entry-*.dot
 
