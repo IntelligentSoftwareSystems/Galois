@@ -19,8 +19,8 @@ do
   set $j;
   for i in "${EXECS[@]}"
   do
-      echo "./run_multi-host_multi-device_all.sh ${i} ${1} ${2} $QUEUE"
-      ./run_multi-host_multi-device_all.sh ${i} ${1} ${2} $QUEUE |& tee -a jobs
+      echo "./run_bridges_all.sh ${i} ${1} ${2} $QUEUE"
+      ./run_bridges_all.sh ${i} ${1} ${2} $QUEUE |& tee -a jobs
   done
 done
 
