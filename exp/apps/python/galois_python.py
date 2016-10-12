@@ -28,8 +28,8 @@ glib.createNode.argtypes = [GraphPtr]
 glib.addNode.argtypes = [GraphPtr, Node]
 glib.addNodeAttr.argtypes = [GraphPtr, Node, KeyTy, ValTy]
 glib.removeNodeAttr.argtypes = [GraphPtr, Node, KeyTy]
-glib.addMultiEdge.restype = Edge
-glib.addMultiEdge.argtypes = [GraphPtr, Node, Node]
+glib.addEdge.restype = Edge
+glib.addEdge.argtypes = [GraphPtr, Node, Node]
 glib.addEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy, ValTy]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.analyzeBFS.argtypes = [GraphPtr, c_int]
@@ -46,9 +46,12 @@ class GaloisGraph(object):
     glib.deleteGraph(self.graph)
 
   def printGraph(self):
+    print "=====", "GaloisGraph", "====="
     glib.printGraph(self.graph)
 
   def addNode(self, nid):
+    if self.nodeMap.has_key(nid):
+      return
     n = glib.createNode(self.graph)
     glib.addNode(self.graph, n)
     self.nodeMap[nid] = n
@@ -59,10 +62,10 @@ class GaloisGraph(object):
   def removeNodeAttr(self, nid, key):
     glib.removeNodeAttr(self.graph, self.nodeMap[nid], key)
 
-  def addMultiEdge(self, eid, srcid, dstid):
+  def addEdge(self, eid, srcid, dstid):
     src = self.nodeMap[srcid]
     dst = self.nodeMap[dstid]
-    self.edgeMap[eid] = glib.addMultiEdge(self.graph, src, dst)
+    self.edgeMap[eid] = glib.addEdge(self.graph, src, dst)
 
   def addEdgeAttr(self, eid, key, val):
     glib.addEdgeAttr(self.graph, self.edgeMap[eid], key, val)
@@ -71,6 +74,7 @@ class GaloisGraph(object):
     glib.removeEdgeAttr(self.graph, self.edgeMap[eid], key)
 
   def analyzeBFS(self, numThreads):
+    print "=====", "analyzeBFS", "====="
     glib.analyzeBFS(self.graph, numThreads)
 
 
@@ -90,10 +94,12 @@ if __name__ == "__main__":
   g.printGraph()
   print "====="
 
-  g.addMultiEdge("n1n2e1", "n1", "n2")
+  g.addEdge("n1n2e1", "n1", "n2")
   g.addEdgeAttr("n1n2e1", "weight", "3.0")
+  g.printGraph()
+  print "====="
 
-  g.addMultiEdge("n1n2e2", "n1", "n2")
+  g.addEdge("n1n2e2", "n1", "n2")
   g.addEdgeAttr("n1n2e2", "place", "texas")
   g.addEdgeAttr("n1n2e2", "garbage", "discard")
   g.printGraph()

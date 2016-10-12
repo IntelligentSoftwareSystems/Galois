@@ -24,10 +24,12 @@ int main(int argc, char *argv[]) {
   printGraph(g);
   std::cout << "=====" << std::endl;
 
-  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
+  edges.push_back(addEdge(g, nodes[0], nodes[1]));
   addEdgeAttr(g, edges[0], "weight", "3.0");
+  printGraph(g);
+  std::cout << "=====" << std::endl;
 
-  edges.push_back(addMultiEdge(g, nodes[0], nodes[1]));
+  edges.push_back(addEdge(g, nodes[0], nodes[1]));
   addEdgeAttr(g, edges[1], "place", "texas");
   addEdgeAttr(g, edges[1], "garbage", "discard");
   printGraph(g);

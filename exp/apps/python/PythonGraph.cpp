@@ -43,8 +43,8 @@ void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
   g->getData(n).erase(key);
 }
 
-Edge addMultiEdge(Graph *g, GNode src, GNode dst) {
-  auto ei = g->addMultiEdge(src, dst, Galois::MethodFlag::WRITE);
+Edge addEdge(Graph *g, GNode src, GNode dst) {
+  auto ei = g->addEdge(src, dst, Galois::MethodFlag::WRITE);
   return {ei.base(), ei.end()};
 }
 

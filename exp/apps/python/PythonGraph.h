@@ -60,7 +60,7 @@ void addNode(Graph *g, const GNode n);
 void addNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
 
-Edge addMultiEdge(Graph *g, GNode src, GNode dst);
+Edge addEdge(Graph *g, GNode src, GNode dst);
 void addEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
