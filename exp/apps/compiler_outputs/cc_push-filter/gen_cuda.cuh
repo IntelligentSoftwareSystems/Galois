@@ -29,7 +29,7 @@ struct CUDA_Context {
 	Shared<unsigned int> *master_comp_old; // per host
 	Shared<unsigned int> *slave_comp_old; // per host
 	Shared<int> p_retval;
-	Any any_retval;
+	Sum sum_retval;
 };
 
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID) {

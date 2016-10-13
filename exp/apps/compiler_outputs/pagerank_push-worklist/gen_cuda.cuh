@@ -35,7 +35,7 @@ struct CUDA_Context {
 	Worklist2 in_wl;
 	Worklist2 out_wl;
 	struct CUDA_Worklist *shared_wl;
-	Any any_retval;
+	Sum sum_retval;
 };
 
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {

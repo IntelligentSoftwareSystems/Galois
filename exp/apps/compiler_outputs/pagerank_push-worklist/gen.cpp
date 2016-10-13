@@ -426,10 +426,12 @@ struct PageRank {
     		auto &local_wl = DBag::get();
     		std::string impl_str("CUDA_FOR_EACH_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		unsigned long _num_work_items;
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = (*(_graph.end())-*(_graph.begin()));
     		for (int __i = *(_graph.begin()); __i < *(_graph.end()); ++__i) cuda_wl.in_items[__i] = __i;
     		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
     		StatTimer_cuda.stop();
@@ -450,6 +452,7 @@ struct PageRank {
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			PageRank_cuda(alpha, tolerance, cuda_ctx);
     		StatTimer_cuda.stop();
@@ -461,7 +464,8 @@ struct PageRank {
     		dbag.sync();
     		++_num_iterations;
     		}
-    		Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)_num_iterations, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), _num_work_items, 0);
     	} else if (personality == CPU)
     #endif
     Galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));

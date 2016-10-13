@@ -245,7 +245,7 @@ public:
       std::size_t begin = text.find("=");
       std::size_t end = text.find(";", begin);
       std::string value = text.substr(begin+1, end - begin - 3);
-      text = "any_retval.return_(" + value + ")";
+      text = "sum_retval.do_return(" + value + ")";
     }
 
     return text;
@@ -312,7 +312,7 @@ public:
         SharedVariablesToTypeMap[param.first] = param.second;
       }
       if (!accumulatorName.empty()) {
-        declString << ", ('Any', 'any_retval')";
+        declString << ", ('Sum', 'sum_retval')";
       }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
       if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
@@ -703,7 +703,7 @@ public:
       cuheader << "\tWorklist2 out_wl;\n";
       cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
     }
-    cuheader << "\tAny any_retval;\n";
+    cuheader << "\tSum sum_retval;\n";
     cuheader << "};\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
@@ -1060,7 +1060,7 @@ public:
       }
       if (hasAReturnValue) {
         Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
-        Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
+        Output << "CBlock([\"ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
       }
       Output << "Invoke(\"" << kernelName << "\", ";
       Output << "(\"ctx->gg\", \"ctx->nowned\"";
@@ -1075,7 +1075,7 @@ public:
         Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
       }
       if (hasAReturnValue) {
-        Output << ", \"ctx->any_retval\"";
+        Output << ", \"ctx->sum_retval\"";
       }
       if (!isTopological) {
         Output << ", \"ctx->in_wl\"";

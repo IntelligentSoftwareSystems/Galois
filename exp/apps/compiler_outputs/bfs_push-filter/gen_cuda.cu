@@ -234,7 +234,7 @@ __global__ void FirstItr_BFS(CSRGraph graph, unsigned int __nowned, unsigned int
   }
   // FP: "101 -> 102;
 }
-__global__ void BFS(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Any any_retval)
+__global__ void BFS(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Sum sum_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -270,7 +270,7 @@ __global__ void BFS(CSRGraph graph, unsigned int __nowned, unsigned int __begin,
       if (p_dist_old[src] > p_dist_current[src])
       {
         p_dist_old[src] = p_dist_current[src];
-        any_retval.return_( 1);
+        sum_retval.do_return( 1);
       }
       else
       {
@@ -496,9 +496,9 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct
   // FP: "4 -> 5;
   *(ctx->p_retval.cpu_wr_ptr()) = __retval;
   // FP: "5 -> 6;
-  ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
+  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.gpu_wr_ptr(), ctx->dist_old.gpu_wr_ptr(), ctx->any_retval);
+  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.gpu_wr_ptr(), ctx->dist_old.gpu_wr_ptr(), ctx->sum_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;

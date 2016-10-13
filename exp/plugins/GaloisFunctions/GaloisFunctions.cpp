@@ -519,6 +519,7 @@ namespace {
             kernelBefore << "\t\tstd::string impl_str(\"CUDA_FOR_EACH_IMPL_" 
               << className << "_\" + std::to_string(_graph.get_run_num()));\n";
             kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+            kernelBefore << "\t\tunsigned long _num_work_items;\n";
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
             if (!single_source.empty()) {
               kernelBefore << "\t\tif (_graph.isOwned(" << single_source << ")) {\n";
@@ -535,6 +536,7 @@ namespace {
               cudaKernelCall << "\t\tint __retval = 0;\n";
             }
             cudaKernelCall << "\t\tcuda_wl.num_out_items = 0;\n";
+            cudaKernelCall << "\t\t_num_work_items += cuda_wl.num_in_items;\n";
             cudaKernelCall << "\t\tif (cuda_wl.num_in_items > 0)\n";
             cudaKernelCall << "\t\t\t" << className << "_cuda(";
             if (!accumulator.empty()) {
@@ -572,7 +574,8 @@ namespace {
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\t++_num_iterations;\n";
             kernelBefore << "\t\t}\n";
-            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"Num Iterations\", (unsigned long)_num_iterations, 0);\n";
+            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
+            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), _num_work_items, 0);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             if (!single_source.empty()) {

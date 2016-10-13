@@ -29,7 +29,7 @@ struct CUDA_Context {
 	Shared<float> *master_value; // per host
 	Shared<float> *slave_value; // per host
 	Shared<int> p_retval;
-	Any any_retval;
+	Sum sum_retval;
 };
 
 int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {

@@ -151,12 +151,20 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
               string firstItr_func_call = "\nFirstItr_" + i.first + "::go(_graph);\n";
               string iteration = "\nunsigned _num_iterations = 1;\n";
+              size_t found = operator_range.find(",");
+              assert(found != string::npos);
+              if (operator_range.find(",", found+1) == string::npos) // single-source
+                iteration += "\nunsigned long _num_work_items = 1;\n";
+              else
+                iteration += "\nunsigned long _num_work_items = _graph.end() - _graph.begin();\n";
               string do_while = firstItr_func_call + iteration + "do { \n" + galois_distributed_accumulator_name + ".reset();\n";
               rewriter.InsertText(for_each_loc_begin, do_while, true, true);
 
               string iteration_inc = "++_num_iterations;\n";
+              iteration_inc += "_num_work_items += " + galois_distributed_accumulator_name + ".read();\n";
               string while_conditional = "}while("+ galois_distributed_accumulator_name + ".reduce());\n";
-              string report_iteration = "Galois::Runtime::reportStat(\"(NULL)\", \"Num Iterations\", (unsigned long)_num_iterations, 0);\n";
+              string report_iteration = "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
+              report_iteration += "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
               rewriter.InsertText(for_each_loc_end, iteration_inc + while_conditional + report_iteration, true, true);
 
               /**8. Adding definition for static accumulator field name **/

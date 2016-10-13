@@ -28,7 +28,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "7 -> 8;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, Any any_retval)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, Sum sum_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -142,7 +142,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           old_comp = atomicMin(&p_comp_current[src], new_comp);
           if (old_comp > new_comp)
           {
-            any_retval.return_( 1);
+            sum_retval.do_return( 1);
           }
         }
       }
@@ -188,7 +188,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
             old_comp = atomicMin(&p_comp_current[src], new_comp);
             if (old_comp > new_comp)
             {
-              any_retval.return_( 1);
+              sum_retval.do_return( 1);
             }
           }
         }
@@ -230,7 +230,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           old_comp = atomicMin(&p_comp_current[src], new_comp);
           if (old_comp > new_comp)
           {
-            any_retval.return_( 1);
+            sum_retval.do_return( 1);
           }
         }
       }
@@ -276,9 +276,9 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   // FP: "4 -> 5;
   *(ctx->p_retval.cpu_wr_ptr()) = __retval;
   // FP: "5 -> 6;
-  ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
+  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->any_retval);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->sum_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;

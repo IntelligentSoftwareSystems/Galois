@@ -624,6 +624,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     Galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
 
+    unsigned long num_work_items = r.end() - r.begin();
     Timer_for_each_impl.start();
     Runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
@@ -647,7 +648,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
 
     /** loop while work in the worklist **/
-    int num_iterations = 1;
+    unsigned num_iterations = 1;
     while(!dbag.canTerminate()) {
 
       //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
@@ -656,6 +657,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       Timer_for_each_impl.start();
       bag.clear();
       if(!local_wl.empty()){
+        num_work_items += local_wl.end() - local_wl.begin();
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
@@ -675,7 +677,8 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
       ++num_iterations;
     }
-    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(helper_fn.get_run_num()), num_work_items, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 

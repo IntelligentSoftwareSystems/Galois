@@ -305,6 +305,7 @@ struct SSSP {
     		auto &local_wl = DBag::get();
     		std::string impl_str("CUDA_FOR_EACH_IMPL_SSSP_" + std::to_string(_graph.get_run_num()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		unsigned long _num_work_items;
     		StatTimer_cuda.start();
     		if (_graph.isOwned(src_node)) {
     			cuda_wl.num_in_items = 1;
@@ -312,6 +313,7 @@ struct SSSP {
     		} else
     			cuda_wl.num_in_items = 0;
     		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -332,6 +334,7 @@ struct SSSP {
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
@@ -343,7 +346,8 @@ struct SSSP {
     		dbag.sync();
     		++_num_iterations;
     		}
-    		Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)_num_iterations, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), _num_work_items, 0);
     	} else if (personality == CPU)
     #endif
     	{

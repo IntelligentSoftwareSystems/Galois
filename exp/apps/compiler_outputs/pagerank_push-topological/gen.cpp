@@ -408,7 +408,7 @@ struct PageRank {
       
       ++iteration; 
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)iteration, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;

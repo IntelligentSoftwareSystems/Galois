@@ -26,7 +26,7 @@ struct CUDA_Context {
 	Shared<unsigned int> *master_dist_current; // per host
 	Shared<unsigned int> *slave_dist_current; // per host
 	Shared<int> p_retval;
-	Any any_retval;
+	Sum sum_retval;
 };
 
 unsigned int get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID) {

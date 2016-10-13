@@ -361,6 +361,8 @@ struct PageRank {
     FirstItr_PageRank::go(_graph);
     
     unsigned _num_iterations = 1;
+    
+    unsigned long _num_work_items = _graph.end() - _graph.begin();
     do { 
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
@@ -450,8 +452,10 @@ struct PageRank {
     	_graph.sync_pull<SyncerPull_vertexCut_0>("PageRank");
     }
     ++_num_iterations;
+    _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "Num Iterations", (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 

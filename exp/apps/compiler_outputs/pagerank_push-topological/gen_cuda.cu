@@ -241,7 +241,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "101 -> 102;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Any any_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Sum sum_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -367,7 +367,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
           if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
           {
-            any_retval.return_( 1);
+            sum_retval.do_return( 1);
           }
         }
       }
@@ -411,7 +411,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
             dst_residual_old = atomicAdd(&p_residual[dst], delta);
             if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
             {
-              any_retval.return_( 1);
+              sum_retval.do_return( 1);
             }
           }
         }
@@ -451,7 +451,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
           if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
           {
-            any_retval.return_( 1);
+            sum_retval.do_return( 1);
           }
         }
       }
@@ -517,9 +517,9 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, c
   // FP: "4 -> 5;
   *(ctx->p_retval.cpu_wr_ptr()) = __retval;
   // FP: "5 -> 6;
-  ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
+  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
   // FP: "6 -> 7;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->sum_retval);
   // FP: "7 -> 8;
   check_cuda_kernel;
   // FP: "8 -> 9;
