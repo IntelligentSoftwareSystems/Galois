@@ -32,11 +32,11 @@
 
 #include <iostream>
 #include <string>
-#include <map>
+#include <unordered_map>
 
 typedef std::string KeyTy;
 typedef std::string ValTy;
-typedef std::map<KeyTy, ValTy> Attr;
+typedef std::unordered_map<KeyTy, ValTy> Attr;
 
 typedef char * KeyAltTy;
 typedef char * ValAltTy;

@@ -74,7 +74,9 @@ class GaloisGraph(object):
     glib.removeEdgeAttr(self.graph, self.edgeMap[eid], key)
 
   def analyzeBFS(self, numThreads):
+#     pass
     print "=====", "analyzeBFS", "====="
+    print len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
     glib.analyzeBFS(self.graph, numThreads)
 
 
