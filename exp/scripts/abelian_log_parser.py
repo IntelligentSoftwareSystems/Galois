@@ -58,60 +58,37 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   total_do_all_impl = 0.0
   total_send_bytes = 0;
   max_do_all_impl = 0.0;
+  min_do_all_impl = sys.maxint;
   #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,5145
   #35537c51-6ba3-47aa-afa0-72edec803b75,(NULL),0 , DO_ALL_IMPL_bfs,3,0,41104
-  if(partition == "vertex-cut"):
-    do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'.*,\d*,\d*,(\d*)')
-    do_all_impl_all = re.findall(do_all_impl_regex, log_data)
+  #0d0cd9b5-f61d-4bd7-963d-f5d129cd711e,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,8007
+  for host in range(0,int(total_hosts)):
+    do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+    do_all_impl_per_host = re.findall(do_all_impl_regex, log_data)
     #print do_all_impl_all
-    for do_all_time in do_all_impl_all:
-      #print("->", float(do_all_time))
-      if(max_do_all_impl < float(do_all_time)):
-        max_do_all_impl = float(do_all_time)
-
-      total_do_all_impl += float(do_all_time)
-
-    total_do_all_impl /= int(numRuns)
-    total_do_all_impl /= divisor
-    total_do_all_impl = round(total_do_all_impl, 3)
-
-    max_do_all_impl /= int(numRuns)
-    max_do_all_impl /= divisor
-    max_do_all_impl = round(max_do_all_impl, 3)
-
-    print total_do_all_impl
-    print "max : ", max_do_all_impl
-
-  if(partition == "edge-cut"):
-    #0d0cd9b5-f61d-4bd7-963d-f5d129cd711e,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,8007
-    for host in range(0,int(total_hosts)):
-      do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0.*,'+ re.escape(str(host)) + r',\d*,(\d*)')
-      do_all_impl_per_host = re.findall(do_all_impl_regex, log_data)
-      #print do_all_impl_all
-      time_per_host = 0.0
-      #print "----> ", do_all_impl_per_host
-      for do_all_time in do_all_impl_per_host:
-        time_per_host += float(do_all_time)
-        #print time_per_host
-
-      total_do_all_impl += time_per_host
-      if(max_do_all_impl < time_per_host):
-        max_do_all_impl = time_per_host
-
-    total_do_all_impl /= divisor
-    total_do_all_impl = round(total_do_all_impl, 3)
-
-    max_do_all_impl /= divisor
-    max_do_all_impl = round(max_do_all_impl, 3)
-
-    print "total_do_all : ", total_do_all_impl
-    print "max : ", max_do_all_impl
-
-
-
-
-  if(benchmark == "cc"):
-    benchmark = "ConnectedComp"
+    time_per_host = 0.0
+    #print "----> ", do_all_impl_per_host
+    for do_all_time in do_all_impl_per_host:
+      time_per_host += float(do_all_time)
+      #print time_per_host
+    time_per_host /= int(numRuns)
+    total_do_all_impl += time_per_host
+    if(max_do_all_impl < time_per_host):
+      max_do_all_impl = time_per_host
+    if(min_do_all_impl > time_per_host):
+      min_do_all_impl = time_per_host
+  total_do_all_impl /= divisor
+  total_do_all_impl = round(total_do_all_impl, 3)
+  mean_do_all_impl = total_do_all_impl/int(total_hosts)
+  mean_do_all_impl = round(mean_do_all_impl, 3)
+  max_do_all_impl /= divisor
+  max_do_all_impl = round(max_do_all_impl, 3)
+  min_do_all_impl /= divisor
+  min_do_all_impl = round(min_do_all_impl, 3)
+  print "total_do_all : ", total_do_all_impl
+  print "mean_do_all : ", mean_do_all_impl
+  print "max_do_all : ", max_do_all_impl
+  print "min_do_all : ", min_do_all_impl
 
   #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,BFS,0 , SEND_BYTES_SYNC_PULL,0,0,4209914580
   if(partition == "edge-cut"):
@@ -268,11 +245,9 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     pushes = int(pushes_search.group(1))
     pushes /= int(numRuns)
 
-
-  print mean_time
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
   #return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
-  return mean_time,total_do_all_impl,max_do_all_impl,total_send_bytes
+  return mean_time,total_do_all_impl,mean_do_all_impl,max_do_all_impl,min_do_all_impl,total_send_bytes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -365,8 +340,14 @@ def replication_factor(fileName, benchmark, partition, total_hosts, numRuns, num
   total_nodes = 0
   if(input_graph == "rmat28"):
     total_nodes = 268435456
-  elif(input_graph == "twitter-ICWSM10-component"):
+  elif(input_graph == "twitter-50"):
     total_nodes = 51161011
+  elif(input_graph == "rmat25"):
+    total_nodes = 33554432
+  elif(input_graph == "twitter-40"):
+    total_nodes = 41652230
+  else:
+    return 0
 
   print "total_nodes : ", total_nodes
   if partition == "edge-cut":
@@ -379,6 +360,7 @@ def replication_factor(fileName, benchmark, partition, total_hosts, numRuns, num
       total_ghost += int(line[1])
 
     rep_factor = float(total_nodes + total_ghost)/float(total_nodes)
+    rep_factor = round(rep_factor, 3)
     return rep_factor
   elif partition == "vertex-cut" or partition == "vertex-cut-balanced":
     total_slave = 0
@@ -390,6 +372,7 @@ def replication_factor(fileName, benchmark, partition, total_hosts, numRuns, num
       total_slave += int(line[2])
 
     rep_factor = float(float(total_slave)/float(total_nodes))
+    rep_factor = round(rep_factor, 3)
     return rep_factor
 
 
@@ -500,11 +483,16 @@ def get_basicInfo(fileName):
     runs = runs_search.group(1)
  
   split_cmdLine_algo = cmdLine.split()[0].split("/")[-1].split("_")
-  benchmark, algo_type, cut_type =  split_cmdLine_algo
+  benchmark, algo_type =  split_cmdLine_algo
 
   split_cmdLine_input = cmdLine.split()[1].split("/")
   input_graph_name = split_cmdLine_input[-1]
   input_graph = input_graph_name.split(".")[0]
+  cut_type = "edge-cut"
+  for index in range(0, len(split_cmdLine_input)):
+    if split_cmdLine_input[index] == "-enableVertexCut":
+      cut_type = "vertex-cut"
+      break
 
   devices = str(hostNum) + " CPU"
   deviceKind = "CPU"
@@ -567,16 +555,10 @@ def main(argv):
   hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices, deviceKind = get_basicInfo(inputFile)
 
   #shorten the graph names:
-  if input_graph == "twitter-ICWSM10-component_withRandomWeights.transpose.gr" or input_graph == "twitter-ICWSM10-component-transpose.gr" or input_graph == "twitter-ICWSM10-component_withRandomWeights.gr" or input_graph == "twitter-ICWSM10-component.gr":
-    input_graph = "twitterIC"
-  elif input_graph == "USA-road-d.USA.transpose.gr" or input_graph == "USA-road-d.USA-trans.gr" or input_graph == "USA-road-d.USA.gr":
-    input_graph = "road-USA"
-  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr" or input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr":
-    input_graph = "rmat25"
-  elif input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr" or input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.gr":
-    input_graph = "rmat24"
-  elif input_graph == "rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.trgr" or input_graph == "rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.rgr":
-    input_graph = "rmat28"
+  if input_graph == "twitter-ICWSM10-component_withRandomWeights" or input_graph == "twitter-ICWSM10-component-transpose" or input_graph == "twitter-ICWSM10-component":
+    input_graph = "twitter-50"
+  elif input_graph == "twitter-WWW10-component_withRandomWeights" or input_graph == "twitter-WWW10-component-transpose" or input_graph == "twitter-WWW10-component":
+    input_graph = "twitter-40"
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
   print 'Devices : ', devices
@@ -602,7 +584,7 @@ def main(argv):
 
   header_csv_str = "benchmark,platform,host,threads,"
   header_csv_str += "deviceKind,devices,"
-  header_csv_str += "input,variant,partition,mean_time,total_comp_time,max_comp_time,total_bytes_sent,rep_factor" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time,total_comp_time,mean_comp_time,max_comp_time,min_comp_time,total_bytes_sent,rep_factor" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   #for i in range(0,256):
     #header_csv_str += ","
