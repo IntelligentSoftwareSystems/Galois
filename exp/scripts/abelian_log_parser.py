@@ -34,7 +34,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   else:
     divisor = 1
   #e2901bc2-f648-4ff4-9976-ac3b4c794a6a,(NULL),0 , TIMER_2,7,0,79907
-  timer_regex = re.compile(r'.*,\(NULL\),0\s,\sTIMER_(\d*),' + re.escape(forHost) + r',(\d*),(\d*)')
+  timer_regex = re.compile(r'.*,\(NULL\),0\s,\sTIMER_(\d*),(\d*),0,(\d*)')
   #timer_regex = re.compile(r'.*,\(NULL\),0\s,\sTIMER_(\d*),7,\d*,(\d*)')
 
   log_data = open(fileName).read()
@@ -42,16 +42,22 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   timers = re.findall(timer_regex, log_data)
   print timers
 
+  time = []
+  for i in range(int(numRuns)):
+    time.append(0)
   for timer in timers:
-    mean_time = mean_time + float(timer[2])
-
-  if(len(timers) > 0):
-    mean_time /= len(timers)
-    mean_time /= divisor
-    mean_time = round(mean_time, 3)
-
+    run_num = int(timer[0])
+    host = int(timer[1])
+    host_time = float(timer[2])
+    if time[run_num] < host_time:
+      time[run_num] = host_time
+  for i in range(int(numRuns)):
+    mean_time = mean_time + time[i]
+  if(len(time) > 0):
+    mean_time /= int(numRuns) 
+  mean_time /= divisor
+  mean_time = round(mean_time, 3)
   print "Mean time: ", mean_time
-
 
   #TOTAL_DO_ALL_IMPL all hosts
   #414c1fb5-0df1-4741-a0ee-cee82f2fc83b,(NULL),0 , DO_ALL_IMPL_bfs,0,0,389
@@ -62,7 +68,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,5145
   #35537c51-6ba3-47aa-afa0-72edec803b75,(NULL),0 , DO_ALL_IMPL_bfs,3,0,41104
   #0d0cd9b5-f61d-4bd7-963d-f5d129cd711e,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,8007
-  for host in range(0,int(total_hosts)):
+  for host in range(int(total_hosts)):
     do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
     do_all_impl_per_host = re.findall(do_all_impl_regex, log_data)
     #print do_all_impl_all
