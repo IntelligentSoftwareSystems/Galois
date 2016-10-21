@@ -32,7 +32,8 @@ glib.addEdge.restype = Edge
 glib.addEdge.argtypes = [GraphPtr, Node, Node]
 glib.addEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy, ValTy]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
-glib.analyzeBFS.argtypes = [GraphPtr, c_int]
+glib.setNumThreads.argtypes = [c_int]
+glib.analyzeBFS.argtypes = [GraphPtr, Node, Node]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -73,11 +74,13 @@ class GaloisGraph(object):
   def removeEdgeAttr(self, eid, key):
     glib.removeEdgeAttr(self.graph, self.edgeMap[eid], key)
 
-  def analyzeBFS(self, numThreads):
+  def analyzeBFS(self, srcid, reportid, numThreads):
 #     pass
     print "=====", "analyzeBFS", "====="
     print len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
-    glib.analyzeBFS(self.graph, numThreads)
+    print "src =", srcid, ", report =", reportid
+    glib.setNumThreads(numThreads)
+    glib.analyzeBFS(self.graph, self.nodeMap[srcid], self.nodeMap[reportid])
 
 
 if __name__ == "__main__":
@@ -90,31 +93,25 @@ if __name__ == "__main__":
   g.addNodeAttr("n2", "language", "english")
   g.addNodeAttr("n2", "garbage", "to_be_deleted")
   g.printGraph()
-  print "====="
 
   g.removeNodeAttr("n2", "garbage");
   g.printGraph()
-  print "====="
 
   g.addEdge("n1n2e1", "n1", "n2")
   g.addEdgeAttr("n1n2e1", "weight", "3.0")
   g.printGraph()
-  print "====="
 
   g.addEdge("n1n2e2", "n1", "n2")
   g.addEdgeAttr("n1n2e2", "place", "texas")
   g.addEdgeAttr("n1n2e2", "garbage", "discard")
   g.printGraph()
-  print "====="
 
   g.removeEdgeAttr("n1n2e2", "garbage")
   g.removeEdgeAttr("n1n2e2", "galois_id")
   g.printGraph()
-  print "====="
 
-  g.analyzeBFS(1)
+  g.analyzeBFS("n1", "n2", 1)
   g.printGraph()
-  print "====="
 
   del g
 

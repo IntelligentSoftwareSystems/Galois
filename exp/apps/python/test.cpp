@@ -1,4 +1,5 @@
 #include "PythonGraph.h"
+#include "AnalyzeBFS.h"
 
 #include <vector>
 #include <iostream>
@@ -40,7 +41,9 @@ int main(int argc, char *argv[]) {
   printGraph(g);
   std::cout << "=====" << std::endl;
 
-  analyzeBFS(g, 1);
+  setNumThreads(1);
+
+  analyzeBFS(g, nodes[0], nodes[1]);
   printGraph(g);
   std::cout << "=====" << std::endl;
 
