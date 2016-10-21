@@ -48,7 +48,7 @@ void analyzeBFS(Graph *g, GNode src, GNode report) {
     [=] (GNode n) 
       {
         auto& data = (*g).getData(n); 
-        data.attr["dist"] = std::to_string(data.vInt);
+        data.attr["dist"] = (DIST_INFINITY == data.vInt) ? "INFINITY" : std::to_string(data.vInt);
       }
     );
 
