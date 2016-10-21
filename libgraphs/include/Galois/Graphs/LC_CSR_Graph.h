@@ -233,7 +233,7 @@ public:
     return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { return getEdgeDst(e) == N2; });
   }
 
-  edge_iterator findEdgeSorted(GraphNode N1, GraphNode N2) {
+  edge_iterator findEdgeSortedByDst(GraphNode N1, GraphNode N2) {
     auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, [=] (edge_iterator e, GraphNode N) { return getEdgeDst(e) < N; });
     return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }

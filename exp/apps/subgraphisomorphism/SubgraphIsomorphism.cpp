@@ -147,7 +147,7 @@ struct VF2Algo {
           continue;
         
         // self loop for nQ but not for nD
-        if(gQ.findEdgeSorted(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nD) == gD.edge_end(nD))
           continue;
         
         dQ.candidate.push_back(nD);
@@ -304,13 +304,13 @@ struct VF2Algo {
           return false;
         
         // nQ => (nm.nQ) exists but not nD => (nm.nD)
-        if(gQ.findEdgeSorted(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nm.nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nm.nD) == gD.edge_end(nD))
           return false;
         
         // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
         if(!undirected)
-          if(gQ.findEdgeSorted(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSorted(nm.nD, nD) == gD.edge_end(nm.nD))
+          if(gQ.findEdgeSortedByDst(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSortedByDst(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
       }
       
@@ -479,7 +479,7 @@ struct UllmannAlgo {
           continue;
 
         // self loop for nQ but not for nD
-        if(gQ.findEdgeSorted(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nD) == gD.edge_end(nD))
           continue;
 
         dQ.candidate.push_back(nD);
@@ -531,13 +531,13 @@ struct UllmannAlgo {
           return false;
 
         // nQ => (nm.nQ) exists but not nD => (nm.nD)
-        if(gQ.findEdgeSorted(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nm.nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nm.nD) == gD.edge_end(nD))
           return false;
 
         // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
         if(!undirected)
-          if(gQ.findEdgeSorted(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSorted(nm.nD, nD) == gD.edge_end(nm.nD))
+          if(gQ.findEdgeSortedByDst(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSortedByDst(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
       }
 
@@ -637,7 +637,7 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
       }
 
       // query edge not matched to data edge
-      if(gQ.findEdgeSorted(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdgeSorted(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
+      if(gQ.findEdgeSortedByDst(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdgeSortedByDst(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
         isFailed = true;
         std::cerr << "edge not match: gQ(" << dQ1.id << " => " << dQ2.id;
         std::cerr << "), but no gD(" << dD1.id << " => " << dD2.id << ")" << std::endl;
