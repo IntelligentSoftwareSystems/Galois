@@ -43,12 +43,12 @@ typedef char * ValAltTy;
 
 struct Node;
 
-typedef Galois::Graph::FirstGraph<Node, Node, true, true> Graph; // directed in-out graph with Node nodes and Attr edges
+typedef Galois::Graph::FirstGraph<Node, Attr, true> Graph; // directed in-out graph with Node nodes and Attr edges
 typedef Graph::GraphNode GNode;
 typedef Graph::edge_iterator edge_iterator;
 
 // see StatCollector for the design
-typedef struct Node {
+struct Node {
   Attr attr;
   char mode; // 0: int, 1: double, 2: vector
   union {
@@ -62,11 +62,12 @@ typedef struct Node {
   Node(double v): mode(1), vDouble(v) {}
   Node(const std::vector<GNode>& v): mode(2), vVec(v) {}
   ~Node();
-} Node;
+};
+
 
 extern "C" {
 
-typedef struct Edge {
+typedef struct {
   typename Graph::edge_iterator::value_type *base, *end;
 } Edge;
 

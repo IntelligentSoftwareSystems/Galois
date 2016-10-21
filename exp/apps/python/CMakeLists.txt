@@ -5,7 +5,6 @@ add_library(galois_python SHARED
   $<TARGET_OBJECTS:galois_substrate_obj>
   $<TARGET_OBJECTS:galois_runtime_obj> 
   $<TARGET_OBJECTS:galois_graphs_obj> 
-  $<TARGET_OBJECTS:galois_exp_obj>
 )
 target_include_directories(galois_python PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include

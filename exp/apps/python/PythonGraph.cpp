@@ -32,7 +32,7 @@ void printGraph(Graph* g) {
     }
     for(auto e: g->edges(n)) {
       std::cout << "  edge" << std::endl;
-      for(auto i: g->getEdgeData(e).attr) {
+      for(auto i: g->getEdgeData(e)) {
         std::cout << "    " << i.first << ": " << i.second << std::endl;
       }
     }
@@ -61,11 +61,11 @@ Edge addEdge(Graph *g, GNode src, GNode dst) {
 }
 
 void addEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
-  g->getEdgeData(edge_iterator(e.base, e.end)).attr[key] = val;
+  g->getEdgeData(edge_iterator(e.base, e.end))[key] = val;
 }
 
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
-  g->getEdgeData(edge_iterator(e.base, e.end)).attr.erase(key);
+  g->getEdgeData(edge_iterator(e.base, e.end)).erase(key);
 }
 
 void setNumThreads(int numThreads) {

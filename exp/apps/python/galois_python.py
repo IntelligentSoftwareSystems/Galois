@@ -17,7 +17,8 @@ class Edge(Structure):
   _fields_ = [("base", c_void_p),
               ("end", c_void_p)]
 
-glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
+#glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
+glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
 
 # cast the result and arg types
 glib.createGraph.restype = GraphPtr
