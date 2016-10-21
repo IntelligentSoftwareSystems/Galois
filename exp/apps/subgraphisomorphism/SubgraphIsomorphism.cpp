@@ -125,9 +125,6 @@ void initializeGraph(Graph& g, unsigned int seed) {
     Node& data = g.getData(n);
     data.id = i++;
     data.label = 'A' + distribution(generator) % numLabels;
-
-    g.sortEdgesByDst(n);
-    g.sortInEdgesByDst(n);
   }
 }
 
@@ -150,7 +147,7 @@ struct VF2Algo {
           continue;
         
         // self loop for nQ but not for nD
-        if(gQ.findEdge(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSorted(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nD) == gD.edge_end(nD))
           continue;
         
         dQ.candidate.push_back(nD);
@@ -307,13 +304,13 @@ struct VF2Algo {
           return false;
         
         // nQ => (nm.nQ) exists but not nD => (nm.nD)
-        if(gQ.findEdge(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nm.nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSorted(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nm.nD) == gD.edge_end(nD))
           return false;
         
         // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
         if(!undirected)
-          if(gQ.findEdge(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdge(nm.nD, nD) == gD.edge_end(nm.nD))
+          if(gQ.findEdgeSorted(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSorted(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
       }
       
@@ -482,7 +479,7 @@ struct UllmannAlgo {
           continue;
 
         // self loop for nQ but not for nD
-        if(gQ.findEdge(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSorted(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nD) == gD.edge_end(nD))
           continue;
 
         dQ.candidate.push_back(nD);
@@ -534,13 +531,13 @@ struct UllmannAlgo {
           return false;
 
         // nQ => (nm.nQ) exists but not nD => (nm.nD)
-        if(gQ.findEdge(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nm.nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSorted(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSorted(nD, nm.nD) == gD.edge_end(nD))
           return false;
 
         // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
         if(!undirected)
-          if(gQ.findEdge(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdge(nm.nD, nD) == gD.edge_end(nm.nD))
+          if(gQ.findEdgeSorted(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSorted(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
       }
 
@@ -640,7 +637,7 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
       }
 
       // query edge not matched to data edge
-      if(gQ.findEdge(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdge(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
+      if(gQ.findEdgeSorted(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdgeSorted(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
         isFailed = true;
         std::cerr << "edge not match: gQ(" << dQ1.id << " => " << dQ2.id;
         std::cerr << "), but no gD(" << dD1.id << " => " << dD2.id << ")" << std::endl;
@@ -674,6 +671,9 @@ void run() {
   } else
     GALOIS_DIE("Failed to read data graph");
 
+  gD.sortAllEdgesByDst();
+  gD.sortAllInEdgesByDst();
+
   if(rndSeedDByTime)
     rndSeedD = std::chrono::system_clock::now().time_since_epoch().count();
   std::cout << "rndSeedD: " << rndSeedD << std::endl;
@@ -686,6 +686,9 @@ void run() {
     std::cout << "Reading query graph..." << std::endl;
   } else
     GALOIS_DIE("Failed to read query graph");
+
+  gQ.sortAllEdgesByDst();
+  gQ.sortAllInEdgesByDst();
 
   if(rndSeedQByTime)
     rndSeedQ = std::chrono::system_clock::now().time_since_epoch().count();
