@@ -30,9 +30,9 @@
 
 #include "Galois/Graphs/Graph.h"
 
-#include <iostream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 typedef std::string KeyTy;
 typedef std::string ValTy;
@@ -41,9 +41,28 @@ typedef std::unordered_map<KeyTy, ValTy> Attr;
 typedef char * KeyAltTy;
 typedef char * ValAltTy;
 
-typedef Galois::Graph::FirstGraph<Attr, Attr, true> Graph; // directed graph with nodes and edges of type Attr
+struct Node;
+
+typedef Galois::Graph::FirstGraph<Node, Node, true, true> Graph; // directed graph with nodes and edges of type Attr
 typedef Graph::GraphNode GNode;
 typedef Graph::edge_iterator edge_iterator;
+
+// see StatCollector for the design
+struct Node {
+  Attr attr;
+  char mode; // 0: int, 1: double, 2: vector
+  union {
+    size_t vInt;
+    double vDouble;
+    std::vector<GNode> vVec;
+  };
+
+  Node(): mode(0), vInt(0) {}
+  Node(size_t v): mode(0), vInt(v) {}
+  Node(double v): mode(1), vDouble(v) {}
+  Node(const std::vector<GNode>& v): mode(2), vVec(v) {}
+  ~Node();
+};
 
 extern "C" {
 
@@ -64,7 +83,10 @@ Edge addEdge(Graph *g, GNode src, GNode dst);
 void addEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
-void analyzeBFS(Graph* g, int numThreads);
+void setNumThreads(int numThreads);
+
+//void searchGraphUllmann(Graph *gD, Graph *gQ);
+//void searchGraphVF2(Graph *gD, Graph *gQ);
 
 } // extern "C"
 
