@@ -24,7 +24,7 @@ struct BFS {
   }
 };
 
-void analyzeBFS(Graph *g, GNode src, GNode report) {
+void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
   Galois::StatManager statManager;
 
   Galois::StatTimer T;
@@ -48,12 +48,10 @@ void analyzeBFS(Graph *g, GNode src, GNode report) {
     [=] (GNode n) 
       {
         auto& data = (*g).getData(n); 
-        data.attr["dist"] = (DIST_INFINITY == data.vInt) ? "INFINITY" : std::to_string(data.vInt);
+        data.attr[result] = (DIST_INFINITY == data.vInt) ? "INFINITY" : std::to_string(data.vInt);
       }
     );
 
   T.stop();
-
-  std::cout << "distance of reported node: " << g->getData(report).attr["dist"] << std::endl;
 }
 

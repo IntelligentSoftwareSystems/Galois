@@ -5,7 +5,7 @@
 
 extern "C" {
 
-void analyzeBFS(Graph* g, GNode start, GNode report);
+void analyzeBFS(Graph* g, GNode start, const ValAltTy result);
 
 } // extern "C"
 

@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
 
   setNumThreads(1);
 
-  analyzeBFS(g, nodes[0], nodes[1]);
+  analyzeBFS(g, nodes[0], "dist");
   printGraph(g);
   std::cout << "=====" << std::endl;
 

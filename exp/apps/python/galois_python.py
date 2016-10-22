@@ -17,8 +17,9 @@ class Edge(Structure):
   _fields_ = [("base", c_void_p),
               ("end", c_void_p)]
 
-#glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
-glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
+#glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
+glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
+#glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
 
 # cast the result and arg types
 glib.createGraph.restype = GraphPtr
@@ -34,7 +35,7 @@ glib.addEdge.argtypes = [GraphPtr, Node, Node]
 glib.addEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy, ValTy]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.setNumThreads.argtypes = [c_int]
-glib.analyzeBFS.argtypes = [GraphPtr, Node, Node]
+glib.analyzeBFS.argtypes = [GraphPtr, Node, KeyTy]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -75,13 +76,13 @@ class GaloisGraph(object):
   def removeEdgeAttr(self, eid, key):
     glib.removeEdgeAttr(self.graph, self.edgeMap[eid], key)
 
-  def analyzeBFS(self, srcid, reportid, numThreads):
+  def analyzeBFS(self, srcid, attr, numThreads):
 #     pass
     print "=====", "analyzeBFS", "====="
     print len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
-    print "src =", srcid, ", report =", reportid
+    print "src =", srcid
     glib.setNumThreads(numThreads)
-    glib.analyzeBFS(self.graph, self.nodeMap[srcid], self.nodeMap[reportid])
+    glib.analyzeBFS(self.graph, self.nodeMap[srcid], attr)
 
 
 if __name__ == "__main__":
@@ -111,7 +112,7 @@ if __name__ == "__main__":
   g.removeEdgeAttr("n1n2e2", "galois_id")
   g.printGraph()
 
-  g.analyzeBFS("n1", "n2", 1)
+  g.analyzeBFS("n1", "dist", 1)
   g.printGraph()
 
   del g

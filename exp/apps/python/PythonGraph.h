@@ -43,7 +43,7 @@ typedef char * ValAltTy;
 
 struct Node;
 
-typedef Galois::Graph::FirstGraph<Node, Attr, true> Graph; // directed in-out graph with Node nodes and Attr edges
+typedef Galois::Graph::FirstGraph<Node, Attr, true, true> Graph; // directed in-out graph with Node nodes and Attr edges
 typedef Graph::GraphNode GNode;
 typedef Graph::edge_iterator edge_iterator;
 
