@@ -47,8 +47,12 @@ void addNode(Graph *g, const GNode n) {
   g->addNode(n);
 }
 
-void addNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val) {
+void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val) {
   g->getData(n).attr[key] = val;
+}
+
+const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
+  return const_cast<ValAltTy>(g->getData(n).attr[key].c_str());
 }
 
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
@@ -60,8 +64,12 @@ Edge addEdge(Graph *g, GNode src, GNode dst) {
   return {ei.base(), ei.end()};
 }
 
-void addEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
+void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
   g->getEdgeData(edge_iterator(e.base, e.end))[key] = val;
+}
+
+const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
+  return const_cast<ValAltTy>(g->getEdgeData(edge_iterator(e.base, e.end))[key].c_str());
 }
 
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {

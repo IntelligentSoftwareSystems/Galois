@@ -12,12 +12,12 @@ int main(int argc, char *argv[]) {
 
   nodes.push_back(createNode(g));
   addNode(g, nodes[0]);
-  addNodeAttr(g, nodes[0], "color", "red");
+  setNodeAttr(g, nodes[0], "color", "red");
 
   nodes.push_back(createNode(g));
   addNode(g, nodes[1]);
-  addNodeAttr(g, nodes[1], "language", "english");
-  addNodeAttr(g, nodes[1], "garbage", "to_be_deleted");
+  setNodeAttr(g, nodes[1], "language", "english");
+  setNodeAttr(g, nodes[1], "garbage", "to_be_deleted");
   printGraph(g);
   std::cout << "=====" << std::endl;
 
@@ -26,13 +26,13 @@ int main(int argc, char *argv[]) {
   std::cout << "=====" << std::endl;
 
   edges.push_back(addEdge(g, nodes[0], nodes[1]));
-  addEdgeAttr(g, edges[0], "weight", "3.0");
+  setEdgeAttr(g, edges[0], "weight", "3.0");
   printGraph(g);
   std::cout << "=====" << std::endl;
 
   edges.push_back(addEdge(g, nodes[0], nodes[1]));
-  addEdgeAttr(g, edges[1], "place", "texas");
-  addEdgeAttr(g, edges[1], "garbage", "discard");
+  setEdgeAttr(g, edges[1], "place", "texas");
+  setEdgeAttr(g, edges[1], "garbage", "discard");
   printGraph(g);
   std::cout << "=====" << std::endl;
 

@@ -77,11 +77,13 @@ void printGraph(Graph *g);
 
 GNode createNode(Graph *g);
 void addNode(Graph *g, const GNode n);
-void addNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
+void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
+const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
 
 Edge addEdge(Graph *g, GNode src, GNode dst);
-void addEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
+void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
+const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
 void setNumThreads(int numThreads);
