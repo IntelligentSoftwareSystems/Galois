@@ -1470,10 +1470,9 @@ public:
 
       StatTimer_SendTime.start();
 
-      for (unsigned x = 0; x < net.Num; ++x) {
+      for (unsigned h = 1; h < net.Num; ++h) {
+         unsigned x = (id + h) % net.Num;
          uint32_t num = slaveNodes[x].size();
-         if((x == id))
-           continue;
 
          Galois::Runtime::SendBuffer b;
 
@@ -1563,10 +1562,9 @@ public:
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      for (unsigned x = 0; x < net.Num; ++x) {
+      for (unsigned h = 1; h < net.Num; ++h) {
+         unsigned x = (id + h) % net.Num;
          uint32_t num = slaveNodes[x].size();
-         if((x == id))
-           continue;
 
          Galois::Runtime::SendBuffer b;
 
@@ -1785,10 +1783,9 @@ public:
 
 
     StatTimer_SendTime.start();
-      for (unsigned x = 0; x < net.Num; ++x) {
+      for (unsigned h = 1; h < net.Num; ++h) {
+        unsigned x = (id + h) % net.Num;
         uint32_t num = masterNodes[x].size();
-        if((x == id))
-          continue;
 
         Galois::Runtime::SendBuffer b;
 
@@ -1813,7 +1810,6 @@ public:
 
         SyncPull_send_bytes += b.size();
         net.sendTagged(x, Galois::Runtime::evilPhase, b);
-
       }
 
     StatTimer_SendTime.stop();
