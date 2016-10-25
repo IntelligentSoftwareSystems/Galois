@@ -36,6 +36,14 @@ void printGraph(Graph* g) {
         std::cout << "    " << i.first << ": " << i.second << std::endl;
       }
     }
+#if !(DIRECTED && !IN_EDGES)
+    for(auto e: g->in_edges(n)) {
+      std::cout << "  in_edge" << std::endl;
+      for(auto i: g->getEdgeData(e)) {
+        std::cout << "    " << i.first << ": " << i.second << std::endl;
+      }
+    }
+#endif
   }
 }
 
