@@ -2200,7 +2200,7 @@ public:
    uint32_t get_run_num() {
      return num_run;
    }
-   uint32_t set_num_iter(uint32_t iteration){
+   void set_num_iter(uint32_t iteration){
     num_iteration = iteration;
    }
 
