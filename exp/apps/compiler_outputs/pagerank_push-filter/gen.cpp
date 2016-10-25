@@ -112,14 +112,14 @@ struct ResetGraph {
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + std::to_string(_graph.get_run_num()));
+    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + _graph.get_run_identifier());
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		ResetGraph_all_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_num()));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -136,6 +136,7 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
+      _graph.set_num_iter(0);
       	struct Syncer_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -207,14 +208,14 @@ struct InitializeGraph {
       	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-      		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
+      		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + _graph.get_run_identifier());
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
       		InitializeGraph_all_cuda(alpha, cuda_ctx);
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       _graph.sync_push<Syncer_0>("InitializeGraph");
       
       if(_graph.is_vertex_cut()) {
@@ -245,6 +246,7 @@ cll::opt<float> & local_tolerance;
 Graph * graph;
 FirstItr_PageRank(const float & _local_alpha,cll::opt<float> & _local_tolerance,Graph * _graph):local_alpha(_local_alpha),local_tolerance(_local_tolerance),graph(_graph){}
 void static go(Graph& _graph) {
+  _graph.set_num_iter(0);
 	struct Syncer_0 {
 		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -316,14 +318,14 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
-		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_PageRank_" + std::to_string(_graph.get_run_num()));
+		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_PageRank_" + _graph.get_run_identifier());
 		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
 		StatTimer_cuda.start();
 		FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
 		StatTimer_cuda.stop();
 	} else if (personality == CPU)
 #endif
-Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
 _graph.sync_push<Syncer_0>("FirstItr_PageRank");
 
 if(_graph.is_vertex_cut()) {
@@ -363,7 +365,8 @@ struct PageRank {
     unsigned _num_iterations = 1;
     
     unsigned long _num_work_items = _graph.end() - _graph.begin();
-    do { 
+    do {
+    _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
@@ -436,7 +439,7 @@ struct PageRank {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + std::to_string(_graph.get_run_num()));
+    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + _graph.get_run_identifier());
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
@@ -445,7 +448,7 @@ struct PageRank {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_num()));
+    Galois::do_all(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
     _graph.sync_push<Syncer_0>("PageRank");
     
     if(_graph.is_vertex_cut()) {
@@ -454,8 +457,8 @@ struct PageRank {
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + _graph.get_run_identifier(), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + _graph.get_run_identifier(), (unsigned long)_num_work_items, 0);
     
   }
 

@@ -298,7 +298,7 @@ struct BFS {
       std::string checkpoint_timer_str("TIME_CHKPNT_" + std::to_string(iteration));
       Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
       StatTimer_checkpoint.start();
-      _graph.checkpoint_mem<Syncer_0>("BFS");
+      _graph.checkpoint<Syncer_0>("BFS");
       StatTimer_checkpoint.stop();
 
       if(Galois::Runtime::getSystemNetworkInterface().ID == 0){

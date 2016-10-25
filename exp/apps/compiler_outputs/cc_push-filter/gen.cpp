@@ -100,6 +100,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+      _graph.set_num_iter(0);
     	struct SyncerPull_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -166,14 +167,14 @@ struct InitializeGraph {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + std::to_string(_graph.get_run_num()));
+    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + _graph.get_run_identifier());
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		InitializeGraph_all_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
     }
@@ -193,6 +194,7 @@ struct FirstItr_ConnectedComp{
 Graph * graph;
 FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
+  _graph.set_num_iter(0);
 	struct Syncer_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -259,14 +261,14 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
-		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_ConnectedComp_" + std::to_string(_graph.get_run_num()));
+		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_ConnectedComp_" + _graph.get_run_identifier());
 		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
 		StatTimer_cuda.start();
 		FirstItr_ConnectedComp_all_cuda(cuda_ctx);
 		StatTimer_cuda.stop();
 	} else if (personality == CPU)
 #endif
-Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_num()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
 _graph.sync_push<Syncer_0>("FirstItr_ConnectedComp");
 
 if(_graph.is_vertex_cut()) {
@@ -302,6 +304,7 @@ struct ConnectedComp {
     
     unsigned long _num_work_items = _graph.end() - _graph.begin();
     do { 
+    _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
@@ -369,7 +372,7 @@ struct ConnectedComp {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + std::to_string(_graph.get_run_num()));
+    		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + _graph.get_run_identifier());
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
@@ -378,7 +381,7 @@ struct ConnectedComp {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_num()));
+    Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
     _graph.sync_push<Syncer_0>("ConnectedComp");
     
     if(_graph.is_vertex_cut()) {
@@ -387,8 +390,8 @@ struct ConnectedComp {
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + _graph.get_run_identifier(), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + _graph.get_run_identifier(), (unsigned long)_num_work_items, 0);
     
   }
 
