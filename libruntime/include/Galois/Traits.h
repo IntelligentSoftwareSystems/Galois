@@ -186,8 +186,8 @@ struct default_loopname: public loopname {
  * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}
  */
 struct numrun_tag {};
-struct numrun: public trait_has_value<uint32_t>, numrun_tag {
-  numrun(uint32_t i = 0): trait_has_value<uint32_t>(0) { }
+struct numrun: public trait_has_value<const std::string>, numrun_tag {
+  numrun(const std::string p = 0): trait_has_value<const std::string>(p) { }
 };
 
 /**
