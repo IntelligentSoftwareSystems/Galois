@@ -204,7 +204,7 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+               }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          }
        }
        if(net.ID == (from_id + 1)%net.Num){
@@ -235,7 +235,7 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+               }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          }
        }
        StatTimer_set.stop();
@@ -274,7 +274,7 @@ public:
               assert(n < num);
               val_vec[n] = val;
 
-              }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+              }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
         }
 
         Galois::Runtime::gSerialize(b, val_vec);
@@ -312,7 +312,7 @@ public:
 #else
               FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-              }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+              }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          }
       }
       StatTimer_set.stop();
@@ -396,14 +396,14 @@ public:
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
              [&](uint32_t n){
              masterNodes[h][n] = G2L(masterNodes[h][n]);
-             }, Galois::loopname("MASTER_NODES"), Galois::numrun(num_run));
+             }, Galois::loopname("MASTER_NODES"), Galois::numrun(get_run_identifier()));
       }
 
       for(uint32_t h = 0; h < slaveNodes.size(); ++h){
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
              [&](uint32_t n){
              slaveNodes[h][n] = G2L(slaveNodes[h][n]);
-             }, Galois::loopname("SLAVE_NODES"), Galois::numrun(num_run));
+             }, Galois::loopname("SLAVE_NODES"), Galois::numrun(get_run_identifier()));
       }
 
       for(auto x = 0; x < masterNodes.size(); ++x){
@@ -653,7 +653,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -730,7 +730,7 @@ public:
 #else
                FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
           }
 #endif
 
@@ -803,7 +803,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -879,7 +879,7 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
          }
 #endif
 
@@ -933,7 +933,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -989,7 +989,7 @@ public:
 #else
                FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
           }
 #endif
       }
@@ -1043,7 +1043,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1098,7 +1098,7 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
          }
 #endif
       }
@@ -1137,7 +1137,7 @@ public:
 #else
            FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-           }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(num_run));
+           }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
       }
 #endif
    }
@@ -1168,7 +1168,7 @@ public:
 #else
        FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-           }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(num_run));
+           }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
      }
 #endif
    }
@@ -1216,7 +1216,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1279,7 +1279,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(num_run));
+               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1361,7 +1361,7 @@ public:
                   FnTy::reset(lid, getData(lid));
 #endif
                   val_vec[n] = val;
-                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
            }
 
            gSerialize(b, val_vec);
@@ -1492,7 +1492,7 @@ public:
                   FnTy::reset(lid, getData(lid));
 #endif
                   val_vec[n] = val;
-                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
            }
 
            gSerialize(b, val_vec);
@@ -1584,7 +1584,7 @@ public:
                   FnTy::reset(lid, getData(lid));
 #endif
                   val_vec[n] = val;
-                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
            }
 
         }
@@ -1608,7 +1608,7 @@ public:
 
                auto val = FnTy::extract(n, getData(n));
                checkpoint_val_vec[n] = val;
-               }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+               }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          gSerialize(b, checkpoint_val_vec);
          checkpoint_bytes += (b.size() - send_bytes);
 
@@ -1691,7 +1691,7 @@ public:
                 auto val = FnTy::extract((localID), getData(localID));
 #endif
                 val_vec[n] = val;
-                }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+                }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
           }
           gSerialize(b, val_vec);
         } else {
@@ -1801,7 +1801,7 @@ public:
                 auto val = FnTy::extract((localID), getData(localID));
 #endif
                 val_vec[n] = val;
-                }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+                }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
           }
           gSerialize(b, val_vec);
         } else {
@@ -1857,7 +1857,7 @@ public:
 
           auto val = FnTy::extract(n, getData(n));
           val_vec[n] = val;
-        }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
 
 #if 0
     //Write val_vec to disk.
@@ -1900,7 +1900,7 @@ public:
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
 
           FnTy::setVal(n, getData(n), val_vec[n]);
-          }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+          }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
     }
 
  /*************************************************
@@ -1938,7 +1938,7 @@ public:
 
           auto val = FnTy::extract(n, getData(n));
           val_vec[n] = val;
-        }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
 
     Galois::Runtime::SendBuffer b;
     gSerialize(b, val_vec);
@@ -2001,7 +2001,7 @@ public:
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
 
           FnTy::setVal(n, getData(n), val_vec[n]);
-          }, Galois::loopname(doall_str.c_str()), Galois::numrun(num_run));
+          }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
     }
 
 
