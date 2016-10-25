@@ -431,13 +431,14 @@ private:
     // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
-    if (ii == src->end()) {
+    if (ii == src->end() || ii->isInEdge()) {
       if (Directional && !InOut) {
 	ii = src->createEdgeWithReuse(dst, 0, false, std::forward<Args>(args)...);
       } else {
         dst->acquire(mflag);
 	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
-	ii = dst->createEdgeWithReuse(src, e, Directional ? true : false,  std::forward<Args>(args)...);
+        if (src != dst)
+	  ii = dst->createEdgeWithReuse(src, e, Directional ? true : false,  std::forward<Args>(args)...);
 	ii = src->createEdgeWithReuse(dst, e, false, std::forward<Args>(args)...);
       }
     }
@@ -457,7 +458,8 @@ private:
       } else {
         dst->acquire(mflag);
 	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
-	ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
+        if (src != dst)
+	  ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
 	ii = src->createEdge(dst, e, false, std::forward<Args>(args)...);
       }
     }

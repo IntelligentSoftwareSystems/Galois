@@ -43,7 +43,10 @@ typedef char * ValAltTy;
 
 struct Node;
 
-typedef Galois::Graph::FirstGraph<Node, Attr, true, true> Graph; // directed in-out graph with Node nodes and Attr edges
+#define DIRECTED true
+#define IN_EDGES true
+
+typedef Galois::Graph::FirstGraph<Node, Attr, DIRECTED, IN_EDGES> Graph; // Node nodes and Attr edges
 typedef Graph::GraphNode GNode;
 typedef Graph::edge_iterator edge_iterator;
 
@@ -87,9 +90,6 @@ const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
 void setNumThreads(int numThreads);
-
-//void searchGraphUllmann(Graph *gD, Graph *gQ);
-//void searchGraphVF2(Graph *gD, Graph *gQ);
 
 } // extern "C"
 
