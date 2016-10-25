@@ -135,8 +135,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::string part_metaFile = getMetaFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
 
       Galois::Graph::OfflineGraph g(part_fileName);
+      Galois::Graph::OfflineGraph g_baseFile(filename);
 
-      base_hGraph::totalNodes = g.size();
+      base_hGraph::totalNodes = g_baseFile.size();
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
       readMetaFile(part_metaFile, localToGlobalMap_meta);
 

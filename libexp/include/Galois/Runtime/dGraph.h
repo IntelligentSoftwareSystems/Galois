@@ -72,6 +72,7 @@ class hGraph: public GlobalObject {
    GraphTy graph;
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
+   uint64_t totalSlaveNodes; // Total slave nodes from others.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
@@ -412,12 +413,15 @@ public:
         StatMasterNodes += masterNodes[x].size();
       }
 
+      totalSlaveNodes = 0;
       for(auto x = 0; x < slaveNodes.size(); ++x){
         std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
         Galois::Statistic StatSlaveNodes(slave_nodes_str);
         StatSlaveNodes += slaveNodes[x].size();
+        totalSlaveNodes += slaveNodes[x].size();
       }
 
+      send_info_to_host();
       StatTimer_comm_setup.stop();
    }
 
@@ -590,6 +594,46 @@ public:
     //may be reusing tag, so need a barrier
     Galois::Runtime::getHostBarrier().wait();
    }
+
+  void send_info_to_host(){
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    //may be reusing tag, so need a barrier
+    Galois::Runtime::getHostBarrier().wait();
+
+    //send info to host 0, msg tagged with 1
+    for(unsigned x = 0; x < net.Num; ++x){
+      if(x == id)
+        continue;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, totalSlaveNodes);
+      net.sendTagged(x,1,b);
+    }
+
+    //receive and print
+      uint64_t global_total_slave_nodes = totalSlaveNodes;
+      for(unsigned x = 0; x < net.Num; ++x){
+        if(x == id)
+          continue;
+        decltype(net.recieveTagged(1, nullptr)) p;
+        do{
+          net.handleReceives();
+          p = net.recieveTagged(1, nullptr);
+        }while(!p);
+
+        uint64_t total_slave_nodes_from_others;
+        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others);
+        global_total_slave_nodes += total_slave_nodes_from_others;
+      }
+
+      float replication_factor = (global_total_slave_nodes + totalNodes)/totalNodes;
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
+
+    //may be reusing tag, so need a barrier
+    Galois::Runtime::getHostBarrier().wait();
+
+  }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
@@ -2217,7 +2261,7 @@ public:
   template<typename FnTy>
   void save_prev_slaves(){
   for(unsigned x = 0; x < net.Num; ++x){
-    uint32_t num = slaveNodes[x].size(); 
+    uint32_t num = slaveNodes[x].size();
     if(x == id)
       continue;
 
