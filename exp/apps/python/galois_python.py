@@ -107,31 +107,53 @@ class GaloisGraph(object):
 if __name__ == "__main__":
   g = GaloisGraph()
 
+  g.addNode("n0")
+  g.setNodeAttr("n0", "color", "red")
+  g.setNodeAttr("n0", "id", "node 0")
+
   g.addNode("n1")
-  g.setNodeAttr("n1", "color", "red")
+  g.setNodeAttr("n1", "language", "english")
+  g.setNodeAttr("n1", "garbage", "to_be_deleted")
+  g.setNodeAttr("n1", "id", "node 1")
 
   g.addNode("n2")
-  g.setNodeAttr("n2", "language", "english")
-  g.setNodeAttr("n2", "garbage", "to_be_deleted")
+  g.setNodeAttr("n2", "date", "Oct. 24, 2016")
+  g.setNodeAttr("n2", "id", "node 2")
   g.printGraph()
 
-  g.removeNodeAttr("n2", "garbage");
+  g.removeNodeAttr("n1", "garbage");
   g.printGraph()
 
-  g.addEdge("n1n2e1", "n1", "n2")
-  g.setEdgeAttr("n1n2e1", "weight", "3.0")
+  g.addEdge("e0n0n1", "n0", "n1")
+  g.setEdgeAttr("e0n0n1", "weight", "3.0")
+  g.setEdgeAttr("e0n0n1", "id", "edge 0: 0 -> 1")
   g.printGraph()
 
-  g.addEdge("n1n2e2", "n1", "n2")
-  g.setEdgeAttr("n1n2e2", "place", "texas")
-  g.setEdgeAttr("n1n2e2", "garbage", "discard")
+  g.addEdge("e1n0n1", "n0", "n1")
+  g.setEdgeAttr("e1n0n1", "place", "texas")
+  g.setEdgeAttr("e1n0n1", "garbage", "discard")
+  g.setEdgeAttr("e1n0n1", "id", "edge 1: 0 -> 1")
   g.printGraph()
 
-  g.removeEdgeAttr("n1n2e2", "garbage")
-  g.removeEdgeAttr("n1n2e2", "galois_id")
+  g.removeEdgeAttr("e1n0n1", "garbage")
+  g.removeEdgeAttr("e1n0n1", "galois_id")
   g.printGraph()
 
-  g.analyzeBFS("n1", "dist", 1)
+  g.addEdge("e2n0n0", "n0", "n0")
+  g.setEdgeAttr("e2n0n0", "id", "edge 2: 0 -> 0")
+
+  g.addEdge("e3n1n0", "n1", "n0")
+  g.setEdgeAttr("e3n1n0", "id", "edge 3: 1 -> 0")
+  g.printGraph()
+
+  g.addEdge("e4n1n2", "n1", "n2")
+  g.setEdgeAttr("e4n1n2", "id", "edge 4: 1 -> 2")
+
+  g.addEdge("e5n2n0", "n2", "n0")
+  g.setEdgeAttr("e5n2n0", "id", "edge 5: 2 -> 0")
+  g.printGraph()
+
+  g.analyzeBFS("n0", "dist", 1)
   g.printGraph()
 
   del g
