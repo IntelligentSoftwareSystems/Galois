@@ -621,7 +621,8 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
     std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
-    std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + helper_fn.get_run_identifier());
     Galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
 
     unsigned long num_work_items = r.end() - r.begin();
@@ -677,8 +678,10 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
       ++num_iterations;
     }
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(helper_fn.get_run_num()), num_work_items, 0);
+    //Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (helper_fn.get_run_identifier()), (unsigned long)num_iterations, 0);
+    //Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(helper_fn.get_run_num()), num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), num_work_items, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 

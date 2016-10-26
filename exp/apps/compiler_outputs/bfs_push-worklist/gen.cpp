@@ -277,8 +277,8 @@ struct Get_info_functor : public Galois::op_tag {
 	void sync_graph(){
 		sync_graph_static(graph);
 	}
-	uint32_t get_run_num() const {
-		return graph.get_run_num();
+  std::string get_run_identifier() const {
+		return graph.get_run_identifier();
 	}
 	void static sync_graph_static(Graph& _graph) {
 

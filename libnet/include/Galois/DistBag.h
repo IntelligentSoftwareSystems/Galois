@@ -73,7 +73,8 @@ public:
   }
 
   void set(InsertBag<ValueTy> &bag) {
-    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
@@ -87,7 +88,7 @@ public:
   }
 
   void set_local(int* array, size_t size) {
-    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
@@ -100,11 +101,13 @@ public:
   }
 
   void sync() {
-    std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_sync(sync_str.c_str());
     StatTimer_sync.start();
 
-    std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::Statistic num_work_bytes(work_bytes_str.c_str());
     //send things to other hosts.
     for(auto x = 0; x < net.Num; ++x){
@@ -138,7 +141,8 @@ public:
     workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
     std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
     std::unique(workItem_recv_vec.begin(), workItem_recv_vec.end());
-    std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + helper_fn.get_run_identifier());
     Galois::Statistic num_work_items(work_item_str.c_str());
     num_work_items += workItem_recv_vec.size();
 
