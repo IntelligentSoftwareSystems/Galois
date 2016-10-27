@@ -95,6 +95,9 @@ int main(int argc, char *argv[]) {
   if(g->findEdge(nodes[2], nodes[0]) != g->edge_end(nodes[2]))
     std::cout << "edge 5 exists" << std::endl;
 
+  if(g->findEdge(nodes[2], nodes[1]) != g->edge_end(nodes[2]))
+    std::cout << "non-existing edge!" << std::endl;
+
 #if !(DIRECTED && !IN_EDGES)
   // find incoming edges
   if(g->findInEdge(nodes[1], nodes[0]) != g->in_edge_end(nodes[1]))
@@ -111,12 +114,58 @@ int main(int argc, char *argv[]) {
 
   if(g->findInEdge(nodes[0], nodes[2]) != g->in_edge_end(nodes[0]))
     std::cout << "in_edge 5 exists" << std::endl;
+
+  if(g->findInEdge(nodes[1], nodes[2]) != g->in_edge_end(nodes[1]))
+    std::cout << "non-existing in_edge!" << std::endl;
 #endif
 
   // sort edges by dst
   g->sortAllEdgesByDst();
   printGraph(g);
   std::cout << "=====" << std::endl;
+
+  // find edges after sorting edges
+  auto e = g->findEdgeSortedByDst(nodes[0], nodes[1]);
+  if(e != g->edge_end(nodes[0])) {
+    std::cout << "find edge 1 after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  }
+
+  e = g->findEdgeSortedByDst(nodes[0], nodes[0]);
+  if(e != g->edge_end(nodes[0])) {
+    std::cout << "find edge 2 after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  }
+
+  e = g->findEdgeSortedByDst(nodes[1], nodes[0]);
+  if(e != g->edge_end(nodes[1])) {
+    std::cout << "find edge 3 after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  }
+
+  e = g->findEdgeSortedByDst(nodes[1], nodes[2]);
+  if(e != g->edge_end(nodes[1])) {
+    std::cout << "find edge 4 after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  }
+
+  e = g->findEdgeSortedByDst(nodes[2], nodes[0]);
+  if(e != g->edge_end(nodes[2])) {
+    std::cout << "find edge 5 after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  }
+
+  e = g->findEdgeSortedByDst(nodes[2], nodes[1]);
+  if(e != g->edge_end(nodes[2])) {
+    std::cout << "find non-existing edge after sorting edges" << std::endl;
+    for(auto i: g->getEdgeData(e))
+      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  } 
 
   deleteGraph(g);
   nodes.clear();

@@ -311,12 +311,15 @@ private:
     }
 
     iterator find(gNode* N, bool inEdge = false) {
-      iterator ii = edges.begin(), ei = edges.end();
+      iterator ii, ei;
       if (SortedNeighbors) {
         ei = std::upper_bound(edges.begin(), edges.end(), N, 
                               first_lt<gNode*>());
         ii = std::lower_bound(edges.begin(), edges.end(), N,
                               first_lt<gNode*>());
+      } else {
+        ei = edges.end();
+        ii = edges.begin();
       }
 
       first_eq_and_valid<gNode*> checker(N);
@@ -607,6 +610,33 @@ public:
     else
       ii = ei;
     return boost::make_filter_iterator(edge_predicate, ii, ei);
+  }
+
+  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    assert(src);
+    assert(dst);
+    src->acquire(mflag);
+
+    auto ei = std::upper_bound(src->edges.begin(), src->edges.end(), dst, 
+                               first_lt<gNode*>());
+    auto ii = std::lower_bound(src->edges.begin(), src->edges.end(), dst,
+                               first_lt<gNode*>());
+
+    first_eq_and_valid<gNode*> checker(dst);
+    ii = std::find_if(ii, ei, checker);
+    while(ii != ei && ii->isInEdge()) {
+      ++ii;
+      ii = std::find_if(ii, ei, checker);
+    };
+
+    is_out_edge edge_predicate;
+    if(ii != ei) {
+      dst->acquire(mflag);
+      if(!edge_predicate(*ii)) {
+        ii = src->edges.end();
+      }
+    }
+    return boost::make_filter_iterator(edge_predicate, ii, src->edges.end());
   }
 
   template<bool _Undirected = !Directional>
