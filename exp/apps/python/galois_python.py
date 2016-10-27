@@ -2,6 +2,7 @@
 
 import ctypes
 from ctypes import *
+import pprint
 
 # type definition
 GraphPtr = c_void_p
@@ -16,6 +17,10 @@ http://stackoverflow.com/questions/20773602/returning-struct-from-c-dll-to-pytho
 class Edge(Structure):
   _fields_ = [("base", c_void_p),
               ("end", c_void_p)]
+
+class NodePair(Structure):
+  _fields_ = [("nQ", Node),
+              ("nD", Node)]
 
 glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
 #glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
@@ -40,14 +45,18 @@ glib.getEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.setNumThreads.argtypes = [c_int]
 glib.analyzeBFS.argtypes = [GraphPtr, Node, KeyTy]
+glib.searchSubgraphUllmann.restype = POINTER(NodePair)
+glib.searchSubgraphUllmann.argtypes = [GraphPtr, GraphPtr, c_int]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
 
-  def __init__(self):
+  def __init__(self, name):
+    self.name = name
     self.graph = glib.createGraph()
     self.nodeMap = {}
     self.edgeMap = {}
+    self.inverseNodeMap = {}
 
   def __del__(self):
     glib.deleteGraph(self.graph)
@@ -58,12 +67,11 @@ class GaloisGraph(object):
 
   def addNode(self, nid):
     if self.nodeMap.has_key(nid):
-#      "repeated", nid, "=> Node", format(self.nodeMap[nid], 'x')
       return
     n = glib.createNode(self.graph)
     glib.addNode(self.graph, n)
     self.nodeMap[nid] = n
-#    print "add", nid, "=> Node", format(n, 'x')
+    self.inverseNodeMap[n] = nid
 
   def setNodeAttr(self, nid, key, val):
     glib.setNodeAttr(self.graph, self.nodeMap[nid], key, val)
@@ -75,15 +83,9 @@ class GaloisGraph(object):
     glib.removeNodeAttr(self.graph, self.nodeMap[nid], key)
 
   def addEdge(self, eid, srcid, dstid):
-#    print "trying to add edge from", srcid, "to", dstid
-#    if self.nodeMap.has_key(srcid):
-#      print "find", srcid, "=> Node", format(self.nodeMap[srcid], 'x')
-#    if self.nodeMap.has_key(dstid):
-#      print "find", dstid, "=> Node", format(self.nodeMap[dstid], 'x')
     src = self.nodeMap[srcid]
     dst = self.nodeMap[dstid]
     self.edgeMap[eid] = glib.addEdge(self.graph, src, dst)
-#    print "add", eid, "=> Edge (", format(self.edgeMap[eid].base, 'x'), ",", format(self.edgeMap[eid].end, 'x'), ")"
 
   def setEdgeAttr(self, eid, key, val):
     glib.setEdgeAttr(self.graph, self.edgeMap[eid], key, val)
@@ -94,18 +96,40 @@ class GaloisGraph(object):
   def removeEdgeAttr(self, eid, key):
     glib.removeEdgeAttr(self.graph, self.edgeMap[eid], key)
 
+  def showStatistics(self):
+    print self.name, ":", len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
+
   def analyzeBFS(self, srcid, attr, numThreads):
-#     pass
     print "=====", "analyzeBFS", "====="
-    print len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
+    self.showStatistics()
     print "src =", srcid
     glib.setNumThreads(numThreads)
     glib.analyzeBFS(self.graph, self.nodeMap[srcid], attr)
     print attr, "of src is", self.getNodeAttr(srcid, attr)
 
+  def searchSubgraphUllmann(self, gQ, numInstances, numThreads):
+    print "=====", "searchSubgraphUllmann", "====="
+    self.showStatistics()
+    gQ.showStatistics()
+    glib.setNumThreads(numThreads)
+    matches = glib.searchSubgraphUllmann(self.graph, gQ.graph, numInstances)
+    result = []
+    for i in range(numInstances):
+      sol = {}
+      gQSize = len(gQ.nodeMap)
+      for j in range(gQSize):
+        nQ = matches[i*gQSize+j].nQ
+        nD = matches[i*gQSize+j].nD
+        if nQ == None or nD == None:
+          continue
+        sol[gQ.inverseNodeMap[nQ]] = self.inverseNodeMap[nD]
+      if len(sol):
+        result.append(sol);
+    glib.deleteGraphMatches(matches)
+    return result
 
 if __name__ == "__main__":
-  g = GaloisGraph()
+  g = GaloisGraph("g")
 
   g.addNode("n0")
   g.setNodeAttr("n0", "color", "red")
@@ -156,5 +180,15 @@ if __name__ == "__main__":
   g.analyzeBFS("n0", "dist", 1)
   g.printGraph()
 
+  g2 = GaloisGraph("g2")
+  g2.addNode("g2n0")
+  g2.addNode("g2n1")
+  g2.addNode("g2n2")
+  g2.addEdge("e0g2n0g2n1", "g2n0", "g2n1")
+  g2.addEdge("e1g2n1g2n1", "g2n1", "g2n2")
+  g2.addEdge("e2g2n2g2n0", "g2n2", "g2n0")
+  pprint.pprint(g.searchSubgraphUllmann(g2, 10, 3))
+
   del g
+  del g2
 

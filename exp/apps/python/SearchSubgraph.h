@@ -3,10 +3,17 @@
 
 #include "PythonGraph.h"
 
+struct NodePair {
+  GNode nQ;
+  GNode nD;
+};
+
+
 extern "C" {
 
-void searchSubgraphUllmann(Graph *gD, Graph *gQ, size_t k);
-void searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k);
+void deleteGraphMatches(NodePair *pairs);
+NodePair *searchSubgraphUllmann(Graph *gD, Graph *gQ, size_t k);
+//NodePair *searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k);
 
 } // extern "C"
 

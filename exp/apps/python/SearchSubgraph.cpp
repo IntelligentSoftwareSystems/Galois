@@ -29,11 +29,20 @@ struct NodeMatch {
 typedef std::vector<NodeMatch> Matching;
 typedef Galois::InsertBag<Matching> MatchingVector;
 
-template<typename G>
-void initializeGraph(G& g) {
-  for(auto n : g) {
-    g.getData(n).mode = 2; // set to use vVec
+// check if all attributes in q show up in d
+bool contain(const Attr& d, const Attr& q) {
+  auto de = d.end();
+  for(auto qi: q) {
+    auto di = d.find(qi.first);
+    if(di == de) {
+      return false;
+    }
+    // ylu: exact match for now. should implement "superset" here.
+    if(di->second != qi.second) {
+      return false;
+    }
   }
+  return true;
 }
 
 struct UllmannAlgo {
@@ -48,14 +57,17 @@ struct UllmannAlgo {
     void operator()(const GNode nQ) const {
       auto& dQ = gQ.getData(nQ);
 
+      dQ.mode = 3; // set to use vVec
+      dQ.vVec.clear();
+
       for(auto nD : gD) {
         auto& dD = gD.getData(nD);
 
-//        if(!dD.contains(dQ))
-//          continue;
+        if(!contain(dD.attr, dQ.attr))
+          continue;
 
         // self loop for nQ but not for nD
-        if(gQ.findEdge(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nD) == gD.edge_end(nD))
           continue;
 
         dQ.vVec.push_back(nD);
@@ -107,11 +119,11 @@ struct UllmannAlgo {
           return false;
 
         // nQ => (nm.nQ) exists but not nD => (nm.nD)
-        if(gQ.findEdge(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nm.nD) == gD.edge_end(nD))
+        if(gQ.findEdgeSortedByDst(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdgeSortedByDst(nD, nm.nD) == gD.edge_end(nD))
           return false;
 
         // (nm.nQ) => nQ exists but not (nm.nD) => nD
-        if(gQ.findEdge(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdge(nm.nD, nD) == gD.edge_end(nm.nD))
+        if(gQ.findEdgeSortedByDst(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdgeSortedByDst(nm.nD, nD) == gD.edge_end(nm.nD))
           return false;
       }
 
@@ -176,18 +188,74 @@ public:
   }
 };
 
+// check if the matching is correct
+void verifyMatching(Matching& matching, Graph& gD, Graph& gQ) {
+  bool isFailed = false;
+
+  for(auto& nm1 : matching) {
+    auto& dQ1 = gQ.getData(nm1.nQ);
+    auto& dD1 = gD.getData(nm1.nD);
+
+    if(!contain(dD1.attr, dQ1.attr)) {
+      isFailed = true;
+      std::cerr << "attr not match: gQ(" << nm1.nQ << ") not contained by gD(" << nm1.nD << ")" << std::endl;
+    }
+
+    for(auto& nm2 : matching) {
+      // two distinct query nodes map to the same data node
+      if(nm1.nQ != nm2.nQ && nm1.nD == nm2.nD) {
+        isFailed = true;
+        std::cerr << "inconsistent mapping to data node: gQ(" << nm1.nQ;
+        std::cerr << ") to gD(" << nm1.nD << "), gQ(" << nm2.nQ;
+        std::cerr << ") to gD(" << nm2.nD << ")" << std::endl;
+      }
+
+      // a query node mapped to different data nodes
+      if(nm1.nQ == nm2.nQ && nm1.nD != nm2.nD) {
+        isFailed = true;
+        std::cerr << "inconsistent mapping from query node: gQ(" << nm1.nQ;
+        std::cerr << ") to gD(" << nm1.nD << "), gQ(" << nm2.nQ;
+        std::cerr << ") to gD(" << nm2.nD << ")" << std::endl;
+      }
+
+      // query edge not matched to data edge
+      if(gQ.findEdgeSortedByDst(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdgeSortedByDst(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
+        isFailed = true;
+        std::cerr << "edge not match: gQ(" << nm1.nQ << " => " << nm2.nQ;
+        std::cerr << "), but no gD(" << nm1.nD << " => " << nm2.nD << ")" << std::endl;
+      }
+    }
+  }
+
+  if(isFailed)
+    GALOIS_DIE("Verification failed");
+}
+
+NodePair *reportMatchings(MatchingVector& report, size_t size) {
+  NodePair *result = new NodePair [size] ();
+  size_t i = 0;
+  for(auto& m : report) {
+    for(auto& nm : m) {
+      result[i].nQ = nm.nQ;
+      result[i++].nD = nm.nD;
+      if(i == size) {
+        break;
+      }
+    }
+    if(i == size) {
+      break;
+    }
+  } 
+  return result;
+}
+
 template<typename Algo>
-void run(Graph& gD, Graph& gQ) {
+NodePair *run(Graph& gD, Graph& gQ) {
   Algo algo;
   std::cout << "Running " << algo.name() << " Algorithm..." << std::endl;
 
-//  gD.sortAllEdgesByDst();
-//  gD.sortAllInEdgesByDst();
-  initializeGraph(gD);
-
-//  gQ.sortAllEdgesByDst();
-//  gQ.sortAllInEdgesByDst();
-  initializeGraph(gQ);
+  gD.sortAllEdgesByDst();
+  gQ.sortAllEdgesByDst();
 
   Galois::StatTimer T;
   T.start();
@@ -200,7 +268,7 @@ void run(Graph& gD, Graph& gQ) {
   if(isSomeNodeUnmatched) {
     T.stop();
     std::cout << "Some nodes have no candidates to match." << std::endl;
-    return;
+    return (new NodePair [gQ.size()*kFound] ());
   }
 
   Galois::StatTimer searchT("SubgraphSearch");
@@ -212,33 +280,41 @@ void run(Graph& gD, Graph& gQ) {
   T.stop();
   std::cout << "Found " << currentlyFound << " instance(s) of the query graph." << std::endl;
   if(currentlyFound) {
-// TODO: index scheme
-//    reportMatchings(report, gD, gQ);
-//    for(auto& m: report)
-//      verifyMatching(m, gD, gQ);
+    for(auto& m: report)
+      verifyMatching(m, gD, gQ);
     std::cout << "Verification succeeded" << std::endl;
   }
+  return reportMatchings(report, gQ.size()*kFound);
 }
 
-void searchSubgraphUllmann(Graph *gD, Graph *gQ, size_t k) {
+NodePair *searchSubgraphUllmann(Graph *gD, Graph *gQ, size_t k) {
   Galois::StatManager statManager; 
 
   kFound = k;
 
   Galois::StatTimer T("TotalTime");
   T.start();
-  run<UllmannAlgo>(*gD, *gQ);
+  NodePair *result = run<UllmannAlgo>(*gD, *gQ);
   T.stop();
-}
 
-void searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k) {
+  return result;
+}
+#if 0
+NodePair *searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k) {
   Galois::StatManager statManager; 
 
   kFound = k;
 
   Galois::StatTimer T("TotalTime");
   T.start();
-//  run<VF2Algo>(*gD, *gQ);
+//  NodePair *result = run<VF2Algo>(*gD, *gQ);
   T.stop();
+
+  return result;
+}
+#endif
+
+void deleteGraphMatches(NodePair *pairs) {
+  delete[] pairs;
 }
 
