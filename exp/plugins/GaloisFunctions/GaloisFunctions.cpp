@@ -440,8 +440,8 @@ namespace {
                                     <<"\t\treturn graph.getLID(n);\n\t}\n"
                                     <<"\tvoid sync_graph(){\n"
                                     <<"\t\tsync_graph_static(graph);\n\t}\n"
-                                    <<"\tuint32_t get_run_num() const {\n"
-                                    <<"\t\treturn graph.get_run_num();\n\t}\n"
+                                    <<"\tstd::string get_run_identifier() const {\n"
+                                    <<"\t\treturn graph.get_run_identifier();\n\t}\n"
                                     <<"\tvoid static sync_graph_static(Graph& _graph) {\n";
 
             rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
@@ -517,7 +517,7 @@ namespace {
             kernelBefore << "\t\tDBag dbag(__sync_functor, \"" << className << "\");\n";
             kernelBefore << "\t\tauto &local_wl = DBag::get();\n";
             kernelBefore << "\t\tstd::string impl_str(\"CUDA_FOR_EACH_IMPL_" 
-              << className << "_\" + std::to_string(_graph.get_run_num()));\n";
+              << className << "_\" + (_graph.get_run_identifier()));\n";
             kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
             kernelBefore << "\t\tunsigned long _num_work_items;\n";
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
@@ -562,6 +562,7 @@ namespace {
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\tunsigned _num_iterations = 1;\n";
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
+            kernelBefore << "\t\t_graph.set_num_iter(_num_iterations);\n"
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
             kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
             kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
@@ -574,8 +575,8 @@ namespace {
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\t++_num_iterations;\n";
             kernelBefore << "\t\t}\n";
-            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
-            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), _num_work_items, 0);\n";
+            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);\n";
+            kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + (_graph.get_run_identifier()), _num_work_items, 0);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             if (!single_source.empty()) {
@@ -868,7 +869,7 @@ namespace {
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
             kernelBefore << "\t\tstd::string impl_str(\"CUDA_DO_ALL_IMPL_" 
-              << className << "_\" + std::to_string(_graph.get_run_num()));\n";
+              << className << "_\" + (_graph.get_run_identifier()));\n";
             kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
             kernelBefore << "\t\tStatTimer_cuda.start();\n";
             std::string accumulator;
