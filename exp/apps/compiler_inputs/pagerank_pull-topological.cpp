@@ -107,7 +107,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_num()));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -122,7 +122,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_num()));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -144,11 +144,12 @@ struct PageRank {
   void static go(Graph& _graph) {
     iteration = 0;
     do{
+      _graph.set_num_iter(iteration);
       DGAccumulator_accum.reset();
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_num()));
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()));
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (_graph.get_run_identifier()), (unsigned long)iteration, 0);
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
