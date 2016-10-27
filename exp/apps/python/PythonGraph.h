@@ -53,17 +53,29 @@ typedef Graph::edge_iterator edge_iterator;
 // see StatCollector for the design
 struct Node {
   Attr attr;
-  char mode; // 0: int, 1: double, 2: vector
+  char mode; // 0: ID, 1: II, 2: DD, 3: vector
   union {
-    size_t vInt;
-    double vDouble;
+    struct {
+      size_t vInt;
+      double vDouble;
+    } ID;
+    struct {
+      size_t vInt1;
+      size_t vInt2;
+    } II;
+    struct {
+      size_t vDouble1;
+      size_t vDouble2;
+    } DD;
     std::vector<GNode> vVec;
   };
 
-  Node(): mode(0), vInt(0) {}
-  Node(size_t v): mode(0), vInt(v) {}
-  Node(double v): mode(1), vDouble(v) {}
-  Node(const std::vector<GNode>& v): mode(2), vVec(v) {}
+  Node(): mode(0), ID({0, 0.0}) {}
+  Node(size_t vi, double vd): mode(0), ID({vi, vd}) {}
+  Node(double vd, size_t vi): mode(0), ID({vi, vd}) {}
+  Node(size_t vi1, size_t vi2): mode(1), II({vi1, vi2}) {}
+  Node(double vd1, double vd2): mode(2), DD({vd1, vd2}) {}
+  Node(const std::vector<GNode>& v): mode(3), vVec(v) {}
   ~Node();
 };
 

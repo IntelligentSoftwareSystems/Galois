@@ -7,7 +7,7 @@
  *************************************/
 Node::~Node() {
   using vector_type = std::vector<GNode>;
-  if(2 == mode) {
+  if(3 == mode) {
     vVec.~vector_type();
   }
 }
