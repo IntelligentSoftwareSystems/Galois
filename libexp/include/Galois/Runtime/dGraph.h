@@ -230,12 +230,15 @@ public:
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
                uint32_t lid = masterNodes[from_id][n];
+
+
 #ifdef __GALOIS_HET_OPENCL__
            CLNodeDataWrapper d = clGraph.getDataW(lid);
            FnTy::reduce(lid, d, val_vec[n]);
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
+
                }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          }
        }
@@ -305,6 +308,7 @@ public:
         if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
               uint32_t localID = slaveNodes[from_id][n];
+
 #ifdef __GALOIS_HET_OPENCL__
               {
               CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -313,6 +317,7 @@ public:
 #else
               FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
+
               }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
          }
       }
@@ -378,17 +383,6 @@ public:
       Galois::Runtime::getHostBarrier().wait();
       StatTimer_comm_setup.start();
 
-      //fill_slaveNodes(slaveNodes);
-
-#if 0
-      for(uint32_t h = 0; h < hostNodes.size(); ++h){
-        uint32_t start, end;
-        std::tie(start, end) = nodes_by_host(h);
-        for(; start != end; ++start){
-          slaveNodes[h].push_back(L2G(start));
-        }
-      }
-#endif
 
       //Exchange information for memoization optimization.
       exchange_info_init();
@@ -625,8 +619,8 @@ public:
         global_total_slave_nodes += total_slave_nodes_from_others;
       }
 
-      float replication_factor = (global_total_slave_nodes + totalNodes)/totalNodes;
-      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor, 0);
+      float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
 
