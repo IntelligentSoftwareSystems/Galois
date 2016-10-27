@@ -113,6 +113,11 @@ int main(int argc, char *argv[]) {
     std::cout << "in_edge 5 exists" << std::endl;
 #endif
 
+  // sort edges by dst
+  g->sortAllEdgesByDst();
+  printGraph(g);
+  std::cout << "=====" << std::endl;
+
   deleteGraph(g);
   nodes.clear();
   edges.clear();

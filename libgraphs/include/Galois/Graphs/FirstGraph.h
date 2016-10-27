@@ -35,6 +35,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
+#include "Galois/Galois.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -668,6 +669,16 @@ public:
   GraphNode getEdgeDst(in_edge_iterator ii) {
     assert(ii->first()->active);
     return GraphNode(ii->first());
+  }
+
+  void sortEdgesByDst(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) { 
+    acquire(N, mflag);
+    typedef typename gNode::EdgeInfo EdgeInfo;
+    std::sort(N->begin(), N->end(), [=] (EdgeInfo e1, EdgeInfo e2) { return e1.first() < e2.first(); } );
+  }
+
+  void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
   }
 
   //// General Things ////
