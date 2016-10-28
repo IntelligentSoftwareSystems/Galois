@@ -25,23 +25,20 @@ void deleteGraph(Graph *g) {
 }
 
 void printGraph(Graph* g) {
-  size_t nodeID = 0;
   for(auto n: *g) {
-    std::cout << "node " << nodeID++ << std::endl;
+    std::cout << "node " << n << std::endl;
     for(auto i: g->getData(n).attr) {
       std::cout << "  " << i.first << ": " << i.second << std::endl;
     }
-    size_t outEdgeID = 0;
     for(auto e: g->edges(n)) {
-      std::cout << "  edge " << outEdgeID++ << std::endl;
+      std::cout << "  edge to " << e->first() << std::endl;
       for(auto i: g->getEdgeData(e)) {
         std::cout << "    " << i.first << ": " << i.second << std::endl;
       }
     }
 #if !(DIRECTED && !IN_EDGES)
-    size_t inEdgeID = 0;
     for(auto e: g->in_edges(n)) {
-      std::cout << "  in_edge " << inEdgeID++ << std::endl;
+      std::cout << "  in_edge from " << e->first() << std::endl;
       for(auto i: g->getEdgeData(e)) {
         std::cout << "    " << i.first << ": " << i.second << std::endl;
       }

@@ -47,6 +47,8 @@ glib.setNumThreads.argtypes = [c_int]
 glib.analyzeBFS.argtypes = [GraphPtr, Node, KeyTy]
 glib.searchSubgraphUllmann.restype = POINTER(NodePair)
 glib.searchSubgraphUllmann.argtypes = [GraphPtr, GraphPtr, c_int]
+glib.searchSubgraphVF2.restype = POINTER(NodePair)
+glib.searchSubgraphVF2.argtypes = [GraphPtr, GraphPtr, c_int]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -62,7 +64,7 @@ class GaloisGraph(object):
     glib.deleteGraph(self.graph)
 
   def printGraph(self):
-    print "=====", "GaloisGraph", "====="
+    print "=====", "GaloisGraph", self.name, "====="
     glib.printGraph(self.graph)
 
   def addNode(self, nid):
@@ -107,12 +109,19 @@ class GaloisGraph(object):
     glib.analyzeBFS(self.graph, self.nodeMap[srcid], attr)
     print attr, "of src is", self.getNodeAttr(srcid, attr)
 
-  def searchSubgraphUllmann(self, gQ, numInstances, numThreads):
-    print "=====", "searchSubgraphUllmann", "====="
+  def searchSubgraph(self, gQ, numInstances, numThreads, algo):
+    print "=====", "searchSubgraph", "====="
     self.showStatistics()
     gQ.showStatistics()
     glib.setNumThreads(numThreads)
-    matches = glib.searchSubgraphUllmann(self.graph, gQ.graph, numInstances)
+
+    if algo == "Ullmann":
+      matches = glib.searchSubgraphUllmann(self.graph, gQ.graph, numInstances)
+    elif algo == "VF2":
+      matches = glib.searchSubgraphVF2(self.graph, gQ.graph, numInstances)
+    else:
+      raise Exception("Unknown algorithm for searchSubgraph")
+
     result = []
     for i in range(numInstances):
       sol = {}
@@ -120,13 +129,20 @@ class GaloisGraph(object):
       for j in range(gQSize):
         nQ = matches[i*gQSize+j].nQ
         nD = matches[i*gQSize+j].nD
-        if nQ == None or nD == None:
+
+        if nQ != None and nD != None:
+          sol[gQ.inverseNodeMap[nQ]] = self.inverseNodeMap[nD]
+        elif nQ == None and nD == None:
           continue
-        sol[gQ.inverseNodeMap[nQ]] = self.inverseNodeMap[nD]
+        else:
+          raise Exception("Matching error")
+
       if len(sol):
         result.append(sol);
+
     glib.deleteGraphMatches(matches)
     return result
+
 
 if __name__ == "__main__":
   g = GaloisGraph("g")
@@ -187,7 +203,9 @@ if __name__ == "__main__":
   g2.addEdge("e0g2n0g2n1", "g2n0", "g2n1")
   g2.addEdge("e1g2n1g2n1", "g2n1", "g2n2")
   g2.addEdge("e2g2n2g2n0", "g2n2", "g2n0")
-  pprint.pprint(g.searchSubgraphUllmann(g2, 10, 3))
+  g2.printGraph()
+  pprint.pprint(g.searchSubgraph(g2, 10, 3, "Ullmann"))
+  pprint.pprint(g.searchSubgraph(g2, 10, 3, "VF2"))
 
   del g
   del g2

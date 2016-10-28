@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     std::cout << "edge 5 exists" << std::endl;
 
   if(g->findEdge(nodes[2], nodes[1]) != g->edge_end(nodes[2]))
-    std::cout << "non-existing edge!" << std::endl;
+    std::cout << ((DIRECTED) ? "non-existing edge!" : "implied by edge 4") << std::endl;
 
 #if !(DIRECTED && !IN_EDGES)
   // find incoming edges
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     std::cout << "in_edge 5 exists" << std::endl;
 
   if(g->findInEdge(nodes[1], nodes[2]) != g->in_edge_end(nodes[1]))
-    std::cout << "non-existing in_edge!" << std::endl;
+    std::cout << ((DIRECTED) ? "non-existing in_edge!" : "the same as edge 4") << std::endl;
 #endif
 
   // sort edges by dst
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
 
   e = g->findEdgeSortedByDst(nodes[2], nodes[1]);
   if(e != g->edge_end(nodes[2])) {
-    std::cout << "find non-existing edge after sorting edges" << std::endl;
+    std::cout << ((!DIRECTED) ? "the same as edge 4" : "find non-existing edge after sorting edges") << std::endl;
     for(auto i: g->getEdgeData(e))
       std::cout << "  " << i.first << ": " << i.second << std::endl;
   } 
@@ -179,8 +179,12 @@ int main(int argc, char *argv[]) {
   edges.push_back(addEdge(g2, nodes[3], nodes[4]));
   edges.push_back(addEdge(g2, nodes[4], nodes[5]));
   edges.push_back(addEdge(g2, nodes[5], nodes[3]));
-  setNumThreads(2);
+  printGraph(g2);
+
+  setNumThreads(1);
   NodePair *result = searchSubgraphUllmann(g, g2, 10);
+  deleteGraphMatches(result);
+  result = searchSubgraphVF2(g, g2, 10);
   deleteGraphMatches(result);
   deleteGraph(g2);
 
