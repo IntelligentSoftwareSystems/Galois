@@ -245,7 +245,7 @@ public:
       std::size_t begin = text.find("=");
       std::size_t end = text.find(";", begin);
       std::string value = text.substr(begin+1, end - begin - 3);
-      text = "sum_retval.do_return(" + value + ")";
+      text = "ReturnFromParallelFor(\"" + value + "\")";
     }
 
     return text;
@@ -257,8 +257,9 @@ public:
     if (found != std::string::npos) {
       bodyString << "CBlock(['" << text << "']),\n";
     } else {
-      found = text.find("WL.push");
-      if (found != std::string::npos) {
+      if (text.find("WL.push") != std::string::npos) {
+        bodyString << text << ",\n";
+      } else if (text.find("ReturnFromParallelFor") != std::string::npos) {
         bodyString << text << ",\n";
       } else {
         bodyString << "CBlock([\"" << text << "\"]),\n";
@@ -310,9 +311,6 @@ public:
         arguments.push_back(param.first);
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
-      }
-      if (!accumulatorName.empty()) {
-        declString << ", ('Sum', 'sum_retval')";
       }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
       if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
@@ -697,13 +695,11 @@ public:
       cuheader << "\tShared<" << var.second << "> *master_" << var.first << "; // per host\n";
       cuheader << "\tShared<" << var.second << "> *slave_" << var.first << "; // per host\n";
     }
-    cuheader << "\tShared<int> p_retval;\n";
     if (requiresWorklist) {
       cuheader << "\tWorklist2 in_wl;\n";
       cuheader << "\tWorklist2 out_wl;\n";
       cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
     }
-    cuheader << "\tSum sum_retval;\n";
     cuheader << "};\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
@@ -870,7 +866,6 @@ public:
       cuheader << "\twl->out_items = ctx->out_wl.wl;\n";
       cuheader << "\tctx->shared_wl = wl;\n";
     }
-    cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);\n"; 
     if (requiresWorklist) {
       cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
@@ -1058,10 +1053,6 @@ public:
         Output << "CBlock([\"ctx->out_wl.will_write()\"]),\n";
         Output << "CBlock([\"ctx->out_wl.reset()\"]),\n";
       }
-      if (hasAReturnValue) {
-        Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
-        Output << "CBlock([\"ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
-      }
       Output << "Invoke(\"" << kernelName << "\", ";
       Output << "(\"ctx->gg\", \"ctx->nowned\"";
       if (isTopological) {
@@ -1074,17 +1065,18 @@ public:
       for (auto& argument : karguments.second) {
         Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
       }
-      if (hasAReturnValue) {
-        Output << ", \"ctx->sum_retval\"";
-      }
       if (!isTopological) {
         Output << ", \"ctx->in_wl\"";
         Output << ", \"ctx->out_wl\"";
       }
-      Output << ")),\n";
+      Output << ")";
+      if (hasAReturnValue) {
+        Output << ", \"SUM\"";
+      }
+      Output << "),\n";
       Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
       if (hasAReturnValue) {
-        Output << "CBlock([\"__retval = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
+        Output << "CBlock([\"__retval = *(retval.cpu_rd_ptr())\"], parse = False),\n";
       }
       if (!isTopological) {
         Output << "CBlock([\"ctx->out_wl.update_cpu()\"]),\n";
