@@ -313,6 +313,11 @@ private:
     iterator find(gNode* N, bool inEdge = false) {
       iterator ii, ei = edges.end();
       if (SortedNeighbors) {
+        assert(std::is_sorted(edges.begin(), edges.end(), 
+                              [=] (const EdgeInfo& e1, const EdgeInfo& e2) 
+                                  { return e1.first() < e2.first(); }
+                             )
+              );
         ii = std::lower_bound(edges.begin(), edges.end(), N,
                               first_lt<gNode*>());
       } else {
@@ -613,6 +618,11 @@ public:
     assert(src);
     assert(dst);
     src->acquire(mflag);
+    assert(std::is_sorted(src->begin(), src->end(), 
+                          [=] (const typename gNode::EdgeInfo& e1, const typename gNode::EdgeInfo& e2) 
+                              { return e1.first() < e2.first(); }
+                         )
+          );
 
     auto ei = src->end();
     auto ii = std::lower_bound(src->begin(), src->end(), dst,
@@ -700,7 +710,7 @@ public:
   void sortEdgesByDst(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) { 
     acquire(N, mflag);
     typedef typename gNode::EdgeInfo EdgeInfo;
-    std::sort(N->begin(), N->end(), [=] (EdgeInfo e1, EdgeInfo e2) { return e1.first() < e2.first(); } );
+    std::sort(N->begin(), N->end(), [=] (const EdgeInfo& e1, const EdgeInfo& e2) { return e1.first() < e2.first(); } );
   }
 
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {

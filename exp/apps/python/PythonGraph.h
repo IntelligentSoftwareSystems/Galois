@@ -70,11 +70,11 @@ struct Node {
     std::vector<GNode> vVec;
   };
 
-  Node(): mode(0), ID({0, 0.0}) {}
-  Node(size_t vi, double vd): mode(0), ID({vi, vd}) {}
-  Node(double vd, size_t vi): mode(0), ID({vi, vd}) {}
-  Node(size_t vi1, size_t vi2): mode(1), II({vi1, vi2}) {}
-  Node(double vd1, double vd2): mode(2), DD({vd1, vd2}) {}
+  Node(): mode(0), ID{0, 0.0} {}
+  Node(size_t vi, double vd): mode(0), ID{vi, vd} {}
+  Node(double vd, size_t vi): mode(0), ID{vi, vd} {}
+  Node(size_t vi1, size_t vi2): mode(1), II{vi1, vi2} {}
+  Node(double vd1, double vd2): mode(2), DD{vd1, vd2} {}
   Node(const std::vector<GNode>& v): mode(3), vVec(v) {}
   ~Node();
 };
