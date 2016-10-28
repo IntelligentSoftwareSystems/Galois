@@ -311,14 +311,11 @@ private:
     }
 
     iterator find(gNode* N, bool inEdge = false) {
-      iterator ii, ei;
+      iterator ii, ei = edges.end();
       if (SortedNeighbors) {
-        ei = std::upper_bound(edges.begin(), edges.end(), N, 
-                              first_lt<gNode*>());
         ii = std::lower_bound(edges.begin(), edges.end(), N,
                               first_lt<gNode*>());
       } else {
-        ei = edges.end();
         ii = edges.begin();
       }
 
@@ -617,13 +614,12 @@ public:
     assert(dst);
     src->acquire(mflag);
 
-    auto ei = std::upper_bound(src->edges.begin(), src->edges.end(), dst, 
-                               first_lt<gNode*>());
-    auto ii = std::lower_bound(src->edges.begin(), src->edges.end(), dst,
+    auto ei = src->end();
+    auto ii = std::lower_bound(src->begin(), src->end(), dst,
                                first_lt<gNode*>());
 
     first_eq_and_valid<gNode*> checker(dst);
-    ii = std::find_if(ii, ei, checker);
+    ii = std::find_if(ii, ei, checker); // bug if ei set to upper_bound
     while(ii != ei && ii->isInEdge()) {
       ++ii;
       ii = std::find_if(ii, ei, checker);
@@ -633,10 +629,10 @@ public:
     if(ii != ei) {
       dst->acquire(mflag);
       if(!edge_predicate(*ii)) {
-        ii = src->edges.end();
+        ii = ei;
       }
     }
-    return boost::make_filter_iterator(edge_predicate, ii, src->edges.end());
+    return boost::make_filter_iterator(edge_predicate, ii, ei);
   }
 
   template<bool _Undirected = !Directional>
