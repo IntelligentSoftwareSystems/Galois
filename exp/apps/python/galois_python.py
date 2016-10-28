@@ -22,8 +22,8 @@ class NodePair(Structure):
   _fields_ = [("nQ", Node),
               ("nD", Node)]
 
-glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
-#glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
+#glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
+glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
 #glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
 
 # cast the result and arg types

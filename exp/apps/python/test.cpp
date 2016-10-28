@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
   edges.push_back(addEdge(g2, nodes[5], nodes[3]));
   printGraph(g2);
 
-  setNumThreads(1);
+  setNumThreads(3);
   NodePair *result = searchSubgraphUllmann(g, g2, 10);
   deleteGraphMatches(result);
   result = searchSubgraphVF2(g, g2, 10);
