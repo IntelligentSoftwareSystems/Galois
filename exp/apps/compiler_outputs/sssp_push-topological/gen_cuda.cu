@@ -28,12 +28,15 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "7 -> 8;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, Sum sum_retval)
+__global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_SSSP;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  ret_val.thread_entry();
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -56,57 +59,38 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
-    // FP: "6 -> 7;
     bool pop  = src < __end;
-    // FP: "7 -> 8;
     if (pop)
     {
     }
-    // FP: "9 -> 10;
-    // FP: "12 -> 13;
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "13 -> 14;
     __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "14 -> 15;
     _np_closure[threadIdx.x].src = src;
-    // FP: "15 -> 16;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "18 -> 19;
-    // FP: "19 -> 20;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "20 -> 21;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "21 -> 22;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "24 -> 25;
     __syncthreads();
-    // FP: "25 -> 26;
     while (true)
     {
-      // FP: "26 -> 27;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "29 -> 30;
       __syncthreads();
-      // FP: "30 -> 31;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "31 -> 32;
         __syncthreads();
-        // FP: "32 -> 33;
         break;
       }
-      // FP: "34 -> 35;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -115,20 +99,15 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "37 -> 38;
       __syncthreads();
-      // FP: "38 -> 39;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "39 -> 40;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "42 -> 43;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "43 -> 44;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -142,21 +121,17 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            sum_retval.do_return( 1);
+            ret_val.do_return( 1);
+            continue;
           }
         }
       }
-      // FP: "56 -> 57;
       __syncthreads();
     }
-    // FP: "58 -> 59;
 
-    // FP: "59 -> 60;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "60 -> 61;
       const int _np_laneid = cub::LaneId();
-      // FP: "61 -> 62;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -188,33 +163,24 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
             old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist)
             {
-              sum_retval.do_return( 1);
+              ret_val.do_return( 1);
+              continue;
             }
           }
         }
       }
-      // FP: "84 -> 85;
       __syncthreads();
-      // FP: "85 -> 86;
     }
 
-    // FP: "86 -> 87;
     __syncthreads();
-    // FP: "87 -> 88;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "88 -> 89;
     while (_np.work())
     {
-      // FP: "89 -> 90;
       int _np_i =0;
-      // FP: "90 -> 91;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "91 -> 92;
       __syncthreads();
-      // FP: "92 -> 93;
 
-      // FP: "93 -> 94;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -230,20 +196,18 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            sum_retval.do_return( 1);
+            ret_val.do_return( 1);
+            continue;
           }
         }
       }
-      // FP: "107 -> 108;
       _np.execute_round_done(ITSIZE);
-      // FP: "108 -> 109;
       __syncthreads();
     }
-    // FP: "110 -> 111;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "112 -> 113;
+  ret_val.thread_exit<_br>(_ts);
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
 {
@@ -274,16 +238,16 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  *(ctx->p_retval.cpu_wr_ptr()) = __retval;
+  Shared<int> retval = Shared<int>(1);
+  Sum _rv;
+  *(retval.cpu_wr_ptr()) = 0;
+  _rv.rv = retval.gpu_wr_ptr();
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
-  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
-  // FP: "6 -> 7;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.gpu_wr_ptr(), ctx->sum_retval);
-  // FP: "7 -> 8;
   check_cuda_kernel;
-  // FP: "8 -> 9;
-  __retval = *(ctx->p_retval.cpu_rd_ptr());
-  // FP: "9 -> 10;
+  // FP: "6 -> 7;
+  __retval = *(retval.cpu_rd_ptr());
+  // FP: "7 -> 8;
 }
 void SSSP_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {

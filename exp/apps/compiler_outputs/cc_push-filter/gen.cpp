@@ -100,7 +100,6 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-      _graph.set_num_iter(0);
     	struct SyncerPull_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -167,7 +166,7 @@ struct InitializeGraph {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + _graph.get_run_identifier());
+    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		InitializeGraph_all_cuda(cuda_ctx);
@@ -194,7 +193,6 @@ struct FirstItr_ConnectedComp{
 Graph * graph;
 FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
-  _graph.set_num_iter(0);
 	struct Syncer_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -261,7 +259,7 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
-		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_ConnectedComp_" + _graph.get_run_identifier());
+		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_ConnectedComp_" + (_graph.get_run_identifier()));
 		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
 		StatTimer_cuda.start();
 		FirstItr_ConnectedComp_all_cuda(cuda_ctx);
@@ -304,7 +302,7 @@ struct ConnectedComp {
     
     unsigned long _num_work_items = _graph.end() - _graph.begin();
     do { 
-    _graph.set_num_iter(_num_iterations);
+     _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
@@ -372,7 +370,7 @@ struct ConnectedComp {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + _graph.get_run_identifier());
+    		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
@@ -390,8 +388,8 @@ struct ConnectedComp {
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + _graph.get_run_identifier(), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + _graph.get_run_identifier(), (unsigned long)_num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 
@@ -402,15 +400,15 @@ void operator()(GNode src) const {
     if(snode.comp_old > snode.comp_current){
         snode.comp_old = snode.comp_current;
 
-    
-DGAccumulator_accum+= 1;
-for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = snode.comp_current;
       Galois::atomicMin(dnode.comp_current, new_dist);
       
     }
+
+DGAccumulator_accum+= 1;
       }
   }
 };

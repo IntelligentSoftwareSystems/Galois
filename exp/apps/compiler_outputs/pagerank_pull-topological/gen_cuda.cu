@@ -222,12 +222,15 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "95 -> 96;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Sum sum_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = TB_SIZE;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  ret_val.thread_entry();
   float sum;
   index_type src_end;
   // FP: "1 -> 2;
@@ -264,10 +267,11 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
     if (diff > local_tolerance)
     {
       p_value[src] = pr_value;
-      sum_retval.do_return( 1);
+      ret_val.do_return( 1);
+      continue;
     }
   }
-  // FP: "28 -> 29;
+  ret_val.thread_exit<_br>(_ts);
 }
 void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
@@ -318,16 +322,16 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, c
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  *(ctx->p_retval.cpu_wr_ptr()) = __retval;
+  Shared<int> retval = Shared<int>(1);
+  Sum _rv;
+  *(retval.cpu_wr_ptr()) = 0;
+  _rv.rv = retval.gpu_wr_ptr();
+  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
-  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
-  // FP: "6 -> 7;
-  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->sum_retval);
-  // FP: "7 -> 8;
   check_cuda_kernel;
-  // FP: "8 -> 9;
-  __retval = *(ctx->p_retval.cpu_rd_ptr());
-  // FP: "9 -> 10;
+  // FP: "6 -> 7;
+  __retval = *(retval.cpu_rd_ptr());
+  // FP: "7 -> 8;
 }
 void PageRank_all_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {

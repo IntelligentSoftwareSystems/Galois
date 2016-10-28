@@ -28,8 +28,6 @@ struct CUDA_Context {
 	Shared<unsigned int> comp_old;
 	Shared<unsigned int> *master_comp_old; // per host
 	Shared<unsigned int> *slave_comp_old; // per host
-	Shared<int> p_retval;
-	Sum sum_retval;
 };
 
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -251,7 +249,6 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 	graph.copy_to_gpu(ctx->gg);
 	ctx->comp_current.alloc(graph.nnodes);
 	ctx->comp_old.alloc(graph.nnodes);
-	ctx->p_retval = Shared<int>(1);
 	printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 	reset_CUDA_context(ctx);
 }

@@ -31,11 +31,9 @@ struct CUDA_Context {
 	Shared<float> value;
 	Shared<float> *master_value; // per host
 	Shared<float> *slave_value; // per host
-	Shared<int> p_retval;
 	Worklist2 in_wl;
 	Worklist2 out_wl;
 	struct CUDA_Worklist *shared_wl;
-	Sum sum_retval;
 };
 
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -345,7 +343,6 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, double 
 	wl->in_items = ctx->in_wl.wl;
 	wl->out_items = ctx->out_wl.wl;
 	ctx->shared_wl = wl;
-	ctx->p_retval = Shared<int>(1);
 	printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 	printf("[%d] load_graph_GPU: worklist size %d\n", ctx->id, (size_t)wl_dup_factor*graph.nnodes);
 	reset_CUDA_context(ctx);

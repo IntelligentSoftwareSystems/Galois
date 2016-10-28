@@ -106,7 +106,6 @@ struct InitializeGraph {
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-      _graph.set_num_iter(0);
     	struct SyncerPull_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -208,7 +207,6 @@ void static go(Graph& _graph) {
 			__begin = 0;
 			__end = 0;
 		}
-  _graph.set_num_iter(0);
 	struct Syncer_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -318,7 +316,7 @@ struct SSSP {
     
     unsigned long _num_work_items = 1;
     do { 
-    _graph.set_num_iter(_num_iterations);
+     _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
@@ -404,8 +402,8 @@ struct SSSP {
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)_num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 
@@ -416,15 +414,15 @@ void operator()(GNode src) const {
     if(snode.dist_old > snode.dist_current){
         snode.dist_old = snode.dist_current;
 
-    
-DGAccumulator_accum+= 1;
-for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = graph->getEdgeData(jj) + snode.dist_current;
       Galois::atomicMin(dnode.dist_current, new_dist);
       
     }
+
+DGAccumulator_accum+= 1;
       }
   }
 };

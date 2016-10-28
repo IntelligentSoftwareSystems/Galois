@@ -244,7 +244,7 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   static_go += "Galois::do_all(" + entry.OPERATOR_RANGE;
   static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
   static_go += "Galois::loopname(\"" + orig_functor_name + "\"), ";
-  static_go += "Galois::numrun(_graph.get_run_num())" + SS_write_set.str() + ");\n}\n";
+  static_go += "Galois::numrun(_graph.get_run_identifier())" + SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
   string operator_func = entry.OPERATOR_BODY + "\n";

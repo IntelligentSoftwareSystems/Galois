@@ -455,12 +455,15 @@ __global__ void FirstItr_PageRank(CSRGraph graph, unsigned int __nowned, unsigne
   }
   // FP: "105 -> 106;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Sum sum_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_PageRank;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  ret_val.thread_entry();
   float residual_old;
   float delta;
   index_type src_end;
@@ -499,7 +502,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
         if (p_nout[src] > 0)
         {
           delta = residual_old*(1-local_alpha)/p_nout[src];
-          sum_retval.do_return( 1);
+          ret_val.do_return( 1);
         }
         else
         {
@@ -511,51 +514,51 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
         pop = false;
       }
     }
-    // FP: "19 -> 20;
-    // FP: "22 -> 23;
+    // FP: "18 -> 19;
+    // FP: "21 -> 22;
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "23 -> 24;
+    // FP: "22 -> 23;
     __shared__ struct { float delta; } _np_closure [TB_SIZE];
-    // FP: "24 -> 25;
+    // FP: "23 -> 24;
     _np_closure[threadIdx.x].delta = delta;
-    // FP: "25 -> 26;
+    // FP: "24 -> 25;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
+    // FP: "27 -> 28;
     // FP: "28 -> 29;
-    // FP: "29 -> 30;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "30 -> 31;
+    // FP: "29 -> 30;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "31 -> 32;
+    // FP: "30 -> 31;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "34 -> 35;
+    // FP: "33 -> 34;
     __syncthreads();
-    // FP: "35 -> 36;
+    // FP: "34 -> 35;
     while (true)
     {
-      // FP: "36 -> 37;
+      // FP: "35 -> 36;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "39 -> 40;
+      // FP: "38 -> 39;
       __syncthreads();
-      // FP: "40 -> 41;
+      // FP: "39 -> 40;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "41 -> 42;
+        // FP: "40 -> 41;
         __syncthreads();
-        // FP: "42 -> 43;
+        // FP: "41 -> 42;
         break;
       }
-      // FP: "44 -> 45;
+      // FP: "43 -> 44;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -564,20 +567,20 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "47 -> 48;
+      // FP: "46 -> 47;
       __syncthreads();
-      // FP: "48 -> 49;
+      // FP: "47 -> 48;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "49 -> 50;
+      // FP: "48 -> 49;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "52 -> 53;
+      // FP: "51 -> 52;
       assert(nps.tb.src < __kernel_tb_size);
       delta = _np_closure[nps.tb.src].delta;
-      // FP: "53 -> 54;
+      // FP: "52 -> 53;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type nbr;
@@ -589,17 +592,17 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
         }
       }
-      // FP: "61 -> 62;
+      // FP: "60 -> 61;
       __syncthreads();
     }
-    // FP: "63 -> 64;
+    // FP: "62 -> 63;
 
-    // FP: "64 -> 65;
+    // FP: "63 -> 64;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "65 -> 66;
+      // FP: "64 -> 65;
       const int _np_laneid = cub::LaneId();
-      // FP: "66 -> 67;
+      // FP: "65 -> 66;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -630,28 +633,28 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           }
         }
       }
-      // FP: "84 -> 85;
+      // FP: "83 -> 84;
       __syncthreads();
-      // FP: "85 -> 86;
+      // FP: "84 -> 85;
     }
 
-    // FP: "86 -> 87;
+    // FP: "85 -> 86;
     __syncthreads();
-    // FP: "87 -> 88;
+    // FP: "86 -> 87;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "88 -> 89;
+    // FP: "87 -> 88;
     while (_np.work())
     {
-      // FP: "89 -> 90;
+      // FP: "88 -> 89;
       int _np_i =0;
-      // FP: "90 -> 91;
+      // FP: "89 -> 90;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "91 -> 92;
+      // FP: "90 -> 91;
       __syncthreads();
-      // FP: "92 -> 93;
+      // FP: "91 -> 92;
 
-      // FP: "93 -> 94;
+      // FP: "92 -> 93;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type nbr;
@@ -665,16 +668,18 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
         }
       }
-      // FP: "102 -> 103;
+      // FP: "101 -> 102;
       _np.execute_round_done(ITSIZE);
-      // FP: "103 -> 104;
+      // FP: "102 -> 103;
       __syncthreads();
     }
-    // FP: "105 -> 106;
+    // FP: "104 -> 105;
     assert(threadIdx.x < __kernel_tb_size);
     delta = _np_closure[threadIdx.x].delta;
+    // FP: "105 -> 106;
+    // FP: "106 -> 107;
   }
-  // FP: "109 -> 110;
+  ret_val.thread_exit<_br>(_ts);
 }
 void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
@@ -745,16 +750,16 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, c
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  *(ctx->p_retval.cpu_wr_ptr()) = __retval;
+  Shared<int> retval = Shared<int>(1);
+  Sum _rv;
+  *(retval.cpu_wr_ptr()) = 0;
+  _rv.rv = retval.gpu_wr_ptr();
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
-  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
-  // FP: "6 -> 7;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->sum_retval);
-  // FP: "7 -> 8;
   check_cuda_kernel;
-  // FP: "8 -> 9;
-  __retval = *(ctx->p_retval.cpu_rd_ptr());
-  // FP: "9 -> 10;
+  // FP: "6 -> 7;
+  __retval = *(retval.cpu_rd_ptr());
+  // FP: "7 -> 8;
 }
 void PageRank_all_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {

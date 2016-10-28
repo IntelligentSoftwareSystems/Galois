@@ -209,7 +209,6 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-      _graph.set_num_iter(0);
     	struct Syncer_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -398,7 +397,7 @@ struct Get_info_functor : public Galois::op_tag {
 	void sync_graph(){
 		sync_graph_static(graph);
 	}
-  std::string get_run_identifier() const {
+	std::string get_run_identifier() const {
 		return graph.get_run_identifier();
 	}
 	void static sync_graph_static(Graph& _graph) {
@@ -444,7 +443,7 @@ struct PageRank {
     		dbag.sync();
     		unsigned _num_iterations = 1;
     		while (!dbag.canTerminate()) {
-        _graph.set_num_iter(_num_iterations);
+    		_graph.set_num_iter(_num_iterations);
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = local_wl.size();
     		if (cuda_wl.num_in_items > cuda_wl.max_size) {
