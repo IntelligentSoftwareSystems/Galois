@@ -16,8 +16,6 @@ def main():
   row = Row()
   rows = []
   cols = set()
-  in_stat = False
-  in_parse = False
 
   for line in sys.stdin:
     try:
@@ -31,13 +29,9 @@ def main():
       # parameter setting by run.py
       if param_token[0] == "RUN:":
         if param_token[1] == "Start":
-          if in_parse == True:
-            if row.r:
-              rows.append(row.r)
-              row.reset()
-          else:
-            in_parse = True
-          in_stat = False
+          if row.r:
+            rows.append(row.r)
+            row.reset()
         elif param_token[1] == "Variable":
           key = param_token[2]
           cols.add(key)
@@ -50,11 +44,10 @@ def main():
 
       # stat header returned by Galois
       elif stat_token[0] == "LOOP":
-        in_stat = True
         row.header = stat_token
 
       # stat lines. ignore HOST for shared-memory version
-      elif in_stat == True:
+      elif row.header != None:
         loop_name = row.get(stat_token, "LOOP")
         instance = row.get(stat_token, "INSTANCE")
         th = row.get(stat_token, "THREAD")
