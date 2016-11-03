@@ -44,6 +44,14 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/OfflineGraph.h"
 
+#include "Common.h"
+//#include "RandomPartitioner.h"
+//#include "GreedyBalancedPartitioner.h"
+#include "GreedyBalancedPartitionerDisk.h"
+#include "GBalancedPartitionerDisk2.h"
+//using namespace std;
+
+
 static const char* const name = "Off-line graph partitioner";
 static const char* const desc = "A collection of routines to partition graphs off-line.";
 static const char* const url = 0;
@@ -62,14 +70,6 @@ typedef GraphType::iterator NodeItType;
 #ifdef _HAS_EDGE_DATA
 typedef unsigned int EdgeDataType;
 #endif
-
-
-#include "Common.h"
-//#include "RandomPartitioner.h"
-//#include "GreedyBalancedPartitioner.h"
-#include "GreedyBalancedPartitionerDisk.h"
-#include "GBalancedPartitionerDisk2.h"
-//using namespace std;
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);

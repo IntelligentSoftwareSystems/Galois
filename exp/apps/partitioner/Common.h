@@ -24,6 +24,8 @@
 #ifndef GDIST_EXP_APPS_PARTITIONER_COMMON_H_
 #define GDIST_EXP_APPS_PARTITIONER_COMMON_H_
 
+using Galois::Graph::OfflineGraph;
+
 
 /******************************************************************
  *
