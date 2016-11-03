@@ -34,8 +34,8 @@ fi
 grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
-if [[ $execname == *"vertex-cut"* ]]; then
-  FLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
+if [ -n "$ABELIAN_VERTEX_CUT" ]; then
+  FLAGS+=" -enableVertexCut -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
 elif [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
   FLAGS+=" -scalegpu=3"
 fi

@@ -83,20 +83,6 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
  * @param fn operator
  * @param args optional arguments to loop
  */
-/**This is original correct one:**/
-/*
-template<typename ItemTy, typename FunctionTy, typename... Args>
-void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
-  ItemTy iwl[1] = {i};
-  Runtime::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
-}
-*/
-
-/**
- * for_each for distributed: Takes Graph as an argument.
- *
- */
-
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
@@ -128,9 +114,24 @@ void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
  * @param args optional arguments to loop
  * @returns fn
  */
-template<typename IterTy,typename FunctionTy, typename... Args>
+template<typename IterTy, typename FunctionTy, typename... Args>
 void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
   Runtime::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
+}
+
+/**
+ * Standard do-all loop. All iterations should be independent.
+ * Operator should conform to <code>fn(item)</code> where item is i
+ *
+ * @param i item
+ * @param fn operator
+ * @param args optional arguments to loop
+ * @returns fn
+ */
+template<typename ItemTy, typename FunctionTy, typename... Args>
+void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
+  ItemTy iwl[1] = {i};
+  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
 }
 
 /**

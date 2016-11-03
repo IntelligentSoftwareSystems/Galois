@@ -201,10 +201,11 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        reportStat(loopname, "Conflicts", stat_conflicts, 0);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, 0);
-        reportStat(loopname, "Pushes", stat_pushes, 0);
-        reportStat(loopname, "Iterations", stat_iterations, 0);
+        unsigned tid = Substrate::ThreadPool::getTID();
+        reportStat(loopname, "Conflicts", stat_conflicts, tid);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, tid);
+        reportStat(loopname, "Pushes", stat_pushes, tid);
+        reportStat(loopname, "Iterations", stat_iterations, tid);
       }
     }
   };
@@ -616,15 +617,21 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<Galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
+    std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
+    //std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + helper_fn.get_run_identifier());
+    Galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
+
+    unsigned long num_work_items = r.end() - r.begin();
+    Timer_for_each_impl.start();
     Runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(ztpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
+    Timer_for_each_impl.stop();
 
-    int num_iter = 1;
     typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
-    std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
     DBag dbag(helper_fn, loopName);
     auto &local_wl = DBag::get();
 
@@ -636,22 +643,26 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
     dbag.sync();
-    bag.clear();
 
 
     /** loop while work in the worklist **/
+    unsigned num_iterations = 1;
     while(!dbag.canTerminate()) {
 
-      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iter <<" Total items to work on : " << local_wl.size() << "\n";
+      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 
       // call for_each again.
+      Timer_for_each_impl.start();
+      bag.clear();
       if(!local_wl.empty()){
+        num_work_items += local_wl.end() - local_wl.begin();
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
       }
+      Timer_for_each_impl.stop();
 
       // Sync
       helper_fn.sync_graph();
@@ -661,10 +672,13 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
       dbag.sync();
-      bag.clear();
 
-      num_iter++;
+      ++num_iterations;
     }
+    //Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (helper_fn.get_run_identifier()), (unsigned long)num_iterations, 0);
+    //Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(helper_fn.get_run_num()), num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), num_work_items, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 

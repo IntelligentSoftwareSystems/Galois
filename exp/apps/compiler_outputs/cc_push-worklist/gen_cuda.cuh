@@ -4,11 +4,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "gen_cuda.h"
+#include "Galois/Runtime/Cuda/cuda_helpers.h"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
 #define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());
 #else
-#define check_cuda_kernel  
+#define check_cuda_kernel check_cuda(cudaGetLastError());
 #endif
 
 struct CUDA_Context {
@@ -24,11 +25,9 @@ struct CUDA_Context {
 	Shared<unsigned int> comp_current;
 	Shared<unsigned int> *master_comp_current; // per host
 	Shared<unsigned int> *slave_comp_current; // per host
-	Shared<int> p_retval;
 	Worklist2 in_wl;
 	Worklist2 out_wl;
 	struct CUDA_Worklist *shared_wl;
-	Any any_retval;
 };
 
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -52,53 +51,31 @@ void min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 		comp_current[LID] = v;
 }
 
-__global__ void batch_get_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, unsigned int * __restrict__ p_master_comp_current, const unsigned int * __restrict__ p_comp_current) {
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	index_type src_end = size;
-	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
-		unsigned LID = p_master_nodes[src];
-		p_master_comp_current[src] = p_comp_current[LID];
-	}
-}
-
 void batch_get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_node_comp_current <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_wr_ptr(true), ctx->comp_current.gpu_rd_ptr());
+	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_wr_ptr(true), ctx->comp_current.gpu_rd_ptr());
 	check_cuda_kernel;
 	memcpy(v, ctx->master_comp_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
 }
 
-__global__ void batch_get_reset_node_comp_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, unsigned int * __restrict__ p_slave_comp_current, unsigned int * __restrict__ p_comp_current, unsigned int value) {
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	index_type src_end = size;
-	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
-		unsigned LID = p_slave_nodes[src];
-		p_slave_comp_current[src] = p_comp_current[LID];
-		p_comp_current[LID] = value;
-	}
+void batch_get_slave_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
+	dim3 blocks;
+	dim3 threads;
+	kernel_sizing(ctx->gg, blocks, threads);
+	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_comp_current[from_id].gpu_wr_ptr(true), ctx->comp_current.gpu_rd_ptr());
+	check_cuda_kernel;
+	memcpy(v, ctx->slave_comp_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
 }
 
 void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_node_comp_current <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_comp_current[from_id].gpu_wr_ptr(true), ctx->comp_current.gpu_rd_ptr(), i);
+	batch_get_reset_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_comp_current[from_id].gpu_wr_ptr(true), ctx->comp_current.gpu_rd_ptr(), i);
 	check_cuda_kernel;
 	memcpy(v, ctx->slave_comp_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-}
-
-__global__ void batch_set_node_comp_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, const unsigned int * __restrict__ p_slave_comp_current, unsigned int * __restrict__ p_comp_current) {
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	index_type src_end = size;
-	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
-		unsigned LID = p_slave_nodes[src];
-		p_comp_current[LID] = p_slave_comp_current[src];
-	}
 }
 
 void batch_set_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -106,18 +83,8 @@ void batch_set_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
 	memcpy(ctx->slave_comp_current[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-	batch_set_node_comp_current <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
+	batch_set_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
 	check_cuda_kernel;
-}
-
-__global__ void batch_add_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_current, unsigned int * __restrict__ p_comp_current) {
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	index_type src_end = size;
-	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
-		unsigned LID = p_master_nodes[src];
-		p_comp_current[LID] += p_master_comp_current[src];
-	}
 }
 
 void batch_add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -125,18 +92,8 @@ void batch_add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
 	memcpy(ctx->master_comp_current[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
-	batch_add_node_comp_current <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
+	batch_add_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
 	check_cuda_kernel;
-}
-
-__global__ void batch_min_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_current, unsigned int * __restrict__ p_comp_current) {
-	unsigned tid = TID_1D;
-	unsigned nthreads = TOTAL_THREADS_1D;
-	index_type src_end = size;
-	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
-		unsigned LID = p_master_nodes[src];
-		p_comp_current[LID] = (p_comp_current[LID] > p_master_comp_current[src]) ? p_master_comp_current[src] : p_comp_current[LID];
-	}
 }
 
 void batch_min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -144,7 +101,7 @@ void batch_min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
 	memcpy(ctx->master_comp_current[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
-	batch_min_node_comp_current <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
+	batch_min_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_comp_current[from_id].gpu_rd_ptr(), ctx->comp_current.gpu_wr_ptr());
 	check_cuda_kernel;
 }
 
@@ -212,7 +169,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, double 
 	}
 	graph.copy_to_gpu(ctx->gg);
 	ctx->comp_current.alloc(graph.nnodes);
-  wl->max_size = wl_dup_factor*graph.nnodes;
+	wl->max_size = wl_dup_factor*graph.nnodes;
 	ctx->in_wl = Worklist2((size_t)wl->max_size);
 	ctx->out_wl = Worklist2((size_t)wl->max_size);
 	wl->num_in_items = -1;
@@ -220,7 +177,6 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, double 
 	wl->in_items = ctx->in_wl.wl;
 	wl->out_items = ctx->out_wl.wl;
 	ctx->shared_wl = wl;
-	ctx->p_retval = Shared<int>(1);
 	printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 	printf("[%d] load_graph_GPU: worklist size %d\n", ctx->id, (size_t)wl_dup_factor*graph.nnodes);
 	reset_CUDA_context(ctx);

@@ -8,7 +8,7 @@ struct CUDA_Worklist {
 	int num_in_items;
 	int *out_items;
 	int num_out_items;
-  int max_size;
+	int max_size;
 };
 
 struct CUDA_Context *get_CUDA_context(int id);
@@ -21,9 +21,11 @@ void set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
+void batch_get_slave_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i);
 void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void BFS_cuda(struct CUDA_Context *ctx);
-void InitializeGraph_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context *ctx);
+void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context *ctx);
+void InitializeGraph_all_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context *ctx);

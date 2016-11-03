@@ -319,7 +319,7 @@ public:
       comm_mode = 0;
 #endif
 #endif
-      OfflineGraph g(filename);
+      Galois::Graph::OfflineGraph g(filename);
       //std::cerr << "Offline Graph Done\n";
 
       masterNodes.resize(numHosts);
@@ -494,7 +494,7 @@ public:
 #endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-   void loadEdges(OfflineGraph & g) {
+   void loadEdges(Galois::Graph::OfflineGraph & g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
 
       uint64_t cur = 0;
@@ -562,7 +562,7 @@ public:
       std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-   void loadEdges(OfflineGraph & g) {
+   void loadEdges(Galois::Graph::OfflineGraph & g) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
       uint64_t cur = 0;
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {

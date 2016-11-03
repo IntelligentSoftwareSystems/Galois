@@ -73,6 +73,10 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
               reduceOP_entry.FIELD_NAME = j.FIELD_NAME;
               reduceOP_entry.VAL_TYPE = j.VAL_TYPE;
               reduceOP_entry.SYNC_TYPE = "sync_pull";
+
+              reduceOP_entry.OPERATION_EXPR = j.OPERATION_EXPR;
+              reduceOP_entry.RESETVAL_EXPR = j.RESETVAL_EXPR;
+
               llvm::outs() << " sync for struct " << i.first << "\n";
               /** check for duplicate **/
               if(!syncPull_reduction_exists(reduceOP_entry, i.second)){

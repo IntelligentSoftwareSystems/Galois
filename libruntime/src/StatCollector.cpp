@@ -109,8 +109,8 @@ void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
 }
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID) {
-  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   MAKE_LOCK_GUARD(StatsLock);
+  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 0);
@@ -119,8 +119,8 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
 }
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID) {
-  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   MAKE_LOCK_GUARD(StatsLock);
+  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 1);
@@ -129,8 +129,8 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
 }
 
 void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
- auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   MAKE_LOCK_GUARD(StatsLock);
+ auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
   if (iip.second == false) {
     assert(iip.first->second.mode == 2);

@@ -153,8 +153,6 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
                   string reduceOP = "{node." + j.FIELD_NAME + "= y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
@@ -168,9 +166,6 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   string reduceOP = "{ Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
-                  string resetValExpr = "{node." + j.FIELD_NAME + " = std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
-
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
 
@@ -181,9 +176,6 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                   string reduceOP = "{Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-
-                  string resetValExpr = "{node." + j.FIELD_NAME + " = std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   whileCAS_LHS->dump();
@@ -204,8 +196,6 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 else if(assignmentOP_vec){
                   string reduceOP = "{node." + j.FIELD_NAME + "= y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;

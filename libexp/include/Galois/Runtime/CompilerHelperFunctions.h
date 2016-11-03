@@ -41,18 +41,20 @@ namespace Galois {
 
   template<typename Ty>
     const Ty min(std::atomic<Ty>& a, const Ty& b) {
+      Ty old_a = a;
       if(a > b){
         a = b;
       }
-      return a;
+      return old_a;
     }
 
   template<typename Ty>
     const Ty min(Ty& a, const Ty& b) {
+      Ty old_a = a;
       if(a > b){
         a = b;
       }
-      return a;
+      return old_a;
     }
 
   /** Galois::atomicAdd **/
@@ -69,18 +71,26 @@ namespace Galois {
 
   template<typename Ty>
     const Ty add(std::atomic<Ty>& a, const Ty& b) {
+      Ty old_a = a;
       a = a + b;
-      return a;
+      return old_a;
     }
 
   template<typename Ty>
     const Ty add(Ty& a, const Ty& b) {
+      Ty old_a = a;
       a += b;
-      return a;
+      return old_a;
     }
 
   template<typename Ty>
     const Ty set(Ty& a, const Ty& b) {
+      a = b;
+      return a;
+    }
+
+  template<typename Ty>
+    const Ty set(std::atomic<Ty>& a, const Ty& b) {
       a = b;
       return a;
     }

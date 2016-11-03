@@ -32,16 +32,15 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-#include "Galois/Runtime/vGraph.h"
-#else
-#include "Galois/Runtime/hGraph.h"
-#endif
+#include "Galois/Runtime/dGraph_edgeCut.h"
+#include "Galois/Runtime/dGraph_vertexCut.h"
+
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/DistBag.h"
+#include "Galois/Runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 struct CUDA_Worklist cuda_wl;
@@ -69,12 +68,13 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-#endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+
+static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -83,6 +83,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
+static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
 static cll::opt<double> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
 #endif
 
@@ -93,11 +94,10 @@ struct NodeData {
   std::atomic<unsigned int> dist_current;
 };
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-typedef vGraph<NodeData, void> Graph;
-#else
 typedef hGraph<NodeData, void> Graph;
-#endif
+typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -106,7 +106,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -117,12 +117,13 @@ struct InitializeGraph {
 
 struct BFS {
   Graph* graph;
+  typedef int tt_does_not_need_aborts;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), Galois::workList_version(), Galois::loopname("bfs"));
+    Galois::for_each(src_node, BFS (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("BFS"));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
@@ -143,6 +144,8 @@ struct BFS {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
@@ -169,14 +172,9 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
-#ifdef __GALOIS_SINGLE_HOST_MULTIPLE_GPUS__
-      if (gpu_device == -1) {
-        gpu_device = 0;
-        for (unsigned i = 0; i < my_host_id; ++i) {
-          if (personality_set.c_str()[i] != 'c') ++gpu_device;
-        }
+      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
+        gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
-#endif
       for (unsigned i=0; i<personality_set.length(); ++i) {
         if (personality_set.c_str()[i] == 'c') 
           scalefactor.push_back(scalecpu);
@@ -188,18 +186,21 @@ int main(int argc, char** argv) {
 
 
     StatTimer_hg_init.start();
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-    Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
-#else
-    Graph hg(inputFile, net.ID, net.Num, scalefactor);
-#endif
+    Graph* hg;
+    if(enableVCut){
+      hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+    else {
+      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
-      MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m, net.Num, cuda_wl_dup_factor);
+      MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
+      load_graph_CUDA(cuda_ctx, &cuda_wl, cuda_wl_dup_factor, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
@@ -208,7 +209,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-      InitializeGraph::go(hg);
+      InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
     for(auto run = 0; run < numRuns; ++run){
@@ -216,16 +217,14 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-      hg.reset_num_iter(run);
-
       StatTimer_main.start();
-        BFS::go(hg);
+        BFS::go((*hg));
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
         Galois::Runtime::getHostBarrier().wait();
-        hg.reset_num_iter(run);
-        InitializeGraph::go(hg);
+        (*hg).reset_num_iter(run+1);
+        InitializeGraph::go((*hg));
       }
     }
 
@@ -237,13 +236,13 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif

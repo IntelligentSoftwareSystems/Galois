@@ -68,6 +68,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
             /** For vector operations **/
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
@@ -85,6 +86,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
               auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
+              auto min_op = Results.Nodes.getNodeAs<clang::Stmt>(str_min);
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
@@ -190,14 +192,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.VAR_NAME = "DirectAssignment";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
-                  field_entry.RESET_VAL = "0";
 
 
                   string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-
-                  string resetValExpr = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //info->fieldData_map[i.first].push_back(field_entry);
@@ -217,8 +215,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   if(varCondRHS == varAssignRHS) {
                     string reduceOP = "min";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
-                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                     //varAssignRHS->dump();
 
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -231,8 +227,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //whileCAS_LHS->dump();
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //whileCAS_LHS->dump();
@@ -256,15 +250,23 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //atomicAdd_op->dump();
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
                   /** Also needs sync pull for operator to terminate! **/
+#if 0
                   ReductionOps_entry reduceOP_entry_pull = reduceOP_entry;
                   reduceOP_entry_pull.SYNC_TYPE = "sync_pull";
                   info->reductionOps_map[i.first].push_back(reduceOP_entry_pull);
+#endif
+
+                  break;
+                }
+                else if(min_op){
+                  string reduceOP = "min";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
 
                   break;
                 }
@@ -272,8 +274,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(assignmentOP_vec){
                   string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;

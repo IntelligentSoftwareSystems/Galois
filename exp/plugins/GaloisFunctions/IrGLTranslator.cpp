@@ -65,7 +65,7 @@ private:
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
   std::string accumulatorName;
-  std::stringstream declString, bodyString;
+  std::stringstream declString, varDeclString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
@@ -76,6 +76,7 @@ private:
   std::set<std::string> &KernelsHavingReturnValue;
 
   unsigned conditional; // if (generated) code is enclosed within an if-condition
+  bool conditional_pop; // if (generated) code is enclosed within an (generated) if-condition for pop
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
@@ -91,7 +92,8 @@ public:
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
     KernelsHavingReturnValue(returnKernels),
-    conditional(0)
+    conditional(0),
+    conditional_pop(false)
   {}
   
   virtual ~IrGLOperatorVisitor() {}
@@ -180,6 +182,34 @@ public:
       }
       findAndReplace(text, "Galois::atomic", "atomic");
     }
+    {
+      std::size_t start = 0;
+      while (1) {
+        std::size_t found = text.find("Galois::min", start);
+        if (found != std::string::npos) {
+          std::size_t replace = text.find("(", start);
+          text.insert(replace+1, "&");
+          start = replace;
+        } else {
+          break;
+        }
+      }
+      findAndReplace(text, "Galois::min", "atomicMin");
+    }
+    {
+      std::size_t start = 0;
+      while (1) {
+        std::size_t found = text.find("Galois::add", start);
+        if (found != std::string::npos) {
+          std::size_t replace = text.find("(", start);
+          text.insert(replace+1, "&");
+          start = replace;
+        } else {
+          break;
+        }
+      }
+      findAndReplace(text, "Galois::add", "atomicAdd");
+    }
 
     {
       std::size_t found = text.find("ctx.push(");
@@ -215,7 +245,7 @@ public:
       std::size_t begin = text.find("=");
       std::size_t end = text.find(";", begin);
       std::string value = text.substr(begin+1, end - begin - 3);
-      text = "any_retval.return_(" + value + ")";
+      text = "ReturnFromParallelFor(\"" + value + "\")";
     }
 
     return text;
@@ -227,8 +257,9 @@ public:
     if (found != std::string::npos) {
       bodyString << "CBlock(['" << text << "']),\n";
     } else {
-      found = text.find("WL.push");
-      if (found != std::string::npos) {
+      if (text.find("WL.push") != std::string::npos) {
+        bodyString << text << ",\n";
+      } else if (text.find("ReturnFromParallelFor") != std::string::npos) {
         bodyString << text << ",\n";
       } else {
         bodyString << "CBlock([\"" << text << "\"]),\n";
@@ -263,6 +294,11 @@ public:
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
+      if (conditional_pop) {
+        bodyString << "]),\n"; // end If "pop" (no edge-iterator)
+        conditional_pop = false;
+      }
+      assert(conditional == 0);
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end Kernel
       std::vector<std::string> arguments, globalArguments;
@@ -276,14 +312,12 @@ public:
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
-      if (!accumulatorName.empty()) {
-        declString << ", ('Any', 'any_retval')";
-      }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
       if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
+      Output << varDeclString.str();
       Output << bodyString.str();
       Output.close();
     }
@@ -295,10 +329,13 @@ public:
     if (traverse && S) {
       if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
-        if (conditional == 0) bodyString << "),\n";
+        bodyString << "),\n"; // end ClosureHint
+        // FIXME: assert that there is no code after the edge-iterator
       } else if (isa<IfStmt>(S)) {
-        bodyString << "]),\n"; // end If
-        --conditional;
+        if (conditional > 0) {
+          bodyString << "]),\n"; // end If
+          --conditional;
+        }
       }
     }
     return traverse;
@@ -309,17 +346,22 @@ public:
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', 'nowned') ";
+    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', '__nowned')";
     // FIXME: assuming first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
-      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(None, \"nowned\"),\n[\n";
+      declString << ", ('unsigned int', '__begin'), ('unsigned int', '__end')";
+      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(\"__begin\", \"__end\"),\n[\n";
+      bodyString << "CDecl([(\"bool\", \"pop\", \" = " << vertexName << " < __end\")]),\n"; // hack for IrGL compiler
+      bodyString << "If(\"pop\", [\n"; // hack to handle nested parallelism (should be handled by IrGL compiler in the future)
+      conditional_pop = true;
     } else {
       bodyString << "ForAll(\"wlvertex\", WL.items(),\n[\n";
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \"\")]),\n";
       bodyString << "WL.pop(\"pop\", \"wlvertex\", \"" << vertexName << "\"),\n";
       bodyString << "If(\"pop\", [\n"; // hack to handle unsuccessful pop (should be handled by IrGL compiler in the future)
+      conditional_pop = true;
     }
     symbolTable.insert(vertexName);
     return true;
@@ -345,8 +387,14 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!isTopological) bodyString << "]),\n"; // end If "pop"
-    if (conditional == 0) bodyString << "ClosureHint(\n";
+    while (conditional > 0) {
+      bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
+      --conditional;
+    }
+    bodyString << "]),\n"; // end If "pop"
+    conditional_pop = false;
+    bodyString << "UniformConditional(If(\"!pop\", [CBlock(\"continue\")]), uniform_only = False, _only_if_np = True),\n"; // hack to handle non-nested parallelism
+    bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -372,8 +420,14 @@ public:
       }
     }
     symbolTable.insert(variableName);
-    if (!isTopological) bodyString << "]),\n"; // end If "pop"
-    if (conditional == 0) bodyString << "ClosureHint(\n";
+    while (conditional > 0) {
+      bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
+      --conditional;
+    }
+    bodyString << "]),\n"; // end If "pop"
+    conditional_pop = false;
+    bodyString << "UniformConditional(If(\"!pop\", [CBlock(\"continue\")]), uniform_only = False, _only_if_np = True),\n"; // hack to handle non-nested parallelism
+    bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -394,8 +448,13 @@ public:
           }
           if (pos == std::string::npos) {
             std::string decl = varDecl->getType().getAsString();
-            bodyString << "CDecl([(\"" << FormatType(decl)
-              << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            if (conditional_pop) {
+              varDeclString << "CDecl([(\"" << FormatType(decl)
+                << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            } else {
+              bodyString << "CDecl([(\"" << FormatType(decl)
+                << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+            }
 
             if (!initText.empty()) {
               WriteCBlock(varDecl->getNameAsString() + " = " + initText);
@@ -539,7 +598,6 @@ private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool requiresWorklist; // shared across kernels
-  bool started; // to recognize CXXMethodDecl that is the top/entry point
   std::string accumulatorName;
   std::ofstream Output;
 
@@ -554,8 +612,7 @@ public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
     astContext(context),
     rewriter(R),
-    requiresWorklist(false),
-    started(false)
+    requiresWorklist(false)
   {}
   
   virtual ~IrGLOrchestratorVisitor() {}
@@ -594,6 +651,7 @@ public:
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
       header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i);\n";
       header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
       header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
@@ -616,10 +674,11 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "#include \"Galois/Runtime/Cuda/cuda_helpers.h\"\n";
     cuheader << "\n#ifdef __GALOIS_CUDA_CHECK_ERROR__\n";
     cuheader << "#define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());\n";
     cuheader << "#else\n";
-    cuheader << "#define check_cuda_kernel  \n";
+    cuheader << "#define check_cuda_kernel check_cuda(cudaGetLastError());\n";
     cuheader << "#endif\n";
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
@@ -636,13 +695,11 @@ public:
       cuheader << "\tShared<" << var.second << "> *master_" << var.first << "; // per host\n";
       cuheader << "\tShared<" << var.second << "> *slave_" << var.first << "; // per host\n";
     }
-    cuheader << "\tShared<int> p_retval;\n";
     if (requiresWorklist) {
       cuheader << "\tWorklist2 in_wl;\n";
       cuheader << "\tWorklist2 out_wl;\n";
       cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
     }
-    cuheader << "\tAny any_retval;\n";
     cuheader << "};\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
@@ -662,104 +719,62 @@ public:
       cuheader << "\tif (" << var.first << "[LID] > v)\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", const " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_master_" << var.first << "[src] = p_" << var.first << "[LID];\n";
-      cuheader << "\t}\n";
-      cuheader << "}\n\n";
       cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
-      cuheader << "\tbatch_get_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_get_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_wr_ptr(true), "
                << "ctx->" << var.first << ".gpu_rd_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->master_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, " 
-               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ", " << var.second << " value) {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
-      cuheader << "\t\tp_slave_" << var.first << "[src] = p_" << var.first << "[LID];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = value;\n";
-      cuheader << "\t}\n";
+      cuheader << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tbatch_get_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+               << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_wr_ptr(true), "
+               << "ctx->" << var.first << ".gpu_rd_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
       cuheader << "}\n\n";
       cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
-      cuheader << "\tbatch_get_reset_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+      cuheader << "\tbatch_get_reset_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
                << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_wr_ptr(true), "
                << "ctx->" << var.first << ".gpu_rd_ptr(), i);\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, const " 
-               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = p_slave_" << var.first << "[src];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->slave_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
-      cuheader << "\tbatch_set_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+      cuheader << "\tbatch_set_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
                << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] += p_master_" << var.first << "[src];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
-      cuheader << "\tbatch_add_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_add_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
-      cuheader << "}\n\n";
-      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
-               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
-      cuheader << "\tunsigned tid = TID_1D;\n";
-      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
-      cuheader << "\tindex_type src_end = size;\n";
-      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
-      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
-      cuheader << "\t\tp_" << var.first << "[LID] = (p_" << var.first << "[LID] > p_master_" << var.first << "[src]) ? "
-               << "p_master_" << var.first << "[src] : p_" << var.first << "[LID];\n";
-      cuheader << "\t}\n";
       cuheader << "}\n\n";
       cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tdim3 blocks;\n";
       cuheader << "\tdim3 threads;\n";
       cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
       cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
-      cuheader << "\tbatch_min_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+      cuheader << "\tbatch_min_subset<" << var.second << "> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
                << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
@@ -842,8 +857,7 @@ public:
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
     }
     if (requiresWorklist) {
-      // Assuming at the most an average duplicaton of 4 in the worklist
-      cuheader << "\twl->max_size = wl_dup_factor*graph.nnodes*num_hosts/2;\n";
+      cuheader << "\twl->max_size = wl_dup_factor*graph.nnodes;\n";
       cuheader << "\tctx->in_wl = Worklist2((size_t)wl->max_size);\n";
       cuheader << "\tctx->out_wl = Worklist2((size_t)wl->max_size);\n";
       cuheader << "\twl->num_in_items = -1;\n";
@@ -852,9 +866,10 @@ public:
       cuheader << "\twl->out_items = ctx->out_wl.wl;\n";
       cuheader << "\tctx->shared_wl = wl;\n";
     }
-    cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);\n"; 
-    cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
+    if (requiresWorklist) {
+      cuheader << "\tprintf(\"[%d] load_graph_GPU: worklist size %d\\n\", ctx->id, (size_t)wl_dup_factor*graph.nnodes);\n"; 
+    }
     cuheader << "\treset_CUDA_context(ctx);\n";
     cuheader << "}\n\n";
     cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";
@@ -930,52 +945,7 @@ public:
   }
 
   virtual bool TraverseDecl(Decl *D) {
-    CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
-    if (method && !started) {
-      started = true;
-      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
-      std::string kernelName = method->getParent()->getNameAsString();
-      Output << "Kernel(\"" << kernelName << "_cuda\", ";
-      Output << "[";
-      std::vector<std::string> arguments;
-      for (auto decl : method->getParent()->decls()) {
-        auto var = dyn_cast<VarDecl>(decl);
-        if (var && var->isStaticDataMember()) {
-          std::string type = var->getType().getAsString();
-          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
-            Output << "('int &', '__retval'), ";
-            arguments.push_back("int & __retval");
-            accumulatorName = var->getNameAsString();
-            break;
-          }
-        }
-      }
-      for (auto field : method->getParent()->fields()) {
-        std::string name = field->getNameAsString();
-        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
-          std::string type = FormatType(field->getType().getAsString());
-          Output << "('" << type << "', '" << name << "'), ";
-          arguments.push_back(type + " " + name);
-        } 
-      }
-      HostKernelsToArgumentsMap[kernelName] = arguments;
-      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
-    } else {
-      method = NULL;
-    }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
-    if (traverse && method) {
-      Output << "], host = True),\n"; // end Kernel
-      Output.close();
-      accumulatorName.clear();
-
-      std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
-      std::size_t found = fileName.rfind(".");
-      assert(found != std::string::npos);
-      FileNamePath = fileName.substr(0, found);
-
-      started = false;
-    }
     return traverse;
   }
 
@@ -985,16 +955,26 @@ public:
     std::size_t begin = text.find("Galois::do_all");
     if (begin != 0) {
       begin = text.find("Galois::for_each");
-      if (text.find("Galois::workList_version") != std::string::npos)
-        isTopological = false;
+      isTopological = false;
     }
     if (begin == 0) {
       // generate kernel for operator
-      assert(callExpr->getNumArgs() > 1);
-      // FIXME: pick the right argument
-      Expr *op = callExpr->getArg(2);
-      RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
+      assert(callExpr->getNumArgs() > 2);
+      auto arg_type = callExpr->getArg(2)->getType();
+      assert(arg_type->isStructureType());
+      RecordDecl *record = arg_type->getAsStructureType()->getDecl();
       CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
+      // find if there are any accumulators being used
+      for (auto decl : cxxrecord->decls()) {
+        auto var = dyn_cast<VarDecl>(decl);
+        if (var && var->isStaticDataMember()) {
+          std::string type = var->getType().getAsString();
+          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+            accumulatorName = var->getNameAsString();
+            break;
+          }
+        }
+      }
       for (auto method : cxxrecord->methods()) {
         // FIXME: handle overloading/polymorphism
         if (method->getNameAsString().compare("operator()") == 0) {
@@ -1013,13 +993,59 @@ public:
         }
       }
 
+      std::string kernelName = cxxrecord->getNameAsString();
+
+      // kernel signature
+      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
+      std::stringstream Output_topo_all, Output_topo_all_body;
+      Output << "Kernel(\"" << kernelName << "_cuda\", [";
+      if (isTopological) {
+        Output_topo_all << "Kernel(\"" << kernelName << "_all_cuda\", [";
+        Output_topo_all_body << "CBlock([\"" << kernelName << "_cuda(";
+        Output_topo_all_body << "0, ctx->nowned, ";
+      }
+      std::vector<std::string> arguments, arguments_topo_all;
+      if (isTopological) {
+        Output << "('unsigned int ', '__begin'), ('unsigned int ', '__end'), ";
+        arguments.push_back("unsigned int __begin");
+        arguments.push_back("unsigned int __end");
+      }
+      if (!accumulatorName.empty()) {
+        Output << "('int &', '__retval'), ";
+        arguments.push_back("int & __retval");
+        if (isTopological) {
+          Output_topo_all << "('int &', '__retval'), ";
+          Output_topo_all_body << "__retval, ";
+          arguments_topo_all.push_back("int & __retval");
+        }
+      }
+      for (auto field : cxxrecord->fields()) {
+        std::string name = field->getNameAsString();
+        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+          std::string type = FormatType(field->getType().getAsString());
+          Output << "('" << type << "', '" << name << "'), ";
+          arguments.push_back(type + " " + name);
+          if (isTopological) {
+            Output_topo_all << "('" << type << "', '" << name << "'), ";
+            Output_topo_all_body << name << ", ";
+            arguments_topo_all.push_back(type + " " + name);
+          }
+        } 
+      }
+      HostKernelsToArgumentsMap[kernelName] = arguments;
+      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
+      if (isTopological) {
+        HostKernelsToArgumentsMap[kernelName + "_all"] = arguments_topo_all;
+        Output_topo_all << "('struct CUDA_Context *', 'ctx')],\n[\n";
+        Output_topo_all_body << "ctx)\"]),\n";
+      }
+
       // initialize blocks and threads
       Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
       Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
       Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
 
       // generate call to kernel
-      std::string kernelName = record->getNameAsString();
       bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
       if (!isTopological) {
         requiresWorklist = true;
@@ -1027,35 +1053,51 @@ public:
         Output << "CBlock([\"ctx->out_wl.will_write()\"]),\n";
         Output << "CBlock([\"ctx->out_wl.reset()\"]),\n";
       }
-      if (hasAReturnValue) {
-        Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
-        Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
-      }
       Output << "Invoke(\"" << kernelName << "\", ";
       Output << "(\"ctx->gg\", \"ctx->nowned\"";
-      auto& arguments = KernelToArgumentsMap[kernelName];
-      for (auto& argument : arguments.first) {
+      if (isTopological) {
+        Output << ", \"__begin\", \"__end\"";
+      }
+      auto& karguments = KernelToArgumentsMap[kernelName];
+      for (auto& argument : karguments.first) {
         Output << ", \"" << argument << "\"";
       }
-      for (auto& argument : arguments.second) {
+      for (auto& argument : karguments.second) {
         Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
-      }
-      if (hasAReturnValue) {
-        Output << ", \"ctx->any_retval\"";
       }
       if (!isTopological) {
         Output << ", \"ctx->in_wl\"";
         Output << ", \"ctx->out_wl\"";
       }
-      Output << ")),\n";
+      Output << ")";
+      if (hasAReturnValue) {
+        Output << ", \"SUM\"";
+      }
+      Output << "),\n";
       Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
       if (hasAReturnValue) {
-        Output << "CBlock([\"__retval = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
+        Output << "CBlock([\"__retval = *(retval.cpu_rd_ptr())\"], parse = False),\n";
       }
       if (!isTopological) {
         Output << "CBlock([\"ctx->out_wl.update_cpu()\"]),\n";
         Output << "CBlock([\"ctx->shared_wl->num_out_items = ctx->out_wl.nitems()\"]),\n";
       }
+
+      Output << "], host = True),\n"; // end Kernel
+
+      if (isTopological) {
+        Output << Output_topo_all.str();
+        Output << Output_topo_all_body.str();
+        Output << "], host = True),\n"; // end Kernel
+      }
+
+      Output.close();
+      accumulatorName.clear();
+
+      std::string fileName = rewriter.getSourceMgr().getFilename(cxxrecord->getLocStart()).str();
+      std::size_t found = fileName.rfind(".");
+      assert(found != std::string::npos);
+      FileNamePath = fileName.substr(0, found);
     }
     return true;
   }

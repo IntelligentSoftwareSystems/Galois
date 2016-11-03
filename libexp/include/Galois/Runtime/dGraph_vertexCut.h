@@ -28,10 +28,16 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
+#include "Galois/Runtime/dGraph.h"
 
-class DS_vertexCut {
+//template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
+//class hGraph;
+
+template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
+class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   public:
+    typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     /** Utilities for reading partitioned graphs. **/
     struct NodeInfo {
       NodeInfo() :
@@ -56,18 +62,18 @@ class DS_vertexCut {
     //OfflineGraph* g;
 
     uint64_t globalOffset;
-    uint32_t numOwned;
+    //uint32_t numOwned;
     uint32_t numNodes;
-    uint32_t id;
-    uint32_t numHosts;
+    //uint32_t id;
+    //uint32_t numHosts;
 
-    unsigned getHostID(uint64_t gid) {
+    unsigned getHostID(uint64_t gid) const {
       auto lid = G2L(gid);
       return OwnerVec[lid];
     }
 
     bool isOwned(uint64_t gid) const {
-      return gid >= globalOffset && gid < globalOffset + numOwned;
+      return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
     }
 
 
@@ -101,7 +107,7 @@ class DS_vertexCut {
       return true;
     }
 
-    std::string getPartitionFileName(const std::string& filename, const std::string & basename, unsigned hostID, unsigned num_hosts){
+    std::string getPartitionFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
       std::string result = basename;
       result+= ".PART.";
       result+=std::to_string(hostID);
@@ -110,30 +116,49 @@ class DS_vertexCut {
       return result;
     }
 
+    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
+      return std::make_pair<uint32_t, uint32_t>(~0,~0);
+    }
 
-    void hGraph(OfflineGraph& g, const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id ){
+    std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
+      return std::make_pair<uint64_t, uint64_t>(~0,~0);
+    }
+
+
+    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) :  base_hGraph(host, _numHosts) {
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
-      id = _id;
-      numHosts = _numHosts;
+      //id = _id;
+      //numHosts = _numHosts;
 
-      //std::string part_fileName = getPartitionFileName(partitionFolder,id,numHosts);
-      std::string part_metaFile = getMetaFileName(partitionFolder, id, numHosts);
+      std::string part_fileName = getPartitionFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
+      std::string part_metaFile = getMetaFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
 
-      //g = new OfflineGraph(part_fileName);
+      Galois::Graph::OfflineGraph g(part_fileName);
+      Galois::Graph::OfflineGraph g_baseFile(filename);
 
-      _totalNodes = g.size();
-      std::cerr << "[" << id << "] Total nodes : " << _totalNodes << "\n";
+      base_hGraph::totalNodes = g_baseFile.size();
+      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
       readMetaFile(part_metaFile, localToGlobalMap_meta);
 
       //compute owners for all nodes
-      numOwned = _numOwned = g.size();
+      base_hGraph::numOwned = g.size();
 
-      _numEdges = g.edge_begin(*(g.end())) - g.edge_begin(*(g.begin())); // depends on Offline graph impl
-      std::cerr << "[" << id << "] Total edges : " << _numEdges << "\n";
+      uint64_t _numEdges = g.edge_begin(*(g.end())) - g.edge_begin(*(g.begin())); // depends on Offline graph impl
+      std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
 
-      numNodes = _numNodes = numOwned;
+      uint32_t _numNodes = base_hGraph::numOwned;
 
+      base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+      //std::cerr << "Allocate done\n";
+
+      base_hGraph::graph.constructNodes();
+      //std::cerr << "Construct nodes done\n";
+      loadEdges(base_hGraph::graph, g);
+      std::cerr << "Edges loaded \n";
+
+      fill_slaveNodes(base_hGraph::slaveNodes);
+      base_hGraph::setup_communication();
     }
 
     uint32_t G2L(uint64_t gid) const {
@@ -152,10 +177,11 @@ class DS_vertexCut {
 
 
     template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void loadEdges(GraphTy& graph, OfflineGraph& g) {
+      void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading edge-data while creating edges.\n");
         uint64_t cur = 0;
         for (auto n = g.begin(); n != g.end(); ++n) {
+
           for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
@@ -167,7 +193,7 @@ class DS_vertexCut {
 
 
     template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void loadEdges(GraphTy& graph, OfflineGraph& g) {
+      void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
         for(auto n = g.begin(); n != g.end(); ++n){
@@ -182,7 +208,7 @@ class DS_vertexCut {
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
       for(auto info : localToGlobalMap_meta){
-        assert(info.owner_id >= 0 && info.owner_id < numHosts);
+        assert(info.owner_id >= 0 && info.owner_id < base_hGraph::numHosts);
         slaveNodes[info.owner_id].push_back(info.global_id);
 
         GlobalVec.push_back(info.global_id);

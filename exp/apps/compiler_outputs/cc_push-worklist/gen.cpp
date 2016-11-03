@@ -32,11 +32,9 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-#include "Galois/Runtime/vGraph.h"
-#else
-#include "Galois/Runtime/hGraph.h"
-#endif
+#include "Galois/Runtime/dGraph_edgeCut.h"
+#include "Galois/Runtime/dGraph_vertexCut.h"
+
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
@@ -70,16 +68,12 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-#endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
-#ifdef __GALOIS_SIMULATE_COMMUNICATION__
-#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-static cll::opt<unsigned> comm_mode("comm_mode", cll::desc("Communication mode: 0 - original, 1 - simulated net, 2 - simulated bare MPI"), cll::init(0));
-#endif
-#endif
+
+static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -96,11 +90,10 @@ struct NodeData {
   std::atomic<unsigned int> comp_current;
 };
 
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-typedef vGraph<NodeData, void> Graph;
-#else
 typedef hGraph<NodeData, void> Graph;
-#endif
+typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -117,16 +110,13 @@ struct InitializeGraph {
     		#endif
     			return node.comp_current;
     		}
-        static bool extract_batch(unsigned from_id, unsigned int *y) {
-        #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) {
-            batch_get_node_comp_current_cuda(cuda_ctx, from_id, y);
-            return true;
-          }
-          assert (personality == CPU);
-        #endif
-          return false;
-        }
+    		static bool extract_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
     		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, y);
@@ -134,24 +124,62 @@ struct InitializeGraph {
     		#endif
     				node.comp_current = y;
     		}
-        static bool setVal_batch(unsigned from_id, unsigned int *y) {
-        #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) {
-            batch_set_node_comp_current_cuda(cuda_ctx, from_id, y);
-            return true;
-          } 
-          assert (personality == CPU);
-        #endif
-            return false;
-        }
+    		static bool setVal_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_set_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		typedef unsigned int ValTy;
+    	};
+    	struct Syncer_vertexCut_0 {
+    		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.comp_current;
+    		}
+    		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{ Galois::set(node.comp_current, y); }
+    		}
+    		static bool reduce_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_set_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static void reset (uint32_t node_id, struct NodeData & node ) {
+    		}
     		typedef unsigned int ValTy;
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(cuda_ctx);
+    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
+    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		StatTimer_cuda.start();
+    		InitializeGraph_all_cuda(cuda_ctx);
+    		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
+    if(_graph.is_vertex_cut()) {
+    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
+    }
+    
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
     
   }
@@ -173,16 +201,13 @@ struct Get_info_functor : public Galois::op_tag {
 		#endif
 			return node.comp_current;
 		}
-    static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        batch_get_reset_node_comp_current_cuda(cuda_ctx, from_id, y, std::numeric_limits<unsigned int>::max());
-        return true;
-      }
-      assert (personality == CPU);
-    #endif
-      return false;
-    }
+		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+		#ifdef __GALOIS_HET_CUDA__
+			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			assert (personality == CPU);
+		#endif
+			return false;
+		}
 		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) min_node_comp_current_cuda(cuda_ctx, node_id, y);
@@ -190,26 +215,18 @@ struct Get_info_functor : public Galois::op_tag {
 		#endif
 				{ Galois::min(node.comp_current, y); }
 		}
-    static bool reduce_batch(unsigned from_id, unsigned int *y) {
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        batch_min_node_comp_current_cuda(cuda_ctx, from_id, y);
-        return true;
-      } 
-      assert (personality == CPU);
-    #endif
-        return false;
-    }
-		static void reset (uint32_t node_id, struct NodeData & node ) {
+		static bool reduce_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max());
-			else if (personality == CPU)
+			if (personality == GPU_CUDA) { batch_min_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			assert (personality == CPU);
 		#endif
-				{ node.comp_current = std::numeric_limits<unsigned int>::max(); }
+			return false;
+		}
+		static void reset (uint32_t node_id, struct NodeData & node ) {
 		}
 		typedef unsigned int ValTy;
 	};
-	struct SyncerPull_0 {
+	struct SyncerPull_vertexCut_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -217,16 +234,13 @@ struct Get_info_functor : public Galois::op_tag {
 		#endif
 			return node.comp_current;
 		}
-    static bool extract_batch(unsigned from_id, unsigned int *y) {
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        batch_get_node_comp_current_cuda(cuda_ctx, from_id, y);
-        return true;
-      }
-      assert (personality == CPU);
-    #endif
-      return false;
-    }
+		static bool extract_batch(unsigned from_id, unsigned int *y) {
+		#ifdef __GALOIS_HET_CUDA__
+			if (personality == GPU_CUDA) { batch_get_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			assert (personality == CPU);
+		#endif
+			return false;
+		}
 		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, y);
@@ -234,16 +248,13 @@ struct Get_info_functor : public Galois::op_tag {
 		#endif
 				node.comp_current = y;
 		}
-    static bool setVal_batch(unsigned from_id, unsigned int *y) {
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        batch_set_node_comp_current_cuda(cuda_ctx, from_id, y);
-        return true;
-      } 
-      assert (personality == CPU);
-    #endif
-        return false;
-    }
+		static bool setVal_batch(unsigned from_id, unsigned int *y) {
+		#ifdef __GALOIS_HET_CUDA__
+			if (personality == GPU_CUDA) { batch_set_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			assert (personality == CPU);
+		#endif
+			return false;
+		}
 		typedef unsigned int ValTy;
 	};
 	Get_info_functor(GraphTy& _g): graph(_g){}
@@ -259,14 +270,16 @@ struct Get_info_functor : public Galois::op_tag {
 	void sync_graph(){
 		sync_graph_static(graph);
 	}
-  uint32_t get_run_num() const {
-    graph.get_run_num();
-  }
+	std::string get_run_identifier() const {
+		return graph.get_run_identifier();
+	}
 	void static sync_graph_static(Graph& _graph) {
 
 		_graph.sync_push<Syncer_0>("ConnectedComp");
 
-		_graph.sync_pull<SyncerPull_0>("ConnectedComp");
+if(_graph.is_vertex_cut()) {
+	_graph.sync_pull<SyncerPull_vertexCut_0>("ConnectedComp");
+}
 	}
 };
 
@@ -280,50 +293,56 @@ struct ConnectedComp {
     typedef dChunkedFIFO<64> dChunk;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		unsigned num_iter = 0;
     		auto __sync_functor = Get_info_functor<Graph>(_graph);
     		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
-    		DBag dbag(__sync_functor, "BFS");
+    		DBag dbag(__sync_functor, "ConnectedComp");
     		auto &local_wl = DBag::get();
-        std::string comp_str("CUDA_IMPL_CC_" + std::to_string(_graph.get_run_num()));
-        Galois::StatTimer StatTimer_comp(comp_str.c_str());
-        StatTimer_comp.start();
-    		cuda_wl.num_in_items = _graph.getNumOwned();
-    		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
+    		std::string impl_str("CUDA_FOR_EACH_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
+    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		unsigned long _num_work_items;
+    		StatTimer_cuda.start();
+    		cuda_wl.num_in_items = (*(_graph.end())-*(_graph.begin()));
+    		for (int __i = *(_graph.begin()); __i < *(_graph.end()); ++__i) cuda_wl.in_items[__i] = __i;
+    		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			ConnectedComp_cuda(cuda_ctx);
-        StatTimer_comp.stop();
+    		StatTimer_cuda.stop();
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-        #ifdef __GALOIS_DEBUG_WORKLIST__
+    		#ifdef __GALOIS_DEBUG_WORKLIST__
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
-        #endif
+    		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
+    		unsigned _num_iterations = 1;
     		while (!dbag.canTerminate()) {
-    		++num_iter;
+    		_graph.set_num_iter(_num_iterations);
+    		StatTimer_cuda.start();
     		cuda_wl.num_in_items = local_wl.size();
-        if (cuda_wl.num_in_items > cuda_wl.max_size) {
-          std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] ERROR - worklist size insufficent; size : " << cuda_wl.max_size << " , expected : " << cuda_wl.num_in_items << "\n";
-          exit(1);
-        }
+    		if (cuda_wl.num_in_items > cuda_wl.max_size) {
+    			std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] ERROR - worklist size insufficient; size : " << cuda_wl.max_size << " , expected : " << cuda_wl.num_in_items << "\n";
+    			exit(1);
+    		}
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
-        StatTimer_comp.start();
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
+    		cuda_wl.num_out_items = 0;
+    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			ConnectedComp_cuda(cuda_ctx);
-        StatTimer_comp.stop();
+    		StatTimer_cuda.stop();
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-        #ifdef __GALOIS_DEBUG_WORKLIST__
+    		#ifdef __GALOIS_DEBUG_WORKLIST__
     		std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
-        #endif
+    		#endif
     		dbag.sync();
-    		cuda_wl.num_out_items = 0;
+    		++_num_iterations;
     		}
+    		Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _num_work_items, 0);
     	} else if (personality == CPU)
     #endif
-    Galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::loopname("cc"), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int"), Get_info_functor<Graph>(_graph));
+    Galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
@@ -385,22 +404,21 @@ int main(int argc, char** argv) {
 
 
     StatTimer_hg_init.start();
-#ifdef __GALOIS_VERTEX_CUT_GRAPH__
-    Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
-#else
-    Graph hg(inputFile, net.ID, net.Num, scalefactor);
-#endif
-#ifdef __GALOIS_SIMULATE_COMMUNICATION__
-#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-    hg.set_comm_mode(comm_mode);
-#endif
-#endif
+    Graph* hg;
+    if(enableVCut){
+      hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+    else {
+      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+    }
+
+
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
-      MarshalGraph m = hg.getMarshalGraph(my_host_id);
+      MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, &cuda_wl, cuda_wl_dup_factor, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
@@ -410,7 +428,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-      InitializeGraph::go(hg);
+      InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
 
@@ -419,18 +437,14 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-      Galois::Runtime::getHostBarrier().wait();
-      hg.reset_num_iter(run);
-
-      Galois::Runtime::beginSampling();
       StatTimer_main.start();
-        ConnectedComp::go(hg);
+        ConnectedComp::go((*hg));
       StatTimer_main.stop();
-      Galois::Runtime::endSampling();
 
       if((run + 1) != numRuns){
-        hg.reset_num_iter(run);
-        InitializeGraph::go(hg);
+        Galois::Runtime::getHostBarrier().wait();
+        (*hg).reset_num_iter(run+1);
+        InitializeGraph::go((*hg));
       }
     }
 
@@ -441,13 +455,13 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).comp_current);
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).comp_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_comp_current_cuda(cuda_ctx, *ii));
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_comp_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif

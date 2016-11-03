@@ -1,4 +1,6 @@
 #!/bin/sh
+# Usage: ./verify.sh <ABELIAN_EXECUTABLE_NAME> <INPUT_GRAPH_NAME>
+# environment variables: ABELIAN_NON_HETEROGENEOUS ABELIAN_GALOIS_ROOT ABELIAN_VERTEX_CUT
 # executes only on single machine
 # assumes 2 GPU devices available (if heterogeneous)
 
@@ -47,22 +49,22 @@ checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
 hostname=`hostname`
 
 SET=
-if [[ $execname == *"vertex-cut"* ]]; then
+if [ -n "$ABELIAN_VERTEX_CUT" ]; then
   if [[ $inputname == *"road"* ]]; then
     exit
   fi
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-    # assumes only one GPU device available
-    SET="cc,2,2 gg,2,2 gc,2,2 cg,2,2"
+    # assumes only 2 GPUs device available
+    SET="gg,2,2 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
   else
-    SET="cc,2,2 cccc,4,2 cccccccc,8,2"
+    SET="cc,2,8 cccc,4,4 cccccccc,8,2"
   fi
 else
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-    # assumes only one GPU device available
-    SET="c,1,4 g,1,4 cc,2,2 gg,2,2 gc,2,2 cg,2,2"
+    # assumes only 2 GPUs device available
+    SET="g,1,2 gg,2,2 c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
   else
-    SET="c,1,4 cc,2,2 cccc,4,2 cccccccc,8,2"
+    SET="c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2"
   fi
 fi
 
@@ -72,8 +74,8 @@ for task in $SET; do
   IFS=",";
   set $task;
   PFLAGS=$FLAGS
-  if [[ $execname == *"vertex-cut"* ]]; then
-    PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
+  if [ -n "$ABELIAN_VERTEX_CUT" ]; then
+    PFLAGS+=" -enableVertexCut -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
   elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
     PFLAGS+=" -scalegpu=3"
   fi

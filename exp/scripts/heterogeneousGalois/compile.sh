@@ -1,4 +1,6 @@
 #!/bin/sh
+# Usage: ./compile.sh <SOURCE_INPUT_FILE> <GENERATED_OUTPUTD_DIR>
+# environment variables: ABELIAN_NON_HETEROGENEOUS ABELIAN_LLVM_BUILD ABELIAN_GALOIS_ROOT ABELIAN_GALOIS_BUILD ABELIAN_GGC_ROOT
 
 INPUT=$(cd $(dirname "$1") && pwd -P)/$(basename "$1")
 if [ -n "$2" ]; then
@@ -28,8 +30,6 @@ if [ $OS = "Scientific" ]; then
     fi
   fi
   MPI_INCLUDE=/opt/apps/ossw/libraries/mpich2/mpich2-3.1.3/sl6/gcc-4.8/include
-  TBB_INCLUDE=/opt/apps/ossw/libraries/tbb/tbb-4.0/sl6/gcc-4.8/include
-  BOOST_INCLUDE=/opt/apps/ossw/libraries/boost/boost-1.58.0/sl6/gcc-4.8/include
 elif [ $OS = "CentOS" ]; then
   if [ -z "$ABELIAN_LLVM_BUILD" ]; then
     ABELIAN_LLVM_BUILD=/net/velocity/workspace/SourceCode/llvm/build
@@ -38,16 +38,14 @@ elif [ $OS = "CentOS" ]; then
     ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/GaloisCpp
   fi
   if [ -z "$ABELIAN_GALOIS_BUILD" ]; then
-    ABELIAN_GALOIS_BUILD=/net/velocity/workspace/SourceCode/GaloisCpp/build/atc1.2-debug
+    ABELIAN_GALOIS_BUILD=/net/velocity/workspace/SourceCode/GaloisCpp/build/verify
   fi
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
     if [ -z "$ABELIAN_GGC_ROOT" ]; then
       ABELIAN_GGC_ROOT=/net/velocity/workspace/SourceCode/ggc
     fi
   fi
-  MPI_INCLUDE=/opt/apps/ossw/libraries/mpich2/mpich2-1.5/c7/clang-system/include
-  TBB_INCLUDE=/net/faraday/workspace/local/modules/tbb-4.2/include
-  BOOST_INCLUDE=/opt/apps/ossw/libraries/boost/boost-1.58.0/c7/clang-system/include
+  MPI_INCLUDE=/opt/apps/ossw/libraries/mpich2/mpich2-3.1.4/c7/gcc-4.9/include
 fi
 
 echo "Using LLVM build:" $ABELIAN_LLVM_BUILD
@@ -57,9 +55,10 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
 fi
 
 CXX_DEFINES="-DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_USE_EXP -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_LIMIT_MACROS"
-CXX_FLAGS="-g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libexp/include -I$MPI_INCLUDE -I$TBB_INCLUDE -I$BOOST_INCLUDE -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include -std=gnu++11"
+CXX_FLAGS="-g -Wall -gcc-toolchain $GCC_BIN/.. -fopenmp -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/libexp/include -I$MPI_INCLUDE -I$TBB_INC -I$BOOST_INC -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include -std=gnu++14"
+
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-  GGC_FLAGS="--cuda-worklist basic --cuda-graph basic"
+  GGC_FLAGS="--cuda-worklist basic --cuda-graph basic --opt parcomb --opt np --npf 8 "
   if [ -f "$OUTPUT_DIR/GGCFLAGS" ]; then
     GGC_FLAGS+=$(head -n 1 "$OUTPUT_DIR/GGCFLAGS")
   fi
@@ -104,5 +103,5 @@ else
   echo "Generated files in $OUTPUT_DIR: gen.cpp" 
 fi
 
-rm -f Entry-*.dot
+rm -f *Entry-*.dot
 

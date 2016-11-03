@@ -57,7 +57,7 @@ class DGBag {
     gDeserialize(buf, x_ID, x_didWork, vec);
     workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
     hosts_didWork_vec.push_back(x_didWork);
-    num_Hosts_recvd++;
+    //num_Hosts_recvd++;
   }
 
   void init_sync() {
@@ -73,7 +73,8 @@ public:
   }
 
   void set(InsertBag<ValueTy> &bag) {
-    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
@@ -87,7 +88,7 @@ public:
   }
 
   void set_local(int* array, size_t size) {
-    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
@@ -100,27 +101,48 @@ public:
   }
 
   void sync() {
-    std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::StatTimer StatTimer_sync(sync_str.c_str());
     StatTimer_sync.start();
 
+    //std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + (helper_fn.get_run_identifier()));
+    Galois::Statistic num_work_bytes(work_bytes_str.c_str());
     //send things to other hosts.
     for(auto x = 0; x < net.Num; ++x){
       if(x == net.ID)
         continue;
       Galois::Runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
-      net.sendMsg(x, recv_BagItems, b);
+      num_work_bytes += b.size();
+      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      //net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
-    while(num_Hosts_recvd < (net.Num - 1)){
-      net.handleReceives();
+
+    //receive
+    for(auto x = 0; x < net.Num; ++x) {
+      if(x == net.ID)
+        continue;
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      recv_BagItems(p->first, p->second);
     }
+    ++Galois::Runtime::evilPhase;
+
+    //while(num_Hosts_recvd < (net.Num - 1)){
+      //net.handleReceives();
+    //}
 
     workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
     std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
     std::unique(workItem_recv_vec.begin(), workItem_recv_vec.end());
-    std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    //std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
+    std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + helper_fn.get_run_identifier());
     Galois::Statistic num_work_items(work_item_str.c_str());
     num_work_items += workItem_recv_vec.size();
 

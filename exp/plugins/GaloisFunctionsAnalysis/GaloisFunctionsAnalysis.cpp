@@ -206,7 +206,7 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
               if(j.SYNC_TYPE == "sync_push")
                 SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR <<"\")";
 
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
@@ -350,6 +350,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
+
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
@@ -394,6 +397,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
+                                                                      /** Atomic min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
+                                                                      /** min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("min"))))), hasAnyArgument(LHS_memExpr)).bind(str_min),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp),
@@ -435,6 +442,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
+            string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME + "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME + "_" + i.first;
@@ -490,6 +498,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
                                                                       /** Atomic min **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
+                                                                      /** min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("min"))))), hasAnyArgument(LHS_memExpr)).bind(str_min),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp)
@@ -703,7 +713,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
 
-
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
       for (auto i : info.reductionOps_map) {
         for(auto j : i.second) {
@@ -716,51 +725,53 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             /** Only need sync_pull if modified **/
               llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
-              StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
-              StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
-              StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
-              StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
+              if(j.SYNC_TYPE == "sync_pull_maybe"){
+                StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+                StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
+                StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
+                StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
 
-            /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+              /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
 #if 0
-              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
-                                                                                                  hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
-                                                                                                  memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
-                                                                                                  ),unless(stmt_reductionOp))),
-                                                                        hasAncestor(recordDecl(hasName(i.first)))
-                                                                    ).bind(str_syncPull_var);
+                DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                    hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
+                                                                                                    memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
+                                                                                                    ),unless(stmt_reductionOp))),
+                                                                          hasAncestor(recordDecl(hasName(i.first)))
+                                                                      ).bind(str_syncPull_var);
 #endif
 
-              /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
-              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
-                                                                                                  hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
-                                                                                                  unless(stmt_reductionOp))),
-                                                                                 hasAncestor(EdgeForLoopMatcher)
-                                                                    ).bind(str_syncPull_var);
+                /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
+                DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
+                                                                                                    hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
+                                                                                                    unless(stmt_reductionOp))),
+                                                                                   hasAncestor(EdgeForLoopMatcher)
+                                                                      ).bind(str_syncPull_var);
 
-              StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
-                                                                      anyOf(
-                                                                      /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
-                                                                      binaryOperator(hasOperatorName("="),
-                                                                                     hasLHS(LHS_varDecl),
-                                                                                     hasRHS(RHS_memExpr)),
+                StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
+                                                                        anyOf(
+                                                                        /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
+                                                                        binaryOperator(hasOperatorName("="),
+                                                                                       hasLHS(LHS_varDecl),
+                                                                                       hasRHS(RHS_memExpr)),
 
-                                                                      /** For builtInType : varname += NodeData.fieldName **/
-                                                                      binaryOperator(hasOperatorName("+="),
-                                                                                      hasLHS(LHS_varDecl),
-                                                                                      hasRHS(RHS_memExpr)),
+                                                                        /** For builtInType : varname += NodeData.fieldName **/
+                                                                        binaryOperator(hasOperatorName("+="),
+                                                                                        hasLHS(LHS_varDecl),
+                                                                                        hasRHS(RHS_memExpr)),
 
-                                                                      /** For builtInType : varname -= NodeData.fieldName **/
-                                                                      binaryOperator(hasOperatorName("-="),
-                                                                                      hasLHS(LHS_varDecl),
-                                                                                      hasRHS(RHS_memExpr))
+                                                                        /** For builtInType : varname -= NodeData.fieldName **/
+                                                                        binaryOperator(hasOperatorName("-="),
+                                                                                        hasLHS(LHS_varDecl),
+                                                                                        hasRHS(RHS_memExpr))
 
-                                                                      ),
-                                                                      hasAncestor(EdgeForLoopMatcher)
-                                                  ).bind(str_plusOp);
+                                                                        ),
+                                                                        hasAncestor(EdgeForLoopMatcher)
+                                                    ).bind(str_plusOp);
 
-              Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
-              Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+          }
         }
       }
 
@@ -830,43 +841,42 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       for (auto i : info.edgeData_map) {
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
-            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
             string str_if_RHS_const = "if_RHS_const" + j.VAR_NAME + "_" + i.first;
             string str_if_RHS_nonconst = "if_RHS_nonconst" + j.VAR_NAME + "_" + i.first;
+            string str_if_LHS_const = "if_LHS_const" + j.VAR_NAME + "_" + i.first;
+            string str_if_LHS_nonconst = "if_LHS_nonconst" + j.VAR_NAME + "_" + i.first;
             string str_main_struct = "main_struct_" + i.first;
             string str_forLoop_2LT = "forLoop_2LT_" + i.first;
             string str_method_operator  = "methodDecl_" + i.first;
             string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
             string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
 
-            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+            StatementMatcher LHS_memExpr_nonconst = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_if_LHS_nonconst);
             StatementMatcher RHS_memExpr_nonconst = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_if_RHS_nonconst);
 
-            StatementMatcher callExpr_atomicAdd = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr));
-            StatementMatcher callExpr_atomicMin = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr));
+            StatementMatcher callExpr_atomicAdd = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(anyOf(LHS_memExpr_nonconst,RHS_memExpr_nonconst)));
+            StatementMatcher callExpr_atomicMin = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(anyOf(LHS_memExpr_nonconst,RHS_memExpr_nonconst)));
+            StatementMatcher binaryOp_assign = binaryOperator(hasOperatorName("="), hasLHS(anyOf(LHS_memExpr_nonconst,RHS_memExpr_nonconst)));
 
-            StatementMatcher binaryOp_assign = binaryOperator(hasOperatorName("="), hasLHS(LHS_memExpr));
             /**Assumptions: 1. first argument is always src in operator() method **/
             /** For 2 loop Transforms: if nodeData.field > TOLERANCE **/
             /** For 2 loop Transforms: if nodeData.field > nodeData.otherField **/
-            StatementMatcher f_2loopTrans_1 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"), 
-                                                                                                                hasLHS(hasDescendant(LHS_memExpr)), 
-                                                                                                                /** Order matters: Finds [nodeData.field > nodeData.field2] first then [nodeData.field > constant] **/
-                                                                                                                hasRHS(anyOf(hasDescendant(RHS_memExpr_nonconst),hasDescendant(memberExpr().bind(str_if_RHS_const))))),
-                                                                                                anyOf(hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(binaryOp_assign, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicMin, str_forLoop_2LT))),
-                                                                                                hasAncestor(recordDecl(hasName(i.first), 
-                                                                                                                                       hasDescendant(methodDecl(hasName("operator()"), 
-                                                                                                                                                                hasAncestor(recordDecl(hasDescendant(callExpr(callee(functionDecl(hasName("for_each"))), 
-                                                                                                                                                                           unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))
-                                                                                                                                                               )).bind(str_for_each)))),
-                                                                                                                                                     hasParameter(0,decl().bind("src_arg")), 
-                                                                                                                                                     hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata)
-                                                                                                                                                       )
-                                                                                                                                                     ).bind(str_method_operator)
-                                                                                                                                         )
-                                                                                                                                       ).bind(str_main_struct)
-                                                                                                                  )))).bind(str_ifGreater_2loopTrans);
+            StatementMatcher f_2loopTrans_1 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(
+              binaryOperator(
+                hasLHS(anyOf(hasDescendant(LHS_memExpr_nonconst),hasDescendant(memberExpr().bind(str_if_LHS_const)))),                                                                                    
+                /** Order matters: Finds [nodeData.field > nodeData.field2] first then [nodeData.field > constant] **/ 
+                hasRHS(anyOf(hasDescendant(RHS_memExpr_nonconst),hasDescendant(memberExpr().bind(str_if_RHS_const))))),
+              anyOf(hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicMin, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(binaryOp_assign, str_forLoop_2LT))),
+              hasAncestor(recordDecl(hasName(i.first),
+                hasDescendant(methodDecl(hasName("operator()"),                                 
+                  hasAncestor(recordDecl(hasDescendant(callExpr(callee(functionDecl(hasName("for_each"))),
+                    unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version"))))))).bind(str_for_each)))),
+                  hasParameter(0,decl().bind("src_arg")), 
+                  hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata))
+                ).bind(str_method_operator))
+              ).bind(str_main_struct) 
+              )))).bind(str_ifGreater_2loopTrans);
 
             Matchers_2LT.addMatcher(f_2loopTrans_1, &loopTransform_handler);
 
