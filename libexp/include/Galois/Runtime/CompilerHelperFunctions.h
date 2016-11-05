@@ -30,13 +30,15 @@
 namespace Galois {
   /** Galois::atomicMin **/
   template<typename Ty>
-    const Ty atomicMin(std::atomic<Ty>& a, const Ty& b){
+    const Ty atomicMin(std::atomic<Ty>& a, const Ty b){
       Ty old_a = a;
+      Ty old_a2 = old_a;
       //std::cout << " b : " << b <<"\n";
-      while(a > b){
-        a.compare_exchange_strong(old_a, b);
+      while(old_a > b && !a.compare_exchange_strong(old_a,b)) {
+  //        old_a = a;
+  //      a.compare_exchange_strong(old_a, b);
       }
-      return old_a;
+      return old_a2;
     }
 
   template<typename Ty>
