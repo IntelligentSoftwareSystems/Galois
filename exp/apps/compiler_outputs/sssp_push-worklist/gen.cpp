@@ -108,7 +108,6 @@ struct InitializeGraph {
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-      _graph.set_num_iter(0);
     	struct SyncerPull_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -277,7 +276,7 @@ struct Get_info_functor : public Galois::op_tag {
 	void sync_graph(){
 		sync_graph_static(graph);
 	}
-  std::string get_run_identifier() const {
+	std::string get_run_identifier() const {
 		return graph.get_run_identifier();
 	}
 	void static sync_graph_static(Graph& _graph) {
@@ -326,7 +325,7 @@ struct SSSP {
     		dbag.sync();
     		unsigned _num_iterations = 1;
     		while (!dbag.canTerminate()) {
-        _graph.set_num_iter(_num_iterations);
+    		_graph.set_num_iter(_num_iterations);
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = local_wl.size();
     		if (cuda_wl.num_in_items > cuda_wl.max_size) {

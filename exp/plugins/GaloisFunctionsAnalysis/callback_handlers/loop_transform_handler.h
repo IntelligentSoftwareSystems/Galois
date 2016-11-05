@@ -87,11 +87,11 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               /** Adding new condtional outside for loop **/
               auto forLoop_2LT = Results.Nodes.getNodeAs<clang::Stmt>(str_forLoop_2LT);
               auto sdata_declStmt = Results.Nodes.getNodeAs<clang::Stmt>(str_sdata);
-              SourceLocation for_loc_begin = forLoop_2LT->getSourceRange().getBegin();
+              SourceLocation for_loc_end = forLoop_2LT->getSourceRange().getEnd().getLocWithOffset(2);
 
               /**Add galois accumulator += (work is done) **/
               string work_done = "\n" + galois_distributed_accumulator_name + "+= 1;\n";
-              rewriter.InsertTextBefore(for_loc_begin, work_done);
+              rewriter.InsertTextAfter(for_loc_end, work_done);
 
               //TODO: change sdata_loc getLocWithOffset from 2 to total length of statement.
               SourceLocation sdata_loc = sdata_declStmt->getSourceRange().getEnd().getLocWithOffset(2);

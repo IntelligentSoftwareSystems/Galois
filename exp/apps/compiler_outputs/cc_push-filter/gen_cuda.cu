@@ -234,12 +234,15 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
   }
   // FP: "101 -> 102;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old, Sum sum_retval)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_ConnectedComp;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  ret_val.thread_entry();
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -270,58 +273,58 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
       if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
-        sum_retval.do_return( 1);
+        ret_val.do_return( 1);
       }
       else
       {
         pop = false;
       }
     }
-    // FP: "13 -> 14;
-    // FP: "16 -> 17;
+    // FP: "12 -> 13;
+    // FP: "15 -> 16;
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "17 -> 18;
+    // FP: "16 -> 17;
     __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "18 -> 19;
+    // FP: "17 -> 18;
     _np_closure[threadIdx.x].src = src;
-    // FP: "19 -> 20;
+    // FP: "18 -> 19;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
+    // FP: "21 -> 22;
     // FP: "22 -> 23;
-    // FP: "23 -> 24;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "24 -> 25;
+    // FP: "23 -> 24;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "25 -> 26;
+    // FP: "24 -> 25;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "28 -> 29;
+    // FP: "27 -> 28;
     __syncthreads();
-    // FP: "29 -> 30;
+    // FP: "28 -> 29;
     while (true)
     {
-      // FP: "30 -> 31;
+      // FP: "29 -> 30;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "33 -> 34;
+      // FP: "32 -> 33;
       __syncthreads();
-      // FP: "34 -> 35;
+      // FP: "33 -> 34;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "35 -> 36;
+        // FP: "34 -> 35;
         __syncthreads();
-        // FP: "36 -> 37;
+        // FP: "35 -> 36;
         break;
       }
-      // FP: "38 -> 39;
+      // FP: "37 -> 38;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -330,20 +333,20 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "41 -> 42;
+      // FP: "40 -> 41;
       __syncthreads();
-      // FP: "42 -> 43;
+      // FP: "41 -> 42;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "43 -> 44;
+      // FP: "42 -> 43;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "46 -> 47;
+      // FP: "45 -> 46;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "47 -> 48;
+      // FP: "46 -> 47;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -356,17 +359,17 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           atomicMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "56 -> 57;
+      // FP: "55 -> 56;
       __syncthreads();
     }
-    // FP: "58 -> 59;
+    // FP: "57 -> 58;
 
-    // FP: "59 -> 60;
+    // FP: "58 -> 59;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "60 -> 61;
+      // FP: "59 -> 60;
       const int _np_laneid = cub::LaneId();
-      // FP: "61 -> 62;
+      // FP: "60 -> 61;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -398,28 +401,28 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           }
         }
       }
-      // FP: "80 -> 81;
+      // FP: "79 -> 80;
       __syncthreads();
-      // FP: "81 -> 82;
+      // FP: "80 -> 81;
     }
 
-    // FP: "82 -> 83;
+    // FP: "81 -> 82;
     __syncthreads();
-    // FP: "83 -> 84;
+    // FP: "82 -> 83;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "84 -> 85;
+    // FP: "83 -> 84;
     while (_np.work())
     {
-      // FP: "85 -> 86;
+      // FP: "84 -> 85;
       int _np_i =0;
-      // FP: "86 -> 87;
+      // FP: "85 -> 86;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "87 -> 88;
+      // FP: "86 -> 87;
       __syncthreads();
-      // FP: "88 -> 89;
+      // FP: "87 -> 88;
 
-      // FP: "89 -> 90;
+      // FP: "88 -> 89;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -434,16 +437,18 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           atomicMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "99 -> 100;
+      // FP: "98 -> 99;
       _np.execute_round_done(ITSIZE);
-      // FP: "100 -> 101;
+      // FP: "99 -> 100;
       __syncthreads();
     }
-    // FP: "102 -> 103;
+    // FP: "101 -> 102;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
+    // FP: "102 -> 103;
+    // FP: "103 -> 104;
   }
-  // FP: "105 -> 106;
+  ret_val.thread_exit<_br>(_ts);
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
@@ -494,16 +499,16 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   // FP: "3 -> 4;
   kernel_sizing(ctx->gg, blocks, threads);
   // FP: "4 -> 5;
-  *(ctx->p_retval.cpu_wr_ptr()) = __retval;
+  Shared<int> retval = Shared<int>(1);
+  Sum _rv;
+  *(retval.cpu_wr_ptr()) = 0;
+  _rv.rv = retval.gpu_wr_ptr();
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
-  ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr();
-  // FP: "6 -> 7;
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr(), ctx->sum_retval);
-  // FP: "7 -> 8;
   check_cuda_kernel;
-  // FP: "8 -> 9;
-  __retval = *(ctx->p_retval.cpu_rd_ptr());
-  // FP: "9 -> 10;
+  // FP: "6 -> 7;
+  __retval = *(retval.cpu_rd_ptr());
+  // FP: "7 -> 8;
 }
 void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {

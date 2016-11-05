@@ -19,7 +19,7 @@ CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : lo
 ]),
 ]),
 ]),
-Kernel("SSSP", [G.param(), ('unsigned int', '__nowned'), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('unsigned int *', 'p_dist_current'), ('Sum', 'sum_retval')],
+Kernel("SSSP", [G.param(), ('unsigned int', '__nowned'), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('unsigned int *', 'p_dist_current')],
 [
 ForAll("src", G.nodes("__begin", "__end"),
 [
@@ -38,7 +38,7 @@ CDecl([("unsigned int", "old_dist", "")]),
 CBlock(["old_dist = atomicMin(&p_dist_current[dst], new_dist)"]),
 If("old_dist > new_dist",
 [
-CBlock(["sum_retval.do_return( 1)"]),
+ReturnFromParallelFor(" 1"),
 ]),
 ]),
 ),
@@ -61,11 +61,9 @@ Kernel("SSSP_cuda", [('unsigned int ', '__begin'), ('unsigned int ', '__end'), (
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
 CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
-CBlock(["*(ctx->p_retval.cpu_wr_ptr()) = __retval"]),
-CBlock(["ctx->sum_retval.rv = ctx->p_retval.gpu_wr_ptr()"]),
-Invoke("SSSP", ("ctx->gg", "ctx->nowned", "__begin", "__end", "ctx->dist_current.gpu_wr_ptr()", "ctx->sum_retval")),
+Invoke("SSSP", ("ctx->gg", "ctx->nowned", "__begin", "__end", "ctx->dist_current.gpu_wr_ptr()"), "SUM"),
 CBlock(["check_cuda_kernel"], parse = False),
-CBlock(["__retval = *(ctx->p_retval.cpu_rd_ptr())"]),
+CBlock(["__retval = *(retval.cpu_rd_ptr())"], parse = False),
 ], host = True),
 Kernel("SSSP_all_cuda", [('int &', '__retval'), ('struct CUDA_Context *', 'ctx')],
 [

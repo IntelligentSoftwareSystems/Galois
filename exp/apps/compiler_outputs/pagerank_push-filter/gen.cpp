@@ -112,7 +112,7 @@ struct ResetGraph {
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + _graph.get_run_identifier());
+    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		ResetGraph_all_cuda(cuda_ctx);
@@ -136,7 +136,6 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-      _graph.set_num_iter(0);
       	struct Syncer_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -208,7 +207,7 @@ struct InitializeGraph {
       	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-      		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + _graph.get_run_identifier());
+      		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
       		InitializeGraph_all_cuda(alpha, cuda_ctx);
@@ -246,7 +245,6 @@ cll::opt<float> & local_tolerance;
 Graph * graph;
 FirstItr_PageRank(const float & _local_alpha,cll::opt<float> & _local_tolerance,Graph * _graph):local_alpha(_local_alpha),local_tolerance(_local_tolerance),graph(_graph){}
 void static go(Graph& _graph) {
-  _graph.set_num_iter(0);
 	struct Syncer_0 {
 		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -318,7 +316,7 @@ void static go(Graph& _graph) {
 	};
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
-		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_PageRank_" + _graph.get_run_identifier());
+		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_PageRank_" + (_graph.get_run_identifier()));
 		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
 		StatTimer_cuda.start();
 		FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
@@ -365,8 +363,8 @@ struct PageRank {
     unsigned _num_iterations = 1;
     
     unsigned long _num_work_items = _graph.end() - _graph.begin();
-    do {
-    _graph.set_num_iter(_num_iterations);
+    do { 
+     _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
@@ -439,7 +437,7 @@ struct PageRank {
     	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + _graph.get_run_identifier());
+    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
@@ -457,8 +455,8 @@ struct PageRank {
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
     }while(DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + _graph.get_run_identifier(), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + _graph.get_run_identifier(), (unsigned long)_num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 
@@ -472,9 +470,7 @@ void operator()(WorkItem src) const {
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
       float delta = residual_old*(1-local_alpha)/sdata.nout;
-      
-DGAccumulator_accum+= 1;
-for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
+      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
@@ -482,6 +478,8 @@ for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++n
         //Schedule TOLERANCE threshold crossed.
         
       }
+
+DGAccumulator_accum+= 1;
     }
       }
   }

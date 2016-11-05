@@ -505,10 +505,8 @@ template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
-
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
-
   typedef typename WorkListTy::value_type g;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
@@ -519,7 +517,6 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));
-
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
 
