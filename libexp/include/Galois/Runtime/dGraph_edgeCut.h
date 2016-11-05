@@ -255,5 +255,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return false;
     }
 
+    uint64_t get_local_total_nodes() const {
+      return (base_hGraph::numOwned + base_hGraph::totalSlaveNodes);
+    }
+
 };
 

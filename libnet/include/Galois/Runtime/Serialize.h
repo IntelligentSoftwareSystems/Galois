@@ -34,14 +34,19 @@
 #include <boost/mpl/has_xxx.hpp>
 
 #include <Galois/gdeque.h>
+#include <Galois/Runtime/Dynamic_bitset.h>
+#include <Galois/Atomic_wrapper.h>
+
+#ifndef _GALOIS_EXTRA_TRAITS_
+#define _GALOIS_EXTRA_TRAITS_
 
 //from libc++, clang specific
 namespace std {
 #ifdef __clang__
-//template <class T> struct is_trivially_copyable;
-//template <class _Tp> struct is_trivially_copyable
-//  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
-//{};
+template <class T> struct is_trivially_copyable;
+template <class _Tp> struct is_trivially_copyable
+  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
+{};
 #else
 #if __GNUC__ < 5
 template<class T>
@@ -49,6 +54,7 @@ using is_trivially_copyable = is_trivial<T>;
 #endif
 #endif
 }
+#endif
 
 namespace Galois {
 namespace Runtime {
@@ -298,7 +304,10 @@ template<typename T1, typename T2>
 inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
-
+template<typename T>
+inline void gSerializeObj(SerializeBuffer& buf, const Galois::CopyableAtomic<T>& data){
+  buf.insert((uint8_t*)data.load(), sizeof(T));
+}
 //Fixme: specialize for Sequences with consecutive PODS
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
@@ -354,6 +363,17 @@ inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   //  buf.reserve(rbuf.r_size());
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
+}
+
+
+
+//template<typename T>
+//inline void gSerializeObj(SerializeBuffer& buf, const std::vector<Galois::CopyableAtomic<T>>& data){
+  //gSerializeSeq(buf, data);
+//}
+
+inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& data) {
+     gSerializeObj(buf, data.get_vec());
 }
 
 } //detail
@@ -415,6 +435,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
   return gDeserializeTuple(buf, data, typename gens<sizeof...(T)>::type());
 }
 
+
 template<typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
   seq.clear();
@@ -468,6 +489,10 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
 template<typename T, unsigned CS>
 void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
   gDeserializeSeq(buf, data);
+}
+
+inline void gDeserializeObj(DeSerializeBuffer& buf, Galois::DynamicBitSet& data) {
+     gDeserializeObj(buf, data.get_vec());
 }
 
 } //namespace detail

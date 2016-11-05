@@ -230,5 +230,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     bool is_vertex_cut() const{
       return true;
     }
+
+    uint64_t get_local_total_nodes() const {
+      return (base_hGraph::numOwned);
+    }
 };
 
