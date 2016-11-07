@@ -55,8 +55,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     std::vector<NodeInfo> localToGlobalMap_meta;
     std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
     std::vector<size_t> GlobalVec; //Global Id's sorted vector.
-    std::vector<size_t> LocalVec; //Local Id's sorted vector.
+    std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
 
+    std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
 
 
     //OfflineGraph* g;
@@ -154,21 +155,25 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::graph.constructNodes();
       //std::cerr << "Construct nodes done\n";
+      fill_slaveNodes(base_hGraph::slaveNodes);
+
       loadEdges(base_hGraph::graph, g);
       std::cerr << "Edges loaded \n";
 
-      fill_slaveNodes(base_hGraph::slaveNodes);
       base_hGraph::setup_communication();
     }
 
     uint32_t G2L(uint64_t gid) const {
       //we can assume that GID exits and is unique. Index is localID since it is sorted.
-      auto iter = std::lower_bound(GlobalVec.begin(), GlobalVec.end(), gid);
-      assert(*iter == gid);
-      if(*iter == gid)
-        return (iter - GlobalVec.begin());
-      else
-        abort();
+      uint32_t found_index  = ~0;
+      for(auto i : hostNodes){
+        if(i.first != ~0){
+          auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
+          if(*iter == gid)
+            return (iter - GlobalVec.begin());
+        }
+      }
+      abort();
     }
 
     uint64_t L2G(uint32_t lid) const {
@@ -180,6 +185,27 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading edge-data while creating edges.\n");
         uint64_t cur = 0;
+
+
+        for(auto n = 0; n < base_hGraph::numOwned; ++n){
+          auto gid = L2G(n);
+          auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
+          uint32_t old_lid;
+          assert(*iter == gid);
+          if(*iter == gid){
+            old_lid = (iter - GlobalVec_ordered.begin());
+          }
+
+          for (auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
+            auto gdst = g.getEdgeDst(ii);
+            graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]));
+            auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
+            graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]), gdata);
+          }
+          graph.fixEndEdge(n, cur);
+        }
+
+#if 0
         for (auto n = g.begin(); n != g.end(); ++n) {
 
           for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
@@ -189,6 +215,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           }
           graph.fixEndEdge((*n), cur);
         }
+#endif
       }
 
 
@@ -196,35 +223,105 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
-        for(auto n = g.begin(); n != g.end(); ++n){
-          for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
-            auto gdst = g.getEdgeDst(ii);
-            graph.constructEdge(cur++, gdst);
+
+        for(auto n = 0; n < base_hGraph::numOwned; ++n){
+          auto gid = L2G(n);
+          auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
+          uint32_t old_lid;
+          assert(*iter == gid);
+          if(*iter == gid){
+            old_lid = (iter - GlobalVec_ordered.begin());
           }
-          graph.fixEndEdge((*n), cur);
+
+          for (auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
+            auto gdst = g.getEdgeDst(ii);
+            graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]));
+          }
+          graph.fixEndEdge(n, cur);
         }
+
       }
 
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+
+      std::vector<std::vector<size_t>> GlobalVec_perHost(base_hGraph::numHosts);
+      std::vector<std::vector<size_t>> OwnerVec_perHost(base_hGraph::numHosts);
+      std::vector<std::vector<size_t>> LocalVec_perHost(base_hGraph::numHosts);
+
       for(auto info : localToGlobalMap_meta){
         assert(info.owner_id >= 0 && info.owner_id < base_hGraph::numHosts);
         slaveNodes[info.owner_id].push_back(info.global_id);
 
-        GlobalVec.push_back(info.global_id);
-        OwnerVec.push_back(info.owner_id);
-        LocalVec.push_back(info.local_id);
+        GlobalVec_ordered.push_back(info.global_id);
+        GlobalVec_perHost[info.owner_id].push_back(info.global_id);
+        OwnerVec_perHost[info.owner_id].push_back(info.owner_id);
+        LocalVec_perHost[info.owner_id].push_back(info.local_id);
+
       }
+
+      hostNodes.resize(base_hGraph::numHosts);
+      uint32_t counter = 0;
+      for(auto i = 0; i < base_hGraph::numHosts; i++){
+        if(GlobalVec_perHost[i].size() > 0){
+          hostNodes[i] = std::make_pair(counter, GlobalVec_perHost[i].size() + counter);
+          counter += GlobalVec_perHost[i].size();
+        }
+        else {
+          hostNodes[i] = std::make_pair(~0, ~0);
+        }
+      }
+
+      GlobalVec.reserve(counter);
+      auto iter_insert = GlobalVec.begin();
+      uint32_t c = 0;
+      for(auto v : GlobalVec_perHost){
+        for(auto j : v){
+          GlobalVec.push_back(j);
+        }
+      }
+
+      OwnerVec.reserve(counter);
+      c = 0;
+      iter_insert = OwnerVec.begin();
+      for(auto v : OwnerVec_perHost){
+        for(auto j : v){
+          OwnerVec.push_back(j);
+        }
+      }
+
+#if 0
+       std::cout << "[" << base_hGraph::id << "] : Global size :"  << GlobalVec.size() << "\n";
+      for(auto k : hostNodes){
+        std::cout << "[" << base_hGraph::id << "] : " << k.first << ", " << k.second << "\n";
+      }
+#endif
+
+      assert(counter == GlobalVec.size());
+#if 0
+      for(auto j = 0; j < GlobalVec_perHost.size(); ++j){
+        if(!std::is_sorted(GlobalVec_perHost[j].begin(), GlobalVec_perHost[j].end())){
+          std::cerr << "GlobalVec_perhost not sorted; Aborting execution for : " << j << "\n";
+          abort();
+        }
+      }
+#endif
       //Check to make sure GlobalVec is sorted. Everything depends on it.
-      assert(std::is_sorted(GlobalVec.begin(), GlobalVec.end()));
-      if(!std::is_sorted(GlobalVec.begin(), GlobalVec.end())){
-        std::cerr << "GlobalVec not sorted; Aborting execution\n";
-        abort();
+      //assert(std::is_sorted(GlobalVec.begin(), GlobalVec.end()));
+      for(auto h : hostNodes) {
+        if(h.first != ~0) {
+          if(!std::is_sorted(GlobalVec.begin() + h.first , GlobalVec.begin() + h.second)){
+            std::cerr << "GlobalVec not sorted; Aborting execution\n";
+            abort();
+          }
+        }
       }
-      if(!std::is_sorted(LocalVec.begin(), LocalVec.end())){
-        std::cerr << "LocalVec not sorted; Aborting execution\n";
-        abort();
+
+#if 0
+      for(auto i = 0; i < base_hGraph::numOwned; ++i){
+        assert( i == G2L(L2G(i)));
       }
+#endif
     }
 
     bool is_vertex_cut() const{

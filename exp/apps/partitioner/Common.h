@@ -24,8 +24,6 @@
 #ifndef GDIST_EXP_APPS_PARTITIONER_COMMON_H_
 #define GDIST_EXP_APPS_PARTITIONER_COMMON_H_
 
-using Galois::Graph::OfflineGraph;
-
 
 /******************************************************************
  *
@@ -73,9 +71,9 @@ struct NodeInfo {
    size_t global_id;
    PartitionIDType owner_id;
 };
-bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts) {
+bool verifyParitions(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts) {
    bool verified = true;
-   std::vector<OfflineGraph*> pGraphs(num_hosts);
+   std::vector<Galois::Graph::OfflineGraph*> pGraphs(num_hosts);
    std::vector<std::map<size_t, NodeInfo>> hostLocalToGlobalMap(num_hosts);
    std::cout << "Verifying partitions...\n";
    for (size_t h = 0; h < num_hosts; ++h) {
@@ -98,7 +96,7 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
       }
 
       std::string gFileName = getPartitionFileName(basename, h, num_hosts);
-      pGraphs[h] = new OfflineGraph(gFileName);
+      pGraphs[h] = new Galois::Graph::OfflineGraph(gFileName);
    }      //End for each host.
 
    std::vector<size_t> nodeOwners(g.size());
