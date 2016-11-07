@@ -44,14 +44,6 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/OfflineGraph.h"
 
-#include "Common.h"
-//#include "RandomPartitioner.h"
-//#include "GreedyBalancedPartitioner.h"
-#include "GreedyBalancedPartitionerDisk.h"
-#include "GBalancedPartitionerDisk2.h"
-//using namespace std;
-
-
 static const char* const name = "Off-line graph partitioner";
 static const char* const desc = "A collection of routines to partition graphs off-line.";
 static const char* const url = 0;
@@ -61,7 +53,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 static cll::opt<unsigned int> numPartitions("num", cll::desc("Number of partitions to be created"), cll::init(2));
 static cll::opt<std::string> outputFolder("outputTo", cll::desc("Name of the output folder to store the partitioned graphs."), cll::init("./"));
 
-typedef OfflineGraph GraphType;
+typedef Galois::Graph::OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
 typedef GraphType::iterator NodeItType;
 
@@ -71,12 +63,20 @@ typedef GraphType::iterator NodeItType;
 typedef unsigned int EdgeDataType;
 #endif
 
+
+#include "Common.h"
+//#include "RandomPartitioner.h"
+//#include "GreedyBalancedPartitioner.h"
+#include "GreedyBalancedPartitionerDisk.h"
+#include "GBalancedPartitionerDisk2.h"
+//using namespace std;
+
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
    T_total.start();
    T_hGraph_init.start();
-   OfflineGraph g(inputFile);
+   Galois::Graph::OfflineGraph g(inputFile);
    T_hGraph_init.stop();
    //VertexCutInfo vci;
    T_init.start();
