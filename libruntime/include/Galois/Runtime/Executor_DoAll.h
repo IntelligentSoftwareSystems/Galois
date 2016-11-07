@@ -136,7 +136,7 @@ class DoAllExecutor {
   
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const char* ln)
-    :F(_F), range(r), loopname(ln)
+    :F(_F), range(r), loopname(ln), waiting(0)
   {  }
 
   void operator()() {
