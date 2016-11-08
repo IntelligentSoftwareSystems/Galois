@@ -32,20 +32,14 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Threads.h"
 #include "Galois/Version.h"
 
 #include <iostream>
 #include <sstream>
 
-#include <unistd.h>
-
 //! standard global options to the benchmarks
 llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
-llvm::cl::opt<std::string> statLoc("stat", llvm::cl::desc("Statfile, '-' for standard out"));
-llvm::cl::opt<bool> statR("statR", llvm::cl::desc("use R style stat reporting"), llvm::cl::init(false));
-llvm::cl::opt<bool> statJSON("statJSON", llvm::cl::desc("use JSON to store stats"), llvm::cl::init(false));
 
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
@@ -80,10 +74,7 @@ void LonestarStart(int argc, char** argv,
   
   char name[256];
   gethostname(name, 256);
-  Galois::Runtime::reportStatGlobal("Hostname", std::string(name));
+  Galois::Runtime::reportStatGlobal("Hostname", name);
 
   Galois::Runtime::reportStatGlobal("Threads", numThreads);
-
-  Galois::Runtime::setStatOutput(statLoc);
-  Galois::Runtime::setStatFormat(statR, statJSON);
 }

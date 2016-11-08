@@ -47,7 +47,7 @@ namespace Graph {
 template<typename GraphTy, typename... Args>
 void readGraph(GraphTy& graph, Args&&... args) {
   typename GraphTy::read_tag tag;
-  readGraphDispatch(graph, getActiveThreads(), tag, std::forward<Args>(args)...);
+  readGraphDispatch(graph, tag, std::forward<Args>(args)...);
 }
 
 template<typename GraphTy>
@@ -62,7 +62,7 @@ struct ReadGraphConstructFrom {
   GraphTy& graph;
   FileGraph& f;
   ReadGraphConstructFrom(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
-  void operator()(unsigned tid, unsigned total) const {
+  void operator()(unsigned tid, unsigned total) {
     graph.constructFrom(f, tid, total);
   }
 };
@@ -73,7 +73,7 @@ struct ReadGraphConstructNodesFrom {
   FileGraph& f;
   Aux& aux;
   ReadGraphConstructNodesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
-  void operator()(unsigned tid, unsigned total) const {
+  void operator()(unsigned tid, unsigned total) {
     graph.constructNodesFrom(f, tid, total, aux);
   }
 };
@@ -84,69 +84,69 @@ struct ReadGraphConstructEdgesFrom {
   FileGraph& f;
   Aux& aux;
   ReadGraphConstructEdgesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
-  void operator()(unsigned tid, unsigned total) const {
+  void operator()(unsigned tid, unsigned total) {
     graph.constructEdgesFrom(f, tid, total, aux);
   }
 };
 
   
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_default_graph_tag, FileGraph& f) {
-  graph.allocateFrom(f, numThreads);
+void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
+  graph.allocateFrom(f);
 
   Galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_with_aux_graph_tag tag, const std::string& filename) {
+void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag tag, const std::string& filename) {
   FileGraph f;
   f.fromFileInterleaved<typename GraphTy::file_edge_data_type>(filename);
-  readGraphDispatch(graph, numThreads, tag, f);
+  readGraphDispatch(graph, tag, f);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_with_aux_graph_tag, FileGraph& f) {
+void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag, FileGraph& f) {
   typedef typename GraphTy::ReadGraphAuxData Aux;
 
   Aux aux;
-  graph.allocateFrom(f, aux, numThreads);
+  graph.allocateFrom(f, aux);
 
   Galois::on_each(ReadGraphConstructNodesFrom<GraphTy, Aux>(graph, f, aux));
   Galois::on_each(ReadGraphConstructEdgesFrom<GraphTy, Aux>(graph, f, aux));
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_lc_inout_graph_tag, const std::string& f1, const std::string& f2) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1, const std::string& f2) { 
   graph.createAsymmetric();
 
   typename GraphTy::out_graph_type::read_tag tag1;
-  readGraphDispatch(graph, numThreads, tag1, f1);
+  readGraphDispatch(graph, tag1, f1);
 
   typename GraphTy::in_graph_type::read_tag tag2;
-  readGraphDispatch(graph.inGraph, numThreads, tag2, f2);
+  readGraphDispatch(graph.inGraph, tag2, f2);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_lc_inout_graph_tag, FileGraph& f1, FileGraph& f2) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1, FileGraph& f2) { 
   graph.createAsymmetric();
 
   typename GraphTy::out_graph_type::read_tag tag1;
-  readGraphDispatch(graph, numThreads, tag1, f1);
+  readGraphDispatch(graph, tag1, f1);
 
   typename GraphTy::in_graph_type::read_tag tag2;
-  readGraphDispatch(graph.inGraph, numThreads, tag2, f2);
+  readGraphDispatch(graph.inGraph, tag2, f2);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_lc_inout_graph_tag, FileGraph& f1) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1) { 
   typename GraphTy::out_graph_type::read_tag tag1;
-  readGraphDispatch(graph, numThreads, tag1, f1);
+  readGraphDispatch(graph, tag1, f1);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, unsigned numThreads, read_lc_inout_graph_tag, const std::string& f1) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1) { 
   typename GraphTy::out_graph_type::read_tag tag1;
-  readGraphDispatch(graph, numThreads, tag1, f1);
+  readGraphDispatch(graph, tag1, f1);
 }
 
 } // end namespace

@@ -5,41 +5,37 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
- * amorphous data-parallelism in irregular programs.
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
  *
- * Galois is free software: you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * Galois is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with Galois.  If not, see
- * <http://www.gnu.org/licenses/>.
- *
- * @section Copyright
- *
- * Copyright (C) 2016, The University of Texas at Austin. All rights
- * reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Runtime/Bag.h"
-#include "Galois/StatTimer.h"
+#include "Galois/Bag.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#ifdef HAS_EIGEN
 #include <Eigen/Dense>
+#endif
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -218,6 +214,7 @@ struct NodeIteratorAlgo {
   }
 };
 
+#ifdef HAS_EIGEN
 /**
  * AYZ algorithm. Combine node iterator algorithm with matrix multiplication.
  * Divide nodes into two categories. Low and high degree ones. Apply node
@@ -329,7 +326,8 @@ struct HybridAlgo {
     }
     Eigen::setNbThreads(numThreads);
 
-    Galois::StatTimer Tlimit("SetLimitTime", Galois::start_now);
+    Galois::StatTimer Tlimit("SetLimitTime");
+    Tlimit.start();
     bool hasLimit = setLimit();
     Tlimit.stop();
 
@@ -340,7 +338,8 @@ struct HybridAlgo {
         adjacency.setZero();
         Galois::do_all(limitIterator, graph.end(), WriteAdjacency(this));
         // Compute matrix^3
-        Galois::StatTimer Tmm("MMTime", Galois::start_now);
+        Galois::StatTimer Tmm("MMTime");
+        Tmm.start();
         Matrix B, C;
         B.noalias() = adjacency * adjacency;
         C.noalias() = B * adjacency;
@@ -359,6 +358,7 @@ struct HybridAlgo {
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
+#endif
 
 /**
  * Edge Iterator algorithm for counting triangles.
@@ -380,7 +380,7 @@ struct EdgeIteratorAlgo {
     WorkItem(const GNode& a1, const GNode& a2): src(a1), dst(a2) { }
   };
 
-  Galois::Runtime::InsertBag<WorkItem> items;
+  Galois::InsertBag<WorkItem> items;
   Galois::GAccumulator<size_t> numTriangles;
 
   struct Initialize {
@@ -433,7 +433,8 @@ template<typename Algo>
 void run() {
   Algo algo;
 
-  Galois::StatTimer T(Galois::start_now);
+  Galois::StatTimer T;
+  T.start();
   algo();
   T.stop();
 }
@@ -450,7 +451,7 @@ void makeGraph(const std::string& triangleFilename) {
   std::deque<N> nodes;
   std::copy(initial.begin(), initial.end(), std::back_inserter(nodes));
   // Sort by degree
-  std::sort(nodes.begin(), nodes.end(), DegreeLess<G>(initial));
+  Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), DegreeLess<G>(initial));
   
   std::deque<N> p;
   std::copy(nodes.begin(), nodes.end(), std::back_inserter(p));
@@ -494,7 +495,8 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer Tinitial("InitializeTime", Galois::start_now);
+  Galois::StatTimer Tinitial("InitializeTime");
+  Tinitial.start();
   readGraph();
   Tinitial.stop();
 

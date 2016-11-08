@@ -1,12 +1,21 @@
 set(sources 
             src/gIO.cpp
-#            src/Barrier_Counting.cpp
-#            src/Barrier_Dissemination.cpp 
-#            src/Barrier_MCS.cpp
-#            src/Barrier_Pthread.cpp
-#            src/Barrier_Simple.cpp
-#            src/PerThreadStorage.cpp
+            src/Barrier.cpp
+            src/Barrier_Counting.cpp
+            src/Barrier_Dissemination.cpp 
+            src/Barrier_MCS.cpp
+            src/Barrier_Topo.cpp 
+            src/Barrier_Pthread.cpp
+            src/Barrier_Simple.cpp
+            src/ThreadPool.cpp
+            src/SimpleLock.cpp
+            src/PtrLock.cpp
+            src/EnvCheck.cpp
+            src/PerThreadStorage.cpp
+            src/HWTopoLinux.cpp
+            src/Termination.cpp
             src/NumaMem.cpp
+            src/PageAlloc.cpp
 )
 
 add_library(galois_substrate STATIC ${sources})
