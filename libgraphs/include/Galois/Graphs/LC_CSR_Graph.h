@@ -36,6 +36,7 @@
 #include "Galois/Runtime/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
+#include "Galois/Galois.h"
 
 #include <type_traits>
 
@@ -131,9 +132,6 @@ protected:
 
   uint64_t numNodes;
   uint64_t numEdges;
-
-  // ylu: should it be atomic for sorting edges by dst for nodes in parallel?
-  uint64_t numNodesWithEdgesSortedByDst; 
 
   typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
 
@@ -232,12 +230,12 @@ public:
   }
 
   edge_iterator findEdge(GraphNode N1, GraphNode N2) {
-    if(numNodesWithEdgesSortedByDst < numNodes) {
-      return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { return getEdgeDst(e) == N2; });
-    } else {
-      auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, [=] (edge_iterator e, GraphNode N) { return getEdgeDst(e) < N; });
-      return (getEdgeDst(e) == N2) ? e : edge_end(N1);
-    }
+    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { return getEdgeDst(e) == N2; });
+  }
+
+  edge_iterator findEdgeSortedByDst(GraphNode N1, GraphNode N2) {
+    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, [=] (edge_iterator e, GraphNode N) { return getEdgeDst(e) < N; });
+    return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }
 
   Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
@@ -267,13 +265,19 @@ public:
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison is over getEdgeDst(e). Assumed to be called by all nodes.
+   * Sorts outgoing edges of a node. Comparison is over getEdgeDst(e).
    */
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
     std::sort(edge_sort_begin(N), edge_sort_end(N), [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
-    numNodesWithEdgesSortedByDst++;
+  }
+
+  /**
+   * Sorts all outgoing edges of all nodes in parallel. Comparison is over getEdgeDst(e).
+   */
+  void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
   }
 
   template <typename F>
