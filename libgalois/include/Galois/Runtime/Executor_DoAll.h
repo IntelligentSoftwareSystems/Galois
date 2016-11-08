@@ -49,14 +49,8 @@
 #include "Galois/Runtime/Blocking.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
-//#include <algorithm>
-//#include <mutex>
-//#include <tuple>
-#include <iostream>
-
 namespace Galois {
 namespace Runtime {
-
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 template<class FunctionTy, class RangeTy>
