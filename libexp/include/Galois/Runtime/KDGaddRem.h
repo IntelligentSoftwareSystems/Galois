@@ -335,7 +335,7 @@ protected:
 
     KDGaddRemAsyncExec& exec;
     WinWL& winWL;
-    const T* minWinWL;
+    const Galois::optional<T>& minWinWL;
     Accumulator& nsrc;
     Accumulator& ntotal;;
 
@@ -519,9 +519,10 @@ public:
     // TODO: code to find global min goes here
 
     DummyWinWL winWL;
+    Galois::optional<T> minWinWL; // should remain uninitialized 
 
     t_for.start ();
-    applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, nullptr, nsrc, nInitCtxt});
+    applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
     t_for.stop ();
 
     reportStat (Base::loopname, "Number of iterations: ", nsrc.reduce (), 0);
@@ -563,7 +564,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
   void applyOperator (void) {
 
-    const T* minWinWL = nullptr;
+    Galois::optional<T> minWinWL;
 
     if (Base::NEEDS_PUSH && Base::targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin ();

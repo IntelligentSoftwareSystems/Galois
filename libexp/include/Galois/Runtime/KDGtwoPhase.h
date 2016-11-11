@@ -79,7 +79,6 @@ public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
-  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
 
 
@@ -101,33 +100,8 @@ protected:
     }
   };
 
-  struct WindowWLwrapper: public WindowWL {
-    IKDGtwoPhaseExecutor& outer;
 
-    WindowWLwrapper (IKDGtwoPhaseExecutor& outer, const Cmp& cmp):
-      WindowWL (cmp), outer (outer) {}
-
-    void push (const T& x) {
-      WindowWL::push (x);
-    }
-
-    // TODO: complete this class
-    void push (Ctxt* c) {
-      assert (c);
-
-      WindowWL::push (c->getActive ());
-
-      // destroy and deallocate c
-      outer.ctxtAlloc.destroy (c);
-      outer.ctxtAlloc.deallocate (c, 1);
-    }
-
-    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
-      WindowWL::poll (wl, newSize, origSize, outer.ctxtMaker);
-    }
-  };
-
-  WindowWLwrapper winWLwrapper;
+  typename Base::template WindowWLwrapper<IKDGtwoPhaseExecutor> winWL;
   CtxtMaker ctxtMaker;
 
 
@@ -140,7 +114,7 @@ public:
       const ArgsTuple& argsTuple)
     :
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
-      winWLwrapper (*this, cmp),
+      winWL (*this, cmp),
       ctxtMaker {*this}
   {
   }
@@ -159,6 +133,10 @@ public:
     reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
   }
 
+  CtxtMaker& getCtxtMaker(void) {
+    return ctxtMaker;
+  }
+
   template <typename R>
   void push_initial (const R& range) {
     if (Base::targetCommitRatio == 0.0) {
@@ -173,7 +151,7 @@ public:
 
 
     } else {
-      winWLwrapper.initfill (range);
+      winWL.initfill (range);
           
     }
   }
@@ -278,8 +256,8 @@ protected:
     Galois::optional<T> minElem;
 
     if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWLwrapper.empty ()) {
-        minElem = *winWLwrapper.getMin();
+      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
+        minElem = *winWL.getMin();
       }
     }
 
@@ -317,7 +295,7 @@ protected:
                   // if *i >= *minElem
                   Base::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
-                  winWLwrapper.push (*i);
+                  winWL.push (*i);
                 } 
               }
             } else {
@@ -342,7 +320,7 @@ protected:
   void execute_impl () {
 
     while (true) {
-      Base::beginRound (winWLwrapper);
+      Base::beginRound (winWL);
 
       if (Base::getCurrWL ().empty_all ()) {
         break;

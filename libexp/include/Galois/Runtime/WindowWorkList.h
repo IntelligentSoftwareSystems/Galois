@@ -104,17 +104,17 @@ public:
   }
 
 
-  const T* getMin (void) const {
+  Galois::optional<T> getMin (void) const {
     unsigned numT = getActiveThreads ();
 
-    const T* minElem = nullptr;
+    Galois::optional<T> minElem;
 
     for (unsigned i = 0; i < numT; ++i) {
       const Range& r = *wlRange.getRemote (i);
 
       if (r.first != r.second) {
-        if (minElem == nullptr || cmp (*minElem, *r.first)) {
-          minElem = &(*r.first);
+        if (!minElem || cmp (*minElem, *r.first)) {
+          minElem = *r.first;
         }
       }
     }
@@ -242,8 +242,8 @@ public:
 
   }
 
-  const T* getMin (void) const {
-    const T* ret = nullptr;
+  Galois::optional<T> getMin (void) const {
+    Galois::optional<T> ret;
 
     unsigned numT = getActiveThreads ();
 
@@ -251,8 +251,9 @@ public:
     for (unsigned i = 0; i < numT; ++i) {
 
       if (!m_wl[i].empty ()) {
-        if (!ret || cmp (static_cast<const Derived*> (this)->getTop (i), *ret)) {
-          ret = &(static_cast<const Derived*> (this)->getTop (i));
+        const T& top = static_cast<const Derived*> (this)->getTop (i);
+        if (!ret || cmp (top, *ret)) {
+          ret = top;
         }
       }
     }
@@ -262,11 +263,6 @@ public:
 
   void push (const T& x) {
     static_cast<Derived*> (this)->pushImpl (x);
-  }
-
-  void push (const T& x, const unsigned owner) {
-    assert (owner < Galois::getActiveThreads ());
-    static_cast<Derived*> (this)->pushImpl (x, owner);
   }
 
   size_t initSize (void) const {
@@ -301,8 +297,11 @@ public:
 
     Substrate::PerThreadStorage<Galois::optional<T> > perThrdLastPop;
 
+    Derived* d = static_cast<Derived*> (this);
+    assert(d);
+
     Galois::Runtime::on_each_impl (
-        [this, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
+        [this, d, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
 
           Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
 
@@ -311,13 +310,13 @@ public:
 
           for (int i = 0; i < lim; ++i) {
             if (i == (lim - 1)) {
-              lastPop = static_cast<Derived*> (this)->getTop ();
+              lastPop = d->getTop ();
             }
 
-            dbg::print("Removing and adding to window: ", static_cast<Derived*> (this)->getTop ());
+            dbg::print("Removing and adding to window: ", d->getTop ());
 
-            workList.get ().push_back (wrap (static_cast<Derived*> (this)->getTop ()));
-            static_cast<Derived*> (this)->popMin();
+            workList.get ().push_back (wrap (d->getTop ()));
+            d->popMin();
           }
         }
         , "poll_part_1");
@@ -360,11 +359,14 @@ public:
 
     if (windowLim) {
 
+      Derived* d = static_cast<Derived*> (this);
+      assert(d);
+
       Galois::Runtime::on_each_impl (
-          [this, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
+          [this, d, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
             while (!m_wl.get ().empty ()) {
-              const T& t = static_cast<Derived*> (this)->getTop ();
+              const T& t = d->getTop ();
 
               if (cmp (*windowLim, t)) { // windowLim < t
                 break;
@@ -372,13 +374,13 @@ public:
 
               dbg::print("Removing and adding to window: ", t, ", windowLim: ", *windowLim);
               workList.get ().push_back (wrap (t));
-              static_cast<Derived*> (this)->popMin ();
+              d->popMin ();
             }
           }
           , "poll_part_2");
 
 
-      const T* min = static_cast<Derived*> (this)->getMin ();
+      Galois::optional<T> min  = d->getMin ();
       if (min) {
         assert (cmp (*windowLim, *min));
       }
@@ -386,7 +388,7 @@ public:
 
       for (unsigned i = 0; i < numT; ++i) {
         if (!m_wl[i].empty ()) {
-          assert (cmp (*windowLim, static_cast<Derived*> (this)->getTop (i)) && "poll gone wrong");
+          assert (cmp (*windowLim, d->getTop (i)) && "poll gone wrong");
         }
       }
 
@@ -420,10 +422,6 @@ class PQwindowWL: public WindowWLbase<T, Cmp, PerThreadMinHeap<T, Cmp>, PQwindow
 
   void pushImpl (const T& x) {
     Base::m_wl.get ().push (x);
-  }
-
-  void pushImpl (const T& x, const unsigned owner) {
-    Base::m_wl[owner].push (x);
   }
 
   void popMin (void) {
@@ -465,10 +463,6 @@ class SetWindowWL: public WindowWLbase<T, Cmp, PerThreadSet<T, Cmp>, SetWindowWL
 
   void pushImpl (const T& x) {
     Base::m_wl.get ().insert (x);
-  }
-
-  void pushImpl (const T& x, const unsigned owner) {
-    Base::m_wl[owner].insert (x);
   }
 
   void popMin (void) {

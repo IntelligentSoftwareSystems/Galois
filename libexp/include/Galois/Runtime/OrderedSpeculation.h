@@ -717,7 +717,6 @@ class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using CtxtWL = typename Base::CtxtWL;
 
-  using WindowWL = PQwindowWL<Ctxt*, CtxtCmp>;
 
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
   using ExecutionRecords = std::vector<ParaMeter::StepStats>;
@@ -738,12 +737,11 @@ class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple
   };
 
 
-  WindowWL winWL;
   CtxtMaker ctxtMaker;
-  Substrate::PerThreadStorage<Ctxt*> currMinPending; // reset at the beginning of each round
-
 
   GAccumulator<size_t> totalRetires;
+  GAccumulator<size_t> totalAborts;
+
   CommitQ commitQ;
   ExecutionRecords execRcrds;
   TimeAccumulator t_beginRound;
@@ -754,7 +752,6 @@ public:
   OrdSpecExecBase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
-      winWL (Base::ctxtCmp),
       ctxtMaker {*this}
   {
   }
@@ -763,49 +760,9 @@ public:
     dumpStats();
   }
 
-  template <typename R>
-  void push_initial (const R& range) {
-
-    StatTimer t ("push_initial");
-
-    t.start();
-
-    const bool USE_WIN = (Base::targetCommitRatio != 0.0);
-    Galois::do_all_choice (range,
-        [this, USE_WIN] (const T& x) {
-
-          Ctxt* c = ctxtMaker (x);
-          if (USE_WIN) {
-            winWL.push (c);
-          } else {
-            Base::getNextWL().push (c);
-          }
-
-        }, 
-        std::make_tuple (
-          Galois::loopname ("init-fill"),
-          chunk_size<DEFAULT_CHUNK_SIZE>()));
-
-    t.stop();
-
+  CtxtMaker& getCtxtMaker(void) {
+    return ctxtMaker;
   }
-
-
-  void push_abort (Ctxt* ctxt) {
-    assert (ctxt);
-    assert (ctxt->hasState (ContextState::ABORT_DONE));
-
-    ctxt->setState (ContextState::UNSCHEDULED);
-
-    updateCurrMinPending (ctxt);
-    Base::getNextWL().push (ctxt);
-
-    Ctxt* m = getMinWinWL();
-    if (m) {
-      assert (Base::ctxtCmp (ctxt, m));
-    }
-  }
-
 
 protected:
 
@@ -835,65 +792,10 @@ protected:
     }
   }
 
-  void updateCurrMinPending (Ctxt* c) {
-    Ctxt*& minPending = *currMinPending.getLocal();
 
-    if (!minPending || Base::ctxtCmp (c, minPending)) {
-      minPending = c;
-    }
-  }
 
-  Ctxt* getMinWinWL (void) {
-    Ctxt* m = nullptr;
-
-    if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWL.empty()) {
-        m = *winWL.getMin();
-      }
-    }
-
-    return m;
-  }
-
-  Ctxt* getMinPending (void) {
-    Ctxt* m = getMinWinWL();
-
-    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
-      Ctxt* c = *currMinPending.getRemote (i);
-
-      if (!c) { continue; }
-
-      if (!m || Base::ctxtCmp (c, m)) {
-        m = c;
-      }
-    }
-
-    return m;
-  }
-
-  Ctxt* push_commit (const T& x, Ctxt* minWinWL, unsigned owner=Substrate::ThreadPool::getTID()) {
-
-    Ctxt* c = ctxtMaker (x); 
-    assert (c);
-
-    updateCurrMinPending (c);
-
-    if (!minWinWL || Base::ctxtCmp (c, minWinWL)) {
-        Base::getNextWL().push_back (c, owner);
-
-        dbg::print ("Child going to nextWL, c: ", c, ", with active: ", c->getActive());
-    } else {
-      assert (!Base::ctxtCmp (c, minWinWL));
-      assert (Base::targetCommitRatio != 0.0);
-      winWL.push (c, owner);
-
-      dbg::print ("Child going to winWL, c: ", c, ", with active: ", c->getActive());
-    }
-
-    return c;
-  }
-
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound() {
+  template <typename W>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound(W& winWL) {
 
     t_beginRound.start();
     
@@ -902,33 +804,6 @@ protected:
     if (Base::ENABLE_PARAMETER) {
       execRcrds.emplace_back (Base::rounds, Base::getCurrWL().size_all());
     }
-
-    // reset currMinPending
-    on_each_impl (
-        [this] (const unsigned tid, const unsigned numT) {
-          *(currMinPending.getLocal()) = nullptr;
-        });
-
-
-    // TODO: remove after debugging
-#ifndef NDEBUG
-    const Ctxt* minWinWL = getMinWinWL();
-    const Ctxt* minCurrWL = Base::getMinCurrWL();
-    const Ctxt* maxCurrWL = Base::getMaxCurrWL();
-
-    if (minCurrWL) {
-      dbg::print ("===== min CurrWL: ", minCurrWL, " with item: ", minCurrWL->getActive());
-    }
-    if (maxCurrWL) {
-      dbg::print ("max CurrWL: ", maxCurrWL, " with item: ", maxCurrWL->getActive());
-    }
-    if (minWinWL) {
-      dbg::print ("min Win WL: ", minWinWL, " with item: ", minWinWL->getActive());
-      assert (Base::ctxtCmp (maxCurrWL, minWinWL));
-    }
-
-#endif
-
     t_beginRound.stop();
   }
 
@@ -941,10 +816,10 @@ protected:
 
           if (!c->hasState (ContextState::ABORTED_CHILD)) {
 
+            dbg::print ("scheduling: ", c, " with item: ", c->getActive());
+
             assert (!c->hasState (ContextState::RECLAIM));
             c->schedule();
-
-            dbg::print ("scheduling: ", c, " with item: ", c->getActive());
 
             typename Base::UserCtxt& uhand = c->userHandle;
 
@@ -1032,9 +907,13 @@ protected:
   using NItemFactory = typename NItem::Factory;
   using CtxtWL = typename Base::CtxtWL;
 
+  using WindowWL = PQwindowWL<Ctxt*, CtxtCmp>;
+
+  WindowWL winWL;
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
   PerThreadBag<NItem*> abortLocations;
+  Substrate::PerThreadStorage<Ctxt*> currMinPending; // reset at the beginning of each round
 
   CtxtWL abortRoots;
   CtxtWL commitRoots;
@@ -1044,9 +923,36 @@ public:
   OptimOrderedExecBase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
+      winWL (Base::ctxtCmp),
       nitemFactory (Base::ctxtCmp),
       nhmgr (nitemFactory)
   {
+  }
+
+  template <typename R>
+  void push_initial (const R& range) {
+
+    StatTimer t ("push_initial");
+    t.start();
+
+    const bool USE_WIN = (Base::targetCommitRatio != 0.0);
+    Galois::do_all_choice (range,
+        [this, USE_WIN] (const T& x) {
+
+          Ctxt* c = Base::ctxtMaker (x);
+          if (USE_WIN) {
+            winWL.push (c);
+          } else {
+            Base::getNextWL().push (c);
+          }
+
+        }, 
+        std::make_tuple (
+          Galois::loopname ("init-fill"),
+          chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
+
+    t.stop();
+
   }
 
   NhoodMgr& getNhoodMgr (void) {
@@ -1060,6 +966,96 @@ public:
     }
   }
 
+  void push_abort (Ctxt* ctxt) {
+    assert (ctxt);
+    assert (ctxt->hasState (ContextState::ABORT_DONE));
+
+    ctxt->setState (ContextState::UNSCHEDULED);
+
+    Ctxt* m = getMinWinWL();
+    if (!m || Base::ctxtCmp(ctxt, m)) {
+      updateCurrMinPending (ctxt);
+      Base::getNextWL().push (ctxt);
+
+    } else {
+      winWL.push(ctxt);
+    }
+
+  }
+
+protected:
+
+  void resetCurrMinPending(void) {
+    // reset currMinPending
+    on_each_impl (
+        [this] (const unsigned tid, const unsigned numT) {
+          *(currMinPending.getLocal()) = nullptr;
+        });
+  }
+
+  void updateCurrMinPending (Ctxt* c) {
+    Ctxt*& minPending = *currMinPending.getLocal();
+
+    if (!minPending || Base::ctxtCmp (c, minPending)) {
+      minPending = c;
+    }
+  }
+
+  Ctxt* getMinWinWL (void) {
+    if (Base::targetCommitRatio != 0.0) {
+      Galois::optional<Ctxt*> m = winWL.getMin();
+      if (m) {
+        return *m;
+      }
+    }
+    return nullptr;
+  }
+
+  Ctxt* getMinPending (void) {
+    Ctxt* m = getMinWinWL();
+
+    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
+      Ctxt* c = *currMinPending.getRemote (i);
+
+      if (!c) { continue; }
+
+      if (!m || Base::ctxtCmp (c, m)) {
+        m = c;
+      }
+    }
+
+    return m;
+  }
+
+  void beginRound(void) {
+    Base::beginRound(winWL);
+    resetCurrMinPending();
+  }
+
+  Ctxt* push_commit (const T& x, Ctxt* minWinWL) {
+
+    Ctxt* c = Base::ctxtMaker (x); 
+    assert(c);
+
+
+    if (!minWinWL || Base::ctxtCmp (c, minWinWL)) {
+      Base::getNextWL().push_back (c);
+
+      dbg::print ("Child going to nextWL, c: ", c, ", with active: ", c->getActive());
+
+      updateCurrMinPending (c);
+
+    } else {
+      assert (!Base::ctxtCmp (c, minWinWL));
+      winWL.push (c);
+
+      dbg::print ("Child going to winWL, c: ", c, ", with active: ", c->getActive());
+    }
+
+    return c;
+  }
+
+
   void quickAbort (Ctxt* c) {
     assert (c);
     bool b= c->hasState (ContextState::SCHEDULED) 
@@ -1070,7 +1066,7 @@ public:
     assert (b);
 
     if (c->casState (ContextState::SCHEDULED, ContextState::ABORT_DONE)) {
-      Base::push_abort (c);
+      push_abort (c);
       dbg::print("Quick Abort c: ", c, ", with active: ", c->getActive());
 
     } 
@@ -1091,7 +1087,8 @@ public:
           Ctxt* c = ni->getMin();
           ni->findAborts (c, abortRoots);
 
-          quickAbort (c); // re-try c 
+          // quickAbort (c); // not needed as applyOperator aborts 
+          // c->disableSrc();
         },
         std::make_tuple (
           Galois::loopname ("mark-aborts"),
@@ -1203,7 +1200,7 @@ public:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits() {
 
 
-    Ctxt* gvt = Base::getMinPending();
+    Ctxt* gvt = getMinPending();
 
     // TODO: remove this after debugging
     // Ctxt* gvtAlt = Base::computeGVT();
@@ -1331,6 +1328,8 @@ protected:
   using CtxtWL = typename Base::CtxtWL;
 
 
+
+
   TimeAccumulator t_executeSources;
   TimeAccumulator t_applyOperator;
   TimeAccumulator t_serviceAborts;
@@ -1341,6 +1340,7 @@ public:
   OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple)
+
   {
   }
 
@@ -1351,6 +1351,7 @@ public:
     reportStat ("NULL", "t_performCommits", t_performCommits.get(),0);
     reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get(),0);
   }
+
 
   void operator() (void) {
     execute();
@@ -1399,8 +1400,7 @@ public:
     t.stop();
   }
 
-private:
-
+protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
 
@@ -1529,20 +1529,17 @@ public:
   using Executor = Exec;
 
   
-  unsigned owner;
   NhoodList nhood;
 
   explicit PessimOrdContext (const T& x, const ContextState& s, Exec& e)
     : 
-      Base (x, s, e), 
-      owner (Substrate::ThreadPool::getTID())
+      Base (x, s, e)
 
   {}
 
   void schedule() {
     Base::schedule();
     nhood.clear();
-    owner = Substrate::ThreadPool::getTID();
   }
 
 
@@ -1668,6 +1665,10 @@ protected:
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using CtxtWL = typename Base::CtxtWL;
 
+  typename Base::template WindowWLwrapper<PessimOrdExecutor> winWL;
+
+  Substrate::PerThreadStorage<Galois::optional<T> > currMinPending; // reset at the beginning of each round
+
   CtxtWL abortRoots;
   CtxtWL freeWL;
 
@@ -1680,7 +1681,8 @@ public:
 
   PessimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
-      Base (cmp, nhFunc, exFunc, opFunc, argsTuple)
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
+      winWL (*this, cmp)
   {
   }
 
@@ -1689,6 +1691,24 @@ public:
     reportStat ("NULL", "t_applyOperator",  t_applyOperator.get(),0);
     reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get(),0);
     reportStat ("NULL", "t_performCommits", t_performCommits.get(),0);
+  }
+
+  template <typename R>
+  void push_initial (const R& range) {
+    if (Base::targetCommitRatio == 0.0) {
+
+      Galois::do_all_choice (range,
+          [this] (const T& x) {
+            Base::getNextWL ().push_back (Base::ctxtMaker (x));
+          }, 
+          std::make_tuple (
+            Galois::loopname ("init-fill"),
+            chunk_size<NhFunc::CHUNK_SIZE> ()));
+
+    } else {
+      winWL.initfill (range);
+          
+    }
   }
 
   void markForAbort (Ctxt* c) {
@@ -1703,7 +1723,8 @@ public:
 
     while (true) {
 
-      Base::beginRound();
+      Base::beginRound(winWL);
+      resetCurrMinPending();
 
       if (Base::getCurrWL().empty_all()) {
         break;
@@ -1732,6 +1753,87 @@ public:
     }
 
     t.stop();
+
+  }
+
+protected:
+
+
+  void resetCurrMinPending(void) {
+    // reset currMinPending
+    on_each_impl (
+        [this] (const unsigned tid, const unsigned numT) {
+          *(currMinPending.getLocal()) = Galois::optional<T>();
+        });
+  }
+
+  void updateCurrMinPending (const T& elem) {
+    Galois::optional<T>& minPending = *currMinPending.getLocal();
+
+    if (!minPending || Base::getItemCmp()(elem, *minPending)) {
+      minPending = elem;
+    }
+  }
+
+  Galois::optional<T> getMinWinWL (void) {
+
+    Galois::optional<T> m;
+    if (Base::targetCommitRatio != 0.0) {
+      m = winWL.getMin();
+    }
+    return m;
+  }
+
+  Galois::optional<T> getMinPending (void) {
+    Galois::optional<T> m = getMinWinWL();
+
+    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
+      Galois::optional<T> c = *currMinPending.getRemote (i);
+
+      if (!c) { continue; }
+
+      if (!m || Base::getItemCmp()(*c, *m)) {
+        m = c;
+      }
+    }
+
+    return m;
+  }
+
+  void push_commit (const T& x, const Galois::optional<T>& minWinWL) {
+
+
+    if (!minWinWL || Base::getItemCmp()(x, *minWinWL)) {
+
+      Ctxt* c = Base::ctxtMaker (x); 
+      assert (c);
+      dbg::print ("Child going to nextWL, c: ", c, ", with active: ", c->getActive());
+      Base::getNextWL().push_back (c);
+
+      updateCurrMinPending (x);
+
+    } else {
+      dbg::print ("Child going to winWL, active: ", x);
+      assert(!Base::getItemCmp()(x, *minWinWL));
+      winWL.push(x);
+    }
+  }
+
+  void push_abort (Ctxt* ctxt) {
+    assert (ctxt);
+    assert (ctxt->hasState (ContextState::ABORT_DONE));
+
+    ctxt->setState (ContextState::UNSCHEDULED);
+
+    Galois::optional<T> m = getMinWinWL();
+    if (!m || Base::getItemCmp()(ctxt->getActive(), *m)) {
+      updateCurrMinPending (ctxt->getActive());
+      Base::getNextWL().push (ctxt);
+
+    } else {
+      winWL.push(ctxt->getActive());
+      Base::freeCtxt(ctxt);
+    }
 
   }
 
@@ -1811,6 +1913,15 @@ public:
               Base::commitQ.get().push_back (c);
               Base::roundCommits += 1;
 
+              if (Base::NEEDS_PUSH) {
+                auto& uhand = c->userHandle;
+                for (auto i = uhand.getPushBuffer().begin()
+                    , end_i = uhand.getPushBuffer().end(); i != end_i; ++i) {
+
+                  updateCurrMinPending(*i);
+                }
+              }
+
               if (Base::ENABLE_PARAMETER) {
                 c->markExecRound (Base::rounds);
               }
@@ -1832,128 +1943,196 @@ public:
 
   }
 
+  void tryCommit(Ctxt* c, const Galois::optional<T>& minWinWL) {
+    assert (c);
+    assert (c->hasState(ContextState::READY_TO_COMMIT));
+
+    if (c->casState(ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
+      if (Base::NEEDS_PUSH) {
+        auto& uhand = c->userHandle;
+        for (auto i = uhand.getPushBuffer().begin()
+            , end_i = uhand.getPushBuffer().end(); i != end_i; ++i) {
+
+          push_commit (*i, minWinWL);
+
+        }
+        uhand.getPushBuffer().clear();
+      }
+
+      c->doCommit();
+      Base::totalRetires += 1;
+
+      if (Base::ENABLE_PARAMETER) {
+        assert (c->getExecRound() < Base::execRcrds.size());
+        Base::execRcrds[c->getExecRound()].parallelism += 1;
+      }
+
+      Base::freeCtxt(c);
+
+    } // end if committing
+  }
+
   void performCommits (void) {
 
-    auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
+    Galois::optional<T> gvt = getMinPending();
+    Galois::optional<T> minWinWL = winWL.getMin();
+
+    // partition criteria
+    auto ptest = [&gvt, &minWinWL, this] (Ctxt* c) -> bool {
+      assert (c);
+
+      bool ret = false;
+      if (c->hasState(ContextState::READY_TO_COMMIT)) {
+        ret = true; // move to left 
+
+        if (!gvt || Base::getItemCmp()(c->getActive(), *gvt)) {
+          ret = false; // can commit so move to right and deallocate
+
+          tryCommit (c, minWinWL);
+        } // end if gvt
+
+
+      } else {
+        ret = false; // an aborted or already committed task, so move to right
+      }
+
+      return ret;
+    };
+
 
     Galois::Runtime::on_each_impl (
-        [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
+        [this, &ptest] (const unsigned tid, const unsigned numT) {
           auto& localQ = Base::commitQ.get();
-          auto new_end = std::partition (localQ.begin(), 
-            localQ.end(), 
-            [] (Ctxt* c) {
-              assert (c);
-              return c->hasState (ContextState::READY_TO_COMMIT);
-            });
 
+          auto new_end = std::partition (localQ.begin(), localQ.end(), ptest); 
           localQ.erase (new_end, localQ.end());
-
-          std::sort (localQ.begin(), localQ.end(), revCtxtCmp);
         });
 
-    using C = typename Base::CommitQ::container_type;
 
-    // assumes that per thread commit queues are sorted in reverse order
-    auto qcmp = [this] (const C* q1, const C* q2) -> bool {
+  }
 
-      assert (q1 && !q1->empty());
-      assert (q2 && !q2->empty());
-
-      return Base::ctxtCmp (q1->back(), q2->back());
-    };
-     
-
-    using PQ = Galois::MinHeap<C*, typename std::remove_reference<decltype (qcmp)>::type>;
-    PQ commitMetaPQ (qcmp);
-
-    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
-
-      if (!Base::commitQ.get (i).empty()) {
-        commitMetaPQ.push (&(Base::commitQ.get (i))); 
-      }
-    }
-
-    Ctxt* minWinWL = Base::getMinWinWL();
-    Ctxt* minPending = Base::getMinPending();
-
-
-
-    while (!commitMetaPQ.empty()) { 
-
-      C* q = commitMetaPQ.pop();
-      assert (!q->empty());
-
-      bool e = commitMetaPQ.empty();
-
-      bool exit = false;
-
-      do {
-        Ctxt* c = q->back();
-
-        if (!minPending || !Base::ctxtCmp (minPending, c)) { // minPending >= c
-          //do commit
-          q->pop_back();
-
-          assert (c->hasState (ContextState::READY_TO_COMMIT) || c->hasState (ContextState::COMMIT_DONE));
-
-          if (c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
-
-            if (Base::NEEDS_PUSH) {
-              auto& uhand = c->userHandle;
-              for (auto i = uhand.getPushBuffer().begin()
-                  , end_i = uhand.getPushBuffer().end(); i != end_i; ++i) {
-
-                Ctxt* child = Base::push_commit (*i, minWinWL, c->owner);
-
-                if (!minPending || Base::ctxtCmp (child, minPending)) { // update minPending
-                  minPending = child;
-                }
-              }
-              uhand.getPushBuffer().clear();
-            }
-
-            c->doCommit();
-            Base::totalRetires += 1;
-
-            if (Base::ENABLE_PARAMETER) {
-              assert (c->getExecRound() < Base::execRcrds.size());
-              Base::execRcrds[c->getExecRound()].parallelism += 1;
-            }
-
-
-            freeWL.push (c, c->owner);
-          }
-            
-
-        } else {
-          exit = true;
-          break; // exit
-        }
-      } while (!q->empty() && !e && qcmp (q, commitMetaPQ.top()));
-
-      if (exit) {
-        break;
-      }
-
-      if (!q->empty()) {
-        commitMetaPQ.push (q);
-      }
-    } // end outer while
-
-
-    // memory is returned to owner thread, thus thread 0 doesn't accumulate all 
-    // the feed blocks
-    on_each_impl (
-        [this] (const unsigned tid, const unsigned numT) {
-          for (auto i = freeWL.get().begin()
-              , end_i = freeWL.get().end(); i != end_i; ++i) {
-
-            Base::freeCtxt (*i);
-          }
-          freeWL.get().clear();
-        });
-          
-  } // end performCommits
+  // void performCommits (void) {
+// 
+    // auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
+// 
+    // Galois::Runtime::on_each_impl (
+        // [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
+          // auto& localQ = Base::commitQ.get();
+          // auto new_end = std::partition (localQ.begin(), 
+            // localQ.end(), 
+            // [] (Ctxt* c) {
+              // assert (c);
+              // return c->hasState (ContextState::READY_TO_COMMIT);
+            // });
+// 
+          // localQ.erase (new_end, localQ.end());
+// 
+          // std::sort (localQ.begin(), localQ.end(), revCtxtCmp);
+        // });
+// 
+    // using C = typename Base::CommitQ::container_type;
+// 
+    // // assumes that per thread commit queues are sorted in reverse order
+    // auto qcmp = [this] (const C* q1, const C* q2) -> bool {
+// 
+      // assert (q1 && !q1->empty());
+      // assert (q2 && !q2->empty());
+// 
+      // return Base::ctxtCmp (q1->back(), q2->back());
+    // };
+     // 
+// 
+    // using PQ = Galois::MinHeap<C*, typename std::remove_reference<decltype (qcmp)>::type>;
+    // PQ commitMetaPQ (qcmp);
+// 
+    // for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
+// 
+      // if (!Base::commitQ.get (i).empty()) {
+        // commitMetaPQ.push (&(Base::commitQ.get (i))); 
+      // }
+    // }
+// 
+    // Ctxt* minWinWL = Base::getMinWinWL();
+    // Ctxt* minPending = Base::getMinPending();
+// 
+// 
+// 
+    // while (!commitMetaPQ.empty()) { 
+// 
+      // C* q = commitMetaPQ.pop();
+      // assert (!q->empty());
+// 
+      // bool e = commitMetaPQ.empty();
+// 
+      // bool exit = false;
+// 
+      // do {
+        // Ctxt* c = q->back();
+// 
+        // if (!minPending || !Base::ctxtCmp (minPending, c)) { // minPending >= c
+          // //do commit
+          // q->pop_back();
+// 
+          // assert (c->hasState (ContextState::READY_TO_COMMIT) || c->hasState (ContextState::COMMIT_DONE));
+// 
+          // if (c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
+// 
+            // if (Base::NEEDS_PUSH) {
+              // auto& uhand = c->userHandle;
+              // for (auto i = uhand.getPushBuffer().begin()
+                  // , end_i = uhand.getPushBuffer().end(); i != end_i; ++i) {
+// 
+                // Ctxt* child = Base::push_commit (*i, minWinWL);
+// 
+                // if (!minPending || Base::ctxtCmp (child, minPending)) { // update minPending
+                  // minPending = child;
+                // }
+              // }
+              // uhand.getPushBuffer().clear();
+            // }
+// 
+            // c->doCommit();
+            // Base::totalRetires += 1;
+// 
+            // if (Base::ENABLE_PARAMETER) {
+              // assert (c->getExecRound() < Base::execRcrds.size());
+              // Base::execRcrds[c->getExecRound()].parallelism += 1;
+            // }
+// 
+// 
+            // freeWL.push (c);
+          // }
+            // 
+// 
+        // } else {
+          // exit = true;
+          // break; // exit
+        // }
+      // } while (!q->empty() && !e && qcmp (q, commitMetaPQ.top()));
+// 
+      // if (exit) {
+        // break;
+      // }
+// 
+      // if (!q->empty()) {
+        // commitMetaPQ.push (q);
+      // }
+    // } // end outer while
+// 
+// 
+    // // memory is returned to owner thread, thus thread 0 doesn't accumulate all 
+    // // the feed blocks
+    // on_each_impl (
+        // [this] (const unsigned tid, const unsigned numT) {
+          // for (auto i = freeWL.get().begin()
+              // , end_i = freeWL.get().end(); i != end_i; ++i) {
+// 
+            // Base::freeCtxt (*i);
+          // }
+          // freeWL.get().clear();
+        // });
+          // 
+  // } // end performCommits
 
 };
 

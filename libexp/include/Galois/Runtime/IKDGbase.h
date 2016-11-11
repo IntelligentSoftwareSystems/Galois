@@ -102,6 +102,34 @@ protected:
   using Base = OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
   using CtxtWL = typename Base::CtxtWL;
 
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+
+  template <typename Outer>
+  struct WindowWLwrapper: public WindowWL {
+    Outer& outer;
+
+    WindowWLwrapper (Outer& outer, const Cmp& cmp):
+      WindowWL (cmp), outer (outer) {}
+
+    void push (const T& x) {
+      WindowWL::push (x);
+    }
+
+    // TODO: complete this class
+    void push (Ctxt* c) {
+      assert (c);
+
+      WindowWL::push (c->getActive ());
+
+      // destroy and deallocate c
+      outer.ctxtAlloc.destroy (c);
+      outer.ctxtAlloc.deallocate (c, 1);
+    }
+
+    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
+      WindowWL::poll (wl, newSize, origSize, outer.getCtxtMaker());
+    }
+  };
 
   std::unique_ptr<CtxtWL> currWL;
   std::unique_ptr<CtxtWL> nextWL;

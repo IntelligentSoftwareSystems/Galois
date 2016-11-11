@@ -53,7 +53,7 @@ protected:
     reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
   }
 
-  void abortCtxt (Ctxt* c) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void abortCtxt (Ctxt* c) {
     assert (c);
     c->cancelIteration ();
     c->reset ();
@@ -61,8 +61,14 @@ protected:
     Base::ctxtAlloc.deallocate (c, 1);
   }
 
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void retireCtxt (Ctxt* c) {
+    assert (c);
+    c->commitIteration ();
+    c->~Ctxt ();
+    Base::ctxtAlloc.deallocate (c, 1);
+  }
 
-  void expandNhood (void) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
     Galois::do_all_choice (makeLocalRange (pending),
         [this] (const T& x) {
@@ -90,7 +96,7 @@ protected:
     pending.clear_all_parallel ();
   }
 
-  void applyOperator (void) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
 
     Galois::optional<T> minElem;
 
@@ -127,9 +133,7 @@ protected:
               assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
             }
 
-            c->commitIteration ();
-            c->~Ctxt ();
-            Base::ctxtAlloc.deallocate (c, 1);
+            retireCtxt(c);
 
           } else {
             abortCtxt (c);

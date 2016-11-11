@@ -40,7 +40,7 @@
 namespace Galois {
 namespace Runtime {
 
-using dbg = Galois::Substrate::debug<0>;
+using dbg = Galois::Substrate::debug<1>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
