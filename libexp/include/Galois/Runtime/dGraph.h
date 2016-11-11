@@ -202,7 +202,7 @@ public:
        std::vector<typename FnTy::ValTy> val_vec(num);
        Galois::Runtime::gDeserialize(buf, val_vec);
        if(num > 0){
-         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+         if (!FnTy::reduce_batch(from_id, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
                uint32_t lid = masterNodes[from_id][n];
@@ -221,7 +221,16 @@ public:
        StatTimer_set.stop();
    }
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
+   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), s);
+   }
+   template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
+   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::reduce_batch(x, v.data());
+   }
+
+   template<typename FnTy, bool updated_only>
      void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
        auto& net = Galois::Runtime::getSystemNetworkInterface();
        std::string set_timer_str("SYNC_SET_" + loopName + "_" + get_run_identifier());
@@ -235,33 +244,41 @@ public:
          Galois::DynamicBitSet bit_set_comm;
          bit_set_comm.resize_init(num);
 
-         Galois::Runtime::gDeserialize(buf, bit_set_comm);
-         auto bits_set_num = bit_set_comm.bit_count(num);
+         size_t bit_set_count = 0;
+         if (updated_only) {
+           Galois::Runtime::gDeserialize(buf, bit_set_comm);
+           bit_set_count = bit_set_comm.bit_count(num);
+         }
 
-         if(bits_set_num > 0){
-         std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-         Galois::Runtime::gDeserialize(buf, val_vec);
+         if (!updated_only || (bit_set_count > 0)) {
+           std::vector<typename FnTy::ValTy> val_vec;
+           if (updated_only) val_vec.resize(bit_set_count);
+           else val_vec.resize(num);
+           Galois::Runtime::gDeserialize(buf, val_vec);
 
-         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
-           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
-               [&](uint32_t n){
+           bool batch_succeeded = batch_reduce<FnTy, updated_only>(from_id, bit_set_comm, val_vec, bit_set_count);
+           if (!batch_succeeded) {
+             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+                 [&](uint32_t n){
 
-               if(bit_set_comm.is_set(n)){
+                 if(!updated_only || bit_set_comm.is_set(n)){
 
-                  uint32_t lid = masterNodes[from_id][n];
-                  uint32_t vec_index = bit_set_comm.bit_count(n);
+                    uint32_t lid = masterNodes[from_id][n];
+                    uint32_t vec_index;
+                    if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                    else vec_index = n;
 
 #ifdef __GALOIS_HET_OPENCL__
-                 CLNodeDataWrapper d = clGraph.getDataW(lid);
-                 FnTy::reduce(lid, d, val_vec[vec_index]);
+                   CLNodeDataWrapper d = clGraph.getDataW(lid);
+                   FnTy::reduce(lid, d, val_vec[vec_index]);
 #else
 
-                 FnTy::reduce(lid, getData(lid), val_vec[vec_index]);
+                   FnTy::reduce(lid, getData(lid), val_vec[vec_index]);
 #endif
-               }
-               }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+                 }
+                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+           }
          }
-        }
        }
        StatTimer_set.stop();
    }
@@ -288,7 +305,7 @@ public:
       if(num > 0){
         std::vector<typename FnTy::ValTy> val_vec(num);
 
-        if (!FnTy::extract_batch(from_id, &val_vec[0])) {
+        if (!FnTy::extract_batch(from_id, val_vec.data())) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
               uint32_t localID = masterNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -310,7 +327,16 @@ public:
       net.sendMsg(from_id, syncRecv, b);
    }
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
+   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), s);
+   }
+   template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
+   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::setVal_batch(x, v.data());
+   }
+
+   template<typename FnTy, bool updated_only>
    void syncPullRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
       std::string set_timer_str("SYNC_SET_" + loopName + "_" + get_run_identifier());
       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
@@ -322,36 +348,45 @@ public:
       StatTimer_set.start();
 
       if(num > 0){
-         Galois::DynamicBitSet bit_set_comm;
-         bit_set_comm.resize_init(num);
 
-         Galois::Runtime::gDeserialize(buf, bit_set_comm);
-         auto bits_set_num = bit_set_comm.bit_count(num);
+        Galois::DynamicBitSet bit_set_comm;
+        bit_set_comm.resize_init(num);
 
-         if(bits_set_num > 0){
-         std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-         Galois::Runtime::gDeserialize(buf, val_vec);
+        size_t bit_set_count = 0;
+        if (updated_only) {
+          Galois::Runtime::gDeserialize(buf, bit_set_comm);
+          bit_set_count = bit_set_comm.bit_count(num);
+        }
 
-        if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
-          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+        if (!updated_only || (bit_set_count > 0)) {
+          std::vector<typename FnTy::ValTy> val_vec;
+          if (updated_only) val_vec.resize(bit_set_count);
+          else val_vec.resize(num);
+          Galois::Runtime::gDeserialize(buf, val_vec);
 
-              if(bit_set_comm.is_set(n)){
-                uint32_t localID = slaveNodes[from_id][n];
-                uint32_t vec_index = bit_set_comm.bit_count(n);
+          bool batch_succeeded = batch_setVal<FnTy, updated_only>(from_id, bit_set_comm, val_vec, bit_set_count);
+          if (!batch_succeeded) {
+            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+                [&](uint32_t n){
+
+                if(!updated_only || bit_set_comm.is_set(n)){
+
+                   uint32_t lid = slaveNodes[from_id][n];
+                   uint32_t vec_index;
+                   if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                   else vec_index = n;
 
 #ifdef __GALOIS_HET_OPENCL__
-                  {
-                  CLNodeDataWrapper d = clGraph.getDataW(localID);
-                  FnTy::setVal(localID, d, val_vec[vec_index]);
-                  }
+                  CLNodeDataWrapper d = clGraph.getDataW(lid);
+                  FnTy::setVal(lid, d, val_vec[vec_index]);
 #else
-                  FnTy::setVal(localID, getData(localID), val_vec[vec_index]);
-#endif
 
-              }
-              }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
-         }
-      }
+                  FnTy::setVal(lid, getData(lid), val_vec[vec_index]);
+#endif
+                }
+                }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+          }
+        }
       }
       StatTimer_set.stop();
    }
@@ -718,7 +753,7 @@ public:
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -794,7 +829,7 @@ public:
          std::vector<uint64_t> &val_vec = rb[x];
 #endif
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::setVal_batch(x, &val_vec[0])) {
+         if (!FnTy::setVal_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                uint32_t localID = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -866,7 +901,7 @@ public:
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                 uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -944,7 +979,7 @@ public:
          std::vector<uint64_t> &val_vec = rb[x];
 #endif
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::reduce_batch(x, &val_vec[0])) {
+         if (!FnTy::reduce_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
                uint32_t lid = masterNodes[x][n];
@@ -998,7 +1033,7 @@ public:
          size+=8;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1053,7 +1088,7 @@ public:
 #endif
          Galois::Runtime::gDeserialize(rb[x], val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::setVal_batch(x, &val_vec[0])) {
+         if (!FnTy::setVal_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                uint32_t localID = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1106,7 +1141,7 @@ public:
          size+=8;
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                 uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1163,7 +1198,7 @@ public:
 #endif
          Galois::Runtime::gDeserialize(rb[x], val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::reduce_batch(x, &val_vec[0])) {
+         if (!FnTy::reduce_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
                uint32_t lid = masterNodes[x][n];
@@ -1201,7 +1236,7 @@ public:
 #endif
      Galois::Runtime::gDeserialize(buf, val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-     if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
+     if (!FnTy::setVal_batch(from_id, val_vec.data())) {
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
            uint32_t localID = slaveNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1233,7 +1268,7 @@ public:
 #endif
      Galois::Runtime::gDeserialize(buf, val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-     if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+     if (!FnTy::reduce_batch(from_id, val_vec.data())) {
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
            [&](uint32_t n){
            uint32_t lid = masterNodes[from_id][n];
@@ -1281,7 +1316,7 @@ public:
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1342,7 +1377,7 @@ public:
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+         if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                 uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1374,8 +1409,17 @@ public:
    }
 #endif
 
+   template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
+   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
 
-   template<typename FnTy>
+     return FnTy::extract_reset_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s);
+   }
+   template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
+   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::extract_reset_batch(x, v.data());
+   }
+
+   template<typename FnTy, bool updated_only = false>
    void sync_push_isend(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1394,7 +1438,8 @@ public:
       std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + get_run_identifier());
       std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + get_run_identifier());
       std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-
+      std::string statSavedBytes_str("SAVED_BYTES_SYNC_PUSH_" + loopName +"_" + get_run_identifier());
+      Galois::Statistic SyncPull_saved_bytes(statSavedBytes_str);
       Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
       Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
@@ -1421,53 +1466,60 @@ public:
         Galois::Runtime::SendBuffer b;
 
         StatTimer_extract.start();
-        if(num > 0 ){
-          Galois::DynamicBitSet bit_set_comm;
-          bit_set_comm.resize_init(num);
+         if(num > 0){
+           Galois::DynamicBitSet bit_set_comm;
+           bit_set_comm.resize_init(num);
+           size_t bit_set_count = 0;
+           std::vector<typename FnTy::ValTy> val_vec(num);
 
-          std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
+           bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
-          if(bit_set_compute.bit_count() > 0){
-            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                uint32_t lid = slaveNodes[x][n];
-                if(bit_set_compute.is_set(lid)){
-                bit_set_comm.bit_set(n);
-                }
+           if (!batch_succeeded) {
+             if (updated_only) {
+               if(bit_set_compute.bit_count() > 0){
+                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
+                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
+                       uint32_t lid = slaveNodes[x][n];
+                       if(bit_set_compute.is_set(lid)){
+                         bit_set_comm.bit_set(n);
+                       }
 
-                }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-          }
+                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
+               }
+               //bits set to be sent to x
+               bit_set_count = bit_set_comm.bit_count();
+             }
+             if (!updated_only || (bit_set_count > 0)) {
+               Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-          //bits set to be sent to x
-          auto bits_set_num = bit_set_comm.bit_count(num);
-          //std::cout << "BIT_COMM : " << bits_set_num << " , BITS_COMP : " << bit_set_compute.bit_count()  << " num : " << num << "\n";
-          Galois::Runtime::reportStat("(NULL)", "SYNC_PUSH_BITS_SAVED", (unsigned)(bits_set_num - num), 0);
-          std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-
-          if(bits_set_num > 0){
-
-            if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
-              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-
-                  if(bit_set_comm.is_set(n)){
-                    uint32_t lid = slaveNodes[x][n];
-                    uint32_t vec_index = bit_set_comm.bit_count(n);
-
+                    if(!updated_only || bit_set_comm.is_set(n)){
+                      uint32_t lid = slaveNodes[x][n];
+                      uint32_t vec_index;
+                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                      else vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
-                  CLNodeDataWrapper d = clGraph.getDataW(lid);
-                  auto val = FnTy::extract(lid, getData(lid, d));
-                  FnTy::reset(lid, d);
+                      CLNodeDataWrapper d = clGraph.getDataW(lid);
+                      auto val = FnTy::extract(lid, getData(lid, d));
+                      FnTy::reset(lid, d);
 #else
-                  auto val = FnTy::extract(lid, getData(lid));
-                  FnTy::reset(lid, getData(lid));
+                      auto val = FnTy::extract(lid, getData(lid));
+                      FnTy::reset(lid, getData(lid));
 #endif
-                  val_vec[vec_index] = val;
-                  }
-                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+                      val_vec[vec_index] = val;
+                    }
+                   }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+             }
            }
-          }
 
-           gSerialize(b, bit_set_comm, val_vec);
-           bit_set_compute.reset();
+           if (updated_only) {
+             size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
+             size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
+             if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
+             val_vec.resize(bit_set_count);
+             gSerialize(b, bit_set_comm, val_vec);
+           } else {
+             gSerialize(b, val_vec);
+           }
          } else {
            gSerialize(b, loopName);
          }
@@ -1483,7 +1535,7 @@ public:
    }
 
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only = false>
    void sync_push_recv(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1526,7 +1578,7 @@ public:
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncRecvApply<FnTy>(p->first, p->second, loopName);
+        syncRecvApply<FnTy, updated_only>(p->first, p->second, loopName);
       }
       ++Galois::Runtime::evilPhase;
 
@@ -1534,7 +1586,7 @@ public:
 
    }
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only = false>
    void sync_push(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1553,7 +1605,8 @@ public:
       std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + get_run_identifier());;
       std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + get_run_identifier());
       std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-
+      std::string statSavedBytes_str("SAVED_BYTES_SYNC_PUSH_" + loopName +"_" + get_run_identifier());
+      Galois::Statistic SyncPull_saved_bytes(statSavedBytes_str);
       Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
       Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
@@ -1583,32 +1636,34 @@ public:
          if(num > 0){
            Galois::DynamicBitSet bit_set_comm;
            bit_set_comm.resize_init(num);
+           size_t bit_set_count = 0;
+           std::vector<typename FnTy::ValTy> val_vec(num);
 
-            std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
+           bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
-            if(bit_set_compute.bit_count() > 0){
-               Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                    uint32_t lid = slaveNodes[x][n];
-                    if(bit_set_compute.is_set(lid)){
-                      bit_set_comm.bit_set(n);
-                    }
+           if (!batch_succeeded) {
+             if (updated_only) {
+               if(bit_set_compute.bit_count() > 0){
+                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET_" + loopName + "_" + get_run_identifier());
+                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
+                       uint32_t lid = slaveNodes[x][n];
+                       if(bit_set_compute.is_set(lid)){
+                         bit_set_comm.bit_set(n);
+                       }
 
-                   }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-            }
-
-           //bits set to be sent to x
-           auto bits_set_num = bit_set_comm.bit_count(num);
-           //std::cout << "BIT_COMM : " << bits_set_num << " , BITS_COMP : " << bit_set_compute.bit_count()  << " num : " << num << "\n";
-           Galois::Runtime::reportStat("(NULL)", "SYNC_PUSH_BITS_SAVED", (unsigned)(bits_set_num - num), 0);
-           std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-
-           if(bits_set_num > 0){
-             if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
+               }
+               //bits set to be sent to x
+               bit_set_count = bit_set_comm.bit_count(num);
+             }
+             if (!updated_only || (bit_set_count > 0)) {
                Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-                    if(bit_set_comm.is_set(n)){
+                    if(!updated_only || bit_set_comm.is_set(n)){
                       uint32_t lid = slaveNodes[x][n];
-                      uint32_t vec_index = bit_set_comm.bit_count(n);
+                      uint32_t vec_index;
+                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                      else vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
                       CLNodeDataWrapper d = clGraph.getDataW(lid);
                       auto val = FnTy::extract(lid, getData(lid, d));
@@ -1623,8 +1678,15 @@ public:
              }
            }
 
-           gSerialize(b, bit_set_comm, val_vec);
-           bit_set_compute.reset();
+           if (updated_only) {
+             size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
+             size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
+             if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
+             val_vec.resize(bit_set_count);
+             gSerialize(b, bit_set_comm, val_vec);
+           } else {
+             gSerialize(b, val_vec);
+           }
          } else {
            gSerialize(b, loopName);
          }
@@ -1648,7 +1710,7 @@ public:
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncRecvApply<FnTy>(p->first, p->second, loopName);
+        syncRecvApply<FnTy, updated_only>(p->first, p->second, loopName);
       }
     StatTimer_RecvTime.stop();
       ++Galois::Runtime::evilPhase;
@@ -1701,7 +1763,7 @@ public:
            std::vector<typename FnTy::ValTy> val_vec(num);
 
          if(num > 0 ){
-           if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+           if (!FnTy::extract_reset_batch(x, val_vec.data())) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                   uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1768,10 +1830,19 @@ public:
 
    }
 
+   template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
+   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s);
+   }
+   template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
+   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+     return FnTy::extract_batch(x, v.data());
+   }
+
   /****************************
    * Communication Pipelining
    ***************************/
-    template<typename FnTy>
+    template<typename FnTy, bool updated_only = false>
    void sync_pull_isend(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1788,6 +1859,8 @@ public:
       std::string doall_str("LAMBDA::SYNC_PULL_iSEND_" + loopName + "_" + get_run_identifier());
       std::string timer_str("SYNC_PULL_iSEND_" + loopName +"_" + get_run_identifier());
       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_iSEND_" + loopName +"_" + get_run_identifier());
+      std::string statSavedBytes_str("SAVED_BYTES_SYNC_PULL_iSEND_" + loopName +"_" + get_run_identifier());
+      Galois::Statistic SyncPull_saved_bytes(statSavedBytes_str);
       Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -1808,50 +1881,57 @@ public:
 
         Galois::Runtime::SendBuffer b;
 
-        if(num > 0 ){
-          Galois::DynamicBitSet bit_set_comm;
-          bit_set_comm.resize_init(num);
+         if(num > 0){
+           Galois::DynamicBitSet bit_set_comm;
+           bit_set_comm.resize_init(num);
+           size_t bit_set_count = 0;
+           std::vector<typename FnTy::ValTy> val_vec(num);
 
-          std::string doall_str2("LAMBDA::SYNC_PULL_BIT_SET" + loopName + "_" + get_run_identifier());
+           bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
-          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-              uint32_t lid = masterNodes[x][n];
-              if(bit_set_compute.is_set(lid))
-              bit_set_comm.bit_set(n);
+           if (!batch_succeeded) {
+             if (updated_only) {
+               if(bit_set_compute.bit_count() > 0){
+                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
+                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
+                       uint32_t lid = masterNodes[x][n];
+                       if(bit_set_compute.is_set(lid)){
+                         bit_set_comm.bit_set(n);
+                       }
 
-              }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
+                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
+               }
+               //bits set to be sent to x
+               bit_set_count = bit_set_comm.bit_count(num);
+             }
+             if (!updated_only || (bit_set_count > 0)) {
+               Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-
-          //bits set to be sent to x
-          auto bits_set_num = bit_set_comm.bit_count(num);
-
-          //std::cout << "BIT_COMM : " << bits_set_num << " , BITS_COMP : " << bit_set_compute.bit_count()  << " num : " << num << "\n";
-          Galois::Runtime::reportStat("(NULL)", "SYNC_PULL_BITS_SAVED", (unsigned)(bits_set_num - num), 0);
-
-          std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-
-          if(bits_set_num > 0){
-
-            if (!FnTy::extract_batch(x, &val_vec[0])) {
-
-              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-
-                  if(bit_set_comm.is_set(n)){
-                  uint32_t localID = masterNodes[x][n];
-                  uint32_t vec_index = bit_set_comm.bit_count(n);
-
+                    if(!updated_only || bit_set_comm.is_set(n)){
+                      uint32_t lid = masterNodes[x][n];
+                      uint32_t vec_index;
+                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                      else vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
-                  auto val = FnTy::extract((localID), clGraph.getDataR(localID));
+                      auto val = FnTy::extract(lid, clGraph.getDataR(lid));
 #else
-                  auto val = FnTy::extract((localID), getData(localID));
+                      auto val = FnTy::extract(lid, getData(lid));
 #endif
-                  val_vec[vec_index] = val;
-                  }
-                  }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
-            }
-          }
-          gSerialize(b, bit_set_comm, val_vec);
-          bit_set_compute.reset();
+                      val_vec[vec_index] = val;
+                    }
+                   }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+             }
+           }
+
+           if (updated_only) {
+             size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
+             size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
+             if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
+             val_vec.resize(bit_set_count);
+             gSerialize(b, bit_set_comm, val_vec);
+           } else {
+             gSerialize(b, val_vec);
+           }
         } else {
           gSerialize(b, loopName);
         }
@@ -1867,7 +1947,7 @@ public:
 
    }
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only = false>
    void sync_pull_recv(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1900,7 +1980,7 @@ public:
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncPullRecvApply<FnTy>(p->first, p->second, loopName);
+        syncPullRecvApply<FnTy, updated_only>(p->first, p->second, loopName);
       }
 
       ++Galois::Runtime::evilPhase;
@@ -1908,7 +1988,7 @@ public:
 
    }
 
-   template<typename FnTy>
+   template<typename FnTy, bool updated_only = false>
    void sync_pull(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1925,6 +2005,8 @@ public:
       std::string doall_str("LAMBDA::SYNC_PULL_" + loopName + "_" + get_run_identifier());
       std::string timer_str("SYNC_PULL_" + loopName +"_" + get_run_identifier());
       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + get_run_identifier());
+      std::string statSavedBytes_str("SAVED_BYTES_SYNC_PULL_" + loopName +"_" + get_run_identifier());
+      Galois::Statistic SyncPull_saved_bytes(statSavedBytes_str);
       Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -1947,51 +2029,57 @@ public:
 
         Galois::Runtime::SendBuffer b;
 
-        if(num > 0 ){
+         if(num > 0){
            Galois::DynamicBitSet bit_set_comm;
            bit_set_comm.resize_init(num);
+           size_t bit_set_count = 0;
+           std::vector<typename FnTy::ValTy> val_vec(num);
 
-            std::string doall_str2("LAMBDA::SYNC_PULL_BIT_SET" + loopName + "_" + get_run_identifier());
+           bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
-           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                uint32_t lid = masterNodes[x][n];
-                if(bit_set_compute.is_set(lid))
-                  bit_set_comm.bit_set(n);
+           if (!batch_succeeded) {
+             if (updated_only) {
+               if(bit_set_compute.bit_count() > 0){
+                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
+                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
+                       uint32_t lid = masterNodes[x][n];
+                       if(bit_set_compute.is_set(lid)){
+                         bit_set_comm.bit_set(n);
+                       }
 
-               }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-
-
-           //bits set to be sent to x
-           auto bits_set_num = bit_set_comm.bit_count(num);
-
-           //std::cout << "BIT_COMM : " << bits_set_num << " , BITS_COMP : " << bit_set_compute.bit_count()  << " num : " << num << "\n";
-           Galois::Runtime::reportStat("(NULL)", "SYNC_PULL_BITS_SAVED", (unsigned)(bits_set_num - num), 0);
-
-           std::vector<typename FnTy::ValTy> val_vec(bits_set_num);
-
-           if(bits_set_num > 0){
-
-
-             if (!FnTy::extract_batch(x, &val_vec[0])) {
-
+                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
+               }
+               //bits set to be sent to x
+               bit_set_count = bit_set_comm.bit_count(num);
+             }
+             if (!updated_only || (bit_set_count > 0)) {
                Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-                   if(bit_set_comm.is_set(n)){
-                     uint32_t localID = masterNodes[x][n];
-                     uint32_t vec_index = bit_set_comm.bit_count(n);
-
+                    if(!updated_only || bit_set_comm.is_set(n)){
+                      uint32_t lid = masterNodes[x][n];
+                      uint32_t vec_index;
+                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
+                      else vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
-                     auto val = FnTy::extract((localID), clGraph.getDataR(localID));
+                      auto val = FnTy::extract(lid, clGraph.getDataR(lid));
 #else
-                     auto val = FnTy::extract((localID), getData(localID));
+                      auto val = FnTy::extract(lid, getData(lid));
 #endif
-                     val_vec[vec_index] = val;
-                   }
+                      val_vec[vec_index] = val;
+                    }
                    }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
              }
            }
-           gSerialize(b, bit_set_comm, val_vec);
-           bit_set_compute.reset();
+
+           if (updated_only) {
+             size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
+             size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
+             if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
+             val_vec.resize(bit_set_count);
+             gSerialize(b, bit_set_comm, val_vec);
+           } else {
+             gSerialize(b, val_vec);
+           }
         } else {
           gSerialize(b, loopName);
         }
@@ -2014,7 +2102,7 @@ public:
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncPullRecvApply<FnTy>(p->first, p->second, loopName);
+        syncPullRecvApply<FnTy, updated_only>(p->first, p->second, loopName);
       }
     StatTimer_RecvTime.stop();
 
@@ -2059,7 +2147,7 @@ public:
     //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary);
     chkPt_file.seekp(0);
-    chkPt_file.write(reinterpret_cast<char*>(&val_vec[0]), val_vec.size()*sizeof(uint32_t));
+    chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
     chkPt_file.close();
     StatTimer_checkpoint.stop();
   }
@@ -2078,7 +2166,7 @@ public:
         std::cout << "Unable to open checkpoint file " << chkPt_fileName << " ! Exiting!\n";
         exit(1);
       }
-      chkPt_file.read(reinterpret_cast<char*>(&val_vec[0]), numOwned*sizeof(uint32_t));
+      chkPt_file.read(reinterpret_cast<char*>(val_vec.data()), numOwned*sizeof(uint32_t));
 
       for(auto k = 0; k < 10; ++k){
         std::cout << "AFTER : val_vec[" << k << "] : " << val_vec[k] << "\n";
@@ -2401,6 +2489,10 @@ public:
 
   void bit_set(uint32_t LID){
     bit_set_compute.bit_set(LID);
+  }
+
+  void bitset_clear(){
+    bit_set_compute.reset();
   }
 
   void get_bit_set_count(){

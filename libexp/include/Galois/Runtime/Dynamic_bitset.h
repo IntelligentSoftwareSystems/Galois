@@ -20,7 +20,7 @@ namespace Galois {
 
     void resize_init(uint64_t n){
       bitvec.resize(std::ceil((float)n/bits_uint64));
-      for(auto x = 0; x < std::ceil(n/bits_uint64); x++){
+      for(uint32_t x = 0; x < bitvec.size(); x++){
         bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
       }
     }
@@ -33,9 +33,12 @@ namespace Galois {
       return bitvec;
     }
 
-    void bit_set(uint32_t LID){
-      assert(LID/bits_uint64 < bitvec.size());
-      bitvec[LID/bits_uint64].fetch_or(1<<(LID%bits_uint64));
+    void bit_set(uint32_t index){
+      uint32_t bit_index = index/64;
+      assert(bit_index < bitvec.size());
+      uint64_t bit_offset = 1;
+      bit_offset <<= (index%64);
+      bitvec[bit_index].fetch_or(bit_offset);
     }
 
     // single thread is accessing.
@@ -46,17 +49,12 @@ namespace Galois {
     }
 
     bool is_set(uint32_t index){
-      assert(index/bits_uint64 < bitvec.size());
-      return std::bitset<bits_uint64>(bitvec[index/bits_uint64])[index%bits_uint64];
-#if 0
-      if(std::bitset<bits_uint64>(bitvec[index/bits_uint64])[index%bits_uint64] == 0){
-        return false;
-      }else {
-        return true;
-      }
-#endif
+      uint32_t bit_index = index/64;
+      assert(bit_index < bitvec.size());
+      uint64_t bit_offset = 1;
+      bit_offset <<= (index%64);
+      return ((bitvec[bit_index] & bit_offset) != 0);
     }
-
 
     uint64_t bit_count(){
       uint64_t bits_set = 0;
@@ -68,18 +66,16 @@ namespace Galois {
 
     uint64_t bit_count(uint32_t num){
       uint64_t bits_set = 0;
-      uint32_t i = 0;
-      for(auto j = 0;  (num - i) >= bits_uint64; i+=64, ++j){
-        bits_set += std::bitset<bits_uint64>(bitvec[j]).count();
+      unsigned index = num/bits_uint64;
+      unsigned offset = num%bits_uint64;
+      for (unsigned i = 0; i < index; ++i) {
+        bits_set += std::bitset<bits_uint64>(bitvec[i]).count();
       }
-
-      if(num - i > 0)
-        bits_set += std::bitset<bits_uint64>(bitvec[i/bits_uint64] << (bits_uint64 - (num - i))).count();
-
-      //for(auto x = i; x < num; ++x){
-        //bits_set += is_set(x);
-      //}
-
+      if (offset > 0) {
+        unsigned long long int value = bitvec[index];
+        value <<= (bits_uint64-offset);
+        bits_set += std::bitset<bits_uint64>(value).count();
+      }
       return bits_set;
     }
 

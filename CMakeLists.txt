@@ -227,7 +227,7 @@ if(USE_EXP)
         set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
 
         cuda_include_directories( ${GGC_INCLUDE_PATH} ${MGPU_PATH})
-        set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_61,code=sm_61)
+        set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_61,code=sm_61)
         link_directories(${GGC_PATH}/rt/lib)
       endif()
     else()
