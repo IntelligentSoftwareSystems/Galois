@@ -19,11 +19,16 @@ protected:
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
 
+  static const bool ENABLE_PROF = true;
+  static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
 
   WindowWL winWL;
   PerThreadBag<T> pending;
   CtxtWL scheduled;
+
+  PerThreadBag<Ctxt*> abortList;
+  PerThreadBag<Ctxt*> retireList;
 
 public:
 
@@ -84,7 +89,12 @@ protected:
           if (c->isSrc ()) {
             scheduled.push (c);
           } else {
-            abortCtxt (c);
+
+            if (ENABLE_PROF) {
+              abortList.push(c);
+            } else {
+              abortCtxt (c);
+            }
           }
 
           Base::roundTasks += 1;
@@ -114,7 +124,7 @@ protected:
           uhand.reset ();
 
           if (c->isSrc ()) {
-            static_assert (!Base::OPERATOR_CAN_ABORT, "operator not allowed to abort");
+            static_assert (!Base::NEEDS_CUSTOM_LOCKING, "operator not allowed to abort");
             Base::opFunc (c->getActive (), uhand);
             Base::roundCommits += 1;
 
@@ -133,17 +143,54 @@ protected:
               assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
             }
 
-            retireCtxt(c);
+            if (ENABLE_PROF) {
+              retireList.push(c);
+            } else {
+              retireCtxt(c);
+            }
 
-          } else {
-            abortCtxt (c);
+          } else { // not isSrc
+
+            if (ENABLE_PROF) {
+              abortList.push(c);
+            } else {
+              abortCtxt (c);
+            }
           }
         },
         std::make_tuple (
-          Galois::loopname ("applyOperator"),
-          chunk_size<OpFunc::CHUNK_SIZE> ()));
+          Galois::loopname("applyOperator"),
+          chunk_size<OpFunc::CHUNK_SIZE>()));
 
-    scheduled.clear_all_parallel ();
+    scheduled.clear_all_parallel();
+  }
+
+  void serviceAborts(void) {
+    if (ENABLE_PROF) {
+      Galois::do_all_choice (makeLocalRange(abortList),
+          [this] (Ctxt* c) {
+            abortCtxt(c);
+          }, 
+          std::make_tuple (
+            Galois::loopname ("serviceAborts"),
+            chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
+      abortList.clear_all_parallel();
+    }
+  }
+
+  void performCommits(void) {
+    if (ENABLE_PROF) {
+      Galois::do_all_choice (makeLocalRange(retireList),
+          [this] (Ctxt* c) {
+            retireCtxt(c);
+          }, 
+          std::make_tuple (
+            Galois::loopname ("performCommits"),
+            chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
+      retireList.clear_all_parallel();
+    }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
@@ -169,7 +216,7 @@ public:
           }, 
           std::make_tuple (
             Galois::loopname ("init-fill"),
-            chunk_size<NhFunc::CHUNK_SIZE> ()));
+            chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
 
     } else {
@@ -181,15 +228,29 @@ public:
 
     while (true) {
 
+      Base::t_beginRound.start();
       Base::refillRound (winWL, pending);
+      Base::t_beginRound.stop();
 
       if (pending.empty_all()) {
         break;
       }
 
+      Base::t_expandNhood.start();
       expandNhood ();
+      Base::t_expandNhood.stop();
 
+      Base::t_applyOperator.start();
       applyOperator ();
+      Base::t_applyOperator.stop();
+
+      Base::t_serviceAborts.start();
+      serviceAborts();
+      Base::t_serviceAborts.stop();
+
+      Base::t_performCommits.start();
+      performCommits();
+      Base::t_performCommits.stop();
 
       endRound ();
 

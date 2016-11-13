@@ -144,6 +144,16 @@ protected:
   GAccumulator<size_t> roundTasks;;
   GAccumulator<size_t> roundCommits;
 
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_expandNhood;
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
+  TimeAccumulator t_reclaimMemory;
+
+
+
   IKDGbase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
@@ -191,6 +201,13 @@ protected:
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 
+    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get(),0);
+    reportStat ("NULL", "t_beginRound",     t_beginRound.get(),0);
+    reportStat ("NULL", "t_executeSources", t_executeSources.get(),0);
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get(),0);
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get(),0);
+    reportStat ("NULL", "t_performCommits", t_performCommits.get(),0);
+    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get(),0);
   }
 
   //  TODO: spill range 
