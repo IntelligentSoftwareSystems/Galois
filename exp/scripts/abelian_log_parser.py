@@ -59,6 +59,60 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   mean_time = round(mean_time, 3)
   print "Mean time: ", mean_time
 
+  #total_cpu_do_all_impl = 0.0
+  #max_cpu_do_all_impl = 0.0;
+  #min_cpu_do_all_impl = sys.maxint;
+  #for host in range(int(total_hosts)):
+  #  cpu_do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+  #  cpu_do_all_impl_per_host = re.findall(cpu_do_all_impl_regex, log_data)
+  #  time_per_host = 0.0
+  #  for cpu_do_all_time in cpu_do_all_impl_per_host:
+  #    time_per_host += float(cpu_do_all_time)
+  #    #print time_per_host
+  #  time_per_host /= int(numRuns)
+  #  total_cpu_do_all_impl += time_per_host
+  #  if(max_cpu_do_all_impl < time_per_host):
+  #    max_cpu_do_all_impl = time_per_host
+  #  if(min_cpu_do_all_impl > time_per_host):
+  #    min_cpu_do_all_impl = time_per_host
+  #total_cpu_do_all_impl /= divisor
+  #total_cpu_do_all_impl = round(total_cpu_do_all_impl, 3)
+  #mean_cpu_do_all_impl = total_cpu_do_all_impl/int(total_hosts)
+  #mean_cpu_do_all_impl = round(mean_cpu_do_all_impl, 3)
+  #max_cpu_do_all_impl /= divisor
+  #max_cpu_do_all_impl = round(max_cpu_do_all_impl, 3)
+  #min_cpu_do_all_impl /= divisor
+  #min_cpu_do_all_impl = round(min_cpu_do_all_impl, 3)
+  #print "total_cpu_do_all : ", total_cpu_do_all_impl
+  #print "mean_cpu_do_all : ", mean_cpu_do_all_impl
+
+  #total_cuda_do_all_impl = 0.0
+  #max_cuda_do_all_impl = 0.0;
+  #min_cuda_do_all_impl = sys.maxint;
+  #for host in range(int(total_hosts)):
+  #  cuda_do_all_impl_regex = re.compile(r'.*,\(NULL\),0\s,\sCUDA_DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+  #  cuda_do_all_impl_per_host = re.findall(cuda_do_all_impl_regex, log_data)
+  #  time_per_host = 0.0
+  #  for cuda_do_all_time in cuda_do_all_impl_per_host:
+  #    time_per_host += float(cuda_do_all_time)
+  #    #print time_per_host
+  #  time_per_host /= int(numRuns)
+  #  total_cuda_do_all_impl += time_per_host
+  #  if(max_cuda_do_all_impl < time_per_host):
+  #    max_cuda_do_all_impl = time_per_host
+  #  if(min_cuda_do_all_impl > time_per_host):
+  #    min_cuda_do_all_impl = time_per_host
+  #total_cuda_do_all_impl /= divisor
+  #total_cuda_do_all_impl = round(total_cuda_do_all_impl, 3)
+  #mean_cuda_do_all_impl = total_cuda_do_all_impl/int(total_hosts)
+  #mean_cuda_do_all_impl = round(mean_cuda_do_all_impl, 3)
+  #max_cuda_do_all_impl /= divisor
+  #max_cuda_do_all_impl = round(max_cuda_do_all_impl, 3)
+  #min_cuda_do_all_impl /= divisor
+  #min_cuda_do_all_impl = round(min_cuda_do_all_impl, 3)
+  #print "total_cuda_do_all : ", total_cuda_do_all_impl
+  #print "mean_cuda_do_all : ", mean_cuda_do_all_impl
+
   #TOTAL_DO_ALL_IMPL all hosts
   #414c1fb5-0df1-4741-a0ee-cee82f2fc83b,(NULL),0 , DO_ALL_IMPL_bfs,0,0,389
   total_do_all_impl = 0.0
@@ -137,12 +191,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     send_bytes_firstItr_host = re.findall(send_bytes_firstItr_regex, log_data)
 
     for byte in send_bytes_host:
-      total_send_bytes += (int(byte[1]))
+      if (byte[1] != ""):
+        total_send_bytes += (int(byte[1]))
       #print("->", byte[0], " , " , byte[1])
       #print("->", byte_firstItr[0], " , " , byte_firstItr[1])
 
     for byte_firstItr in send_bytes_firstItr_host:
-      total_send_bytes += int(byte_firstItr[1])
+      if (byte_firstItr[1] != ""):
+        total_send_bytes += int(byte_firstItr[1])
 
     total_send_bytes /= int(numRuns)
 
@@ -154,14 +210,15 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     send_bytes_host = re.findall(send_bytes_regex, log_data)
     send_bytes_firstItr_host = re.findall(send_bytes_firstItr_regex, log_data)
 
-    print send_bytes_host
     for byte in send_bytes_host:
-      total_send_bytes += (int(byte[1]))
+      if (byte[1] != ""):
+        total_send_bytes += (int(byte[1]))
       #print("->", byte[0], " , " , byte[1])
       #print("->", byte_firstItr[0], " , " , byte_firstItr[1])
 
     for byte_firstItr in send_bytes_firstItr_host:
-      total_send_bytes += int(byte_firstItr[1])
+      if (byte_firstItr[1] != ""):
+        total_send_bytes += int(byte_firstItr[1])
 
     total_send_bytes /= int(numRuns)
 
