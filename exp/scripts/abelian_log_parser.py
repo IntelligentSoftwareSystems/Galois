@@ -62,7 +62,6 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   #TOTAL_DO_ALL_IMPL all hosts
   #414c1fb5-0df1-4741-a0ee-cee82f2fc83b,(NULL),0 , DO_ALL_IMPL_bfs,0,0,389
   total_do_all_impl = 0.0
-  total_send_bytes = 0;
   max_do_all_impl = 0.0;
   min_do_all_impl = sys.maxint;
   #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,(NULL),0 , DO_ALL_IMPL_BFS_0_1,0,0,5145
@@ -91,11 +90,44 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   max_do_all_impl = round(max_do_all_impl, 3)
   min_do_all_impl /= divisor
   min_do_all_impl = round(min_do_all_impl, 3)
-  print "total_do_all : ", total_do_all_impl
-  print "mean_do_all : ", mean_do_all_impl
-  print "max_do_all : ", max_do_all_impl
-  print "min_do_all : ", min_do_all_impl
+  #print "total_do_all : ", total_do_all_impl
+  #print "mean_do_all : ", mean_do_all_impl
+  #print "max_do_all : ", max_do_all_impl
+  #print "min_do_all : ", min_do_all_impl
 
+  total_comm_time = 0.0
+  max_comm_time = 0.0;
+  min_comm_time = sys.maxint;
+  for host in range(int(total_hosts)):
+    comm_time_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+    #comm_time_regex = re.compile(r'.*,\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_..*,'+ re.escape(str(host)) + r',\d*,(\d*)')
+    comm_time_per_host = re.findall(comm_time_regex, log_data)
+    #print comm_time_per_host
+    time_per_host = 0.0
+    #print "----> ", comm_time_per_host
+    for comm_time in comm_time_per_host:
+      time_per_host += float(comm_time)
+      #print time_per_host
+    time_per_host /= int(numRuns)
+    total_comm_time += time_per_host
+    if(max_comm_time < time_per_host):
+      max_comm_time = time_per_host
+    if(min_comm_time > time_per_host):
+      min_comm_time = time_per_host
+  total_comm_time /= divisor
+  total_comm_time = round(total_comm_time, 3)
+  mean_comm_time = total_comm_time/int(total_hosts)
+  mean_comm_time = round(mean_comm_time, 3)
+  max_comm_time /= divisor
+  max_comm_time = round(max_comm_time, 3)
+  min_comm_time /= divisor
+  min_comm_time = round(min_comm_time, 3)
+  #print "total_comm_time : ", total_comm_time
+  #print "mean_comm_time : ", mean_comm_time
+  #print "max_comm_time : ", max_comm_time
+  #print "min_comm_time : ", min_comm_time
+
+  total_send_bytes = 0;
   #6d3d9407-ed61-4fc9-a4ee-dd9af891b47a,BFS,0 , SEND_BYTES_SYNC_PULL,0,0,4209914580
   if(partition == "edge-cut"):
     send_bytes_regex = re.compile(r'.*,\(NULL\),0\s,\sSEND_BYTES_SYNC_(PUSH|PULL)_(?i)' + re.escape(benchmark) + r'.*,\d*,\d*,(\d*)')
@@ -134,52 +166,52 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_send_bytes /= int(numRuns)
 
   ## SYNC_PULL and SYNC_PUSH total average over runs.
-  num_iterations = 0
-  for i in range(0, int(numRuns)):
+  #num_iterations = 0
+  #for i in range(0, int(numRuns)):
     # find extract
-    extract_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_EXTRACT_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
-    extract_lines = re.findall(extract_regex, log_data)
-    for j in range (0, len(extract_lines)):
-      extract_avg_time_total += float(extract_lines[j][2])
+    #extract_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_EXTRACT_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    #extract_lines = re.findall(extract_regex, log_data)
+    #for j in range (0, len(extract_lines)):
+      #extract_avg_time_total += float(extract_lines[j][2])
 
     # find set
-    set_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_SET_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
-    set_lines = re.findall(set_regex, log_data)
-    for j in range (0, len(set_lines)):
-      set_avg_time_total += float(set_lines[j][2])
+    #set_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_SET_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    #set_lines = re.findall(set_regex, log_data)
+    #for j in range (0, len(set_lines)):
+      #set_avg_time_total += float(set_lines[j][2])
 
     # find sync_pull
-    sync_pull_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PULL_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
-    sync_pull_lines = re.findall(sync_pull_regex, log_data)
-    num_iterations = len(sync_pull_lines);
-    for j in range (0, len(sync_pull_lines)):
-      sync_pull_avg_time_total += float(sync_pull_lines[j][2])
+    #sync_pull_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PULL_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    #sync_pull_lines = re.findall(sync_pull_regex, log_data)
+    #num_iterations = len(sync_pull_lines);
+    #for j in range (0, len(sync_pull_lines)):
+      #sync_pull_avg_time_total += float(sync_pull_lines[j][2])
 
     # find sync_push
-    sync_push_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PUSH_(?i)' + re.escape(benchmark) + r'\w*_'+ re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
-    sync_push_lines = re.findall(sync_push_regex, log_data)
+    #sync_push_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PUSH_(?i)' + re.escape(benchmark) + r'\w*_'+ re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    #sync_push_lines = re.findall(sync_push_regex, log_data)
 
-    if(num_iterations == 0):
-      num_iterations = len(sync_push_lines)
+    #if(num_iterations == 0):
+    #  num_iterations = len(sync_push_lines)
 
-    for j in range (0, len(sync_push_lines)):
-      sync_push_avg_time_total += float(sync_push_lines[j][2])
+    #for j in range (0, len(sync_push_lines)):
+    #  sync_push_avg_time_total += float(sync_push_lines[j][2])
 
-  extract_avg_time_total /= int(numRuns)
-  extract_avg_time_total /= divisor
-  extract_avg_time_total = round(extract_avg_time_total, 0)
+  #extract_avg_time_total /= int(numRuns)
+  #extract_avg_time_total /= divisor
+  #extract_avg_time_total = round(extract_avg_time_total, 0)
 
-  set_avg_time_total /= int(numRuns)
-  set_avg_time_total /= divisor
-  set_avg_time_total = round(set_avg_time_total, 0)
+  #set_avg_time_total /= int(numRuns)
+  #set_avg_time_total /= divisor
+  #set_avg_time_total = round(set_avg_time_total, 0)
 
-  sync_pull_avg_time_total /= int(numRuns)
-  sync_pull_avg_time_total /= divisor
-  sync_pull_avg_time_total = round(sync_pull_avg_time_total, 0)
+  #sync_pull_avg_time_total /= int(numRuns)
+  #sync_pull_avg_time_total /= divisor
+  #sync_pull_avg_time_total = round(sync_pull_avg_time_total, 0)
 
-  sync_push_avg_time_total /= int(numRuns)
-  sync_push_avg_time_total /= divisor
-  sync_push_avg_time_total = round(sync_push_avg_time_total, 0)
+  #sync_push_avg_time_total /= int(numRuns)
+  #sync_push_avg_time_total /= divisor
+  #sync_push_avg_time_total = round(sync_push_avg_time_total, 0)
 
   ## sendBytes and recvBytes.
   #recvBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvBytes,\d*,(\d*),(\d*),.*')
@@ -253,7 +285,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
   #return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
-  return mean_time,total_do_all_impl,mean_do_all_impl,max_do_all_impl,min_do_all_impl,total_send_bytes
+  return mean_time,total_do_all_impl,mean_do_all_impl,max_do_all_impl,min_do_all_impl,total_comm_time,mean_comm_time,max_comm_time,min_comm_time,total_send_bytes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -590,7 +622,7 @@ def main(argv):
 
   header_csv_str = "benchmark,platform,host,threads,"
   header_csv_str += "deviceKind,devices,"
-  header_csv_str += "input,variant,partition,mean_time,total_comp_time,mean_comp_time,max_comp_time,min_comp_time,total_bytes_sent,rep_factor" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time,total_comp_time,mean_comp_time,max_comp_time,min_comp_time,total_comm_time,mean_comm_time,max_comm_time,min_comm_time,total_bytes_sent,rep_factor" #,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   #for i in range(0,256):
     #header_csv_str += ","
