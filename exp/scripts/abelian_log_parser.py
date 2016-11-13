@@ -29,6 +29,9 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   hg_init_time = 0
   total_time = 0
 
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
+
   if (time_unit == 'seconds'):
     divisor = 1000
   else:
@@ -294,6 +297,9 @@ def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
 
   log_data = open(fileName).read()
 
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
+
   ## sendBytes and recvBytes.
   total_SendBytes = 0;
   for host in range(0,int(total_hosts)):
@@ -323,6 +329,9 @@ def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
   sendBytes_pull_sync_reply_list = [0]*256 #Max host number is 256
 
   log_data = open(fileName).read()
+
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
 
   ## sendBytes from sync_pull.
   total_SendBytes_pull_sync = 0;
@@ -388,6 +397,15 @@ def replication_factor(fileName, benchmark, partition, total_hosts, numRuns, num
     return 0
 
   print "total_nodes : ", total_nodes
+  rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_0_0,(\d*),\d*,(.*)')
+
+  rep_search = rep_regex.search(log_data)
+  if rep_search is not None:
+    rep_factor = rep_search.group(2)
+    rep_factor = round(float(rep_factor), 3)
+    print ("FOUND  : ", rep_factor)
+    return rep_factor
+
   if partition == "edge-cut":
     total_ghost = 0
     #7fee06cb-4c74-458f-a761-ddf6997a1edd,(NULL),0 , TotalGhostNodes,3,0,28215509
@@ -452,6 +470,9 @@ def time_at_barrier(fileName, benchmark, total_hosts, numRuns, numThreads):
   thousand = 1000.0
   sync_pull_barrier_avg_time_total = [0.0]*256
   sync_pull_avg_time_total = [0.0]*256
+
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
 
   for host in range(0, int(total_hosts)):
       for i in range(0, int(numRuns)):
