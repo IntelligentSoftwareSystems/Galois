@@ -29,6 +29,9 @@ def sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, it
   hg_init_time = 0
   total_time = 0
 
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
+
   if (time_unit == 'seconds'):
     divisor = 1000
   else:
@@ -39,6 +42,13 @@ def sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, it
   data = [variant, input_graph, hostNum, benchmark, deviceKind, devices]
   fd_outputFile = open(outputFile, 'a')
 
+  rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_0_0,(\d*),\d*,(.*)')
+
+  rep_search = rep_regex.search(log_data)
+  if rep_search is not None:
+    rep_factor = rep_search.group(2)
+    rep_factor = round(float(rep_factor), 3)
+    print ("FOUND  : ", rep_factor)
 
   for iterNum in range(int(iterationNum)):
     do_all_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(iterNum))  +r',.*' + r',\d*,(\d*)')
@@ -49,7 +59,7 @@ def sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, it
     mean = numpy.mean(num_arr, axis=0)
     var = numpy.var(num_arr, axis=0)
 
-    complete_data = data + [iterNum, mean, var, sd, sd/mean]
+    complete_data = data + [rep_factor,iterNum, mean, var, sd, sd/mean]
     wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
     wr.writerow(complete_data)
 
@@ -174,7 +184,7 @@ def main(argv):
 
 
   header_csv_str = "variant,input,hosts,benchmark,"
-  header_csv_str += "deviceKind,devices,iteration,mean,variance,sd,sdByMean"
+  header_csv_str += "deviceKind,devices,replication,iteration,mean,variance,sd,sdByMean"
 
 
   output_str = variant + ',' + input_graph + ',' + hostNum + ',' + benchmark + ','
