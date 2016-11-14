@@ -131,9 +131,11 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     time_per_host = 0.0
     #print "----> ", do_all_impl_per_host
     for do_all_time in do_all_impl_per_host:
-      time_per_host += float(do_all_time)
-      #print time_per_host
-    time_per_host /= int(numRuns)
+      if (do_all_time != ""):
+        time_per_host += float(do_all_time)
+    if time_per_host == 0.0:
+      continue
+    time_per_host /= len(do_all_impl_per_host) 
     total_do_all_impl += time_per_host
     if(max_do_all_impl < time_per_host):
       max_do_all_impl = time_per_host
@@ -163,9 +165,11 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     time_per_host = 0.0
     #print "----> ", comm_time_per_host
     for comm_time in comm_time_per_host:
-      time_per_host += float(comm_time)
-      #print time_per_host
-    time_per_host /= int(numRuns)
+      if (comm_time != ""):
+        time_per_host += float(comm_time)
+    if time_per_host == 0.0:
+      continue
+    time_per_host /= len(comm_time_per_host) 
     total_comm_time += time_per_host
     if(max_comm_time < time_per_host):
       max_comm_time = time_per_host
@@ -597,9 +601,11 @@ def get_basicInfo(fileName):
   runs_search    = runs_regex.search(log_data)
   if runs_search is not None:
     runs = runs_search.group(1)
+  if runs == "":
+    runs = "3"
  
   split_cmdLine_algo = cmdLine.split()[0].split("/")[-1].split("_")
-  benchmark, algo_type =  split_cmdLine_algo
+  benchmark, algo_type = split_cmdLine_algo
 
   split_cmdLine_input = cmdLine.split()[1].split("/")
   input_graph_name = split_cmdLine_input[-1]
