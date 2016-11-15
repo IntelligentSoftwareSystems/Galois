@@ -73,6 +73,10 @@ if (AVI_FOUND)
     app(AVIlevelExec exp/AVIlevelExec.cpp 
       REQUIRES AVI_FOUND EXP_OPT
       EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+    app(AVIserialGalloc exp/AVIserialGalloc.cpp 
+      REQUIRES AVI_FOUND EXP_OPT
+      EXTLIBS AVI ${LAPACK_LIBRARIES})
   endif()
 
   include_directories(util)
