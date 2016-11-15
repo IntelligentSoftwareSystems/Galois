@@ -100,7 +100,7 @@ protected:
 class BFSserialWavefront: public AbstractWavefrontBFS {
 
 protected:
-  typedef std::vector<GNode> WL_ty;
+  typedef Galois::SerialBag<GNode> WL_ty;
   typedef AbstractWavefrontBFS::Super_ty Super_ty;
 
 
