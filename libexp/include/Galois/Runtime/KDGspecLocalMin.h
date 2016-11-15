@@ -19,7 +19,7 @@ protected:
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
 
-  static const bool ENABLE_PROF = true;
+  static const bool ENABLE_PROF = false;
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
 

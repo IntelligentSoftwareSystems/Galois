@@ -319,34 +319,37 @@ protected:
 
   void execute_impl () {
 
+    StatTimer t ("executorLoop");
+    t.start();
+
     while (true) {
+      Base::t_beginRound.start();
       Base::beginRound (winWL);
 
       if (Base::getCurrWL ().empty_all ()) {
         break;
       }
+      Base::t_beginRound.stop();
 
       Timer t;
 
-      if (DETAILED_STATS) {
-        std::printf ("trying to execute %zd elements\n", Base::getCurrWL ().size_all ());
-        t.start ();
-      }
-
+      Base::t_expandNhood.start();
       expandNhood ();
+      Base::t_expandNhood.stop();
 
+      Base::t_executeSources.start();
       executeSources ();
+      Base::t_executeSources.stop();
 
+      Base::t_applyOperator.start();
       applyOperator ();
+      Base::t_applyOperator.stop();
 
       endRound ();
-
-      if (DETAILED_STATS) {
-        t.stop ();
-        std::printf ("Time taken: %ld\n", t.get ());
-      }
       
     }
+
+    t.stop();
   }
   
 };
