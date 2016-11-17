@@ -252,7 +252,7 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    Galois::preAlloc (Galois::getActiveThreads () + 24*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
+    Galois::preAlloc ((Galois::getActiveThreads () * 10 * graph.sizeEdges ())/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();

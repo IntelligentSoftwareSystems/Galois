@@ -35,8 +35,7 @@
 #include "bfs.h"
 #include "bfsParallel.h"
 
-using Level_ty = unsigned;
-class LevelExecBFS: public BFS<Level_ty> {
+class LevelExecBFS: public BFS {
 
 public:
 
@@ -59,7 +58,7 @@ public:
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeStandardRange (wl.begin (), wl.end ()), 
         GetLevel (), 
-        std::less<Level_ty> (),
+        std::less<unsigned> (),
         VisitNhood (graph),
         OpFunc (graph, numIter));
 

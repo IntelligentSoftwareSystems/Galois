@@ -1542,6 +1542,7 @@ public:
         if (conflict) {
           // A lock that I want but can't get
           this->disableSrc();
+          dbg::print (this, " lost to ", other);
           return false; 
         }
       }
@@ -1554,9 +1555,10 @@ public:
       if (other->casState (ContextState::READY_TO_COMMIT, ContextState::ABORT_HELP)) {
 
         Base::exec.markForAbort (other);
-        this->disableSrc();// abort self to recompute after other has abortedthis->disableSrc();
+        dbg::print (this, " marking for abort: ", other);
+        // this->disableSrc();// abort self to recompute after other has abortedthis->disableSrc();
       } else if (other->hasState (ContextState::ABORT_HELP)) {
-        this->disableSrc(); // abort self to recompute after other has aborted
+        // this->disableSrc(); // abort self to recompute after other has aborted
       }
 
     }
@@ -1580,10 +1582,10 @@ public:
       bool succ = priorityAcquire (l);
 
       if (succ) {
-        dbg::print (this, " acquired lock ", l);
+        // dbg::print (this, " acquired lock ", l);
       } else {
         assert (!this->isSrc());
-        dbg::print (this, " failed to acquire lock ", l);
+        // dbg::print (this, " failed to acquire lock ", l);
       }
 
 
@@ -1624,7 +1626,7 @@ private:
     for (Lockable* l: nhood) {
       assert (l != nullptr);
       if (static_cast<PessimOrdContext*> (Base::getOwner (l)) == this) {
-        dbg::print (this, " releasing lock ", l);
+        // dbg::print (this, " releasing lock ", l);
         bool b = Base::tryLock (l); // release requires having had the lock
         assert (b);
         Base::release (l);
@@ -1886,6 +1888,8 @@ protected:
               bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
               assert (b);
 
+              dbg::print (c, " completed operator, with active: ", c->getActive());
+
               Base::commitQ.get().push_back (c);
               Base::roundCommits += 1;
 
@@ -1953,6 +1957,9 @@ protected:
 
     Galois::optional<T> gvt = getMinPending();
 
+    if (gvt) {
+      dbg::print ("gvt computed as: ", *gvt);
+    }
     // partition criteria
     auto ptest = [&gvt, this] (Ctxt* c) -> bool {
       assert (c);
@@ -1964,7 +1971,7 @@ protected:
         if (!gvt || Base::getItemCmp()(c->getActive(), *gvt)) {
           ret = false; // can commit so move to right and deallocate
 
-          dbg::print (c, " committing with item ", c->getActive());
+          dbg::print (c, " trying to commit with item ", c->getActive());
           
           tryCommit (c);
         } // end if gvt

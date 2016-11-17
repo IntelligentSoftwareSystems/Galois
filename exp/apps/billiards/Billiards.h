@@ -199,7 +199,7 @@ private:
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
-    Galois::preAlloc (Galois::getActiveThreads () + (unsigned(endtime) * numballs * initEvents.size())/Galois::Runtime::pagePoolSize());
+    Galois::preAlloc ((Galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     Galois::StatTimer timer;
