@@ -26,8 +26,6 @@
 #include <sys/mman.h>
 #include <mcheck.h>
 
-using Galois::Graph::OfflineGraph;
-
 /******************************************************************
  *
  *****************************************************************/
@@ -145,7 +143,7 @@ struct GBPartitionerDisk {
       /*
        *
        * */
-      void assignEdge(OfflineGraph & g, NodeItType & _src, OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
+      void assignEdge(Galois::Graph::OfflineGraph & g, NodeItType & _src, Galois::Graph::OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
@@ -166,7 +164,7 @@ struct GBPartitionerDisk {
        * This will ensure that localids and globalids are sequential
        * */
 
-      void assignLocalIDs(size_t numhost, OfflineGraph &g) {
+      void assignLocalIDs(size_t numhost, Galois::Graph::OfflineGraph &g) {
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
 #if 1 // Currently some error in stats - use threaded code after it is fixed.
          std::vector<size_t> hosts;
@@ -190,7 +188,7 @@ struct GBPartitionerDisk {
 #endif
       }
 
-      void writeReplicaInfo(std::string &basename, OfflineGraph &g, size_t numhosts) {
+      void writeReplicaInfo(std::string &basename, Galois::Graph::OfflineGraph &g, size_t numhosts) {
 #if 0
          this->print_size_stats(numhosts);
          for (size_t n = 0; n < g.size(); ++n) {
@@ -223,7 +221,7 @@ struct GBPartitionerDisk {
        * smallest number of masters is selected to be the master of the current
        * node, and the masters-count for the host is updated.
        * */
-      void assignMasters(size_t nn, size_t numhost, OfflineGraph &g) {
+      void assignMasters(size_t nn, size_t numhost, Galois::Graph::OfflineGraph &g) {
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
 
          vertexMasters.resize(nn, ~0);
@@ -345,7 +343,7 @@ struct GBPartitionerDisk {
    /*
     * Partitioning routine.
     * */
-   void operator()(std::string & basename, OfflineGraph & g, size_t num_hosts) {
+   void operator()(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts) {
       Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
 
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
@@ -401,7 +399,7 @@ struct GBPartitionerDisk {
     * Write both the metadata as well as the partition information.
     * */
 
-   void writePartitionsMem(std::string & basename, OfflineGraph & g, size_t num_hosts) {
+   void writePartitionsMem(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts) {
       //Create graph
       //TODO RK - Fix edgeData
       std::cout << " Low mem version\n";
