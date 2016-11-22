@@ -2147,7 +2147,8 @@ public:
     checkpoint_bytes += val_vec.size() * sizeof(typename FnTy::ValTy);
 
     //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    std::string chkPt_fileName = "CheckPointFiles/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary | std::ofstream::trunc);
     int fd = open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
     if(fd==-1){
@@ -2157,6 +2158,7 @@ public:
     write(fd,reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
     //chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
     fsync(fd);
+    close(fd);
     //chkPt_file.close();
     StatTimer_checkpoint.stop();
   }

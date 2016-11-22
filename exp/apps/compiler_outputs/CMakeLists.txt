@@ -295,7 +295,7 @@ if(USE_GGC)
 endif()
 
 #### CheckPointing ####
-app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen_checkpoint.cpp DISTSAFE)
+app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 if(USE_GGC)
   target_compile_definitions(bfs_pull-topological PRIVATE __GALOIS_HET_CUDA__=1)
   target_link_libraries(bfs_pull-topological bfs_pull-topological_cuda galois_exp)
