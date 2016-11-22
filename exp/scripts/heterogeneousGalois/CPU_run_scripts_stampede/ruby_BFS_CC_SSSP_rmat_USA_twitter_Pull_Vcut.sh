@@ -6,7 +6,7 @@ partition=${4}
 comm_mode="0"
 queue=$9
 
-algo=$benchmark"_pull-"$variant"_vertex-cut"
+algo=$benchmark"_pull-"$variant
 #algo=$benchmark"_pull-"$variant"_"$partition
 echo $algo
 
@@ -22,8 +22,8 @@ GRAPH_twitter="/scratch/03279/roshand/dist-inputs/transpose/twitter-ICWSM10-comp
 
 GRAPH_rmat28="/scratch/03279/roshand/dist-inputs/transpose/rmat28.tgr" #Randomized rmat28
 
-cmd_options_reset="-maxIterations=10000 -verify=0 -t=$1"
-cmd_options="-maxIterations=10000 -verify=0 -t=$1"
+cmd_options_reset="-maxIterations=10000 -verify=0 -t=$1 -enableVertexCut=${partition}  "
+cmd_options="-maxIterations=10000 -verify=0 -t=$1 -enableVertexCut=${partition} "
 
 if [ $benchmark = "pagerank" ]; then
 	cmd_options=$cmd_options"  -tolerance=0.0000001"
@@ -40,7 +40,8 @@ if [ $5 = "rmat28" ]; then
     cmd_options=$cmd_options" -srcNodeId=155526494"
   fi
 
-  partFileBase="/scratch/01131/rashid/inputs/partitioned"
+  #partFileBase="/scratch/01131/rashid/inputs/partitioned"
+  partFileBase="/scratch/02982/ggill0/dist_inputs/partitioned"
   for i in $6
   do
     if [ $benchmark != "cc" ]; then
@@ -58,7 +59,8 @@ if [ $5 = "rmat28" ]; then
       elif [ $i == 64 ]; then
         partFileExt="rmat28.tgr"
       elif [ $i == 128 ]; then
-        partFileExt="rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.trgr"
+        partFileExt="rmat28.tgr"
+        #partFileExt="rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.trgr"
       elif [ $i == 256 ]; then
         partFileExt="rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.trgr"
       fi
@@ -67,7 +69,7 @@ if [ $5 = "rmat28" ]; then
       partFileType="rmat28-sym"
     fi
 
-    ruby ../../../../../../Distributed_latest/scripts/stampede_jobs.rb  -t "01:25:00" -q $queue -n 4 -N 4 -i dist_run_script_generated -o  ./LOG_aug_9/LOG_${algo}_TH$1\_CM${comm_mode}\_rmat28.rgr_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_rmat28  -partFolder=$partFileBase/$i/$partFileType/$partFileExt $cmd_options" -s $i  -e $i  -k 2
+    ruby /work/02982/ggill0/Distributed_latest/scripts/stampede_jobs.rb  -t "01:45:00" -q $queue -n 4 -N 4 -i dist_run_script_generated -o  ./LOG_RUNS/LOG_${algo}_TH$1\_VCUT\_${partition}\_rmat28.tgr_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_rmat28  -partFolder=$partFileBase/$i/$partFileType/$partFileExt $cmd_options" -s $i  -e $i  -k 2
   done
 fi
 
@@ -90,6 +92,6 @@ if [ $7 = "twitter" ]; then
       partFileType="twitter-sym"
     fi
 
-    ruby ../../../../../../Distributed_latest/scripts/stampede_jobs.rb  -t "01:25:00" -q $queue -n 4 -N 4 -i dist_run_script_generated -o  ./LOG_aug_9/LOG_${algo}_TH$1\_CM${comm_mode}\_Twitter-ICWSM10_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_twitter  -partFolder=$partFileBase/$i/$partFileType/$partFileExt $cmd_options" -s $i  -e $i  -k 2
+    ruby /work/02982/ggill0/Distributed_latest/scripts/stampede_jobs.rb -t "01:25:00" -q $queue -n 4 -N 4 -i dist_run_script_generated -o  ./LOG_RUNS/LOG_${algo}_TH$1\_VCUT\_${partition}\_Twitter-ICWSM10_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_twitter  -partFolder=$partFileBase/$i/$partFileType/$partFileExt $cmd_options" -s $i  -e $i  -k 2
   done
 fi
