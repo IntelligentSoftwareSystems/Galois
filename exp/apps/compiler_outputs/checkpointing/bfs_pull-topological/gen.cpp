@@ -429,7 +429,7 @@ int main(int argc, char** argv) {
    StatTimer_total.stop();
 
    //XXX temp solution
-   system("rm -r ./CheckPointFiles/");
+   system("rm ./CheckPointFiles/*");
 
     // Verify
     if(verify){
