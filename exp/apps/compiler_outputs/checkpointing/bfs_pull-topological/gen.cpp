@@ -311,6 +311,12 @@ struct BFS {
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
+#ifdef __CHECKPOINT_NO_FSYNC__
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_NO_FSYNC",0,0);
+#else
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_WITH_FSYNC",0,0);
+#endif
+	
   }
 
   void operator()(GNode src) const {
@@ -429,7 +435,7 @@ int main(int argc, char** argv) {
    StatTimer_total.stop();
 
    //XXX temp solution
-   system("rm ./CheckPointFiles/*");
+   //system("rm ./CheckPointFiles/*");
 
     // Verify
     if(verify){

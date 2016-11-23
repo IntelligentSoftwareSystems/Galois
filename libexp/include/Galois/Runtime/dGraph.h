@@ -2120,8 +2120,10 @@ public:
   void checkpoint(std::string loopName) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::string doall_str("LAMBDA::CHECKPOINT_" + loopName + "_" + get_run_identifier());
-    std::string checkpoint_timer_str("TIME_CHECKPOINT_TOTAL_" + get_run_identifier());
+    std::string checkpoint_timer_str("TIME_CHECKPOINT_" + get_run_identifier());
+    std::string checkpoint_fsync_timer_str("TIME_CHECKPOINT_FSYNC_" + get_run_identifier());
     Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    Galois::StatTimer StatTimer_checkpoint_fsync(checkpoint_fsync_timer_str.c_str());
     StatTimer_checkpoint.start();
 
 
@@ -2148,16 +2150,27 @@ public:
 
     //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    std::string chkPt_fileName = "CheckPointFiles/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    //std::string chkPt_fileName = "CheckPointFiles_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+#ifdef __CHECKPOINT_NO_FSYNC__
+    std::string chkPt_fileName = "CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+#else
+    std::string chkPt_fileName = "CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+#endif
     //std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary | std::ofstream::trunc);
     int fd = open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
     if(fd==-1){
       std::cerr << "file could not be created. file name : " << chkPt_fileName << " fd : " << fd << "\n";
       abort();
     }
-    write(fd,reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
+    write(fd,reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(typename FnTy::ValTy));
     //chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
+    StatTimer_checkpoint_fsync.start();
+#ifdef __CHECKPOINT_NO_FSYNC__
+#else
     fsync(fd);
+#endif
+    StatTimer_checkpoint_fsync.stop();
+
     close(fd);
     //chkPt_file.close();
     StatTimer_checkpoint.stop();
