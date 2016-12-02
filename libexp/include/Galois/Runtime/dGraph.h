@@ -43,6 +43,7 @@
 
 #include "Galois/Runtime/Dynamic_bitset.h"
 #include <fcntl.h>
+#include <sys/mman.h>
 
 //#include "Galois/Runtime/dGraph_vertexCut.h"
 //#include "Galois/Runtime/dGraph_edgeCut.h"
@@ -2151,13 +2152,33 @@ public:
     //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::string chkPt_fileName = "CheckPointFiles_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+
+#ifdef __TMPFS__
+#ifdef __CHECKPOINT_NO_FSYNC__
+    std::string chkPt_fileName = "/dev/shm/CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#else
+    std::string chkPt_fileName = "/dev/shm/CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#endif
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#else
+
 #ifdef __CHECKPOINT_NO_FSYNC__
     std::string chkPt_fileName = "CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
 #else
     std::string chkPt_fileName = "CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
 #endif
+#endif
+
     //std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary | std::ofstream::trunc);
+#if __TMPFS__
+    int fd = shm_open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
+#else
     int fd = open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
+#endif
     if(fd==-1){
       std::cerr << "file could not be created. file name : " << chkPt_fileName << " fd : " << fd << "\n";
       abort();

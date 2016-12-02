@@ -312,4 +312,10 @@ if(USE_GGC)
   target_link_libraries(bfs_pull-topological_cuda ggrt)
 endif()
 
+app(bfs_pull-topological_DiskCP_tmpfs checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
+target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs PRIVATE __TMPFS__=1)
+
+
+app(bfs_pull-topological_DiskCP_tmpfs_noFsync checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
+target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs_noFsync PRIVATE __TMPFS__=1 __CHECKPOINT__NO_FSYNC__=1)
 
