@@ -31,6 +31,10 @@
 #include "Galois/Runtime/dGraph.h"
 #include <boost/dynamic_bitset.hpp>
 #include "Galois/Runtime/dGraph_edgeAssign_policy.h"
+#include "Galois/Runtime/Dynamic_bitset.h"
+#include "Galois/Runtime/vecBool_bitset.h"
+#include "Galois/Graphs/FileGraph.h"
+#include <sstream>
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
@@ -64,16 +68,21 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     //XXX: initialize to ~0
-    std::vector<std::vector<uint64_t>> node_mapping;
+    //std::vector<std::vector<uint64_t>> node_mapping;
     std::vector<uint64_t> numNodes_per_host;
-    std::vector<uint64_t> Nodes_isolated;
-    std::vector<std::vector<uint64_t>> master_mapping;
-    std::vector<std::vector<uint64_t>> slave_mapping;
-    std::vector<std::pair<uint64_t, uint64_t>> host_edges;
+    //std::vector<uint64_t> Nodes_isolated;
+    //std::vector<std::vector<uint64_t>> master_mapping;
+    //std::vector<std::vector<uint64_t>> slave_mapping;
+    //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
+    std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
     //std::vector<std::vector<bool>> gid_bitVector(g.size(), std::vector<bool>(base_hGraph::numHosts, false));
-    std::vector<boost::dynamic_bitset<uint32_t>>gid_bitset;
+    //std::vector<boost::dynamic_bitset<uint32_t>>gid_bitset;
+    //std::vector<Galois::DynamicBitSet<uint64_t>>gid_bitset;
+    //std::vector<std::vector<bool>>gid_bitset_vecBool;
+    //std::vector<bool> gid_bitset_oneVec;
     std::vector<uint64_t> numEdges_per_host;
 
+    Galois::VecBool gid_vecBool;
 
 
 
@@ -146,108 +155,109 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) :  base_hGraph(host, _numHosts) {
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
-      //id = _id;
-      //numHosts = _numHosts;
+      Galois::StatTimer StatTimer_distributed_edges("TIMER_DISTRIBUTE_EDGES");
 
-      //std::string part_fileName = getPartitionFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
-      //std::string part_metaFile = getMetaFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
+      {
+      Galois::Graph::FileGraph g;
+      g.fromFile(filename);
 
-
-      Galois::Graph::OfflineGraph g(filename);
-
-      node_mapping.resize(base_hGraph::numHosts);
       numNodes_per_host.resize(base_hGraph::numHosts);
-      master_mapping.resize(base_hGraph::numHosts);
-      slave_mapping.resize(base_hGraph::numHosts);
       numEdges_per_host.resize(base_hGraph::numHosts, 0);
-      gid_bitset.resize(g.size(), boost::dynamic_bitset<uint32_t>(base_hGraph::numHosts));
-
-      std::cout << "SIZE OF EACH BITSET : " << gid_bitset[0].size() << "\n";
-
-
+      gid_vecBool.resize(g.size() , base_hGraph::numHosts);
 
       /********** vertex cut begins *******************/
-
       srand(1);
-      for(auto src = g.begin(); src != g.end(); ++src){
-        for(auto iter_edge = g.edge_begin(*src); iter_edge != g.edge_end(*src); ++iter_edge){
-          auto dst = g.getEdgeDst(iter_edge);
 
-          //auto assigned_host = balanced_edge_assignment(*src, dst, gid_bitset[*src], gid_bitset[dst]);
-          auto assigned_host = random_edge_assignment(*src, dst, gid_bitset[*src], gid_bitset[dst], base_hGraph::numHosts);
+      base_hGraph::totalNodes = g.size();
+
+      std::cout << "Start loop over nodes\n";
+
+      StatTimer_distributed_edges.start();
+      for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
+        for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
+          auto dst = g.getEdgeDst(e);
+          auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
 
           assert(assigned_host < base_hGraph::numHosts);
 
           // my edge to be constructed later
           if(assigned_host == base_hGraph::id){
-            host_edges.push_back(std::make_pair(*src, dst));
+            host_edges_map[*src].push_back(dst);
           }
 
-          // gid_bitset updated
-          //if(!gid_bitset[*src][assigned_host]){
-          if(!gid_bitset[*src].test(assigned_host)){
-            gid_bitset[*src][assigned_host] = 1;
+          if(!gid_vecBool.is_set(*src, assigned_host)){
+            gid_vecBool.set_bit(*src, assigned_host);
             ++numNodes_per_host[assigned_host];
-            //node_mapping[assigned_host].push_back(*src);
           }
 
-          //if(!gid_bitset[dst][assigned_host]){
-          if(!gid_bitset[dst].test(assigned_host)){
-            gid_bitset[dst][assigned_host] = 1;
-            //node_mapping[assigned_host].push_back(dst);
+          if(!gid_vecBool.is_set(dst, assigned_host)){
+            gid_vecBool.set_bit(dst, assigned_host);
             ++numNodes_per_host[assigned_host];
           }
           ++numEdges_per_host[assigned_host];
         }
       }
+      }
+      std::stringstream ss;
+      ss << "[" << base_hGraph::id << "] numNodes assigned :" << numNodes_per_host[base_hGraph::id] << "\n";
+      std::cout << ss.str();
 
+
+      StatTimer_distributed_edges.stop();
+      //std::cerr << "TOTAL_EDGES : " <<total_edges << "\n";
 
         // Assigning isolated nodes
-        for(auto k = gid_bitset.begin(); k != gid_bitset.end(); ++k){
-          if((*k).none()){
+        for(auto k = 0; k < base_hGraph::totalNodes; ++k){
+          if(gid_vecBool.bit_count(k) == 0){
             uint32_t assigned_host = 0;
             for(auto h = 1; h < base_hGraph::numHosts; ++h){
               if(numNodes_per_host[h] < numNodes_per_host[assigned_host])
                 assigned_host = h;
             }
-            (*k)[assigned_host] = 1;
+            gid_vecBool.set_bit(k, assigned_host);
             if(assigned_host == base_hGraph::id){
-              Nodes_isolated.push_back(std::distance(gid_bitset.begin(), k));
               ++numNodes_per_host[assigned_host];
             }
           }
         }
 
-      base_hGraph::totalNodes = g.size();
+      std::cerr << "Done assigning isolated nodes\n";
+
+      std::stringstream ss1;
+      ss1 << "[" << base_hGraph::id << "] numNodes assigned After :" << numNodes_per_host[base_hGraph::id] << "\n";
+      std::cout << ss1.str();
+
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
 
       //compute owners for all nodes
       base_hGraph::numOwned = numNodes_per_host[base_hGraph::id];
-
+      uint32_t _numNodes = base_hGraph::numOwned;
       std::cerr << "[" << base_hGraph::id << "] Owned nodes : " << base_hGraph::numOwned << "\n";
 
-      assert(host_edges.size() == numEdges_per_host[base_hGraph::id]);
 
-      uint64_t _numEdges = host_edges.size();
+      uint64_t _numEdges = numEdges_per_host[base_hGraph::id];
       std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
 
-      uint32_t _numNodes = base_hGraph::numOwned;
-
       base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
-      //std::cerr << "Allocate done\n";
+      std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
-      //std::cerr << "Construct nodes done\n";
+      std::cerr << "Construct nodes done\n";
 
       fill_slaveNodes(base_hGraph::slaveNodes);
+      std::cerr << "fill_slaveNodes done\n";
 
-      // sort edges based on sources
-      std::sort(host_edges.begin(), host_edges.end(), [&](std::pair<uint64_t, uint64_t>& p1, std::pair<uint64_t, uint64_t>& p2){ return (G2L(p1.first) < G2L(p2.first)) ;});
+      // free the memory 
+      gid_vecBool.clear();
+      std::vector<uint64_t>().swap(numEdges_per_host);
+      std::vector<uint64_t>().swap(numNodes_per_host);
 
-      loadEdges(base_hGraph::graph, g);
-      std::cerr << "Edges loaded \n";
+      loadEdges(base_hGraph::graph);
+      std::cerr << base_hGraph::id << "Edges loaded \n";
 
       base_hGraph::setup_communication();
+      //Galois::Runtime::getHostBarrier().wait();
+      //exit(0);
 
     }
 
@@ -308,25 +318,35 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+      void loadEdges(GraphTy& graph) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
 
-        auto p = host_edges.begin();
+        //auto p = host_edges_map.begin();
+        auto map_end = host_edges_map.end();
         for(auto l = 0; l < base_hGraph::numOwned; ++l){
-            while(L2G(l) == (*p).first){
-              graph.constructEdge(cur++, G2L((*p).second));
-              ++p;
-            }
+          auto p = host_edges_map.find(L2G(l));
+          if( p != map_end){
+            for(auto n : (*p).second)
+              graph.constructEdge(cur++, G2L(n));
+          }
           graph.fixEndEdge(l, cur);
         }
       }
 
+#if 0
     struct sort_dynamic_bitset{
       inline bool operator()(const boost::dynamic_bitset<uint32_t>& a_set, const boost::dynamic_bitset<uint32_t>& b_set){
         return a_set.count() < b_set.count();
       }
     };
+#endif
+    struct sort_dynamic_bitset{
+      inline bool operator()(const Galois::DynamicBitSet<uint64_t>& a_set, const Galois::DynamicBitSet<uint64_t>& b_set) const{
+        return a_set.bit_count() < b_set.bit_count();
+      }
+    };
+
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
 
@@ -336,27 +356,27 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // To keep track of the masters assinged.
       std::vector<uint32_t> master_load(base_hGraph::numHosts);
       // To preserve the old indicies
-      std::vector<uint64_t> old_index(gid_bitset.size());
+      std::vector<uint64_t> old_index(base_hGraph::totalNodes);
       std::iota(old_index.begin(), old_index.end(), 0);
 
-      std::sort(old_index.begin(), old_index.end(), [&](uint64_t i1, uint64_t i2) {return (gid_bitset[i1].count() <  gid_bitset[i2].count());});
-
-      //sort vector of dynamic_bitset to select masters and slaves.
-      std::sort(gid_bitset.begin(), gid_bitset.end(), sort_dynamic_bitset());
+      std::sort(old_index.begin(), old_index.end(), [&](uint64_t i1, uint64_t i2) {return (gid_vecBool.bit_count(i1) <  gid_vecBool.bit_count(i2));});
 
       uint64_t current_index = 0;
-      for(auto bit_set = gid_bitset.begin(); bit_set != gid_bitset.end(); ++bit_set, ++current_index){
+      for(auto i : old_index){
+        ++current_index;
         //must be assigned to some host.
-        auto num_set_bits = (*bit_set).count();
+        auto num_set_bits = gid_vecBool.bit_count(i);
         assert(num_set_bits > 0);
 
-        uint32_t first_set_pos = (*bit_set).find_first();
+        uint32_t first_set_pos = gid_vecBool.find_first(i);
+        assert(first_set_pos != ~0);
         uint32_t owner = first_set_pos;
         uint32_t next_set_pos = first_set_pos;
 
         if(num_set_bits > 1){
           for(auto n = 1; n < num_set_bits; ++n){
-            next_set_pos = (*bit_set).find_next(next_set_pos) ;
+            next_set_pos = gid_vecBool.find_next(i,next_set_pos) ;
+            assert(next_set_pos != ~0);
             if(master_load[owner] > master_load[next_set_pos]){
               owner = next_set_pos;
             }
@@ -369,10 +389,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         assert(owner < base_hGraph::numHosts);
 
 
-        if((*bit_set).test(base_hGraph::id)){
-          GlobalVec_perHost[owner].push_back(old_index[current_index]);
+        if(gid_vecBool.is_set(i, base_hGraph::id)){
+          GlobalVec_perHost[owner].push_back(i);
           OwnerVec_perHost[owner].push_back(owner);
-          slaveNodes[owner].push_back(old_index[current_index]);
+          slaveNodes[owner].push_back(i);
         }
       }
 
@@ -405,21 +425,21 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       GlobalVec.reserve(counter);
       auto iter_insert = GlobalVec.begin();
-        uint32_t c = 0;
-        for(auto v : GlobalVec_perHost){
-          for(auto j : v){
-            GlobalVec.push_back(j);
-          }
+      uint32_t c = 0;
+      for(auto v : GlobalVec_perHost){
+        for(auto j : v){
+          GlobalVec.push_back(j);
         }
+      }
 
-        OwnerVec.reserve(counter);
-        c = 0;
-        iter_insert = OwnerVec.begin();
-        for(auto v : OwnerVec_perHost){
-          for(auto j : v){
-            OwnerVec.push_back(j);
-          }
+      OwnerVec.reserve(counter);
+      c = 0;
+      iter_insert = OwnerVec.begin();
+      for(auto v : OwnerVec_perHost){
+        for(auto j : v){
+          OwnerVec.push_back(j);
         }
+      }
     }
 
     bool is_vertex_cut() const{

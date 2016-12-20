@@ -15,6 +15,22 @@
       }
 #endif
 
+uint32_t random_edge_assignment(uint64_t src, uint64_t dst, std::vector<bool>& src_bitset, std::vector<bool>& dst_bitset, uint32_t numHosts){
+
+ uint32_t rand_number = rand() % numHosts;
+ return rand_number;
+
+}
+
+
+uint32_t random_edge_assignment(uint64_t src, uint64_t dst, Galois::DynamicBitSet<uint64_t>& src_bitset, Galois::DynamicBitSet<uint64_t>& dst_bitset, uint32_t numHosts){
+
+ uint32_t rand_number = rand() % numHosts;
+ return rand_number;
+
+}
+
+
 uint32_t random_edge_assignment(uint64_t src, uint64_t dst, boost::dynamic_bitset<uint32_t>& src_bitset, boost::dynamic_bitset<uint32_t>& dst_bitset, uint32_t numHosts){
 
  uint32_t rand_number = rand() % numHosts;

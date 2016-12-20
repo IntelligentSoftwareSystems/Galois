@@ -1,0 +1,66 @@
+namespace Galois {
+
+  class VecBool {
+    std::vector<bool> vec;
+    uint64_t numItems;
+    uint32_t size_each;
+
+    public:
+      VecBool() = default;
+      VecBool(uint64_t _numItems, uint32_t _size_each) : numItems(_numItems), size_each(_size_each) {
+        vec.resize(_numItems*_size_each);
+      }
+
+      void resize(uint64_t _numItems, uint32_t _size_each) {
+        numItems = _numItems;
+        size_each = _size_each;
+        vec.resize(_numItems*_size_each, false);
+        std::fill(vec.begin(), vec.end(), false);
+        std::cerr << "resizing : " << vec[0] << "\n";
+      }
+
+      void set_bit(uint64_t n, uint32_t a) {
+        vec[n*size_each + a] = true;
+      }
+
+      bool is_set(uint64_t n, uint32_t a) const {
+        return vec[n*size_each + a];
+      }
+
+      uint64_t size() const {
+        return numItems;
+      }
+
+      uint32_t bit_count(uint64_t n){
+        uint32_t set_bit_count = 0;
+        for(auto k = 0; k < size_each; ++k){
+          if(is_set(n,k)){
+            set_bit_count++;
+          }
+        }
+        return set_bit_count;
+      }
+      uint32_t find_first(uint64_t n){
+        for(auto k = 0; k < size_each; ++k){
+          if(is_set(n,k)){
+            return k;
+          }
+        }
+        return ~0;
+      }
+      uint32_t find_next(uint64_t n, uint32_t p){
+        for(auto k = p; k < size_each; ++k){
+          if(is_set(n,k)){
+            return k;
+          }
+        }
+        return ~0;
+      }
+
+      void clear(){
+        std::vector<bool>().swap(vec);
+      }
+
+  };
+
+}//namespace Galois ends
