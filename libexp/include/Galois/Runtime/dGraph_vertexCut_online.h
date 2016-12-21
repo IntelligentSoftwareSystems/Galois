@@ -30,9 +30,9 @@
 #include <unordered_map>
 #include "Galois/Runtime/dGraph.h"
 #include <boost/dynamic_bitset.hpp>
+#include "Galois/Runtime/vecBool_bitset.h"
 #include "Galois/Runtime/dGraph_edgeAssign_policy.h"
 #include "Galois/Runtime/Dynamic_bitset.h"
-#include "Galois/Runtime/vecBool_bitset.h"
 #include "Galois/Graphs/FileGraph.h"
 #include <sstream>
 
@@ -176,7 +176,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
         for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
           auto dst = g.getEdgeDst(e);
-          auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
+          //auto assigned_host = random_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts);
+          auto assigned_host = balanced_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts, numEdges_per_host);
+          //auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
 
           assert(assigned_host < base_hGraph::numHosts);
 
@@ -340,12 +342,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         return a_set.count() < b_set.count();
       }
     };
-#endif
     struct sort_dynamic_bitset{
       inline bool operator()(const Galois::DynamicBitSet<uint64_t>& a_set, const Galois::DynamicBitSet<uint64_t>& b_set) const{
         return a_set.bit_count() < b_set.bit_count();
       }
     };
+#endif
 
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
