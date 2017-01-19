@@ -49,7 +49,7 @@ namespace Galois {
         return ~0;
       }
       uint32_t find_next(uint64_t n, uint32_t p){
-        for(auto k = p; k < size_each; ++k){
+        for(auto k = p+1; k < size_each; ++k){
           if(is_set(n,k)){
             return k;
           }

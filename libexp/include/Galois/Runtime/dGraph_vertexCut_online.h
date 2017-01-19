@@ -154,8 +154,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) :  base_hGraph(host, _numHosts) {
 
+      Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT", 0, 0);
+
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_distributed_edges("TIMER_DISTRIBUTE_EDGES");
+      Galois::StatTimer StatTimer_distributed_edges_policy("TIMER_DISTRIBUTE_EDGES_POLICY");
+      Galois::StatTimer StatTimer_distributed_edges_map("TIMER_DISTRIBUTE_EDGES_MAP");
+      Galois::StatTimer StatTimer_distributed_edges_test_set_bit("TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT");
+      Galois::StatTimer StatTimer_distributed_edges_get_dst("TIMER_DISTRIBUTE_EDGES_GET_DST");
+      Galois::StatTimer StatTimer_distributed_edges_get_edges("TIMER_DISTRIBUTE_EDGES_GET_EDGES");
+      Galois::StatTimer StatTimer_distributed_edges_inner_loop("TIMER_DISTRIBUTE_EDGES_INNER_LOOP");
+      Galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
 
       {
       Galois::Graph::FileGraph g;
@@ -173,20 +182,39 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cout << "Start loop over nodes\n";
 
       StatTimer_distributed_edges.start();
-      for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
-        for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
+      //for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
+      for(auto src = g.begin(), src_end= g.end(); src != src_end;){
+
+
+      StatTimer_distributed_edges_inner_loop.start();
+    
+      StatTimer_distributed_edges_get_edges.start();
+        auto e_start = g.edge_begin(*src);
+        auto e_end = g.edge_end(*src);
+      StatTimer_distributed_edges_get_edges.stop();
+
+        //for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
+        for(auto e = e_start; e != e_end; ++e){
+	
+          StatTimer_distributed_edges_get_dst.start();
           auto dst = g.getEdgeDst(e);
+          StatTimer_distributed_edges_get_dst.stop();
           //auto assigned_host = random_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts);
+          StatTimer_distributed_edges_policy.start();
           auto assigned_host = balanced_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts, numEdges_per_host);
+          StatTimer_distributed_edges_policy.stop();
           //auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
 
           assert(assigned_host < base_hGraph::numHosts);
 
+          StatTimer_distributed_edges_map.start();
           // my edge to be constructed later
           if(assigned_host == base_hGraph::id){
             host_edges_map[*src].push_back(dst);
           }
+          StatTimer_distributed_edges_map.stop();
 
+          StatTimer_distributed_edges_test_set_bit.start();
           if(!gid_vecBool.is_set(*src, assigned_host)){
             gid_vecBool.set_bit(*src, assigned_host);
             ++numNodes_per_host[assigned_host];
@@ -197,12 +225,22 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             ++numNodes_per_host[assigned_host];
           }
           ++numEdges_per_host[assigned_host];
+          StatTimer_distributed_edges_test_set_bit.stop();
         }
+      StatTimer_distributed_edges_inner_loop.stop();
+
+      StatTimer_distributed_edges_next_src.start();
+	++src;
+      StatTimer_distributed_edges_next_src.stop();
       }
+
       }
-      std::stringstream ss;
-      ss << "[" << base_hGraph::id << "] numNodes assigned :" << numNodes_per_host[base_hGraph::id] << "\n";
-      std::cout << ss.str();
+
+
+
+      //std::stringstream ss;
+      //ss << "[" << base_hGraph::id << "] numNodes assigned :" << numNodes_per_host[base_hGraph::id] << "\n";
+      //std::cout << ss.str();
 
 
       StatTimer_distributed_edges.stop();
@@ -234,11 +272,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //compute owners for all nodes
       base_hGraph::numOwned = numNodes_per_host[base_hGraph::id];
       uint32_t _numNodes = base_hGraph::numOwned;
-      std::cerr << "[" << base_hGraph::id << "] Owned nodes : " << base_hGraph::numOwned << "\n";
+      Galois::Runtime::reportStat("(NULL)", "OWNED_NODES", numNodes_per_host[base_hGraph::id], 0);
+      //std::cerr << "[" << base_hGraph::id << "] Owned nodes : " << base_hGraph::numOwned << "\n";
 
 
       uint64_t _numEdges = numEdges_per_host[base_hGraph::id];
-      std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
+      Galois::Runtime::reportStat("(NULL)", "OWNED_EDGES", _numEdges, 0);
+      //std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
 
       base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
       std::cerr << "Allocate done\n";
@@ -361,6 +401,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::vector<uint64_t> old_index(base_hGraph::totalNodes);
       std::iota(old_index.begin(), old_index.end(), 0);
 
+      // sort by replication factor
       std::sort(old_index.begin(), old_index.end(), [&](uint64_t i1, uint64_t i2) {return (gid_vecBool.bit_count(i1) <  gid_vecBool.bit_count(i2));});
 
       uint64_t current_index = 0;
