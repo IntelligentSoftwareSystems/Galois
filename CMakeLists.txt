@@ -136,17 +136,17 @@ add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
+find_package(OpenMP)
+if(OPENMP_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+endif()
+
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-  endif()
 
   find_package(TBB)
   if(TBB_FOUND)
