@@ -222,11 +222,11 @@ public:
    }
 
    template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
-   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
-     return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), s);
+   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v) {
+     return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), v.data());
    }
    template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
-   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+   bool batch_reduce(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::reduce_batch(x, v.data());
    }
 
@@ -240,23 +240,23 @@ public:
 
        uint32_t num = masterNodes[from_id].size();
        if(num > 0){
-
-         Galois::DynamicBitSet bit_set_comm;
-         bit_set_comm.resize_init(num);
-
-         size_t bit_set_count = 0;
+         unsigned data_mode = 1;
          if (updated_only) {
-           Galois::Runtime::gDeserialize(buf, bit_set_comm);
-           bit_set_count = bit_set_comm.bit_count(num);
+           Galois::Runtime::gDeserialize(buf, data_mode);
          }
+         if (data_mode != 0) {
+           Galois::DynamicBitSet bit_set_comm;
+           bit_set_comm.resize_init(num);
 
-         if (!updated_only || (bit_set_count > 0)) {
+           if (updated_only) {
+             Galois::Runtime::gDeserialize(buf, bit_set_comm);
+           }
+
            std::vector<typename FnTy::ValTy> val_vec;
-           if (updated_only) val_vec.resize(bit_set_count);
-           else val_vec.resize(num);
+           val_vec.resize(num);
            Galois::Runtime::gDeserialize(buf, val_vec);
 
-           bool batch_succeeded = batch_reduce<FnTy, updated_only>(from_id, bit_set_comm, val_vec, bit_set_count);
+           bool batch_succeeded = batch_reduce<FnTy, updated_only>(from_id, bit_set_comm, val_vec);
            if (!batch_succeeded) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                  [&](uint32_t n){
@@ -328,11 +328,11 @@ public:
    }
 
    template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
-   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
-     return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), s);
+   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v) {
+     return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), v.data());
    }
    template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
-   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+   bool batch_setVal(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::setVal_batch(x, v.data());
    }
 
@@ -348,23 +348,23 @@ public:
       StatTimer_set.start();
 
       if(num > 0){
-
-        Galois::DynamicBitSet bit_set_comm;
-        bit_set_comm.resize_init(num);
-
-        size_t bit_set_count = 0;
+        unsigned data_mode = 1;
         if (updated_only) {
-          Galois::Runtime::gDeserialize(buf, bit_set_comm);
-          bit_set_count = bit_set_comm.bit_count(num);
+          Galois::Runtime::gDeserialize(buf, data_mode);
         }
+        if (data_mode != 0) {
+          Galois::DynamicBitSet bit_set_comm;
+          bit_set_comm.resize_init(num);
 
-        if (!updated_only || (bit_set_count > 0)) {
+          if (updated_only) {
+            Galois::Runtime::gDeserialize(buf, bit_set_comm);
+          }
+
           std::vector<typename FnTy::ValTy> val_vec;
-          if (updated_only) val_vec.resize(bit_set_count);
-          else val_vec.resize(num);
+          val_vec.resize(num);
           Galois::Runtime::gDeserialize(buf, val_vec);
 
-          bool batch_succeeded = batch_setVal<FnTy, updated_only>(from_id, bit_set_comm, val_vec, bit_set_count);
+          bool batch_succeeded = batch_setVal<FnTy, updated_only>(from_id, bit_set_comm, val_vec);
           if (!batch_succeeded) {
             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                 [&](uint32_t n){
@@ -1410,12 +1410,12 @@ public:
 #endif
 
    template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
-   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s, unsigned &data_mode) {
 
-     return FnTy::extract_reset_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s);
+     return FnTy::extract_reset_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s, &data_mode);
    }
    template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
-   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+   bool batch_extract_reset(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s, unsigned &data_mode) {
      return FnTy::extract_reset_batch(x, v.data());
    }
 
@@ -1638,8 +1638,9 @@ public:
            bit_set_comm.resize_init(num);
            size_t bit_set_count = 0;
            std::vector<typename FnTy::ValTy> val_vec(num);
+           unsigned data_mode;
 
-           bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
+           bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count, data_mode);
 
            if (!batch_succeeded) {
              if (updated_only) {
@@ -1682,8 +1683,12 @@ public:
              size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
              size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
              if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
-             val_vec.resize(bit_set_count);
-             gSerialize(b, bit_set_comm, val_vec);
+             if (data_mode != 0) {
+               val_vec.resize(bit_set_count);
+               gSerialize(b, data_mode, bit_set_comm, val_vec);
+             } else {
+               gSerialize(b, data_mode);
+             }
            } else {
              gSerialize(b, val_vec);
            }
@@ -1831,11 +1836,11 @@ public:
    }
 
    template<typename FnTy, bool updated_only, typename std::enable_if<updated_only>::type* = nullptr>
-   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
-     return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s);
+   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s, unsigned &data_mode) {
+     return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), v.data(), &s, &data_mode);
    }
    template<typename FnTy, bool updated_only, typename std::enable_if<!updated_only>::type* = nullptr>
-   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s) {
+   bool batch_extract(unsigned x, Galois::DynamicBitSet &b, std::vector<typename FnTy::ValTy> &v, size_t &s, unsigned &data_mode) {
      return FnTy::extract_batch(x, v.data());
    }
 
@@ -2034,8 +2039,9 @@ public:
            bit_set_comm.resize_init(num);
            size_t bit_set_count = 0;
            std::vector<typename FnTy::ValTy> val_vec(num);
+           unsigned data_mode;
 
-           bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
+           bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count, data_mode);
 
            if (!batch_succeeded) {
              if (updated_only) {
@@ -2075,8 +2081,12 @@ public:
              size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
              size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
              if (redundant_size > bit_set_size) SyncPull_saved_bytes += redundant_size-bit_set_size;
-             val_vec.resize(bit_set_count);
-             gSerialize(b, bit_set_comm, val_vec);
+             if (data_mode != 0) {
+               val_vec.resize(bit_set_count);
+               gSerialize(b, data_mode, bit_set_comm, val_vec);
+             } else {
+               gSerialize(b, data_mode);
+             }
            } else {
              gSerialize(b, val_vec);
            }
