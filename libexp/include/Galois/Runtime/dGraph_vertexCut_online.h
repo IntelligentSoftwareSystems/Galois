@@ -183,38 +183,39 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_distributed_edges.start();
       //for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
-      for(auto src = g.begin(), src_end= g.end(); src != src_end;){
+      for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
 
 
-      StatTimer_distributed_edges_inner_loop.start();
+      //StatTimer_distributed_edges_inner_loop.start();
     
-      StatTimer_distributed_edges_get_edges.start();
+      //StatTimer_distributed_edges_get_edges.start();
         auto e_start = g.edge_begin(*src);
         auto e_end = g.edge_end(*src);
-      StatTimer_distributed_edges_get_edges.stop();
+      //StatTimer_distributed_edges_get_edges.stop();
 
         //for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
         for(auto e = e_start; e != e_end; ++e){
 	
-          StatTimer_distributed_edges_get_dst.start();
+          //StatTimer_distributed_edges_get_dst.start();
           auto dst = g.getEdgeDst(e);
-          StatTimer_distributed_edges_get_dst.stop();
+          //StatTimer_distributed_edges_get_dst.stop();
           //auto assigned_host = random_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts);
-          StatTimer_distributed_edges_policy.start();
+          //StatTimer_distributed_edges_policy.start();
           auto assigned_host = balanced_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts, numEdges_per_host);
-          StatTimer_distributed_edges_policy.stop();
+          //StatTimer_distributed_edges_policy.stop();
           //auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
 
           assert(assigned_host < base_hGraph::numHosts);
 
-          StatTimer_distributed_edges_map.start();
+          //StatTimer_distributed_edges_map.start();
           // my edge to be constructed later
           if(assigned_host == base_hGraph::id){
             host_edges_map[*src].push_back(dst);
           }
-          StatTimer_distributed_edges_map.stop();
+          //StatTimer_distributed_edges_map.stop();
 
-          StatTimer_distributed_edges_test_set_bit.start();
+          //StatTimer_distributed_edges_test_set_bit.start();
+#if 0
           if(!gid_vecBool.is_set(*src, assigned_host)){
             gid_vecBool.set_bit(*src, assigned_host);
             ++numNodes_per_host[assigned_host];
@@ -224,14 +225,21 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             gid_vecBool.set_bit(dst, assigned_host);
             ++numNodes_per_host[assigned_host];
           }
-          ++numEdges_per_host[assigned_host];
-          StatTimer_distributed_edges_test_set_bit.stop();
-        }
-      StatTimer_distributed_edges_inner_loop.stop();
+#endif
 
-      StatTimer_distributed_edges_next_src.start();
-	++src;
-      StatTimer_distributed_edges_next_src.stop();
+          if(!gid_vecBool.set_bit_and_return(*src, assigned_host)){
+            ++numNodes_per_host[assigned_host];
+          }
+
+          if(!gid_vecBool.set_bit_and_return(dst, assigned_host)){
+            ++numNodes_per_host[assigned_host];
+          }
+
+          ++numEdges_per_host[assigned_host];
+          //StatTimer_distributed_edges_test_set_bit.stop();
+        }
+      //StatTimer_distributed_edges_inner_loop.stop();
+
       }
 
       }
@@ -245,6 +253,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_distributed_edges.stop();
       //std::cerr << "TOTAL_EDGES : " <<total_edges << "\n";
+
+      //exit(0);
 
         // Assigning isolated nodes
         for(auto k = 0; k < base_hGraph::totalNodes; ++k){

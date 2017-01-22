@@ -23,33 +23,31 @@ uint32_t random_edge_assignment(uint64_t src, uint64_t dst, Galois::VecBool& bit
 }
 
 uint32_t balanced_edge_assignment(uint64_t src, uint64_t dst, Galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
+  uint32_t min_load_host = ~0;
+  uint64_t load = 0;
+  uint32_t minEdge = ~0;
+  uint64_t minEdge_load = ~0;
 
-  std::vector<uint32_t> intersection_vec;
   for(auto k = 0; k < numHosts; ++k){
-    if(bitset.is_set(src, k) && bitset.is_set(dst, k)){
-      intersection_vec.push_back(k);
+    if (numEdges_per_host[k] < minEdge_load) {
+      minEdge = k;
+      minEdge_load = numEdges_per_host[k];
     }
-  }
-
-  // both have common host.
-  uint32_t min_load_host;
-  if(intersection_vec.size() > 0){
-    min_load_host = intersection_vec[0];
-    for(auto h : intersection_vec){
-      if(numEdges_per_host[h] < numEdges_per_host[min_load_host]){
-        min_load_host = h;
+    if(bitset.is_set(src, k) && bitset.is_set(dst, k)){
+      // both have common host.
+      if (min_load_host == ~0) {
+        min_load_host = k;
+        load = numEdges_per_host[k];
+      } else if (numEdges_per_host[k] < load) {
+        min_load_host = k;
+        load = numEdges_per_host[k];
       }
     }
+  }
+  if (min_load_host != ~0)
     return min_load_host;
-  }
-
-  min_load_host = 0;
-  for(auto k = 1; k < numHosts; ++k){
-    if(numEdges_per_host[k] < numEdges_per_host[min_load_host]){
-      min_load_host = k;
-    }
-  }
-  return min_load_host;
+  else
+    return minEdge;
 }
 
 uint32_t balanced_edge_assignment2(uint64_t src, uint64_t dst, Galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
