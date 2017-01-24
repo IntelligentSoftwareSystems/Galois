@@ -2,6 +2,7 @@ add_library(galois_python SHARED
   PythonGraph.cpp
   AnalyzeBFS.cpp 
   SearchSubgraph.cpp
+  PageRank.cpp
   $<TARGET_OBJECTS:gllvm_obj>
   $<TARGET_OBJECTS:galois_substrate_obj>
   $<TARGET_OBJECTS:galois_runtime_obj> 
@@ -12,7 +13,7 @@ target_include_directories(galois_python PUBLIC
   ${CMAKE_SOURCE_DIR}/libsubstrate/include
   ${CMAKE_SOURCE_DIR}/libruntime/include
   ${CMAKE_SOURCE_DIR}/libgraphs/include
-  ${CMAKE_SOURCE_DIR}/libexp/include
+#  ${CMAKE_SOURCE_DIR}/libexp/include
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 set_target_properties (galois_python PROPERTIES 

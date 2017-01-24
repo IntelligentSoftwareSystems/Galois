@@ -1,6 +1,7 @@
 #include "PythonGraph.h"
 #include "AnalyzeBFS.h"
 #include "SearchSubgraph.h"
+#include "PageRank.h"
 
 #include <vector>
 #include <iostream>
@@ -187,6 +188,10 @@ int main(int argc, char *argv[]) {
   result = searchSubgraphVF2(g, g2, 10);
   deleteGraphMatches(result);
   deleteGraph(g2);
+
+  setNumThreads(2);
+  NodeDouble *pr = analyzePagerank(g, 10, 0.01, "pr");
+  deleteNodeDoubles(pr);
 
   deleteGraph(g);
   nodes.clear();
