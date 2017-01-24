@@ -35,7 +35,6 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
     [=] (GNode n) 
       {
         auto& data = (*g).getData(n); 
-        data.mode = 0; 
         data.ID.vInt = DIST_INFINITY;
       }
     );
