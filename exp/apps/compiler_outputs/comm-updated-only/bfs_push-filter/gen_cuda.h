@@ -1,5 +1,6 @@
 #pragma once
 #include "Galois/Runtime/Cuda/cuda_mtypes.h"
+#include "Galois/Runtime/DataCommMode.h"
 
 struct CUDA_Context;
 
@@ -12,23 +13,23 @@ unsigned int get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
-void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned *data_mode);
-void batch_get_slave_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned *data_mode);
-void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned int i, unsigned *data_mode);
-void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
-void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
-void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
+void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode);
+void batch_get_slave_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode);
+void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode, unsigned int i);
+void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
+void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
+void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 
 unsigned int get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
-void batch_get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned *data_mode);
-void batch_get_slave_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned *data_mode);
-void batch_get_reset_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v, size_t *v_size, unsigned int i, unsigned *data_mode);
-void batch_set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
-void batch_add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
-void batch_min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bit_vector, unsigned int *v);
+void batch_get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode);
+void batch_get_slave_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode);
+void batch_get_reset_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode, unsigned int i);
+void batch_set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
+void batch_add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
+void batch_min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 
 void BFS_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
 void BFS_all_cuda(int & __retval, struct CUDA_Context *ctx);

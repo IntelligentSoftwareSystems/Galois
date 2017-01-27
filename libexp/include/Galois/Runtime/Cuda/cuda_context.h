@@ -4,7 +4,7 @@
 struct CUDA_Context_Shared {
 	unsigned int *num_nodes; // per host
 	Shared<unsigned int> *nodes; // per host
-	unsigned int **nodes_updated; // per host : device-only
+	Shared<unsigned int> *offsets; // per host
   Shared<DynamicBitset> *is_updated;
 };
 
@@ -62,12 +62,12 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 	ctx->master.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
 	memcpy(ctx->master.num_nodes, g.num_master_nodes, sizeof(unsigned int) * num_hosts);
 	ctx->master.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->master.nodes_updated = (unsigned int **) calloc(num_hosts, sizeof(unsigned int *));
+	ctx->master.offsets = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
 	ctx->master.is_updated = (Shared<DynamicBitset> *) calloc(num_hosts, sizeof(Shared<DynamicBitset>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->master.num_nodes[h] > 0) {
 			ctx->master.nodes[h].alloc(ctx->master.num_nodes[h]);
-      CUDA_SAFE_CALL(cudaMalloc(&ctx->master.nodes_updated[h], ctx->master.num_nodes[h] * sizeof(unsigned int)));
+			ctx->master.offsets[h].alloc(ctx->master.num_nodes[h]);
 			ctx->master.is_updated[h].alloc(1);
 			ctx->master.is_updated[h].cpu_wr_ptr()->alloc(ctx->master.num_nodes[h]);
 			memcpy(ctx->master.nodes[h].cpu_wr_ptr(), g.master_nodes[h], sizeof(unsigned int) * ctx->master.num_nodes[h]);
@@ -76,12 +76,12 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 	ctx->slave.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
 	memcpy(ctx->slave.num_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
 	ctx->slave.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave.nodes_updated = (unsigned int **) calloc(num_hosts, sizeof(unsigned int *));
+	ctx->slave.offsets = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
 	ctx->slave.is_updated = (Shared<DynamicBitset> *) calloc(num_hosts, sizeof(Shared<DynamicBitset>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->slave.num_nodes[h] > 0) {
 			ctx->slave.nodes[h].alloc(ctx->slave.num_nodes[h]);
-      CUDA_SAFE_CALL(cudaMalloc(&ctx->slave.nodes_updated[h], ctx->slave.num_nodes[h] * sizeof(unsigned int)));
+			ctx->slave.offsets[h].alloc(ctx->slave.num_nodes[h]);
 			ctx->slave.is_updated[h].alloc(1);
 			ctx->slave.is_updated[h].cpu_wr_ptr()->alloc(ctx->slave.num_nodes[h]);
 			memcpy(ctx->slave.nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->slave.num_nodes[h]);

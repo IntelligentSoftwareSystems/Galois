@@ -122,6 +122,53 @@ public:
   bool operator[](const size_t id) const { return bitset->test(offset+id); }
 };
 
+class IdentityIterator : public std::iterator<std::random_access_iterator_tag, size_t> {
+  size_t offset;
+
+public:
+  __device__ __host__ __forceinline__
+  IdentityIterator(size_t i = 0) : offset(i) {}
+
+  __device__ __host__ __forceinline__
+  IdentityIterator& operator++() { offset++; return *this; }
+
+  __device__ __host__ __forceinline__
+  IdentityIterator& operator--() { offset--; return *this; }
+
+  __device__ __host__ __forceinline__
+  bool operator<(const IdentityIterator &bi) { return (offset < bi.offset); }
+
+  __device__ __host__ __forceinline__
+  bool operator<=(const IdentityIterator &bi) { return (offset <= bi.offset); }
+
+  __device__ __host__ __forceinline__
+  bool operator>(const IdentityIterator &bi) { return (offset > bi.offset); }
+
+  __device__ __host__ __forceinline__
+  bool operator>=(const IdentityIterator &bi) { return (offset >= bi.offset); }
+
+  __device__ __host__ __forceinline__
+  IdentityIterator& operator+=(size_t i) { offset += i; return *this; }
+
+  __device__ __host__ __forceinline__
+  IdentityIterator& operator-=(size_t i) { offset -= i; return *this; }
+
+  __device__ __host__ __forceinline__
+  IdentityIterator operator+(size_t i) { return IdentityIterator(offset + i); }
+
+  __device__ __host__ __forceinline__
+  IdentityIterator operator-(size_t i) { return IdentityIterator(offset - i); }
+
+  __device__ __host__ __forceinline__
+  difference_type operator-(const IdentityIterator &bi) { return (offset - bi.offset); }
+
+  __device__ __forceinline__
+  size_t operator*() const { return offset; }
+
+  __device__ __forceinline__
+  size_t operator[](const size_t id) const { return offset+id; }
+};
+
 #ifdef __HETEROGENEOUS_GALOIS_DEPRECATED__
 class DynamicByteset {
   size_t byte_vector_size;
