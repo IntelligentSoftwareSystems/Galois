@@ -225,7 +225,7 @@ void FileGraph::fromFile(const std::string& filename) {
   if (fstat(fd, &buf) == -1)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
 
-  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});

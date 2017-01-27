@@ -43,6 +43,8 @@
 
 #include "Galois/Runtime/DataCommMode.h"
 #include "Galois/Runtime/Dynamic_bitset.h"
+#include <fcntl.h>
+#include <sys/mman.h>
 
 //#include "Galois/Runtime/dGraph_vertexCut.h"
 //#include "Galois/Runtime/dGraph_edgeCut.h"
@@ -2160,8 +2162,10 @@ public:
   void checkpoint(std::string loopName) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::string doall_str("LAMBDA::CHECKPOINT_" + loopName + "_" + get_run_identifier());
-    std::string checkpoint_timer_str("TIME_CHECKPOINT_TOTAL_" + get_run_identifier());
+    std::string checkpoint_timer_str("TIME_CHECKPOINT_" + get_run_identifier());
+    std::string checkpoint_fsync_timer_str("TIME_CHECKPOINT_FSYNC_" + get_run_identifier());
     Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    Galois::StatTimer StatTimer_checkpoint_fsync(checkpoint_fsync_timer_str.c_str());
     StatTimer_checkpoint.start();
 
 
@@ -2177,19 +2181,60 @@ public:
 
 #if 0
     //Write val_vec to disk.
+      if(id == 0)
       for(auto k = 0; k < 10; ++k){
         std::cout << "BEFORE : val_vec[" << k <<"] :" << val_vec[k] << "\n";
       }
 #endif
 
+
     checkpoint_bytes += val_vec.size() * sizeof(typename FnTy::ValTy);
 
-    std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary);
-    chkPt_file.seekp(0);
-    chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
-    chkPt_file.close();
+    //std::string chkPt_fileName = "CheckPointFiles_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+
+#ifdef __TMPFS__
+#ifdef __CHECKPOINT_NO_FSYNC__
+    std::string chkPt_fileName = "/dev/shm/CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#else
+    std::string chkPt_fileName = "/dev/shm/CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#endif
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#else
+
+#ifdef __CHECKPOINT_NO_FSYNC__
+    std::string chkPt_fileName = "CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#else
+    std::string chkPt_fileName = "CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    Galois::Runtime::reportStat("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName, 0);
+#endif
+#endif
+
+    //std::ofstream chkPt_file(chkPt_fileName, std::ios::out | std::ofstream::binary | std::ofstream::trunc);
+#if __TMPFS__
+    int fd = shm_open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
+#else
+    int fd = open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
+#endif
+    if(fd==-1){
+      std::cerr << "file could not be created. file name : " << chkPt_fileName << " fd : " << fd << "\n";
+      abort();
+    }
+    write(fd,reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(typename FnTy::ValTy));
+    //chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
+    StatTimer_checkpoint_fsync.start();
+#ifdef __CHECKPOINT_NO_FSYNC__
+#else
+    fsync(fd);
+#endif
+    StatTimer_checkpoint_fsync.stop();
+
+    close(fd);
+    //chkPt_file.close();
     StatTimer_checkpoint.stop();
   }
 
@@ -2200,8 +2245,8 @@ public:
       //checkpoint owned nodes.
       std::vector<typename FnTy::ValTy> val_vec(numOwned);
       //read val_vec from disk.
-      std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-      //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+      //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+      std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
       std::ifstream chkPt_file(chkPt_fileName, std::ios::in | std::ofstream::binary);
       if(!chkPt_file.is_open()){
         std::cout << "Unable to open checkpoint file " << chkPt_fileName << " ! Exiting!\n";
@@ -2209,6 +2254,7 @@ public:
       }
       chkPt_file.read(reinterpret_cast<char*>(val_vec.data()), numOwned*sizeof(uint32_t));
 
+      if(id == 0)
       for(auto k = 0; k < 10; ++k){
         std::cout << "AFTER : val_vec[" << k << "] : " << val_vec[k] << "\n";
       }

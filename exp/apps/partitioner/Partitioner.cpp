@@ -52,6 +52,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> numPartitions("num", cll::desc("Number of partitions to be created"), cll::init(2));
 static cll::opt<std::string> outputFolder("outputTo", cll::desc("Name of the output folder to store the partitioned graphs."), cll::init("./"));
+static cll::opt<std::string> prefixTmp("prefixTmp", cll::desc("prefix for tmp dir where intermediate files will be stored."), cll::Required);
 
 typedef Galois::Graph::OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
@@ -82,7 +83,8 @@ int main(int argc, char** argv) {
    T_init.start();
    {
       GBPD2 p;
-      p(outputFolder, g, numPartitions);
+      std::cout << "Temp files will be stored in " << prefixTmp << "\n";
+      p(outputFolder, g, numPartitions, prefixTmp);
    }
    T_init.stop();
    if (!verifyParitions(outputFolder, g, numPartitions)) {
