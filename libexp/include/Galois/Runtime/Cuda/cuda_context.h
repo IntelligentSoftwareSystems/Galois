@@ -1,10 +1,11 @@
 #pragma once
 #include <cuda.h>
+#include "gg.h"
 
 struct CUDA_Context_Shared {
 	unsigned int *num_nodes; // per host
 	Shared<unsigned int> *nodes; // per host
-	Shared<unsigned int> *offsets; // per host
+	DeviceOnly<unsigned int> *offsets; // per host
   Shared<DynamicBitset> *is_updated;
 };
 
@@ -21,8 +22,8 @@ struct CUDA_Context_Common {
 template<typename Type>
 struct CUDA_Context_Field { 
   Shared<Type> data;
-  Shared<Type> *master_data; // per host
-  Shared<Type> *slave_data; // per host
+  DeviceOnly<Type> *master_data; // per host
+  DeviceOnly<Type> *slave_data; // per host
   Shared<DynamicBitset> is_updated; // per host
 };
 
@@ -62,7 +63,7 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 	ctx->master.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
 	memcpy(ctx->master.num_nodes, g.num_master_nodes, sizeof(unsigned int) * num_hosts);
 	ctx->master.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->master.offsets = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+	ctx->master.offsets = (DeviceOnly<unsigned int> *) calloc(num_hosts, sizeof(DeviceOnly<unsigned int>));
 	ctx->master.is_updated = (Shared<DynamicBitset> *) calloc(num_hosts, sizeof(Shared<DynamicBitset>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->master.num_nodes[h] > 0) {
@@ -76,7 +77,7 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 	ctx->slave.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
 	memcpy(ctx->slave.num_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
 	ctx->slave.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave.offsets = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+	ctx->slave.offsets = (DeviceOnly<unsigned int> *) calloc(num_hosts, sizeof(DeviceOnly<unsigned int>));
 	ctx->slave.is_updated = (Shared<DynamicBitset> *) calloc(num_hosts, sizeof(Shared<DynamicBitset>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->slave.num_nodes[h] > 0) {
@@ -94,13 +95,13 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 template<typename Type>
 void load_graph_CUDA_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<Type> *field, unsigned num_hosts) {
 	field->data.alloc(ctx->hg.nnodes);
-	field->master_data = (Shared<Type> *) calloc(num_hosts, sizeof(Shared<Type>));
+	field->master_data = (DeviceOnly<Type> *) calloc(num_hosts, sizeof(DeviceOnly<Type>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->master.num_nodes[h] > 0) {
 			field->master_data[h].alloc(ctx->master.num_nodes[h]);
 		}
 	}
-	field->slave_data = (Shared<Type> *) calloc(num_hosts, sizeof(Shared<Type>));
+	field->slave_data = (DeviceOnly<Type> *) calloc(num_hosts, sizeof(DeviceOnly<Type>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
 		if (ctx->slave.num_nodes[h] > 0) {
 			field->slave_data[h].alloc(ctx->slave.num_nodes[h]);
