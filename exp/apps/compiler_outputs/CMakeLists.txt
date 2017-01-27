@@ -296,25 +296,12 @@ endif()
 
 #### CheckPointing ####
 app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
-if(USE_GGC)
-  target_compile_definitions(bfs_pull-topological PRIVATE __GALOIS_HET_CUDA__=1)
-  target_link_libraries(bfs_pull-topological bfs_pull-topological_cuda galois_exp)
-  cuda_add_library(bfs_pull-topological_cuda bfs_pull-topological/gen_cuda.cu)
-  target_link_libraries(bfs_pull-topological_cuda ggrt)
-endif()
 
 app(bfs_pull-topological_DiskCP_noFsync checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP_noFsync PRIVATE __CHECKPOINT_NO_FSYNC__=1)
-if(USE_GGC)
-  target_compile_definitions(bfs_pull-topological PRIVATE __GALOIS_HET_CUDA__=1)
-  target_link_libraries(bfs_pull-topological bfs_pull-topological_cuda galois_exp)
-  cuda_add_library(bfs_pull-topological_cuda bfs_pull-topological/gen_cuda.cu)
-  target_link_libraries(bfs_pull-topological_cuda ggrt)
-endif()
 
 app(bfs_pull-topological_DiskCP_tmpfs checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs PRIVATE __TMPFS__=1)
-
 
 app(bfs_pull-topological_DiskCP_tmpfs_noFsync checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs_noFsync PRIVATE __TMPFS__=1 __CHECKPOINT__NO_FSYNC__=1)
