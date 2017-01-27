@@ -6,7 +6,7 @@ struct CUDA_Context_Shared {
 	unsigned int *num_nodes; // per host
 	Shared<unsigned int> *nodes; // per host
 	DeviceOnly<unsigned int> *offsets; // per host
-  Shared<DynamicBitset> *is_updated;
+  Shared<DynamicBitset> *is_updated; // per host
 };
 
 struct CUDA_Context_Common {
@@ -24,7 +24,7 @@ struct CUDA_Context_Field {
   Shared<Type> data;
   DeviceOnly<Type> *master_data; // per host
   DeviceOnly<Type> *slave_data; // per host
-  Shared<DynamicBitset> is_updated; // per host
+  Shared<DynamicBitset> is_updated;
 };
 
 bool init_CUDA_context_common(struct CUDA_Context_Common *ctx, int device) {

@@ -19,6 +19,17 @@ void kernel_sizing(dim3 &blocks, dim3 &threads) {
 	blocks.y = blocks.z = 1;
 }
 
+template<typename DataType>
+__global__ void batch_get_subset(index_type subset_size, const unsigned int * __restrict__ indices, DataType * __restrict__ subset, const DataType * __restrict__ array) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		subset[src] = array[index];
+	}
+}
+
 template<typename DataType, typename OffsetIteratorType>
 __global__ void batch_get_subset(index_type subset_size, const unsigned int * __restrict__ indices, const OffsetIteratorType offsets, DataType * __restrict__ subset, const DataType * __restrict__ array) {
 	unsigned tid = TID_1D;
@@ -27,6 +38,18 @@ __global__ void batch_get_subset(index_type subset_size, const unsigned int * __
 	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
     unsigned index = indices[offsets[src]];
 		subset[src] = array[index];
+	}
+}
+
+template<typename DataType>
+__global__ void batch_get_reset_subset(index_type subset_size, const unsigned int * __restrict__ indices, DataType * __restrict__ subset, DataType * __restrict__ array, DataType reset_value) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		subset[src] = array[index];
+		array[index] = reset_value;
 	}
 }
 
@@ -42,6 +65,17 @@ __global__ void batch_get_reset_subset(index_type subset_size, const unsigned in
 	}
 }
 
+template<typename DataType>
+__global__ void batch_set_subset(index_type subset_size, const unsigned int * __restrict__ indices, const DataType * __restrict__ subset, DataType * __restrict__ array) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		array[index] = subset[src];
+	}
+}
+
 template<typename DataType, typename OffsetIteratorType>
 __global__ void batch_set_subset(index_type subset_size, const unsigned int * __restrict__ indices, const OffsetIteratorType offsets, const DataType * __restrict__ subset, DataType * __restrict__ array) {
 	unsigned tid = TID_1D;
@@ -50,6 +84,17 @@ __global__ void batch_set_subset(index_type subset_size, const unsigned int * __
 	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
     unsigned index = indices[offsets[src]];
 		array[index] = subset[src];
+	}
+}
+
+template<typename DataType>
+__global__ void batch_add_subset(index_type subset_size, const unsigned int * __restrict__ indices, const DataType * __restrict__ subset, DataType * __restrict__ array) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		array[index] += subset[src];
 	}
 }
 
@@ -64,6 +109,17 @@ __global__ void batch_add_subset(index_type subset_size, const unsigned int * __
 	}
 }
 
+template<typename DataType>
+__global__ void batch_min_subset(index_type subset_size, const unsigned int * __restrict__ indices, const DataType * __restrict__ subset, DataType * __restrict__ array) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		array[index] = (array[index] > subset[src]) ? subset[src] : array[index];
+	}
+}
+
 template<typename DataType, typename OffsetIteratorType>
 __global__ void batch_min_subset(index_type subset_size, const unsigned int * __restrict__ indices, const OffsetIteratorType offsets, const DataType * __restrict__ subset, DataType * __restrict__ array) {
 	unsigned tid = TID_1D;
@@ -72,6 +128,17 @@ __global__ void batch_min_subset(index_type subset_size, const unsigned int * __
 	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
     unsigned index = indices[offsets[src]];
 		array[index] = (array[index] > subset[src]) ? subset[src] : array[index];
+	}
+}
+
+template<typename DataType>
+__global__ void batch_max_subset(index_type subset_size, const unsigned int * __restrict__ indices, const DataType * __restrict__ subset, DataType * __restrict__ array) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = subset_size;
+	for (index_type src = 0 + tid; src < src_end; src += nthreads) {
+    unsigned index = indices[src];
+		array[index] = (array[index] < subset[src]) ? subset[src] : array[index];
 	}
 }
 
@@ -151,12 +218,11 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   }
   //timer3.start();
   if ((*data_mode) == onlyData) {
-    IdentityIterator offset_iterator;
     *v_size = shared->num_nodes[from_id];
     if (reset) {
-      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), offset_iterator, shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr(), i);
+      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr(), i);
     } else {
-      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), offset_iterator, shared_data[from_id].device_ptr(), field->data.gpu_rd_ptr());
+      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data[from_id].device_ptr(), field->data.gpu_rd_ptr());
     }
   } else { // bitsetData || offsetsData
     if (reset) {
@@ -214,13 +280,12 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   //timer1.stop();
   //timer2.start();
   if (data_mode == onlyData) {
-    IdentityIterator offset_iterator;
     if (op == setOp) {
-      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), offset_iterator, shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
+      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
     } else if (op == addOp) {
-      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), offset_iterator, shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
+      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
     } else if (op == minOp) {
-      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), offset_iterator, shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
+      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data[from_id].device_ptr(), field->data.gpu_wr_ptr());
     }
   } else { // bitsetData || offsetsData
     if (op == setOp) {
