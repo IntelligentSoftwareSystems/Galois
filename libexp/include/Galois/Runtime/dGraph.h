@@ -240,6 +240,9 @@ public:
        std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + get_run_identifier());
        Galois::StatTimer StatTimer_set(set_timer_str.c_str());
        StatTimer_set.start();
+       static Galois::DynamicBitSet bit_set_comm;
+       static std::vector<typename FnTy::ValTy> val_vec;
+       static std::vector<unsigned int> offsets;
 
        uint32_t num = masterNodes[from_id].size();
        if(num > 0){
@@ -248,10 +251,7 @@ public:
            Galois::Runtime::gDeserialize(buf, data_mode);
          }
          if (data_mode != noData) {
-           Galois::DynamicBitSet bit_set_comm;
-           bit_set_comm.resize_init(num);
            size_t bit_set_count = num;
-           std::vector<unsigned int> offsets;
 
            if (updated_only && (data_mode != onlyData)) {
              Galois::Runtime::gDeserialize(buf, bit_set_count);
@@ -259,16 +259,17 @@ public:
                offsets.resize(bit_set_count);
                Galois::Runtime::gDeserialize(buf, offsets);
              } else if (data_mode == bitsetData) {
+               bit_set_comm.resize(num);
                Galois::Runtime::gDeserialize(buf, bit_set_comm);
              }
            }
 
-           std::vector<typename FnTy::ValTy> val_vec;
            val_vec.resize(bit_set_count);
            Galois::Runtime::gDeserialize(buf, val_vec);
 
            bool batch_succeeded = batch_reduce<FnTy, updated_only>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
            if (!batch_succeeded) {
+             bit_set_comm.init();
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                  [&](uint32_t n){
 
@@ -357,6 +358,9 @@ public:
       uint32_t num = slaveNodes[from_id].size();
 
       StatTimer_set.start();
+      static Galois::DynamicBitSet bit_set_comm;
+      static std::vector<typename FnTy::ValTy> val_vec;
+      static std::vector<unsigned int> offsets;
 
       if(num > 0){
         DataCommMode data_mode = onlyData;
@@ -364,10 +368,7 @@ public:
           Galois::Runtime::gDeserialize(buf, data_mode);
         }
         if (data_mode != noData) {
-          Galois::DynamicBitSet bit_set_comm;
-          bit_set_comm.resize_init(num);
           size_t bit_set_count = num;
-          std::vector<unsigned int> offsets;
 
           if (updated_only && (data_mode != onlyData)) {
             Galois::Runtime::gDeserialize(buf, bit_set_count);
@@ -375,16 +376,17 @@ public:
               offsets.resize(bit_set_count);
               Galois::Runtime::gDeserialize(buf, offsets);
             } else if (data_mode == bitsetData) {
+              bit_set_comm.resize(num);
               Galois::Runtime::gDeserialize(buf, bit_set_comm);
             }
           }
 
-          std::vector<typename FnTy::ValTy> val_vec;
           val_vec.resize(bit_set_count);
           Galois::Runtime::gDeserialize(buf, val_vec);
 
           bool batch_succeeded = batch_setVal<FnTy, updated_only>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
           if (!batch_succeeded) {
+            bit_set_comm.init();
             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                 [&](uint32_t n){
 
@@ -504,7 +506,8 @@ public:
       }
 
       std::cout << "["<< id << "]" << "Total local nodes : " << get_local_total_nodes() << " NumOwned : "<< numOwned <<"\n"; 
-      bit_set_compute.resize_init(get_local_total_nodes());
+      bit_set_compute.resize(get_local_total_nodes());
+      bit_set_compute.init();
 
       send_info_to_host();
       StatTimer_comm_setup.stop();
@@ -1487,7 +1490,7 @@ public:
         StatTimer_extract.start();
          if(num > 0){
            Galois::DynamicBitSet bit_set_comm;
-           bit_set_comm.resize_init(num);
+           bit_set_comm.resize(num);
            size_t bit_set_count = 0;
            std::vector<typename FnTy::ValTy> val_vec(num);
 
@@ -1495,6 +1498,7 @@ public:
 
            if (!batch_succeeded) {
              if (updated_only) {
+               bit_set_comm.init();
                if(bit_set_compute.bit_count() > 0){
                  std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
                  Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
@@ -1645,6 +1649,9 @@ public:
 
       StatTimer_SendTime.start();
 
+      static Galois::DynamicBitSet bit_set_comm;
+      static std::vector<typename FnTy::ValTy> val_vec;
+      static std::vector<unsigned int> offsets;
       for (unsigned h = 1; h < net.Num; ++h) {
          unsigned x = (id + h) % net.Num;
          uint32_t num = slaveNodes[x].size();
@@ -1653,17 +1660,17 @@ public:
 
          StatTimer_extract.start();
          if(num > 0){
-           Galois::DynamicBitSet bit_set_comm;
-           bit_set_comm.resize_init(num);
+           bit_set_comm.resize(num);
+           val_vec.resize(num);
+           offsets.resize(num);
            size_t bit_set_count = 0;
-           std::vector<typename FnTy::ValTy> val_vec(num);
-           std::vector<unsigned int> offsets(num);
            DataCommMode data_mode;
 
            bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
 
            if (!batch_succeeded) {
              if (updated_only) {
+               bit_set_comm.init();
                if(bit_set_compute.bit_count() > 0){
                  std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET_" + loopName + "_" + get_run_identifier());
                  Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
@@ -1914,7 +1921,7 @@ public:
 
          if(num > 0){
            Galois::DynamicBitSet bit_set_comm;
-           bit_set_comm.resize_init(num);
+           bit_set_comm.resize(num);
            size_t bit_set_count = 0;
            std::vector<typename FnTy::ValTy> val_vec(num);
 
@@ -1922,6 +1929,7 @@ public:
 
            if (!batch_succeeded) {
              if (updated_only) {
+               bit_set_comm.init();
                if(bit_set_compute.bit_count() > 0){
                  std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
                  Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
@@ -2053,7 +2061,10 @@ public:
       StatTimer_syncPull.start();
 
 
-    StatTimer_SendTime.start();
+      StatTimer_SendTime.start();
+      static Galois::DynamicBitSet bit_set_comm;
+      static std::vector<typename FnTy::ValTy> val_vec;
+      static std::vector<unsigned int> offsets;
       for (unsigned h = 1; h < net.Num; ++h) {
         unsigned x = (id + h) % net.Num;
         uint32_t num = masterNodes[x].size();
@@ -2061,17 +2072,17 @@ public:
         Galois::Runtime::SendBuffer b;
 
          if(num > 0){
-           Galois::DynamicBitSet bit_set_comm;
-           bit_set_comm.resize_init(num);
+           bit_set_comm.resize(num);
+           val_vec.resize(num);
+           offsets.resize(num);
            size_t bit_set_count = 0;
-           std::vector<typename FnTy::ValTy> val_vec(num);
-           std::vector<unsigned int> offsets(num);
            DataCommMode data_mode;
 
            bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
 
            if (!batch_succeeded) {
              if (updated_only) {
+               bit_set_comm.init();
                if(bit_set_compute.bit_count() > 0){
                  std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
                  Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){

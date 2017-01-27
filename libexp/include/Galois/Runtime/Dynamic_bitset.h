@@ -5,6 +5,9 @@
 #include <bitset>
 #include "Galois/Atomic_wrapper.h"
 #include <climits> // CHAR_BIT
+#include <boost/iterator/counting_iterator.hpp>
+#include "Galois/GaloisForwardDecl.h"
+#include "Galois/Traits.h"
 
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
@@ -18,11 +21,14 @@ namespace Galois {
 
   public:
 
-    void resize_init(uint64_t n){
+    void resize(uint64_t n){
       bitvec.resize(std::ceil((float)n/bits_uint64));
-      for(uint32_t x = 0; x < bitvec.size(); x++){
+    }
+
+    void init(){
+      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
         bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
-      }
+      }, Galois::loopname("BITSET_INIT"));
     }
 
     const std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() const{
