@@ -5,15 +5,15 @@
 #include <iterator>
 
 class DynamicBitset {
+  size_t num_bits_capacity;
   size_t num_bits;
-  size_t bit_vector_size;
   unsigned long long int *bit_vector;
 
 public:
   DynamicBitset()
   {
+    num_bits_capacity = 0;
     num_bits = 0;
-    bit_vector_size = 0;
     bit_vector = NULL;
   }
 
@@ -30,21 +30,28 @@ public:
   void alloc(size_t nbits) {
     assert(num_bits == 0);
     assert(sizeof(unsigned long long int) * 8 == 64);
+    num_bits_capacity = nbits;
     num_bits = nbits;
-    bit_vector_size = ceil((float)num_bits/64);
+    size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMalloc(&bit_vector, bit_vector_size * sizeof(unsigned long long int)));
     clear();
   }
 
+  void resize(size_t nbits) {
+    assert(nbits <= num_bits_capacity);
+    num_bits = nbits;
+  }
   __device__ __host__ size_t size() const {
     return num_bits;
   }
 
   __device__ __host__ size_t alloc_size() const {
+    size_t bit_vector_size = ceil((float)num_bits/64);
     return bit_vector_size * sizeof(unsigned long long int);
   }
 
   void clear() {
+    size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, bit_vector_size * sizeof(unsigned long long int)));
   }
 
@@ -65,11 +72,13 @@ public:
 
   void copy_to_cpu(unsigned long long int *bit_vector_cpu_copy) {
     assert(bit_vector_cpu_copy != NULL);
+    size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, bit_vector_size * sizeof(unsigned long long int), cudaMemcpyDeviceToHost));
   }
 
   void copy_to_gpu(unsigned long long int * cpu_bit_vector) {
     assert(cpu_bit_vector != NULL);
+    size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, bit_vector_size * sizeof(unsigned long long int), cudaMemcpyHostToDevice));
   }
 };
