@@ -129,16 +129,16 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 	dim3 threads;
 	kernel_sizing(blocks, threads);
 
-  ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2"), timer3("timer3"), timer4("timer 4");
-  timer.start();
-  timer1.start();
+  //ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2"), timer3("timer3"), timer4("timer 4");
+  //timer.start();
+  //timer1.start();
   shared->is_updated[from_id].cpu_rd_ptr()->clear();
 	batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), shared->is_updated[from_id].gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
 	check_cuda_kernel;
-  timer1.stop();
-  timer2.start();
+  //timer1.stop();
+  //timer2.start();
   get_offsets_from_bitset(shared->num_nodes[from_id], shared->offsets[from_id].device_ptr(), shared->is_updated[from_id].gpu_rd_ptr(), v_size);
-  timer2.stop();
+  //timer2.stop();
   if ((*v_size) == 0) {
     *data_mode = noData;
     return;
@@ -149,7 +149,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   } else {
     *data_mode = onlyData;
   }
-  timer3.start();
+  //timer3.start();
   if ((*data_mode) == onlyData) {
     IdentityIterator offset_iterator;
     *v_size = shared->num_nodes[from_id];
@@ -166,21 +166,21 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     }
   }
 	check_cuda_kernel;
-  timer3.stop();
-  timer4.start();
+  //timer3.stop();
+  //timer4.start();
   if ((*data_mode) == offsetsData) {
     shared->offsets[from_id].copy_to_cpu(offsets_comm, *v_size);
   } else if ((*data_mode) == bitsetData) {
     shared->is_updated[from_id].cpu_rd_ptr()->copy_to_cpu(bitset_comm);
   }
   shared_data[from_id].copy_to_cpu(v, *v_size);
-  timer4.stop();
-  timer.stop();
-  fprintf(stderr, "Get %u->%u: %d mode %u bitset %u indices. Time (ms): %llu + %llu + %llu + %llu = %llu\n",
-    ctx->id, from_id, *data_mode,
-    shared->is_updated[from_id].cpu_rd_ptr()->alloc_size(), sizeof(unsigned int) * (*v_size),
-    timer1.duration_ms(), timer2.duration_ms(), timer3.duration_ms(), timer4.duration_ms(),
-    timer.duration_ms());
+  //timer4.stop();
+  //timer.stop();
+  //fprintf(stderr, "Get %u->%u: %d mode %u bitset %u indices. Time (ms): %llu + %llu + %llu + %llu = %llu\n",
+  //  ctx->id, from_id, *data_mode,
+  //  shared->is_updated[from_id].cpu_rd_ptr()->alloc_size(), sizeof(unsigned int) * (*v_size),
+  //  timer1.duration_ms(), timer2.duration_ms(), timer3.duration_ms(), timer4.duration_ms(),
+  //  timer.duration_ms());
 }
 
 template<typename DataType, SharedType sharedType, UpdateOp op>
@@ -199,9 +199,9 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 	dim3 threads;
 	kernel_sizing(blocks, threads);
 
-  ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2");
-  timer.start();
-  timer1.start();
+  //ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2");
+  //timer.start();
+  //timer1.start();
   if (data_mode == bitsetData) {
     shared->is_updated[from_id].cpu_rd_ptr()->copy_to_gpu(bitset_comm);
     size_t v_size2;
@@ -211,8 +211,8 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     shared->offsets[from_id].copy_to_gpu(offsets_comm, v_size);
   }
   shared_data[from_id].copy_to_gpu(v, v_size);
-  timer1.stop();
-  timer2.start();
+  //timer1.stop();
+  //timer2.start();
   if (data_mode == onlyData) {
     IdentityIterator offset_iterator;
     if (op == setOp) {
@@ -232,10 +232,10 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     }
   }
 	check_cuda_kernel;
-  timer2.stop();
-  timer.stop();
-  fprintf(stderr, "Set %u<-%u: %d mode Time (ms): %llu + %llu = %llu\n",
-    ctx->id, from_id, data_mode,
-    timer1.duration_ms(), timer2.duration_ms(),
-    timer.duration_ms());
+  //timer2.stop();
+  //timer.stop();
+  //fprintf(stderr, "Set %u<-%u: %d mode Time (ms): %llu + %llu = %llu\n",
+  //  ctx->id, from_id, data_mode,
+  //  timer1.duration_ms(), timer2.duration_ms(),
+  //  timer.duration_ms());
 }
