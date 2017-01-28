@@ -91,6 +91,34 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
   printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 }
 
+size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {
+  size_t mem_usage = 0;
+  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  mem_usage += num_hosts * sizeof(unsigned int);
+  mem_usage += num_hosts * sizeof(Shared<unsigned int>);
+  for(uint32_t h = 0; h < num_hosts; ++h){
+    if (g.num_master_nodes[h] > 0) {
+      mem_usage += g.num_master_nodes[h] * sizeof(unsigned int);
+    }
+    if (g.num_master_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_master_nodes[h];
+    }
+  }
+  mem_usage += num_hosts * sizeof(unsigned int);
+  mem_usage += num_hosts * sizeof(Shared<unsigned int>);
+  for(uint32_t h = 0; h < num_hosts; ++h){
+    if (g.num_slave_nodes[h] > 0) {
+      mem_usage += g.num_slave_nodes[h] * sizeof(unsigned int);
+    }
+    if (g.num_slave_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_slave_nodes[h];
+    }
+  }
+  mem_usage += max_shared_size * sizeof(unsigned int);
+  mem_usage += ceil((float)max_shared_size/64) * sizeof(unsigned long long int);
+  return mem_usage;
+}
+
 template<typename Type>
 void load_graph_CUDA_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<Type> *field, unsigned num_hosts) {
   field->data.alloc(ctx->hg.nnodes);
@@ -108,5 +136,25 @@ void load_graph_CUDA_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_
   field->shared_data.alloc(max_shared_size);
   field->is_updated.alloc(1);
   field->is_updated.cpu_wr_ptr()->alloc(ctx->hg.nnodes);
+}
+
+template<typename Type>
+size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type> *field, MarshalGraph &g, unsigned num_hosts) {
+  size_t mem_usage = 0;
+  mem_usage += g.nnodes * sizeof(Type);
+  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  for(uint32_t h = 0; h < num_hosts; ++h){
+    if (g.num_master_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_master_nodes[h];
+    }
+  }
+  for(uint32_t h = 0; h < num_hosts; ++h){
+    if (g.num_slave_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_slave_nodes[h];
+    }
+  }
+  mem_usage += max_shared_size * sizeof(Type);
+  mem_usage += ceil((float)g.nnodes/64) * sizeof(unsigned long long int);
+  return mem_usage;
 }
 
