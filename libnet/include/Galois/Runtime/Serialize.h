@@ -105,6 +105,17 @@ public:
     bufdata.insert(bufdata.end(), c, c+bytes);
   }
 
+  void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
+    std::copy_n(bufdata.begin() + offset, c, bytes);
+  }
+  
+  //returns offset to use for insertAt
+  size_t encomber(size_t bytes) {
+    size_t retval = bufdata.size();
+    bufdata.resize(retval+bytes);
+    return retval;
+  }
+
   void reserve(size_t s) {
     bufdata.reserve(bufdata.size() + s);
   }
@@ -365,8 +376,6 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
-
-
 //template<typename T>
 //inline void gSerializeObj(SerializeBuffer& buf, const std::vector<Galois::CopyableAtomic<T>>& data){
   //gSerializeSeq(buf, data);
@@ -377,6 +386,25 @@ inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& dat
 }
 
 } //detail
+
+template<typename T>
+struct LazyRef { size_t off; }
+
+template<typename Seq>
+static inline LazyRef gSerializeLazySeq(SerializeBuffer& buf, unsigned num) {
+  static_assert(is_memory_copyable<typename Seq::value_type>::value, "Not POD Sequence");
+  typename Seq::size_type size = seq.size();
+  gSerializeOb(buf, size);
+  size_t tsize = sizeof(T);
+  return LazyRef<typename Seq::value_type>{buf.encomber(tsize*num)};
+}
+
+template<typename Ty>
+static inline gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned item, Ty&& data) {
+  size_t off = r.off + sizeof(T) * item;
+  uint8_t* pdata = (uint8_t*)&data;
+  buf.insertAt(pdata, sizeof(T), off);
+}
 
 template<typename T1, typename... Args>
 static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
