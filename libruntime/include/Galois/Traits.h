@@ -141,7 +141,6 @@ template<typename T, typename Tuple,
 typename tuple_elements<Tuple, Seq>::type  
 get_tuple_without(T rm_type, Tuple tpl)
 {
-  size_t rm_index = subtype_index_nodup<T, Tuple>::value;
   typedef typename make_int_seq<subtype_index_nodup<T, Tuple>::value>::type Seq_pre;
   typedef typename make_int_seq<std::tuple_size<Tuple>::value - subtype_index_nodup<T, Tuple>::value - 1>::type Seq_post;
   return std::tuple_cat(get_by_offset<0>(tpl, Seq_pre{}), get_by_offset<subtype_index_nodup<T, Tuple>::value + 1>(tpl, Seq_post{})); 

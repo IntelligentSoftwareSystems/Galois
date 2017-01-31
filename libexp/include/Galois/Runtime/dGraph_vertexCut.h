@@ -165,7 +165,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     uint32_t G2L(uint64_t gid) const {
       //we can assume that GID exits and is unique. Index is localID since it is sorted.
-      uint32_t found_index  = ~0;
       for(auto i : hostNodes){
         if(i.first != ~0){
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
@@ -227,7 +226,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         for(auto n = 0; n < base_hGraph::numOwned; ++n){
           auto gid = L2G(n);
           auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
-          uint32_t old_lid;
+          uint32_t old_lid = 0;
           assert(*iter == gid);
           if(*iter == gid){
             old_lid = (iter - GlobalVec_ordered.begin());
