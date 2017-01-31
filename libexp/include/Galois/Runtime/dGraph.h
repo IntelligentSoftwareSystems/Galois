@@ -2097,6 +2097,11 @@ public:
                bit_set_count = bit_set_comm.bit_count(num);
              }
              if (!updated_only || (bit_set_count > 0)) {
+							 // Parallelize over fixed-size ranges.
+							 // Send fixed-sized buffers.
+							 // Select num appropriately and block manually.
+							 // Add message ID to data for reconstruction in the correct order (offset).
+							 // Add idle function to do_all.
                Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
                     if(!updated_only || bit_set_comm.is_set(n)){
@@ -2110,6 +2115,9 @@ public:
                       auto val = FnTy::extract(lid, getData(lid));
 #endif
                       val_vec[vec_index] = val;
+											// Serialize directly into buffer.
+											// Send buffer here.
+											// Post try-receive.
                     }
                    }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
              }
@@ -2132,6 +2140,7 @@ public:
                gSerialize(b, data_mode, val_vec);
              }
            } else {
+						 // This is our data path.
              gSerialize(b, val_vec);
            }
         } else {
@@ -2146,6 +2155,7 @@ public:
 
       net.flush();
 
+			// This gets pushed up into idle function.
       //receive
     StatTimer_RecvTime.start();
       for (unsigned x = 0; x < net.Num; ++x) {
