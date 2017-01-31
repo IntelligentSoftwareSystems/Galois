@@ -106,7 +106,7 @@ public:
   }
 
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
-    std::copy_n(bufdata.begin() + offset, c, bytes);
+    std::copy_n(c, bytes, bufdata.begin() + offset);
   }
   
   //returns offset to use for insertAt
@@ -323,11 +323,11 @@ inline void gSerializeObj(SerializeBuffer& buf, const Galois::CopyableAtomic<T>&
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
-  typedef decltype(*seq.begin()) T;
+  //  typedef decltype(*seq.begin()) T;
 
-  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
-    std::integral_constant<size_t, sizeof(T)>,
-    std::integral_constant<size_t, 1>>::type::value;
+  // size_t tsize = std::conditional<is_memory_copyable<T>::value, 
+  //   std::integral_constant<size_t, sizeof(T)>,
+  //   std::integral_constant<size_t, 1>>::type::value;
   //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
   for (auto& o : seq)
@@ -388,22 +388,22 @@ inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& dat
 } //detail
 
 template<typename T>
-struct LazyRef { size_t off; }
+struct LazyRef { size_t off; };
 
 template<typename Seq>
-static inline LazyRef gSerializeLazySeq(SerializeBuffer& buf, unsigned num) {
+static inline LazyRef<typename Seq::value_type> gSerializeLazySeq(SerializeBuffer& buf, unsigned num) {
   static_assert(is_memory_copyable<typename Seq::value_type>::value, "Not POD Sequence");
-  typename Seq::size_type size = seq.size();
+  typename Seq::size_type size = num;
   gSerializeOb(buf, size);
-  size_t tsize = sizeof(T);
+  size_t tsize = sizeof(typename Seq::value_type);
   return LazyRef<typename Seq::value_type>{buf.encomber(tsize*num)};
 }
 
 template<typename Ty>
-static inline gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned item, Ty&& data) {
-  size_t off = r.off + sizeof(T) * item;
+static inline void gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned item, Ty&& data) {
+  size_t off = r.off + sizeof(Ty) * item;
   uint8_t* pdata = (uint8_t*)&data;
-  buf.insertAt(pdata, sizeof(T), off);
+  buf.insertAt(pdata, sizeof(Ty), off);
 }
 
 template<typename T1, typename... Args>
