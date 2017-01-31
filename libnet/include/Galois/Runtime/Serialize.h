@@ -376,6 +376,8 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
+
+
 //template<typename T>
 //inline void gSerializeObj(SerializeBuffer& buf, const std::vector<Galois::CopyableAtomic<T>>& data){
   //gSerializeSeq(buf, data);
