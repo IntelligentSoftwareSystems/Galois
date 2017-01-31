@@ -265,14 +265,14 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   //ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2");
   //timer.start();
   //timer1.start();
-  if (data_mode == bitsetData) {
+  if (data_mode == offsetsData) {
+    ctx->offsets.copy_to_gpu(offsets_comm, v_size);
+  } else if (data_mode == bitsetData) {
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
     ctx->is_updated.cpu_rd_ptr()->copy_to_gpu(bitset_comm);
     size_t v_size2;
     get_offsets_from_bitset(shared->num_nodes[from_id], ctx->offsets.device_ptr(), ctx->is_updated.gpu_rd_ptr(), &v_size2);
     assert(v_size2 == v_size);
-  } else if (data_mode == offsetsData) {
-    ctx->offsets.copy_to_gpu(offsets_comm, v_size);
   }
   shared_data->copy_to_gpu(v, v_size);
   //timer1.stop();

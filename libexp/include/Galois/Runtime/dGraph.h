@@ -269,26 +269,17 @@ public:
 
            bool batch_succeeded = batch_reduce<FnTy, updated_only>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
            if (!batch_succeeded) {
-             bit_set_comm.init();
-             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
-                 [&](uint32_t n){
-
-                 if(!updated_only || bit_set_comm.is_set(n)){
-
-                    uint32_t lid = masterNodes[from_id][n];
-                    uint32_t vec_index;
-                    if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                    else vec_index = n;
-
-#ifdef __GALOIS_HET_OPENCL__
-                   CLNodeDataWrapper d = clGraph.getDataW(lid);
-                   FnTy::reduce(lid, d, val_vec[vec_index]);
-#else
-
-                   FnTy::reduce(lid, getData(lid), val_vec[vec_index]);
-#endif
-                 }
-                 }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+             if (data_mode == bitsetData) {
+               size_t bit_set_count2;
+               offsets.resize(bit_set_count);
+               get_offsets_from_bitset(loopName, bit_set_comm, offsets, bit_set_count2);
+               assert(bit_set_count ==  bit_set_count2);
+             }
+             if (data_mode == onlyData) {
+               reduce_subset<FnTy, true>(loopName, masterNodes[from_id], bit_set_count, offsets, val_vec);
+             } else {
+               reduce_subset<FnTy, false>(loopName, masterNodes[from_id], bit_set_count, offsets, val_vec);
+             }
            }
          }
        }
@@ -386,26 +377,17 @@ public:
 
           bool batch_succeeded = batch_setVal<FnTy, updated_only>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
           if (!batch_succeeded) {
-            bit_set_comm.init();
-            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
-                [&](uint32_t n){
-
-                if(!updated_only || bit_set_comm.is_set(n)){
-
-                   uint32_t lid = slaveNodes[from_id][n];
-                   uint32_t vec_index;
-                   if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                   else vec_index = n;
-
-#ifdef __GALOIS_HET_OPENCL__
-                  CLNodeDataWrapper d = clGraph.getDataW(lid);
-                  FnTy::setVal(lid, d, val_vec[vec_index]);
-#else
-
-                  FnTy::setVal(lid, getData(lid), val_vec[vec_index]);
-#endif
-                }
-                }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+            if (data_mode == bitsetData) {
+              size_t bit_set_count2;
+              offsets.resize(bit_set_count);
+              get_offsets_from_bitset(loopName, bit_set_comm, offsets, bit_set_count2);
+              assert(bit_set_count ==  bit_set_count2);
+            }
+            if (data_mode == onlyData) {
+              setval_subset<FnTy, true>(loopName, slaveNodes[from_id], bit_set_count, offsets, val_vec);
+            } else {
+              setval_subset<FnTy, false>(loopName, slaveNodes[from_id], bit_set_count, offsets, val_vec);
+            }
           }
         }
       }
@@ -507,7 +489,7 @@ public:
 
       std::cout << "["<< id << "]" << "Total local nodes : " << get_local_total_nodes() << " NumOwned : "<< numOwned <<"\n"; 
       bit_set_compute.resize(get_local_total_nodes());
-      bit_set_compute.init();
+      bit_set_compute.clear();
 
       send_info_to_host();
       StatTimer_comm_setup.stop();
@@ -1497,29 +1479,13 @@ public:
            bool batch_succeeded = batch_extract_reset<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
            if (!batch_succeeded) {
-             if (updated_only) {
-               bit_set_comm.init();
-               if(bit_set_compute.bit_count() > 0){
-                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
-                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                       uint32_t lid = slaveNodes[x][n];
-                       if(bit_set_compute.is_set(lid)){
-                         bit_set_comm.bit_set(n);
-                       }
-
-                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-               }
-               //bits set to be sent to x
-               bit_set_count = bit_set_comm.bit_count();
-             }
              if (!updated_only || (bit_set_count > 0)) {
                Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-                    if(!updated_only || bit_set_comm.is_set(n)){
+                    if(!updated_only || bit_set_comm.test(n)){
                       uint32_t lid = slaveNodes[x][n];
                       uint32_t vec_index;
-                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                      else vec_index = n;
+                      vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
                       CLNodeDataWrapper d = clGraph.getDataW(lid);
                       auto val = FnTy::extract(lid, getData(lid, d));
@@ -1609,6 +1575,140 @@ public:
 
    }
 
+   void get_offsets_from_bitset(const std::string &loopName, const Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count) {
+     std::string offsets_timer_str("SYNC_OFFSETS_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str());
+     StatTimer_offsets.start();
+     std::vector<unsigned int> toffsets(Galois::getActiveThreads());
+     Galois::on_each([&](unsigned tid, unsigned nthreads) {
+         unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
+         unsigned int start = tid*block_size;
+         unsigned int end = (tid+1)*block_size;
+         if (end > (bitset_comm.size() - 1)) end = bitset_comm.size() - 1;
+         unsigned int count = 0;
+         for (unsigned int i = start; i <= end; ++i) {
+           if (bitset_comm.test(i)) ++count;
+         }
+         toffsets[tid] = count;
+     });
+     for (unsigned int i = 1; i < Galois::getActiveThreads(); ++i) {
+       toffsets[i] += toffsets[i-1];
+     }
+     bit_set_count = toffsets[Galois::getActiveThreads() - 1];
+     Galois::on_each([&](unsigned tid, unsigned nthreads) {
+         unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
+         unsigned int start = tid*block_size;
+         unsigned int end = (tid+1)*block_size;
+         if (end > (bitset_comm.size() - 1)) end = bitset_comm.size() - 1;
+         unsigned int count = 0;
+         unsigned int toffset;
+         if (tid == 0) toffset = 0;
+         else toffset = toffsets[tid-1];
+         for (unsigned int i = start; i <= end; ++i) {
+           if (bitset_comm.test(i)) {
+             offsets[toffset + count] = i;
+             ++count;
+           }
+         }
+     });
+     StatTimer_offsets.stop();
+   }
+
+   template<typename FnTy>
+   void get_bitset_offsets(const std::string &loopName, const std::vector<size_t> &indices, const Galois::DynamicBitSet &bitset_compute, Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count, DataCommMode &data_mode) {
+     bitset_comm.clear();
+     std::string doall_str("SYNC_BITSET_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
+       size_t lid = indices[n];
+       if(bitset_compute.test(lid)){
+         bitset_comm.set(n);
+       }
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+     get_offsets_from_bitset(loopName, bitset_comm, offsets, bit_set_count);
+     if (bit_set_count == 0) {
+       data_mode = noData;
+     } else if ((bit_set_count * sizeof(unsigned int)) < bitset_comm.alloc_size()) {
+       data_mode = offsetsData;
+     } else if ((bit_set_count * sizeof(typename FnTy::ValTy) + bitset_comm.alloc_size()) < (indices.size() * sizeof(typename FnTy::ValTy))) {
+       data_mode = bitsetData;
+     } else {
+       data_mode = onlyData;
+       bit_set_count = indices.size();
+     }
+   }
+
+   template<typename FnTy, bool identity_offsets = false>
+   void extract_reset_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+     std::string doall_str("SYNC_EXTRACT_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+#ifdef __GALOIS_HET_OPENCL__
+        CLNodeDataWrapper d = clGraph.getDataW(lid);
+        auto val = FnTy::extract(lid, getData(lid, d));
+        FnTy::reset(lid, d);
+#else
+        auto val = FnTy::extract(lid, getData(lid));
+        FnTy::reset(lid, getData(lid));
+#endif
+        val_vec[n] = val;
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
+   template<typename FnTy, bool identity_offsets = false>
+   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+     std::string doall_str("SYNC_EXTRACT_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+#ifdef __GALOIS_HET_OPENCL__
+        CLNodeDataWrapper d = clGraph.getDataW(lid);
+        auto val = FnTy::extract(lid, getData(lid, d));
+#else
+        auto val = FnTy::extract(lid, getData(lid));
+#endif
+        val_vec[n] = val;
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
+   template<typename FnTy, bool identity_offsets = false>
+   void reduce_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+     std::string doall_str("SYNC_SETVAL_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+#ifdef __GALOIS_HET_OPENCL__
+        CLNodeDataWrapper d = clGraph.getDataW(lid);
+        FnTy::reduce(lid, d, val_vec[n]);
+#else
+        FnTy::reduce(lid, getData(lid), val_vec[n]);
+#endif
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
+   template<typename FnTy, bool identity_offsets = false>
+   void setval_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+     std::string doall_str("SYNC_SETVAL_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+#ifdef __GALOIS_HET_OPENCL__
+        CLNodeDataWrapper d = clGraph.getDataW(lid);
+        FnTy::setVal(lid, d, val_vec[n]);
+#else
+        FnTy::setVal(lid, getData(lid), val_vec[n]);
+#endif
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
    template<typename FnTy, bool updated_only = false>
    void sync_push(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -1670,39 +1770,14 @@ public:
 
            if (!batch_succeeded) {
              if (updated_only) {
-               bit_set_comm.init();
-               if(bit_set_compute.bit_count() > 0){
-                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET_" + loopName + "_" + get_run_identifier());
-                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                       uint32_t lid = slaveNodes[x][n];
-                       if(bit_set_compute.is_set(lid)){
-                         bit_set_comm.bit_set(n);
-                       }
-
-                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-               }
-               //bits set to be sent to x
-               bit_set_count = bit_set_comm.bit_count(num);
+               get_bitset_offsets<FnTy>(loopName, slaveNodes[x], bit_set_compute, bit_set_comm, offsets, bit_set_count, data_mode);
+             } else {
+               bit_set_count = num;
              }
-             if (!updated_only || (bit_set_count > 0)) {
-               Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-
-                    if(!updated_only || bit_set_comm.is_set(n)){
-                      uint32_t lid = slaveNodes[x][n];
-                      uint32_t vec_index;
-                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                      else vec_index = n;
-#ifdef __GALOIS_HET_OPENCL__
-                      CLNodeDataWrapper d = clGraph.getDataW(lid);
-                      auto val = FnTy::extract(lid, getData(lid, d));
-                      FnTy::reset(lid, d);
-#else
-                      auto val = FnTy::extract(lid, getData(lid));
-                      FnTy::reset(lid, getData(lid));
-#endif
-                      val_vec[vec_index] = val;
-                    }
-                   }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+             if (bit_set_count == num) {
+               extract_reset_subset<FnTy, true>(loopName, slaveNodes[x], bit_set_count, offsets, val_vec);
+             } else {
+               extract_reset_subset<FnTy, false>(loopName, slaveNodes[x], bit_set_count, offsets, val_vec);
              }
            }
 
@@ -1928,29 +2003,13 @@ public:
            bool batch_succeeded = batch_extract<FnTy, updated_only>(x, bit_set_comm, val_vec, bit_set_count);
 
            if (!batch_succeeded) {
-             if (updated_only) {
-               bit_set_comm.init();
-               if(bit_set_compute.bit_count() > 0){
-                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
-                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                       uint32_t lid = masterNodes[x][n];
-                       if(bit_set_compute.is_set(lid)){
-                         bit_set_comm.bit_set(n);
-                       }
-
-                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-               }
-               //bits set to be sent to x
-               bit_set_count = bit_set_comm.bit_count(num);
-             }
              if (!updated_only || (bit_set_count > 0)) {
                Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
 
-                    if(!updated_only || bit_set_comm.is_set(n)){
+                    if(!updated_only || bit_set_comm.test(n)){
                       uint32_t lid = masterNodes[x][n];
                       uint32_t vec_index;
-                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                      else vec_index = n;
+                      vec_index = n;
 #ifdef __GALOIS_HET_OPENCL__
                       auto val = FnTy::extract(lid, clGraph.getDataR(lid));
 #else
@@ -2082,36 +2141,14 @@ public:
 
            if (!batch_succeeded) {
              if (updated_only) {
-               bit_set_comm.init();
-               if(bit_set_compute.bit_count() > 0){
-                 std::string doall_str2("LAMBDA::SYNC_PUSH_BIT_SET" + loopName + "_" + get_run_identifier());
-                 Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n ){
-                       uint32_t lid = masterNodes[x][n];
-                       if(bit_set_compute.is_set(lid)){
-                         bit_set_comm.bit_set(n);
-                       }
-
-                      }, Galois::loopname(doall_str2.c_str()), Galois::numrun(get_run_identifier()));
-               }
-               //bits set to be sent to x
-               bit_set_count = bit_set_comm.bit_count(num);
+               get_bitset_offsets<FnTy>(loopName, masterNodes[x], bit_set_compute, bit_set_comm, offsets, bit_set_count, data_mode);
+             } else {
+               bit_set_count = num;
              }
-             if (!updated_only || (bit_set_count > 0)) {
-               Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-
-                    if(!updated_only || bit_set_comm.is_set(n)){
-                      uint32_t lid = masterNodes[x][n];
-                      uint32_t vec_index;
-                      if (updated_only) vec_index = bit_set_comm.bit_count(n);
-                      else vec_index = n;
-#ifdef __GALOIS_HET_OPENCL__
-                      auto val = FnTy::extract(lid, clGraph.getDataR(lid));
-#else
-                      auto val = FnTy::extract(lid, getData(lid));
-#endif
-                      val_vec[vec_index] = val;
-                    }
-                   }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+             if (bit_set_count == num) {
+               extract_subset<FnTy, true>(loopName, masterNodes[x], bit_set_count, offsets, val_vec);
+             } else {
+               extract_subset<FnTy, false>(loopName, masterNodes[x], bit_set_count, offsets, val_vec);
              }
            }
 
@@ -2586,15 +2623,11 @@ public:
    }
 
   void bit_set(uint32_t LID){
-    bit_set_compute.bit_set(LID);
+    bit_set_compute.set(LID);
   }
 
   void bitset_clear(){
-    bit_set_compute.reset();
-  }
-
-  void get_bit_set_count(){
-     Galois::Runtime::reportStat("(NULL)", "FRAC_BITS_CHANGED_" + std::to_string(num_run) + "_HOST_", bit_set_compute.bit_count() , 0);
+    bit_set_compute.clear();
   }
 
 };

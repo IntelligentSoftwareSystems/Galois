@@ -17,19 +17,12 @@ namespace Galois {
   class DynamicBitSet {
 
     std::vector<Galois::CopyableAtomic<uint64_t>> bitvec;
+    size_t num_bits;
     static constexpr uint32_t bits_uint64 = sizeof(uint64_t)*CHAR_BIT;
 
   public:
 
-    void resize(uint64_t n){
-      bitvec.resize(std::ceil((float)n/bits_uint64));
-    }
-
-    void init(){
-      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
-        bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
-      }, Galois::loopname("BITSET_INIT"));
-    }
+    DynamicBitSet() : num_bits(0) {}
 
     const std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() const{
       return bitvec;
@@ -39,55 +32,41 @@ namespace Galois {
       return bitvec;
     }
 
-    void bit_set(uint32_t index){
-      uint32_t bit_index = index/64;
-      assert(bit_index < bitvec.size());
-      uint64_t bit_offset = 1;
-      bit_offset <<= (index%64);
-      bitvec[bit_index].fetch_or(bit_offset);
+    void resize(uint64_t n){
+      assert(bits_uint64 == 64); // compatibility with other devices
+      num_bits = n;
+      bitvec.resize(std::ceil((float)n/bits_uint64));
     }
 
-    // single thread is accessing.
-    void reset(){
-      for(auto x : bitvec){
-        x = 0;
-      }
+    size_t size() const {
+      return num_bits;
     }
 
-    bool is_set(uint32_t index){
-      uint32_t bit_index = index/64;
-      assert(bit_index < bitvec.size());
+    size_t alloc_size() const {
+      return bitvec.size() * sizeof(uint64_t);
+    }
+
+    void clear(){
+      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
+        bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
+      }, Galois::loopname("BITSET_CLEAR"));
+    }
+
+    // assumes bit_vector is not updated (set) in parallel
+    bool test(uint32_t index) const {
+      uint32_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
-      bit_offset <<= (index%64);
+      bit_offset <<= (index%bits_uint64);
       return ((bitvec[bit_index] & bit_offset) != 0);
     }
 
-    uint64_t bit_count(){
-      uint64_t bits_set = 0;
-      for(auto x : bitvec){
-        bits_set += std::bitset<bits_uint64>(x).count();
-      }
-      return bits_set;
+    void set(uint32_t index){
+      uint32_t bit_index = index/bits_uint64;
+      uint64_t bit_offset = 1;
+      bit_offset <<= (index%bits_uint64);
+      bitvec[bit_index].fetch_or(bit_offset);
     }
 
-    uint64_t bit_count(uint32_t num){
-      uint64_t bits_set = 0;
-      unsigned index = num/bits_uint64;
-      unsigned offset = num%bits_uint64;
-      for (unsigned i = 0; i < index; ++i) {
-        bits_set += std::bitset<bits_uint64>(bitvec[i]).count();
-      }
-      if (offset > 0) {
-        unsigned long long int value = bitvec[index];
-        value <<= (bits_uint64-offset);
-        bits_set += std::bitset<bits_uint64>(value).count();
-      }
-      return bits_set;
-    }
-
-    uint64_t size(){
-      return bitvec.size();
-    }
     typedef int tt_is_copyable;
   };
 }

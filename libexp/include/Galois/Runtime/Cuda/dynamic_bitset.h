@@ -41,6 +41,7 @@ public:
     assert(nbits <= num_bits_capacity);
     num_bits = nbits;
   }
+
   __device__ __host__ size_t size() const {
     return num_bits;
   }
