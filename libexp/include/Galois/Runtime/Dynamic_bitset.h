@@ -26,9 +26,11 @@ namespace Galois {
     }
 
     void init(){
-      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
-        bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
-      }, Galois::loopname("BITSET_INIT"));
+      std::fill(bitvec.begin(), bitvec.end(), 0);
+      /* auto init_ = [&](uint32_t x) { */
+      /*   bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load(); */
+      /* }; */
+      //      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), init_, Galois::loopname("BITSET_INIT"));
     }
 
     const std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() const{
@@ -90,5 +92,5 @@ namespace Galois {
     }
     typedef int tt_is_copyable;
   };
-}
+} // namespace Galois
 #endif
