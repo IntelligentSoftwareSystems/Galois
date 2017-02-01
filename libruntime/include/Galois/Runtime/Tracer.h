@@ -124,7 +124,7 @@ static inline void printOutput(const char* format, Args&&... args) {
     detail::print_output_impl(os);
 }
 
-static void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
+static inline void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
   detail::print_send_impl(vec, len, host);
 }
 
