@@ -92,6 +92,8 @@ struct NodeData {
   unsigned int dist_old;
 };
 
+Galois::DynamicBitSet bitset_dist_current;
+
 typedef hGraph<NodeData, void> Graph;
 typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
@@ -116,6 +118,13 @@ struct InitializeGraph {
     		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
+    		static bool extract_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -149,6 +158,13 @@ struct InitializeGraph {
     		#endif
     			return false;
     		}
+    		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
     		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
             assert (personality == CPU);
@@ -166,7 +182,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned int ValTy;
     	};
-      _graph.bitset_clear();
+      bitset_dist_current.clear();
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
@@ -178,10 +194,10 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0, true>("InitializeGraph");
+    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph", bitset_dist_current);
     }
     
-    _graph.sync_pull<SyncerPull_0, true>("InitializeGraph");
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph", bitset_dist_current);
     
   }
 
@@ -189,7 +205,7 @@ struct InitializeGraph {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
     sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    graph->bit_set(src);
+    bitset_dist_current.set(src);
   }
 };
 
@@ -215,6 +231,13 @@ void static go(Graph& _graph) {
 		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			assert (personality == CPU);
+		#endif
+			return false;
+		}
+		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+		#ifdef __GALOIS_HET_CUDA__
+			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -250,6 +273,13 @@ void static go(Graph& _graph) {
 		#endif
 			return false;
 		}
+		static bool extract_batch(unsigned from_id, unsigned int *y) {
+		#ifdef __GALOIS_HET_CUDA__
+			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+			assert (personality == CPU);
+		#endif
+			return false;
+		}
 		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
 		#ifdef __GALOIS_HET_CUDA__
         assert (personality == CPU);
@@ -265,7 +295,7 @@ void static go(Graph& _graph) {
 		}
 		typedef unsigned int ValTy;
 	};
-      _graph.bitset_clear();
+      bitset_dist_current.clear();
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
 		std::string impl_str("CUDA_DO_ALL_IMPL_FirstItr_BFS_" + (_graph.get_run_identifier()));
@@ -276,10 +306,10 @@ void static go(Graph& _graph) {
 	} else if (personality == CPU)
 #endif
 Galois::do_all(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
-_graph.sync_push<Syncer_0, true>("FirstItr_BFS");
+_graph.sync_push<Syncer_0>("FirstItr_BFS", bitset_dist_current);
 
 if(_graph.is_vertex_cut()) {
-	_graph.sync_pull<SyncerPull_vertexCut_0, true>("FirstItr_BFS");
+	_graph.sync_pull<SyncerPull_vertexCut_0>("FirstItr_BFS", bitset_dist_current);
 }
 
 }
@@ -292,7 +322,7 @@ void operator()(GNode src) const {
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = 1 + snode.dist_current;
       unsigned int old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
-      if (old_dist > new_dist) graph->bit_set(dst);
+      if (old_dist > new_dist) bitset_dist_current.set(dst);
       
     }
   }
@@ -328,6 +358,13 @@ struct BFS {
     		#endif
     			return false;
     		}
+    		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
     		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
             assert (personality == CPU);
@@ -359,6 +396,13 @@ struct BFS {
     		#endif
     			return false;
     		}
+    		static bool extract_batch(unsigned from_id, unsigned int *y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) { batch_get_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			assert (personality == CPU);
+    		#endif
+    			return false;
+    		}
     		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
             assert (personality == CPU);
@@ -374,7 +418,7 @@ struct BFS {
     		}
     		typedef unsigned int ValTy;
     	};
-      _graph.bitset_clear();
+      bitset_dist_current.clear();
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
@@ -387,10 +431,10 @@ struct BFS {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
-    _graph.sync_push<Syncer_0, true>("BFS");
+    _graph.sync_push<Syncer_0>("BFS", bitset_dist_current);
     
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0, true>("BFS");
+    	_graph.sync_pull<SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
     }
     ++_num_iterations;
     _num_work_items += DGAccumulator_accum.read();
@@ -412,7 +456,7 @@ void operator()(GNode src) const {
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = 1 + snode.dist_current;
       unsigned int old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
-      if (old_dist > new_dist) graph->bit_set(dst);
+      if (old_dist > new_dist) bitset_dist_current.set(dst);
       
     }
 
@@ -487,6 +531,7 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+    bitset_dist_current.resize(hg->get_local_total_nodes());
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";

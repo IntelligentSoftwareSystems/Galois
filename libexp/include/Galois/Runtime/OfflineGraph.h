@@ -65,7 +65,7 @@ namespace Graph {
 class OfflineGraph {
   std::ifstream file1;
   std::ifstream fileIndex, fileEdgeDst, fileEdgeData;
-  std::streamoff loc1, locIndex, locEdgeDst, locEdgeData;
+  std::streamoff loc1, locIndex, locEdgeData;
 
   uint64_t numNodes;
   uint64_t numEdges;
@@ -142,7 +142,7 @@ public:
 
   OfflineGraph(const std::string& name)
     :file1(name, std::ios_base::binary), fileIndex(name, std::ios_base::binary),fileEdgeDst(name, std::ios_base::binary), fileEdgeData(name, std::ios_base::binary),
-     loc1(0), locIndex(0), locEdgeDst(0), locEdgeData(0),numSeeks1(0), numSeeksDst(0), numSeeksData(0)
+     loc1(0), locIndex(0), locEdgeData(0),numSeeks1(0), numSeeksDst(0), numSeeksData(0)
 
   {
     if (!file1.is_open() || !file1.good()) throw "Bad filename";
