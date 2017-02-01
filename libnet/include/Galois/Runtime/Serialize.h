@@ -296,7 +296,7 @@ static inline size_t gSized(Args&&... args) {
 namespace detail {
 
 template<typename T>
-__attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T& data,
+inline void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
 {
   uint8_t* pdata = (uint8_t*)&data;
@@ -304,7 +304,7 @@ __attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T&
 }
 
 template<typename T>
-__attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T& data,
+inline void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
                    typename std::enable_if<has_serialize<T>::value>::type* = 0)
 {

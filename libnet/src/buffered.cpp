@@ -129,7 +129,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       std::lock_guard<SimpleLock> lg(qlock);
       uint32_t len = getLenFromFront(tag);
       //      assert(len);
-      if (len == ~0 || len == 0)
+      if (len == ~0U || len == 0)
         return optional_t<RecvBuffer>();
       if (!sizeAtLeast(sizeof(uint32_t) + len, tag))
         return optional_t<RecvBuffer>();
@@ -297,7 +297,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
-      for(int i = 0; i < sendData.size(); ++i) {
+      for(unsigned i = 0; i < sendData.size(); ++i) {
         netio->progress();
         //handle send queue i
         auto& sd = sendData[i];

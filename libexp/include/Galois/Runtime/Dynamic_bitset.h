@@ -47,9 +47,7 @@ namespace Galois {
     }
 
     void clear(){
-      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
-        bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
-      }, Galois::loopname("BITSET_CLEAR"));
+      std::fill(bitvec.begin(), bitvec.end(), 0);
     }
 
     // assumes bit_vector is not updated (set) in parallel
@@ -69,5 +67,5 @@ namespace Galois {
 
     typedef int tt_is_copyable;
   };
-}
+} // namespace Galois
 #endif
