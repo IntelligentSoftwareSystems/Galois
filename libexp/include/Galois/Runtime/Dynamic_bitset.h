@@ -22,19 +22,7 @@ namespace Galois {
 
   public:
 
-    void resize(uint64_t n){
-      bitvec.resize(std::ceil((float)n/bits_uint64));
-    }
-
-    void init(){
-      std::fill(bitvec.begin(), bitvec.end(), 0);
-      /* auto init_ = [&](uint32_t x) { */
-      /*   bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load(); */
-      /* }; */
-      //      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), init_, Galois::loopname("BITSET_INIT"));
-    }
-
-  DynamicBitSet() : num_bits(0) {}
+    DynamicBitSet() : num_bits(0) {}
 
     const std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() const{
       return bitvec;
@@ -59,9 +47,7 @@ namespace Galois {
     }
 
     void clear(){
-      Galois::do_all(boost::counting_iterator<uint64_t>(0), boost::counting_iterator<uint64_t>(bitvec.size()), [&](uint32_t x) {
-        bitvec[x] = Galois::CopyableAtomic<uint64_t>(0).load();
-      }, Galois::loopname("BITSET_CLEAR"));
+      std::fill(bitvec.begin(), bitvec.end(), 0);
     }
 
     // assumes bit_vector is not updated (set) in parallel
