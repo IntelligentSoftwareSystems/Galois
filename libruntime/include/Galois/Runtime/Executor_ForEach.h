@@ -507,7 +507,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
-  typedef typename WorkListTy::value_type g;
+  //typedef typename WorkListTy::value_type g;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
@@ -609,7 +609,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
 
-    typedef typename BaseWorkListTy::value_type value_type_base;
+    //typedef typename BaseWorkListTy::value_type value_type_base;
     /** Construct new worklist **/
     typedef Galois::InsertBag<value_type> Bag;
     Bag bag;
