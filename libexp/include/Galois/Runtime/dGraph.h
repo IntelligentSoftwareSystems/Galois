@@ -80,6 +80,7 @@ class hGraph: public GlobalObject {
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint64_t totalSlaveNodes; // Total slave nodes from others.
+   uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
@@ -305,6 +306,8 @@ public:
       totalSlaveNodes = 0;
       for(auto x = 0U; x < slaveNodes.size(); ++x){
         std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
+        if(x == id)
+          continue;
         Galois::Statistic StatSlaveNodes(slave_nodes_str);
         StatSlaveNodes += slaveNodes[x].size();
         totalSlaveNodes += slaveNodes[x].size();
@@ -496,12 +499,14 @@ public:
       if(x == id)
         continue;
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, totalSlaveNodes);
+      gSerialize(b, totalSlaveNodes, totalOnwedNodes);
       net.sendTagged(x,1,b);
     }
 
     //receive and print
       uint64_t global_total_slave_nodes = totalSlaveNodes;
+      uint64_t global_total_owned_nodes = totalOnwedNodes;
+
       for(unsigned x = 0; x < net.Num; ++x){
         if(x == id)
           continue;
@@ -512,13 +517,21 @@ public:
         }while(!p);
 
         uint64_t total_slave_nodes_from_others;
-        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others);
+        uint64_t total_owned_nodes_from_others;
+        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others, total_owned_nodes_from_others);
         global_total_slave_nodes += total_slave_nodes_from_others;
+        global_total_owned_nodes += total_owned_nodes_from_others;
       }
 
       float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
+
+
+      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes)/(float)global_total_owned_nodes;
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
+
       Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
 
     //may be reusing tag, so need a barrier

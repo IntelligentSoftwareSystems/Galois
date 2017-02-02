@@ -229,11 +229,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
-
-        for(auto n = 0U; n < base_hGraph::numOwned; ++n){
-          auto gid = L2G(n);
-          auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
-          uint32_t old_lid = 0;
 #if 0
         std::string output_graph = "graph_" + std::to_string(base_hGraph::id) + ".edglist";
         std::ofstream graph_file;
@@ -285,6 +280,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         //std::cerr << "[" << base_hGraph::id << "]" << " G : " << info.global_id << " , L : " << info.local_id << " , O : " << info.owner_id << "\n";
       }
+
+      std::cerr << "[ " << base_hGraph::id <<"] : OWNED : " << GlobalVec_perHost[base_hGraph::id].size() << "\n";
+
+      base_hGraph::totalOnwedNodes = GlobalVec_perHost[base_hGraph::id].size();
 
       assert(std::is_sorted(GlobalVec_ordered.begin(), GlobalVec_ordered.end()));
 
