@@ -59,6 +59,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
 
+    //EXPERIMENT
+    std::unordered_map<uint64_t, uint32_t> GlobalVec_map;
 
     //OfflineGraph* g;
 
@@ -158,11 +160,16 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       fill_slaveNodes(base_hGraph::slaveNodes);
 
       loadEdges(base_hGraph::graph, g);
-      std::cerr << "Edges loaded \n";
+      std::cerr <<"[" << base_hGraph::id << "] Edges loaded \n";
 
       base_hGraph::setup_communication();
     }
 
+
+    uint32_t G2L(uint64_t gid) const {
+      return GlobalVec_map.at(gid);
+    }
+#if 0
     uint32_t G2L(uint64_t gid) const {
       //we can assume that GID exits and is unique. Index is localID since it is sorted.
       for(auto i : hostNodes){
@@ -174,6 +181,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       abort();
     }
+#endif
 
     uint64_t L2G(uint32_t lid) const {
       return GlobalVec[lid];
@@ -195,7 +203,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             old_lid = (iter - GlobalVec_ordered.begin());
           }
 
-          for (auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
+          for(auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]));
             auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
@@ -217,7 +225,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       }
 
-
     template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
       void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
@@ -227,20 +234,39 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           auto gid = L2G(n);
           auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
           uint32_t old_lid = 0;
+#if 0
+        std::string output_graph = "graph_" + std::to_string(base_hGraph::id) + ".edglist";
+        std::ofstream graph_file;
+        graph_file.open(output_graph.c_str());
+
+        for(auto n = g.begin(); n != g.end(); ++n){
+          for(auto e = g.edge_begin(*n); e != g.edge_end(*n); e++){
+            auto dst = g.getEdgeDst(e);
+            graph_file << *n << "\t" << dst << "\n";
+          }
+        }
+
+        Galois::Runtime::getHostBarrier().wait();
+#endif
+
+        assert(g.size() == GlobalVec_ordered.size());
+
+        for(auto n = 0; n < base_hGraph::numOwned; ++n){
+          auto gid = L2G(n);
+          auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
+          uint32_t old_lid = ~0;
           assert(*iter == gid);
           if(*iter == gid){
             old_lid = (iter - GlobalVec_ordered.begin());
           }
-
+          assert(old_lid < g.size());
           for (auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]));
           }
           graph.fixEndEdge(n, cur);
         }
-
       }
-
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
 
@@ -257,7 +283,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         OwnerVec_perHost[info.owner_id].push_back(info.owner_id);
         LocalVec_perHost[info.owner_id].push_back(info.local_id);
 
+        //std::cerr << "[" << base_hGraph::id << "]" << " G : " << info.global_id << " , L : " << info.local_id << " , O : " << info.owner_id << "\n";
       }
+
+      assert(std::is_sorted(GlobalVec_ordered.begin(), GlobalVec_ordered.end()));
 
       hostNodes.resize(base_hGraph::numHosts);
       uint32_t counter = 0;
@@ -278,6 +307,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         for(auto j : v){
           GlobalVec.push_back(j);
         }
+      }
+
+      //trasfer to unordered_map
+      uint32_t local_id = 0;
+      for(auto v : GlobalVec){
+        GlobalVec_map[v] = local_id;
+        ++local_id;
       }
 
       OwnerVec.reserve(counter);
