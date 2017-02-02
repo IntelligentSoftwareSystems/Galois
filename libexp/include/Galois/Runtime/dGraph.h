@@ -295,7 +295,7 @@ public:
              }, Galois::loopname("SLAVE_NODES"), Galois::numrun(get_run_identifier()));
       }
 
-      for(auto x = 0; x < masterNodes.size(); ++x){
+      for(auto x = 0U; x < masterNodes.size(); ++x){
         //masterNodes_bitvec[x].resize(masterNodes[x].size());
         std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
         Galois::Statistic StatMasterNodes(master_nodes_str);
@@ -303,7 +303,7 @@ public:
       }
 
       totalSlaveNodes = 0;
-      for(auto x = 0; x < slaveNodes.size(); ++x){
+      for(auto x = 0U; x < slaveNodes.size(); ++x){
         std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
         Galois::Statistic StatSlaveNodes(slave_nodes_str);
         StatSlaveNodes += slaveNodes[x].size();
@@ -1298,24 +1298,25 @@ public:
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
-   void extract_wrapper(size_t lid, typename FnTy::ValTy &val) {
+   typename FnTy::ValTy extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
-     val = FnTy::extract(lid, getData(lid, d));
+     auto val = FnTy::extract(lid, getData(lid, d));
      FnTy::reset(lid, d);
 #else
-     val = FnTy::extract(lid, getData(lid));
+     auto val = FnTy::extract(lid, getData(lid));
      FnTy::reset(lid, getData(lid));
 #endif
+     return val;
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
-   void extract_wrapper(size_t lid, typename FnTy::ValTy &val) {
+   typename FnTy::ValTy  extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
-     val = FnTy::extract(lid, getData(lid, d));
+     return FnTy::extract(lid, getData(lid, d));
 #else
-     val = FnTy::extract(lid, getData(lid));
+     return FnTy::extract(lid, getData(lid));
 #endif
    }
 
@@ -1328,7 +1329,7 @@ public:
         if (identity_offsets) offset = n;
         else offset = offsets[n];
         size_t lid = indices[offset];
-        extract_wrapper<FnTy, syncType>(lid, val_vec[n]);
+        val_vec[n] = extract_wrapper<FnTy, syncType>(lid);
      }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
    }
 
