@@ -130,7 +130,9 @@ class PageRankAlamere {
               numEdges += out_deg;
 
             },
-        "init_loop", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple(
+            Galois::loopname("init_loop"), 
+            Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     t_init.stop ();
 
@@ -217,7 +219,9 @@ class PageRankAlamere {
 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (graph),
           PageRankOp (graph, round, allConverged), 
-          "page_rank_inner", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+          std::make_tuple (
+            Galois::loopname("page_rank_inner"), 
+            Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
 
 
@@ -276,7 +280,9 @@ class PageRankAlamere {
             // std::fprintf (stderr, "ERROR: convergence failed on node %d, error=%f, tolerance=%f\n", src, diff, TERM_THRESH);
           }
         }, 
-        "check-convergence", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple(
+            Galois::loopname("check-convergence"), 
+            Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     return allConverged.reduceRO ();
   }
