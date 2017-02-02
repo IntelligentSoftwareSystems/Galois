@@ -166,7 +166,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint32_t G2L(uint64_t gid) const {
       //we can assume that GID exits and is unique. Index is localID since it is sorted.
       for(auto i : hostNodes){
-        if(i.first != ~0){
+        if(i.first != ~0U){
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
           if(*iter == gid)
             return (iter - GlobalVec.begin());
@@ -223,7 +223,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
 
-        for(auto n = 0; n < base_hGraph::numOwned; ++n){
+        for(auto n = 0U; n < base_hGraph::numOwned; ++n){
           auto gid = L2G(n);
           auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
           uint32_t old_lid = 0;
@@ -261,7 +261,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       hostNodes.resize(base_hGraph::numHosts);
       uint32_t counter = 0;
-      for(auto i = 0; i < base_hGraph::numHosts; i++){
+      for(auto i = 0U; i < base_hGraph::numHosts; i++){
         if(GlobalVec_perHost[i].size() > 0){
           hostNodes[i] = std::make_pair(counter, GlobalVec_perHost[i].size() + counter);
           counter += GlobalVec_perHost[i].size();
@@ -273,7 +273,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       GlobalVec.reserve(counter);
       auto iter_insert = GlobalVec.begin();
-      uint32_t c = 0;
+      //uint32_t c = 0;
       for(auto v : GlobalVec_perHost){
         for(auto j : v){
           GlobalVec.push_back(j);
@@ -281,7 +281,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       OwnerVec.reserve(counter);
-      c = 0;
+      //c = 0;
       iter_insert = OwnerVec.begin();
       for(auto v : OwnerVec_perHost){
         for(auto j : v){
@@ -308,7 +308,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //Check to make sure GlobalVec is sorted. Everything depends on it.
       //assert(std::is_sorted(GlobalVec.begin(), GlobalVec.end()));
       for(auto h : hostNodes) {
-        if(h.first != ~0) {
+        if(h.first != ~0U) {
           if(!std::is_sorted(GlobalVec.begin() + h.first , GlobalVec.begin() + h.second)){
             std::cerr << "GlobalVec not sorted; Aborting execution\n";
             abort();

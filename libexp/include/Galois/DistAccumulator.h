@@ -126,7 +126,7 @@ public:
       Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
       Galois::atomicAdd(mdata, tmp);
 #endif
-      for (auto x = 0; x < net.Num; ++x) {
+      for (auto x = 0U; x < net.Num; ++x) {
          if (x == net.ID)
             continue;
          Galois::Runtime::SendBuffer b;

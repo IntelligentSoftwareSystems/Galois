@@ -110,7 +110,7 @@ public:
     std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + (helper_fn.get_run_identifier()));
     Galois::Statistic num_work_bytes(work_bytes_str.c_str());
     //send things to other hosts.
-    for(auto x = 0; x < net.Num; ++x){
+    for(auto x = 0U; x < net.Num; ++x){
       if(x == net.ID)
         continue;
       Galois::Runtime::SendBuffer b;
@@ -122,7 +122,7 @@ public:
     net.flush();
 
     //receive
-    for(auto x = 0; x < net.Num; ++x) {
+    for(auto x = 0U; x < net.Num; ++x) {
       if(x == net.ID)
         continue;
       decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
@@ -147,7 +147,7 @@ public:
     num_work_items += workItem_recv_vec.size();
 
     assert((hosts_didWork_vec.size() == (net.Num - 1)));
-    for(auto x = 0; x < net.Num; ++x){
+    for(auto x = 0U; x < net.Num; ++x){
       bagItems_vec[x].clear();
     }
 
