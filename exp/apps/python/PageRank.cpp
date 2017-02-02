@@ -21,16 +21,14 @@
  * @author Joyce Whang <joyce@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Yi-Shan Lu <yishanlu@utexas.edu>
  */
 
 
 #include "Galois/Galois.h"
-//#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/TypeTraits.h"
-#include "Lonestar/BoilerPlate.h"
-
+#include "PageRank.h"
 
 #include <atomic>
 #include <string>
@@ -42,40 +40,27 @@
 #include <set>
 
 
-namespace cll = llvm::cl;
-
-static const char* name = "Page Rank";
-static const char* desc = "Computes page ranks a la Page and Brin";
-static const char* url = 0;
-
-cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
-
 static const float alpha = 0.85; 
 typedef double PRTy;
 
+struct Initialization {
+  Graph& g;
 
-struct LNode {
-  PRTy value;
-  std::atomic<PRTy> residual; 
-  void init() { value = 1.0 - alpha; residual = 0.0; }
-  friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
-    os << "{PR " << n.value << ", residual " << n.residual << "}";
-    return os;
+  void operator()(const GNode n) {
+    auto& data = g.getData(n);
+    data.DAd.vDouble = 1.0 - alpha; // value
+
+    data.DAd.vAtomicDouble = 0.0;   // residual
   }
 };
-
-
-typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type Graph;
-typedef typename Graph::GraphNode GNode;
 
 //! Make values unique
 template<typename GNode>
 struct TopPair {
-  float value;
+  double value;
   GNode id;
 
-  TopPair(float v, GNode i): value(v), id(i) { }
+  TopPair(double v, GNode i): value(v), id(i) { }
 
   bool operator<(const TopPair& b) const {
     if (value == b.value)
@@ -87,18 +72,18 @@ struct TopPair {
 
 
 template<typename Graph>
-static void printTop(Graph& graph, int topn, const char *algo_name, int numThreads) {
+static NodeDouble *reportTop(Graph& graph, int topn, const ValAltTy result) {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
   typedef TopPair<GNode> Pair;
   typedef std::map<Pair,GNode> Top;
 
   // normalize the PageRank value so that the sum is equal to one
-  float sum=0;
+  double sum=0.0;
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    sum += n.value;
+    sum += n.DAd.vDouble;
   }
 
   Top top;
@@ -107,7 +92,7 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.value/sum; // normalized PR (divide PR by sum)
+    double value = n.DAd.vDouble/sum; // normalized PR (divide PR by sum)
     //float value = n.getPageRank(); // raw PR 
     //std::cout<<value<<" "; 
     Pair key(value, src);
@@ -121,14 +106,26 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
       top.erase(top.begin());
       top.insert(std::make_pair(key, src));
     }
+
+    n.attr[result] = std::to_string(value);
   }
   //std::cout<<"\nend of print\n";
 
+  NodeDouble *pr = new NodeDouble [topn] ();
+  int rank = 0;
+  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
+    pr[rank].n = ii->first.id;
+    pr[rank].v = ii->first.value;
+  }
+  return pr;
+
+#if 0
   int rank = 1;
   std::cout << "Rank PageRank Id\n";
   for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
     std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
+#endif
 }
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
@@ -147,25 +144,25 @@ struct PageRank {
   PageRank(Graph& g, PRTy t) : graph(g), tolerance(t) {}
   
   void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-    LNode& sdata = graph.getData(src);      
+    auto& sdata = graph.getData(src);      
+    auto& sResidual = sdata.DAd.vAtomicDouble;
+    auto& sValue = sdata.DAd.vDouble;
     Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     
-    if (std::fabs(sdata.residual) > tolerance) {
-      PRTy oldResidual = sdata.residual.exchange(0.0);
-      sdata.value += oldResidual;
+    if (std::abs(sResidual) > tolerance) {
+      PRTy oldResidual = sResidual.exchange(0.0);
+      sValue += oldResidual;
       int src_nout = std::distance(graph.edge_begin(src, flag), graph.edge_end(src,flag));
       PRTy delta = oldResidual*alpha/src_nout;
       // for each out-going neighbors
       for (auto jj : graph.edges(src, flag)) {
         GNode dst = graph.getEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, flag);
-        auto old = atomicAdd(ddata.residual, delta);
-        if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
+        auto& ddata = graph.getData(dst, flag);
+        auto& dResidual = ddata.DAd.vAtomicDouble;
+        auto old = atomicAdd(dResidual, delta);
+        if (std::abs(old) <= tolerance && std::abs(old + delta) >= tolerance)
           ctx.push(dst);
       }
-    } else { // might need to reschedule self
-      //Why?
-      //      ctx.push(src);
     }
   }
 };
@@ -180,50 +177,40 @@ void initResidual(Graph& graph) {
       for (auto ii : graph.edges(src)) {
         auto dst = graph.getEdgeDst(ii);
         auto& ddata = graph.getData(dst);
-        atomicAdd(ddata.residual, 1.0/nout);
+        auto& dResidual = ddata.DAd.vAtomicDouble;
+        atomicAdd(dResidual, 1.0/nout);
       }
     }, Galois::do_all_steal<true>());
   //scale residual
   Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
-      data.residual = data.residual * alpha * (1.0-alpha);
+      auto& dResidual = data.DAd.vAtomicDouble;
+      dResidual = dResidual * alpha * (1.0-alpha);
     }, Galois::do_all_steal<true>());
 }
 
-int main(int argc, char **argv) {
-  LonestarStart(argc, argv, name, desc, url);
+NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy result) {
   Galois::StatManager statManager;
 
   Galois::StatTimer T("OverheadTime");
   T.start();
 
-  Graph graph;
-  
-  Galois::Graph::readGraph(graph, filename);
-
-  std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
-
-  Galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
-
   std::cout << "Running Edge Async version\n";
   std::cout << "tolerance: " << tolerance << "\n";
-  Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-  initResidual(graph);
+  Galois::do_all_local(*g, Initialization{*g});
+  initResidual(*g);
 
   Galois::StatTimer Tmain;
   Tmain.start();  
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  Galois::for_each_local(graph, PageRank{graph, tolerance}, Galois::wl<WL>());
+  Galois::for_each_local(*g, PageRank{*g, tolerance}, Galois::wl<WL>());
   Tmain.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
-  
-  if (!skipVerify) {
-    printTop(graph, 10, "EdgeAsync", numThreads);
-  }
-
   T.stop();
 
-  return 0;
+  return reportTop(*g, topK, result);
+}
+
+void deleteNodeDoubles(NodeDouble *array) {
+  delete[] array;
 }

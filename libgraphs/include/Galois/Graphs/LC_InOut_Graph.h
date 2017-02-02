@@ -32,6 +32,7 @@
 #define GALOIS_GRAPH_LC_INOUT_GRAPH_H
 
 #include "Galois/Graphs/Details.h"
+#include "Galois/Galois.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>
@@ -233,7 +234,7 @@ public:
   }
 
   /**
-   * Sorts incoming edges of a node. Comparison is by getInEdgeDst(e). Assumed to be called by all nodes.
+   * Sorts incoming edges of a node. Comparison is by getInEdgeDst(e).
    */
   void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
@@ -246,6 +247,13 @@ public:
       std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)), 
         [=] (const InEdgeSortVal& e1, const InEdgeSortVal& e2) { return e1.dst < e2.dst; });
     }
+  }
+
+  /**
+   * Sorts incoming edges of all nodes. Comparison is by getInEdgeDst(e).
+   */
+  void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
   }
 
   size_t idFromNode(GraphNode N) {

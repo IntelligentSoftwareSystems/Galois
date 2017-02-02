@@ -35,6 +35,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
+#include "Galois/Galois.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -303,22 +304,33 @@ private:
       }
     }
 
-    void erase(gNode* N) { 
-      iterator ii = find(N);
+    void erase(gNode* N, bool inEdge = false) { 
+      iterator ii = find(N, inEdge);
       if (ii != end())
         edges.erase(ii); 
     }
 
-    iterator find(gNode* N) {
+    iterator find(gNode* N, bool inEdge = false) {
+      iterator ii, ei = edges.end();
       if (SortedNeighbors) {
-        iterator ei = edges.end();
-        iterator ii = std::lower_bound(edges.begin(), ei, N,
-                                       first_lt<gNode*>());
-        first_eq_and_valid<gNode*> checker(N);
-        return (ii == ei || checker(*ii)) ? ii : ei;
+        assert(std::is_sorted(edges.begin(), edges.end(), 
+                              [=] (const EdgeInfo& e1, const EdgeInfo& e2) 
+                                  { return e1.first() < e2.first(); }
+                             )
+              );
+        ii = std::lower_bound(edges.begin(), edges.end(), N,
+                              first_lt<gNode*>());
+      } else {
+        ii = edges.begin();
       }
-      else
-        return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
+
+      first_eq_and_valid<gNode*> checker(N);
+      ii = std::find_if(ii, ei, checker);
+      while(ii != ei && ii->isInEdge() != inEdge) {
+        ++ii;
+        ii = std::find_if(ii, ei, checker);
+      };
+      return ii;
     }
 
     void resizeEdges(size_t size) {
@@ -579,7 +591,7 @@ public:
       EdgeTy* e = dst->second();
       edgesF.delEdge(e);
       src->erase(dst.base());
-      dst->first()->erase(src);
+      dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
     }
   }
 
@@ -595,6 +607,67 @@ public:
       dst->acquire(mflag);
       if ( !edge_predicate(*ii) )
         // I think we need this too, else we'll return some random iterator.
+        ii = ei;
+    }
+    else
+      ii = ei;
+    return boost::make_filter_iterator(edge_predicate, ii, ei);
+  }
+
+  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    assert(src);
+    assert(dst);
+    src->acquire(mflag);
+    assert(std::is_sorted(src->begin(), src->end(), 
+                          [=] (const typename gNode::EdgeInfo& e1, const typename gNode::EdgeInfo& e2) 
+                              { return e1.first() < e2.first(); }
+                         )
+          );
+
+    auto ei = src->end();
+    auto ii = std::lower_bound(src->begin(), src->end(), dst,
+                               first_lt<gNode*>());
+
+    first_eq_and_valid<gNode*> checker(dst);
+    ii = std::find_if(ii, ei, checker); // bug if ei set to upper_bound
+    while(ii != ei && ii->isInEdge()) {
+      ++ii;
+      ii = std::find_if(ii, ei, checker);
+    };
+
+    is_out_edge edge_predicate;
+    if(ii != ei) {
+      dst->acquire(mflag);
+      if(!edge_predicate(*ii)) {
+        ii = ei;
+      }
+    }
+    return boost::make_filter_iterator(edge_predicate, ii, ei);
+  }
+
+  template<bool _Undirected = !Directional>
+  edge_iterator findInEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                           typename std::enable_if<_Undirected>::type* = 0)
+  {
+    // incoming neighbors are the same as outgoing neighbors in undirected graphs
+    return findEdge(src, dst, mflag);
+  }
+
+  // Find if an incoming edge between src and dst exists for directed in-out graphs
+  template<bool _DirectedInOut = (Directional && InOut)>
+  in_edge_iterator findInEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                              typename std::enable_if<_DirectedInOut>::type* = 0) 
+  {
+    assert(src);
+    assert(dst);
+    src->acquire(mflag);
+    typename gNodeTypes::iterator ii = src->find(dst, true), ei = src->end();
+    is_in_edge edge_predicate;
+    if ( ii != ei && edge_predicate(*ii) ) {
+      // After finding edges, lock dst and verify still active
+      dst->acquire(mflag);
+      if ( !edge_predicate(*ii) )
+        // need this to avoid returning a random iterator
         ii = ei;
     }
     else
@@ -634,6 +707,16 @@ public:
     return GraphNode(ii->first());
   }
 
+  void sortEdgesByDst(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) { 
+    acquire(N, mflag);
+    typedef typename gNode::EdgeInfo EdgeInfo;
+    std::sort(N->begin(), N->end(), [=] (const EdgeInfo& e1, const EdgeInfo& e2) { return e1.first() < e2.first(); } );
+  }
+
+  void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
+  }
+
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node 
@@ -650,7 +733,10 @@ public:
     return boost::make_filter_iterator(is_out_edge(), N->begin(), N->end());
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  template<bool _Undirected = !Directional>
+  in_edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                                 typename std::enable_if<!_Undirected>::type* = 0) 
+  {
     assert(N);
     N->acquire(mflag);
 
@@ -663,6 +749,13 @@ public:
     return boost::make_filter_iterator(is_in_edge(), N->begin(), N->end());
   }
 
+  template<bool _Undirected = !Directional>
+  edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                              typename std::enable_if<_Undirected>::type* = 0) 
+  {
+    return edge_begin(N, mflag);
+  }
+
   //! Returns the end of the neighbor iterator 
   edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
@@ -672,7 +765,10 @@ public:
     return boost::make_filter_iterator(is_out_edge(), N->end(), N->end());
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  template<bool _Undirected = !Directional>
+  in_edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE,
+                               typename std::enable_if<!_Undirected>::type* = 0)
+  {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -680,12 +776,29 @@ public:
     return boost::make_filter_iterator(is_in_edge(), N->end(), N->end());
   }
 
+  template<bool _Undirected = !Directional>
+  edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE,
+                            typename std::enable_if<_Undirected>::type* = 0)
+  {
+    return edge_end(N, mflag);
+  } 
+
   Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  template<bool _Undirected = !Directional>
+  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                                                                typename std::enable_if<!_Undirected>::type* = 0) 
+  {
     return detail::make_no_deref_range(in_edge_begin(N, mflag), in_edge_end(N, mflag));
+  }
+
+  template<bool _Undirected = !Directional>
+  Runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+                                                                typename std::enable_if<_Undirected>::type* = 0) 
+  {
+    return edges(N, mflag);
   }
 
   /**
