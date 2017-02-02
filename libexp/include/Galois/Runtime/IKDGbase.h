@@ -102,7 +102,7 @@ protected:
   using Base = OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
   using CtxtWL = typename Base::CtxtWL;
 
-  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, SetWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
 
   template <typename Outer>
   struct WindowWLwrapper: public WindowWL {
