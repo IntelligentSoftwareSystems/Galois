@@ -44,6 +44,8 @@ namespace {
   public:
     explicit GaloisFunctionsVisitor(CompilerInstance *CI) : astContext(&(CI->getASTContext())){}
 
+    virtual ~GaloisFunctionsVisitor() {}
+
     virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec){
       Dec->dump();
       return true;
@@ -61,13 +63,14 @@ namespace {
 
   class NameSpaceHandler : public MatchFinder::MatchCallback {
     //CompilerInstance &Instance;
-    clang::LangOptions& langOptions; //Instance.getLangOpts();
+    //clang::LangOptions& langOptions; //Instance.getLangOpts();
   public:
-    NameSpaceHandler(clang::LangOptions &langOptions) : langOptions(langOptions){}
+    NameSpaceHandler(clang::LangOptions &langOptions) {}
     virtual void run(const MatchFinder::MatchResult &Results){
       llvm::errs() << "It is coming here\n"
                    << Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")->getAsNamespace()->getIdentifier()->getName();
-      if (const NestedNameSpecifier* NSDecl = Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")) {
+      const NestedNameSpecifier* NSDecl = Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop");
+      if (NSDecl != NULL) {
         llvm::errs() << "Found Galois Loop\n";
         //NSDecl->dump(langOptions);
       }
@@ -113,6 +116,23 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n";
+    s << "\t\tstatic bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, " << i.VAL_TYPE << " *y, size_t *s, DataCommMode *data_mode) {\n";
+    if (!i.RESET_VAL_EXPR.empty()) {
+      s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_reset_node_" << i.FIELD_NAME 
+        <<  "_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, " << i.RESET_VAL_EXPR << "); return true; }\n"
+        << "\t\t\tassert (personality == CPU);\n"
+        << "\t\t#endif\n"
+        << "\t\t\treturn false;\n";
+    } else {
+      s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+        << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_slave_node_" << i.FIELD_NAME 
+        <<  "_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }\n"
+        << "\t\t\tassert (personality == CPU);\n"
+        << "\t\t#endif\n"
+        << "\t\t\treturn false;\n";
+    }
+    s << "\t\t}\n";
     s << "\t\tstatic bool extract_reset_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n";
     if (!i.RESET_VAL_EXPR.empty()) {
       s << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
@@ -137,10 +157,10 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\t\t{ Galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
       << "\t\t}\n";
-    s << "\t\tstatic bool reduce_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+    s << "\t\tstatic bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, " << i.VAL_TYPE << " *y, size_t s, DataCommMode data_mode) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) { " << "batch_" << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME 
-      <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+      <<  "_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn false;\n"
@@ -169,6 +189,14 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n";
+    s << "\t\tstatic bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, " << i.VAL_TYPE << " *y, size_t *s, DataCommMode *data_mode) {\n" 
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_node_" << i.FIELD_NAME 
+      <<  "_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn false;\n"
+      << "\t\t}\n";
     s << "\t\tstatic bool extract_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_node_" << i.FIELD_NAME 
@@ -184,10 +212,10 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\t\tnode." << i.FIELD_NAME << " = y;\n"
       << "\t\t}\n";
-    s << "\t\tstatic bool setVal_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+    s << "\t\tstatic bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, " << i.VAL_TYPE << " *y, size_t s, DataCommMode data_mode) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) { " << "batch_set_node_" << i.FIELD_NAME 
-      <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+      <<  "_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn false;\n"
@@ -968,7 +996,7 @@ namespace {
 
   class GaloisFunctionsConsumer : public ASTConsumer {
     private:
-    CompilerInstance &Instance;
+    //CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
     MatchFinder Matchers;
@@ -977,7 +1005,7 @@ namespace {
     FunctionCallHandler functionCallHandler;
     FunctionForEachHandler forEachHandler;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), forEachHandler(R) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), forEachHandler(R) {
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all"))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop"), &functionCallHandler);
 
       /** for Galois::for_each. Needs different treatment. **/
