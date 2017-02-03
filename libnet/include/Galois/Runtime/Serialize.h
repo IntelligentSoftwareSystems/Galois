@@ -393,10 +393,10 @@ template<typename T>
 struct LazyRef { size_t off; };
 
 template<typename Seq>
-static inline LazyRef<typename Seq::value_type> gSerializeLazySeq(SerializeBuffer& buf, unsigned num) {
+static inline LazyRef<typename Seq::value_type> gSerializeLazySeq(SerializeBuffer& buf, unsigned num, Seq*) {
   static_assert(is_memory_copyable<typename Seq::value_type>::value, "Not POD Sequence");
   typename Seq::size_type size = num;
-  gSerializeOb(buf, size);
+  detail::gSerializeObj(buf, size);
   size_t tsize = sizeof(typename Seq::value_type);
   return LazyRef<typename Seq::value_type>{buf.encomber(tsize*num)};
 }
