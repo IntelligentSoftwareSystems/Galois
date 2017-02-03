@@ -29,7 +29,7 @@
 #ifndef MATERIAL_H
 #define MATERIAL_H
 
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include "AuxDefs.h"
 
@@ -200,7 +200,7 @@ class NeoHookean: public SimpleMaterial {
   /**
    * Per thread storage for NeoHookenTmpVec 
    */
-  static Galois::Substrate::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
+  static Galois::Runtime::PerThreadStorage<NeoHookenTmpVec> perCPUtmpVec;
 
 public:
   NeoHookean(double LambdaInput, double MuInput, double rhoInput = 0) :

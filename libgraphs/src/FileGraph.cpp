@@ -32,7 +32,8 @@
  */
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Substrate/PageAlloc.h"
+#include "Galois/Runtime/PageAlloc.h"
+#include "Galois/Runtime/PagePool.h"
 
 #include <cassert>
 #include <fstream>
@@ -67,6 +68,11 @@ void* mmap_big(Args... args) {
 }
 typedef off_t offset_t;
 #endif
+
+using Galois::Runtime::convert_le64toh;
+using Galois::Runtime::convert_le32toh;
+using Galois::Runtime::convert_htole32;
+using Galois::Runtime::convert_htole64;
 
 namespace Galois {
 namespace Graph {
@@ -137,7 +143,7 @@ void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset) {
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = convert_le64toh(*fptr++);
   if (version != 1)
-    GALOIS_DIE("unknown file version ", version);
+    Runtime::gDie("unknown file version ", version);
   sizeofEdge = convert_le64toh(*fptr++);
   numNodes = convert_le64toh(*fptr++);
   numEdges = convert_le64toh(*fptr++);
@@ -177,7 +183,7 @@ void* FileGraph::fromArrays(
   size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data);
   char* base = (char*) mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE, _MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED)
-    GALOIS_SYS_DIE("failed allocating graph");
+    Runtime::gDie("failed allocating graph");
   mappings.push_back({base, bytes});
   
   uint64_t* fptr = (uint64_t*) base;
@@ -217,16 +223,16 @@ void* FileGraph::fromArrays(
 void FileGraph::fromFile(const std::string& filename) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
-    GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
+    Runtime::gDie("failed opening ", "'", filename, "'");
   fds.push_back(fd);
 
   struct stat buf;
   if (fstat(fd, &buf) == -1)
-    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
+    Runtime::gDie("failed reading ", "'", filename, "'");
 
   void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (base == MAP_FAILED)
-    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
+    Runtime::gDie("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
 
   fromMem(base, 0, 0);
@@ -235,12 +241,12 @@ void FileGraph::fromFile(const std::string& filename) {
 template<typename Mappings>
 static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
   // mmap needs page-aligned offsets
-  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Substrate::allocSize() - 1);
+  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Runtime::allocSize() - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
   void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
   if (base == MAP_FAILED)
-    GALOIS_SYS_DIE("failed allocating for fd ", fd);
+    Runtime::gDie("failed allocating for fd ", fd);
   mappings.push_back({base, length});
   return static_cast<char*>(base) + alignment;
 }
@@ -248,13 +254,13 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
 void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, EdgeRange erange) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
-    GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
+    Runtime::gDie("failed opening ", "'", filename, "'");
   fds.push_back(fd);
 
   size_t headerSize = 4 * sizeof(uint64_t);
   void* base = mmap(nullptr, headerSize, PROT_READ, MAP_PRIVATE, fd, 0);
   if (base == MAP_FAILED)
-    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
+    Runtime::gDie("failed reading ", "'", filename, "'");
   mappings.push_back({base, headerSize});
 
   // Read metadata of whole graph
@@ -309,9 +315,6 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
     aa = *edge_begin(bb);
     ea = *edge_end(eb-1);
   }
-  if (false) {
-    Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
-  }
   return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
@@ -326,16 +329,13 @@ FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
   size_t bb = findIndex(0, 1, aa, 0, numNodes);
   size_t eb = findIndex(0, 1, ea, bb, numNodes);
 
-  if (true) {
-    Substrate::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, "], [", aa, " ", ea, " ", ea - aa, "]");
-  }
   return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
 //FIXME: perform host -> le on data
 void FileGraph::toFile(const std::string& file) {
   // FIXME handle files with multiple mappings
-  GALOIS_ASSERT(mappings.size() == 1);
+  assert(mappings.size() == 1);
 
   ssize_t retval;
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -348,9 +348,9 @@ void FileGraph::toFile(const std::string& file) {
   while (total) {
     retval = write(fd, ptr, total);
     if (retval == -1) {
-      GALOIS_SYS_DIE("failed writing to ", "'", file, "'");
+      Runtime::gDie("failed writing to ", "'", file, "'");
     } else if (retval == 0) {
-      GALOIS_DIE("ran out of space writing to ", "'", file, "'");
+      Runtime::gDie("ran out of space writing to ", "'", file, "'");
     }
     total -= retval;
     ptr += retval;

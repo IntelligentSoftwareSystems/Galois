@@ -37,21 +37,22 @@
 #include <algorithm>
 #include <vector>
 #include <limits>
+#include <iostream>
 
 #include <cstdio>
 #include <ctime>
 
 
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Runtime/Support.h"
-#include "Galois/Substrate/Termination.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+//#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/CompilerSpecific.h"
+//#include "Galois/Runtime/gio.h"
 
-#include "Galois/Timer.h"
+//#include "Galois/Timer.h"
 #include "Galois/OrderedTraits.h"
 
 
@@ -131,21 +132,21 @@ namespace Galois {
 
     void print (void) const { 
       
-      Substrate::gPrint (m_name , " [" , m_values.size () , "]"
-        , ", max = " , m_max
-        , ", min = " , m_min
-        , ", sum = " , m_sum
-        , ", avg = " , average ()
-        , ", range = " , range () 
-        , "\n");
+      std::cout << m_name << " [" , m_values.size () << "]"
+                << ", max = " << m_max
+                << ", min = " << m_min
+                << ", sum = " << m_sum
+                << ", avg = " << average ()
+                << ", range = " << range () 
+                << "\n" ;
 
-      Substrate::gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
+      std::cout << m_name < " Values[" << m_values.size () << "] = [\n";
 
       for (typename std::vector<T>::const_iterator i = m_values.begin (), endi = m_values.end ();
           i != endi; ++i) {
-        Substrate::gPrint ( *i , ", ");
+        std::cout << *i << ", ";
       }
-      Substrate::gPrint ("]\n");
+      std::cout << "]\n";
     }
 
   };
@@ -169,7 +170,7 @@ class DoAllCoupledExec {
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Substrate::SimpleLock work_mutex;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Runtime::SimpleLock work_mutex;
     unsigned id;
 
     Iter shared_beg;
@@ -187,7 +188,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (Substrate::ThreadPool::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (Runtime::ThreadPool::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -402,10 +403,10 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Runtime::ThreadPool::getThreadPool();
 
     const unsigned maxT = Galois::getActiveThreads ();
-    const unsigned my_pack = Substrate::ThreadPool::getPackage ();
+    const unsigned my_pack = Runtime::ThreadPool::getPackage ();
     const unsigned per_pack = tp.getMaxThreads() / tp.getMaxPackages ();
 
     const unsigned pack_beg = my_pack * per_pack;
@@ -437,8 +438,8 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::ThreadPool::getThreadPool();
-    unsigned myPkg = Substrate::ThreadPool::getPackage();
+    auto& tp = Runtime::ThreadPool::getThreadPool();
+    unsigned myPkg = Runtime::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = Galois::getActiveThreads ();
 
@@ -515,18 +516,18 @@ private:
 
     if (ret) { return true; }
 
-    Substrate::asmPause ();
+    Runtime::asmPause ();
 
-    if (Substrate::ThreadPool::getThreadPool().isLeader(poor.id)) {
+    if (Runtime::ThreadPool::getThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
-      Substrate::asmPause ();
+      Runtime::asmPause ();
     }
 
     ret = stealOutsidePackage (poor, HALF);
     if (ret) { return true; } 
-    Substrate::asmPause ();
+    Runtime::asmPause ();
 
     return ret;
 
@@ -583,7 +584,7 @@ private:
     // work_timer.print ();
     // steal_timer.print ();
     // term_timer.print ();
-    Substrate::gPrint ("--------\n");
+    std::cout << "--------\n";
   }
 
 
@@ -594,9 +595,9 @@ private:
   F func;
   const char* loopname;
   Diff_ty chunk_size;
-  Substrate::PerThreadStorage<ThreadContext> workers;
+  Runtime::PerThreadStorage<ThreadContext> workers;
 
-  Substrate::TerminationDetection& term;
+  std::unique_ptr<Runtime::TerminationDetection> term;
 
   // for stats
 
@@ -613,7 +614,7 @@ public:
       func (_func), 
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
       chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
-      term(Substrate::getSystemTermination(activeThreads))
+      term(createTermination(Galois::getActiveThreads()))
   {
     assert (chunk_size > 0);
     // std::printf ("DoAllCoupledExec loopname: %s, work size: %ld, chunk_size: %u\n", loopname, std::distance(range.begin (), range.end ()), chunk_size);
@@ -628,9 +629,9 @@ public:
 
   // parallel call
   void initThread (void) {
-    term.initializeThread ();
+    term->initializeThread ();
 
-    unsigned id = Substrate::ThreadPool::getTID ();
+    unsigned id = Runtime::ThreadPool::getTID ();
 
     *workers.getLocal (id) = ThreadContext (id, range.local_begin (), range.local_end ());
 
@@ -683,9 +684,9 @@ public:
         assert (!ctx.hasWork ());
         if (USE_TERM) {
           ctx.term_timer.start ();
-          term.localTermination (workHappened);
+          term->localTermination (workHappened);
 
-          bool quit = term.globalTermination ();
+          bool quit = term->globalTermination ();
           ctx.term_timer.stop ();
 
 
@@ -722,9 +723,9 @@ void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple)
   using ArgsT = decltype (argsT);
   details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
-  Substrate::Barrier& barrier = getBarrier(activeThreads);
+  Runtime::Barrier barrier(getActiveThreads());
 
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, 
+  Runtime::ThreadPool::getThreadPool().run(getActiveThreads(), 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));
@@ -769,7 +770,7 @@ void do_all_coupled_detailed (const R& range, const F& func, const _ArgsTuple& a
 
   Runtime::on_each_impl( 
       [&maxTime, &perThrdTimer, ln] (const unsigned tid, const unsigned numT) {
-        GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
+        assert((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
         Runtime::reportStat (ln, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec (), 0);
       });
 

@@ -30,8 +30,7 @@
  */
 
 #include "Galois/Graphs/OCGraph.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/PagePool.h"
 
 #include <cassert>
 
@@ -79,7 +78,7 @@ void OCFileGraph::Block::unload() {
     return;
 
   if (munmap(m_mapping, m_length) != 0) {
-    GALOIS_SYS_DIE("failed unallocating");
+    Runtime::gDie("failed unallocating");
   }
   m_mapping = 0;
 }
@@ -97,7 +96,7 @@ void OCFileGraph::Block::load(int fd, offset_t offset, size_t begin, size_t len,
   m_length = len * sizeof_data + Galois::Runtime::pagePoolSize(); // account for round off due to alignment
   m_mapping = mmap_big(nullptr, m_length, PROT_READ, _MAP_BASE, fd, aligned);
   if (m_mapping == MAP_FAILED) {
-    GALOIS_SYS_DIE("failed allocating ", fd);
+    Runtime::gDie("failed allocating ", fd);
   }
 
   m_data = reinterpret_cast<char*>(m_mapping);
@@ -125,7 +124,7 @@ void OCFileGraph::load(segment_type& s, edge_iterator begin, edge_iterator end, 
 static void readHeader(int fd, uint64_t& numNodes, uint64_t& numEdges) {
   void* m = mmap(0, 4 * sizeof(uint64_t), PROT_READ, MAP_PRIVATE, fd, 0);
   if (m == MAP_FAILED) {
-    GALOIS_SYS_DIE("failed reading ", fd);
+    Galois::Runtime::gDie("failed reading ", fd);
   }
 
   uint64_t* ptr = reinterpret_cast<uint64_t*>(m);
@@ -134,14 +133,14 @@ static void readHeader(int fd, uint64_t& numNodes, uint64_t& numEdges) {
   numEdges = ptr[3];
 
   if (munmap(m, 4 * sizeof(uint64_t))) {
-    GALOIS_SYS_DIE("failed reading ", fd);
+    Galois::Runtime::gDie("failed reading ", fd);
   }
 }
 
 void OCFileGraph::fromFile(const std::string& filename) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
-    GALOIS_SYS_DIE("failed opening ", filename);
+    Runtime::gDie("failed opening ", filename);
   }
   
   readHeader(masterFD, numNodes, numEdges);
@@ -152,7 +151,7 @@ void OCFileGraph::fromFile(const std::string& filename) {
 #endif
   masterMapping = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (masterMapping == MAP_FAILED) {
-    GALOIS_SYS_DIE("failed reading ", filename);
+    Runtime::gDie("failed reading ", filename);
   }
 
   outIdx = reinterpret_cast<uint64_t*>(masterMapping);

@@ -27,7 +27,7 @@
  */
 
 #include "Galois/Runtime/Executor_ParaMeter.h"
-#include "Galois/Substrate/gio.h"
+//#include "Galois/Substrate/gio.h"
 
 namespace Galois {
   namespace Runtime {
@@ -66,7 +66,7 @@ struct StatsFileManager {
       // strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
 
       statsFH = fopen(statsFileName.c_str(), "w");
-      GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
+      assert(statsFH != nullptr && "ParaMeter stats file error");
 
       Galois::Runtime::ParaMeter::StepStats::printHeader(statsFH);
 
@@ -76,7 +76,7 @@ struct StatsFileManager {
 
     if (!isOpen) {
       statsFH = fopen (statsFileName.c_str(), "a"); // open in append mode
-      GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
+      assert(statsFH != nullptr && "ParaMeter stats file error");
 
       isOpen = true;
     }

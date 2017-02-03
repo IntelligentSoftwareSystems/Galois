@@ -1,6 +1,8 @@
-add_library(lonestar STATIC src/BoilerPlate.cpp)
-target_include_directories(lonestar PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(lonestar galois_runtime gllvm)
+add_library(lonestar_static STATIC src/BoilerPlate.cpp)
+
+target_include_directories(lonestar_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_link_libraries(lonestar_static galois_static)
 
 add_subdirectory(avi)
 add_subdirectory(barneshut)

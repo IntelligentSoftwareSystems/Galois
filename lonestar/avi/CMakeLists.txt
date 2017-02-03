@@ -41,8 +41,7 @@ if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND)
     target_link_libraries(AVI ${Boost_LIBRARIES})
   endif()
 
-  target_link_libraries(AVI galois_runtime)
-  target_link_libraries(AVI galois_substrate)
+  target_link_libraries(AVI galois)
 
   set(AVI_FOUND TRUE)
 endif()

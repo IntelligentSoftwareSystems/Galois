@@ -1,0 +1,59 @@
+/** Numa-aware large Allocators -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galoisis a framework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
+ *
+ * Numa interleaved large allocations
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+#ifndef GALOIS_RUNTIME_NUMAMEM
+#define GALOIS_RUNTIME_NUMAMEM
+
+#include <cstddef>
+#include <memory>
+
+namespace Galois {
+namespace Runtime {
+
+namespace detail {
+struct largeFreer {
+  size_t bytes;
+  void operator()(void* ptr) const;
+};
+}//namespace detail
+
+typedef std::unique_ptr<void, detail::largeFreer> LAptr;
+
+LAptr largeMallocLocal(size_t bytes); // fault in locally
+LAptr largeMallocFloating(size_t bytes); // leave numa mapping undefined
+LAptr largeMallocInterleaved(size_t bytes, unsigned numThreads); // fault in interleaved mapping
+LAptr largeMallocBlocked(size_t bytes, unsigned numThreads); // fault in block interleaved mapping
+
+} // namespace Runtime
+} // namespace Galois
+
+#endif //GALOIS_SUBSTRATE_NUMAMEM

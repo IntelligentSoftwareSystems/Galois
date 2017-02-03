@@ -32,10 +32,10 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
-#include "Galois/Bag.h"
+#include "Galois/Runtime/Bag.h"
+#include "Galois/Runtime/SmallAlloc.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
-#include "Galois/Galois.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -304,33 +304,22 @@ private:
       }
     }
 
-    void erase(gNode* N, bool inEdge = false) { 
-      iterator ii = find(N, inEdge);
+    void erase(gNode* N) { 
+      iterator ii = find(N);
       if (ii != end())
         edges.erase(ii); 
     }
 
-    iterator find(gNode* N, bool inEdge = false) {
-      iterator ii, ei = edges.end();
+    iterator find(gNode* N) {
       if (SortedNeighbors) {
-        assert(std::is_sorted(edges.begin(), edges.end(), 
-                              [=] (const EdgeInfo& e1, const EdgeInfo& e2) 
-                                  { return e1.first() < e2.first(); }
-                             )
-              );
-        ii = std::lower_bound(edges.begin(), edges.end(), N,
-                              first_lt<gNode*>());
-      } else {
-        ii = edges.begin();
+        iterator ei = edges.end();
+        iterator ii = std::lower_bound(edges.begin(), ei, N,
+                                       first_lt<gNode*>());
+        first_eq_and_valid<gNode*> checker(N);
+        return (ii == ei || checker(*ii)) ? ii : ei;
       }
-
-      first_eq_and_valid<gNode*> checker(N);
-      ii = std::find_if(ii, ei, checker);
-      while(ii != ei && ii->isInEdge() != inEdge) {
-        ++ii;
-        ii = std::find_if(ii, ei, checker);
-      };
-      return ii;
+      else
+        return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
     void resizeEdges(size_t size) {
@@ -390,7 +379,7 @@ private:
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
-  typedef Galois::InsertBag<gNode> NodeListTy;
+  typedef Galois::Runtime::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
   FirstGraphImpl::EdgeFactory<EdgeTy> edgesF;
@@ -433,7 +422,7 @@ public:
   typedef boost::transform_iterator<makeGraphNode,
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
-  typedef LargeArray<GraphNode> ReadGraphAuxData;
+  typedef Runtime::LargeArray<GraphNode> ReadGraphAuxData;
 
 private:
   template<typename... Args>
@@ -476,11 +465,11 @@ private:
     return boost::make_filter_iterator(is_out_edge(), ii, src->end());
   }
 
-  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = Runtime::LargeArray<EdgeTy>::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
-    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
-    typedef LargeArray<EdgeTy> ED;
+    typedef typename Runtime::LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef Runtime::LargeArray<EdgeTy> ED;
     if (ED::has_value) {
       addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
@@ -488,7 +477,7 @@ private:
     }
   }
 
-  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = Runtime::LargeArray<EdgeTy>::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
     addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
@@ -591,7 +580,7 @@ public:
       EdgeTy* e = dst->second();
       edgesF.delEdge(e);
       src->erase(dst.base());
-      dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
+      dst->first()->erase(src);
     }
   }
 
@@ -783,19 +772,19 @@ public:
     return edge_end(N, mflag);
   } 
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  Runtime::iterable<Runtime::NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
                                                                 typename std::enable_if<!_Undirected>::type* = 0) 
   {
     return detail::make_no_deref_range(in_edge_begin(N, mflag), in_edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  Runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
                                                                 typename std::enable_if<_Undirected>::type* = 0) 
   {
     return edges(N, mflag);
@@ -855,9 +844,9 @@ public:
     return gNode::EdgeInfo::sizeOfSecond();
   }
 
-  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) { 
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux, unsigned numThreads) { 
     size_t numNodes = graph.size();
-    aux.allocateInterleaved(numNodes);
+    aux.allocateInterleaved(numNodes, numThreads);
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
