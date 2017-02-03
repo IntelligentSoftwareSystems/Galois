@@ -1333,8 +1333,8 @@ public:
 #endif
    }
 
-   template<typename FnTy, SyncType syncType, bool identity_offsets = false>
-   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+  template<typename FnTy, SyncType syncType, bool identity_offsets = false>
+  void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
      Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
@@ -1343,6 +1343,19 @@ public:
         else offset = offsets[n];
         size_t lid = indices[offset];
         val_vec[n] = extract_wrapper<FnTy, syncType>(lid);
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+    
+  template<typename FnTy, SyncType syncType, typename SeqTy, bool identity_offsets = false>
+   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq) {
+     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+        gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
      }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
    }
 
@@ -1422,7 +1435,7 @@ public:
    template<typename FnTy, SyncType syncType>
    void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
-     static std::vector<typename FnTy::ValTy> val_vec;
+     static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
@@ -1434,10 +1447,12 @@ public:
        bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, val_vec);
 
        if (!batch_succeeded) {
-         extract_subset<FnTy, syncType, true>(loopName, indices, num, offsets, val_vec);
+         gSerialize(b, onlyData);
+         auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
+         extract_subset<FnTy, syncType, decltype(lseq), true>(loopName, indices, num, offsets, b, lseq);
+       } else {
+         gSerialize(b, onlyData, val_vec);
        }
-
-       gSerialize(b, onlyData, val_vec);
      } else {
        gSerialize(b, noData);
      }
@@ -1974,10 +1989,10 @@ public:
       std::vector<typename FnTy::ValTy> val_vec(numOwned);
       gDeserialize(recv_checkpoint_buf, val_vec);
 
-    if(net.ID == 0 )
-      for(auto k = 0; k < 10; ++k){
-        std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
-      }
+      if(net.ID == 0 )
+        for(auto k = 0; k < 10; ++k){
+          std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
+        }
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
 
           FnTy::setVal(n, getData(n), val_vec[n]);
