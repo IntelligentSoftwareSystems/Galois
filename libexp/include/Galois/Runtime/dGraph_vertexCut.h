@@ -246,7 +246,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         assert(g.size() == GlobalVec_ordered.size());
 
-        for(auto n = 0; n < base_hGraph::numOwned; ++n){
+        for(auto n = 0U; n < base_hGraph::numOwned; ++n){
           auto gid = L2G(n);
           auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
           uint32_t old_lid = ~0;
