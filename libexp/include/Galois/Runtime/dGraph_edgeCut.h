@@ -64,7 +64,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     unsigned getHostID(uint64_t gid) const {
-      for (auto i = 0; i < hostNodes.size(); ++i) {
+      for (auto i = 0U; i < hostNodes.size(); ++i) {
         uint64_t start, end;
         std::tie(start, end) = nodes_by_host_G(i);
         if (gid >= start && gid < end) {
@@ -142,7 +142,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       unsigned lid = ln + base_hGraph::numOwned;
       auto gid = ghostMap[ln];
       bool found = false;
-      for (auto h = 0; h < gid2host.size(); ++h) {
+      for (auto h = 0U; h < gid2host.size(); ++h) {
         auto& p = gid2host[h];
         if (gid >= p.first && gid < p.second) {
           hostNodes[h].first = std::min(hostNodes[h].first, lid);

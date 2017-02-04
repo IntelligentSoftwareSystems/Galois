@@ -80,6 +80,7 @@ class hGraph: public GlobalObject {
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint64_t totalSlaveNodes; // Total slave nodes from others.
+   uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
@@ -295,7 +296,7 @@ public:
              }, Galois::loopname("SLAVE_NODES"), Galois::numrun(get_run_identifier()));
       }
 
-      for(auto x = 0; x < masterNodes.size(); ++x){
+      for(auto x = 0U; x < masterNodes.size(); ++x){
         //masterNodes_bitvec[x].resize(masterNodes[x].size());
         std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
         Galois::Statistic StatMasterNodes(master_nodes_str);
@@ -303,8 +304,10 @@ public:
       }
 
       totalSlaveNodes = 0;
-      for(auto x = 0; x < slaveNodes.size(); ++x){
+      for(auto x = 0U; x < slaveNodes.size(); ++x){
         std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
+        if(x == id)
+          continue;
         Galois::Statistic StatSlaveNodes(slave_nodes_str);
         StatSlaveNodes += slaveNodes[x].size();
         totalSlaveNodes += slaveNodes[x].size();
@@ -496,12 +499,14 @@ public:
       if(x == id)
         continue;
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, totalSlaveNodes);
+      gSerialize(b, totalSlaveNodes, totalOnwedNodes);
       net.sendTagged(x,1,b);
     }
 
     //receive and print
       uint64_t global_total_slave_nodes = totalSlaveNodes;
+      uint64_t global_total_owned_nodes = totalOnwedNodes;
+
       for(unsigned x = 0; x < net.Num; ++x){
         if(x == id)
           continue;
@@ -512,13 +517,21 @@ public:
         }while(!p);
 
         uint64_t total_slave_nodes_from_others;
-        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others);
+        uint64_t total_owned_nodes_from_others;
+        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others, total_owned_nodes_from_others);
         global_total_slave_nodes += total_slave_nodes_from_others;
+        global_total_owned_nodes += total_owned_nodes_from_others;
       }
 
       float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
+
+
+      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes)/(float)global_total_owned_nodes;
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
+
       Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
 
     //may be reusing tag, so need a barrier
@@ -1298,29 +1311,30 @@ public:
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
-   void extract_wrapper(size_t lid, typename FnTy::ValTy &val) {
+   typename FnTy::ValTy extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
-     val = FnTy::extract(lid, getData(lid, d));
+     auto val = FnTy::extract(lid, getData(lid, d));
      FnTy::reset(lid, d);
 #else
-     val = FnTy::extract(lid, getData(lid));
+     auto val = FnTy::extract(lid, getData(lid));
      FnTy::reset(lid, getData(lid));
 #endif
+     return val;
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
-   void extract_wrapper(size_t lid, typename FnTy::ValTy &val) {
+   typename FnTy::ValTy  extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
-     val = FnTy::extract(lid, getData(lid, d));
+     return FnTy::extract(lid, getData(lid, d));
 #else
-     val = FnTy::extract(lid, getData(lid));
+     return FnTy::extract(lid, getData(lid));
 #endif
    }
 
-   template<typename FnTy, SyncType syncType, bool identity_offsets = false>
-   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
+  template<typename FnTy, SyncType syncType, bool identity_offsets = false>
+  void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
      Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
@@ -1328,7 +1342,20 @@ public:
         if (identity_offsets) offset = n;
         else offset = offsets[n];
         size_t lid = indices[offset];
-        extract_wrapper<FnTy, syncType>(lid, val_vec[n]);
+        val_vec[n] = extract_wrapper<FnTy, syncType>(lid);
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+    
+  template<typename FnTy, SyncType syncType, typename SeqTy, bool identity_offsets = false>
+   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq) {
+     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(size), [&](unsigned int n){
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+        size_t lid = indices[offset];
+        gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
      }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
    }
 
@@ -1408,7 +1435,7 @@ public:
    template<typename FnTy, SyncType syncType>
    void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
-     static std::vector<typename FnTy::ValTy> val_vec;
+     static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
@@ -1420,10 +1447,12 @@ public:
        bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, val_vec);
 
        if (!batch_succeeded) {
-         extract_subset<FnTy, syncType, true>(loopName, indices, num, offsets, val_vec);
+         gSerialize(b, onlyData);
+         auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
+         extract_subset<FnTy, syncType, decltype(lseq), true>(loopName, indices, num, offsets, b, lseq);
+       } else {
+         gSerialize(b, onlyData, val_vec);
        }
-
-       gSerialize(b, onlyData, val_vec);
      } else {
        gSerialize(b, noData);
      }
@@ -1960,10 +1989,10 @@ public:
       std::vector<typename FnTy::ValTy> val_vec(numOwned);
       gDeserialize(recv_checkpoint_buf, val_vec);
 
-    if(net.ID == 0 )
-      for(auto k = 0; k < 10; ++k){
-        std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
-      }
+      if(net.ID == 0 )
+        for(auto k = 0; k < 10; ++k){
+          std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
+        }
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numOwned), [&](uint32_t n) {
 
           FnTy::setVal(n, getData(n), val_vec[n]);
