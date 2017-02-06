@@ -78,8 +78,9 @@ public:
             c->disableSrc ();
           }
         },
-        "safety_test_loop",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple(
+          Galois::loopname("safety_test_loop"),
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
   }
 };
 
