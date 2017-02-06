@@ -53,8 +53,12 @@ namespace Runtime {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
-template<class FunctionTy, class RangeTy>
+template<typename FunctionTy, typename RangeTy, typename ArgsTy>
 class DoAllExecutor {
+
+  static const bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
+  static const bool STEAL = get_type_by_supertype<do_all_steal_tag, ArgsTy>::type::value;
+
   typedef typename RangeTy::local_iterator iterator;
   FunctionTy F;
   RangeTy range;
@@ -130,27 +134,28 @@ class DoAllExecutor {
   }
 
 public:
-  DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const char* ln)
-    :F(_F), range(r), loopname(ln)
+  DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const ArgsTy& args)
+    :
+      F(_F), 
+      range(r), 
+      loopname(get_by_supertype<loopname_tag>(args).getValue())
   {
-    reportLoopInstance(loopname);
+    if (!combineStats) {
+      reportLoopInstance(loopname);
+    }
   }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
     iterator end = range.local_end();
-    int minSteal = std::distance(begin,end) / 8;
-    state& tld = *TLDS.getLocal();
 
-    tld.populateSteal(begin,end);
+    if (!STEAL) {
+        while (begin != end) {
+          F(*begin++);
+        }
+    } else {
 
-    do {
-      while (begin != end)
-        F(*begin++);
-    } while (trySteal(tld, begin, end, minSteal));
-  }
-};
 
 template<typename RangeTy, typename FunctionTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
@@ -163,10 +168,32 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname
         auto begin = range.local_begin();
         auto end = range.local_end();
         while (begin != end)
-          f_cpy(*begin++);
+          F(*begin++);
       });
+    }
   }
-}
+};
+
+// template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+// void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+
+//   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+//   Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+
+
+//   // if (steal) {
+//     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
+//     // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+//   // } else {
+//     // FunctionTy f_cpy (f);
+//     // Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+//         // auto begin = range.local_begin();
+//         // auto end = range.local_end();
+//         // while (begin != end)
+//           // f_cpy(*begin++);
+//       // });
+//   // }
+// }
 
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
@@ -179,10 +206,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
         std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
         std::make_tuple(loopname{}, do_all_steal<>{})));
 
-  do_all_impl(
-      r, fn,
-      get_by_supertype<loopname_tag>(dtpl).getValue(),
-      get_by_supertype<do_all_steal_tag>(dtpl).getValue());
+  do_all_impl( r, fn, dtpl);
 }
 
 

@@ -1,4 +1,6 @@
 #include "dependTest.h"
 
 
-const FP OrderDepTest::V_MAX = 30.0;
+namespace cll = llvm::cl;
+cll::opt<unsigned>   vmaxFactor("vmax", cll::desc("upper bound on the velocity as a multiple of maximum initial velocity"), cll::init(5));
+

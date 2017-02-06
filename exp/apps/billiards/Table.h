@@ -35,6 +35,7 @@
 #include <ctime>
 
 #include "FPutils.h"
+#include "DefaultValues.h"
 #include "GeomUtils.h"
 #include "Cushion.h"
 #include "Ball.h"
@@ -49,13 +50,6 @@ template <typename B>
 class Table {
 
 public:
-  struct DefaultValues {
-    static const FP BALL_MASS;
-    static const FP BALL_RADIUS;
-    static const FP MIN_SPEED;
-    static const FP MAX_SPEED;
-  };
-
   using Ball_t = B;
 
   using SerialFlatTable = Table<Ball>;
@@ -801,14 +795,14 @@ protected:
   }
 };
 
-template <typename B>
-const FP Table<B>::DefaultValues::BALL_MASS = 1.0;
-template <typename B>
-const FP Table<B>::DefaultValues::BALL_RADIUS = 1.0;
-
-template <typename B>
-const FP Table<B>::DefaultValues::MIN_SPEED = 1.0;
-template <typename B>
-const FP Table<B>::DefaultValues::MAX_SPEED = 10.0;
-
+// template <typename B>
+// const FP Table<B>::DefaultValues::BALL_MASS = 1.0;
+// template <typename B>
+// const FP Table<B>::DefaultValues::BALL_RADIUS = 1.0;
+// 
+// template <typename B>
+// const FP Table<B>::DefaultValues::MIN_SPEED = 1.0;
+// template <typename B>
+// const FP Table<B>::DefaultValues::MAX_SPEED = 10.0;
+// 
 #endif //  _TABLE_H_

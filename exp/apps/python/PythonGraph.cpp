@@ -3,16 +3,6 @@
 #include <iostream>
 
 /*************************************
- * Node manipulation 
- *************************************/
-Node::~Node() {
-  using vector_type = std::vector<GNode>;
-  if(3 == mode) {
-    vVec.~vector_type();
-  }
-}
-
-/*************************************
  * APIs for PythonGraph
  *************************************/
 Graph *createGraph() {

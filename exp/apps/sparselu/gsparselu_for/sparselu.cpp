@@ -443,7 +443,7 @@ struct Bmod {
 };
 
 struct FwdBdivBmod {
-  enum { LU0, FWD, BDIV, BMOD };
+  enum { LU0=0, FWD=1, BDIV=2, BMOD=3 };
 
   struct Task {
     int type;
@@ -461,7 +461,7 @@ struct FwdBdivBmod {
       // Lexicographic (kk, type, arg0, arg1)
       if (t1.kk == t2.kk)
         if (t1.type == t2.type)
-          if (t1.arg0 == t2.arg1)
+          if (t1.arg0 == t2.arg0)
             return t1.arg1 < t2.arg1;
           else
             return t1.arg0 < t2.arg0;

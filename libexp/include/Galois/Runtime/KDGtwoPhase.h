@@ -79,7 +79,6 @@ public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
-  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
 
 
@@ -101,33 +100,8 @@ protected:
     }
   };
 
-  struct WindowWLwrapper: public WindowWL {
-    IKDGtwoPhaseExecutor& outer;
 
-    WindowWLwrapper (IKDGtwoPhaseExecutor& outer, const Cmp& cmp):
-      WindowWL (cmp), outer (outer) {}
-
-    void push (const T& x) {
-      WindowWL::push (x);
-    }
-
-    // TODO: complete this class
-    void push (Ctxt* c) {
-      assert (c);
-
-      WindowWL::push (c->getActive ());
-
-      // destroy and deallocate c
-      outer.ctxtAlloc.destroy (c);
-      outer.ctxtAlloc.deallocate (c, 1);
-    }
-
-    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
-      WindowWL::poll (wl, newSize, origSize, outer.ctxtMaker);
-    }
-  };
-
-  WindowWLwrapper winWLwrapper;
+  typename Base::template WindowWLwrapper<IKDGtwoPhaseExecutor> winWL;
   CtxtMaker ctxtMaker;
 
 
@@ -140,7 +114,7 @@ public:
       const ArgsTuple& argsTuple)
     :
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
-      winWLwrapper (*this, cmp),
+      winWL (*this, cmp),
       ctxtMaker {*this}
   {
   }
@@ -159,6 +133,10 @@ public:
     reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
   }
 
+  CtxtMaker& getCtxtMaker(void) {
+    return ctxtMaker;
+  }
+
   template <typename R>
   void push_initial (const R& range) {
     if (Base::targetCommitRatio == 0.0) {
@@ -173,7 +151,7 @@ public:
 
 
     } else {
-      winWLwrapper.initfill (range);
+      winWL.initfill (range);
           
     }
   }
@@ -278,8 +256,8 @@ protected:
     Galois::optional<T> minElem;
 
     if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWLwrapper.empty ()) {
-        minElem = *winWLwrapper.getMin();
+      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
+        minElem = *winWL.getMin();
       }
     }
 
@@ -291,9 +269,10 @@ protected:
           typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
           uhand.reset ();
 
-          if (c->isSrc ()) {
+          if (Base::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
             // opFunc (c->active, uhand);
-            if (Base::OPERATOR_CAN_ABORT) {
+            if (Base::NEEDS_CUSTOM_LOCKING) {
+              c->enableSrc();
               runCatching (Base::opFunc, c, uhand);
               commit = c->isSrc (); // in case opFunc signalled abort
 
@@ -316,7 +295,7 @@ protected:
                   // if *i >= *minElem
                   Base::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
-                  winWLwrapper.push (*i);
+                  winWL.push (*i);
                 } 
               }
             } else {
@@ -340,34 +319,37 @@ protected:
 
   void execute_impl () {
 
+    StatTimer t ("executorLoop");
+    t.start();
+
     while (true) {
-      Base::beginRound (winWLwrapper);
+      Base::t_beginRound.start();
+      Base::beginRound (winWL);
 
       if (Base::getCurrWL ().empty_all ()) {
         break;
       }
+      Base::t_beginRound.stop();
 
       Timer t;
 
-      if (DETAILED_STATS) {
-        std::printf ("trying to execute %zd elements\n", Base::getCurrWL ().size_all ());
-        t.start ();
-      }
-
+      Base::t_expandNhood.start();
       expandNhood ();
+      Base::t_expandNhood.stop();
 
+      Base::t_executeSources.start();
       executeSources ();
+      Base::t_executeSources.stop();
 
+      Base::t_applyOperator.start();
       applyOperator ();
+      Base::t_applyOperator.stop();
 
       endRound ();
-
-      if (DETAILED_STATS) {
-        t.stop ();
-        std::printf ("Time taken: %ld\n", t.get ());
-      }
       
     }
+
+    t.stop();
   }
   
 };

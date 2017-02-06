@@ -102,6 +102,34 @@ protected:
   using Base = OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
   using CtxtWL = typename Base::CtxtWL;
 
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, SetWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+
+  template <typename Outer>
+  struct WindowWLwrapper: public WindowWL {
+    Outer& outer;
+
+    WindowWLwrapper (Outer& outer, const Cmp& cmp):
+      WindowWL (cmp), outer (outer) {}
+
+    void push (const T& x) {
+      WindowWL::push (x);
+    }
+
+    // TODO: complete this class
+    void push (Ctxt* c) {
+      assert (c);
+
+      WindowWL::push (c->getActive ());
+
+      // destroy and deallocate c
+      outer.ctxtAlloc.destroy (c);
+      outer.ctxtAlloc.deallocate (c, 1);
+    }
+
+    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
+      WindowWL::poll (wl, newSize, origSize, outer.getCtxtMaker());
+    }
+  };
 
   std::unique_ptr<CtxtWL> currWL;
   std::unique_ptr<CtxtWL> nextWL;
@@ -115,6 +143,16 @@ protected:
 
   GAccumulator<size_t> roundTasks;;
   GAccumulator<size_t> roundCommits;
+
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_expandNhood;
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
+  TimeAccumulator t_reclaimMemory;
+
+
 
   IKDGbase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
@@ -163,6 +201,13 @@ protected:
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 
+    reportStat ("(NULL)", "t_expandNhood",    t_expandNhood.get(),0);
+    reportStat ("(NULL)", "t_beginRound",     t_beginRound.get(),0);
+    reportStat ("(NULL)", "t_executeSources", t_executeSources.get(),0);
+    reportStat ("(NULL)", "t_applyOperator",  t_applyOperator.get(),0);
+    reportStat ("(NULL)", "t_serviceAborts",  t_serviceAborts.get(),0);
+    reportStat ("(NULL)", "t_performCommits", t_performCommits.get(),0);
+    reportStat ("(NULL)", "t_reclaimMemory",  t_reclaimMemory.get(),0);
   }
 
   //  TODO: spill range 
@@ -265,6 +310,7 @@ protected:
   template <typename WinWL, typename WL>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void refillRound (WinWL& winWL, WL& wl) {
 
+
     if (targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
       size_t prevWindowSize = roundTasks.reduceRO ();
@@ -287,6 +333,13 @@ protected:
     ++rounds;
     totalCommits += roundCommits.reduceRO ();
     totalTasks += roundTasks.reduceRO ();
+
+    if (roundTasks.reduceRO () > 0) {
+      assert (roundCommits.reduceRO() > 0 && "No commits this round, No progress");
+    }
+
+    // std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
+        // rounds, roundTasks.reduceRO (), roundCommits.reduceRO ());
   }
 
   // TODO: for debugging only
@@ -305,7 +358,7 @@ protected:
           }
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMinCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
@@ -337,7 +390,7 @@ protected:
           } 
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMaxCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;

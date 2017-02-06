@@ -22,6 +22,10 @@ class NodePair(Structure):
   _fields_ = [("nQ", Node),
               ("nD", Node)]
 
+class NodeDouble(Structure):
+  _fields_ = [("n", Node),
+              ("v", c_double)]
+
 #glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
 glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
 #glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
@@ -49,6 +53,10 @@ glib.searchSubgraphUllmann.restype = POINTER(NodePair)
 glib.searchSubgraphUllmann.argtypes = [GraphPtr, GraphPtr, c_int]
 glib.searchSubgraphVF2.restype = POINTER(NodePair)
 glib.searchSubgraphVF2.argtypes = [GraphPtr, GraphPtr, c_int]
+glib.deleteGraphMatches.argtypes = [POINTER(NodePair)]
+glib.analyzePagerank.restype = POINTER(NodeDouble)
+glib.analyzePagerank.argtypes = [GraphPtr, c_int, c_double, KeyTy]
+glib.deleteNodeDoubles.argtypes = [POINTER(NodeDouble)]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -143,8 +151,22 @@ class GaloisGraph(object):
     glib.deleteGraphMatches(matches)
     return result
 
+  def analyzePagerank(self, topK, tolerance, attr, numThreads):
+    print "=====", "analyzePagerank", "====="
+    self.showStatistics()
+    glib.setNumThreads(numThreads)
+    pr = glib.analyzePagerank(self.graph, topK, tolerance, attr)
 
-if __name__ == "__main__":
+    result = {}
+    for i in range(topK):
+      n = pr[i].n
+      if n != None:
+        result[self.inverseNodeMap[n]] = pr[i].v
+
+    glib.deleteNodeDoubles(pr)
+    return result
+
+def test():
   g = GaloisGraph("g")
 
   g.addNode("n0")
@@ -207,6 +229,12 @@ if __name__ == "__main__":
   pprint.pprint(g.searchSubgraph(g2, 10, 3, "Ullmann"))
   pprint.pprint(g.searchSubgraph(g2, 10, 3, "VF2"))
 
-  del g
   del g2
+
+  pprint.pprint(g.analyzePagerank(10, 0.01, "pagerank", 2))
+
+  del g
+
+if __name__ == "__main__":
+  test()
 

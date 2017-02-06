@@ -85,12 +85,14 @@ public:
 
   void add (const Ctxt* ctxt) {
 
-    // assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
+    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
     sharers.push (const_cast<Ctxt*> (ctxt));
   }
 
   bool isHighestPriority (const Ctxt* ctxt) const {
-    return !sharers.empty () && (sharers.top () == ctxt);
+    assert (ctxt);
+    assert (!sharers.empty ());
+    return (sharers.top () == ctxt);
   }
 
   Ctxt* getHighestPriority () const {
@@ -132,18 +134,19 @@ public:
   // TODO: fix visibility below
 public:
   // FIXME: nhood should be a set instead of list
-  NhoodList nhood;
+  // AtomicBool onWL;
   NhoodMgr& nhmgr;
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
+  NhoodList nhood;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
+  AtomicBool onWL;
 
 public:
 
   KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
     : 
       OrderedContextBase<T> (active), // to make acquire call virtual function sub_acquire
-      nhood (), 
-      nhmgr (nhmgr), 
-      onWL (false) 
+      nhmgr (nhmgr),
+      onWL (false)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -160,13 +163,9 @@ public:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
-    assert (!nhood.empty ()); // TODO: remove later
-
     bool ret = true;
 
-    for (auto n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
-
+    for (auto n = nhood.begin () , endn = nhood.end (); n != endn; ++n) {
       if (!(*n)->isHighestPriority (this)) {
         ret = false;
         break;
@@ -336,7 +335,7 @@ protected:
 
     KDGaddRemAsyncExec& exec;
     WinWL& winWL;
-    const T* minWinWL;
+    const Galois::optional<T>& minWinWL;
     Accumulator& nsrc;
     Accumulator& ntotal;;
 
@@ -520,9 +519,10 @@ public:
     // TODO: code to find global min goes here
 
     DummyWinWL winWL;
+    Galois::optional<T> minWinWL; // should remain uninitialized 
 
     t_for.start ();
-    applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, nullptr, nsrc, nInitCtxt});
+    applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
     t_for.stop ();
 
     reportStat (Base::loopname, "Number of iterations: ", nsrc.reduce (), 0);
@@ -564,7 +564,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
   void applyOperator (void) {
 
-    const T* minWinWL = nullptr;
+    Galois::optional<T> minWinWL;
 
     if (Base::NEEDS_PUSH && Base::targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin ();
@@ -653,6 +653,8 @@ void for_each_ordered_ar_impl (const R& range, const Cmp& cmp, const NhFunc& nhF
   typedef typename Ctxt::CtxtCmp  CtxtCmp;
 
   using Exec =  Executor<T, Cmp, NhFunc, OpFunc, ST, ArgsT, Ctxt>;
+
+  std::cout << "sizeof(KDGaddRemContext) == " << sizeof(Ctxt) << std::endl;
 
   CtxtCmp ctxtcmp (cmp);
   typename NItem::Factory factory(ctxtcmp);

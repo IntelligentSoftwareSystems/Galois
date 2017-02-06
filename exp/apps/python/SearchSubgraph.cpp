@@ -58,9 +58,6 @@ struct VF2Algo {
   public:
     void operator()(const GNode nQ) const {
       auto& dQ = gQ.getData(nQ);
-
-      dQ.mode = 3; // set to use vVec
-      dQ.vVec.clear();
       
       for(auto nD : gD) {
         auto& dD = gD.getData(nD);
@@ -401,9 +398,6 @@ struct UllmannAlgo {
     void operator()(const GNode nQ) const {
       auto& dQ = gQ.getData(nQ);
 
-      dQ.mode = 3; // set to use vVec
-      dQ.vVec.clear();
-
       for(auto nD : gD) {
         auto& dD = gD.getData(nD);
 
@@ -611,6 +605,29 @@ NodePair *reportMatchings(MatchingVector& report, size_t size) {
   return result;
 }
 
+void constructNodeVec(Graph& gQ) {
+  using vector_type = std::vector<GNode>;
+  Galois::do_all_local(
+    gQ, 
+    [&gQ] (const GNode n) {
+      // placement new
+      new (&(gQ.getData(n).vVec)) vector_type();
+    }, 
+    Galois::do_all_steal<true>()
+  );
+}
+
+void destructNodeVec(Graph& gQ) {
+  using vector_type = std::vector<GNode>;
+  Galois::do_all_local(
+    gQ, 
+    [&gQ] (const GNode n) {
+      gQ.getData(n).vVec.~vector_type();
+    }, 
+    Galois::do_all_steal<true>()
+  );
+}
+
 template<typename Algo>
 NodePair *run(Graph& gD, Graph& gQ) {
   Algo algo;
@@ -618,6 +635,7 @@ NodePair *run(Graph& gD, Graph& gQ) {
 
   gD.sortAllEdgesByDst();
   gQ.sortAllEdgesByDst();
+  constructNodeVec(gQ);
 
   Galois::StatTimer T;
   T.start();
@@ -630,6 +648,7 @@ NodePair *run(Graph& gD, Graph& gQ) {
   if(isSomeNodeUnmatched) {
     T.stop();
     std::cout << "Some nodes have no candidates to match." << std::endl;
+    destructNodeVec(gQ);
     return (new NodePair [gQ.size()*kFound] ());
   }
 
@@ -646,6 +665,7 @@ NodePair *run(Graph& gD, Graph& gQ) {
       verifyMatching(m, gD, gQ);
     std::cout << "Verification succeeded" << std::endl;
   }
+  destructNodeVec(gQ);
   return reportMatchings(report, gQ.size()*kFound);
 }
 

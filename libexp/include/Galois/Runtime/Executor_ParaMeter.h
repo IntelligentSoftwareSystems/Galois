@@ -58,6 +58,7 @@ namespace Galois {
 namespace Runtime {
 
   extern llvm::cl::opt<bool> useParaMeterOpt;
+
 namespace ParaMeter {
 
 struct StepStats {

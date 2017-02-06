@@ -199,6 +199,9 @@ private:
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
+    Galois::preAlloc ((Galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/Galois::Runtime::pagePoolSize());
+    Galois::reportPageAlloc("MeminfoPre");
+
     Galois::StatTimer timer;
 
     timer.start ();
@@ -206,6 +209,7 @@ private:
     size_t numEvents = static_cast<Derived*> (this)->runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
     Galois::Runtime::endSampling ();
     timer.stop ();
+    Galois::reportPageAlloc("MeminfoPost");
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
 

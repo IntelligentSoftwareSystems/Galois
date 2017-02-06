@@ -35,13 +35,14 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
     [=] (GNode n) 
       {
         auto& data = (*g).getData(n); 
-        data.mode = 0; 
         data.ID.vInt = DIST_INFINITY;
       }
     );
 
   g->getData(src).ID.vInt = 0;
   Galois::for_each(src, BFS{*g});
+
+  T.stop();
 
   Galois::do_all_local(
     *g, 
@@ -51,7 +52,4 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
         data.attr[result] = (DIST_INFINITY == data.ID.vInt) ? "INFINITY" : std::to_string(data.ID.vInt);
       }
     );
-
-  T.stop();
 }
-

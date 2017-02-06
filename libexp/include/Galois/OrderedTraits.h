@@ -14,9 +14,9 @@ struct has_exec_function_tag {};
 template <typename T=bool>
 struct has_exec_function: public trait_has_type<T>, has_exec_function_tag {};
 
-struct operator_can_abort_tag {};
+struct needs_custom_locking_tag {};
 template <typename T=bool>
-struct operator_can_abort: public trait_has_type<T>, operator_can_abort_tag {};
+struct needs_custom_locking: public trait_has_type<T>, needs_custom_locking_tag {};
 
 
 

@@ -36,8 +36,8 @@
 #include <set>
 #include "Galois/Graphs/LC_InlineEdge_Graph.h"
 
-#define GALOIS_USE_MIC_CSR_IMPL
-// #undef GALOIS_USE_MIC_CSR_IMPL
+// #define GALOIS_USE_MIC_CSR_IMPL
+#undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
   #include "Galois/Graphs/LC_CSR_MIC_Graph.h"
@@ -252,7 +252,7 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    Galois::preAlloc (Galois::getActiveThreads () + 24*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
+    Galois::preAlloc ((Galois::getActiveThreads () * 10 * graph.sizeEdges ())/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();

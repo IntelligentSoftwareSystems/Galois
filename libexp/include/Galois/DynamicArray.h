@@ -30,7 +30,11 @@
 #ifndef GALOIS_DYNAMIC_ARRAY_H
 #define GALOIS_DYNAMIC_ARRAY_H
 
+#include <cassert>
+
 #include <boost/noncopyable.hpp>
+#include <vector>
+
 
 namespace Galois {
 

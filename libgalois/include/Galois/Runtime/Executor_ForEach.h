@@ -170,6 +170,7 @@ public:
   static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+  static const bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type; 

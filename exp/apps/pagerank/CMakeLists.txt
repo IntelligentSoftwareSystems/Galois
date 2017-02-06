@@ -7,6 +7,6 @@ app(PageRankChromatic PageRankChromatic.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP
 #app(PageRankIKDG PageRankIKDG.cpp EXP_OPT)
 app(PageRankKDG PageRankKDG.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP_OPT)
 
-app(PageRankAlamere PageRankAlamere.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP_OPT)
+app(PageRankAlamere PageRankAlamere.cpp EXP_OPT)
 
 app(PageRankSet PageRankSet.cpp)

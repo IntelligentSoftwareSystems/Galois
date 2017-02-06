@@ -40,7 +40,7 @@
 namespace Galois {
 namespace Runtime {
 
-using dbg = Galois::Substrate::debug<0>;
+using dbg = Galois::Substrate::debug<1>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
@@ -120,6 +120,10 @@ public:
     source = true;
   }
 
+  void enableSrc (void) {
+    source = true;
+  }
+
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
 
@@ -183,6 +187,9 @@ public:
     // } // end outer if
   } // end subAcquire
 
+  virtual bool owns (Lockable* l, MethodFlag m) const {
+    return (static_cast<TwoPhaseContext*> (Base::getOwner(l)) == this);
+  }
 
 
 };
@@ -315,17 +322,15 @@ public:
   }
 
 protected:
-  struct Reset {
-    PtrBasedNhoodMgr* self; 
-    void operator()(NItem* ni) const {
-      ni->clearMapping();
-      self->destroy(ni);
-    }
-  };
-
   void resetAllNItems() {
-    Reset fn {this};
-    do_all_impl(makeLocalRange(allNItems), fn);
+    do_all_choice(makeLocalRange(allNItems), 
+        [this] (NItem* ni) {
+          ni->clearMapping();
+          destroy(ni);
+        },
+        std::make_tuple (
+          Galois::loopname ("resetNItems"), 
+          Galois::chunk_size<16>()));
   }
 };
 
@@ -419,7 +424,7 @@ template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename O
 class OrderedExecutorBase {
 protected:
 
-  static const bool OPERATOR_CAN_ABORT = exists_by_supertype<operator_can_abort_tag, ArgsTuple>::value;
+  static const bool NEEDS_CUSTOM_LOCKING = exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
   static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value 
     || !std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value;
 
@@ -457,6 +462,7 @@ protected:
     if (!loopname) { loopname = "Ordered"; }
   }
 
+public:
   const Cmp& getItemCmp () const { return cmp; }
 
   const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
