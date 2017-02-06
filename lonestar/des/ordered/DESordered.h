@@ -37,7 +37,7 @@
 #include "Galois/Galois.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/LCordered.h"
+#include "Galois/Runtime/KDGaddRem.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
@@ -250,13 +250,15 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_lc (
+    Galois::Runtime::for_each_ordered_ar (
         Galois::Runtime::makeStandardRange(
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
-        ReadyTest (sobjInfoVec), "des_main_loop");
+        ReadyTest (sobjInfoVec), 
+        std::make_tuple(
+          Galois::loopname("des_main_loop")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;
