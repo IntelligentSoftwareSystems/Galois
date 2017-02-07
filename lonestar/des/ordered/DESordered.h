@@ -56,15 +56,15 @@ namespace des_ord {
 
 typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
-typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
+typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
 
 
-struct SimObjInfo: public TypeHelper {
+struct SimObjInfo: public TypeHelper<> {
 
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   GNode node;
@@ -137,10 +137,12 @@ struct SimObjInfo: public TypeHelper {
 
 
 class DESordered: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct NhoodVisitor {
     typedef int tt_has_fixed_neighborhood;
+
+    static const unsigned CHUNK_SIZE = 4;
 
     Graph& graph;
     VecSobjInfo& sobjInfoVec;
@@ -204,7 +206,11 @@ class DESordered:
       nevents += 1;
       newEvents.get ().clear ();
 
-      recvObj->execEvent (event, graph, recvInfo.node, newEvents.get ());
+      auto addNewEvents = [this] (const Event_ty& e) {
+        newEvents.get().push_back(e);
+      };
+
+      recvObj->execEvent (event, graph, recvInfo.node, addNewEvents);
 
       for (AddList_ty::local_iterator a = newEvents.get ().begin ()
           , enda = newEvents.get ().end (); a != enda; ++a) {

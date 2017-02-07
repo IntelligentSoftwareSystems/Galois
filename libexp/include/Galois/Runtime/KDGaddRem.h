@@ -249,7 +249,7 @@ struct SourceTest {
   template <typename Ctxt>
   bool operator () (const Ctxt* ctxt) const {
     assert (ctxt != NULL);
-    return ctxt->isSrc () && stabilityTest (ctxt->active);
+    return ctxt->isSrc () && stabilityTest (ctxt->getActive());
   }
 };
 
