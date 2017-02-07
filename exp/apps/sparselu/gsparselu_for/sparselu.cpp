@@ -608,11 +608,13 @@ static void ikdg_algo(float **BENCH)
   Galois::setDoAllImpl (Galois::DOALL_COUPLED);
   if (Galois::getDoAllImpl () != Galois::DOALL_COUPLED) { std::abort (); }
 
-  Galois::Runtime::for_each_ordered_2p_win(
+  Galois::Runtime::for_each_ordered_ikdg(
       Galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
       FwdBdivBmod::Comparator { },
       FwdBdivBmod::NeighborhoodVisitor { BENCH },
-      FwdBdivBmod::Process { BENCH });
+      FwdBdivBmod::Process { BENCH },
+      std::make_tuple(
+        Galois::loopname("sparselu-ikdg")));
 }
 
 void sparselu_par_call(float **BENCH)

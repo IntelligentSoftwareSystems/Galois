@@ -55,7 +55,7 @@
 
 class BilliardsPOsortedVec;
 
-class BilliardsPOunsorted: public Billiards {
+class BilliardsPOunsorted: public Billiards<BilliardsPOunsorted, Table<Ball> > {
 
   typedef Galois::Markable<Event> MEvent;
   typedef Galois::PerThreadVector<MEvent> WLTy;
@@ -64,6 +64,8 @@ class BilliardsPOunsorted: public Billiards {
   typedef Galois::PerThreadVector<Event> AddListTy;
 
   friend class BilliardsPOsortedVec;
+
+  using Tbl_t = Table<Ball>;
 
 
 public:
@@ -74,9 +76,9 @@ public:
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::ThreadPool::getThreadPool().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -85,14 +87,15 @@ public:
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
-        "fill_init",
-        Galois::chunk_size<32> ());
+        std::make_tuple(
+          Galois::loopname("fill_init"),
+          Galois::chunk_size<32> ()));
 
 
     size_t i = runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
 
-    Galois::Substrate::getThreadPool ().beKind ();
+    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
 
     return i;
   }
@@ -112,7 +115,7 @@ GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, cons
 
 template <typename _FindIndepFunc, typename _SimulateFunc,
           typename _AddNextFunc, typename _CleanupFunc>
-static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, bool enablePrints=false) {
+static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, bool enablePrints=false) {
     // TODO: Explain separation of simulating events and adding
     // new events
 
@@ -138,7 +141,9 @@ static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, b
       findTimer.start ();
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
-          "find_indep_events", Galois::chunk_size<1> ());
+          std::make_tuple(
+            Galois::loopname("find_indep_events"), 
+            Galois::chunk_size<1> ()));
 
       findTimer.stop ();
 
@@ -155,7 +160,9 @@ static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, b
       // Galois::Runtime::do_all_coupled (indepList, 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (indepList), 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), 
-          "add_next_events", Galois::chunk_size<1> ());
+          std::make_tuple(
+            Galois::loopname("add_next_events"), 
+            Galois::chunk_size<1> ()));
       addTimer.stop ();
 
 
@@ -166,7 +173,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, b
 
       ++currStep;
       iter += indepList.size_all ();
-      indepList.clear_all ();
+      indepList.clear_all_parallel ();
 
     } 
 
@@ -203,6 +210,8 @@ private:
     unsigned currStep;
     Accumulator& findIter;
 
+    OrderDepTest dt;
+
     FindIndepEvents (
         ILTy& _indepList,
         WLTy& _workList,
@@ -235,7 +244,7 @@ private:
               // >= is used to eliminate duplicate events and different events with same
               // time but a common object between them
 
-              if (OrderDepTest::dependsOn (e, *i)) {
+              if (dt.dependsOn (e, *i)) {
                 indep = false;
                 break;
               }
@@ -274,14 +283,14 @@ private:
 
     WLTy& workList;
     AddListTy& addList;
-    Table& table;
+    Tbl_t& table;
     const FP& endtime;
     bool enablePrints;
 
     AddNextEvents (
         WLTy& _workList,
         AddListTy& _addList,
-        Table& _table,
+        Tbl_t& _table,
         const FP& _endtime,
         bool _enablePrints)
       :
@@ -356,11 +365,13 @@ private:
 };
 
 
-class BilliardsPOsortedVec: public Billiards {
+class BilliardsPOsortedVec: public Billiards<BilliardsPOsortedVec, Table<Ball> > {
 
   typedef BilliardsPOunsorted::MEvent MEvent;
   typedef BilliardsPOunsorted::WLTy WLTy;
   typedef BilliardsPOunsorted::ILTy ILTy;
+
+  using Tbl_t = Table<Ball>;
 
 public:
 
@@ -368,9 +379,9 @@ public:
 
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -379,7 +390,9 @@ public:
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
-        "fill_init", Galois::chunk_size<32> ());
+        std::make_tuple(
+          Galois::loopname("fill_init"), 
+          Galois::chunk_size<32> ()));
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
@@ -401,7 +414,7 @@ public:
            BilliardsPOunsorted::AddNextEvents, RemoveAndSortEvents> 
              (table, workList, endtime, enablePrints);
 
-    Galois::Substrate::getThreadPool ().beKind ();
+    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
 
     return i;
   }
@@ -413,6 +426,8 @@ private:
     WLTy& workList;
     unsigned currStep;
     Accumulator& findIter;
+
+    OrderDepTest dt;
 
     FindIndepEvents (
         ILTy& _indepList,
@@ -439,7 +454,7 @@ private:
 
             if (!i->marked () || (i->version () >= currStep))  {
 
-              if (OrderDepTest::dependsOn (e, *i)) {
+              if (dt.dependsOn (e, *i)) {
                 indep = false;
                 break;
               }
