@@ -85,9 +85,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     //return a (moved) vector if the len bytes requested are the last len bytes of the front of the buffer queue
-    optional_t<std::vector<uint8_t> > popVec(uint32_t len) {
+    optional_t<mv_vector<uint8_t> > popVec(uint32_t len) {
       if (data[0].data.size() == frontOffset + len) {
-        std::vector<uint8_t> retval(std::move(data[0].data));
+        mv_vector<uint8_t> retval(std::move(data[0].data));
         data.pop_front();
         frontOffset = 0;
         if (data.size()) {
@@ -95,12 +95,12 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         } else {
           dataPresent = ~0;
         }
-        return optional_t<std::vector<uint8_t> >(std::move(retval));
+        return optional_t<mv_vector<uint8_t> >(std::move(retval));
       } else {
-        return optional_t<std::vector<uint8_t> >();
+        return optional_t<mv_vector<uint8_t> >();
       }
     }
-    
+
     void erase(size_t n) {
       frontOffset += n;
       while (frontOffset && frontOffset >= data.front().data.size()) {
@@ -141,7 +141,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         //        std::cerr << "FP " << r->size() << " " << len << " " << start << "\n";
         return optional_t<RecvBuffer>(RecvBuffer(std::move(*r), start));
       }
-        
+
       RecvBuffer buf(len);
       //FIXME: This is slows things down 25%
       copyOut((char*)buf.linearData(), len);
@@ -172,22 +172,22 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     bool hasData(uint32_t tag) {
       return dataPresent == tag;
     }
-    
+
     uint32_t getPresentTag(){
       return dataPresent;
     }
 
   };
 
-  std::vector<recvBuffer> recvData;
+  mv_vector<recvBuffer> recvData;
   std::vector<SimpleLock> recvLock;
 
 
-  class sendBuffer { 
+  class sendBuffer {
     struct msg {
       uint32_t tag;
-      std::vector<uint8_t> data;
-      msg(uint32_t t, std::vector<uint8_t>& _data) :tag(t), data(std::move(_data)) {
+      mv_vector<uint8_t> data;
+      msg(uint32_t t, mv_vector<uint8_t>& _data) :tag(t), data(std::move(_data)) {
       }
     };
 
@@ -232,13 +232,13 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         ++statSendTimeout;
         return true;
       }
-      return false;      
+      return false;
     }
 
-    std::pair<uint32_t, std::vector<uint8_t> > assemble() {
+    std::pair<uint32_t, mv_vector<uint8_t> > assemble() {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
-        return std::make_pair(~0, std::vector<uint8_t>());
+        return std::make_pair(~0, mv_vector<uint8_t>());
       //compute message size
       uint32_t len = 0;
       int num = 0;
@@ -253,7 +253,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
       lg.unlock();
       //construct message
-      std::vector<uint8_t> vec;
+      mv_vector<uint8_t> vec;
       vec.reserve(len + num);
       //go out of our way to avoid locking out senders when making messages
       lg.lock();
@@ -273,7 +273,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       return std::make_pair(tag, std::move(vec));
     }
 
-    void add(uint32_t tag, std::vector<uint8_t>& b) {
+    void add(uint32_t tag, mv_vector<uint8_t>& b) {
       std::lock_guard<SimpleLock> lg(lock);
       if (messages.empty()) {
         std::lock_guard<SimpleLock> lg(timelock);
@@ -286,14 +286,16 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
   };
-    
-  std::vector<sendBuffer> sendData;
+
+  mv_vector<sendBuffer> sendData;
 
 
-  
+
   void workerThread() {
+    set_me_to_last();
     std::unique_ptr<Galois::Runtime::NetworkIO> netio;
-    std::tie(netio, ID, Num) = makeNetworkIOMPI();
+    // std::tie(netio, ID, Num) = makeNetworkIOMPI();
+    std::tie(netio, ID, Num) = makeNetworkIOMV();
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
@@ -436,7 +438,7 @@ public:
 NetworkInterface& Galois::Runtime::makeNetworkBuffered() {
   static std::atomic<NetworkInterfaceBuffered* > net;
   static Substrate::SimpleLock m_mutex;
-  
+
   auto* tmp = net.load();
   if (tmp == nullptr) {
     std::lock_guard<Substrate::SimpleLock> lock(m_mutex);

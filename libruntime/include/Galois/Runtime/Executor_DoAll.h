@@ -26,7 +26,7 @@
  *
  * @section Description
  *
- * Implementation of the do all loop. Includes various 
+ * Implementation of the do all loop. Includes various
  * specializations to operators to reduce runtime overhead.
  * Doesn't do Galoisish things
  *
@@ -81,7 +81,7 @@ class DoAllExecutor {
   };
   Substrate::PtrLock<msg> head;
   std::atomic<unsigned> waiting;
-  
+
   //return true to continue, false to exit
   bool wait(iterator& b, iterator& e) {
     //else, add ourselves to the queue
@@ -133,7 +133,7 @@ class DoAllExecutor {
     }
     return 0;
   }
-  
+
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const char* ln)
     :F(_F), range(r), loopname(ln), waiting(0)
@@ -143,7 +143,7 @@ public:
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
     iterator end = range.local_end();
-        
+
     unsigned long stat_iterations = 0;
     unsigned long stat_donations = 0;
 
@@ -155,7 +155,7 @@ public:
         stat_donations += tryDonate(begin,end);
       } while (begin != end);
     } while (wait(begin, end));
-    
+
     reportStat(loopname, "Iterations", stat_iterations, Substrate::ThreadPool::getTID());
     reportStat(loopname, "Donations", stat_donations, Substrate::ThreadPool::getTID());
   }
@@ -187,7 +187,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
         std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, numrun{}, do_all_steal<true>{})));
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
