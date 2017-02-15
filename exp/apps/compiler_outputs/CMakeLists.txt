@@ -8,6 +8,11 @@ if(USE_GGC)
   endif()
 endif()
 
+if(USE_EXP_ALGORITHM)
+  add_definitions(-D__GALOIS_EXP_COMMUNICATION_ALGORITHM__)
+  message(STATUS "Using experimental communication algorithm (with PPL)")
+endif()
+
 #if(CMAKE_BUILD_TYPE MATCHES "Debug")
   #add_definitions(-D__GALOIS_SIMULATE_COMMUNICATION__)
   #add_definitions(-D__GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__)
