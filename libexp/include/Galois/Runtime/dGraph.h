@@ -82,6 +82,7 @@ class hGraph: public GlobalObject {
    uint64_t totalSlaveNodes; // Total slave nodes from others.
    uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+   uint32_t total_isolatedNodes; // Calculate the total isolated nodes
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
    const uint32_t numHosts;
@@ -98,8 +99,17 @@ class hGraph: public GlobalObject {
   virtual std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t) const = 0;
   virtual std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t) const = 0;
   virtual unsigned getHostID(uint64_t) const = 0;
+  virtual size_t getOwner_lid(size_t lid) const {
+    auto gid = L2G(lid);
+    return getHostID(gid);
+  }
   virtual bool isOwned(uint64_t) const = 0;
   virtual uint64_t get_local_total_nodes() const = 0;
+#if 0
+  virtual void save_meta_file(std::string name) const {
+    std::cout << "Base implementation doesn't do anything\n";
+  }
+#endif
 
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -527,13 +537,13 @@ public:
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
 
 
-      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes)/(float)global_total_owned_nodes;
+      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
 
       Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
-
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes, 0);
     //may be reusing tag, so need a barrier
     Galois::Runtime::getHostBarrier().wait();
 
@@ -2203,5 +2213,48 @@ public:
    void reportStats(){
     statGhostNodes.report();
    }
-};
+
+  void save_local_graph(std::string local_file_name){
+
+    std::string graph_GID_file_name_str = "graph_GID_" + local_file_name + ".edgelist.PART." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+    std::cerr << "SAVING LOCAL GRAPH TO FILE : " << graph_GID_file_name_str << "\n";
+    std::ofstream graph_GID_edgelist;
+    graph_GID_edgelist.open(graph_GID_file_name_str.c_str());
+
+      std::string meta_file_str = local_file_name +".gr.META." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+      std::string tmp_meta_file_str = local_file_name +".gr.TMP." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+      std::ofstream meta_file(meta_file_str.c_str());
+      std::ofstream tmp_file;
+      tmp_file.open(tmp_meta_file_str.c_str());
+
+      size_t num_nodes = (size_t)numOwned;
+      std::cerr << id << "  NUMNODES  : " <<  num_nodes << "\n";
+      meta_file.write(reinterpret_cast<char*>(&num_nodes), sizeof(num_nodes));
+
+      for(size_t lid = 0; lid < numOwned; ++lid){
+        //for(auto src = graph.begin(), src_end = graph.end(); src != src_end; ++src){
+        size_t src_GID = L2G(lid);
+        //size_t lid = (size_t)(*src);
+        //size_t gid = (size_t)L2G(*src);
+        size_t owner = getOwner_lid(lid);
+        for(auto e = graph.edge_begin(lid), e_end = graph.edge_end(lid); e != e_end; ++e){
+          auto dst = graph.getEdgeDst(e);
+          auto dst_GID = L2G(dst);
+
+          graph_GID_edgelist << src_GID << " " << dst_GID << " " << id <<  "\n";
+        }
+    meta_file.write(reinterpret_cast<char*>(&src_GID), sizeof(src_GID));
+    meta_file.write(reinterpret_cast<char*>(&lid), sizeof(lid));
+    meta_file.write(reinterpret_cast<char*>(&owner), sizeof(owner));
+
+
+    tmp_file << src_GID << " " << lid << " " << owner << "\n";
+    }
+
+    //save_meta_file(local_file_name);
+    meta_file.close();
+    tmp_file.close();
+    graph_GID_edgelist.close();
+    }
+  };
 #endif//_GALOIS_DIST_HGRAPH_H
