@@ -305,6 +305,7 @@ public:
              slaveNodes[h][n] = G2L(slaveNodes[h][n]);
              }, Galois::loopname("SLAVE_NODES"), Galois::numrun(get_run_identifier()));
       }
+      StatTimer_comm_setup.stop();
 
       for(auto x = 0U; x < masterNodes.size(); ++x){
         //masterNodes_bitvec[x].resize(masterNodes[x].size());
@@ -326,7 +327,6 @@ public:
       std::cout << "["<< id << "]" << "Total local nodes : " << get_local_total_nodes() << " NumOwned : "<< numOwned <<"\n"; 
 
       send_info_to_host();
-      StatTimer_comm_setup.stop();
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
