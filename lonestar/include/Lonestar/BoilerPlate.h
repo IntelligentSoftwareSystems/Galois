@@ -43,6 +43,7 @@ extern llvm::cl::opt<int> numThreads;
 extern llvm::cl::opt<int> numRuns;
 extern llvm::cl::opt<bool> savegraph;
 extern llvm::cl::opt<std::string> outputfile;
+extern llvm::cl::opt<std::string> outputfolder;
 
 
 //! initialize lonestar benchmark
