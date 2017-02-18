@@ -44,6 +44,9 @@ llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl
 
 llvm::cl::opt<int> numRuns("runs", llvm::cl::desc("Number of runs"), llvm::cl::init(3));
 
+llvm::cl::opt<bool> savegraph("savegraph", llvm::cl::desc("Bool flag to enable save graph"), llvm::cl::init(false));
+llvm::cl::opt<std::string> outputfile("outputfile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
+
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
 }
@@ -88,4 +91,7 @@ void LonestarStart(int argc, char** argv,
   Galois::Runtime::reportStatGlobal("Hosts", Galois::Runtime::getSystemNetworkInterface().Num);
 
   Galois::Runtime::reportStatGlobal("Runs", numRuns);
+
+  if(savegraph)
+    Galois::Runtime::reportStat("(NULL)", "Saving Graph structure to:", outputfile.c_str(), 0);
 }

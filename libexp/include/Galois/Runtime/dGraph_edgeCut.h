@@ -42,6 +42,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     // GID = ghostMap[LID - numOwned]
     std::vector<uint64_t> ghostMap;
+    // LID = GlobalToLocalGhostMap[GID]
+    std::unordered_map<uint64_t, uint32_t> GlobalToLocalGhostMap;
     //LID Node owned by host i. Stores ghost nodes from each host.
     std::vector<std::pair<uint32_t, uint32_t> > hostNodes;
     std::vector<std::pair<uint64_t, uint64_t>> gid2host;
@@ -138,9 +140,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << ghostMap.size() << "\n";
 
     hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
+    GlobalToLocalGhostMap.reserve(ghostMap.size());
     for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
       unsigned lid = ln + base_hGraph::numOwned;
       auto gid = ghostMap[ln];
+      GlobalToLocalGhostMap[gid] = lid;
       bool found = false;
       for (auto h = 0U; h < gid2host.size(); ++h) {
         auto& p = gid2host[h];
@@ -181,9 +185,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   uint32_t G2L(uint64_t gid) const {
     if (gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned)
       return gid - globalOffset;
+    return GlobalToLocalGhostMap.at(gid);
+#if 0
     auto ii = std::lower_bound(ghostMap.begin(), ghostMap.end(), gid);
     assert(*ii == gid);
     return std::distance(ghostMap.begin(), ii) + base_hGraph::numOwned;
+#endif
   }
 
   uint64_t L2G(uint32_t lid) const {
@@ -192,7 +199,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return lid + globalOffset;
     return ghostMap[lid - base_hGraph::numOwned];
   }
-
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
     void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
@@ -207,7 +213,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
         for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
           auto ii = ee;
-          ee=g.edge_end(n);
+          ee = g.edge_end(n);
           for (; ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             decltype(gdst) ldst = G2L(gdst);
@@ -226,8 +232,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         std::cout << "n :" << g.size() <<"\n";
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
         uint64_t cur = 0;
+        auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
         for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
-          for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+          auto ii = ee;
+          ee = g.edge_end(n);
+          for (; ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
             decltype(gdst) ldst = G2L(gdst);
             graph.constructEdge(cur++, ldst);
