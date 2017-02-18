@@ -2214,18 +2214,18 @@ public:
     statGhostNodes.report();
    }
 
-  void save_local_graph(std::string local_file_name){
+  void save_local_graph(std::string folder_name, std::string local_file_name){
 
-    std::string graph_GID_file_name_str = "graph_GID_" + local_file_name + ".edgelist.PART." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+    std::string graph_GID_file_name_str = folder_name + "/graph_GID_" + local_file_name + ".edgelist.PART." + std::to_string(id) + ".OF." + std::to_string(numHosts);
     std::cerr << "SAVING LOCAL GRAPH TO FILE : " << graph_GID_file_name_str << "\n";
     std::ofstream graph_GID_edgelist;
     graph_GID_edgelist.open(graph_GID_file_name_str.c_str());
 
-      std::string meta_file_str = local_file_name +".gr.META." + std::to_string(id) + ".OF." + std::to_string(numHosts);
-      std::string tmp_meta_file_str = local_file_name +".gr.TMP." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+      std::string meta_file_str = folder_name + "/" + local_file_name +".gr.META." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+      //std::string tmp_meta_file_str = folder_name + "/" + local_file_name +".gr.TMP." + std::to_string(id) + ".OF." + std::to_string(numHosts);
       std::ofstream meta_file(meta_file_str.c_str());
-      std::ofstream tmp_file;
-      tmp_file.open(tmp_meta_file_str.c_str());
+      //std::ofstream tmp_file;
+      //tmp_file.open(tmp_meta_file_str.c_str());
 
       size_t num_nodes = (size_t)numOwned;
       std::cerr << id << "  NUMNODES  : " <<  num_nodes << "\n";
@@ -2247,13 +2247,12 @@ public:
     meta_file.write(reinterpret_cast<char*>(&lid), sizeof(lid));
     meta_file.write(reinterpret_cast<char*>(&owner), sizeof(owner));
 
-
-    tmp_file << src_GID << " " << lid << " " << owner << "\n";
+    //tmp_file << src_GID << " " << lid << " " << owner << "\n";
     }
 
     //save_meta_file(local_file_name);
     meta_file.close();
-    tmp_file.close();
+    //tmp_file.close();
     graph_GID_edgelist.close();
     }
   };
