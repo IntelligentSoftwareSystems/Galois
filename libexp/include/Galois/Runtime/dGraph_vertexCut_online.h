@@ -421,10 +421,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
-      std::string tmp_meta_file_str = "RMAT15.gr.TMP_ONWER." + std::to_string(base_hGraph::id) + ".OF." + std::to_string(base_hGraph::numHosts);
-      std::ofstream tmp_file;
-      tmp_file.open(tmp_meta_file_str.c_str());
-
 
       std::vector<std::vector<uint64_t>> GlobalVec_perHost(base_hGraph::numHosts);
       std::vector<std::vector<uint32_t>> OwnerVec_perHost(base_hGraph::numHosts);
@@ -450,7 +446,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         uint32_t owner = first_set_pos;
         uint32_t next_set_pos = first_set_pos;
 
-        tmp_file << i << " " << num_set_bits << " " << first_set_pos << " " <<  next_set_pos << " "  << master_load[first_set_pos] << "\n";
         if(num_set_bits > 1){
           for(auto n = 1; n < num_set_bits; ++n){
             next_set_pos = gid_vecBool.find_next(i,next_set_pos) ;
