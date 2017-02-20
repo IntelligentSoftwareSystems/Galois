@@ -75,11 +75,13 @@ namespace {
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple>
 class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> > {
 
+  using ThisClass = IKDGtwoPhaseExecutor;
+
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
-  using CtxtWL = typename Base::CtxtWL;
+  using CtxtWL = typename ThisClass::CtxtWL;
 
 
 
@@ -101,7 +103,7 @@ protected:
   };
 
 
-  typename Base::template WindowWLwrapper<IKDGtwoPhaseExecutor> winWL;
+  typename ThisClass::template WindowWLwrapper<IKDGtwoPhaseExecutor> winWL;
   CtxtMaker ctxtMaker;
 
 
@@ -123,14 +125,14 @@ public:
 
     dumpStats ();
 
-    if (Base::ENABLE_PARAMETER) {
+    if (ThisClass::ENABLE_PARAMETER) {
       ParaMeter::closeStatsFile ();
     }
   }
 
   void dumpStats (void) {
-    reportStat (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks,0);
-    reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
+    reportStat (ThisClass::loopname, "efficiency %", double (100.0 * ThisClass::totalCommits) / ThisClass::totalTasks,0);
+    reportStat (ThisClass::loopname, "avg. parallelism", double (ThisClass::totalCommits) / ThisClass::rounds,0);
   }
 
   CtxtMaker& getCtxtMaker(void) {
@@ -139,11 +141,11 @@ public:
 
   template <typename R>
   void push_initial (const R& range) {
-    if (Base::targetCommitRatio == 0.0) {
+    if (ThisClass::targetCommitRatio == 0.0) {
 
       Galois::do_all_choice (range,
           [this] (const T& x) {
-            Base::getNextWL ().push_back (ctxtMaker (x));
+            ThisClass::getNextWL ().push_back (ctxtMaker (x));
           }, 
           std::make_tuple (
             Galois::loopname ("init-fill"),
@@ -164,26 +166,26 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
 
-    if (Base::ENABLE_PARAMETER) {
-      ParaMeter::StepStats s (Base::rounds, Base::roundCommits.reduceRO (), Base::roundTasks.reduceRO ());
-      s.dump (ParaMeter::getStatsFile (), Base::loopname);
+    if (ThisClass::ENABLE_PARAMETER) {
+      ParaMeter::StepStats s (ThisClass::rounds, ThisClass::roundCommits.reduceRO (), ThisClass::roundTasks.reduceRO ());
+      s.dump (ParaMeter::getStatsFile (), ThisClass::loopname);
     }
 
-    Base::endRound ();
+    ThisClass::endRound ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
     // for stable case
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [this] (Ctxt* c) {
-          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
+          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
 
           // nhFunc (c, uhand);
-          runCatching (Base::nhFunc, c, uhand);
+          runCatching (ThisClass::nhFunc, c, uhand);
 
-          Base::roundTasks += 1;
+          ThisClass::roundTasks += 1;
         },
         std::make_tuple (
           Galois::loopname ("expandNhood"),
@@ -200,17 +202,17 @@ protected:
   template <typename F>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (F*) {
     // for unstable case
-    auto m_beg = boost::make_transform_iterator (Base::getCurrWL ().begin_all (), GetActive ());
-    auto m_end = boost::make_transform_iterator (Base::getCurrWL ().end_all (), GetActive ());
+    auto m_beg = boost::make_transform_iterator (ThisClass::getCurrWL ().begin_all (), GetActive ());
+    auto m_end = boost::make_transform_iterator (ThisClass::getCurrWL ().end_all (), GetActive ());
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [m_beg, m_end, this] (Ctxt* c) {
-          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
+          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
 
-          runCatching (Base::nhFunc, c, uhand, m_beg, m_end);
+          runCatching (ThisClass::nhFunc, c, uhand, m_beg, m_end);
 
-          Base::roundTasks += 1;
+          ThisClass::roundTasks += 1;
         },
         std::make_tuple (
           Galois::loopname ("expandNhoodUnstable"),
@@ -228,12 +230,12 @@ protected:
 
   template <typename F>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
-    assert (Base::HAS_EXEC_FUNC);
+    assert (ThisClass::HAS_EXEC_FUNC);
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
       [this] (Ctxt* ctxt) {
 
-        typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
+        typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
         uhand.reset ();
 
         if (ctxt->isSrc ()) {
@@ -255,29 +257,29 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
     Galois::optional<T> minElem;
 
-    if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
+    if (ThisClass::NEEDS_PUSH) {
+      if (ThisClass::targetCommitRatio != 0.0 && !winWL.empty ()) {
         minElem = *winWL.getMin();
       }
     }
 
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [this, &minElem] (Ctxt* c) {
           bool commit = false;
 
-          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
+          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
 
-          if (Base::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
+          if (ThisClass::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
             // opFunc (c->active, uhand);
-            if (Base::NEEDS_CUSTOM_LOCKING) {
+            if (ThisClass::NEEDS_CUSTOM_LOCKING) {
               c->enableSrc();
-              runCatching (Base::opFunc, c, uhand);
+              runCatching (ThisClass::opFunc, c, uhand);
               commit = c->isSrc (); // in case opFunc signalled abort
 
             } else {
-              Base::opFunc (c->getActive (), uhand);
+              ThisClass::opFunc (c->getActive (), uhand);
               assert (c->isSrc ());
               commit = true;
             }
@@ -286,14 +288,14 @@ protected:
           }
 
           if (commit) {
-            Base::roundCommits += 1;
-            if (Base::NEEDS_PUSH) { 
+            ThisClass::roundCommits += 1;
+            if (ThisClass::NEEDS_PUSH) { 
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                if ((Base::targetCommitRatio == 0.0) || !minElem || !Base::cmp (*minElem, *i)) {
+                if ((ThisClass::targetCommitRatio == 0.0) || !minElem || !ThisClass::cmp (*minElem, *i)) {
                   // if *i >= *minElem
-                  Base::getNextWL ().push_back (ctxtMaker (*i));
+                  ThisClass::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
                   winWL.push (*i);
                 } 
@@ -304,11 +306,11 @@ protected:
 
             c->commitIteration ();
             c->~Ctxt ();
-            Base::ctxtAlloc.deallocate (c, 1);
+            ThisClass::ctxtAlloc.deallocate (c, 1);
           } else {
             c->cancelIteration ();
             c->reset ();
-            Base::getNextWL ().push_back (c);
+            ThisClass::getNextWL ().push_back (c);
           }
         },
         std::make_tuple (
@@ -323,27 +325,27 @@ protected:
     t.start();
 
     while (true) {
-      Base::t_beginRound.start();
-      Base::beginRound (winWL);
+      ThisClass::t_beginRound.start();
+      ThisClass::beginRound (winWL);
 
-      if (Base::getCurrWL ().empty_all ()) {
+      if (ThisClass::getCurrWL ().empty_all ()) {
         break;
       }
-      Base::t_beginRound.stop();
+      ThisClass::t_beginRound.stop();
 
       Timer t;
 
-      Base::t_expandNhood.start();
+      ThisClass::t_expandNhood.start();
       expandNhood ();
-      Base::t_expandNhood.stop();
+      ThisClass::t_expandNhood.stop();
 
-      Base::t_executeSources.start();
+      ThisClass::t_executeSources.start();
       executeSources ();
-      Base::t_executeSources.stop();
+      ThisClass::t_executeSources.stop();
 
-      Base::t_applyOperator.start();
+      ThisClass::t_applyOperator.start();
       applyOperator ();
-      Base::t_applyOperator.stop();
+      ThisClass::t_applyOperator.stop();
 
       endRound ();
       
