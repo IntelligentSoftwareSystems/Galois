@@ -66,6 +66,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
 
 
+    //EXPERIMENT
+    std::unordered_map<uint64_t, uint32_t> GlobalVec_map;
 
     //XXX: initialize to ~0
     //std::vector<std::vector<uint64_t>> node_mapping;
@@ -96,6 +98,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     unsigned getHostID(uint64_t gid) const {
       auto lid = G2L(gid);
+      return OwnerVec[lid];
+    }
+
+    size_t getOwner_lid(size_t lid) const {
       return OwnerVec[lid];
     }
 
@@ -181,6 +187,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       std::cout << "Start loop over nodes\n";
 
+
+
       StatTimer_distributed_edges.start();
       //for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
       for(auto src = g.begin(), src_end= g.end(); src != src_end; ++src){
@@ -193,7 +201,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         auto e_end = g.edge_end(*src);
       //StatTimer_distributed_edges_get_edges.stop();
 
-        //for(auto e = g.edge_begin(*src), ei = g.edge_end(*src); e != ei; ++e){
         for(auto e = e_start; e != e_end; ++e){
 	
           //StatTimer_distributed_edges_get_dst.start();
@@ -203,7 +210,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           //StatTimer_distributed_edges_policy.start();
           auto assigned_host = balanced_edge_assignment(*src, dst, gid_vecBool, base_hGraph::numHosts, numEdges_per_host);
           //StatTimer_distributed_edges_policy.stop();
-          //auto assigned_host = rand() % base_hGraph::numHosts; //random_edge_assignment(*src, dst, gid_bitset_vecBool[*src], gid_bitset_vecBool[dst], base_hGraph::numHosts);
+          //auto assigned_host = rand() % base_hGraph::numHosts;
 
           assert(assigned_host < base_hGraph::numHosts);
 
@@ -219,11 +226,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           if(!gid_vecBool.is_set(*src, assigned_host)){
             gid_vecBool.set_bit(*src, assigned_host);
             ++numNodes_per_host[assigned_host];
+            tmp_file << *src << " " << gid_vecBool.bit_count(*src) << " " << numNodes_per_host[assigned_host] << "\n";
           }
 
           if(!gid_vecBool.is_set(dst, assigned_host)){
             gid_vecBool.set_bit(dst, assigned_host);
             ++numNodes_per_host[assigned_host];
+            tmp_file << dst << " " << gid_vecBool.bit_count(dst) << " " << numNodes_per_host[assigned_host] << "\n";
           }
 #endif
 
@@ -254,22 +263,20 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_distributed_edges.stop();
       //std::cerr << "TOTAL_EDGES : " <<total_edges << "\n";
 
-      //exit(0);
-
         // Assigning isolated nodes
         for(auto k = 0; k < base_hGraph::totalNodes; ++k){
           if(gid_vecBool.bit_count(k) == 0){
+            ++base_hGraph::total_isolatedNodes;
             uint32_t assigned_host = 0;
             for(auto h = 1; h < base_hGraph::numHosts; ++h){
               if(numNodes_per_host[h] < numNodes_per_host[assigned_host])
                 assigned_host = h;
             }
             gid_vecBool.set_bit(k, assigned_host);
-            if(assigned_host == base_hGraph::id){
-              ++numNodes_per_host[assigned_host];
-            }
+            ++numNodes_per_host[assigned_host];
           }
         }
+
 
       std::cerr << "Done assigning isolated nodes\n";
 
@@ -304,7 +311,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::vector<uint64_t>().swap(numEdges_per_host);
       std::vector<uint64_t>().swap(numNodes_per_host);
 
+
+      Galois::StatTimer StatTimer_load_edges("TIMER_LOAD_EDGES");
+
+      StatTimer_load_edges.start();
       loadEdges(base_hGraph::graph);
+      StatTimer_load_edges.stop();
+
       std::cerr << base_hGraph::id << "Edges loaded \n";
 
       base_hGraph::setup_communication();
@@ -313,6 +326,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     }
 
+
+    uint32_t G2L(const uint64_t gid) const {
+      return GlobalVec_map.at(gid);
+    }
+
+#if 0
     uint32_t G2L(uint64_t gid) const {
       //we can assume that GID exits and is unique. Index is localID since it is sorted.
       uint32_t found_index  = ~0;
@@ -325,6 +344,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       abort();
     }
+#endif
 
     uint64_t L2G(uint32_t lid) const {
       return GlobalVec[lid];
@@ -467,15 +487,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           hostNodes[i] = std::make_pair(~0, ~0);
         }
         std::sort(GlobalVec_perHost[i].begin(), GlobalVec_perHost[i].end());
+        std::sort(OwnerVec_perHost[i].begin(), OwnerVec_perHost[i].end());
       }
 
-#if 0
-      if(base_hGraph::id == 0){
-        for(auto i = 0; i < base_hGraph::numHosts; i++){
-          std::cout << base_hGraph::id << " : hostNode " << hostNodes[i].first  << ", " << hostNodes[i].second << "\n";
-        }
-      }
-#endif
+
       GlobalVec.reserve(counter);
       auto iter_insert = GlobalVec.begin();
       uint32_t c = 0;
@@ -485,6 +500,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
+      //trasfer to unordered_map
+      uint32_t local_id = 0;
+      for(auto v : GlobalVec){
+        GlobalVec_map[v] = local_id;
+        ++local_id;
+      }
+
+
       OwnerVec.reserve(counter);
       c = 0;
       iter_insert = OwnerVec.begin();
@@ -493,6 +516,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           OwnerVec.push_back(j);
         }
       }
+      base_hGraph::totalOnwedNodes = GlobalVec_perHost[base_hGraph::id].size();
     }
 
     bool is_vertex_cut() const{
@@ -502,5 +526,36 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint64_t get_local_total_nodes() const {
       return (base_hGraph::numOwned);
     }
+
+#if 0
+    void save_meta_file(std::string file_name_prefix) const {
+      std::string meta_file_str = file_name_prefix +".gr.META." + std::to_string(base_hGraph::id) + ".OF." + std::to_string(base_hGraph::numHosts);
+      std::string tmp_meta_file_str = file_name_prefix +".gr.TMP." + std::to_string(base_hGraph::id) + ".OF." + std::to_string(base_hGraph::numHosts);
+      std::ofstream meta_file(meta_file_str.c_str());
+      std::ofstream tmp_file;
+      tmp_file.open(tmp_meta_file_str.c_str());
+
+      size_t num_nodes = (size_t)base_hGraph::numOwned;
+      std::cerr << base_hGraph::id << "  NUMNODES  : " <<  num_nodes << "\n";
+      meta_file.write(reinterpret_cast<char*>(&num_nodes), sizeof(num_nodes));
+      for(size_t lid = 0; lid < base_hGraph::numOwned; ++lid){
+
+      size_t gid = L2G(lid);
+      size_t owner = getOwner_lid(lid);
+#if 0
+      //for(auto src = base_hGraph::graph.begin(), src_end = base_hGraph::graph.end(); src != src_end; ++src){
+        size_t lid = (size_t)(*src);
+        size_t gid = (size_t)L2G(*src);
+        size_t owner = (size_t)getOwner_lid(lid);
+#endif
+        meta_file.write(reinterpret_cast<char*>(&gid), sizeof(gid));
+        meta_file.write(reinterpret_cast<char*>(&lid), sizeof(lid));
+        meta_file.write(reinterpret_cast<char*>(&owner), sizeof(owner));
+
+        tmp_file << gid << " " << lid << " " << owner << "\n";
+      }
+    }
+#endif
+
 };
 
