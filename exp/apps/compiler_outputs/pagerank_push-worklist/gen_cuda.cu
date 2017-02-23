@@ -486,9 +486,9 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -506,9 +506,9 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -526,7 +526,7 @@ void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items);
   // FP: "5 -> 6;
@@ -534,7 +534,7 @@ void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA
   // FP: "6 -> 7;
   ctx->out_wl.reset();
   // FP: "7 -> 8;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->in_wl, ctx->out_wl);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), ctx->in_wl, ctx->out_wl);
   // FP: "8 -> 9;
   check_cuda_kernel;
   // FP: "9 -> 10;

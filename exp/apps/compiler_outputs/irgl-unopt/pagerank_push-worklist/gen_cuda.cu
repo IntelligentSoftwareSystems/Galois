@@ -136,7 +136,7 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -156,7 +156,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -176,7 +176,7 @@ void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items);
   // FP: "5 -> 6;

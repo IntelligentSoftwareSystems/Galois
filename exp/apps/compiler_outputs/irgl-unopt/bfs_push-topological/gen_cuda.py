@@ -48,7 +48,7 @@ Kernel("InitializeGraph_cuda", [('unsigned int ', '__begin'), ('unsigned int ', 
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
-CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+CBlock(["kernel_sizing(blocks, threads)"]),
 Invoke("InitializeGraph", ("ctx->gg", "ctx->nowned", "__begin", "__end", "local_infinity", "local_src_node", "ctx->dist_current.gpu_wr_ptr()")),
 CBlock(["check_cuda_kernel"], parse = False),
 ], host = True),
@@ -60,7 +60,7 @@ Kernel("BFS_cuda", [('unsigned int ', '__begin'), ('unsigned int ', '__end'), ('
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
-CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+CBlock(["kernel_sizing(blocks, threads)"]),
 Invoke("BFS", ("ctx->gg", "ctx->nowned", "__begin", "__end", "ctx->dist_current.gpu_wr_ptr()"), "SUM"),
 CBlock(["check_cuda_kernel"], parse = False),
 CBlock(["__retval = *(retval.cpu_rd_ptr())"], parse = False),

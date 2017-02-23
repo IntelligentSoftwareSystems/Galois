@@ -6,257 +6,11 @@
 #include "gen_cuda.h"
 #include "Galois/Runtime/Cuda/cuda_helpers.h"
 
-#ifdef __GALOIS_CUDA_CHECK_ERROR__
-#define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());
-#else
-#define check_cuda_kernel check_cuda(cudaGetLastError());
-#endif
-
-struct CUDA_Context {
-	int device;
-	int id;
-	unsigned int nowned;
-	CSRGraphTy hg;
-	CSRGraphTy gg;
-	unsigned int *num_master_nodes; // per host
-	Shared<unsigned int> *master_nodes; // per host
-	unsigned int *num_slave_nodes; // per host
-	Shared<unsigned int> *slave_nodes; // per host
-	Shared<unsigned int> nout;
-	Shared<unsigned int> *master_nout; // per host
-	Shared<unsigned int> *slave_nout; // per host
-	Shared<float> residual;
-	Shared<float> *master_residual; // per host
-	Shared<float> *slave_residual; // per host
-	Shared<float> value;
-	Shared<float> *master_value; // per host
-	Shared<float> *slave_value; // per host
+struct CUDA_Context : public CUDA_Context_Common {
+	struct CUDA_Context_Field<unsigned int> nout;
+	struct CUDA_Context_Field<float> residual;
+	struct CUDA_Context_Field<float> value;
 };
-
-unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	unsigned int *nout = ctx->nout.cpu_rd_ptr();
-	return nout[LID];
-}
-
-void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
-	nout[LID] = v;
-}
-
-void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
-	nout[LID] += v;
-}
-
-void min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
-	if (nout[LID] > v)
-		nout[LID] = v;
-}
-
-void batch_get_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->master_nout[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
-}
-
-void batch_get_slave_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_nout[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_get_reset_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr(), i);
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_nout[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_set_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_nout[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_rd_ptr(), ctx->nout.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_add_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_nout[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
-	batch_add_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_nout[from_id].gpu_rd_ptr(), ctx->nout.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_min_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_nout[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
-	batch_min_subset<unsigned int> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_nout[from_id].gpu_rd_ptr(), ctx->nout.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	float *residual = ctx->residual.cpu_rd_ptr();
-	return residual[LID];
-}
-
-void set_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] = v;
-}
-
-void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] += v;
-}
-
-void min_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	if (residual[LID] > v)
-		residual[LID] = v;
-}
-
-void batch_get_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_residual[from_id].gpu_wr_ptr(true), ctx->residual.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->master_residual[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_master_nodes[from_id]);
-}
-
-void batch_get_slave_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_residual[from_id].gpu_wr_ptr(true), ctx->residual.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_residual[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_get_reset_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v, float i) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_residual[from_id].gpu_wr_ptr(true), ctx->residual.gpu_rd_ptr(), i);
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_residual[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_set_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_residual[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_residual[from_id].gpu_rd_ptr(), ctx->residual.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_add_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_residual[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_master_nodes[from_id]);
-	batch_add_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_residual[from_id].gpu_rd_ptr(), ctx->residual.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_min_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_residual[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_master_nodes[from_id]);
-	batch_min_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_residual[from_id].gpu_rd_ptr(), ctx->residual.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	float *value = ctx->value.cpu_rd_ptr();
-	return value[LID];
-}
-
-void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *value = ctx->value.cpu_wr_ptr();
-	value[LID] = v;
-}
-
-void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *value = ctx->value.cpu_wr_ptr();
-	value[LID] += v;
-}
-
-void min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *value = ctx->value.cpu_wr_ptr();
-	if (value[LID] > v)
-		value[LID] = v;
-}
-
-void batch_get_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->master_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_master_nodes[from_id]);
-}
-
-void batch_get_slave_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr());
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_get_reset_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v, float i) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr(), i);
-	check_cuda_kernel;
-	memcpy(v, ctx->slave_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
-}
-
-void batch_set_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_value[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_rd_ptr(), ctx->value.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_add_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_value[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_master_nodes[from_id]);
-	batch_add_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_value[from_id].gpu_rd_ptr(), ctx->value.gpu_wr_ptr());
-	check_cuda_kernel;
-}
-
-void batch_min_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
-	dim3 blocks;
-	dim3 threads;
-	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->master_value[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_master_nodes[from_id]);
-	batch_min_subset<float> <<<blocks, threads>>>(ctx->num_master_nodes[from_id], ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_value[from_id].gpu_rd_ptr(), ctx->value.gpu_wr_ptr());
-	check_cuda_kernel;
-}
 
 struct CUDA_Context *get_CUDA_context(int id) {
 	struct CUDA_Context *ctx;
@@ -266,86 +20,208 @@ struct CUDA_Context *get_CUDA_context(int id) {
 }
 
 bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
-	struct cudaDeviceProp dev;
-	if(device == -1) {
-		check_cuda(cudaGetDevice(&device));
-	} else {
-		int count;
-		check_cuda(cudaGetDeviceCount(&count));
-		if(device > count) {
-			fprintf(stderr, "Error: Out-of-range GPU %d specified (%d total GPUs)", device, count);
-			return false;
-		}
-		check_cuda(cudaSetDevice(device));
-	}
-	ctx->device = device;
-	check_cuda(cudaGetDeviceProperties(&dev, device));
-	fprintf(stderr, "%d: Using GPU %d: %s\n", ctx->id, device, dev.name);
-	return true;
+	return init_CUDA_context_common(ctx, device);
 }
 
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hosts) {
-	CSRGraphTy &graph = ctx->hg;
-	ctx->nowned = g.nowned;
-	assert(ctx->id == g.id);
-	graph.nnodes = g.nnodes;
-	graph.nedges = g.nedges;
-	if(!graph.allocOnHost(!g.edge_data)) {
-		fprintf(stderr, "Unable to alloc space for graph!");
-		exit(1);
-	}
-	memcpy(graph.row_start, g.row_start, sizeof(index_type) * (g.nnodes + 1));
-	memcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);
-	if(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);
-	if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
-	ctx->num_master_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
-	memcpy(ctx->num_master_nodes, g.num_master_nodes, sizeof(unsigned int) * num_hosts);
-	ctx->master_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->master_nout = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->master_residual = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
-	ctx->master_value = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
-	for(uint32_t h = 0; h < num_hosts; ++h){
-		if (ctx->num_master_nodes[h] > 0) {
-			ctx->master_nodes[h].alloc(ctx->num_master_nodes[h]);
-			memcpy(ctx->master_nodes[h].cpu_wr_ptr(), g.master_nodes[h], sizeof(unsigned int) * ctx->num_master_nodes[h]);
-			ctx->master_nout[h].alloc(ctx->num_master_nodes[h]);
-			ctx->master_residual[h].alloc(ctx->num_master_nodes[h]);
-			ctx->master_value[h].alloc(ctx->num_master_nodes[h]);
-		}
-	}
-	ctx->num_slave_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
-	memcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
-	ctx->slave_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave_nout = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave_residual = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
-	ctx->slave_value = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
-	for(uint32_t h = 0; h < num_hosts; ++h){
-		if (ctx->num_slave_nodes[h] > 0) {
-			ctx->slave_nodes[h].alloc(ctx->num_slave_nodes[h]);
-			memcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->num_slave_nodes[h]);
-			ctx->slave_nout[h].alloc(ctx->num_slave_nodes[h]);
-			ctx->slave_residual[h].alloc(ctx->num_slave_nodes[h]);
-			ctx->slave_value[h].alloc(ctx->num_slave_nodes[h]);
-		}
-	}
-	graph.copy_to_gpu(ctx->gg);
-	ctx->nout.alloc(graph.nnodes);
-	ctx->residual.alloc(graph.nnodes);
-	ctx->value.alloc(graph.nnodes);
-	printf("[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
+	size_t mem_usage = mem_usage_CUDA_common(g, num_hosts);
+	mem_usage += mem_usage_CUDA_field(&ctx->nout, g, num_hosts);
+	mem_usage += mem_usage_CUDA_field(&ctx->residual, g, num_hosts);
+	mem_usage += mem_usage_CUDA_field(&ctx->value, g, num_hosts);
+	printf("[%d] Host memory for communication context: %3u MB\n", ctx->id, mem_usage/1048756);
+	load_graph_CUDA_common(ctx, g, num_hosts);
+	load_graph_CUDA_field(ctx, &ctx->nout, num_hosts);
+	load_graph_CUDA_field(ctx, &ctx->residual, num_hosts);
+	load_graph_CUDA_field(ctx, &ctx->value, num_hosts);
 	reset_CUDA_context(ctx);
 }
 
 void reset_CUDA_context(struct CUDA_Context *ctx) {
-	ctx->nout.zero_gpu();
-	ctx->residual.zero_gpu();
-	ctx->value.zero_gpu();
+	ctx->nout.data.zero_gpu();
+	ctx->residual.data.zero_gpu();
+	ctx->value.data.zero_gpu();
 }
 
-void kernel_sizing(CSRGraphTy & g, dim3 &blocks, dim3 &threads) {
-	threads.x = 256;
-	threads.y = threads.z = 1;
-	blocks.x = 14 * 8;
-	blocks.y = blocks.z = 1;
+void bitset_nout_clear_cuda(struct CUDA_Context *ctx) {
+	ctx->nout.is_updated.cpu_rd_ptr()->clear();
+}
+
+unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	unsigned int *nout = ctx->nout.data.cpu_rd_ptr();
+	return nout[LID];
+}
+
+void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *nout = ctx->nout.data.cpu_wr_ptr();
+	nout[LID] = v;
+}
+
+void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *nout = ctx->nout.data.cpu_wr_ptr();
+	nout[LID] += v;
+}
+
+void min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *nout = ctx->nout.data.cpu_wr_ptr();
+	if (nout[LID] > v)
+		nout[LID] = v;
+}
+
+void batch_get_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
+	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->nout, from_id, v);
+}
+
+void batch_get_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_slave_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
+	batch_get_shared_field<unsigned int, sharedSlave, false>(ctx, &ctx->nout, from_id, v);
+}
+
+void batch_get_slave_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<unsigned int, sharedSlave, false>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_reset_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
+	batch_get_shared_field<unsigned int, sharedSlave, true>(ctx, &ctx->nout, from_id, v, i);
+}
+
+void batch_get_reset_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode, unsigned int i) {
+	batch_get_shared_field<unsigned int, sharedSlave, true>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
+}
+
+void batch_set_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedSlave, setOp>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_add_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_min_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void bitset_residual_clear_cuda(struct CUDA_Context *ctx) {
+	ctx->residual.is_updated.cpu_rd_ptr()->clear();
+}
+
+float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	float *residual = ctx->residual.data.cpu_rd_ptr();
+	return residual[LID];
+}
+
+void set_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *residual = ctx->residual.data.cpu_wr_ptr();
+	residual[LID] = v;
+}
+
+void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *residual = ctx->residual.data.cpu_wr_ptr();
+	residual[LID] += v;
+}
+
+void min_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *residual = ctx->residual.data.cpu_wr_ptr();
+	if (residual[LID] > v)
+		residual[LID] = v;
+}
+
+void batch_get_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
+	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->residual, from_id, v);
+}
+
+void batch_get_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_slave_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
+	batch_get_shared_field<float, sharedSlave, false>(ctx, &ctx->residual, from_id, v);
+}
+
+void batch_get_slave_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<float, sharedSlave, false>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_reset_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v, float i) {
+	batch_get_shared_field<float, sharedSlave, true>(ctx, &ctx->residual, from_id, v, i);
+}
+
+void batch_get_reset_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode, float i) {
+	batch_get_shared_field<float, sharedSlave, true>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
+}
+
+void batch_set_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedSlave, setOp>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_add_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_min_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void bitset_value_clear_cuda(struct CUDA_Context *ctx) {
+	ctx->value.is_updated.cpu_rd_ptr()->clear();
+}
+
+float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	float *value = ctx->value.data.cpu_rd_ptr();
+	return value[LID];
+}
+
+void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *value = ctx->value.data.cpu_wr_ptr();
+	value[LID] = v;
+}
+
+void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *value = ctx->value.data.cpu_wr_ptr();
+	value[LID] += v;
+}
+
+void min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *value = ctx->value.data.cpu_wr_ptr();
+	if (value[LID] > v)
+		value[LID] = v;
+}
+
+void batch_get_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
+	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->value, from_id, v);
+}
+
+void batch_get_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<float, sharedMaster, false>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_slave_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
+	batch_get_shared_field<float, sharedSlave, false>(ctx, &ctx->value, from_id, v);
+}
+
+void batch_get_slave_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<float, sharedSlave, false>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_get_reset_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v, float i) {
+	batch_get_shared_field<float, sharedSlave, true>(ctx, &ctx->value, from_id, v, i);
+}
+
+void batch_get_reset_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t *v_size, DataCommMode *data_mode, float i) {
+	batch_get_shared_field<float, sharedSlave, true>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
+}
+
+void batch_set_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedSlave, setOp>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_add_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_min_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 

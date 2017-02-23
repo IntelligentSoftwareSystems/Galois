@@ -85,7 +85,7 @@ Kernel("ResetGraph_cuda", [('unsigned int ', '__begin'), ('unsigned int ', '__en
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
-CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+CBlock(["kernel_sizing(blocks, threads)"]),
 Invoke("ResetGraph", ("ctx->gg", "ctx->nowned", "__begin", "__end", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()")),
 CBlock(["check_cuda_kernel"], parse = False),
 ], host = True),
@@ -97,7 +97,7 @@ Kernel("InitializeGraph_cuda", [('unsigned int ', '__begin'), ('unsigned int ', 
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
-CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+CBlock(["kernel_sizing(blocks, threads)"]),
 Invoke("InitializeGraph", ("ctx->gg", "ctx->nowned", "__begin", "__end", "local_alpha", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()")),
 CBlock(["check_cuda_kernel"], parse = False),
 ], host = True),
@@ -109,7 +109,7 @@ Kernel("PageRank_cuda", [('const float &', 'local_alpha'), ('float', 'local_tole
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
-CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+CBlock(["kernel_sizing(blocks, threads)"]),
 CBlock(["ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items)"]),
 CBlock(["ctx->out_wl.will_write()"]),
 CBlock(["ctx->out_wl.reset()"]),

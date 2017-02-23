@@ -216,9 +216,9 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -236,13 +236,13 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.gpu_wr_ptr(), _rv);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

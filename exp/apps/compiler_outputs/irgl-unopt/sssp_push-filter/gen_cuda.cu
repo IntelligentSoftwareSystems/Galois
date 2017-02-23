@@ -114,7 +114,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsi
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_infinity, local_src_node, ctx->dist_current.gpu_wr_ptr(), ctx->dist_old.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -134,7 +134,7 @@ void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   FirstItr_SSSP <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.gpu_wr_ptr(), ctx->dist_old.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -154,7 +154,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
   Sum _rv;

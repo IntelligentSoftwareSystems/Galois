@@ -265,9 +265,9 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsi
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_infinity, local_src_node, ctx->dist_current.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -285,7 +285,7 @@ void BFS_cuda(struct CUDA_Context * ctx)
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
-  kernel_sizing(ctx->gg, blocks, threads);
+  kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items);
   // FP: "5 -> 6;
@@ -293,7 +293,7 @@ void BFS_cuda(struct CUDA_Context * ctx)
   // FP: "6 -> 7;
   ctx->out_wl.reset();
   // FP: "7 -> 8;
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->nowned, ctx->dist_current.gpu_wr_ptr(), ctx->in_wl, ctx->out_wl);
+  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->nowned, ctx->dist_current.data.gpu_wr_ptr(), ctx->in_wl, ctx->out_wl);
   // FP: "8 -> 9;
   check_cuda_kernel;
   // FP: "9 -> 10;
