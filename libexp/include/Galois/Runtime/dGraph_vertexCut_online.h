@@ -163,6 +163,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT", 0, 0);
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
+      Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       Galois::StatTimer StatTimer_distributed_edges("TIMER_DISTRIBUTE_EDGES");
       Galois::StatTimer StatTimer_distributed_edges_policy("TIMER_DISTRIBUTE_EDGES_POLICY");
       Galois::StatTimer StatTimer_distributed_edges_map("TIMER_DISTRIBUTE_EDGES_MAP");
@@ -173,6 +174,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
 
       {
+
+      StatTimer_graph_construct.start();
       Galois::Graph::FileGraph g;
       g.fromFile(filename);
 
@@ -317,6 +320,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_load_edges.start();
       loadEdges(base_hGraph::graph);
       StatTimer_load_edges.stop();
+
+      StatTimer_graph_construct.stop();
 
       std::cerr << base_hGraph::id << "Edges loaded \n";
 

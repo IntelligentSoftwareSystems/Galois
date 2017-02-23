@@ -84,6 +84,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     hGraph_edgeCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
+      Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+      StatTimer_graph_construct.start();
       //id = _id;
       //numHosts = _numHosts;
       uint32_t _numNodes;
@@ -115,7 +117,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
+      base_hGraph::totalOnwedNodes = base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
       globalOffset = gid2host[base_hGraph::id].first;
     std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::numOwned << "\n";
 
@@ -179,6 +181,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     fill_slaveNodes(base_hGraph::slaveNodes);
+    StatTimer_graph_construct.start();
     base_hGraph::setup_communication();
   }
 
