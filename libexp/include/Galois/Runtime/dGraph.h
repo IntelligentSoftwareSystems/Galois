@@ -1699,8 +1699,6 @@ public:
       auto& sharedNodes = slaveNodes;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      std::mutex m;
-
       fprintf(stderr, "[%u] START OUTER LOOP\n", id);
       for (unsigned h = 1; h < net.Num; ++h) {
         std::atomic<unsigned> done(0);
@@ -1758,7 +1756,7 @@ public:
             fprintf(stderr, "[%u] START SENDING DATASPLIT (HOST: %u | BYTES: %lu | COUNT: %lu | OFFSET: %lu)\n", id, x, b.size(), num, start);
           }
 
-          m.lock();
+          net.lock.lock();
 
           net.sendTagged(x, Galois::Runtime::evilPhase, b);
 
@@ -1786,7 +1784,7 @@ public:
             }
             msg_received += 1;
           }
-          m.unlock();
+          net.lock.unlock();
           fprintf(stderr, "[%u] END TRY-RECV\n", id);
         }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
         fprintf(stderr, "[%u] END DO_ALL LOOP --- SENT %lu TO HOST %u\n", id, nblocks, x);

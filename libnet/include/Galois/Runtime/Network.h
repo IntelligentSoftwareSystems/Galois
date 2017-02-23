@@ -67,7 +67,7 @@ using optional_t = boost::optional<T>;
 class NetworkInterface {
 
 public:
-
+  std::unique_lock<Substrate::SimpleLock> lock;
   static uint32_t ID;
   static uint32_t Num;
 
