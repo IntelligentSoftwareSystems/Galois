@@ -91,7 +91,7 @@ __global__ void PageRank_partial(CSRGraph graph, unsigned int __nowned, unsigned
       dnout = p_nout[dst];
       if (dnout > 0)
       {
-        p_sum[src] += p_value[dst]/dnout;
+        atomicAdd(&p_sum[src], p_value[dst]/dnout);
       }
     }
   }
@@ -119,7 +119,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
     if (pop)
     {
       pr_value = p_sum[src]*(1.0 - local_alpha) + local_alpha;
-      diff = fabs(pr_value - p_value[src]);
+      diff = pr_value - p_value[src];
       if (diff > local_tolerance)
       {
         p_value[src] = pr_value;

@@ -97,11 +97,11 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
       dnout = p_nout[dst];
       if (dnout > 0)
       {
-        sum += p_value[dst]/dnout;
+        atomicAdd(&sum, p_value[dst]/dnout);
       }
     }
     pr_value = sum*(1.0 - local_alpha) + local_alpha;
-    diff = fabs(pr_value - p_value[src]);
+    diff = pr_value - p_value[src];
     if (diff > local_tolerance)
     {
       p_value[src] = pr_value;

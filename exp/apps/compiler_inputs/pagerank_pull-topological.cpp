@@ -161,12 +161,12 @@ struct PageRank {
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
       if (dnout > 0) {
-        sum += ddata.value/dnout;
+        Galois::add(sum, ddata.value/dnout);
       }
     }
 
     float pr_value = sum*(1.0 - alpha) + alpha;
-    float diff = std::fabs(pr_value - sdata.value);
+    float diff = pr_value - sdata.value;
 
     if(diff > tolerance){
       sdata.value = pr_value; 

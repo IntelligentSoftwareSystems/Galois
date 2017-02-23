@@ -326,7 +326,7 @@ struct PageRank_partial {
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
       if (dnout > 0) {
-        sdata.sum += ddata.value/dnout;
+        Galois::add(sdata.sum, ddata.value/dnout);
       }
     }
   }
@@ -365,7 +365,7 @@ struct PageRank {
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
     float pr_value = sdata.sum*(1.0 - local_alpha) + local_alpha;
-    float diff = std::fabs(pr_value - sdata.value);
+    float diff = pr_value - sdata.value;
 
     if(diff > local_tolerance){
       sdata.value = pr_value; 
