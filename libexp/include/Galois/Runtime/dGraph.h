@@ -1360,6 +1360,7 @@ public:
   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq, size_t start = 0) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
+     fprintf(stderr, "EXTRACT_SUBSET: [%lu, %lu) | %lu\n", start, start + size, indices.size());
      if (parallelize) {
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
@@ -1369,6 +1370,7 @@ public:
           gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
      } else {
+       fprintf(stderr, "STARTING EXTRACT_SUBSET\n");
        for (unsigned int n = start; n < start + size; ++n) {
           unsigned int offset;
           if (identity_offsets) offset = n;
@@ -1376,6 +1378,7 @@ public:
           size_t lid = indices[offset];
           gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
        }
+       fprintf(stderr, "ENDING EXTRACT_SUBSET\n");
      }
    }
 
@@ -1463,7 +1466,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b, unsigned start = 0) {
+   void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
      static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
@@ -1490,7 +1493,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_extract(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b, unsigned start = 0) {
+   void sync_extract(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
      static Galois::DynamicBitSet bit_set_comm;
      static std::vector<typename FnTy::ValTy> val_vec;
@@ -1601,10 +1604,10 @@ public:
              Galois::Runtime::gDeserialize(buf, bit_set_comm);
            } else if (data_mode == dataSplit) {
              Galois::Runtime::gDeserialize(buf, buf_start);
-             fprintf(stderr, "[%u] RECVING DATASPLIT (HOST: %u | BYTES: %u | COUNT: %lu | OFFSET: %lu)\n", id, from_id, buf.size(), bit_set_count, buf_start);
+             fprintf(stderr, "[%u] RECVING DATASPLIT (HOST: %u | BYTES: %u | COUNT: %lu | OFFSET: %lu | BUFOFFSET: %u)\n", id, from_id, buf.size(), bit_set_count, buf_start, buf.getOffset());
            } else if (data_mode == dataSplitFirst) {
              Galois::Runtime::gDeserialize(buf, retval);
-             fprintf(stderr, "[%u] RECVING DATASPLITFIRST (HOST: %u | BYTES: %u | COUNT: %lu | MSGS: %lu)\n", id, from_id, buf.size(), bit_set_count, retval);
+             fprintf(stderr, "[%u] RECVING DATASPLITFIRST (HOST: %u | BYTES: %u | COUNT: %lu | MSGS: %lu | BUFOFFSET: %u)\n", id, from_id, buf.size(), bit_set_count, retval, buf.getOffset());
            }
          }
 
@@ -1625,7 +1628,7 @@ public:
            }
            if (data_mode == onlyData) {
              set_subset<FnTy, syncType, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec);
-           } else {
+           } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
              set_subset<FnTy, syncType, true, parallelize>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, buf_start);
            }
          }
@@ -1686,6 +1689,8 @@ public:
       auto& sharedNodes = slaveNodes;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
+      std::mutex m;
+
       fprintf(stderr, "[%u] START OUTER LOOP\n", id);
       for (unsigned h = 1; h < net.Num; ++h) {
         std::atomic<unsigned> done(0);
@@ -1710,7 +1715,7 @@ public:
           if(num > 0){
             val_vec.resize(num);
 
-            bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(x, val_vec);
+            //extract_batch_wrapper<FnTy, syncType>(x, val_vec);
 
             // TODO: I added block size to the header because I am seeing strange things while debugging, example:
             // - host 0 sends 4096 elements (normal block size) to host 1. Buffer is 16404 bytes
@@ -1719,20 +1724,14 @@ public:
             // Message looks like:
             // COMM_MODE, COUNT, OFFSET, MSG...
             // Note: element count is first because it aligns well with the already existing code for bitsets
-            if (!batch_succeeded) {
-              if (n == 0) {
-                gSerialize(b, dataSplitFirst, num, nblocks);
-              } else {
-                gSerialize(b, dataSplit, num, start);
-              }
+            if (n == 0) {
+              gSerialize(b, dataSplitFirst, num, nblocks);
               auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
-              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq);
+              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
             } else {
-              if (n == 0) {
-                gSerialize(b, dataSplitFirst, num, nblocks, val_vec);
-              } else {
-                gSerialize(b, dataSplit, num, start, val_vec);
-              }
+              gSerialize(b, dataSplit, num, start);
+              auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
+              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
             }
           } else {
             // TODO: Send dataSplitFirst with # msg = 1. Will need extra check in syncRecvApply
@@ -1748,30 +1747,37 @@ public:
           } else {
             fprintf(stderr, "[%u] START SENDING DATASPLIT (HOST: %u | BYTES: %lu | COUNT: %lu | OFFSET: %lu)\n", id, x, b.size(), num, start);
           }
+
+          m.lock();
+
           net.sendTagged(x, Galois::Runtime::evilPhase, b);
 
           // Will force all messages to be processed before continuing
           // TODO: Wont need this after Vu's stuff is merged
           net.flush();
+
           fprintf(stderr, "[%u] END SENDING\n", id);
           StatTimer_send.stop();
 
           sendbytes_count += b.size();
 
           // ========== Try Receive ==========
+          fprintf(stderr, "[%u] START TRY-RECV\n", id);
           decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
 
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
 
           if (p) {
-            auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, loopName);
+            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
             if (val != 0) {
               recved_firsts += 1;
               total_incoming += val;
             }
             msg_received += 1;
           }
+          m.unlock();
+          fprintf(stderr, "[%u] END TRY-RECV\n", id);
         }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
         fprintf(stderr, "[%u] END DO_ALL LOOP --- SENT %lu TO HOST %u\n", id, nblocks, x);
       }
