@@ -82,6 +82,7 @@ class hGraph: public GlobalObject {
    uint64_t totalSlaveNodes; // Total slave nodes from others.
    uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+   uint32_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint32_t total_isolatedNodes; // Calculate the total isolated nodes
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
@@ -2217,9 +2218,11 @@ public:
   void save_local_graph(std::string folder_name, std::string local_file_name){
 
     std::string graph_GID_file_name_str = folder_name + "/graph_GID_" + local_file_name + ".edgelist.PART." + std::to_string(id) + ".OF." + std::to_string(numHosts);
+    std::string graph_LID_DIMACS_file_name_str = folder_name + "/graph_LID_" + local_file_name + ".dimacs.PART." + std::to_string(id) + ".OF." + std::to_string(numHosts);
     std::cerr << "SAVING LOCAL GRAPH TO FILE : " << graph_GID_file_name_str << "\n";
-    std::ofstream graph_GID_edgelist;
+    std::ofstream graph_GID_edgelist, graph_LID_dimacs;
     graph_GID_edgelist.open(graph_GID_file_name_str.c_str());
+    graph_LID_dimacs.open(graph_LID_DIMACS_file_name_str.c_str());
 
       std::string meta_file_str = folder_name + "/" + local_file_name +".gr.META." + std::to_string(id) + ".OF." + std::to_string(numHosts);
       //std::string tmp_meta_file_str = folder_name + "/" + local_file_name +".gr.TMP." + std::to_string(id) + ".OF." + std::to_string(numHosts);
@@ -2231,6 +2234,7 @@ public:
       std::cerr << id << "  NUMNODES  : " <<  num_nodes << "\n";
       meta_file.write(reinterpret_cast<char*>(&num_nodes), sizeof(num_nodes));
 
+      graph_LID_dimacs << "p " << num_nodes << " " << numOwned_edges<<"\n";
       for(size_t lid = 0; lid < numOwned; ++lid){
         //for(auto src = graph.begin(), src_end = graph.end(); src != src_end; ++src){
         size_t src_GID = L2G(lid);
@@ -2239,9 +2243,11 @@ public:
         size_t owner = getOwner_lid(lid);
         for(auto e = graph.edge_begin(lid), e_end = graph.edge_end(lid); e != e_end; ++e){
           auto dst = graph.getEdgeDst(e);
+          auto edge_wt = graph.getEdgeData(e);
           auto dst_GID = L2G(dst);
 
           graph_GID_edgelist << src_GID << " " << dst_GID << " " << id <<  "\n";
+          graph_LID_dimacs << lid + 1 << " " << dst + 1 << " " <<  edge_wt <<  "\n";
         }
     meta_file.write(reinterpret_cast<char*>(&src_GID), sizeof(src_GID));
     meta_file.write(reinterpret_cast<char*>(&lid), sizeof(lid));
@@ -2254,6 +2260,7 @@ public:
     meta_file.close();
     //tmp_file.close();
     graph_GID_edgelist.close();
+    graph_LID_dimacs.close();
     }
   };
 #endif//_GALOIS_DIST_HGRAPH_H
