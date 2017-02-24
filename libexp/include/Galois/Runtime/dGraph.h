@@ -1353,7 +1353,7 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          val_vec[n] = extract_wrapper<FnTy, syncType>(lid);
+          val_vec[n-start] = extract_wrapper<FnTy, syncType>(lid);
        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
      } else {
        for (unsigned n = start; n < start + size; ++n) {
@@ -1361,16 +1361,16 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          val_vec[n] = extract_wrapper<FnTy, syncType>(lid);
+          val_vec[n-start] = extract_wrapper<FnTy, syncType>(lid);
        }
      }
    }
 
+  // TODO: Fix indexing issues (not currently using this path in USE_EXP_ALGORITHM
   template<typename FnTy, SyncType syncType, typename SeqTy, bool identity_offsets = false, bool parallelize = true>
   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq, size_t start = 0) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
-     fprintf(stderr, "EXTRACT_SUBSET: [%lu, %lu) | %lu\n", start, start + size, indices.size());
      if (parallelize) {
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
@@ -1380,7 +1380,6 @@ public:
           gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
      } else {
-       fprintf(stderr, "STARTING EXTRACT_SUBSET\n");
        for (unsigned int n = start; n < start + size; ++n) {
           unsigned int offset;
           if (identity_offsets) offset = n;
@@ -1388,7 +1387,6 @@ public:
           size_t lid = indices[offset];
           gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
        }
-       fprintf(stderr, "ENDING EXTRACT_SUBSET\n");
      }
    }
 
@@ -1614,10 +1612,8 @@ public:
              Galois::Runtime::gDeserialize(buf, bit_set_comm);
            } else if (data_mode == dataSplit) {
              Galois::Runtime::gDeserialize(buf, buf_start);
-             fprintf(stderr, "[%u] RECVING DATASPLIT (HOST: %u | BYTES: %u | COUNT: %lu | OFFSET: %lu | BUFOFFSET: %u)\n", id, from_id, buf.size(), bit_set_count, buf_start, buf.getOffset());
            } else if (data_mode == dataSplitFirst) {
              Galois::Runtime::gDeserialize(buf, retval);
-             fprintf(stderr, "[%u] RECVING DATASPLITFIRST (HOST: %u | BYTES: %u | COUNT: %lu | MSGS: %lu | BUFOFFSET: %u)\n", id, from_id, buf.size(), bit_set_count, retval, buf.getOffset());
            }
          }
 
@@ -1696,10 +1692,11 @@ public:
 
       StatTimer_mainLoop.start();
 
-      auto& sharedNodes = slaveNodes;
+      auto& sharedNodes = (syncType == syncPush) ? slaveNodes : masterNodes;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      fprintf(stderr, "[%u] START OUTER LOOP\n", id);
+      std::mutex m;
+
       for (unsigned h = 1; h < net.Num; ++h) {
         std::atomic<unsigned> done(0);
         unsigned x = (id + h) % net.Num;
@@ -1707,19 +1704,17 @@ public:
         size_t num_elem = indices.size();
         size_t nblocks = (num_elem + (block_size - 1)) / block_size;
 
-        fprintf(stderr, "[%u] START DO_ALL LOOP\n", id);
         Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nblocks), [&](size_t n){
           // ========== Send ==========
           // TODO: Can we pull the buffers out and not have to reallocate them everytime?
           //       Instead, already have a X buffers pre-allocated and serialize into them
           Galois::Runtime::SendBuffer b;
-          size_t num = (n * block_size > num_elem) ? n * block_size - num_elem : block_size;
+          size_t num = ((n+1) * (block_size) > num_elem) ? (num_elem - (n*block_size)) : block_size;
           size_t start = n * block_size;
-          static std::vector<typename FnTy::ValTy> val_vec;
-          static std::vector<unsigned int> offsets;
+          std::vector<typename FnTy::ValTy> val_vec;
+          std::vector<unsigned int> offsets;
 
           StatTimer_extract.start();
-          fprintf(stderr, "[%u] START EXTRACT BRANCH\n", id);
           if(num > 0){
             val_vec.resize(num);
 
@@ -1732,31 +1727,23 @@ public:
             // Message looks like:
             // COMM_MODE, COUNT, OFFSET, MSG...
             // Note: element count is first because it aligns well with the already existing code for bitsets
+
+            extract_subset<FnTy, syncType, true, false>(loopName, indices, num, offsets, val_vec, start);
+
             if (n == 0) {
-              gSerialize(b, dataSplitFirst, num, nblocks);
-              auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
-              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
+              gSerialize(b, dataSplitFirst, num, nblocks, val_vec);
             } else {
-              gSerialize(b, dataSplit, num, start);
-              auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
-              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
+              gSerialize(b, dataSplit, num, start, val_vec);
             }
           } else {
             // TODO: Send dataSplitFirst with # msg = 1. Will need extra check in syncRecvApply
-            fprintf(stderr, "[%u] WE ARE SENDING NO DATA?\n", id);
             gSerialize(b, noData);
           }
-          fprintf(stderr, "[%u] END EXTRACT BRANCH\n", id);
           StatTimer_extract.stop();
 
           StatTimer_send.start();
-          if (n == 0) {
-            fprintf(stderr, "[%u] START SENDING DATASPLITFIRST (HOST: %u | BYTES: %lu | COUNT: %lu | MSGS: %lu)\n", id, x, b.size(), num, nblocks);
-          } else {
-            fprintf(stderr, "[%u] START SENDING DATASPLIT (HOST: %u | BYTES: %lu | COUNT: %lu | OFFSET: %lu)\n", id, x, b.size(), num, start);
-          }
 
-          net.lock.lock();
+          m.lock();
 
           net.sendTagged(x, Galois::Runtime::evilPhase, b);
 
@@ -1764,13 +1751,11 @@ public:
           // TODO: Wont need this after Vu's stuff is merged
           net.flush();
 
-          fprintf(stderr, "[%u] END SENDING\n", id);
           StatTimer_send.stop();
 
           sendbytes_count += b.size();
 
           // ========== Try Receive ==========
-          fprintf(stderr, "[%u] START TRY-RECV\n", id);
           decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
 
           net.handleReceives();
@@ -1784,12 +1769,9 @@ public:
             }
             msg_received += 1;
           }
-          net.lock.unlock();
-          fprintf(stderr, "[%u] END TRY-RECV\n", id);
+          m.unlock();
         }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
-        fprintf(stderr, "[%u] END DO_ALL LOOP --- SENT %lu TO HOST %u\n", id, nblocks, x);
       }
-      fprintf(stderr, "[%u] END OUTER LOOP\n", id);
 
       send_bytes += sendbytes_count.load();
       StatTimer_mainLoop.stop();
@@ -1799,23 +1781,18 @@ public:
 
       decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
 
-      fprintf(stderr, "[%u] START RECV LOOP\n", id);
       while (recved_firsts.load() != (net.Num - 1) || msg_received.load() != total_incoming.load()) {
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         if (p) {
-          fprintf(stderr, "[%u] START RECV APPLY\n", id);
-          auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, loopName);
+          auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
           if (val != 0) {
             recved_firsts += 1;
             total_incoming += val;
-            fprintf(stderr, "[%u] RECVED FIRST MSG (%lu)\n", id, val);
           }
-          fprintf(stderr, "[%u] END RECV APPLY\n", id);
           msg_received += 1;
         }
       }
-      fprintf(stderr, "[%u] END RECV LOOP --- RECVED %u\n", id, msg_received.load());
       ++Galois::Runtime::evilPhase;
 
       StatTimer_RecvTime.stop();

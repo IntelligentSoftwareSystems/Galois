@@ -60,10 +60,8 @@ static void bcastLandingPad(uint32_t src, RecvBuffer& buf) {
 }
 
 void NetworkInterface::sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf) {
-  lock.lock();
   gSerialize(buf, recv);
   sendTagged(dest, 0, buf);
-  lock.unlock();
 }
 
 void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf, bool self) {
