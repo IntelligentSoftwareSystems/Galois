@@ -577,6 +577,30 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+
+    // Verify
+    if(verifyMax){
+#ifdef __GALOIS_HET_CUDA__
+      if (personality == CPU) { 
+#endif
+        uint32_t max_distance = 0;
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          if(max_distance < (*hg).getData(*ii).dist_current && ((*hg).getData(*ii).dist_current != 1073741823))
+            max_distance = (*hg).getData(*ii).dist_current;
+        }
+#ifdef __GALOIS_HET_CUDA__
+      } else if(personality == GPU_CUDA)  {
+        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+          if(max_distance < get_node_dist_current_cuda(cuda_ctx, *ii) && (get_node_dist_current_cuda(cuda_ctx, *ii) != 1073741823))
+            max_distance = get_node_dist_current_cuda(cuda_ctx, *ii);
+        }
+      }
+#endif
+      Galois::Runtime::reportStat("(NULL)", "MAX DISTANCE ", (unsigned long)max_distance, 0);
+    }
+
+
+
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";
