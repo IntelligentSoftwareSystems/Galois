@@ -221,6 +221,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           // my edge to be constructed later
           if(assigned_host == base_hGraph::id){
             host_edges_map[*src].push_back(dst);
+            ++base_hGraph::numOwned_edges;
           }
           //StatTimer_distributed_edges_map.stop();
 

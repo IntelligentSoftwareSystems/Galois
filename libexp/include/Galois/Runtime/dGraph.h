@@ -82,7 +82,7 @@ class hGraph: public GlobalObject {
    uint64_t totalSlaveNodes; // Total slave nodes from others.
    uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-   uint32_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+   uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint32_t total_isolatedNodes; // Calculate the total isolated nodes
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
