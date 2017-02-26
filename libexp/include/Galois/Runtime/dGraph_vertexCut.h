@@ -193,7 +193,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         fprintf(stderr, "Loading edge-data while creating edges.\n");
         uint64_t cur = 0;
 
-
         for(auto n = 0; n < base_hGraph::numOwned; ++n){
           auto gid = L2G(n);
           auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
@@ -205,7 +204,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
           for(auto ii = g.edge_begin(old_lid), ee = g.edge_end(old_lid); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
-            graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]));
             auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
             graph.constructEdge(cur++, G2L(GlobalVec_ordered[gdst]), gdata);
           }

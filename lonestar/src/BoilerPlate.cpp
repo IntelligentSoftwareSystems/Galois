@@ -48,6 +48,8 @@ llvm::cl::opt<bool> savegraph("savegraph", llvm::cl::desc("Bool flag to enable s
 llvm::cl::opt<std::string> outputfile("outputfile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
 llvm::cl::opt<std::string> outputfolder("outputfolder", llvm::cl::desc("Output folder name to store the local graph structure"), llvm::cl::init("."));
 
+llvm::cl::opt<bool> verifyMax("verifyMax", llvm::cl::desc("Just print the max value of nodes fields"), llvm::cl::init(false));
+
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
 }
