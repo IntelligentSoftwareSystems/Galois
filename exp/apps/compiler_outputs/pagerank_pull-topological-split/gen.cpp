@@ -262,6 +262,44 @@ struct InitializeGraph {
     		}
     		typedef int ValTy;
     	};
+      struct SyncerPull_1 {
+        static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+          assert (personality == CPU);
+        #endif
+          return node.sum;
+        }
+        static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        static bool extract_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+          else if (personality == CPU)
+        #endif
+            node.sum = y;
+        }
+        static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_set_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        typedef float ValTy;
+      };
     	struct SyncerPull_vertexCut_0 {
     		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -300,6 +338,46 @@ struct InitializeGraph {
     		}
     		typedef int ValTy;
     	};
+      struct Syncer_vertexCut_1 {
+        static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+          assert (personality == CPU);
+        #endif
+          return node.sum;
+        }
+        static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        static bool extract_reset_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+          else if (personality == CPU)
+        #endif
+            { Galois::set(node.sum, y); }
+        }
+        static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) { batch_set_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
+        static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+        }
+        typedef float ValTy;
+      };
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
@@ -311,10 +389,14 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"));
     _graph.sync_push<Syncer_0>("InitializeGraph");
-    
+
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
+      _graph.sync_push<Syncer_vertexCut_1>("PageRank_partial");
     }
+    
+    _graph.sync_pull<SyncerPull_1>("PageRank_partial");
+    
+    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
     
   }
 
@@ -334,84 +416,6 @@ struct PageRank_partial {
 
   PageRank_partial(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-      	struct SyncerPull_0 {
-      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.sum;
-      		}
-      		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_batch(unsigned from_id, float *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_value_cuda(cuda_ctx, from_id, y); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				node.sum = y;
-      		}
-      		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		typedef float ValTy;
-      	};
-      	struct Syncer_vertexCut_0 {
-      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.sum;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, float *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ Galois::set(node.sum, y); }
-      		}
-      		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-      		}
-      		typedef float ValTy;
-      	};
 
 
     #ifdef __GALOIS_HET_CUDA__
@@ -424,12 +428,6 @@ struct PageRank_partial {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), PageRank_partial { &_graph }, Galois::loopname("PageRank_partial"), Galois::numrun(_graph.get_run_identifier()));
-
-      if(_graph.is_vertex_cut()) {
-      	_graph.sync_push<Syncer_vertexCut_0>("PageRank_partial");
-      }
-      
-      _graph.sync_pull<SyncerPull_0>("PageRank_partial");
   }
 
   void operator()(GNode src)const {
