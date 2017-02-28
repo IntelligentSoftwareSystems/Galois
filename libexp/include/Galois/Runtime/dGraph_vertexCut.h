@@ -76,7 +76,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-      return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
+      if(getHostID(gid) == base_hGraph::id)
+        return true;
+      else 
+        return false;
+      //return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
     }
 
 
