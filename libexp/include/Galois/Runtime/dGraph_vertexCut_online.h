@@ -168,6 +168,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+      Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       Galois::StatTimer StatTimer_distributed_edges("TIMER_DISTRIBUTE_EDGES");
       Galois::StatTimer StatTimer_distributed_edges_policy("TIMER_DISTRIBUTE_EDGES_POLICY");
       Galois::StatTimer StatTimer_distributed_edges_map("TIMER_DISTRIBUTE_EDGES_MAP");
@@ -330,9 +331,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       std::cerr << base_hGraph::id << "Edges loaded \n";
 
+      StatTimer_graph_construct_comm.start();
       base_hGraph::setup_communication();
-      //Galois::Runtime::getHostBarrier().wait();
-      //exit(0);
+      StatTimer_graph_construct_comm.stop();
 
     }
 

@@ -86,6 +86,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       StatTimer_graph_construct.start();
+      Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       //id = _id;
       //numHosts = _numHosts;
       uint32_t _numNodes;
@@ -181,8 +182,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     fill_slaveNodes(base_hGraph::slaveNodes);
-    StatTimer_graph_construct.start();
+    StatTimer_graph_construct.stop();
+    StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
+    StatTimer_graph_construct_comm.stop();
   }
 
   uint32_t G2L(uint64_t gid) const {

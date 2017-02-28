@@ -137,9 +137,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       Galois::Runtime::reportStat("(NULL)", "VERTEX CUT", 0, 0);
       Galois::Statistic statGhostNodes("TotalGhostNodes");
+      Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+      Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       //id = _id;
       //numHosts = _numHosts;
 
+      StatTimer_graph_construct.start();
       std::string part_fileName = getPartitionFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
       std::string part_metaFile = getMetaFileName(partitionFolder, base_hGraph::id, base_hGraph::numHosts);
 
@@ -167,8 +170,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       loadEdges(base_hGraph::graph, g);
       std::cerr <<"[" << base_hGraph::id << "] Edges loaded \n";
+      StatTimer_graph_construct.stop();
 
+      StatTimer_graph_construct_comm.start();
       base_hGraph::setup_communication();
+      StatTimer_graph_construct_comm.stop();
     }
 
 
