@@ -259,7 +259,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
       dnout = p_nout[dst];
       if (dnout > 0)
       {
-        atomicAdd(&sum, p_value[dst]/dnout);
+        sum += p_value[dst]/dnout;
       }
     }
     pr_value = sum*(1.0 - local_alpha) + local_alpha;

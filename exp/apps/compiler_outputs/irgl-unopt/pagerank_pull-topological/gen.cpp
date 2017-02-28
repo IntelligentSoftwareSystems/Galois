@@ -546,7 +546,7 @@ struct PageRank {
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
       if (dnout > 0) {
-        Galois::add(sum, ddata.value/dnout);
+        sum += ddata.value/dnout;
       }
     }
 
@@ -606,6 +606,8 @@ int main(int argc, char** argv) {
       }
     }
 #endif
+
+    assert(!enableVCut); // does not support vertex-cuts
 
     StatTimer_hg_init.start();
     Graph* hg;
