@@ -1,6 +1,6 @@
 #!/bin/sh
 # Usage: ./verify.sh <ABELIAN_EXECUTABLE_NAME> <INPUT_GRAPH_NAME>
-# environment variables: ABELIAN_NON_HETEROGENEOUS ABELIAN_GALOIS_ROOT ABELIAN_VERTEX_CUT
+# environment variables: ABELIAN_NON_HETEROGENEOUS ABELIAN_GALOIS_ROOT ABELIAN_EDGE_CUT_ONLY
 # executes only on single machine
 # assumes 2 GPU devices available (if heterogeneous)
 
@@ -49,52 +49,52 @@ checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
 hostname=`hostname`
 
 SET=
-if [ -n "$ABELIAN_VERTEX_CUT" ]; then
-  if [[ $inputname == *"road"* ]]; then
-    exit
-  fi
-  if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-    # assumes only 2 GPUs device available
-    SET="gg,2,2 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
-  else
-    SET="cc,2,8 cccc,4,4 cccccccc,8,2"
-  fi
+if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
+  # assumes only 2 GPUs device available
+  SET="g,1,2 gg,2,2 c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
 else
-  if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-    # assumes only 2 GPUs device available
-    SET="g,1,2 gg,2,2 c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
-  else
-    SET="c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2"
-  fi
+  SET="c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2"
 fi
 
 fail=0
 failed_cases=""
-for task in $SET; do
-  IFS=",";
-  set $task;
-  PFLAGS=$FLAGS
-  if [ -n "$ABELIAN_VERTEX_CUT" ]; then
-    PFLAGS+=" -enableVertexCut -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
-  elif [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
-    PFLAGS+=" -scalegpu=3"
+for partition in 1 2; do
+  if [ $partition -eq 2 ]; then
+    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
+      FLAGS+=" -enableVertexCut"
+    else
+      break
+    fi
   fi
-  rm -f output_*.log
-  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG 2>&1
-  outputs="output_${hostname}_0.log"
-  i=1
-  while [ $i -lt $2 ]; do
-    outputs+=" output_${hostname}_${i}.log"
-    let i=i+1
+  for task in $SET; do
+    IFS=",";
+    set $task;
+    PFLAGS=$FLAGS
+    if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
+      PFLAGS+=" -scalegpu=3"
+    fi
+    rm -f output_*.log
+    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG
+    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG 2>&1
+    outputs="output_${hostname}_0.log"
+    i=1
+    while [ $i -lt $2 ]; do
+      outputs+=" output_${hostname}_${i}.log"
+      let i=i+1
+    done
+    eval "sort -nu ${outputs} -o output_${hostname}_0.log"
+    eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
+    cat .output_diff >> $LOG
+    if ! grep -q "SUCCESS" .output_diff ; then
+      let fail=fail+1
+      if [ $partition -eq 2 ]; then
+        failed_cases+="vertex-cut $1 devices with $3 threads; "
+      else
+        failed_cases+="edge-cut $1 devices with $3 threads; "
+      fi
+    fi
+    rm .output_diff
   done
-  eval "python $checker $OUTPUT ${outputs} &> .output_diff"
-  cat .output_diff >> $LOG
-  if ! grep -q "SUCCESS" .output_diff ; then
-    let fail=fail+1
-    failed_cases+="$1 devices with $3 threads; "
-  fi
-  rm .output_diff
 done
 
 rm -f output_*.log

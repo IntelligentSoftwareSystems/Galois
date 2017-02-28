@@ -10,13 +10,20 @@ import sys
 
 tolerance=0.0001
 
-def check_results(masterFile, otherFiles, offset, errors):
+def check_results(masterFile, otherFiles, offset, errors, mrows):
   with open(masterFile) as mfile, open(otherFiles) as ofile:
     mfile.seek(offset)
-    for line1, line2 in zip(mfile,ofile):
+    for line2 in ofile:
+      line1 = mfile.readline()
+      offset = offset + len(line1)
       split_line1 = line1.split(' ')
       split_line2 = line2.split(' ')
-      offset = offset + len(line1);
+      while (split_line1[0] < split_line2[0]):
+        print "MISSING ROW: ", split_line1[0]
+        mrows = mrows + 1
+        line1 = mfile.readline()
+        offset = offset + len(line1)
+        split_line1 = line1.split(' ')
       if (split_line1[0] == split_line2[0]):
         if(abs(float(split_line1[1]) - float(split_line2[1])) > tolerance):
           print "NOT MATCHED \n";
@@ -24,27 +31,28 @@ def check_results(masterFile, otherFiles, offset, errors):
           print line2;
           errors = errors + 1;
       else:
-        print "OFFSET NOT CORRECT\n";
-        print split_line2[0];
-        print split_line1[0];
-        return (-1, errors);
+        print "OFFSET MISMATCH: ", split_line1[0], split_line2[0]
+        return (-1, errors, mrows);
 
 
-  return (offset, errors);
+  return (offset, errors, mrows);
 
 def main(masterFile, allFiles_arr):
   offset = 0;
   errors = 0;
+  mrows = 0;
   for i in range(0 , len(allFiles_arr)):
     print allFiles_arr[i]
     print offset
-    offset, errors = check_results(masterFile, allFiles_arr[i], offset, errors)
+    offset, errors, mrows = check_results(masterFile, allFiles_arr[i], offset, errors, mrows)
     if(offset == -1):
-      print "\nOFFSET NOT CORRECT\n";
       break;
+  print "No of offsets/rows missing", mrows;
   if (errors > 0):
-    print "\nFAILED";
     print "No of mismatches", errors;
+    print "\nFAILED\n";
+  if(offset == -1):
+    print "\nOFFSET NOT CORRECT\n";
   if (errors > 0) or (offset == -1):
     print allFiles_arr[i];
     return -1;
@@ -58,4 +66,4 @@ if __name__ == "__main__":
   print allFiles_arr
   ret = main(masterFile, allFiles_arr)
   if(ret == 0):
-    print "SUCCESS!!!!\n";
+    print "\nSUCCESS\n";
