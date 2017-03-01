@@ -48,7 +48,6 @@ checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
 
 hostname=`hostname`
 
-SET=
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   # assumes only 2 GPUs device available
   SET="g,1,2 gg,2,2 c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
@@ -56,6 +55,7 @@ else
   SET="c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2"
 fi
 
+pass=0
 fail=0
 failed_cases=""
 for partition in 1 2; do
@@ -67,6 +67,7 @@ for partition in 1 2; do
     fi
   fi
   for task in $SET; do
+    old_ifs=$IFS
     IFS=",";
     set $task;
     PFLAGS=$FLAGS
@@ -82,7 +83,7 @@ for partition in 1 2; do
       outputs+=" output_${hostname}_${i}.log"
       let i=i+1
     done
-    eval "sort -nu ${outputs} -o output_${hostname}_0.log"
+    eval "sort -n ${outputs} -o output_${hostname}_0.log"
     eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
@@ -92,8 +93,11 @@ for partition in 1 2; do
       else
         failed_cases+="edge-cut $1 devices with $3 threads; "
       fi
+    else
+      let pass=pass+1
     fi
     rm .output_diff
+    IFS=$old_ifs
   done
 done
 
@@ -102,11 +106,12 @@ rm -f output_*.log
 echo "---------------------------------------------------------------------------------------"
 echo "Algorithm: " $execname
 echo "Input: " $inputname
+echo $pass "passed test cases"
 if [[ $fail == 0 ]] ; then
   echo "Status: SUCCESS"
 else
-  echo "Status: FAILED"
   echo $fail "failed test cases:" $failed_cases
+  echo "Status: FAILED"
 fi
 echo "---------------------------------------------------------------------------------------"
 

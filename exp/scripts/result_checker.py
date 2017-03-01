@@ -47,6 +47,14 @@ def main(masterFile, allFiles_arr):
     offset, errors, mrows = check_results(masterFile, allFiles_arr[i], offset, errors, mrows)
     if(offset == -1):
       break;
+  if(offset != -1):
+    mfile = open(masterFile)
+    mfile.seek(offset)
+    old_mrows=mrows
+    for line in mfile:
+      mrows = mrows + 1
+    if mrows > old_mrows:
+      print "INCOMPLETE OUTPUT FILE"
   print "No of offsets/rows missing", mrows;
   if (errors > 0):
     print "No of mismatches", errors;
