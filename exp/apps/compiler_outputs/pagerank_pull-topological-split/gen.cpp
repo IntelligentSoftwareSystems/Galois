@@ -442,14 +442,14 @@ struct PageRank_partial {
         }
         static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) set_node_sum_cuda(cuda_ctx, node_id, y);
+          if (personality == GPU_CUDA) add_node_sum_cuda(cuda_ctx, node_id, y);
           else if (personality == CPU)
         #endif
-            { Galois::set(node.sum, y); }
+            { Galois::add(node.sum, y); }
         }
         static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_set_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          if (personality == GPU_CUDA) { batch_add_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
           assert (personality == CPU);
         #endif
           return false;
