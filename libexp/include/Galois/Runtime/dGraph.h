@@ -65,6 +65,12 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
+
+#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
+namespace cll = llvm::cl;
+static cll::opt<size_t> buffSize("sendBuffSize", cll::desc("max size for send buffers in element count"), cll::init(4096));
+#endif
+
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
 
@@ -1666,7 +1672,7 @@ public:
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
    template<typename FnTy, SyncType syncType>
-   void sync_sendrecv_exp(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, const unsigned block_size) {
+   void sync_sendrecv_exp(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, size_t block_size) {
       std::atomic<unsigned> total_incoming(0);
       std::atomic<unsigned> recved_firsts(0);
       std::atomic<unsigned> sendbytes_count(0);
@@ -1741,35 +1747,37 @@ public:
           }
           StatTimer_extract.stop();
 
+          // NOTE: StatTimer used to include net.flush(). After merging with VUs stuff, this will be correct. For
+          // now it does not include data transfer timing.
           StatTimer_send.start();
 
-          m.lock();
-
           net.sendTagged(x, Galois::Runtime::evilPhase, b);
-
-          // Will force all messages to be processed before continuing
-          // TODO: Wont need this after Vu's stuff is merged
-          net.flush();
 
           StatTimer_send.stop();
 
           sendbytes_count += b.size();
 
           // ========== Try Receive ==========
-          decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+          if (m.try_lock()) {
+            // Will force all messages to be processed before continuing
+            // TODO: Wont need this after Vu's stuff is merged
+            net.flush();
 
-          net.handleReceives();
-          p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+            decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
 
-          if (p) {
-            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
-            if (val != 0) {
-              recved_firsts += 1;
-              total_incoming += val;
+            net.handleReceives();
+            p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+
+            if (p) {
+              auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
+              if (val != 0) {
+                recved_firsts += 1;
+                total_incoming += val;
+              }
+              msg_received += 1;
             }
-            msg_received += 1;
+            m.unlock();
           }
-          m.unlock();
         }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
       }
 
@@ -1824,8 +1832,7 @@ public:
       StatTimer_syncPush.start();
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-      // TODO: Make this configurable somewhere
-      const unsigned block_size = 4096;
+      size_t block_size = buffSize;
       sync_sendrecv_exp<FnTy, syncPush>(loopName, bit_set_compute, block_size);
 #else
       sync_send<FnTy, syncPush>(loopName, bit_set_compute);
@@ -1861,8 +1868,7 @@ public:
       StatTimer_syncPull.start();
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-      // TODO: Make this configurable somewhere
-      const unsigned block_size = 4096;
+      size_t block_size = buffSize;
       sync_sendrecv_exp<FnTy, syncPull>(loopName, bit_set_compute, block_size);
 #else
       sync_send<FnTy, syncPull>(loopName, bit_set_compute);
