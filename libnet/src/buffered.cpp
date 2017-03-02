@@ -318,6 +318,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           recvData[rdata.host].add(std::move(rdata));
         }
       }
+      handleReceives();
     }
   }
 
