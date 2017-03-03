@@ -187,7 +187,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
         std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, numrun{}, do_all_steal<true>{})));
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
