@@ -109,7 +109,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for(auto i : hostNodes){
         if(i.first != ~0){
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
-          if(*iter == gid)
+          if(iter != GlobalVec.end() && *iter == gid)
             return true;
         }
       }

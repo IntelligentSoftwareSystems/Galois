@@ -76,6 +76,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     //std::vector<std::vector<uint64_t>> master_mapping;
     //std::vector<std::vector<uint64_t>> slave_mapping;
     //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
+
+    //XXX: Use EdgeTy to determine if need to load edge weights or not.
+    //using Host_edges_map_type = typename std::conditional<!std::is_void<EdgeTy>::value, std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, uint32_t>>> , std::unordered_map<uint64_t, std::vector<uint64_t>>>::type;
+    //Host_edges_map_type host_edges_map;
+    
     std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, uint32_t>>> host_edges_map;
     //std::vector<std::vector<bool>> gid_bitVector(g.size(), std::vector<bool>(base_hGraph::numHosts, false));
     //std::vector<boost::dynamic_bitset<uint32_t>>gid_bitset;
@@ -86,15 +91,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     Galois::VecBool gid_vecBool;
 
-
-
-    //OfflineGraph* g;
-
     uint64_t globalOffset;
-    //uint32_t numOwned;
     uint32_t numNodes;
-    //uint32_t id;
-    //uint32_t numHosts;
 
     unsigned getHostID(uint64_t gid) const {
       auto lid = G2L(gid);
@@ -106,14 +104,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-     auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
-      uint32_t old_lid;
-      if(*iter == gid){
-        return true;
+      for(auto i : hostNodes){
+        if(i.first != ~0){
+          auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
+          if(iter != GlobalVec.end() && *iter == gid)
+            return true;
+        }
       }
-      else{
-        return false;
-      }
+      return false;
     }
 
     std::string getMetaFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
