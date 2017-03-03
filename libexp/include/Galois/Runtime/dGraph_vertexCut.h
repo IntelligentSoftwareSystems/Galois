@@ -76,14 +76,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-      if(getHostID(gid) == base_hGraph::id)
+     auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
+      uint32_t old_lid;
+      if(*iter == gid){
         return true;
-      else 
+      }
+      else{
         return false;
-      //return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
+      }
     }
-
-
 
     std::string getMetaFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
       std::string result = basename;
@@ -247,13 +248,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         for(auto n = g.begin(); n != g.end(); ++n){
           for(auto e = g.edge_begin(*n); e != g.edge_end(*n); e++){
             auto dst = g.getEdgeDst(e);
-            graph_file << *n << "\t" << dst << "\n";
+            graph_file << L2G(*n) << "\t" << L2G(dst) << "\n";
           }
         }
 
         Galois::Runtime::getHostBarrier().wait();
 #endif
-
         assert(g.size() == GlobalVec_ordered.size());
 
         for(auto n = 0U; n < base_hGraph::numOwned; ++n){

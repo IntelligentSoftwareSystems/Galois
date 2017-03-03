@@ -106,14 +106,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-      if(getHostID(gid) == base_hGraph::id)
-        return true;
-      else 
-        return false;
-      //return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
+      for(auto i : hostNodes){
+        if(i.first != ~0){
+          auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
+          if(*iter == gid)
+            return true;
+        }
+      }
+      return false;
     }
-
-
 
     std::string getMetaFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
       std::string result = basename;

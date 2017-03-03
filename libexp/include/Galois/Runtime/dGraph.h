@@ -105,6 +105,12 @@ class hGraph: public GlobalObject {
     return getHostID(gid);
   }
   virtual bool isOwned(uint64_t) const = 0;
+  virtual bool isMaster(uint64_t gid) const {
+    if(getHostID(gid) == id)
+      return true;
+    else 
+      return false;
+  };
   virtual uint64_t get_local_total_nodes() const = 0;
 #if 0
   virtual void save_meta_file(std::string name) const {
