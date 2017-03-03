@@ -30,13 +30,13 @@
 #define GALOIS_FLAT_SET_H
 
 
-#include "Galois/gstl.h"
-
+//#include "Galois/gstl.h"
+#include <vector>
 #include <algorithm>
 
 namespace Galois {
 
-template <typename T, typename C=typename gstl::Vector<T> > 
+template <typename T, typename C=typename std::vector<T> > 
 class FlatSet {
 
   C vec;

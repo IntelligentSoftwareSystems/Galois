@@ -1,12 +1,14 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 
+#include "Galois/Substrate/ThreadPool.h"
+
 #include <iostream>
 #include <cstdlib>
 #include <omp.h>
 
 int RandomNumber () { return (rand()%1000000); }
-unsigned iter = 1;
+unsigned iter = 10;
 
 struct emp {
   template<typename T>
@@ -58,7 +60,7 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
 unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th); //Galois::Runtime::LL::getMaxThreads());
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    Galois::Substrate::ThreadPool::getThreadPool().burnPower(th);
    
   Galois::Timer t;
   t.start();
@@ -71,7 +73,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
 unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th);
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    Galois::Substrate::ThreadPool::getThreadPool().burnPower(th);
   
   Galois::Timer t;
   t.start();
@@ -105,7 +107,7 @@ int main(int argc, char** argv) {
     {}
 
   
-  unsigned maxVector = 16;
+  unsigned maxVector = 0;
   if (argc > 1)
     iter = atoi(argv[1]);
   if (!iter)
@@ -115,7 +117,8 @@ int main(int argc, char** argv) {
   if (!maxVector)
     maxVector = 1024*1024;
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads() / 2;
+  unsigned M = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads() / 2;
+  std::cout << "Max threads are " << M << ", iter " << iter << ", maxVector " << maxVector << "\n";
   test("inline\t",  1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
   test("stl\t",     1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
   test("omp\t",     M, 16, maxVector, t_omp);

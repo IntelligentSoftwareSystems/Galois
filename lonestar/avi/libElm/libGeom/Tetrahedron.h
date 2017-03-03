@@ -29,7 +29,7 @@
 #ifndef TETRAHEDRON_H
 #define TETRAHEDRON_H
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ErrorFeedBack.h"
 
 #include <algorithm>
 #include <cassert>
@@ -154,7 +154,7 @@ public:
       // AbstractGeom<TET_SPD>::getConnectivity()[FaceNodes[3*e+1]], 
       // AbstractGeom<TET_SPD>::getConnectivity()[FaceNodes[3*e+2]]);
     }
-    GALOIS_DIE("Tetrahedron::getFaceGeometry() : Request for invalid face.");
+    Galois::Runtime::gDie("Tetrahedron::getFaceGeometry() : Request for invalid face.");
     return NULL;
   }
 

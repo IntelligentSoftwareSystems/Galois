@@ -30,8 +30,9 @@
 #ifndef GALOIS_GRAPH_LC_MORPH_GRAPH_H
 #define GALOIS_GRAPH_LC_MORPH_GRAPH_H
 
-#include "Galois/Bag.h"
-#include "Galois/LargeArray.h"
+#include "Galois/Runtime/Bag.h"
+#include "Galois/Runtime/LargeArray.h"
+#include "Galois/Runtime/PagePool.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
 
@@ -80,7 +81,7 @@ public:
 protected:
   class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
-  typedef Galois::InsertBag<NodeInfo> Nodes;
+  typedef Runtime::InsertBag<NodeInfo> Nodes;
   typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
   
   struct EdgeHolder {
@@ -126,11 +127,11 @@ public:
   typedef boost::transform_iterator<makeGraphNode,typename Nodes::const_iterator> const_iterator;
   typedef iterator local_iterator;
   typedef const_iterator const_local_iterator;
-  typedef LargeArray<GraphNode> ReadGraphAuxData;
+  typedef Runtime::LargeArray<GraphNode> ReadGraphAuxData;
 
 protected:
   Nodes nodes;
-  Galois::Substrate::PerThreadStorage<EdgeHolder*> edgesL;
+  Runtime::PerThreadStorage<EdgeHolder*> edgesL;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
@@ -142,10 +143,10 @@ protected:
     this->outOfLineAcquire(getId(N), mflag);
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
-    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef typename Runtime::LargeArray<FileEdgeTy>::value_type FEDV;
     if (EdgeInfo::has_value) {
       addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
@@ -153,7 +154,7 @@ protected:
     }
   }
 
-  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = Runtime::LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
     addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
@@ -235,7 +236,7 @@ public:
     return N->edgeEnd;
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<Runtime::NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
@@ -252,7 +253,7 @@ public:
     // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
     acquireNode(N, MethodFlag::WRITE);
-    EdgeHolder*& local_edges = *edgesL.getLocal();
+    EdgeHolder*& local_edges = *edgesL;
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
       //FIXME: this seems to leak
@@ -326,14 +327,14 @@ public:
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }
   
-  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux, unsigned numThreads) {
     size_t numNodes = graph.size();
     
     if (UseNumaAlloc) {
-      aux.allocateLocal(numNodes);
+      aux.allocateLocal(numNodes, numThreads);
       this->outOfLineAllocateLocal(numNodes);
     } else {
-      aux.allocateInterleaved(numNodes);
+      aux.allocateInterleaved(numNodes, numThreads);
       this->outOfLineAllocateInterleaved(numNodes);
     }
   }
@@ -352,7 +353,7 @@ public:
   
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename EdgeInfo::value_type value_type;
-    typedef LargeArray<FileEdgeTy> FED;
+    typedef Runtime::LargeArray<FileEdgeTy> FED;
     auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),

@@ -30,10 +30,10 @@
 #ifndef GALOIS_QUEUE_H
 #define GALOIS_QUEUE_H
 
-#include "Galois/optional.h"
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "boost/optional.hpp"
+#include "Galois/Runtime/PaddedLock.h"
+#include "Galois/Runtime/SmallAlloc.h"
+#include "Galois/Runtime/PerThreadStorage.h"
 
 #include <boost/utility.hpp>
 #include <atomic>
@@ -322,7 +322,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * Seed for simple random number generator. Not volatile since it doesn't
    * matter too much if different threads don't see updates.
    */
-  Galois::Substrate::PerThreadStorage<int> randomSeed;
+  Galois::Runtime::PerThreadStorage<int> randomSeed;
   Compare comp;
 
   Galois::Runtime::FixedSizeHeap node_heap;
@@ -342,7 +342,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       c = 0; // suppress warning
       // Add slight jitter so threads will get different seeds
       // and ensure non-zero
-      *randomSeed.getRemote(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
+      *randomSeed.get(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
     }
 
     Node *node = new (node_heap.allocate(sizeof(Node))) 
@@ -368,7 +368,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * it takes special non-V values for marker and header nodes.
    */
   struct Node {
-    Galois::optional<K> key;
+    boost::optional<K> key;
     bool voidKey;
     std::atomic<void*> value;
     std::atomic<Node*> next;
@@ -481,7 +481,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * placing field in a shared abstract class.
    */
   struct Index {
-    const Galois::optional<K> key;
+    const boost::optional<K> key;
     /*final*/Node* node;
     /*final*/ Index* down;
     std::atomic<Index*> right;
@@ -557,7 +557,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * <tt>Map.Entry.setValue</tt> method.
    */
   struct SnapshotEntry {
-    Galois::optional<K> key;
+    boost::optional<K> key;
     V* value;
     const bool valid;
 
@@ -902,7 +902,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   int randomLevel() {
     int level = 0;
-    int& seed = *randomSeed.getLocal();
+    int& seed = *randomSeed.get();
     int r = seed;
     seed = r * 134775813 + 1;
     if (r < 0) {
@@ -1369,23 +1369,23 @@ public:
    * @return the removed first entry of this map, or <tt>null</tt> if the map
    *         is empty.
    */
-  Galois::optional<V*> pollFirstValue() {
+  boost::optional<V*> pollFirstValue() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
-      return Galois::optional<V*>(retval.value);
+      return boost::optional<V*>(retval.value);
     else
-      return Galois::optional<V*>();
+      return boost::optional<V*>();
   }
 
   /**
    * Remove first entry; return key or null if empty.
    */
-  Galois::optional<K> pollFirstKey() {
+  boost::optional<K> pollFirstKey() {
     SnapshotEntry retval = doRemoveFirst();
     if (retval.valid)
       return retval.key;
     else
-      return Galois::optional<K>();
+      return boost::optional<K>();
   }
 
   /* ---------------- Finding and removing last element -------------- */
@@ -1618,13 +1618,13 @@ public:
     }
   }
 
-  Galois::optional<T> pollMin() {
+  boost::optional<T> pollMin() {
     if (empty())
-      return Galois::optional<T>();
+      return boost::optional<T>();
     T retval = m_root->value;
     m_root = deleteMin(m_root);
 
-    return Galois::optional<T>(retval);
+    return boost::optional<T>(retval);
   }
 };
 
@@ -1632,7 +1632,7 @@ template<class T,class Compare=std::less<T>,bool Concurrent=true>
 class FCPairingHeap: private boost::noncopyable {
   struct Op {
     T item;
-    Galois::optional<T> retval;
+    boost::optional<T> retval;
     Op* response;
     bool req;
   };
@@ -1644,9 +1644,9 @@ class FCPairingHeap: private boost::noncopyable {
     Slot(): req(NULL), next(NULL), prev(NULL) { }
   };
 
-  Galois::Substrate::PerThreadStorage<Slot*> localSlots;
-  Galois::Substrate::PerThreadStorage<std::vector<Op*> > ops;
-  Galois::Substrate::PaddedLock<Concurrent> lock;
+  Galois::Runtime::PerThreadStorage<Slot*> localSlots;
+  Galois::Runtime::PerThreadStorage<std::vector<Op*> > ops;
+  Galois::Runtime::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
   std::atomic<Slot*> slots;
   const int maxTries;
@@ -1688,7 +1688,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   Slot* getMySlot() {
-    Slot*& mySlot = *localSlots.getLocal();
+    Slot*& mySlot = *localSlots.get();
     if (mySlot == NULL) {
       mySlot = new Slot();
       addSlot(mySlot);
@@ -1698,7 +1698,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   Op* getOp() {
-    std::vector<Op*>& myOps = *ops.getLocal();
+    std::vector<Op*>& myOps = *ops.get();
     if (myOps.empty()) {
       return new Op;
     }
@@ -1708,7 +1708,7 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
   void recycleOp(Op* op) {
-    ops.getLocal()->push_back(op);
+    ops.get()->push_back(op);
   }
 
   Op* makeAddReq(const T& value) {
@@ -1745,7 +1745,7 @@ public:
     }
 
     for (unsigned int i = 0; i < ops.size(); ++i) {
-      std::vector<Op*>& v = *ops.getRemote(i);
+      std::vector<Op*>& v = *ops.get(i);
       for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end(); ii != ee ; ++ii) {
         delete *ii;
       }
@@ -1774,7 +1774,7 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  Galois::Substrate::asmPause();
+	  Galois::Runtime::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
@@ -1783,7 +1783,7 @@ public:
     } while(1);
   }
 
-  Galois::optional<T> pollMin() {
+  boost::optional<T> pollMin() {
     Slot* mySlot = getMySlot();
     //Slot* volatile& myNext = mySlot->next;
     std::atomic<Op*>& myReq = mySlot->req;
@@ -1801,17 +1801,17 @@ public:
         flatCombine();
         lock.unlock();
 
-	Galois::optional<T> retval = myReq.load(std::memory_order_relaxed)->retval;
+	boost::optional<T> retval = myReq.load(std::memory_order_relaxed)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  Galois::Substrate::asmPause();
+	  Galois::Runtime::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
-	Galois::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;
+	boost::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
