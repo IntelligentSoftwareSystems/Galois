@@ -88,6 +88,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   do_all_all_hosts = re.findall(do_all_regex, log_data)
   num_arr = numpy.array(map(int,do_all_all_hosts))
 
+  print num_arr
   sd_do_all = round(numpy.std(num_arr, axis=0),3)
   mean_do_all = round(numpy.mean(num_arr, axis=0),3)
   var_do_all = round(numpy.var(num_arr, axis=0),3)
@@ -105,7 +106,12 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   sync_pull_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PULL_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
   sync_pull_all_hosts = re.findall(sync_pull_regex, log_data)
   num_arr = numpy.array(map(int,sync_pull_all_hosts))
+  if(num_arr.size == 0):
+    sync_pull_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PULL_FirstItr_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
+    sync_pull_all_hosts = re.findall(sync_pull_regex, log_data)
+    num_arr = numpy.array(map(int,sync_pull_all_hosts))
 
+  print "SYNC_PULL" , num_arr
   sd_sync_pull = round(numpy.std(num_arr, axis=0),3)
   mean_sync_pull = round(numpy.mean(num_arr, axis=0),3)
   var_sync_pull = round(numpy.var(num_arr, axis=0),3)
@@ -119,6 +125,11 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   sync_push_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PUSH_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
   sync_push_all_hosts = re.findall(sync_push_regex, log_data)
   num_arr = numpy.array(map(int,sync_push_all_hosts))
+  if(num_arr.size == 0):
+    sync_push_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PUSH_FirstItr_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
+    sync_push_all_hosts = re.findall(sync_push_regex, log_data)
+    num_arr = numpy.array(map(int,sync_push_all_hosts))
+  print "SYNC_PUSH" , num_arr
 
   sd_sync_push =round(numpy.std(num_arr, axis=0),3)
   mean_sync_push = round(numpy.mean(num_arr, axis=0),3)
