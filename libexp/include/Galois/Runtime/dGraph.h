@@ -68,7 +68,7 @@
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
 namespace cll = llvm::cl;
-static cll::opt<size_t> buffSize("sendBuffSize", cll::desc("max size for send buffers in element count"), cll::init(4096));
+static cll::opt<unsigned> buffSize("sendBuffSize", cll::desc("max size for send buffers in element count"), cll::init(4096));
 #endif
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
@@ -1372,7 +1372,6 @@ public:
      }
    }
 
-  // TODO: Fix indexing issues (not currently using this path in USE_EXP_ALGORITHM
   template<typename FnTy, SyncType syncType, typename SeqTy, bool identity_offsets = false, bool parallelize = true>
   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq, size_t start = 0) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
@@ -1383,7 +1382,7 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
+          gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
      } else {
        for (unsigned int n = start; n < start + size; ++n) {
@@ -1391,7 +1390,7 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          gSerializeLazy(b, lseq, n, extract_wrapper<FnTy, syncType>(lid));
+          gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
        }
      }
    }
@@ -1594,9 +1593,9 @@ public:
      std::string set_timer_str(syncTypeStr + "_SET_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
      StatTimer_set.start();
-     static Galois::DynamicBitSet bit_set_comm;
-     static std::vector<typename FnTy::ValTy> val_vec;
-     static std::vector<unsigned int> offsets;
+     Galois::DynamicBitSet bit_set_comm;
+     std::vector<typename FnTy::ValTy> val_vec;
+     std::vector<unsigned int> offsets;
      auto &sharedNodes = (syncType == syncPush) ? masterNodes : slaveNodes;
 
      size_t num = sharedNodes[from_id].size();
@@ -1679,18 +1678,15 @@ public:
       std::atomic<unsigned> msg_received(0);
 
       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-      std::string statSendBytes_str(syncTypeStr + "_EXP_SEND_BYTES_" + loopName + "_" + get_run_identifier());
-      std::string extract_timer_str(syncTypeStr + "_EXP_EXTRACT_" + loopName + "_" + get_run_identifier());
-      std::string send_timer_str(syncTypeStr + "_EXP_SEND_" + loopName + "_" + get_run_identifier());
-      std::string tryrecv_timer_str(syncTypeStr + "_EXP_TRYRECV_" + loopName + "_" + get_run_identifier());
-      std::string recv_timer_str(syncTypeStr + "_EXP_RECV_" + loopName + "_" + get_run_identifier());
-      std::string timer_str(syncTypeStr + "_EXP" + loopName + "_" + get_run_identifier());
+      std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + loopName + "_" + get_run_identifier());
+      std::string send_timer_str(syncTypeStr + "_SEND_" + loopName + "_" + get_run_identifier());
+      std::string tryrecv_timer_str(syncTypeStr + "_TRYRECV_" + loopName + "_" + get_run_identifier());
+      std::string recv_timer_str(syncTypeStr + "_RECV_" + loopName + "_" + get_run_identifier());
       std::string loop_timer_str(syncTypeStr + "_EXP_MAIN_LOOP" + loopName + "_" + get_run_identifier());
       std::string doall_str("LAMBDA::SENDRECV" + loopName + "_" + get_run_identifier());
 
       Galois::Statistic send_bytes(statSendBytes_str);
 
-      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
       Galois::StatTimer StatTimer_send(send_timer_str.c_str());
       Galois::StatTimer StatTimer_tryrecv(tryrecv_timer_str.c_str());
       Galois::StatTimer StatTimer_RecvTime(recv_timer_str.c_str());
@@ -1704,7 +1700,6 @@ public:
       std::mutex m;
 
       for (unsigned h = 1; h < net.Num; ++h) {
-        std::atomic<unsigned> done(0);
         unsigned x = (id + h) % net.Num;
         auto& indices = sharedNodes[x];
         size_t num_elem = indices.size();
@@ -1712,71 +1707,50 @@ public:
 
         Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nblocks), [&](size_t n){
           // ========== Send ==========
-          // TODO: Can we pull the buffers out and not have to reallocate them everytime?
-          //       Instead, already have a X buffers pre-allocated and serialize into them
           Galois::Runtime::SendBuffer b;
           size_t num = ((n+1) * (block_size) > num_elem) ? (num_elem - (n*block_size)) : block_size;
           size_t start = n * block_size;
-          std::vector<typename FnTy::ValTy> val_vec;
           std::vector<unsigned int> offsets;
 
-          StatTimer_extract.start();
-          if(num > 0){
-            val_vec.resize(num);
-
-            //extract_batch_wrapper<FnTy, syncType>(x, val_vec);
-
-            // TODO: I added block size to the header because I am seeing strange things while debugging, example:
-            // - host 0 sends 4096 elements (normal block size) to host 1. Buffer is 16404 bytes
-            // - host 1 recvs message from 0. Buffer is 16408 bytes, so count is assumed to be 4098.
-            // Not sure why the buffer is not the same size on the recving end...
-            // Message looks like:
-            // COMM_MODE, COUNT, OFFSET, MSG...
-            // Note: element count is first because it aligns well with the already existing code for bitsets
-
-            extract_subset<FnTy, syncType, true, false>(loopName, indices, num, offsets, val_vec, start);
-
+          if (num > 0){
             if (n == 0) {
-              gSerialize(b, dataSplitFirst, num, nblocks, val_vec);
+              gSerialize(b, dataSplitFirst, num, nblocks);
+              auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
+              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
             } else {
-              gSerialize(b, dataSplit, num, start, val_vec);
+              gSerialize(b, dataSplit, num, start);
+              auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
+              extract_subset<FnTy, syncType, decltype(lseq), true, false>(loopName, indices, num, offsets, b, lseq, start);
             }
           } else {
             // TODO: Send dataSplitFirst with # msg = 1. Will need extra check in syncRecvApply
             gSerialize(b, noData);
           }
-          StatTimer_extract.stop();
 
-          // NOTE: StatTimer used to include net.flush(). After merging with VUs stuff, this will be correct. For
-          // now it does not include data transfer timing.
           StatTimer_send.start();
 
           net.sendTagged(x, Galois::Runtime::evilPhase, b);
-
+          net.flush();
           StatTimer_send.stop();
 
           sendbytes_count += b.size();
 
           // ========== Try Receive ==========
+          decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+
           if (m.try_lock()) {
-            // Will force all messages to be processed before continuing
-            // TODO: Wont need this after Vu's stuff is merged
-            net.flush();
-
-            decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
-
             net.handleReceives();
             p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
-
-            if (p) {
-              auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
-              if (val != 0) {
-                recved_firsts += 1;
-                total_incoming += val;
-              }
-              msg_received += 1;
-            }
             m.unlock();
+          }
+
+          if (p) {
+            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
+            if (val != 0) {
+              recved_firsts += 1;
+              total_incoming += val;
+            }
+            msg_received += 1;
           }
         }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
       }
@@ -1793,7 +1767,7 @@ public:
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         if (p) {
-          auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
+          auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, loopName);
           if (val != 0) {
             recved_firsts += 1;
             total_incoming += val;
