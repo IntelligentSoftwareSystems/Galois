@@ -2,6 +2,7 @@
 #include "AnalyzeBFS.h"
 #include "SearchSubgraph.h"
 #include "PageRank.h"
+#include "Filter.h"
 
 #include <vector>
 #include <iostream>
@@ -75,6 +76,20 @@ int main(int argc, char *argv[]) {
   printGraph(g);
   std::cout << "=====" << std::endl;
 
+  // node filter
+  setNumThreads(2);
+  NodeList l = filterNode(g, "id", "node 1");
+  if (0 == l.num) 
+    std::cout << "no nodes whose id is \"node 1\"\n=====" << std::endl;
+  else {
+    std::cout << "nodes whose id is \"node 1\":\n";
+    for (auto i = 0; i < l.num; ++i) {
+      std::cout << l.nodes[i] << " ";
+    }
+    std::cout << "\n=====" << std::endl;
+    deleteNodeList(l);
+  }
+  
   // BFS analysis
   setNumThreads(1);
   analyzeBFS(g, nodes[0], "dist");
