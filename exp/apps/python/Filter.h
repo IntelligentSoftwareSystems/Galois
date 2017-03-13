@@ -2,16 +2,11 @@
 #define GALOIS_PYTHON_FILTER_H
 
 #include "PythonGraph.h"
-
-struct NodeList {
-  int num;
-  GNode *nodes;
-};
+#include "NodeList.h"
 
 extern "C" {
 
 NodeList filterNode(Graph* g, const KeyAltTy key, const ValAltTy value);
-void deleteNodeList(NodeList nl);
 
 } // extern "C"
 

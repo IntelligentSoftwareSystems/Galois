@@ -1,4 +1,5 @@
 #include "Filter.h"
+#include "NodeList.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
 
@@ -24,19 +25,11 @@ NodeList filterNode(Graph *g, const KeyAltTy key, const ValAltTy value) {
   T.stop();
 
   int num = std::distance(bag.begin(), bag.end());
-  GNode *l = NULL;
-  if (num) {
-    l = new GNode [num] ();
-    int i = 0;
-    for (auto n: bag) {
-      l[i++] = n;
-    }
+  NodeList l = createNodeList(num);
+  int i = 0;
+  for (auto n: bag) {
+    l.nodes[i++] = n;
   }
-
-  return {num, l};
-}
-
-void deleteNodeList(NodeList nl) {
-  delete[] nl.nodes;
+  return l;
 }
 
