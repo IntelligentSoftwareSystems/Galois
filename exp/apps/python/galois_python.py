@@ -63,6 +63,11 @@ glib.analyzePagerank.argtypes = [GraphPtr, c_int, c_double, KeyTy]
 glib.deleteNodeDoubles.argtypes = [POINTER(NodeDouble)]
 glib.filterNode.argtypes = [GraphPtr, KeyTy, ValTy]
 glib.filterNode.restype = NodeList
+glib.deleteNodeList.argtypes = [NodeList]
+glib.createNodeList.argtypes = [c_int]
+glib.createNodeList.restype = NodeList
+glib.findReachable.argtypes = [GraphPtr, NodeList, NodeList, c_int]
+glib.findReachable.restype = NodeList
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -182,6 +187,21 @@ class GaloisGraph(object):
     glib.deleteNodeList(l)
     return result
 
+  def findReachable(self, srcList, dstList, hop, numThreads):
+    print "=====", "findReachable", "====="
+    glib.setNumThreads(numThreads)
+    srcL = glib.createNodeList(len(srcList))
+    for i in range(len(srcList)):
+      srcL.nodes[i] = srcList[i]
+    dstL = glib.createNodeList(len(dstList))
+    for i in range(len(dstList)):
+      dstL.nodes[i] = dstList[i]
+    reachL = glib.findReachable(self.graph, srcL, dstL, hop)
+    result = []
+    for i in range(reachL.num):
+      result.append(reachL.nodes[i])
+    return result
+
 def test():
   g = GaloisGraph("g")
 
@@ -231,8 +251,6 @@ def test():
   g.setEdgeAttr(e5n2n0, "id", "edge 5: 2 -> 0")
   g.printGraph()
 
-  pprint.pprint(g.filterNode("id", "node 1", 3))
-
   g.analyzeBFS(n0, "dist", 1)
   g.printGraph()
 
@@ -250,6 +268,16 @@ def test():
   del g2
 
   pprint.pprint(g.analyzePagerank(10, 0.01, "pagerank", 2))
+
+  srcList = g.filterNode("id", "node 0", 3)
+  print "srcList:"
+  pprint.pprint(srcList)
+  dstList = g.filterNode("language", "english", 2)
+  print "dstList:"
+  pprint.pprint(dstList)
+  reachList = g.findReachable(srcList, dstList, 1, 2)
+  print "reachList:"
+  pprint.pprint(reachList)
 
   del g
 

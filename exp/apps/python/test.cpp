@@ -3,6 +3,7 @@
 #include "SearchSubgraph.h"
 #include "PageRank.h"
 #include "Filter.h"
+#include "Reachability.h"
 
 #include <vector>
 #include <iostream>
@@ -96,6 +97,25 @@ int main(int argc, char *argv[]) {
   printGraph(g);
   std::cout << "=====" << std::endl;
 
+  // reachability
+  setNumThreads(2);
+  NodeList src = createNodeList(1);
+  src.nodes[0] = nodes[2];
+  std::cout << "src node(s):\n";
+  printNodeList(src);
+  NodeList dst = createNodeList(1);
+  dst.nodes[0] = nodes[1];
+  std::cout << "dst node(s):\n";
+  printNodeList(dst);
+  int hop = 2;
+  NodeList reach = findReachable(g, src, dst, hop);
+  std::cout << "nodes reachable from src to dst within " << hop << " steps:\n";
+  printNodeList(reach);
+  std::cout << "=====" << std::endl;
+  deleteNodeList(reach); 
+  deleteNodeList(src);
+  deleteNodeList(dst);
+
   // find outgoing edges
   if(g->findEdge(nodes[0], nodes[1]) != g->edge_end(nodes[0]))
     std::cout << "edge 1 exists" << std::endl;
@@ -114,6 +134,7 @@ int main(int argc, char *argv[]) {
 
   if(g->findEdge(nodes[2], nodes[1]) != g->edge_end(nodes[2]))
     std::cout << ((DIRECTED) ? "non-existing edge!" : "implied by edge 4") << std::endl;
+  std::cout << "=====" << std::endl;
 
 #if !(DIRECTED && !IN_EDGES)
   // find incoming edges
@@ -134,6 +155,7 @@ int main(int argc, char *argv[]) {
 
   if(g->findInEdge(nodes[1], nodes[2]) != g->in_edge_end(nodes[1]))
     std::cout << ((DIRECTED) ? "non-existing in_edge!" : "the same as edge 4") << std::endl;
+  std::cout << "=====" << std::endl;
 #endif
 
   // sort edges by dst
@@ -183,6 +205,7 @@ int main(int argc, char *argv[]) {
     for(auto i: g->getEdgeData(e))
       std::cout << "  " << i.first << ": " << i.second << std::endl;
   } 
+  std::cout << "=====" << std::endl;
 
   // subgraph isomorphism
   Graph *g2 = createGraph();
@@ -196,17 +219,23 @@ int main(int argc, char *argv[]) {
   edges.push_back(addEdge(g2, nodes[4], nodes[5]));
   edges.push_back(addEdge(g2, nodes[5], nodes[3]));
   printGraph(g2);
+  std::cout << "=====" << std::endl;
 
   setNumThreads(3);
   NodePair *result = searchSubgraphUllmann(g, g2, 10);
   deleteGraphMatches(result);
+  std::cout << "=====" << std::endl;
+
   result = searchSubgraphVF2(g, g2, 10);
   deleteGraphMatches(result);
   deleteGraph(g2);
+  std::cout << "=====" << std::endl;
 
+  // pagerank
   setNumThreads(2);
   NodeDouble *pr = analyzePagerank(g, 10, 0.01, "pr");
   deleteNodeDoubles(pr);
+  std::cout << "=====" << std::endl;
 
   deleteGraph(g);
   nodes.clear();

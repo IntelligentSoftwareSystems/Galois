@@ -5,6 +5,7 @@ add_library(galois_python SHARED
   PageRank.cpp
   Filter.cpp
   NodeList.cpp
+  Reachability.cpp
   $<TARGET_OBJECTS:gllvm_obj>
   $<TARGET_OBJECTS:galois_substrate_obj>
   $<TARGET_OBJECTS:galois_runtime_obj> 

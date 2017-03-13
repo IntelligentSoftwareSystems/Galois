@@ -11,6 +11,7 @@ struct NodeList {
 extern "C" {
 
 NodeList createNodeList(int num);
+void printNodeList(NodeList nl);
 void deleteNodeList(NodeList nl);
 
 } // extern "C"
