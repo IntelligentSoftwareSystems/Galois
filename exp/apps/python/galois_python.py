@@ -66,8 +66,12 @@ glib.filterNode.restype = NodeList
 glib.deleteNodeList.argtypes = [NodeList]
 glib.createNodeList.argtypes = [c_int]
 glib.createNodeList.restype = NodeList
-glib.findReachable.argtypes = [GraphPtr, NodeList, NodeList, c_int]
-glib.findReachable.restype = NodeList
+glib.findReachableFrom.argtypes = [GraphPtr, NodeList, c_int]
+glib.findReachableFrom.restype = NodeList
+glib.findReachableTo.argtypes = [GraphPtr, NodeList, c_int]
+glib.findReachableTo.restype = NodeList
+glib.findReachableBetween.argtypes = [GraphPtr, NodeList, NodeList, c_int]
+glib.findReachableBetween.restype = NodeList
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -187,8 +191,25 @@ class GaloisGraph(object):
     glib.deleteNodeList(l)
     return result
 
-  def findReachable(self, srcList, dstList, hop, numThreads):
-    print "=====", "findReachable", "====="
+  def findReachableOutward(self, root, isBackward, hop, numThreads):
+    print "=====", "findReachableOutward", "====="
+    glib.setNumThreads(numThreads)
+    rootL = glib.createNodeList(len(root))
+    for i in range(len(root)):
+      rootL.nodes[i] = root[i]
+    if isBackward:
+      print "backward within", hop, "steps"
+      reachL = glib.findReachableFrom(self.graph, rootL, hop)
+    else:
+      print "forward within", hop, "steps"
+      reachL = glib.findReachableTo(self.graph, rootL, hop)
+    result = []
+    for i in range(reachL.num):
+      result.append(reachL.nodes[i])
+    return result
+
+  def findReachableBetween(self, srcList, dstList, hop, numThreads):
+    print "=====", "findReachableBetween", "====="
     glib.setNumThreads(numThreads)
     srcL = glib.createNodeList(len(srcList))
     for i in range(len(srcList)):
@@ -196,7 +217,7 @@ class GaloisGraph(object):
     dstL = glib.createNodeList(len(dstList))
     for i in range(len(dstList)):
       dstL.nodes[i] = dstList[i]
-    reachL = glib.findReachable(self.graph, srcL, dstL, hop)
+    reachL = glib.findReachableBetween(self.graph, srcL, dstL, hop)
     result = []
     for i in range(reachL.num):
       result.append(reachL.nodes[i])
@@ -269,15 +290,21 @@ def test():
 
   pprint.pprint(g.analyzePagerank(10, 0.01, "pagerank", 2))
 
-  srcList = g.filterNode("id", "node 0", 3)
+  srcList = g.filterNode("color", "red", 3)
   print "srcList:"
   pprint.pprint(srcList)
-  dstList = g.filterNode("language", "english", 2)
+  dstList = g.filterNode("id", "node 2", 2)
   print "dstList:"
   pprint.pprint(dstList)
-  reachList = g.findReachable(srcList, dstList, 1, 2)
-  print "reachList:"
-  pprint.pprint(reachList)
+  fromList = g.findReachableOutward(dstList, True, 1, 2)
+  print "fromList:"
+  pprint.pprint(fromList)
+  toList = g.findReachableOutward(srcList, False, 1, 2)
+  print "toList:"
+  pprint.pprint(toList)
+  betweenList = g.findReachableBetween(srcList, dstList, 2, 2)
+  print "betweenList:"
+  pprint.pprint(betweenList)
 
   del g
 

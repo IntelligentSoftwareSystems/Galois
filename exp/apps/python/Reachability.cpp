@@ -2,6 +2,8 @@
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
 
+typedef Galois::InsertBag<GNode> NodeSet;
+
 template<bool isBackward>
 struct Reach {
   Graph& g;
@@ -46,14 +48,7 @@ struct Reach {
   }
 };
 
-// report nodes touched by shortest paths from src to dst within hop steps
-//   1. go forward from src by hop steps 
-//   2. go backward from dst by hop steps
-//   3. intersect nodes touched by 1. and 2.
-NodeList findReachable(Graph *g, NodeList src, NodeList dst, int hop) {
-  Galois::StatManager statManager;
-  Galois::InsertBag<GNode> from, to, intersect;
-
+static void initialize(Graph *g) {
   // set all distance to infinity
   Galois::do_all_local(*g, 
     [=] (GNode n)
@@ -64,59 +59,120 @@ NodeList findReachable(Graph *g, NodeList src, NodeList dst, int hop) {
       },
     Galois::do_all_steal<true>()
     );
+}
 
-  // set forward distance of src to 0 
-  for (auto i = 0; i < src.num; ++i) {
-    auto n = src.nodes[i];
-    g->getData(n).II.vInt1 = 0;
-    from.push_back(n);
+template<bool isBackward>
+static void findOutward(Graph *g, NodeList l, int hop) {
+  NodeSet w;
+
+  // set distance of l.nodes to 0 
+  for (auto i = 0; i < l.num; ++i) {
+    auto n = l.nodes[i];
+    auto& dist = (!isBackward) ? g->getData(n).II.vInt1 : g->getData(n).II.vInt2;
+    dist = 0;
+    w.push_back(n);
   }
 
-  // set backward distance of dst to 0
-  for (auto i = 0; i < dst.num; ++i) {
-    auto n = dst.nodes[i];
-    g->getData(n).II.vInt2 = 0;
-    to.push_back(n);
-  }
+  // move from w up to hop steps
+  Galois::for_each_local(w, Reach<isBackward>{*g, hop});
+}
 
-  Galois::StatTimer T;
-  T.start();
+// collect nodes marked within hop steps
+template<bool isBackward>
+static NodeSet collectOutward(Graph *g, int hop) {
+  NodeSet w;
 
-  // move from src
-  Galois::for_each_local(from, Reach<false>{*g, hop});
-
-  // move from dst
-  Galois::for_each_local(to, Reach<true>{*g, hop});
-
-  // intersect the above two movements
-  Galois::do_all_local(
-    *g, 
-    [g, &intersect, hop] (GNode n) 
+  Galois::do_all_local(*g, 
+    [g, &w, hop] (GNode n)
       {
-        auto& data = (*g).getData(n);
-        auto distF = data.II.vInt1, distB = data.II.vInt2;
-
-        // untouched
-        if (DIST_INFINITY == distF || DIST_INFINITY == distB) {
-          return;
-        }
-
-        // only count nodes on shortest paths
-        if (distF + distB <= hop) {
-          intersect.push_back(n);
+        auto dist = (!isBackward) ? (*g).getData(n).II.vInt1 : (*g).getData(n).II.vInt2;
+        if (dist <= hop) {
+          w.push_back(n);
         }
       },
     Galois::do_all_steal<true>()
     );
 
-  T.stop();
+  return w;
+}
 
-  auto num = std::distance(intersect.begin(), intersect.end());
+// collect nodes marked within hop steps from both src and dst
+static NodeSet collectBetween(Graph *g, int hop) {
+  NodeSet w;
+
+  Galois::do_all_local(
+    *g, 
+    [g, &w, hop] (GNode n) 
+      {
+        auto& data = (*g).getData(n);
+        auto distF = data.II.vInt1, distB = data.II.vInt2;
+
+        // only count nodes on shortest paths
+        if (distF + distB <= hop) {
+          w.push_back(n);
+        }
+      },
+    Galois::do_all_steal<true>()
+    );
+
+  return w;
+}
+
+static NodeList allocateNodeList(NodeSet& w) {
+  auto num = std::distance(w.begin(), w.end());
   NodeList l = createNodeList(num);
   auto i = 0;
-  for (auto n: intersect) {
+  for (auto n: w) {
     l.nodes[i++] = n;
   }
   return l;
+}
+
+template<bool isBackward>
+static NodeList findReachableOutward(Graph *g, NodeList l, int hop) {
+  Galois::StatManager statManager;
+
+  Galois::StatTimer T("findReachableOutward");
+  T.start();
+
+  initialize(g);
+  findOutward<isBackward>(g, l, hop);
+  NodeSet w = collectOutward<isBackward>(g, hop);
+
+  T.stop();
+
+  return allocateNodeList(w); 
+}
+
+// find forward, e.g. where src goes to
+NodeList findReachableTo(Graph *g, NodeList src, int hop) {
+  return findReachableOutward<false>(g, src, hop);
+}
+
+// find backward, e.g. where dst comes from
+NodeList findReachableFrom(Graph *g, NodeList dst, int hop) {
+  return findReachableOutward<true>(g, dst, hop);
+}
+
+NodeList findReachableBetween(Graph *g, NodeList src, NodeList dst, int hop) {
+  Galois::StatManager statManager;
+
+  Galois::StatTimer T("findReachableBetween");
+  T.start();
+
+  initialize(g);
+
+  // move forward from src
+  findOutward<false>(g, src, hop);
+
+  // move backward from dst
+  findOutward<true>(g, dst, hop);
+
+  // intersect the two movements
+  NodeSet intersect = collectBetween(g, hop);
+
+  T.stop();
+
+  return allocateNodeList(intersect);
 }
 
