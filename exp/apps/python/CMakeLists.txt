@@ -4,7 +4,7 @@ add_library(galois_python SHARED
   SearchSubgraph.cpp
   PageRank.cpp
   Filter.cpp
-  NodeList.cpp
+  Auxiliary.cpp
   Reachability.cpp
   $<TARGET_OBJECTS:gllvm_obj>
   $<TARGET_OBJECTS:galois_substrate_obj>

@@ -1,5 +1,4 @@
 #include "Filter.h"
-#include "NodeList.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
 

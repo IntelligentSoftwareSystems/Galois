@@ -2,7 +2,7 @@
 #define GALOIS_PYTHON_FILTER_H
 
 #include "PythonGraph.h"
-#include "NodeList.h"
+#include "Auxiliary.h"
 
 extern "C" {
 

@@ -1,6 +1,9 @@
-#include "NodeList.h"
+#include "Auxiliary.h"
 
 #include <iostream>
+#include <limits>
+
+const size_t DIST_INFINITY = std::numeric_limits<size_t>::max() - 1;
 
 NodeList createNodeList(int num) {
   GNode *l = NULL;
@@ -18,5 +21,12 @@ void printNodeList(NodeList nl) {
 
 void deleteNodeList(NodeList nl) {
   delete[] nl.nodes;
+}
+
+void deleteNodeDoubles(NodeDouble *array) {
+  delete[] array;
+}
+void deleteGraphMatches(NodePair *pairs) {
+  delete[] pairs;
 }
 

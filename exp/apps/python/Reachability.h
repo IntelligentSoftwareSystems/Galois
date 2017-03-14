@@ -2,7 +2,7 @@
 #define GALOIS_PYTHON_REACHABILITY_H
 
 #include "PythonGraph.h"
-#include "Filter.h"
+#include "Auxiliary.h"
 
 extern "C" {
 

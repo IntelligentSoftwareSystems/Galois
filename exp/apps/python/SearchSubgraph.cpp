@@ -695,7 +695,3 @@ NodePair *searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k) {
   return result;
 }
 
-void deleteGraphMatches(NodePair *pairs) {
-  delete[] pairs;
-}
-

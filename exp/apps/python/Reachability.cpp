@@ -1,11 +1,6 @@
 #include "Reachability.h"
-#include "Filter.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-
-#include <limits>
-
-static const size_t DIST_INFINITY = std::numeric_limits<size_t>::max() - 1;
 
 template<bool isBackward>
 struct Reach {

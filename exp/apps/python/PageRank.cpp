@@ -211,6 +211,3 @@ NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy
   return reportTop(*g, topK, result);
 }
 
-void deleteNodeDoubles(NodeDouble *array) {
-  delete[] array;
-}

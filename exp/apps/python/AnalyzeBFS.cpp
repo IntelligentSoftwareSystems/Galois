@@ -1,10 +1,9 @@
 #include "AnalyzeBFS.h"
+#include "Auxiliary.h"
 #include "Galois/Statistic.h"
 
 #include <limits>
 #include <iostream>
-
-static const size_t DIST_INFINITY = std::numeric_limits<size_t>::max() - 1;
 
 struct BFS {
   Graph& g;
