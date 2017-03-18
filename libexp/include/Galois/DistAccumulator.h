@@ -32,6 +32,7 @@
 
 #include <limits>
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 
 #ifdef __GALOIS_HET_OPENCL__
 #include "Galois/OpenCL/CL_Header.h"
@@ -43,7 +44,8 @@ template<typename Ty>
 class DGAccumulator {
    Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
 
-   std::atomic<Ty> mdata;
+   Galois::GAccumulator<Ty> mdata;
+   Ty local_mdata, global_mdata;
    static Ty others_mdata;
    static unsigned num_Hosts_recvd;
 #ifdef __GALOIS_HET_OPENCL__
@@ -65,14 +67,15 @@ public:
 #endif
    }
    DGAccumulator& operator+=(const Ty& rhs) {
-      Galois::atomicAdd(mdata, rhs);
-      return *this;
+     mdata += rhs;
+     return *this;
    }
    /************************************************************
     *
     ************************************************************/
    void operator=(const Ty rhs) {
-      mdata.store(rhs);
+     mdata.reset();
+     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
       int err;
       Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
@@ -88,7 +91,8 @@ public:
     ************************************************************/
 
    void set(const Ty rhs) {
-      mdata.store(rhs);
+     mdata.reset();
+     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
       int err;
       Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
@@ -99,8 +103,12 @@ public:
 
    }
    
+   Ty read_local() {
+     return local_mdata; 
+   }
+   
    Ty read() {
-     return mdata.load();
+     return global_mdata;
    }
 
    /************************************************************
@@ -118,6 +126,8 @@ public:
     *
     ************************************************************/
    Ty reduce() {
+     local_mdata = mdata.reduce();
+     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
       Ty tmp;
       Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
@@ -130,7 +140,7 @@ public:
          if (x == net.ID)
             continue;
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, net.ID, mdata);
+         gSerialize(b, net.ID, local_mdata);
          net.sendMsg(x, reduce_landingPad, b);
       }
 
@@ -140,10 +150,10 @@ public:
       }
       Galois::Runtime::getHostBarrier().wait();
 
-      Galois::atomicAdd(mdata, others_mdata);
+      global_mdata += others_mdata;
       others_mdata = 0;
       num_Hosts_recvd = 0;
-      return mdata;
+      return global_mdata;
    }
    /************************************************************
        *
@@ -158,7 +168,9 @@ public:
     *
     ************************************************************/
    Ty reset() {
-      Ty retval = mdata.exchange(0);
+     Ty retval = global_mdata;
+     mdata.reset();
+     local_mdata = global_mdata = 0;
 #ifdef __GALOIS_HET_OPENCL__
       int err;
       Ty val = mdata.load();
