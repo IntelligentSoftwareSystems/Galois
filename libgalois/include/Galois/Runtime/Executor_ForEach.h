@@ -45,7 +45,7 @@
 //#include "Galois/Runtime/SyncContext.h"
 #include "Galois/Runtime/ForEachTraits.h"
 //#include "Galois/Runtime/Range.h"
-//#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"

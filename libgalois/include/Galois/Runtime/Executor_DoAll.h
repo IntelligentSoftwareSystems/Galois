@@ -151,27 +151,28 @@ public:
     iterator end = range.local_end();
 
     if (!STEAL) {
-        while (begin != end) {
-          F(*begin++);
-        }
+      while (begin != end) {
+        F(*begin++);
+      }
     } else {
+      int minSteal = std::distance(begin,end) / 8;
+      state& tld = *TLDS.getLocal();
 
+      tld.populateSteal(begin,end);
 
-template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
-  } else {
-    FunctionTy f_cpy (f);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), [&f_cpy, &range] () {
-        auto begin = range.local_begin();
-        auto end = range.local_end();
+      do {
         while (begin != end)
           F(*begin++);
-      });
+      } while (trySteal(tld, begin, end, minSteal));
     }
   }
+
+};
+
+template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+  ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
