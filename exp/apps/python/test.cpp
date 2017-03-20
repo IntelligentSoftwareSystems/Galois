@@ -4,6 +4,7 @@
 #include "PageRank.h"
 #include "Filter.h"
 #include "Reachability.h"
+#include "Coarsen.h"
 
 #include <vector>
 #include <iostream>
@@ -245,6 +246,38 @@ int main(int argc, char *argv[]) {
   std::cout << "=====" << std::endl;
 
   deleteGraph(g);
+  nodes.clear();
+  edges.clear();
+
+  // coarsen
+  std::vector<std::string> colors = {"red", "green", "blue"};
+  Graph *fg = createGraph();
+  for (int i = 0; i < 10; ++i) {
+    nodes.push_back(createNode(fg));
+    addNode(fg, nodes[i]);
+  }
+  for (int i = 0; i < 9; i++) {
+    setNodeAttr(fg, nodes[i], "color", const_cast<ValAltTy>(colors[i%3].c_str()));
+  }
+  edges.push_back(addEdge(fg, nodes[0], nodes[5]));
+  edges.push_back(addEdge(fg, nodes[1], nodes[6]));
+  edges.push_back(addEdge(fg, nodes[2], nodes[7]));
+  edges.push_back(addEdge(fg, nodes[3], nodes[9]));
+  edges.push_back(addEdge(fg, nodes[4], nodes[7]));
+  edges.push_back(addEdge(fg, nodes[5], nodes[2]));
+  edges.push_back(addEdge(fg, nodes[5], nodes[6]));
+  edges.push_back(addEdge(fg, nodes[8], nodes[7]));
+  edges.push_back(addEdge(fg, nodes[9], nodes[4]));
+  printGraph(fg);
+  std::cout << "coarsening..." << std::endl;
+
+  setNumThreads(3);
+  Graph *cg = createGraph(); 
+  coarsen(fg, cg, "color");
+  printGraph(cg);
+
+  deleteGraph(fg);
+  deleteGraph(cg);
   nodes.clear();
   edges.clear();
 

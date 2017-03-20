@@ -72,6 +72,7 @@ glib.findReachableTo.argtypes = [GraphPtr, NodeList, c_int]
 glib.findReachableTo.restype = NodeList
 glib.findReachableBetween.argtypes = [GraphPtr, NodeList, NodeList, c_int]
 glib.findReachableBetween.restype = NodeList
+glib.coarsen.argtypes = [GraphPtr, GraphPtr, KeyTy]
 
 class GaloisGraph(object):
   """Interface to a Galois graph"""
@@ -223,6 +224,15 @@ class GaloisGraph(object):
       result.append(reachL.nodes[i])
     return result
 
+  def coarsen(self, key, numThreads):
+    print "=====", "coarsen", "====="
+    print "by", key
+    glib.setNumThreads(numThreads)
+    cgName = self.name + " coarsened by " + key
+    cg = GaloisGraph(cgName)
+    glib.coarsen(self.graph, cg.graph, key)
+    return cg
+
 def test():
   g = GaloisGraph("g")
 
@@ -307,6 +317,28 @@ def test():
   pprint.pprint(betweenList)
 
   del g
+
+  fg = GaloisGraph("fg")
+  for i in range(9):
+    n = fg.addNode(i)
+    fg.setNodeAttr(n, "color", str(i%3))
+  fg.addNode(9) 
+  fg.addEdge(0, 0, 5)
+  fg.addEdge(1, 1, 6)
+  fg.addEdge(2, 2, 7)
+  fg.addEdge(3, 3, 9)
+  fg.addEdge(4, 4, 7)
+  fg.addEdge(5, 5, 2)
+  fg.addEdge(6, 5, 6)
+  fg.addEdge(7, 8, 7)
+  fg.addEdge(8, 9, 4)
+  fg.printGraph()
+
+  cg = fg.coarsen("color", 3)
+  cg.printGraph()
+
+  del fg
+  del cg
 
 if __name__ == "__main__":
   test()

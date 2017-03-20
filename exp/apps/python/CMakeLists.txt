@@ -6,6 +6,7 @@ add_library(galois_python SHARED
   Filter.cpp
   Auxiliary.cpp
   Reachability.cpp
+  Coarsen.cpp
   $<TARGET_OBJECTS:gllvm_obj>
   $<TARGET_OBJECTS:galois_substrate_obj>
   $<TARGET_OBJECTS:galois_runtime_obj> 
