@@ -233,7 +233,7 @@ class GaloisGraph(object):
     glib.coarsen(self.graph, cg.graph, key)
     return cg
 
-def test():
+def testGraphConstruction():
   g = GaloisGraph("g")
 
   n0 = g.addNode("n0")
@@ -282,9 +282,9 @@ def test():
   g.setEdgeAttr(e5n2n0, "id", "edge 5: 2 -> 0")
   g.printGraph()
 
-  g.analyzeBFS(n0, "dist", 1)
-  g.printGraph()
+  return g
 
+def testSubgraphIsomorphism(g):
   g2 = GaloisGraph("g2")
   g2.addNode("g2n0")
   g2.addNode("g2n1")
@@ -297,9 +297,8 @@ def test():
   pprint.pprint(g.searchSubgraph(g2, 10, 3, "VF2"))
 
   del g2
-
-  pprint.pprint(g.analyzePagerank(10, 0.01, "pagerank", 2))
-
+ 
+def testReachability(g):
   srcList = g.filterNode("color", "red", 3)
   print "srcList:"
   pprint.pprint(srcList)
@@ -316,8 +315,7 @@ def test():
   print "betweenList:"
   pprint.pprint(betweenList)
 
-  del g
-
+def testCoarsening():
   fg = GaloisGraph("fg")
   for i in range(9):
     n = fg.addNode(i)
@@ -339,6 +337,20 @@ def test():
 
   del fg
   del cg
+
+def test():
+  g = testGraphConstruction()
+
+  g.analyzeBFS(g.nodeMap["n0"], "dist", 1)
+  g.printGraph()
+
+  pprint.pprint(g.analyzePagerank(10, 0.01, "pagerank", 2))
+
+  testSubgraphIsomorphism(g)
+  testReachability(g)
+  del g
+
+  testCoarsening()
 
 if __name__ == "__main__":
   test()
