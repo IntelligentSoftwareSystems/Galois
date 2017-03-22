@@ -46,6 +46,10 @@ llvm::cl::opt<int> numRuns("runs", llvm::cl::desc("Number of runs"), llvm::cl::i
 
 llvm::cl::opt<bool> savegraph("savegraph", llvm::cl::desc("Bool flag to enable save graph"), llvm::cl::init(false));
 llvm::cl::opt<std::string> outputfile("outputfile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
+llvm::cl::opt<std::string> outputfolder("outputfolder", llvm::cl::desc("Output folder name to store the local graph structure"), llvm::cl::init("."));
+
+llvm::cl::opt<bool> verifyMax("verifyMax", llvm::cl::desc("Just print the max value of nodes fields"), llvm::cl::init(false));
+llvm::cl::opt<std::string> statOutputFile("statOutputFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
 
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
@@ -53,13 +57,13 @@ static void LonestarPrintVersion() {
 
 
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, 
+void LonestarStart(int argc, char** argv,
                    const char* app, const char* desc, const char* url) {
-  
+
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  numThreads = Galois::setActiveThreads(numThreads); 
-  
+  numThreads = Galois::setActiveThreads(numThreads);
+
   LonestarPrintVersion();
   std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";

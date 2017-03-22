@@ -43,9 +43,12 @@ extern llvm::cl::opt<int> numThreads;
 extern llvm::cl::opt<int> numRuns;
 extern llvm::cl::opt<bool> savegraph;
 extern llvm::cl::opt<std::string> outputfile;
+extern llvm::cl::opt<std::string> outputfolder;
+extern llvm::cl::opt<bool> verifyMax;
+extern llvm::cl::opt<std::string> statOutputFile;
 
 
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, 
+void LonestarStart(int argc, char** argv,
                    const char* app, const char* desc = nullptr, const char* url = nullptr);
 #endif

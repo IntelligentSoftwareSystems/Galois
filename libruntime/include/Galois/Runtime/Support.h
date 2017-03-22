@@ -60,6 +60,7 @@ void reportStatGlobal(const std::string& category, unsigned long val);
 
 //! Prints all stats
 void printStats();
+void printStats(std::string);
 void printDistStats();
 
 }
