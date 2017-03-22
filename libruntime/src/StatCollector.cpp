@@ -43,6 +43,7 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <fstream>
 
 using namespace Galois;
 using namespace Galois::Runtime;
@@ -259,11 +260,34 @@ void Galois::Runtime::reportStat(const char* loopname, const char* category, con
                  value, TID);
 }
 
+static std::ofstream& openIfNot_output(std::string fname) {
+  static std::ofstream output_file;
+  if(!output_file.is_open()){
+    output_file.open(fname, std::ios_base::app);
+  }
+  assert(output_file.is_open());
+  return output_file;
+}
+
 void Galois::Runtime::printStats() {
   //getSystemNetworkInterface().reportStats();
   Galois::Runtime::getHostBarrier().wait();
-  //    SM.get()->printDistStats(std::cout);
-    //SM.get()->printStats(std::cout);
+  //SM.get()->printDistStats(std::cout);
+  //SM.get()->printStats(std::cout);
   SM.get()->printStatsForR(std::cout, false);
+}
+
+void Galois::Runtime::printStats(std::string fname) {
+  //getSystemNetworkInterface().reportStats();
+  Galois::Runtime::getHostBarrier().wait();
+  //SM.get()->printDistStats(std::cout);
+  //SM.get()->printStats(std::cout);
+  std::cerr << "STAT FILENAME : " << fname << "\n";
+  if(fname == "")
+    SM.get()->printStatsForR(std::cout, false);
+  else{
+    auto& out = openIfNot_output(fname);
+    SM.get()->printStatsForR(out, false);
+  }
   //  SM.get()->printStatsForR(std::cout, true);
 }

@@ -45,6 +45,7 @@ extern llvm::cl::opt<bool> savegraph;
 extern llvm::cl::opt<std::string> outputfile;
 extern llvm::cl::opt<std::string> outputfolder;
 extern llvm::cl::opt<bool> verifyMax;
+extern llvm::cl::opt<std::string> statOutputFile;
 
 
 //! initialize lonestar benchmark
