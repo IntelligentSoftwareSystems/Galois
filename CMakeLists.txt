@@ -51,6 +51,10 @@ enable_testing()
 
 ###### Configure compiler ######
 
+#Always include debug info and aggressive warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -fno-use-cxa-atexit")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -fno-use-cxa-atexit")
+
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
   set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
@@ -121,7 +125,7 @@ if(USE_SANATIZER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ###### Configure features ######
@@ -294,10 +298,11 @@ function(app name)
     target_link_libraries(${name} galois_exp)
   endif()
   target_link_libraries(${name} ${APP_EXTLIBS})
-  target_link_libraries(${name} lonestar_static)
-  target_link_libraries(${name} galois_graphs_static)
-  target_link_libraries(${name} galois_static)
-  target_link_libraries(${name} gllvm_static)
+  target_link_libraries(${name} lonestar)
+  target_link_libraries(${name} galois_graphs)
+  target_link_libraries(${name} galois_runtime)
+  target_link_libraries(${name} galois_substrate)
+  target_link_libraries(${name} gllvm)
   target_link_libraries(${name} rt)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
@@ -339,8 +344,11 @@ function(makeTest)
     endif()
     target_link_libraries(test-${name} lonestar)
     target_link_libraries(test-${name} galois_graphs)
-    target_link_libraries(test-${name} galois)
+    target_link_libraries(test-${name} galois_runtime)
+    target_link_libraries(test-${name} galois_substrate)
     target_link_libraries(test-${name} gllvm)
+#    target_link_libraries(test-${name} galois_substrate)
+#    target_link_libraries(test-${name} galois)
     list(APPEND commandline "$<TARGET_FILE:test-${name}>")
   elseif(${APP_TARGET}) 
     get_filename_component(base ${name} NAME)
@@ -369,7 +377,8 @@ endfunction()
 #include_directories(include)
 
 add_subdirectory(libllvm)
-add_subdirectory(libgalois)
+add_subdirectory(libsubstrate)
+add_subdirectory(libruntime)
 add_subdirectory(libgraphs)
 add_subdirectory(libexp)
 
@@ -389,7 +398,7 @@ endif()
 ###### Documentation ######
 find_package(Doxygen 1.8)
 if(DOXYGEN_FOUND)
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgalois\" \"${CMAKE_CURRENT_SOURCE_DIR}/libexp")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}

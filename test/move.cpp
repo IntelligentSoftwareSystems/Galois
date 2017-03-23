@@ -1,4 +1,4 @@
-#include "Galois/Runtime/Bag.h"
+#include "Galois/Bag.h"
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
 #include "Galois/FlatMap.h"

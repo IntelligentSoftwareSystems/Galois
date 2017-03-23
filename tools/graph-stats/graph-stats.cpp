@@ -110,7 +110,7 @@ void doSparsityPattern() {
 
   for (int i = 0; i < columns; ++i) {
     std::vector<bool> row(columns);
-    auto p = Galois::Runtime::block_range(graph.begin(), graph.end(), i, columns);
+    auto p = Galois::block_range(graph.begin(), graph.end(), i, columns);
     for (auto ii = p.first, ei = p.second; ii != ei; ++ii) {
       for (auto jj : graph.out_edges(*ii)) {
         row[graph.getEdgeDst(jj) / blockSize] = true;
@@ -131,7 +131,7 @@ void doDegreeHistogram() {
 
   std::vector<std::map<unsigned, unsigned> > hists;
   for (int i = 0; i < numHist; ++i) {
-    auto p = Galois::Runtime::block_range(graph.begin(), graph.end(), i, numHist);
+    auto p = Galois::block_range(graph.begin(), graph.end(), i, numHist);
 
     hists.emplace_back();
     auto& hist = hists.back();
@@ -150,7 +150,7 @@ void doInDegreeHistogram() {
   std::vector<std::map<unsigned, unsigned> > hists;
 
   for (int i = 0; i < numHist; ++i) {
-    auto p = Galois::Runtime::block_range(graph.begin(), graph.end(), i, numHist);
+    auto p = Galois::block_range(graph.begin(), graph.end(), i, numHist);
 
     hists.emplace_back();
     invs.emplace_back();
@@ -196,7 +196,7 @@ void doSortedLogOffsetHistogram() {
   hists.emplace_back();
   auto hist = &hists.back();
   int curHist = 0;
-  auto p = Galois::Runtime::block_range(
+  auto p = Galois::block_range(
       boost::counting_iterator<size_t>(0),
       boost::counting_iterator<size_t>(graph.sizeEdges()),
       curHist,
@@ -220,7 +220,7 @@ void doSortedLogOffsetHistogram() {
         hists.emplace_back();
         hist = &hists.back();
         curHist += 1;
-        p = Galois::Runtime::block_range(
+        p = Galois::block_range(
             boost::counting_iterator<size_t>(0),
             boost::counting_iterator<size_t>(graph.sizeEdges()),
             curHist,
@@ -237,7 +237,7 @@ void doDestinationHistogram() {
   hists.emplace_back();
   auto hist = &hists.back();
   int curHist = 0;
-  auto p = Galois::Runtime::block_range(
+  auto p = Galois::block_range(
       boost::counting_iterator<size_t>(0),
       boost::counting_iterator<size_t>(graph.sizeEdges()),
       curHist,
@@ -252,7 +252,7 @@ void doDestinationHistogram() {
         hists.emplace_back();
         hist = &hists.back();
         curHist += 1;
-        p = Galois::Runtime::block_range(
+        p = Galois::block_range(
             boost::counting_iterator<size_t>(0),
             boost::counting_iterator<size_t>(graph.sizeEdges()),
             curHist,

@@ -1,4 +1,4 @@
-#include "Galois/Runtime/HWTopo.h"
+#include "Galois/Substrate/HWTopo.h"
 
 #include <iostream>
 

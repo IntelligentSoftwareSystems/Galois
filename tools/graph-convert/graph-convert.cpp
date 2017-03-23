@@ -22,7 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Runtime/LargeArray.h"
+#include "Galois/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -179,8 +179,7 @@ void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<std::is_sa
 
 template<typename EdgeTy, typename C>
 void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
-  std::cerr << "conversion undefined for non-void graphs\n";
-  exit(1);
+  GALOIS_DIE("conversion undefined for non-void graphs");
 }
 
 template<typename EdgeTy, typename C>
@@ -190,8 +189,7 @@ void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<!std::is_sam
 
 template<typename EdgeTy, typename C>
 void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
-  std::cerr << "conversion undefined for void graphs\n";
-  exit(1);
+  GALOIS_DIE("conversion undefined for void graphs");
 }
 
 static std::string edgeTypeToName(EdgeType e) {
@@ -267,7 +265,7 @@ struct Edgelist2Gr: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -300,7 +298,7 @@ struct Edgelist2Gr: public Conversion {
     p.setNumNodes(numNodes);
     p.setNumEdges(numEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(numEdges, Galois::getActiveThreads());
+    edgeData.create(numEdges);
 
     infile.clear();
     infile.seekg(0, std::ios::beg);
@@ -361,7 +359,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -372,8 +370,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
     for (int phase = 0; phase < 2; ++phase) {
       std::ifstream infile(infilename.c_str());
       if (!infile) {
-        std::cerr << "Failed to open input file\n";
-        exit(1);
+        GALOIS_DIE("Failed to open input file");
       }
 
       // Skip comments
@@ -397,8 +394,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
         }
       }
       if (tokens.size() != 3) {
-        std::cerr << "Unknown problem specification line: " << line.str() << "\n";
-        exit(1);
+        GALOIS_DIE("Unknown problem specification line: ", line.str());
       }
       // Prefer C functions for maximum compatibility
       //nnodes = std::stoull(tokens[0]);
@@ -411,7 +407,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
         p.setNumNodes(nnodes);
         p.setNumEdges(nedges);
         p.setSizeofEdgeData(EdgeData::size_of::value);
-        edgeData.create(nedges, Galois::getActiveThreads());
+        edgeData.create(nedges);
         p.phase1();
       } else {
         p.phase2();
@@ -423,12 +419,10 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
         infile >> cur_id >> neighbor_id >> weight;
         if (cur_id == 0 || cur_id > nnodes) {
-          std::cerr << "Error: node id out of range: " << cur_id << "\n";
-          exit(1);
+          GALOIS_DIE("Error: node id out of range: ", cur_id);
         }
         if (neighbor_id == 0 || neighbor_id > nnodes) {
-          std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
-          exit(1);
+          GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
         }
 
         // 1 indexed
@@ -443,8 +437,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
       infile.peek();
       if (!infile.eof()) {
-        std::cerr << "Error: additional lines in file\n";
-        exit(1);
+        GALOIS_DIE("Error: additional lines in file");
       }
     }
 
@@ -564,7 +557,7 @@ struct Gr2Edgelist: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -592,10 +585,10 @@ template<bool LittleEndian, typename T>
 void writeEndian(T* out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
-  case 3: value = Galois::Runtime::convert_htobe64(value); break;
-    case 2: value = Galois::Runtime::convert_htole64(value); break;
-    case 1: value = Galois::Runtime::convert_htobe32(value); break;
-    case 0: value = Galois::Runtime::convert_htole32(value); break;
+    case 3: value = Galois::convert_htobe64(value); break;
+    case 2: value = Galois::convert_htole64(value); break;
+    case 1: value = Galois::convert_htobe32(value); break;
+    case 0: value = Galois::convert_htole32(value); break;
     default: abort();
   }
 
@@ -606,10 +599,10 @@ template<bool LittleEndian, typename T>
 void writeEndian(std::ofstream& out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
-    case 3: value = Galois::Runtime::convert_htobe64(value); break;
-    case 2: value = Galois::Runtime::convert_htole64(value); break;
-    case 1: value = Galois::Runtime::convert_htobe32(value); break;
-    case 0: value = Galois::Runtime::convert_htole32(value); break;
+    case 3: value = Galois::convert_htobe64(value); break;
+    case 2: value = Galois::convert_htole64(value); break;
+    case 1: value = Galois::convert_htobe32(value); break;
+    case 0: value = Galois::convert_htole32(value); break;
     default: abort();
   }
 
@@ -622,7 +615,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<InEdgeTy> EdgeData;
+    typedef Galois::LargeArray<InEdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -687,14 +680,14 @@ struct RandomizeNodes: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<GNode> Permutation;
+    typedef Galois::LargeArray<GNode> Permutation;
     typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
     graph.fromFile(infilename);
 
     Permutation perm;
-    perm.create(graph.size(), Galois::getActiveThreads());
+    perm.create(graph.size());
     std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
     std::mt19937 gen;
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
@@ -774,7 +767,7 @@ struct AddRing: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Galois::Graph::FileGraphWriter Writer;
     typedef typename Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -789,8 +782,8 @@ struct AddRing: public Conversion {
     p.setNumNodes(size);
     p.setNumEdges(graph.sizeEdges() + newEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(graph.sizeEdges() + newEdges, Galois::getActiveThreads());
-    edgeValue.create(1, Galois::getActiveThreads());
+    edgeData.create(graph.sizeEdges() + newEdges);
+    edgeValue.create(1);
     setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue);
 
     p.phase1();
@@ -845,7 +838,7 @@ struct AddTree: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Galois::Graph::FileGraphWriter Writer;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -869,8 +862,8 @@ struct AddTree: public Conversion {
     p.setNumNodes(size);
     p.setNumEdges(graph.sizeEdges() + newEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(graph.sizeEdges() + newEdges, Galois::getActiveThreads());
-    edgeValue.create(1, Galois::getActiveThreads());
+    edgeData.create(graph.sizeEdges() + newEdges);
+    edgeValue.create(1);
     //edgeValue.set(0, maxValue + 1);
     setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue);
 
@@ -961,14 +954,14 @@ struct BipartiteSortByDegree: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<GNode> Permutation;
+    typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph, transposegraph;
     ingraph.fromFile(infilename);
     transposegraph.fromFile(transposeFilename);
 
     Permutation perm;
-    perm.create(ingraph.size(), Galois::getActiveThreads());
+    perm.create(ingraph.size());
 
     auto hasOutEdge = [&](GNode x) {
       return ingraph.edge_begin(x) != ingraph.edge_end(x);
@@ -988,7 +981,7 @@ struct BipartiteSortByDegree: public Conversion {
 
     // Finalize by taking the transpose/inverse
     Permutation inverse;
-    inverse.create(ingraph.size(), Galois::getActiveThreads());
+    inverse.create(ingraph.size());
     size_t idx = 0;
     for (auto n : perm) {
       inverse[n] = idx++;
@@ -1007,13 +1000,13 @@ struct SortByDegree: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<GNode> Permutation;
+    typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
     ingraph.fromFile(infilename);
 
     Permutation perm;
-    perm.create(ingraph.size(), Galois::getActiveThreads());
+    perm.create(ingraph.size());
 
     std::copy(ingraph.begin(), ingraph.end(), perm.begin());
     std::sort(perm.begin(), perm.end(), [&](GNode lhs, GNode rhs) -> bool {
@@ -1023,7 +1016,7 @@ struct SortByDegree: public Conversion {
 
     // Finalize by taking the transpose/inverse
     Permutation inverse;
-    inverse.create(ingraph.size(), Galois::getActiveThreads());
+    inverse.create(ingraph.size());
     size_t idx = 0;
     for (auto n : perm) {
       inverse[n] = idx++;
@@ -1041,7 +1034,7 @@ struct ToBigEndian: public HasNoVoidSpecialization {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<GNode> Permutation;
+    typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
     ingraph.fromFile(infilename);
@@ -1060,7 +1053,7 @@ struct SortByHighDegreeParent: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Runtime::LargeArray<GNode> Permutation;
+    typedef Galois::LargeArray<GNode> Permutation;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -1068,7 +1061,7 @@ struct SortByHighDegreeParent: public Conversion {
     auto sz = graph.size();
 
     Permutation perm;
-    perm.create(sz, Galois::getActiveThreads());
+    perm.create(sz);
     std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(sz), perm.begin());
 
     std::cout << "Done setting up perm\n";
@@ -1103,7 +1096,7 @@ struct SortByHighDegreeParent: public Conversion {
     std::cout << "Done sorting\n";
 
     Permutation perm2;
-    perm2.create(sz, Galois::getActiveThreads());
+    perm2.create(sz);
     for (unsigned x = 0; x < perm.size(); ++x) 
       perm2[perm[x]] = x;
 
@@ -1136,7 +1129,7 @@ struct RemoveHighDegree: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1173,7 +1166,7 @@ struct RemoveHighDegree: public Conversion {
     p.setNumNodes(numNodes);
     p.setNumEdges(numEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(numEdges, Galois::getActiveThreads());
+    edgeData.create(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1223,7 +1216,7 @@ struct PartitionBySource: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1242,7 +1235,7 @@ struct PartitionBySource: public Conversion {
       p.setNumNodes(graph.size());
       p.setNumEdges(numEdges);
       p.setSizeofEdgeData(EdgeData::size_of::value);
-      edgeData.create(numEdges, Galois::getActiveThreads());
+      edgeData.create(numEdges);
 
       p.phase1();
       for (Graph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
@@ -1295,7 +1288,7 @@ static std::pair<It,It> divide_by_destination(InDegree& inDegree, int id, int to
 
 template<typename GraphTy, typename InDegree>
 static void compute_indegree(GraphTy& graph, InDegree& inDegree) {
-  inDegree.create(graph.size(), Galois::getActiveThreads());
+  inDegree.create(graph.size());
 
   for (auto nn = graph.begin(), en = graph.end(); nn != en; ++nn) {
     for (auto jj = graph.edge_begin(*nn), ej = graph.edge_end(*nn); jj != ej; ++jj) {
@@ -1315,8 +1308,8 @@ struct PartitionByDestination: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
-    typedef Galois::Runtime::LargeArray<size_t> InDegree;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<size_t> InDegree;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1342,7 +1335,7 @@ struct PartitionByDestination: public Conversion {
       p.setNumNodes(graph.size());
       p.setNumEdges(numEdges);
       p.setSizeofEdgeData(EdgeData::size_of::value);
-      edgeData.create(numEdges, Galois::getActiveThreads());
+      edgeData.create(numEdges);
 
       p.phase1();
       for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1393,7 +1386,7 @@ struct Transpose: public Conversion {
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1405,7 +1398,7 @@ struct Transpose: public Conversion {
     p.setNumNodes(graph.size());
     p.setNumEdges(graph.sizeEdges());
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(graph.sizeEdges(), Galois::getActiveThreads());
+    edgeData.create(graph.sizeEdges());
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1497,7 +1490,7 @@ struct Cleanup: public Conversion {
     }
 
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Writer p;
@@ -1506,7 +1499,7 @@ struct Cleanup: public Conversion {
     p.setNumNodes(graph.size());
     p.setNumEdges(numEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(numEdges, Galois::getActiveThreads());
+    edgeData.create(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1558,7 +1551,7 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
     typedef Galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph orig, graph;
@@ -1613,7 +1606,7 @@ struct MakeUnsymmetric: public Conversion {
     }
 
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Writer p;
@@ -1622,7 +1615,7 @@ struct MakeUnsymmetric: public Conversion {
     p.setNumNodes(graph.size());
     p.setNumEdges(numEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(numEdges, Galois::getActiveThreads());
+    edgeData.create(numEdges);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1671,7 +1664,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -1703,7 +1696,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
         }
       }
       if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
-        std::cerr << "Unknown problem specification line: " << line.str() << "\n";
+        GALOIS_DIE("Unknown problem specification line: ", line.str());
       }
       // Prefer C functions for maximum compatibility
       //nnodes = std::stoull(tokens[tokens.size() - 2]);
@@ -1716,7 +1709,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
         p.setNumNodes(nnodes);
         p.setNumEdges(nedges);
         p.setSizeofEdgeData(EdgeData::size_of::value);
-        edgeData.create(nedges, Galois::getActiveThreads());
+        edgeData.create(nedges);
         p.phase1();
       } else {
         p.phase2();
@@ -1736,12 +1729,10 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
         infile >> cur_id >> neighbor_id >> weight;
         if (cur_id == 0 || cur_id > nnodes) {
-          std::cerr << "Error: node id out of range: " << cur_id << "\n";
-          exit(1);
+          GALOIS_DIE("Error: node id out of range: ", cur_id);
         }
         if (neighbor_id == 0 || neighbor_id > nnodes) {
-          std::cerr << "Error: neighbor id out of range: " << neighbor_id << "\n";
-          exit(1);
+          GALOIS_DIE("Error: neighbor id out of range: ", neighbor_id);
         }
 
         // 1 indexed
@@ -1756,8 +1747,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
       infile.peek();
       if (!infile.eof()) {
-        std::cerr << "Error: additional lines in file\n";
-        exit(1);
+        GALOIS_DIE("Error: additional lines in file");
       }
     }
 
@@ -1799,8 +1789,7 @@ struct Pbbs2Gr: public HasOnlyVoidSpecialization {
 
     infile >> header >> nnodes >> nedges;
     if (header != "AdjacencyGraph") {
-      std::cerr << "Error: unknown file format\n";
-      exit(1);
+      GALOIS_DIE("Error: unknown file format");
     }
 
     p.setNumNodes(nnodes);
@@ -1889,7 +1878,7 @@ struct Gr2Pbbs: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -2183,7 +2172,7 @@ struct Gr2Bsml: public Conversion {
   void convert(const std::string& infilename, const std::string& outfilename) { 
     typedef Galois::Graph::FileGraph Graph;
     typedef typename Graph::GraphNode GNode;
-    typedef typename Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef typename Galois::LargeArray<EdgeTy> EdgeData;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -2245,7 +2234,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::Runtime::LargeArray<EdgeTy> EdgeData;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -2254,8 +2243,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
     std::ofstream outlabels(labelsFilename.c_str());
 
     if (!outlabels) {
-      std::cerr << "unable to create labels file\n";
-      exit(1);
+      GALOIS_DIE("unable to create labels file");
     }
 
     size_t featureOffset = 0;
@@ -2293,10 +2281,8 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
             // Parse "feature:value" pairs
             if (idx) {
               char *delim = strchr(buffer, ':');
-              if (!delim) {
-                std::cerr << "unknown feature format: '" << buffer << "' on line: " << numNodes + 1 << "\n";
-                exit(1);
-              }
+              if (!delim)
+                GALOIS_DIE("unknown feature format: '", buffer, "' on line: ", numNodes + 1);
               *delim = '\0';
               double value = strtod(delim + 1, NULL);
               if (value == 0.0) {
@@ -2317,10 +2303,8 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
             idx = 0;
           } else {
             buffer[idx++] = c;
-            if (idx == maxLength) {
-              std::cerr << "token too long\n";
-              exit(1);
-            }
+            if (idx == maxLength)
+              GALOIS_DIE("token too long");
             continue;
           }
           if (c == '#') {
@@ -2340,7 +2324,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
         p.setNumNodes(numNodes);
         p.setNumEdges(numEdges);
         p.setSizeofEdgeData(EdgeData::size_of::value);
-        edgeData.create(numEdges, Galois::getActiveThreads());
+        edgeData.create(numEdges);
         p.phase1();
       } else if (phase == 1) {
         p.phase2();

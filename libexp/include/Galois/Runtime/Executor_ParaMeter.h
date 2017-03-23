@@ -34,15 +34,14 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
-#include "Galois/Runtime/gtuple.h"
+#include "Galois/gtuple.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Traits.h"
 #include "Galois/Mem.h"
-#include "Galois/Runtime/SyncContext.h"
+#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_ForEach.h"
-//#include "Galois/Runtime/Support.h"
-//#include "Galois/Substrate/gio.h"
-#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Substrate/gio.h"
 #include "Galois/WorkList/Simple.h"
 
 #include <algorithm>
@@ -123,7 +122,7 @@ class ParaMeterExecutor {
     WorkListTy* next;
 
     void copyWL(WorkListTy& wl) {
-      for (boost::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
+      for (Galois::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
         curr->push(*item);
       }
     }
@@ -196,7 +195,7 @@ class ParaMeterExecutor {
       //
       size_t numIter = 0;
 
-      boost::optional<value_type> item;
+      Galois::optional<value_type> item;
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 
@@ -212,7 +211,7 @@ class ParaMeterExecutor {
               break;
 
             case Galois::Runtime::BREAK:
-              gDie("can't handle breaks yet");
+              GALOIS_DIE("can't handle breaks yet");
               break;
 
             default:
@@ -238,7 +237,7 @@ class ParaMeterExecutor {
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        gDie("no progress made in step ", currStep);
+        GALOIS_DIE("no progress made in step ", currStep);
       }
 
       double avgLocks = 0;

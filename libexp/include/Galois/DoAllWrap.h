@@ -32,10 +32,10 @@
 #define GALOIS_DOALL_WRAPPER_H
 
 #include "Galois/Galois.h"
-//#include "Galois/GaloisForwardDecl.h"
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/OrderedTraits.h"
 #include "Galois/Runtime/DoAllCoupled.h"
-//#include "Galois/Runtime/EnvCheck.h"
+#include "Galois/Substrate/EnvCheck.h"
 
 #ifdef GALOIS_USE_TBB
 #include "tbb/parallel_for_each.h"
@@ -105,7 +105,7 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 
     using T = typename R::value_type;
 
-    const unsigned CHUNK_SIZE = Runtime::get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
+    const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
 
     using WL_ty =  Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
 
@@ -142,7 +142,7 @@ struct DoAllImpl<DOALL_CILK> {
 template <> struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Runtime::gDie("Cilk not found\n");
+    GALOIS_DIE("Cilk not found\n");
   }
 };
 #endif

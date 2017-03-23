@@ -2,7 +2,7 @@
 #define GALOIS_ORDERED_TRAITS_H
 
 #include "Galois/Traits.h"
-//#include "Galois/gtuple.h"
+#include "Galois/gtuple.h"
 
 namespace Galois {
 

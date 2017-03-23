@@ -31,7 +31,7 @@
 #ifndef GALOIS_GRAPH_LC_ADAPTOR_H
 #define GALOIS_GRAPH_LC_ADAPTOR_H
 
-#include "Galois/Runtime/LargeArray.h"
+#include "Galois/LargeArray.h"
 #include "Galois/Graphs/Details.h"
 
 namespace Galois { namespace Graph {

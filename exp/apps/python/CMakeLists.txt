@@ -2,13 +2,20 @@ add_library(galois_python SHARED
   PythonGraph.cpp
   AnalyzeBFS.cpp 
   SearchSubgraph.cpp
+<<<<<<< HEAD
   PageRank.cpp
 #  $<TARGET_OBJECTS:gllvm_obj>
 #  $<TARGET_OBJECTS:galois_obj>
+||||||| 9ab2c53... checkpoint
+#  $<TARGET_OBJECTS:gllvm_obj>
+#  $<TARGET_OBJECTS:galois_obj>
+=======
+  $<TARGET_OBJECTS:gllvm_obj>
+  $<TARGET_OBJECTS:galois_substrate_obj>
+  $<TARGET_OBJECTS:galois_runtime_obj> 
+  $<TARGET_OBJECTS:galois_graphs_obj> 
+>>>>>>> parent of 9ab2c53... checkpoint
 )
-
-target_link_libraries(galois_python galois)
-
 target_include_directories(galois_python PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libsubstrate/include

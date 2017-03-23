@@ -28,7 +28,7 @@
 #include <iostream>
 
 #include "StressWork.h"
-#include "Galois/Runtime/ErrorFeedBack.h"
+#include "Galois/Substrate/gio.h"
 
 StressWork::PerCPUtmpVecTy StressWork::perCPUtmpVec;
 
@@ -48,7 +48,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
 
 
-  StressWorkTmpVec*& tmpVecPtr = *StressWork::perCPUtmpVec;
+  StressWorkTmpVec*& tmpVecPtr = *StressWork::perCPUtmpVec.getLocal ();
 
   if (!tmpVecPtr) {
     // TODO: memory not freed. 
@@ -150,7 +150,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
     }
 
     if (!material.getConstitutiveResponse(F, P, A, SimpleMaterial::SKIP_TANGENTS)) {
-      Galois::Runtime::gDie("StressWork.cpp: Error in the constitutive response\n");
+      GALOIS_DIE("StressWork.cpp: Error in the constitutive response\n");
       return false;
     }
 
