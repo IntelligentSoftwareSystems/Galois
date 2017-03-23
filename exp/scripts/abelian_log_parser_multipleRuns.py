@@ -121,6 +121,41 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   mean_set_time = round(sum_set/float(total_hosts),3)
 
 
+  #Finding total mean communication time 
+  sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_all_hosts = re.findall(sync_regex, log_data)
+  num_arr = numpy.array(map(int,sync_all_hosts))
+
+  sum_sync = numpy.sum(num_arr, axis=0)
+
+  sync_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_firstItr_all_hosts = re.findall(sync_firstItr_regex, log_data)
+  num_arr_firstItr = numpy.array(map(int,sync_firstItr_all_hosts))
+
+  # TOTAL SYNC TIME
+  sum_sync += numpy.sum(num_arr_firstItr, axis=0)
+  mean_sync_time = sum_sync/float(total_hosts)
+  mean_sync_time = round(mean_sync_time/divisor,3)
+
+  #Finding total communication volume in bytes 
+  sync_bytes_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._SEND_BYTES_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_bytes_all_hosts = re.findall(sync_bytes_regex, log_data)
+  num_arr = numpy.array(map(int,sync_bytes_all_hosts))
+
+  sum_sync_bytes = numpy.sum(num_arr, axis=0)
+  print "BYTES : ", sum_sync_bytes
+
+  sync_bytes_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._SEND_BYTES_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_bytes_firstItr_all_hosts = re.findall(sync_bytes_firstItr_regex, log_data)
+  num_arr_firstItr = numpy.array(map(int,sync_bytes_firstItr_all_hosts))
+
+  # TOTAL BYTES EXCHANGED
+  sum_sync_bytes += numpy.sum(num_arr_firstItr, axis=0)
+  print "BYTES : ", sum_sync_bytes
+  total_sync_bytes = sum_sync_bytes
+
+
+
   ## Get Graph_init, HG_init, total
   #81a5b117-8054-46af-9a23-1f28e5ed1bba,(NULL),0 , TIMER_GRAPH_INIT,0,0,306
   #timer_graph_init_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_GRAPH_INIT,\d*,\d*,(\d*)')
@@ -136,7 +171,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time /= divisor
     total_time = round(total_time, 3)
 
-  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,total_time
+  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,total_time
 
 '''
   if timer_graph_init is not None:
@@ -314,7 +349,7 @@ def main(argv):
 
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,total_time"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,total_time"
     
 
     header_csv_list = header_csv_str.split(',')
