@@ -44,6 +44,7 @@
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
+<<<<<<< HEAD:libruntime/include/Galois/Runtime/Executor_ForEach.h
 <<<<<<< HEAD:libgalois/include/Galois/Runtime/Executor_ForEach.h
 //#include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Statistics.h"
@@ -62,6 +63,18 @@
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Substrate/ThreadPool.h"
 >>>>>>> parent of 9ab2c53... checkpoint:libruntime/include/Galois/Runtime/Executor_ForEach.h
+||||||| 70f510b... merge
+//#include "Galois/Runtime/Range.h"
+//#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/ThreadPool.h"
+=======
+#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
+>>>>>>> parent of 70f510b... merge:libruntime/include/Galois/Runtime/Executor_ForEach.h
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/Simple.h"
@@ -367,8 +380,20 @@ protected:
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
+<<<<<<< HEAD:libruntime/include/Galois/Runtime/Executor_ForEach.h
     broke(false) {
     reportLoopInstance(loopname);
+||||||| 70f510b... merge
+    broke(false),
+    activeThreads(activeThreads) {
+    reportLoopInstance(loopname);
+=======
+    broke(false) 
+  {
+    if (!combineStats) {
+      reportLoopInstance(loopname);
+    }
+>>>>>>> parent of 70f510b... merge:libruntime/include/Galois/Runtime/Executor_ForEach.h
   }
 
   template<typename WArgsTy, int... Is>
