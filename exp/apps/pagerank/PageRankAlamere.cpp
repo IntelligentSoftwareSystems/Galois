@@ -7,6 +7,35 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> transposeFile("transpose", cll::desc("<transpose file>"), cll::Required);
 
 
+struct PNode {
+  double deg_inv;
+  double value[2];
+
+  explicit PNode (double init=initVal, unsigned out_deg=0) {
+    // Assumption: 0 is to be read first
+    // can't init both to same because the computation 
+    // may converge immediately due to all 1s
+    value[0] = init;
+    value[1] = 0.0;
+
+    deg_inv = 1 / double (out_deg);
+  }
+
+  // even vs odd
+  double getValue (unsigned iteration) const {
+    return value[iteration % 2];
+  }
+
+  double getScaledValue (unsigned iteration) const {
+    return getValue (iteration) * deg_inv;
+  }
+
+  void setValue (unsigned iteration, double val) {
+    value[(iteration + 1) % 2] = val;
+  }
+
+};
+
 
 typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
   ::template with_numa_alloc<true>::type
@@ -25,7 +54,7 @@ public:
 
   typedef std::vector<GNode> VecGNode;
 
-  virtual std::string getVersion(void) {
+  virtual std::string getVersion(void) const {
     return "Pull-Topo-Both-Graphs";
   }
   void initGraph(Graph& graph) {

@@ -1,5 +1,0 @@
-#ifndef PAGE_RANK_ALAMERE_H
-#define PAGE_RANK_ALAMERE_H
-
-
-#endif // PAGE_RANK_ALAMERE_H
