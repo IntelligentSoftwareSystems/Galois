@@ -169,7 +169,7 @@ public:
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
+  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
@@ -190,7 +190,7 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) 
           // f_cpy(*begin++);
       // });
   // }
-}
+// }
 
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
