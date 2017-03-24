@@ -2,36 +2,18 @@ add_library(galois_python SHARED
   PythonGraph.cpp
   AnalyzeBFS.cpp 
   SearchSubgraph.cpp
-<<<<<<< HEAD
   PageRank.cpp
-<<<<<<< HEAD
-#  $<TARGET_OBJECTS:gllvm_obj>
-#  $<TARGET_OBJECTS:galois_obj>
-||||||| 9ab2c53... checkpoint
-#  $<TARGET_OBJECTS:gllvm_obj>
-#  $<TARGET_OBJECTS:galois_obj>
-=======
   $<TARGET_OBJECTS:gllvm_obj>
   $<TARGET_OBJECTS:galois_substrate_obj>
   $<TARGET_OBJECTS:galois_runtime_obj> 
   $<TARGET_OBJECTS:galois_graphs_obj> 
->>>>>>> parent of 9ab2c53... checkpoint
-||||||| 70f510b... merge
-#  $<TARGET_OBJECTS:gllvm_obj>
-#  $<TARGET_OBJECTS:galois_obj>
-=======
-  $<TARGET_OBJECTS:gllvm_obj>
-  $<TARGET_OBJECTS:galois_substrate_obj>
-  $<TARGET_OBJECTS:galois_runtime_obj> 
-  $<TARGET_OBJECTS:galois_graphs_obj> 
->>>>>>> parent of 70f510b... merge
 )
 target_include_directories(galois_python PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libsubstrate/include
   ${CMAKE_SOURCE_DIR}/libruntime/include
   ${CMAKE_SOURCE_DIR}/libgraphs/include
-#  ${CMAKE_SOURCE_DIR}/libexp/include
+  ${CMAKE_SOURCE_DIR}/libexp/include
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 set_target_properties (galois_python PROPERTIES 

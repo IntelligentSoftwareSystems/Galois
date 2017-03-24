@@ -156,55 +156,9 @@ public:
     } else {
       int minSteal = std::distance(begin,end) / 8;
       state& tld = *TLDS.getLocal();
-
-<<<<<<< HEAD:libgalois/include/Galois/Runtime/Executor_DoAll.h
-      tld.populateSteal(begin,end);
-
-<<<<<<< HEAD:libruntime/include/Galois/Runtime/Executor_DoAll.h
-      do {
-||||||| 9ab2c53... checkpoint
-template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
-  } else {
-    FunctionTy f_cpy (f);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), [&f_cpy, &range] () {
-        auto begin = range.local_begin();
-        auto end = range.local_end();
-=======
-template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
-  } else {
-    FunctionTy f_cpy (f);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
-        auto begin = range.local_begin();
-        auto end = range.local_end();
->>>>>>> parent of 9ab2c53... checkpoint:libruntime/include/Galois/Runtime/Executor_DoAll.h
-||||||| 70f510b... merge
-template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
-  } else {
-    FunctionTy f_cpy (f);
-    ThreadPool::getThreadPool().run(Galois::getActiveThreads(), [&f_cpy, &range] () {
-        auto begin = range.local_begin();
-        auto end = range.local_end();
-=======
-      int minSteal = std::distance(begin,end) / 8;
-      state& tld = *TLDS.getLocal();
-
       tld.populateSteal(begin,end);
 
       do {
->>>>>>> parent of 70f510b... merge:libruntime/include/Galois/Runtime/Executor_DoAll.h
-        while (begin != end)
           F(*begin++);
       } while (trySteal(tld, begin, end, minSteal));
     }
@@ -218,12 +172,11 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) 
   ThreadPool::getThreadPool().run(Galois::getActiveThreads(), std::ref(W));
 };
 
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
-
-  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
-
+// template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+// void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+// 
+  // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+  // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
