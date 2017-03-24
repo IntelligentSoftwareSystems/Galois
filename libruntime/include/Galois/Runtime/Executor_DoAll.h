@@ -159,7 +159,9 @@ public:
       tld.populateSteal(begin,end);
 
       do {
+        while (begin != end) {
           F(*begin++);
+        }
       } while (trySteal(tld, begin, end, minSteal));
     }
   }
