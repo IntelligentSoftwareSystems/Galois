@@ -14,7 +14,7 @@ import numpy
 # All time values are in sec by default.
 
 
-def sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, iterationNum, variant, input_graph, deviceKind, devices):
+def sd_iterations(inputFile, outputFile, outputFile_mainfile, benchmark, runs, time_unit, hostNum, iterationNum, variant, input_graph, deviceKind, devices, partition):
 
   mean_time = 0.0;
   recvNum_total = 0
@@ -39,30 +39,90 @@ def sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, it
 
   log_data = open(inputFile).read()
 
-  data = [variant, input_graph, hostNum, benchmark, deviceKind, devices]
+  data = [variant, input_graph, hostNum, benchmark, partition, deviceKind, devices]
   fd_outputFile = open(outputFile, 'a')
+  fd_outputFile_main = open(outputFile_mainfile, 'a')
 
   rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_0_0,(\d*),\d*,(.*)')
 
+  Total_mean_compute = 0.0
+  Total_rsd_compute = 0.0
   rep_search = rep_regex.search(log_data)
   if rep_search is not None:
     rep_factor = rep_search.group(2)
     rep_factor = round(float(rep_factor), 3)
     print ("FOUND  : ", rep_factor)
 
-  for iterNum in range(int(iterationNum)):
+  iterNum_start = 0
+  #do_all_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_FirstItr_(?i)' + re.escape(benchmark) + r'_0_' + r',.*' + r',\d*,(\d*)')
+  #do_all_all_hosts = re.findall(do_all_regex, log_data)
+  #num_arr = numpy.array(map(int,do_all_all_hosts))
+
+  #if(num_arr.size > 0):
+    #sd = numpy.std(num_arr, axis=0)
+    #mean = numpy.mean(num_arr, axis=0)
+    #var = numpy.var(num_arr, axis=0)
+
+    #complete_data = data + [rep_factor,iterNum, mean, var, sd, sd/mean]
+    #wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
+    #wr.writerow(complete_data)
+    #iterNum_start += 1
+
+    #Total_mean_compute += mean
+    #Total_rsd_compute += sd/mean
+
+
+
+  for iterNum in range(iterNum_start, int(iterationNum)):
     do_all_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(iterNum))  +r',.*' + r',\d*,(\d*)')
     do_all_all_hosts = re.findall(do_all_regex, log_data)
-    num_arr = numpy.array(map(int,do_all_all_hosts))
+    num_arr_tmp = numpy.array(map(int,do_all_all_hosts))
+    if(num_arr_tmp.size < int(hostNum) and iterNum == 0):
+      num_arr = numpy.zeros(int(hostNum));
+      for i in range(0, num_arr_tmp.size):
+          num_arr[i] = num_arr_tmp[i]
+    else:
+      num_arr = num_arr_tmp
+    print num_arr
 
-    sd = numpy.std(num_arr, axis=0)
-    mean = numpy.mean(num_arr, axis=0)
-    var = numpy.var(num_arr, axis=0)
+    if(num_arr.size < int(hostNum)):
+      print "SOME DATA IS MISSING\n"
+      #sys.exit("aa! errors! SOME DATA MISSING IN THE LOG FILES!!")
 
-    complete_data = data + [rep_factor,iterNum, mean, var, sd, sd/mean]
+    sd=0.0
+    mean=0.0
+    var=0.0
+    try:
+      if(num_arr.size > 0):
+        sd = numpy.std(num_arr, axis=0)
+        mean = numpy.mean(num_arr, axis=0)
+        var = numpy.var(num_arr, axis=0)
+    except ValueError:
+      pass
+
+    rsd = 0.0;
+    if(mean > 0):
+      rsd = sd/mean
+    complete_data = data + [rep_factor,iterNum, mean, var, sd, rsd]
     wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
     wr.writerow(complete_data)
 
+    Total_mean_compute += mean
+    Total_rsd_compute += rsd
+    print ("MEAN : ", Total_mean_compute)
+    print ("RSD : ", Total_rsd_compute)
+
+
+  Total_mean_compute = round(Total_mean_compute,3)
+  Total_rsd_compute = round(Total_rsd_compute/int(iterationNum),3)
+
+  print ("Total_mean_compute : ", Total_mean_compute)
+  print ("Total_rsd_compute : ", Total_rsd_compute)
+
+  complete_data = data + [rep_factor,iterNum, Total_mean_compute, Total_rsd_compute]
+  wr = csv.writer(fd_outputFile_main, quoting=csv.QUOTE_NONE, lineterminator='\n')
+  wr.writerow(complete_data)
+  fd_outputFile_main.close();
   fd_outputFile.close()
 
 def get_basicInfo(fileName):
@@ -111,11 +171,25 @@ def get_basicInfo(fileName):
   split_cmdLine_input = cmdLine.split()[1].split("/")
   input_graph_name = split_cmdLine_input[-1]
   input_graph = input_graph_name.split(".")[0]
+
+  split_cmdLine = cmdLine.split()
   cut_type = "edge-cut"
-  for index in range(0, len(split_cmdLine_input)):
-    if split_cmdLine_input[index] == "-enableVertexCut":
+  for index in range(0, len(split_cmdLine)):
+    if split_cmdLine[index] == "-enableVertexCut=1":
       cut_type = "vertex-cut"
       break
+    elif split_cmdLine[index] == "-enableVertexCut":
+         cut_type = "vertex-cut"
+         break
+    elif split_cmdLine[index] == "-enableVertexCut=0":
+         cut_type = "edge-cut"
+         break
+
+  #cut_type = "edge-cut"
+  #for index in range(0, len(split_cmdLine_input)):
+    #if split_cmdLine_input[index] == "-enableVertexCut":
+      #cut_type = "vertex-cut"
+      #break
 
   devices = str(hostNum) + " CPU"
   deviceKind = "CPU"
@@ -183,15 +257,21 @@ def main(argv):
   print 'Devices : ', devices
 
 
-  header_csv_str = "variant,input,hosts,benchmark,"
+  header_csv_str = "variant,input,hosts,benchmark,partition,"
   header_csv_str += "deviceKind,devices,replication,iteration,mean,variance,sd,sdByMean"
 
+  header_csv_str_mainfile = "variant,input,hosts,benchmark,partition,"
+  header_csv_str_mainfile += "deviceKind,devices,replication,total_mean_compute,rsd_total"
 
   output_str = variant + ',' + input_graph + ',' + hostNum + ',' + benchmark + ','
   output_str += deviceKind  + ',' + devices  + ','
 
 
   header_csv_list = header_csv_str.split(',')
+  header_csv_list_mainfile = header_csv_str_mainfile.split(',')
+
+  outputFile_mainfile = outputFile
+  outputFile = outputFile + ".csv"
   #if outputFile is empty add the header to the file
   try:
     if os.path.isfile(outputFile) is False:
@@ -205,7 +285,23 @@ def main(argv):
   except OSError:
     print "Error in outfile opening\n"
 
-  sd_iterations(inputFile, outputFile, benchmark, runs, time_unit, hostNum, iterationNum, variant, input_graph, deviceKind, devices)
+  outputFile_mainfile = outputFile_mainfile + "_main.csv"
+  try:
+    if os.path.isfile(outputFile_mainfile) is False:
+      fd_outputFile = open(outputFile_mainfile, 'wb')
+      wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
+      wr.writerow(header_csv_list_mainfile)
+      fd_outputFile.close()
+      print "Adding header to the empty file."
+    else:
+      print "outputFile_mainfile : ", outputFile_mainfile, " exists, results will be appended to it."
+  except OSError:
+    print "Error in outfile opening\n"
+
+
+
+
+  sd_iterations(inputFile, outputFile, outputFile_mainfile, benchmark, runs, time_unit, hostNum, iterationNum, variant, input_graph, deviceKind, devices, cut_type)
 '''
   data_list = list(data) #[data] #list(data)
   #data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
