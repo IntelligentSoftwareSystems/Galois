@@ -89,18 +89,23 @@ using Statistic = StatisticBase<unsigned long>;
 class StatManager: private boost::noncopyable {
   std::deque<Statistic*> stats;
   std::string statOutputFile_name;
+  bool stat_printed;
 
 public:
   StatManager(){
    statOutputFile_name = "";
+   stat_printed = false;
   }
   StatManager(std::string name){
    statOutputFile_name = name;
+   stat_printed = false;
   }
   ~StatManager() {
-    for(auto* s : stats)
-      s->report();
-    Galois::Runtime::printStats(statOutputFile_name);
+    if(!stat_printed){
+      for(auto* s : stats)
+        s->report();
+      Galois::Runtime::printStats(statOutputFile_name);
+    }
   }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
@@ -110,7 +115,8 @@ public:
   void reportStat(){
     for(auto* s : stats)
       s->report();
-    Galois::Runtime::printStats();
+    Galois::Runtime::printStats(statOutputFile_name);
+    stat_printed = true;
   }
 };
 
