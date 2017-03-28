@@ -5,13 +5,13 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
-unsigned int * P_DIST_CURRENT;
-unsigned int * P_DIST_OLD;
+unsigned int * P_COMP_CURRENT;
+unsigned int * P_COMP_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-static const int __tb_FirstItr_BFS = TB_SIZE;
-static const int __tb_BFS = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current, unsigned int * p_dist_old)
+static const int __tb_ConnectedComp = TB_SIZE;
+static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -25,19 +25,19 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
     bool pop  = src < __end;
     if (pop)
     {
-      p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
-      p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
+      p_comp_current[src] = graph.node_data[src];
+      p_comp_old[src] = graph.node_data[src];
       is_updated->set(src);
     }
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_FirstItr_BFS;
+  const unsigned __kernel_tb_size = __tb_FirstItr_ConnectedComp;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -65,7 +65,7 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
     // FP: "7 -> 8;
     if (pop)
     {
-      p_dist_old[src] = p_dist_current[src];
+      p_comp_old[src] = p_comp_current[src];
     }
     // FP: "10 -> 11;
     // FP: "13 -> 14;
@@ -142,8 +142,8 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          new_dist = p_comp_current[src];
+          unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -184,8 +184,8 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
             index_type dst;
             unsigned int new_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
-            unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            new_dist = p_comp_current[src];
+            unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
         }
@@ -222,8 +222,8 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          new_dist = p_comp_current[src];
+          unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -238,12 +238,12 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
   }
   // FP: "101 -> 102;
 }
-__global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Sum ret_val)
+__global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_comp_current, unsigned int * p_comp_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_BFS;
+  const unsigned __kernel_tb_size = __tb_ConnectedComp;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -274,9 +274,9 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
     // FP: "7 -> 8;
     if (pop)
     {
-      if (p_dist_old[src] > p_dist_current[src])
+      if (p_comp_old[src] > p_comp_current[src])
       {
-        p_dist_old[src] = p_dist_current[src];
+        p_comp_old[src] = p_comp_current[src];
         ret_val.do_return( 1);
       }
       else
@@ -359,8 +359,8 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          new_dist = p_comp_current[src];
+          unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -401,8 +401,8 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
             index_type dst;
             unsigned int new_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
-            unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            new_dist = p_comp_current[src];
+            unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
         }
@@ -439,8 +439,8 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          new_dist = p_comp_current[src];
+          unsigned int old_dist = atomicMin(&p_comp_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -457,7 +457,7 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
   }
   ret_val.thread_exit<_br>(_ts);
 }
-void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -466,18 +466,18 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsi
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_all_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, local_infinity, local_src_node, ctx);
+  InitializeGraph_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_BFS_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -486,18 +486,18 @@ void FirstItr_BFS_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_C
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_BFS <<<blocks, __tb_FirstItr_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
+  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void FirstItr_BFS_all_cuda(struct CUDA_Context * ctx)
+void FirstItr_ConnectedComp_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_BFS_cuda(0, ctx->nowned, ctx);
+  FirstItr_ConnectedComp_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
-void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
+void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -510,16 +510,16 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), _rv);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
   __retval = *(retval.cpu_rd_ptr());
   // FP: "7 -> 8;
 }
-void BFS_all_cuda(int & __retval, struct CUDA_Context * ctx)
+void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  BFS_cuda(0, ctx->nowned, __retval, ctx);
+  ConnectedComp_cuda(0, ctx->nowned, __retval, ctx);
   // FP: "2 -> 3;
 }

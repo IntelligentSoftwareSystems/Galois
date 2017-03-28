@@ -9,8 +9,8 @@ unsigned int * P_DIST_CURRENT;
 unsigned int * P_DIST_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-static const int __tb_FirstItr_BFS = TB_SIZE;
-static const int __tb_BFS = TB_SIZE;
+static const int __tb_FirstItr_SSSP = TB_SIZE;
+static const int __tb_SSSP = TB_SIZE;
 __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current, unsigned int * p_dist_old)
 {
   unsigned tid = TID_1D;
@@ -32,12 +32,12 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old)
+__global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_FirstItr_BFS;
+  const unsigned __kernel_tb_size = __tb_FirstItr_SSSP;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -142,7 +142,7 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
+          new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
@@ -184,7 +184,7 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
             index_type dst;
             unsigned int new_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
+            new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
             unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
@@ -222,7 +222,7 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
+          new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
@@ -238,12 +238,12 @@ __global__ void FirstItr_BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned
   }
   // FP: "101 -> 102;
 }
-__global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Sum ret_val)
+__global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_BFS;
+  const unsigned __kernel_tb_size = __tb_SSSP;
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
@@ -359,7 +359,7 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
+          new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
@@ -401,7 +401,7 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
             index_type dst;
             unsigned int new_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
+            new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
             unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
@@ -439,7 +439,7 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
           index_type dst;
           unsigned int new_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
+          new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
@@ -477,7 +477,7 @@ void InitializeGraph_all_cuda(const unsigned int & local_infinity, unsigned int 
   InitializeGraph_cuda(0, ctx->nowned, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_BFS_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -486,18 +486,18 @@ void FirstItr_BFS_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_C
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_BFS <<<blocks, __tb_FirstItr_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
+  FirstItr_SSSP <<<blocks, __tb_FirstItr_SSSP>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void FirstItr_BFS_all_cuda(struct CUDA_Context * ctx)
+void FirstItr_SSSP_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_BFS_cuda(0, ctx->nowned, ctx);
+  FirstItr_SSSP_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
-void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
+void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -510,16 +510,16 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), _rv);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
   __retval = *(retval.cpu_rd_ptr());
   // FP: "7 -> 8;
 }
-void BFS_all_cuda(int & __retval, struct CUDA_Context * ctx)
+void SSSP_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  BFS_cuda(0, ctx->nowned, __retval, ctx);
+  SSSP_cuda(0, ctx->nowned, __retval, ctx);
   // FP: "2 -> 3;
 }
