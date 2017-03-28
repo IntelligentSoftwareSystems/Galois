@@ -71,7 +71,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
@@ -330,6 +330,8 @@ if(_graph.is_vertex_cut()) {
 	_graph.sync_pull<SyncerPull_vertexCut_0>("FirstItr_PageRank");
 }
 
+Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
+
 }
 void operator()(WorkItem src) const {
     PR_NodeData& sdata = graph->getData(src);
@@ -362,7 +364,6 @@ struct PageRank {
     
     unsigned _num_iterations = 1;
     
-    unsigned long _num_work_items = _graph.end() - _graph.begin();
     do { 
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
@@ -452,11 +453,10 @@ struct PageRank {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_pull<SyncerPull_vertexCut_0>("PageRank");
     }
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
-    _num_work_items += DGAccumulator_accum.read();
-    }while(DGAccumulator_accum.reduce());
+    }while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 

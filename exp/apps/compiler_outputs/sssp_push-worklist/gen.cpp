@@ -69,7 +69,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
@@ -304,6 +304,12 @@ struct Get_info_functor : public Galois::op_tag {
 	void sync_graph(){
 		sync_graph_static(graph);
 	}
+  void set_num_iter(uint32_t iteration){
+    graph.set_num_iter(iteration);
+  }
+  uint32_t get_run_num() {
+    return graph.get_run_num();
+  }
 	std::string get_run_identifier() const {
 		return graph.get_run_identifier();
 	}
@@ -333,7 +339,7 @@ struct SSSP {
     		auto &local_wl = DBag::get();
     		std::string impl_str("CUDA_FOR_EACH_IMPL_SSSP_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		unsigned long _num_work_items;
+    		_graph.set_num_iter(0);
     		StatTimer_cuda.start();
     		if (_graph.isOwned(src_node)) {
     			cuda_wl.num_in_items = 1;
@@ -341,10 +347,10 @@ struct SSSP {
     		} else
     			cuda_wl.num_in_items = 0;
     		cuda_wl.num_out_items = 0;
-    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
+    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
     		#ifdef __GALOIS_DEBUG_WORKLIST__
@@ -363,10 +369,10 @@ struct SSSP {
     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		cuda_wl.num_out_items = 0;
-    		_num_work_items += cuda_wl.num_in_items;
     		if (cuda_wl.num_in_items > 0)
     			SSSP_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
+    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
     		#ifdef __GALOIS_DEBUG_WORKLIST__
@@ -375,8 +381,7 @@ struct SSSP {
     		dbag.sync();
     		++_num_iterations;
     		}
-    		Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);
-    		Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _num_work_items, 0);
+    		Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
     	{
@@ -449,6 +454,8 @@ int main(int argc, char** argv) {
       }
     }
 #endif
+
+    assert(!enableVCut); // does not vertex-cut yet
 
     StatTimer_hg_init.start();
     Graph* hg;

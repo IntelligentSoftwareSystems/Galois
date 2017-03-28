@@ -67,7 +67,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
@@ -287,6 +287,8 @@ if(_graph.is_vertex_cut()) {
 	_graph.sync_pull<SyncerPull_vertexCut_0>("FirstItr_SSSP");
 }
 
+Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
+
 }
 void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
@@ -314,7 +316,6 @@ struct SSSP {
     
     unsigned _num_iterations = 1;
     
-    unsigned long _num_work_items = 1;
     do { 
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
@@ -399,11 +400,10 @@ struct SSSP {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_pull<SyncerPull_vertexCut_0>("SSSP");
     }
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
-    _num_work_items += DGAccumulator_accum.read();
-    }while(DGAccumulator_accum.reduce());
+    }while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
     
   }
 
