@@ -65,6 +65,8 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
+llvm::cl::opt<bool> useGidMetadata("useGidMetadata", llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), llvm::cl::init(false));
+
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
 
@@ -249,6 +251,12 @@ public:
    //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
    hGraph(unsigned host, unsigned numHosts) :
          GlobalObject(this), round(false), id(host), numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
+
+      if (useGidMetadata) {
+        if (enforce_data_mode != offsetsData) {
+          useGidMetadata = false;
+        }
+      }
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       comm_mode = 0;
@@ -1309,25 +1317,30 @@ public:
 
    template<typename FnTy, SyncType syncType>
    void get_bitset_and_offsets(const std::string &loopName, const std::vector<size_t> &indices, const Galois::DynamicBitSet &bitset_compute, Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count, DataCommMode &data_mode) {
-     bitset_comm.clear();
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-     std::string doall_str(syncTypeStr + "_BITSET_" + loopName + "_" + get_run_identifier());
-     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
-       size_t lid = indices[n];
-       if(bitset_compute.test(lid)){
-         bitset_comm.set(n);
+     if (enforce_data_mode != onlyData) {
+       bitset_comm.clear();
+       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string doall_str(syncTypeStr + "_BITSET_" + loopName + "_" + get_run_identifier());
+       Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
+         size_t lid = indices[n];
+         if(bitset_compute.test(lid)){
+           bitset_comm.set(n);
+         }
+       }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+       get_offsets_from_bitset<syncType>(loopName, bitset_comm, offsets, bit_set_count);
+     }
+     if (enforce_data_mode != noData) {
+       data_mode = enforce_data_mode;
+     } else { // auto
+       if (bit_set_count == 0) {
+         data_mode = noData;
+       } else if ((bit_set_count * sizeof(unsigned int)) < bitset_comm.alloc_size()) {
+         data_mode = offsetsData;
+       } else if ((bit_set_count * sizeof(typename FnTy::ValTy) + bitset_comm.alloc_size()) < (indices.size() * sizeof(typename FnTy::ValTy))) {
+         data_mode = bitsetData;
+       } else {
+         data_mode = onlyData;
        }
-     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
-     get_offsets_from_bitset<syncType>(loopName, bitset_comm, offsets, bit_set_count);
-     if (bit_set_count == 0) {
-       data_mode = noData;
-     } else if ((bit_set_count * sizeof(unsigned int)) < bitset_comm.alloc_size()) {
-       data_mode = offsetsData;
-     } else if ((bit_set_count * sizeof(typename FnTy::ValTy) + bitset_comm.alloc_size()) < (indices.size() * sizeof(typename FnTy::ValTy))) {
-       data_mode = bitsetData;
-     } else {
-       data_mode = onlyData;
-       bit_set_count = indices.size();
      }
    }
 
@@ -1453,16 +1466,38 @@ public:
      return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), s, data_mode);
    }
 
+   template<SyncType syncType>
+   void convert_lid_to_gid(const std::string &loopName, std::vector<unsigned int> &offsets) {
+     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string doall_str(syncTypeStr + "_LID2GID_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(offsets.size()), [&](unsigned int n){
+         offsets[n] = static_cast<uint32_t>(getGID(offsets[n]));
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
+   template<SyncType syncType>
+   void convert_gid_to_lid(const std::string &loopName, std::vector<unsigned int> &offsets) {
+     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string doall_str(syncTypeStr + "_GID2LID_" + loopName + "_" + get_run_identifier());
+     Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(offsets.size()), [&](unsigned int n){
+         offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
+     }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
+   }
+
    template<typename FnTy, SyncType syncType>
    void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
      static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string metadata_str(syncTypeStr + "_METADATA_" + loopName +"_" + get_run_identifier());
+     Galois::Statistic Statistic_metadata(metadata_str.c_str());
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
+     DataCommMode data_mode;
      if(num > 0){
+       data_mode = onlyData;
        val_vec.resize(num);
 
        bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, val_vec);
@@ -1475,9 +1510,11 @@ public:
          gSerialize(b, onlyData, val_vec);
        }
      } else {
+       data_mode = noData;
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
+     Statistic_metadata += data_mode;
    }
 
    template<typename FnTy, SyncType syncType>
@@ -1487,22 +1524,26 @@ public:
      static std::vector<typename FnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string metadata_str(syncTypeStr + "_METADATA_" + loopName +"_" + get_run_identifier());
+     Galois::Statistic Statistic_metadata(metadata_str.c_str());
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
+     DataCommMode data_mode;
      if(num > 0){
        bit_set_comm.resize(num);
+       offsets.resize(num);
        val_vec.resize(num);
        size_t bit_set_count = 0;
-       DataCommMode data_mode;
 
        bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
 
        if (!batch_succeeded) {
          get_bitset_and_offsets<FnTy, syncType>(loopName, indices, bit_set_compute, bit_set_comm, offsets, bit_set_count, data_mode);
-         if (bit_set_count == num) {
+         if (data_mode == onlyData) {
+           bit_set_count = indices.size();
            extract_subset<FnTy, syncType, true>(loopName, indices, bit_set_count, offsets, val_vec);
-         } else {
+         } else if (data_mode != noData) { // bitsetData or offsetsData
            extract_subset<FnTy, syncType, false>(loopName, indices, bit_set_count, offsets, val_vec);
          }
        }
@@ -1516,6 +1557,9 @@ public:
          gSerialize(b, data_mode);
        } else if (data_mode == offsetsData) {
          offsets.resize(bit_set_count);
+         if (useGidMetadata) {
+           convert_lid_to_gid<syncType>(loopName, offsets);
+         }
          val_vec.resize(bit_set_count);
          gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
        } else if (data_mode == bitsetData) {
@@ -1525,9 +1569,11 @@ public:
          gSerialize(b, data_mode, val_vec);
        }
      } else {
+       data_mode = noData;
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
+     Statistic_metadata += data_mode;
    }
 
    template<typename FnTy, SyncType syncType>
@@ -1583,6 +1629,9 @@ public:
            if (data_mode == offsetsData) {
              offsets.resize(bit_set_count);
              Galois::Runtime::gDeserialize(buf, offsets);
+             if (useGidMetadata) {
+               convert_gid_to_lid<syncType>(loopName, offsets);
+             }
            } else if (data_mode == bitsetData) {
              bit_set_comm.resize(num);
              Galois::Runtime::gDeserialize(buf, bit_set_comm);

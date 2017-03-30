@@ -34,6 +34,7 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Version.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/DataCommMode.h"
 
 #include <iostream>
 #include <sstream>
@@ -50,6 +51,9 @@ llvm::cl::opt<std::string> outputfolder("outputfolder", llvm::cl::desc("Output f
 
 llvm::cl::opt<bool> verifyMax("verifyMax", llvm::cl::desc("Just print the max value of nodes fields"), llvm::cl::init(false));
 llvm::cl::opt<std::string> statOutputFile("statOutputFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
+llvm::cl::opt<unsigned int> enforce_metadata("metadata", llvm::cl::desc("Enforce communication metadata: 0 - auto (default), 1 - bitset, 2 - indices, 3 - no metadata"), llvm::cl::init(0));
+
+DataCommMode enforce_data_mode = noData;
 
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
@@ -63,6 +67,8 @@ void LonestarStart(int argc, char** argv,
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
+  assert(enforce_metadata <= 3);
+  enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
   
   LonestarPrintVersion();
   std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
