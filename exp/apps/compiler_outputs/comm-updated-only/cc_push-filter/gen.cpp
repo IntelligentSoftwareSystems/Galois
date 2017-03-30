@@ -462,7 +462,6 @@ void operator()(GNode src) const {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = snode.comp_current;
-      Galois::atomicMin(dnode.comp_current, new_dist);
       unsigned int old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
       if (old_dist > new_dist) bitset_comp_current.set(dst);
       
