@@ -17,7 +17,7 @@ target_include_directories(galois_python PUBLIC
   ${CMAKE_SOURCE_DIR}/libsubstrate/include
   ${CMAKE_SOURCE_DIR}/libruntime/include
   ${CMAKE_SOURCE_DIR}/libgraphs/include
-#  ${CMAKE_SOURCE_DIR}/libexp/include
+  ${CMAKE_SOURCE_DIR}/libexp/include
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 set_target_properties (galois_python PROPERTIES 

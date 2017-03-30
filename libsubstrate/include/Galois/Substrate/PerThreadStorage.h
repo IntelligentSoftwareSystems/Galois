@@ -113,8 +113,8 @@ void initPTS(unsigned maxT);
 template<typename T>
 class PerThreadStorage {
 protected:
-  PerBackend* b;
   unsigned offset;
+  PerBackend* b;
 
   void destruct() {
     if (offset == ~0U)

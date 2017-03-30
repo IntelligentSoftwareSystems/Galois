@@ -52,7 +52,7 @@ public:
   OrderDepTest (void): V_MAX (DefaultValues::MAX_SPEED * FP(unsigned(vmaxFactor))) {
   }
 
-  bool dependsOn(const Event& later, const Event& earlier) {
+  bool dependsOn(const Event& later, const Event& earlier) const {
 
     assert (earlier < later);
 
@@ -61,7 +61,7 @@ public:
 
 private:
 
-  bool dependsOnInternal (const Event& e2, const Event& e1) {
+  bool dependsOnInternal (const Event& e2, const Event& e1) const {
     assert (e1 < e2);
 
     GALOIS_ASSERT (e1.getBall ()->vel ().mag () < V_MAX);

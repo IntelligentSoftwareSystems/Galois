@@ -193,7 +193,7 @@ static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
 
     double * resvals = new double[localsize];
     size_t * indices = new size_t[localsize];
-    double * dresvals;
+    double * dresvals = nullptr;
 
     if (mode == DRESIDUE) {
       dresvals = new double[localsize * localsize];

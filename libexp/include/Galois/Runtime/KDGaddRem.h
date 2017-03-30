@@ -249,7 +249,7 @@ struct SourceTest {
   template <typename Ctxt>
   bool operator () (const Ctxt* ctxt) const {
     assert (ctxt != NULL);
-    return ctxt->isSrc () && stabilityTest (ctxt->active);
+    return ctxt->isSrc () && stabilityTest (ctxt->getActive());
   }
 };
 
@@ -266,6 +266,8 @@ struct SourceTest <void> {
 // TODO: remove template parameters that can be passed to execute
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt>
 class KDGaddRemAsyncExec: public IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+
+  using ThisClass = KDGaddRemAsyncExec;
 
 protected:
   using Base = IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
@@ -365,14 +367,14 @@ protected:
         // addWL.get ().clear ();
         UserCtxt& userCtxt = *(exec.userHandles.getLocal ());
 
-        if (Base::NEEDS_PUSH) {
+        if (ThisClass::NEEDS_PUSH) {
           userCtxt.resetPushBuffer ();
         }
 
         exec.opFunc (src->getActive (), userCtxt); 
 
 
-        if (Base::NEEDS_PUSH) {
+        if (ThisClass::NEEDS_PUSH) {
 
           exec.addCtxtWL.get ().clear ();
           CreateCtxtExpandNhood addCtxt {exec, ntotal};
@@ -485,8 +487,8 @@ public:
 
     Galois::do_all_choice (makeLocalRange(ctxtDelQ),
         [this] (Ctxt* ctxt) {
-          Base::ctxtAlloc.destroy (ctxt);
-          Base::ctxtAlloc.deallocate (ctxt, 1);
+          ThisClass::ctxtAlloc.destroy (ctxt);
+          ThisClass::ctxtAlloc.deallocate (ctxt, 1);
         },
         std::make_tuple (
           Galois::loopname ("delete_all_ctxt"),
@@ -525,11 +527,11 @@ public:
     applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
     t_for.stop ();
 
-    reportStat (Base::loopname, "Number of iterations: ", nsrc.reduce (), 0);
-    reportStat (Base::loopname, "Time taken in creating intial contexts: ",   t_create.get (), 0);
-    reportStat (Base::loopname, "Time taken in finding intial sources: ", t_find.get (), 0);
-    reportStat (Base::loopname, "Time taken in for_each loop: ", t_for.get (), 0);
-    reportStat (Base::loopname, "Time taken in destroying all the contexts: ", t_destroy.get (), 0);
+    reportStat (ThisClass::loopname, "Number of iterations: ", nsrc.reduce (), 0);
+    reportStat (ThisClass::loopname, "Time taken in creating intial contexts: ",   t_create.get (), 0);
+    reportStat (ThisClass::loopname, "Time taken in finding intial sources: ", t_find.get (), 0);
+    reportStat (ThisClass::loopname, "Time taken in for_each loop: ", t_for.get (), 0);
+    reportStat (ThisClass::loopname, "Time taken in destroying all the contexts: ", t_destroy.get (), 0);
   }
 };
 
@@ -544,6 +546,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
   using CtxtWL = typename Base::CtxtWL;
   using Accumulator = typename Base::Accumulator;
 
+  using ThisClass = KDGaddRemWindowExec;
 
 
   WindowWL winWL;
@@ -552,12 +555,12 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
   Accumulator nsrc;
 
   void beginRound (void) {
-    Base::refillRound (winWL, pending);
+    ThisClass::refillRound (winWL, pending);
   }
 
   void expandNhoodPending (void) {
 
-    Base::expandNhoodpickSources (makeLocalRange (pending), sources, Base::roundTasks);
+    ThisClass::expandNhoodpickSources (makeLocalRange (pending), sources, ThisClass::roundTasks);
     pending.clear_all_parallel ();
 
   }
@@ -566,18 +569,18 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
     Galois::optional<T> minWinWL;
 
-    if (Base::NEEDS_PUSH && Base::targetCommitRatio != 0.0) {
+    if (ThisClass::NEEDS_PUSH && ThisClass::targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin ();
     }
     
-    using Op = typename Base::template ApplyOperator<WindowWL>;
-    Base::applyOperator (sources, Op {*this, winWL, minWinWL, Base::roundCommits, Base::roundTasks});
+    using Op = typename ThisClass::template ApplyOperator<WindowWL>;
+    Base::applyOperator (sources, Op {*this, winWL, minWinWL, ThisClass::roundCommits, ThisClass::roundTasks});
   }
 
   template <typename R>
   void push_initial (const R& range) {
 
-    if (Base::targetCommitRatio == 0.0) {
+    if (ThisClass::targetCommitRatio == 0.0) {
 
       Galois::do_all_choice (range,
           [this] (const T& x) {
@@ -625,7 +628,7 @@ public:
 
       applyOperator ();
 
-      Base::endRound ();
+      ThisClass::endRound ();
 
 
     }

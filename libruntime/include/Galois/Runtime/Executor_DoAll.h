@@ -150,31 +150,35 @@ public:
     iterator end = range.local_end();
 
     if (!STEAL) {
-        while (begin != end) {
-          F(*begin++);
-        }
+      while (begin != end) {
+        F(*begin++);
+      }
     } else {
-
-
       int minSteal = std::distance(begin,end) / 8;
       state& tld = *TLDS.getLocal();
-
       tld.populateSteal(begin,end);
 
       do {
-        while (begin != end)
+        while (begin != end) {
           F(*begin++);
+        }
       } while (trySteal(tld, begin, end, minSteal));
     }
   }
+
 };
 
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
-
   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
   Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+};
 
+// template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+// void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+// 
+  // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+  // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
@@ -188,7 +192,7 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) 
           // f_cpy(*begin++);
       // });
   // }
-}
+// }
 
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {

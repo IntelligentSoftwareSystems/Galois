@@ -37,7 +37,7 @@
 #include "Galois/Galois.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/LCordered.h"
+#include "Galois/Runtime/KDGaddRem.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
@@ -56,15 +56,15 @@ namespace des_ord {
 
 typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
-typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
+typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
 
 
-struct SimObjInfo: public TypeHelper {
+struct SimObjInfo: public TypeHelper<> {
 
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   GNode node;
@@ -137,10 +137,12 @@ struct SimObjInfo: public TypeHelper {
 
 
 class DESordered: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct NhoodVisitor {
     typedef int tt_has_fixed_neighborhood;
+
+    static const unsigned CHUNK_SIZE = 4;
 
     Graph& graph;
     VecSobjInfo& sobjInfoVec;
@@ -204,7 +206,11 @@ class DESordered:
       nevents += 1;
       newEvents.get ().clear ();
 
-      recvObj->execEvent (event, graph, recvInfo.node, newEvents.get ());
+      auto addNewEvents = [this] (const Event_ty& e) {
+        newEvents.get().push_back(e);
+      };
+
+      recvObj->execEvent (event, graph, recvInfo.node, addNewEvents);
 
       for (AddList_ty::local_iterator a = newEvents.get ().begin ()
           , enda = newEvents.get ().end (); a != enda; ++a) {
@@ -250,13 +256,15 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_lc (
+    Galois::Runtime::for_each_ordered_ar (
         Galois::Runtime::makeStandardRange(
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
-        ReadyTest (sobjInfoVec), "des_main_loop");
+        ReadyTest (sobjInfoVec), 
+        std::make_tuple(
+          Galois::loopname("des_main_loop")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

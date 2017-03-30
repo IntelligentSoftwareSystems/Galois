@@ -216,13 +216,15 @@ public:
   template <typename R>
   void execute (const R& initRange) {
 
-    Galois::Runtime::do_all_impl (initRange,
+    Galois::do_all_choice(initRange,
         [this] (const T& item) {
           Task* initTask = taskAlloc.allocate (1);
           taskAlloc.construct (initTask, item, nullptr, Task::DIVIDE);
           push (initTask);
         },
-        "create_initial_tasks", true);
+        std::make_tuple(
+          Galois::loopname("create_initial_tasks"),
+          Galois::chunk_size<4>()));
 
     typedef WorkList::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = nullptr;
