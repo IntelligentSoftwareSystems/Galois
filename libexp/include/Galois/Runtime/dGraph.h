@@ -1269,7 +1269,7 @@ public:
      Galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str());
      StatTimer_offsets.start();
      auto activeThreads = Galois::getActiveThreads();
-     std::vector<unsigned int> toffsets(activeThreads);
+     std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
      Galois::on_each([&](unsigned tid, unsigned nthreads) {
          unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
          unsigned int start = tid*block_size;
@@ -1279,28 +1279,31 @@ public:
          for (unsigned int i = start; i < end; ++i) {
            if (bitset_comm.test(i)) ++count;
          }
-         toffsets[tid] = count;
+         t_prefix_bit_counts[tid] = count;
      });
      for (unsigned int i = 1; i < activeThreads; ++i) {
-       toffsets[i] += toffsets[i-1];
+       t_prefix_bit_counts[i] += t_prefix_bit_counts[i-1];
      }
-     bit_set_count = toffsets[activeThreads - 1];
-     Galois::on_each([&](unsigned tid, unsigned nthreads) {
-         unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
-         unsigned int start = tid*block_size;
-         unsigned int end = (tid+1)*block_size;
-         if (end > bitset_comm.size()) end = bitset_comm.size();
-         unsigned int count = 0;
-         unsigned int toffset;
-         if (tid == 0) toffset = 0;
-         else toffset = toffsets[tid-1];
-         for (unsigned int i = start; i < end; ++i) {
-           if (bitset_comm.test(i)) {
-             offsets[toffset + count] = i;
-             ++count;
+     bit_set_count = t_prefix_bit_counts[activeThreads - 1];
+     if (bit_set_count > 0) {
+       offsets.resize(bit_set_count);
+       Galois::on_each([&](unsigned tid, unsigned nthreads) {
+           unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
+           unsigned int start = tid*block_size;
+           unsigned int end = (tid+1)*block_size;
+           if (end > bitset_comm.size()) end = bitset_comm.size();
+           unsigned int count = 0;
+           unsigned int t_prefix_bit_count;
+           if (tid == 0) t_prefix_bit_count = 0;
+           else t_prefix_bit_count = t_prefix_bit_counts[tid-1];
+           for (unsigned int i = start; i < end; ++i) {
+             if (bitset_comm.test(i)) {
+               offsets[t_prefix_bit_count + count] = i;
+               ++count;
+             }
            }
-         }
-     });
+       });
+     }
      StatTimer_offsets.stop();
    }
 
@@ -1490,7 +1493,6 @@ public:
      if(num > 0){
        bit_set_comm.resize(num);
        val_vec.resize(num);
-       offsets.resize(num);
        size_t bit_set_count = 0;
        DataCommMode data_mode;
 
@@ -1598,7 +1600,6 @@ public:
          if (!batch_succeeded) {
            if (data_mode == bitsetData) {
              size_t bit_set_count2;
-             offsets.resize(bit_set_count);
              get_offsets_from_bitset<syncType>(loopName, bit_set_comm, offsets, bit_set_count2);
              assert(bit_set_count ==  bit_set_count2);
            }
