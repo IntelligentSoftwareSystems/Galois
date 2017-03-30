@@ -1380,7 +1380,7 @@ public:
      }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
    }
     
-  template<typename FnTy, SyncType syncType, typename SeqTy, bool identity_offsets = false>
+  template<typename FnTy, typename SeqTy, SyncType syncType, bool identity_offsets = false>
    void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
@@ -1505,7 +1505,7 @@ public:
        if (!batch_succeeded) {
          gSerialize(b, onlyData);
          auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
-         extract_subset<FnTy, syncType, decltype(lseq), true>(loopName, indices, num, offsets, b, lseq);
+         extract_subset<FnTy, decltype(lseq), syncType, true>(loopName, indices, num, offsets, b, lseq);
        } else {
          gSerialize(b, onlyData, val_vec);
        }
