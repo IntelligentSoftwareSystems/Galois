@@ -33,6 +33,9 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   if(benchmark == "cc"):
     benchmark = "ConnectedComp"
 
+  if(benchmark == "pagerank"):
+    benchmark = "PageRank"
+
   if (time_unit == 'seconds'):
     divisor = 1000
   else:
@@ -53,6 +56,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   slowest_host = int(0);
   for timer in timers:
     host = int(timer[1])
+    #print host ," : ", timer[2]
     host_time = float(timer[2])
     time[host] += host_time
 
@@ -73,13 +77,19 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   forHost = slowest_host 
 
 
-  rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_NEW_0_0,(\d*),\d*,(.*)')
+  rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_0_0,(\d*),\d*,(.*)')
 
   rep_search = rep_regex.search(log_data)
   rep_factor = 0;
   if rep_search is not None:
     rep_factor = rep_search.group(2)
     rep_factor = round(float(rep_factor), 3)
+    if (rep_factor == 1.0):
+      rep_regex = re.compile(r'.*,\(NULL\),0\s,\sREPLICATION_FACTOR_0_0,(\d*),\d*,(.*)')
+      rep_search = rep_regex.search(log_data)
+      rep_factor = rep_search.group(2)
+      rep_factor = round(float(rep_factor), 3)
+
     print ("Replication factor  : ", rep_factor)
 
 
@@ -87,6 +97,15 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   do_all_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
   do_all_all_hosts = re.findall(do_all_regex, log_data)
   num_arr = numpy.array(map(int,do_all_all_hosts))
+
+  if(num_arr.size < total_hosts):
+    #for i in range(1, int(total_hosts)):
+    for i in range(1, 3):
+      do_all_regex = re.compile(r'.*,\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i)) +r',.*' + r',\d*,(\d*)')
+      do_all_all_hosts = re.findall(do_all_regex, log_data)
+      num_arr = numpy.array(map(int,do_all_all_hosts))
+      if(num_arr.size == total_hosts):
+        break;
 
   print num_arr
   sd_do_all = round(numpy.std(num_arr, axis=0),3)
@@ -111,12 +130,34 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     sync_pull_all_hosts = re.findall(sync_pull_regex, log_data)
     num_arr = numpy.array(map(int,sync_pull_all_hosts))
 
+  if(num_arr.size < total_hosts):
+    #for i in range(1, int(total_hosts)):
+    for i in range(1, 3):
+      sync_pull_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PULL_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i)) +r',.*' + r',\d*,(\d*)')
+      sync_pull_all_hosts = re.findall(sync_pull_regex, log_data)
+      try:
+        num_arr = numpy.array(map(int,sync_pull_all_hosts))
+      except ValueError:
+        pass
+      if(num_arr.size == total_hosts):
+        break;
+
   print "SYNC_PULL" , num_arr
-  sd_sync_pull = round(numpy.std(num_arr, axis=0),3)
-  mean_sync_pull = round(numpy.mean(num_arr, axis=0),3)
-  var_sync_pull = round(numpy.var(num_arr, axis=0),3)
-  min_sync_pull = num_arr.min(axis=0)
-  max_sync_pull = num_arr.max(axis=0)
+  sd_sync_pull = 0.0
+  mean_sync_pull = 0.0
+  var_sync_pull = 0.0
+  min_sync_pull = 0.0
+  max_sync_pull = 0.0
+  if(num_arr.size > 0):
+    try:
+      sd_sync_pull = round(numpy.std(num_arr, axis=0),3)
+      mean_sync_pull = round(numpy.mean(num_arr, axis=0),3)
+      var_sync_pull = round(numpy.var(num_arr, axis=0),3)
+      min_sync_pull = num_arr.min(axis=0)
+      max_sync_pull = num_arr.max(axis=0)
+    except ValueError:  #raised if `num_arr` is empty.
+      pass
+
   print "sd_sync_pull", sd_sync_pull
   print "mean_sync_pull", mean_sync_pull
   print "min_sync_pull", min_sync_pull
@@ -129,13 +170,33 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     sync_push_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PUSH_FirstItr_(?i)' + re.escape(benchmark) + r'_0_0'  +r',.*' + r',\d*,(\d*)')
     sync_push_all_hosts = re.findall(sync_push_regex, log_data)
     num_arr = numpy.array(map(int,sync_push_all_hosts))
+
+
+  if(num_arr.size < total_hosts):
+    #for i in range(1, int(total_hosts)):
+    for i in range(1, 3):
+      sync_push_regex = re.compile(r'.*,\(NULL\),0\s,\sSYNC_PUSH_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
+      sync_push_all_hosts = re.findall(sync_push_regex, log_data)
+      num_arr = numpy.array(map(int,sync_push_all_hosts))
+      if(num_arr.size == total_hosts):
+        break;
+
   print "SYNC_PUSH" , num_arr
 
-  sd_sync_push =round(numpy.std(num_arr, axis=0),3)
-  mean_sync_push = round(numpy.mean(num_arr, axis=0),3)
-  var_sync_push = round(numpy.var(num_arr, axis=0),3)
-  min_sync_push = num_arr.min(axis=0)
-  max_sync_push = num_arr.max(axis=0)
+  sd_sync_push = 0.0
+  mean_sync_push = 0.0
+  var_sync_push = 0.0
+  min_sync_push = 0.0
+  max_sync_push = 0.0
+  if(num_arr.size > 0):
+    try:
+      sd_sync_push = round(numpy.std(num_arr, axis=0),3)
+      mean_sync_push = round(numpy.mean(num_arr, axis=0),3)
+      var_sync_push = round(numpy.var(num_arr, axis=0),3)
+      min_sync_push = num_arr.min(axis=0)
+      max_sync_push = num_arr.max(axis=0)
+    except ValueError:  #raised if `num_arr` is empty.
+      pass
   print "sd_sync_push", sd_sync_push
   print "mean_sync_push", mean_sync_push
   print "min_sync_push", min_sync_push
@@ -211,6 +272,7 @@ def get_basicInfo(fileName):
   if runs == "":
     runs = "3"
 
+  print cmdLine
   split_cmdLine_algo = cmdLine.split()[0].split("/")[-1].split("_")
   benchmark, algo_type = split_cmdLine_algo
 
