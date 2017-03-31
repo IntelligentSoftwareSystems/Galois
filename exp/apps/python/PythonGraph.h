@@ -78,6 +78,11 @@ struct Node {
   ~Node() {}
 };
 
+struct AttrList {
+  size_t num;
+  KeyAltTy *key;
+  ValAltTy *value;
+};
 
 extern "C" {
 
@@ -93,6 +98,7 @@ GNode createNode(Graph *g);
 void addNode(Graph *g, const GNode n);
 void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
 const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
+AttrList getNodeAllAttr(Graph *g, GNode n);
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
 
 Edge addEdge(Graph *g, GNode src, GNode dst);
@@ -101,6 +107,7 @@ const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
 void setNumThreads(int numThreads);
+void deleteAttrList(AttrList l);
 
 } // extern "C"
 

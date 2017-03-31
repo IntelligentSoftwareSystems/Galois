@@ -36,7 +36,11 @@ int main(int argc, char *argv[]) {
 
   // remove node attributes
   removeNodeAttr(g, nodes[1], "garbage");
-  printGraph(g);
+  AttrList attrL = getNodeAllAttr(g, nodes[1]);
+  for(auto i = 0; i < attrL.num; i++) {
+    std::cout << attrL.key[i] << ": " << attrL.value[i] << std::endl;
+  }
+  deleteAttrList(attrL);
   std::cout << "=====" << std::endl;
 
   // add edges and set edge attributes

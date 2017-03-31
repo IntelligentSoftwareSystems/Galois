@@ -30,6 +30,11 @@ class NodeList(Structure):
   _fields_ = [("num", c_int),
               ("nodes", POINTER(Node))]
 
+class AttrList(Structure):
+  _fields_ = [("num", c_int),
+              ("key", POINTER(KeyTy)),
+              ("value", POINTER(ValTy))]
+
 #glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/debug/exp/apps/python/libgalois_python.so")
 glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
 #glib = cdll.LoadLibrary("/home/lenharth/UT/build/GaloisSM/debug/exp/apps/python/libgalois_python.so")
@@ -44,6 +49,9 @@ glib.addNode.argtypes = [GraphPtr, Node]
 glib.setNodeAttr.argtypes = [GraphPtr, Node, KeyTy, ValTy]
 glib.getNodeAttr.restype = ValTy
 glib.getNodeAttr.argtypes = [GraphPtr, Node, KeyTy]
+glib.getNodeAllAttr.restype = AttrList
+glib.getNodeAllAttr.argtypes = [GraphPtr, Node]
+glib.deleteAttrList.argtypes = [AttrList]
 glib.removeNodeAttr.argtypes = [GraphPtr, Node, KeyTy]
 glib.addEdge.restype = Edge
 glib.addEdge.argtypes = [GraphPtr, Node, Node]
@@ -102,6 +110,14 @@ class GaloisGraph(object):
 
   def getNodeAttr(self, n, key):
     return glib.getNodeAttr(self.graph, n, key)
+
+  def getNodeAllAttr(self, n):
+    attr = glib.getNodeAllAttr(self.graph, n)
+    sol = {}
+    for i in range(attr.num):
+      sol[attr.key[i]] = attr.value[i]
+    glib.deleteAttrList(attr)
+    return sol
 
   def removeNodeAttr(self, n, key):
     glib.removeNodeAttr(self.graph, n, key)
@@ -251,7 +267,7 @@ def testGraphConstruction():
   g.printGraph()
 
   g.removeNodeAttr(n1, "garbage");
-  g.printGraph()
+  pprint.pprint(g.getNodeAllAttr(n1))
 
   e0n0n1 = g.addEdge("e0n0n1", "n0", "n1")
   g.setEdgeAttr(e0n0n1, "weight", "3.0")
