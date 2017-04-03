@@ -6,284 +6,418 @@
 #include "Reachability.h"
 #include "Coarsen.h"
 
-#include <vector>
+#include <unordered_map>
 #include <iostream>
 
-int main(int argc, char *argv[]) {
-  std::vector<GNode> nodes;
-  std::vector<Edge> edges;
+struct GraphWrapper {
+  Graph *g;
+  std::string name;
+  std::unordered_map<std::string, GNode> nodes;
+  std::unordered_map<std::string, Edge> edges;
+  std::unordered_map<GNode, std::string> inv_nodes;
+};
 
-  Graph *g = createGraph();
 
-  // add nodes and set node attributes
-  nodes.push_back(createNode(g));
-  addNode(g, nodes[0]);
-  setNodeAttr(g, nodes[0], "color", "red");
-  setNodeAttr(g, nodes[0], "id", "node 0");
+GraphWrapper testGraphConstruction() {
+  GraphWrapper gw;
+  gw.g = createGraph();
+  gw.name = "g";
 
-  nodes.push_back(createNode(g));
-  addNode(g, nodes[1]);
-  setNodeAttr(g, nodes[1], "language", "english");
-  setNodeAttr(g, nodes[1], "garbage", "to_be_deleted");
-  setNodeAttr(g, nodes[1], "id", "node 1");
+  auto n = createNode(gw.g);
+  addNode(gw.g, n);
+  gw.nodes["n0"] = n;
+  gw.inv_nodes[n] = "n0";
+  setNodeAttr(gw.g, n, "color", "red");
+  setNodeAttr(gw.g, n, "id", "node 0");
 
-  nodes.push_back(createNode(g));
-  addNode(g, nodes[2]);
-  setNodeAttr(g, nodes[2], "date", "Oct. 24, 2016");
-  setNodeAttr(g, nodes[2], "id", "node 2");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
+  n = createNode(gw.g);
+  addNode(gw.g, n);
+  gw.nodes["n1"] = n;
+  gw.inv_nodes[n] = "n1";
+  setNodeAttr(gw.g, n, "language", "english");
+  setNodeAttr(gw.g, n, "garbage", "to_be_deleted");
+  setNodeAttr(gw.g, n, "id", "node 1");
+
+  n = createNode(gw.g);
+  addNode(gw.g, n);
+  gw.nodes["n2"] = n;
+  gw.inv_nodes[n] = "n2";
+  setNodeAttr(gw.g, n, "date", "Oct. 24, 2016");
+  setNodeAttr(gw.g, n, "id", "node 2");
+  assert("node 2" == getNodeAttr(gw.g, gw.nodes["n2"], "id"));
 
   // remove node attributes
-  removeNodeAttr(g, nodes[1], "garbage");
-  AttrList attrL = getNodeAllAttr(g, nodes[1]);
+  removeNodeAttr(gw.g, gw.nodes["n1"], "garbage");
+  Attr& attrN1 = (gw.g)->getData(gw.nodes["n1"]).attr;
+  assert(attrN1.find("garbage") == attrN1.end());
+
+  // getNodeAllAttr
+  AttrList attrL = getNodeAllAttr(gw.g, gw.nodes["n1"]);
+  assert(attrN1.size() == attrL.num);
   for(auto i = 0; i < attrL.num; i++) {
-    std::cout << attrL.key[i] << ": " << attrL.value[i] << std::endl;
+    assert(attrN1.find(attrL.key[i]) != attrN1.end());
+    assert(attrN1[attrL.key[i]] == attrL.value[i]);
   }
   deleteAttrList(attrL);
-  std::cout << "=====" << std::endl;
 
   // add edges and set edge attributes
-  edges.push_back(addEdge(g, nodes[0], nodes[1]));
-  setEdgeAttr(g, edges[0], "weight", "3.0");
-  setEdgeAttr(g, edges[0], "id", "edge 0: 0 -> 1");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
+  auto e = addEdge(gw.g, gw.nodes["n0"], gw.nodes["n1"]);
+  gw.edges["e0"] = e;
+  setEdgeAttr(gw.g, e, "weight", "3.0");
+  setEdgeAttr(gw.g, e, "id", "edge 0: 0 -> 1");
+  assert("edge 0: 0 -> 1" == getEdgeAttr(gw.g, gw.edges["e0"], "id"));
 
   // merge edges
-  edges.push_back(addEdge(g, nodes[0], nodes[1]));
-  setEdgeAttr(g, edges[1], "place", "texas");
-  setEdgeAttr(g, edges[1], "garbage", "discard");
-  setEdgeAttr(g, edges[1], "id", "edge 1: 0 -> 1");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
+  e = addEdge(gw.g, gw.nodes["n0"], gw.nodes["n1"]);
+  gw.edges["e1"] = e;
+  setEdgeAttr(gw.g, e, "place", "texas");
+  setEdgeAttr(gw.g, e, "garbage", "discard");
+  setEdgeAttr(gw.g, e, "id", "edge 1: 0 -> 1");
 
   // remove edge attributes
-  removeEdgeAttr(g, edges[1], "garbage");
-  removeEdgeAttr(g, edges[1], "galois_id");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
+  removeEdgeAttr(gw.g, e, "garbage");
+  removeEdgeAttr(gw.g, e, "galois_id");
+  Attr& attrE1 = (gw.g)->getEdgeData((gw.g)->findEdge(gw.edges["e1"].src, gw.edges["e1"].dst));
+  assert(attrE1.find("garbage") == attrE1.end());
+  assert(attrE1.find("galois_id") == attrE1.end());
 
+  // getEdgeAllAttr
+  attrL = getEdgeAllAttr(gw.g, gw.edges["e1"]);
+  assert(attrE1.size() == attrL.num);
+  for(auto i = 0; i < attrL.num; i++) {
+    assert(attrE1.find(attrL.key[i]) != attrE1.end());
+    assert(attrE1[attrL.key[i]] == attrL.value[i]);
+  }
+  deleteAttrList(attrL);
+ 
   // add a self loop
-  edges.push_back(addEdge(g, nodes[0], nodes[0]));
-  setEdgeAttr(g, edges[2], "id", "edge 2: 0 -> 0");
+  e = addEdge(gw.g, gw.nodes["n0"], gw.nodes["n0"]);
+  gw.edges["e2"] = e;
+  setEdgeAttr(gw.g, e, "id", "edge 2: 0 -> 0");
 
   // add a length-2 loop
-  edges.push_back(addEdge(g, nodes[1], nodes[0]));
-  setEdgeAttr(g, edges[3], "id", "edge 3: 1 -> 0");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
+  e = addEdge(gw.g, gw.nodes["n1"], gw.nodes["n0"]);
+  gw.edges["e3"] = e;
+  setEdgeAttr(gw.g, e, "id", "edge 3: 1 -> 0");
 
   // add a length-3 loop
-  edges.push_back(addEdge(g, nodes[1], nodes[2]));
-  setEdgeAttr(g, edges[4], "id", "edge 4: 1 -> 2");
-  edges.push_back(addEdge(g, nodes[2], nodes[0]));
-  setEdgeAttr(g, edges[5], "id", "edge 5: 2 -> 0");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
-
-  // node filter
-  setNumThreads(2);
-  NodeList l = filterNode(g, "id", "node 1");
-  if (0 == l.num) 
-    std::cout << "no nodes whose id is \"node 1\"\n=====" << std::endl;
-  else {
-    std::cout << "nodes whose id is \"node 1\":\n";
-    for (auto i = 0; i < l.num; ++i) {
-      std::cout << l.nodes[i] << " ";
-    }
-    std::cout << "\n=====" << std::endl;
-    deleteNodeList(l);
-  }
-  
-  // BFS analysis
-  setNumThreads(1);
-  analyzeBFS(g, nodes[0], "dist");
-  printGraph(g);
-  std::cout << "=====" << std::endl;
-
-  // reachability
-  setNumThreads(2);
-  NodeList src = createNodeList(1);
-  src.nodes[0] = nodes[2];
-  std::cout << "src node(s):\n";
-  printNodeList(src);
-  NodeList dst = createNodeList(1);
-  dst.nodes[0] = nodes[1];
-  std::cout << "dst node(s):\n";
-  printNodeList(dst);
-  int hop = 1;
-  NodeList fromL = findReachableFrom(g, dst, hop);
-  std::cout << "nodes reachable to dst within " << hop << " step(s):\n";
-  printNodeList(fromL);
-  NodeList toL = findReachableTo(g, src, hop);
-  std::cout << "nodes reachable from src within " << hop << " step(s):\n";
-  printNodeList(toL);
-  hop = 2;
-  NodeList reach = findReachableBetween(g, src, dst, hop);
-  std::cout << "nodes reachable from src to dst within " << hop << " step(s):\n";
-  printNodeList(reach);
-  std::cout << "=====" << std::endl;
-  deleteNodeList(reach); 
-  deleteNodeList(src);
-  deleteNodeList(dst);
+  e = addEdge(gw.g, gw.nodes["n1"], gw.nodes["n2"]);
+  gw.edges["e4"] = e;
+  setEdgeAttr(gw.g, e, "id", "edge 4: 1 -> 2");
+  e = addEdge(gw.g, gw.nodes["n2"], gw.nodes["n0"]);
+  gw.edges["e5"] = e;
+  setEdgeAttr(gw.g, e, "id", "edge 5: 2 -> 0");
 
   // find outgoing edges
-  if(g->findEdge(nodes[0], nodes[1]) != g->edge_end(nodes[0]))
-    std::cout << "edge 1 exists" << std::endl;
-
-  if(g->findEdge(nodes[0], nodes[0]) != g->edge_end(nodes[0]))
-    std::cout << "edge 2 exists" << std::endl;
-
-  if(g->findEdge(nodes[1], nodes[0]) != g->edge_end(nodes[1]))
-    std::cout << "edge 3 exists" << std::endl;
-
-  if(g->findEdge(nodes[1], nodes[2]) != g->edge_end(nodes[1]))
-    std::cout << "edge 4 exists" << std::endl;
-
-  if(g->findEdge(nodes[2], nodes[0]) != g->edge_end(nodes[2]))
-    std::cout << "edge 5 exists" << std::endl;
-
-  if(g->findEdge(nodes[2], nodes[1]) != g->edge_end(nodes[2]))
-    std::cout << ((DIRECTED) ? "non-existing edge!" : "implied by edge 4") << std::endl;
-  std::cout << "=====" << std::endl;
+  assert((gw.g)->findEdge(gw.edges["e1"].src, gw.edges["e1"].dst) != (gw.g)->edge_end(gw.edges["e1"].src));
+  assert((gw.g)->findEdge(gw.edges["e2"].src, gw.edges["e2"].dst) != (gw.g)->edge_end(gw.edges["e2"].src));
+  assert((gw.g)->findEdge(gw.edges["e3"].src, gw.edges["e3"].dst) != (gw.g)->edge_end(gw.edges["e3"].src));
+  assert((gw.g)->findEdge(gw.edges["e4"].src, gw.edges["e4"].dst) != (gw.g)->edge_end(gw.edges["e4"].src));
+  assert((gw.g)->findEdge(gw.edges["e5"].src, gw.edges["e5"].dst) != (gw.g)->edge_end(gw.edges["e5"].src));
+  if (DIRECTED) {
+    // non-existing edge
+    assert((gw.g)->findEdge(gw.nodes["n2"], gw.nodes["n1"]) == (gw.g)->edge_end(gw.nodes["n2"]));
+  } else {
+    // implied by edge 4
+    assert((gw.g)->findEdge(gw.nodes["n2"], gw.nodes["n1"]) != (gw.g)->edge_end(gw.nodes["n2"]));
+  }
 
 #if !(DIRECTED && !IN_EDGES)
   // find incoming edges
-  if(g->findInEdge(nodes[1], nodes[0]) != g->in_edge_end(nodes[1]))
-    std::cout << "in_edge 1 exists" << std::endl;
+  assert((gw.g)->findInEdge(gw.edges["e1"].dst, gw.edges["e1"].src) != (gw.g)->in_edge_end(gw.edges["e1"].dst));
+  assert((gw.g)->findInEdge(gw.edges["e2"].dst, gw.edges["e2"].src) != (gw.g)->in_edge_end(gw.edges["e2"].dst));
+  assert((gw.g)->findInEdge(gw.edges["e3"].dst, gw.edges["e3"].src) != (gw.g)->in_edge_end(gw.edges["e3"].dst));
+  assert((gw.g)->findInEdge(gw.edges["e4"].dst, gw.edges["e4"].src) != (gw.g)->in_edge_end(gw.edges["e4"].dst));
+  assert((gw.g)->findInEdge(gw.edges["e5"].dst, gw.edges["e5"].src) != (gw.g)->in_edge_end(gw.edges["e5"].dst));
+  if (DIRECTED) {
+    // non-existing in_edge
+    assert((gw.g)->findInEdge(gw.nodes["n1"], gw.nodes["n2"]) == (gw.g)->in_edge_end(gw.nodes["n1"]));
+  } else {
+    // the smae as edge 4
+    assert((gw.g)->findInEdge(gw.nodes["n1"], gw.nodes["n2"]) != (gw.g)->in_edge_end(gw.nodes["n1"]));
+  }
+#endif
 
-  if(g->findInEdge(nodes[0], nodes[0]) != g->in_edge_end(nodes[0]))
-    std::cout << "in_edge 2 exists" << std::endl;
-
-  if(g->findInEdge(nodes[0], nodes[1]) != g->in_edge_end(nodes[0]))
-    std::cout << "in_edge 3 exists" << std::endl;
-
-  if(g->findInEdge(nodes[2], nodes[1]) != g->in_edge_end(nodes[2]))
-    std::cout << "in_edge 4 exists" << std::endl;
-
-  if(g->findInEdge(nodes[0], nodes[2]) != g->in_edge_end(nodes[0]))
-    std::cout << "in_edge 5 exists" << std::endl;
-
-  if(g->findInEdge(nodes[1], nodes[2]) != g->in_edge_end(nodes[1]))
-    std::cout << ((DIRECTED) ? "non-existing in_edge!" : "the same as edge 4") << std::endl;
+#if 0
+  std::cout << "g before sorting edges by dst: " << std::endl;
+  printGraph(gw.g);
   std::cout << "=====" << std::endl;
 #endif
 
   // sort edges by dst
-  g->sortAllEdgesByDst();
-  printGraph(g);
-  std::cout << "=====" << std::endl;
-
-  // find edges after sorting edges
-  auto e = g->findEdgeSortedByDst(nodes[0], nodes[1]);
-  if(e != g->edge_end(nodes[0])) {
-    std::cout << "find edge 1 after sorting edges" << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
+  (gw.g)->sortAllEdgesByDst();
+  assert((gw.g)->findEdgeSortedByDst(gw.edges["e1"].src, gw.edges["e1"].dst) != (gw.g)->edge_end(gw.edges["e1"].src));
+  assert((gw.g)->findEdgeSortedByDst(gw.edges["e2"].src, gw.edges["e2"].dst) != (gw.g)->edge_end(gw.edges["e2"].src));
+  assert((gw.g)->findEdgeSortedByDst(gw.edges["e3"].src, gw.edges["e3"].dst) != (gw.g)->edge_end(gw.edges["e3"].src));
+  assert((gw.g)->findEdgeSortedByDst(gw.edges["e4"].src, gw.edges["e4"].dst) != (gw.g)->edge_end(gw.edges["e4"].src));
+  assert((gw.g)->findEdgeSortedByDst(gw.edges["e5"].src, gw.edges["e5"].dst) != (gw.g)->edge_end(gw.edges["e5"].src));
+  if (!DIRECTED) {
+    // the same as edge 4
+    assert((gw.g)->findEdgeSortedByDst(gw.nodes["n2"], gw.nodes["n1"]) != (gw.g)->edge_end(gw.nodes["n2"]));
+  } else {
+    // non-existing edge
+    assert((gw.g)->findEdgeSortedByDst(gw.nodes["n2"], gw.nodes["n1"]) == (gw.g)->edge_end(gw.nodes["n2"]));
   }
 
-  e = g->findEdgeSortedByDst(nodes[0], nodes[0]);
-  if(e != g->edge_end(nodes[0])) {
-    std::cout << "find edge 2 after sorting edges" << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
-  }
-
-  e = g->findEdgeSortedByDst(nodes[1], nodes[0]);
-  if(e != g->edge_end(nodes[1])) {
-    std::cout << "find edge 3 after sorting edges" << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
-  }
-
-  e = g->findEdgeSortedByDst(nodes[1], nodes[2]);
-  if(e != g->edge_end(nodes[1])) {
-    std::cout << "find edge 4 after sorting edges" << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
-  }
-
-  e = g->findEdgeSortedByDst(nodes[2], nodes[0]);
-  if(e != g->edge_end(nodes[2])) {
-    std::cout << "find edge 5 after sorting edges" << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
-  }
-
-  e = g->findEdgeSortedByDst(nodes[2], nodes[1]);
-  if(e != g->edge_end(nodes[2])) {
-    std::cout << ((!DIRECTED) ? "the same as edge 4" : "find non-existing edge after sorting edges") << std::endl;
-    for(auto i: g->getEdgeData(e))
-      std::cout << "  " << i.first << ": " << i.second << std::endl;
-  } 
+#if 0
+  std::cout << "g after sorting edges by dst: " << std::endl;
+  printGraph(gw.g);
   std::cout << "=====" << std::endl;
+#endif
 
-  // subgraph isomorphism
-  Graph *g2 = createGraph();
-  nodes.push_back(createNode(g2));
-  addNode(g2, nodes[3]);
-  nodes.push_back(createNode(g2));
-  addNode(g2, nodes[4]);
-  nodes.push_back(createNode(g2));
-  addNode(g2, nodes[5]);
-  edges.push_back(addEdge(g2, nodes[3], nodes[4]));
-  edges.push_back(addEdge(g2, nodes[4], nodes[5]));
-  edges.push_back(addEdge(g2, nodes[5], nodes[3]));
-  printGraph(g2);
-  std::cout << "=====" << std::endl;
+  return gw;
+}
 
-  setNumThreads(3);
-  NodePair *result = searchSubgraphUllmann(g, g2, 10);
-  deleteGraphMatches(result);
-  std::cout << "=====" << std::endl;
+void deleteGraphWrapper(GraphWrapper& gw) {
+  delete gw.g;
+  gw.name.clear();
+  gw.nodes.clear();
+  gw.edges.clear();
+  gw.inv_nodes.clear();
+}
 
-  result = searchSubgraphVF2(g, g2, 10);
-  deleteGraphMatches(result);
-  deleteGraph(g2);
-  std::cout << "=====" << std::endl;
+void testBFS(GraphWrapper& gw) {
+  setNumThreads(1);
+  analyzeBFS(gw.g, gw.nodes["n0"], "dist");
+  assert("0" == getNodeAttr(gw.g, gw.nodes["n0"], "dist"));
+  assert("1" == getNodeAttr(gw.g, gw.nodes["n1"], "dist"));
+  assert("2" == getNodeAttr(gw.g, gw.nodes["n2"], "dist"));
+}
 
-  // pagerank
+void testPagerank(GraphWrapper& gw) {
   setNumThreads(2);
-  NodeDouble *pr = analyzePagerank(g, 10, 0.01, "pr");
+  NodeDouble *pr = analyzePagerank(gw.g, 10, 0.01, "pr");
+  assert(pr[0].n == gw.nodes["n0"] && pr[1].n == gw.nodes["n1"] && pr[2].n == gw.nodes["n2"]);
+  assert(pr[0].v >= pr[1].v && pr[1].v >= pr[2].v);
+  for (auto i = 3; i < 10; ++i) {
+    assert(nullptr == pr[i].n && 0.0 == pr[i].v);
+  }
   deleteNodeDoubles(pr);
-  std::cout << "=====" << std::endl;
+}
 
-  deleteGraph(g);
-  nodes.clear();
-  edges.clear();
+void testReachability(GraphWrapper& gw) {
+  setNumThreads(2);
 
-  // coarsen
-  std::vector<std::string> colors = {"red", "green", "blue"};
-  Graph *fg = createGraph();
-  for (int i = 0; i < 10; ++i) {
-    nodes.push_back(createNode(fg));
-    addNode(fg, nodes[i]);
-  }
-  for (int i = 0; i < 9; i++) {
-    setNodeAttr(fg, nodes[i], "color", const_cast<ValAltTy>(colors[i%3].c_str()));
-  }
-  edges.push_back(addEdge(fg, nodes[0], nodes[5]));
-  edges.push_back(addEdge(fg, nodes[1], nodes[6]));
-  edges.push_back(addEdge(fg, nodes[2], nodes[7]));
-  edges.push_back(addEdge(fg, nodes[3], nodes[9]));
-  edges.push_back(addEdge(fg, nodes[4], nodes[7]));
-  edges.push_back(addEdge(fg, nodes[5], nodes[2]));
-  edges.push_back(addEdge(fg, nodes[5], nodes[6]));
-  edges.push_back(addEdge(fg, nodes[8], nodes[7]));
-  edges.push_back(addEdge(fg, nodes[9], nodes[4]));
-  printGraph(fg);
-  std::cout << "coarsening..." << std::endl;
+  NodeList src = filterNode(gw.g, "color", "red");
+  assert(1 == src.num);
+  assert(gw.nodes["n0"] == src.nodes[0]);
+
+  NodeList dst = filterNode(gw.g, "id", "node 2");
+  assert(1 == dst.num);
+  assert(gw.nodes["n2"] == dst.nodes[0]);
+
+  int hop = 1;
+  NodeList fromL = findReachableFrom(gw.g, dst, hop);
+  assert(2 == fromL.num);
+  assert(fromL.nodes[0] != fromL.nodes[1]);
+  assert(fromL.nodes[0] == gw.nodes["n1"] || fromL.nodes[1] == gw.nodes["n1"]);
+  assert(fromL.nodes[0] == gw.nodes["n2"] || fromL.nodes[1] == gw.nodes["n2"]);
+
+  NodeList toL = findReachableTo(gw.g, src, hop);
+  assert(2 == toL.num);
+  assert(toL.nodes[0] != toL.nodes[1]);
+  assert(toL.nodes[0] == gw.nodes["n0"] || toL.nodes[1] == gw.nodes["n0"]);
+  assert(toL.nodes[0] == gw.nodes["n1"] || toL.nodes[1] == gw.nodes["n1"]);
+
+  hop = 2;
+  NodeList reach = findReachableBetween(gw.g, src, dst, hop);
+  assert(3 == reach.num);
+  assert(reach.nodes[0] != reach.nodes[1] && reach.nodes[0] != reach.nodes[2] && reach.nodes[1] != reach.nodes[2]);
+  assert(reach.nodes[0] == gw.nodes["n0"] || reach.nodes[1] == gw.nodes["n0"] || reach.nodes[2] == gw.nodes["n0"]);
+  assert(reach.nodes[0] == gw.nodes["n1"] || reach.nodes[1] == gw.nodes["n1"] || reach.nodes[2] == gw.nodes["n1"]);
+  assert(reach.nodes[0] == gw.nodes["n2"] || reach.nodes[1] == gw.nodes["n2"] || reach.nodes[2] == gw.nodes["n2"]);
+
+  deleteNodeList(src);
+  deleteNodeList(dst);
+  deleteNodeList(fromL);
+  deleteNodeList(toL);
+  deleteNodeList(reach);
+}
+
+void testSearchSubgraph(GraphWrapper& gw) {
+  // set up subgraph as a length-3 cycle
+  GraphWrapper gw2;
+  gw2.g = createGraph();
+  gw2.name = "subgraph";
+
+  auto n = createNode(gw2.g);
+  addNode(gw2.g, n);
+  gw2.nodes["s.n0"] = n;
+  gw2.inv_nodes[n] = "s.n0";
+  n = createNode(gw2.g);
+  addNode(gw2.g, n);
+  gw2.nodes["s.n1"] = n;
+  gw2.inv_nodes[n] = "s.n1";
+  n = createNode(gw2.g);
+  addNode(gw2.g, n);
+  gw2.nodes["s.n2"] = n;
+  gw2.inv_nodes[n] = "s.n2";
+
+  auto e = addEdge(gw2.g, gw2.nodes["s.n0"], gw2.nodes["s.n1"]);
+  gw2.edges["s.n0 -> s.n1"] = e;
+  e = addEdge(gw2.g, gw2.nodes["s.n1"], gw2.nodes["s.n2"]);
+  gw2.edges["s.n1 -> s.n2"] = e;
+  e = addEdge(gw2.g, gw2.nodes["s.n2"], gw2.nodes["s.n0"]);
+  gw2.edges["s.n2 -> s.n0"] = e;
 
   setNumThreads(3);
-  Graph *cg = createGraph(); 
-  coarsen(fg, cg, "color");
-  printGraph(cg);
 
-  deleteGraph(fg);
-  deleteGraph(cg);
-  nodes.clear();
-  edges.clear();
+  std::unordered_map<std::string, std::string> sol[3] = { 
+    { {"s.n0", "n0"}, {"s.n1", "n1"}, {"s.n2", "n2"} }, 
+    { {"s.n0", "n1"}, {"s.n1", "n2"}, {"s.n2", "n0"} }, 
+    { {"s.n0", "n2"}, {"s.n1", "n0"}, {"s.n2", "n1"} }
+  };
+
+  NodePair *result = searchSubgraphUllmann(gw.g, gw2.g, 10);
+  for (auto i = 3; i < 10; ++i) {
+    for (auto j = 0; j < 3; ++j) {
+      // empty solutions
+      assert(nullptr == result[i*3+j].nQ);
+      assert(nullptr == result[i*3+j].nD);
+    }
+  }
+
+  std::unordered_map<std::string, std::string> res_ull[3];
+  for (auto i = 0; i < 3; ++i) {
+    for (auto j = 0; j < 3; ++j) {
+      res_ull[i][gw2.inv_nodes[result[i*3+j].nQ]] = gw.inv_nodes[result[i*3+j].nD];
+    }
+  }
+  assert(res_ull[0] != res_ull[1] && res_ull[0] != res_ull[2] && res_ull[1] != res_ull[2]);
+  assert(res_ull[0] == sol[0] || res_ull[0] == sol[1] || res_ull[0] == sol[2]);
+  deleteGraphMatches(result);
+
+  result = searchSubgraphVF2(gw.g, gw2.g, 10);
+  for (auto i = 3; i < 10; ++i) {
+    for (auto j = 0; j < 3; ++j) {
+      assert(nullptr == result[i*3+j].nQ);
+      assert(nullptr == result[i*3+j].nD);
+    }
+  }
+
+  std::unordered_map<std::string, std::string> res_vf2[3];
+  for (auto i = 0; i < 3; ++i) {
+    for (auto j = 0; j < 3; ++j) {
+      res_vf2[i][gw2.inv_nodes[result[i*3+j].nQ]] = gw.inv_nodes[result[i*3+j].nD];
+    }
+  }
+  assert(res_vf2[0] != res_vf2[1] && res_vf2[0] != res_vf2[2] && res_vf2[1] != res_vf2[2]);
+  assert(res_vf2[0] == sol[0] || res_vf2[0] == sol[1] || res_vf2[0] == sol[2]);
+  deleteGraphMatches(result);
+
+  deleteGraphWrapper(gw2);
+}
+
+void testCoarsening() {
+  std::vector<std::string> colors = {"red", "green", "blue"};
+
+  GraphWrapper fgw;
+  fgw.g = createGraph();
+  fgw.name = "fg";
+
+  for (int i = 0; i < 10; ++i) {
+    auto n = createNode(fgw.g);
+    addNode(fgw.g, n);
+    std::string nName = "f" + std::to_string(i);
+    fgw.nodes[nName] = n;
+    fgw.inv_nodes[n] = nName;
+  }
+
+  for (int i = 0; i < 9; i++) {
+    std::string nName = "f" + std::to_string(i);
+    setNodeAttr(fgw.g, fgw.nodes[nName], "color", const_cast<ValAltTy>(colors[i%3].c_str()));
+  }
+
+  addEdge(fgw.g, fgw.nodes["f0"], fgw.nodes["f5"]);
+  addEdge(fgw.g, fgw.nodes["f1"], fgw.nodes["f6"]);
+  addEdge(fgw.g, fgw.nodes["f2"], fgw.nodes["f7"]);
+  addEdge(fgw.g, fgw.nodes["f3"], fgw.nodes["f9"]);
+  addEdge(fgw.g, fgw.nodes["f4"], fgw.nodes["f7"]);
+  addEdge(fgw.g, fgw.nodes["f5"], fgw.nodes["f2"]);
+  addEdge(fgw.g, fgw.nodes["f5"], fgw.nodes["f6"]);
+  addEdge(fgw.g, fgw.nodes["f8"], fgw.nodes["f7"]);
+  addEdge(fgw.g, fgw.nodes["f9"], fgw.nodes["f4"]);
+
+#if 0
+  std::cout << fgw.name << ": " << std::endl;
+  printGraph(fgw.g);
+#endif
+
+  GraphWrapper cgw;
+  cgw.g = createGraph();
+  cgw.name = "cg";
+  setNumThreads(3);
+  coarsen(fgw.g, cgw.g, "color");
+
+#if 0
+  std::cout << cgw.name << ": " << std::endl;
+  printGraph(cgw.g);
+#endif
+
+  NodeList nl = getAllNodes(cgw.g);
+  assert(3 == nl.num);
+  for (auto i = 0; i < 3; ++i) {
+    std::string nName = getNodeAttr(cgw.g, nl.nodes[i], "color");
+    cgw.inv_nodes[nl.nodes[i]] = nName;
+    cgw.nodes[nName] = nl.nodes[i];
+  }
+
+  // nodes of cg are of different colors
+  assert(getNodeAttr(cgw.g, nl.nodes[0], "color") != getNodeAttr(cgw.g, nl.nodes[1], "color"));
+  assert(getNodeAttr(cgw.g, nl.nodes[0], "color") != getNodeAttr(cgw.g, nl.nodes[2], "color"));
+  assert(getNodeAttr(cgw.g, nl.nodes[1], "color") != getNodeAttr(cgw.g, nl.nodes[2], "color"));
+
+  Edge cge[4] = { 
+    {cgw.nodes["red"], cgw.nodes["blue"]},
+    {cgw.nodes["green"], cgw.nodes["red"]},
+    {cgw.nodes["blue"], cgw.nodes["red"]},
+    {cgw.nodes["blue"], cgw.nodes["green"]}
+  };
+  EdgeList el = getAllEdges(cgw.g);
+  assert(4 == el.num);
+  for (auto i = 0; i < 4; ++i) {
+    // edges of cg connect nodes of different colors
+    assert(el.edges[i].src != el.edges[i].dst);
+    // no repeated edges
+    for (auto j = i+1; j < 4; ++j) {
+      assert(el.edges[i] != el.edges[j]);
+    }
+    // must be in cge
+    assert(el.edges[i] == cge[0] || el.edges[i] == cge[1] || el.edges[i] == cge[2] || el.edges[i] == cge[3]);
+  }
+
+  deleteNodeList(nl);
+  deleteEdgeList(el);
+  deleteGraphWrapper(fgw);
+  deleteGraphWrapper(cgw);
+}
+
+int main(int argc, char *argv[]) {
+  std::cout << "testGraphConstruction()...";
+  auto gw = testGraphConstruction();
+  std::cout << " pass" << std::endl;
+
+  std::cout << "testBFS()...";
+  testBFS(gw);
+  std::cout << " pass" << std::endl;
+
+  std::cout << "testPagerank()...";
+  testPagerank(gw);
+  std::cout << " pass" << std::endl;
+
+  std::cout << "testReachability()...";
+  testReachability(gw);
+  std::cout << " pass" << std::endl;
+
+  std::cout << "testSearchSubgraph()...";
+  testSearchSubgraph(gw);
+  std::cout << " pass" << std::endl;
+
+  deleteGraphWrapper(gw);
+
+  std::cout << "testCoarsening...";
+  testCoarsening();
+  std::cout << " pass" << std::endl;
 
   return 0;
 }
