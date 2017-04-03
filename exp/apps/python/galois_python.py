@@ -113,6 +113,7 @@ class GaloisGraph(object):
         self.nodeMap.clear()
         self.edgeMap.clear()
         self.invNodeMap.clear()
+        self.invEdgeMap.clear()
 
     def printGraph(self):
         print "=====", "GaloisGraph", self.name, "====="
@@ -162,6 +163,10 @@ class GaloisGraph(object):
 
     def setEdgeIndex(self, e, eid):
         self.edgeMap[eid] = e
+        self.invEdgeMap[(e.src, e.dst)] = eid
+
+    def getEdgeIndex(self, e):
+        return self.invEdgeMap[(e.src, e.dst)]
 
     def addEdge(self, eid, srcid, dstid):
         src = self.nodeMap[srcid]
@@ -177,7 +182,8 @@ class GaloisGraph(object):
         l = glib.getAllEdges(self.graph)
         result = []
         for j in range(l.num):
-            result.append(l.edges[j])
+            # multi-field struct needs to be constructed
+            result.append(Edge(l.edges[j].src, l.edges[j].dst))
         glib.deleteEdgeList(l)
         return result
 
@@ -198,8 +204,14 @@ class GaloisGraph(object):
         glib.deleteAttrList(attr)
         return sol
 
+    def getNumNodes(self):
+        return glib.getNumNodes(self.graph)
+
+    def getNumEdges(self):
+        return glib.getNumEdges(self.graph)
+
     def showStatistics(self):
-        print self.name, ":", glib.getNumNodes(self.graph), "nodes,", glib.getNumEdges(self.graph), "edges"
+        print self.name, ":", self.getNumNodes(), "nodes,", self.getNumEdges(), "edges"
 
     def analyzeBFS(self, src, attr, numThreads):
         print "=====", "analyzeBFS", "====="
@@ -207,7 +219,6 @@ class GaloisGraph(object):
         print "src =", src
         glib.setNumThreads(numThreads)
         glib.analyzeBFS(self.graph, src, attr)
-        print attr, "of src is", self.getNodeAttr(src, attr)
 
     def searchSubgraph(self, gQ, numInstances, numThreads, algo):
         print "=====", "searchSubgraph", "====="
@@ -294,6 +305,7 @@ class GaloisGraph(object):
         dstL = glib.createNodeList(len(dstList))
         for i in range(len(dstList)):
             dstL.nodes[i] = dstList[i]
+        print "in between within", hop, "hops"
         reachL = glib.findReachableBetween(self.graph, srcL, dstL, hop)
         result = []
         for i in range(reachL.num):
@@ -412,7 +424,9 @@ def testCoarsening():
 
     cg = fg.coarsen("color", 3)
     pprint.pprint(cg.getAllNodes())
-    pprint.pprint(cg.getAllEdges())
+    el = cg.getAllEdges()
+    for e in el:
+        print e.src, "->", e.dst
     cg.printGraph()
 
     del fg

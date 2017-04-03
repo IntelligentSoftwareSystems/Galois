@@ -415,7 +415,7 @@ int main(int argc, char *argv[]) {
 
   deleteGraphWrapper(gw);
 
-  std::cout << "testCoarsening...";
+  std::cout << "testCoarsening()...";
   testCoarsening();
   std::cout << " pass" << std::endl;
 
