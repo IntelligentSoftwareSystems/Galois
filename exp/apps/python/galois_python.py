@@ -20,6 +20,10 @@ class Edge(Structure):
     _fields_ = [("src", Node),
                 ("dst", Node)]
 
+class EdgeList(Structure):
+    _fields_ = [("num", c_int),
+                ("edges", POINTER(Edge))]
+
 class NodePair(Structure):
     _fields_ = [("nQ", Node),
                 ("nD", Node)]
@@ -52,6 +56,8 @@ glib.getNodeAttr.restype = ValTy
 glib.getNodeAttr.argtypes = [GraphPtr, Node, KeyTy]
 glib.getNodeAllAttr.restype = AttrList
 glib.getNodeAllAttr.argtypes = [GraphPtr, Node]
+glib.getAllNodes.restype = NodeList
+glib.getAllNodes.argtypes = [GraphPtr]
 glib.deleteAttrList.argtypes = [AttrList]
 glib.removeNodeAttr.argtypes = [GraphPtr, Node, KeyTy]
 glib.addEdge.restype = Edge
@@ -59,6 +65,8 @@ glib.addEdge.argtypes = [GraphPtr, Node, Node]
 glib.setEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy, ValTy]
 glib.getEdgeAttr.restype = ValTy
 glib.getEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
+glib.getAllEdges.restype = EdgeList
+glib.getAllEdges.argtypes = [GraphPtr]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.setNumThreads.argtypes = [c_int]
 glib.analyzeBFS.argtypes = [GraphPtr, Node, KeyTy]
@@ -120,6 +128,14 @@ class GaloisGraph(object):
         glib.deleteAttrList(attr)
         return sol
 
+    def getAllNodes(self):
+        l = glib.getAllNodes(self.graph)
+        result = []
+        for j in range(l.num):
+            result.append(l.nodes[j])
+        glib.deleteNodeList(l)
+        return result
+
     def removeNodeAttr(self, n, key):
         glib.removeNodeAttr(self.graph, n, key)
 
@@ -135,6 +151,14 @@ class GaloisGraph(object):
 
     def getEdgeAttr(self, e, key):
         return glib.getEdgeAttr(self.graph, e, key)
+
+    def getAllEdges(self):
+        l = glib.getAllEdges(self.graph)
+        result = []
+        for j in range(l.num):
+            result.append((l.edges[j].src, l.edges[j].dst))
+        glib.deleteEdgeList(l)
+        return result
 
     def removeEdgeAttr(self, e, key):
         glib.removeEdgeAttr(self.graph, e, key)
@@ -350,6 +374,8 @@ def testCoarsening():
     fg.printGraph()
 
     cg = fg.coarsen("color", 3)
+    pprint.pprint(cg.getAllNodes())
+    pprint.pprint(cg.getAllEdges())
     cg.printGraph()
 
     del fg

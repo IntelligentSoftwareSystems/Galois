@@ -53,31 +53,6 @@ const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
   return const_cast<ValAltTy>(g->getData(n).attr[key].c_str());
 }
 
-AttrList getNodeAllAttr(Graph *g, GNode n) {
-  Attr& attr = g->getData(n).attr;
-  size_t num = attr.size();
-
-  KeyAltTy *key = nullptr; 
-  ValAltTy *value = nullptr;
-
-  if (num) {
-    key = new KeyAltTy [num] ();
-    value = new ValAltTy [num] ();
-
-    size_t i = 0;
-    for (auto k: attr) {
-      // deep copy for strings
-      key[i] = new std::string::value_type [k.first.size()+1] ();
-      std::copy(k.first.begin(), k.first.end(), key[i]);
-      value[i] = new std::string::value_type [k.second.size()+1] ();
-      std::copy(k.second.begin(), k.second.end(), value[i]);
-      i++;
-    }
-  }
-
-  return {num, key, value};
-}
-
 void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
   g->getData(n).attr.erase(key);
 }
@@ -107,19 +82,5 @@ void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
 
 void setNumThreads(int numThreads) {
   Galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
-}
-
-void deleteAttrList(AttrList l) {
-  if (0 == l.num) {
-    return;
-  }
-
-  for (int i = 0; i < l.num; ++i) {
-    delete[] l.key[i];
-    delete[] l.value[i];
-  }
-
-  delete[] l.key;
-  delete[] l.value;
 }
 
