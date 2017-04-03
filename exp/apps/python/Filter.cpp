@@ -3,11 +3,11 @@
 #include "Galois/Bag.h"
 
 NodeList filterNode(Graph *g, const KeyAltTy key, const ValAltTy value) {
-  Galois::StatManager statManager;
+//  Galois::StatManager statManager;
   Galois::InsertBag<GNode> bag;
 
-  Galois::StatTimer T;
-  T.start();
+//  Galois::StatTimer T;
+//  T.start();
 
   Galois::do_all_local(
     *g,
@@ -21,7 +21,7 @@ NodeList filterNode(Graph *g, const KeyAltTy key, const ValAltTy value) {
       }
     );
 
-  T.stop();
+//  T.stop();
 
   int num = std::distance(bag.begin(), bag.end());
   NodeList l = createNodeList(num);

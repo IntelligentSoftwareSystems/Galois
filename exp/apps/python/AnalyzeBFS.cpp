@@ -24,10 +24,10 @@ struct BFS {
 };
 
 void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
-  Galois::StatManager statManager;
+//  Galois::StatManager statManager;
 
-  Galois::StatTimer T;
-  T.start();
+//  Galois::StatTimer T;
+//  T.start();
 
   Galois::do_all_local(
     *g, 
@@ -41,7 +41,7 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
   g->getData(src).ID.vInt = 0;
   Galois::for_each(src, BFS{*g});
 
-  T.stop();
+//  T.stop();
 
   Galois::do_all_local(
     *g, 

@@ -130,16 +130,16 @@ static NodeList allocateNodeList(NodeSet& w) {
 
 template<bool isBackward>
 static NodeList findReachableOutward(Graph *g, NodeList l, int hop) {
-  Galois::StatManager statManager;
+//  Galois::StatManager statManager;
 
-  Galois::StatTimer T("findReachableOutward");
-  T.start();
+//  Galois::StatTimer T("findReachableOutward");
+//  T.start();
 
   initialize(g);
   findOutward<isBackward>(g, l, hop);
   NodeSet w = collectOutward<isBackward>(g, hop);
 
-  T.stop();
+//  T.stop();
 
   return allocateNodeList(w); 
 }
@@ -155,10 +155,10 @@ NodeList findReachableFrom(Graph *g, NodeList dst, int hop) {
 }
 
 NodeList findReachableBetween(Graph *g, NodeList src, NodeList dst, int hop) {
-  Galois::StatManager statManager;
+//  Galois::StatManager statManager;
 
-  Galois::StatTimer T("findReachableBetween");
-  T.start();
+//  Galois::StatTimer T("findReachableBetween");
+//  T.start();
 
   initialize(g);
 
@@ -171,7 +171,7 @@ NodeList findReachableBetween(Graph *g, NodeList src, NodeList dst, int hop) {
   // intersect the two movements
   NodeSet intersect = collectBetween(g, hop);
 
-  T.stop();
+//  T.stop();
 
   return allocateNodeList(intersect);
 }

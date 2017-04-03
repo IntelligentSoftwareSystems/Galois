@@ -190,23 +190,23 @@ void initResidual(Graph& graph) {
 }
 
 NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy result) {
-  Galois::StatManager statManager;
+//  Galois::StatManager statManager;
 
-  Galois::StatTimer T("OverheadTime");
-  T.start();
+//  Galois::StatTimer T("OverheadTime");
+//  T.start();
 
-  std::cout << "Running Edge Async version\n";
-  std::cout << "tolerance: " << tolerance << "\n";
+//  std::cout << "Running Edge Async version\n";
+//  std::cout << "tolerance: " << tolerance << "\n";
   Galois::do_all_local(*g, Initialization{*g});
   initResidual(*g);
 
-  Galois::StatTimer Tmain;
-  Tmain.start();  
+//  Galois::StatTimer Tmain;
+//  Tmain.start();  
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
   Galois::for_each_local(*g, PageRank{*g, tolerance}, Galois::wl<WL>());
-  Tmain.stop();
+//  Tmain.stop();
   
-  T.stop();
+//  T.stop();
 
   return reportTop(*g, topK, result);
 }

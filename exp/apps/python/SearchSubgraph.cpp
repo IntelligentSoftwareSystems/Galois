@@ -631,66 +631,66 @@ void destructNodeVec(Graph& gQ) {
 template<typename Algo>
 NodePair *run(Graph& gD, Graph& gQ) {
   Algo algo;
-  std::cout << "Running " << algo.name() << " Algorithm..." << std::endl;
+//  std::cout << "Running " << algo.name() << " Algorithm..." << std::endl;
 
   gD.sortAllEdgesByDst();
   gQ.sortAllEdgesByDst();
   constructNodeVec(gQ);
 
-  Galois::StatTimer T;
-  T.start();
+//  Galois::StatTimer T;
+//  T.start();
 
-  Galois::StatTimer filterT("FilterCandidates");
-  filterT.start();
+//  Galois::StatTimer filterT("FilterCandidates");
+//  filterT.start();
   bool isSomeNodeUnmatched = algo.filterCandidates(gD, gQ);
-  filterT.stop();
+//  filterT.stop();
 
   if(isSomeNodeUnmatched) {
-    T.stop();
+//    T.stop();
     std::cout << "Some nodes have no candidates to match." << std::endl;
     destructNodeVec(gQ);
     return (new NodePair [gQ.size()*kFound] ());
   }
 
-  Galois::StatTimer searchT("SubgraphSearch");
-  searchT.start();
+//  Galois::StatTimer searchT("SubgraphSearch");
+//  searchT.start();
   currentlyFound.store(0);
   MatchingVector report = algo.subgraphSearch(gD, gQ);
-  searchT.stop();
+//  searchT.stop();
 
-  T.stop();
-  std::cout << "Found " << currentlyFound << " instance(s) of the query graph." << std::endl;
+//  T.stop();
+//  std::cout << "Found " << currentlyFound << " instance(s) of the query graph." << std::endl;
   if(currentlyFound) {
     for(auto& m: report)
       verifyMatching(m, gD, gQ);
-    std::cout << "Verification succeeded" << std::endl;
+//    std::cout << "Verification succeeded" << std::endl;
   }
   destructNodeVec(gQ);
   return reportMatchings(report, gQ.size()*kFound);
 }
 
 NodePair *searchSubgraphUllmann(Graph *gD, Graph *gQ, size_t k) {
-  Galois::StatManager statManager; 
+//  Galois::StatManager statManager; 
 
   kFound = k;
 
-  Galois::StatTimer T("TotalTime");
-  T.start();
+//  Galois::StatTimer T("TotalTime");
+//  T.start();
   NodePair *result = run<UllmannAlgo>(*gD, *gQ);
-  T.stop();
+//  T.stop();
 
   return result;
 }
 
 NodePair *searchSubgraphVF2(Graph *gD, Graph *gQ, size_t k) {
-  Galois::StatManager statManager; 
+//  Galois::StatManager statManager; 
 
   kFound = k;
 
-  Galois::StatTimer T("TotalTime");
-  T.start();
+//  Galois::StatTimer T("TotalTime");
+//  T.start();
   NodePair *result = run<VF2Algo>(*gD, *gQ);
-  T.stop();
+//  T.stop();
 
   return result;
 }
