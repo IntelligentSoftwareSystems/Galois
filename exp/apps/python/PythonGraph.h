@@ -48,7 +48,6 @@ struct Node;
 
 typedef Galois::Graph::FirstGraph<Node, Attr, DIRECTED, IN_EDGES> Graph; // Node nodes and Attr edges
 typedef Graph::GraphNode GNode;
-typedef Graph::edge_iterator edge_iterator;
 
 // see StatCollector for the design
 struct Node {
@@ -84,11 +83,12 @@ struct AttrList {
   ValAltTy *value;
 };
 
-extern "C" {
+struct Edge {
+  GNode src;
+  GNode dst;
+};
 
-typedef struct {
-  typename Graph::edge_iterator::value_type *base, *end;
-} Edge;
+extern "C" {
 
 Graph *createGraph();
 void deleteGraph(Graph *g);

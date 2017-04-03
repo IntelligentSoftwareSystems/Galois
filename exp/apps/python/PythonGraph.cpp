@@ -83,20 +83,26 @@ void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
 }
 
 Edge addEdge(Graph *g, GNode src, GNode dst) {
-  auto ei = g->addEdge(src, dst, Galois::MethodFlag::WRITE);
-  return {ei.base(), ei.end()};
+  g->addEdge(src, dst, Galois::MethodFlag::WRITE);
+  return {src, dst};
 }
 
 void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
-  g->getEdgeData(edge_iterator(e.base, e.end))[key] = val;
+  auto ei = g->findEdge(e.src, e.dst);
+  assert(ei != g.edge_end(e.src));
+  g->getEdgeData(ei)[key] = val;
 }
 
 const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
-  return const_cast<ValAltTy>(g->getEdgeData(edge_iterator(e.base, e.end))[key].c_str());
+  auto ei = g->findEdge(e.src, e.dst);
+  assert(ei != g.edge_end(e.src));
+  return const_cast<ValAltTy>(g->getEdgeData(ei)[key].c_str());
 }
 
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
-  g->getEdgeData(edge_iterator(e.base, e.end)).erase(key);
+  auto ei = g->findEdge(e.src, e.dst);
+  assert(ei != g.edge_end(e.src));
+  g->getEdgeData(ei).erase(key);
 }
 
 void setNumThreads(int numThreads) {

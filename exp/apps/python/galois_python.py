@@ -15,8 +15,8 @@ for passing struct back and forth between C++ and python, see
 http://stackoverflow.com/questions/20773602/returning-struct-from-c-dll-to-python 
 """
 class Edge(Structure):
-  _fields_ = [("base", c_void_p),
-              ("end", c_void_p)]
+  _fields_ = [("src", Node),
+              ("dst", Node)]
 
 class NodePair(Structure):
   _fields_ = [("nQ", Node),
