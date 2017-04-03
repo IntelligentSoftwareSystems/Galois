@@ -113,7 +113,6 @@ class GaloisGraph(object):
         self.nodeMap.clear()
         self.edgeMap.clear()
         self.invNodeMap.clear()
-        self.invEdgeMap.clear()
 
     def printGraph(self):
         print "=====", "GaloisGraph", self.name, "====="
@@ -163,10 +162,6 @@ class GaloisGraph(object):
 
     def setEdgeIndex(self, e, eid):
         self.edgeMap[eid] = e
-        self.invEdgeMap[(e.src, e.dst)] = eid
-
-    def getEdgeIndex(self, e):
-        return self.invEdgeMap[(e.src, e.dst)]
 
     def addEdge(self, eid, srcid, dstid):
         src = self.nodeMap[srcid]
@@ -182,7 +177,7 @@ class GaloisGraph(object):
         l = glib.getAllEdges(self.graph)
         result = []
         for j in range(l.num):
-            result.append((l.edges[j].src, l.edges[j].dst))
+            result.append(l.edges[j])
         glib.deleteEdgeList(l)
         return result
 
