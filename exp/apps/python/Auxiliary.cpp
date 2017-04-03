@@ -40,7 +40,7 @@ AttrList getEdgeAllAttr(Graph *g, Edge e) {
 }
 
 NodeList getAllNodes(Graph *g) {
-  NodeList l = createNodeList(std::distance(g->begin(), g->end()));
+  NodeList l = createNodeList(getNumNodes(g));
   auto i = 0;
   for (auto n: *g) {
     l.nodes[i++] = n;
@@ -49,12 +49,7 @@ NodeList getAllNodes(Graph *g) {
 }
 
 EdgeList getAllEdges(Graph *g) {
-  size_t num = 0;
-  for (auto n: *g) {
-    num += std::distance(g->edge_begin(n), g->edge_end(n));
-  }
-
-  EdgeList l = createEdgeList(num);
+  EdgeList l = createEdgeList(getNumEdges(g));
   auto i = 0;
   for (auto n: *g) {
     for (auto e: g->edges(n)) {

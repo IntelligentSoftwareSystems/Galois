@@ -84,3 +84,15 @@ void setNumThreads(int numThreads) {
   Galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
 }
 
+size_t getNumNodes(Graph *g) {
+  return std::distance(g->begin(), g->end());
+}
+
+size_t getNumEdges(Graph *g) {
+  size_t num = 0;
+  for (auto n: *g) {
+    num += std::distance(g->edge_begin(n), g->edge_end(n));
+  }
+  return num;
+}
+

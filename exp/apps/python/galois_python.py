@@ -65,10 +65,16 @@ glib.addEdge.argtypes = [GraphPtr, Node, Node]
 glib.setEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy, ValTy]
 glib.getEdgeAttr.restype = ValTy
 glib.getEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
+glib.getEdgeAllAttr.restype = AttrList
+glib.getEdgeAllAttr.argtypes = [GraphPtr, Edge]
 glib.getAllEdges.restype = EdgeList
 glib.getAllEdges.argtypes = [GraphPtr]
 glib.removeEdgeAttr.argtypes = [GraphPtr, Edge, KeyTy]
 glib.setNumThreads.argtypes = [c_int]
+glib.getNumNodes.restype = c_int
+glib.getNumNodes.argtypes = [GraphPtr]
+glib.getNumEdges.restype = c_int
+glib.getNumEdges.argtypes = [GraphPtr]
 glib.analyzeBFS.argtypes = [GraphPtr, Node, KeyTy]
 glib.searchSubgraphUllmann.restype = POINTER(NodePair)
 glib.searchSubgraphUllmann.argtypes = [GraphPtr, GraphPtr, c_int]
@@ -99,34 +105,36 @@ class GaloisGraph(object):
         self.graph = glib.createGraph()
         self.nodeMap = {}
         self.edgeMap = {}
+        self.invNodeMap = {}
+        self.invEdgeMap = {}
 
     def __del__(self):
         glib.deleteGraph(self.graph)
+        self.nodeMap.clear()
+        self.edgeMap.clear()
+        self.invNodeMap.clear()
+        self.invEdgeMap.clear()
 
     def printGraph(self):
         print "=====", "GaloisGraph", self.name, "====="
         glib.printGraph(self.graph)
 
+    def setNodeIndex(self, n, nid):
+        self.nodeMap[nid] = n
+        self.invNodeMap[n] = nid
+
+    def getNodeIndex(self, n):
+        return self.invNodeMap[n]
+
     def addNode(self, nid):
         if nid not in self.nodeMap:
             n = glib.createNode(self.graph)
             glib.addNode(self.graph, n)
-            self.nodeMap[nid] = n
+            self.setNodeIndex(n, nid)
         return self.nodeMap[nid]
 
-    def setNodeAttr(self, n, key, val):
-        glib.setNodeAttr(self.graph, n, key, val)
-
-    def getNodeAttr(self, n, key):
-        return glib.getNodeAttr(self.graph, n, key)
-
-    def getNodeAllAttr(self, n):
-        attr = glib.getNodeAllAttr(self.graph, n)
-        sol = {}
-        for i in range(attr.num):
-            sol[attr.key[i]] = attr.value[i]
-        glib.deleteAttrList(attr)
-        return sol
+    def getNode(self, nid):
+        return self.nodeMap[nid]
 
     def getAllNodes(self):
         l = glib.getAllNodes(self.graph)
@@ -136,21 +144,39 @@ class GaloisGraph(object):
         glib.deleteNodeList(l)
         return result
 
+    def setNodeAttr(self, n, key, val):
+        glib.setNodeAttr(self.graph, n, key, val)
+
+    def getNodeAttr(self, n, key):
+        return glib.getNodeAttr(self.graph, n, key)
+
     def removeNodeAttr(self, n, key):
         glib.removeNodeAttr(self.graph, n, key)
+
+    def getNodeAllAttr(self, n):
+        attr = glib.getNodeAllAttr(self.graph, n)
+        sol = {}
+        for i in range(attr.num):
+            sol[attr.key[i]] = attr.value[i]
+        glib.deleteAttrList(attr)
+        return sol
+
+    def setEdgeIndex(self, e, eid):
+        self.edgeMap[eid] = e
+        self.invEdgeMap[(e.src, e.dst)] = eid
+
+    def getEdgeIndex(self, e):
+        return self.invEdgeMap[(e.src, e.dst)]
 
     def addEdge(self, eid, srcid, dstid):
         src = self.nodeMap[srcid]
         dst = self.nodeMap[dstid]
         e = glib.addEdge(self.graph, src, dst)
-        self.edgeMap[eid] = e
+        self.setEdgeIndex(e, eid)
         return e
 
-    def setEdgeAttr(self, e, key, val):
-        glib.setEdgeAttr(self.graph, e, key, val)
-
-    def getEdgeAttr(self, e, key):
-        return glib.getEdgeAttr(self.graph, e, key)
+    def getEdge(self, eid):
+        return self.edgeMap[eid]
 
     def getAllEdges(self):
         l = glib.getAllEdges(self.graph)
@@ -160,11 +186,25 @@ class GaloisGraph(object):
         glib.deleteEdgeList(l)
         return result
 
+    def setEdgeAttr(self, e, key, val):
+        glib.setEdgeAttr(self.graph, e, key, val)
+
+    def getEdgeAttr(self, e, key):
+        return glib.getEdgeAttr(self.graph, e, key)
+
     def removeEdgeAttr(self, e, key):
         glib.removeEdgeAttr(self.graph, e, key)
 
+    def getEdgeAllAttr(self, e):
+        attr = glib.getEdgeAllAttr(self.graph, e)
+        sol = {}
+        for i in range(attr.num):
+            sol[attr.key[i]] = attr.value[i]
+        glib.deleteAttrList(attr)
+        return sol
+
     def showStatistics(self):
-        print self.name, ":", len(self.nodeMap), "nodes,", len(self.edgeMap), "edges"
+        print self.name, ":", glib.getNumNodes(self.graph), "nodes,", glib.getNumEdges(self.graph), "edges"
 
     def analyzeBFS(self, src, attr, numThreads):
         print "=====", "analyzeBFS", "====="
@@ -298,6 +338,8 @@ def testGraphConstruction():
     g.setEdgeAttr(e0n0n1, "weight", "3.0")
     g.setEdgeAttr(e0n0n1, "id", "edge 0: 0 -> 1")
     g.printGraph()
+    print g.getNodeIndex(g.getEdge("e0n0n1").src)
+    print g.getNodeIndex(g.getEdge("e0n0n1").dst)
 
     e1n0n1 = g.addEdge("e1n0n1", "n0", "n1")
     g.setEdgeAttr(e1n0n1, "place", "texas")

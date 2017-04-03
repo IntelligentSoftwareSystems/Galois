@@ -100,6 +100,8 @@ const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
 void setNumThreads(int numThreads);
+size_t getNumNodes(Graph* g);
+size_t getNumEdges(Graph* g);
 
 } // extern "C"
 
