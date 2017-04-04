@@ -40,9 +40,9 @@ void batch_set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 void batch_add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 
-void BFS_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
-void BFS_all_cuda(int & __retval, struct CUDA_Context *ctx);
-void FirstItr_BFS_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
-void FirstItr_BFS_all_cuda(struct CUDA_Context *ctx);
+void FirstItr_SSSP_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
+void FirstItr_SSSP_all_cuda(struct CUDA_Context *ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context *ctx);
 void InitializeGraph_all_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context *ctx);
+void SSSP_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
+void SSSP_all_cuda(int & __retval, struct CUDA_Context *ctx);

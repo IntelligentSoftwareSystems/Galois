@@ -622,7 +622,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + helper_fn.get_run_identifier());
     Galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
 
-    unsigned long num_work_items = r.end() - r.begin();
+    helper_fn.set_num_iter(0);
     Timer_for_each_impl.start();
     Runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
@@ -630,6 +630,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
     Timer_for_each_impl.stop();
+    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
 
     typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
     DBag dbag(helper_fn, loopName);
@@ -648,6 +649,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     /** loop while work in the worklist **/
     unsigned num_iterations = 1;
     while(!dbag.canTerminate()) {
+      helper_fn.set_num_iter(num_iterations);
 
       //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 
@@ -655,7 +657,6 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       Timer_for_each_impl.start();
       bag.clear();
       if(!local_wl.empty()){
-        num_work_items += local_wl.end() - local_wl.begin();
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
@@ -663,6 +664,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
       }
       Timer_for_each_impl.stop();
+      Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), local_wl.end() - local_wl.begin(), 0);
 
       // Sync
       helper_fn.sync_graph();
@@ -675,10 +677,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
       ++num_iterations;
     }
-    //Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + (helper_fn.get_run_identifier()), (unsigned long)num_iterations, 0);
-    //Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(helper_fn.get_run_num()), num_work_items, 0);
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), num_work_items, 0);
+    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 

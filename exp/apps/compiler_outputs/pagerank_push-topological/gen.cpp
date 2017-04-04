@@ -71,7 +71,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));

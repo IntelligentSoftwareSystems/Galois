@@ -230,24 +230,30 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 
   //ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2"), timer3("timer3"), timer4("timer 4");
   //timer.start();
-  //timer1.start();
-  ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
-  ctx->is_updated.cpu_rd_ptr()->clear();
-	batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
-	check_cuda_kernel;
-  //timer1.stop();
-  //timer2.start();
-  get_offsets_from_bitset(shared->num_nodes[from_id], ctx->offsets.device_ptr(), ctx->is_updated.gpu_rd_ptr(), v_size);
-  //timer2.stop();
-  if ((*v_size) == 0) {
-    *data_mode = noData;
-    return;
-  } else if (((*v_size)*sizeof(unsigned int)) < ctx->is_updated.cpu_rd_ptr()->alloc_size()) {
-    *data_mode = offsetsData;
-  } else if (((*v_size)*sizeof(DataType)+ctx->is_updated.cpu_rd_ptr()->alloc_size()) < ((shared->num_nodes[from_id])*sizeof(DataType))) {
-    *data_mode = bitsetData;
-  } else {
-    *data_mode = onlyData;
+  if (enforce_data_mode != onlyData) {
+    //timer1.start();
+    ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
+    ctx->is_updated.cpu_rd_ptr()->clear();
+    batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
+    check_cuda_kernel;
+    //timer1.stop();
+    //timer2.start();
+    get_offsets_from_bitset(shared->num_nodes[from_id], ctx->offsets.device_ptr(), ctx->is_updated.gpu_rd_ptr(), v_size);
+    //timer2.stop();
+  }
+  if (enforce_data_mode != noData) {
+    *data_mode = enforce_data_mode;
+  } else { // auto
+    if ((*v_size) == 0) {
+      *data_mode = noData;
+      return;
+    } else if (((*v_size)*sizeof(unsigned int)) < ctx->is_updated.cpu_rd_ptr()->alloc_size()) {
+      *data_mode = offsetsData;
+    } else if (((*v_size)*sizeof(DataType)+ctx->is_updated.cpu_rd_ptr()->alloc_size()) < ((shared->num_nodes[from_id])*sizeof(DataType))) {
+      *data_mode = bitsetData;
+    } else {
+      *data_mode = onlyData;
+    }
   }
   //timer3.start();
   if ((*data_mode) == onlyData) {
