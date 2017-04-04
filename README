@@ -59,3 +59,6 @@ If you are using CMake, put something like the following CMakeLists.txt:
 
 Using basic commands (although the specific commands vary by system):
   c++ -std=c++11 app.cpp -I${installdir}/include -L${installdir}/lib -lgalois
+
+
+##Gurbinder added this dummy line
