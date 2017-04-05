@@ -161,8 +161,8 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   work_items = re.findall(work_items_regex, log_data)
   print work_items
   num_arr = numpy.array(map(int,work_items))
-  avg_total_work_item = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
-  print avg_total_work_item
+  total_work_item = numpy.sum(num_arr, axis=0)
+  print total_work_item
 
 
 
@@ -175,6 +175,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   num_arr = numpy.array(map(int,timer_hg_init_all_hosts))
   avg_hg_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
   avg_hg_init_time = round((avg_hg_init_time / divisor),3)
+  load_time = avg_hg_init_time
 
   print "avg_hg_init time : ", avg_hg_init_time
 
@@ -197,7 +198,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     num_iter = num_iter_search.group(1)
     print "NUM_ITER : ", num_iter
 
-  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,avg_total_work_item,avg_hg_init_time,total_time
+  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,load_time,total_time
 
 '''
   if timer_graph_init is not None:
@@ -375,7 +376,7 @@ def main(argv):
 
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,host_avg_work_items,host_avg_hg_init_time,total_time"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,load_time,total_time"
 
 
     header_csv_list = header_csv_str.split(',')
