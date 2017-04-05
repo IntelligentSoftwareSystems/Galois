@@ -13,6 +13,7 @@ float * P_VALUE;
 static const int __tb_FirstItr_PageRank = TB_SIZE;
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
+static const int __tb_InitializeGraphNout = TB_SIZE;
 __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
@@ -33,6 +34,26 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int _
     }
   }
   // FP: "9 -> 10;
+}
+__global__ void InitializeGraphNout(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_nout)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = __tb_InitializeGraphNout;
+  index_type src_end;
+  // FP: "1 -> 2;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
+  {
+    bool pop  = src < __end;
+    if (pop)
+    {
+      atomicAdd(&p_nout[src], graph.getOutDegree(src));
+      is_updated->set(src);
+    }
+  }
+  // FP: "8 -> 9;
 }
 __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
@@ -715,6 +736,26 @@ void ResetGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
   ResetGraph_cuda(0, ctx->nowned, ctx);
+  // FP: "2 -> 3;
+}
+void InitializeGraphNout_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  // FP: "3 -> 4;
+  kernel_sizing(blocks, threads);
+  // FP: "4 -> 5;
+  InitializeGraphNout <<<blocks, __tb_InitializeGraphNout>>>(ctx->gg, ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->nout.data.gpu_wr_ptr());
+  // FP: "5 -> 6;
+  check_cuda_kernel;
+  // FP: "6 -> 7;
+}
+void InitializeGraphNout_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraphNout_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
