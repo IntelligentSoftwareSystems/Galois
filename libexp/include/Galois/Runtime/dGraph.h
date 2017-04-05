@@ -1792,6 +1792,18 @@ public:
      }
    }
 
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_switch(std::string loopName) {
+     Galois::DynamicBitSet emptyBitset;
+     sync_switch<PushFnTy, PullFnTy>(loopName, emptyBitset);
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_switch(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     sync_push<PushFnTy>(loopName, bit_set_compute);
+     sync_pull<PullFnTy>(loopName, bit_set_compute);
+   }
+
    template<typename FnTy>
    void sync_push_ck(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
