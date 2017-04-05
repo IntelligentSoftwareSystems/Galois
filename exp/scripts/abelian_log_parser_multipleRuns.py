@@ -155,11 +155,29 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   total_sync_bytes = sum_sync_bytes
 
 
+  #75ae6860-be9f-4498-9315-1478c78551f6,(NULL),0 , NUM_WORK_ITEMS_0_0,0,0,262144
+  #Total work items, averaged across hosts
+  work_items_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sNUM_WORK_ITEMS_0_\d*,\d*,\d*,(\d*)')
+  work_items = re.findall(work_items_regex, log_data)
+  print work_items
+  num_arr = numpy.array(map(int,work_items))
+  avg_total_work_item = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+  print avg_total_work_item
+
+
 
   ## Get Graph_init, HG_init, total
   #81a5b117-8054-46af-9a23-1f28e5ed1bba,(NULL),0 , TIMER_GRAPH_INIT,0,0,306
   #timer_graph_init_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_GRAPH_INIT,\d*,\d*,(\d*)')
-  #timer_hg_init_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_HG_INIT' + r',\d*,\d*,(\d*)')
+  timer_hg_init_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_HG_INIT' + r',\d*,\d*,(\d*)')
+  timer_hg_init_all_hosts = re.findall(timer_hg_init_regex, log_data)
+
+  num_arr = numpy.array(map(int,timer_hg_init_all_hosts))
+  avg_hg_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+  avg_hg_init_time = round((avg_hg_init_time / divisor),3)
+
+  print "avg_hg_init time : ", avg_hg_init_time
+
   timer_total_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_TOTAL' + r',\d*,\d*,(\d*)')
 
 
@@ -171,7 +189,15 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time /= divisor
     total_time = round(total_time, 3)
 
-  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,total_time
+
+  #75ae6860-be9f-4498-9315-1478c78551f6,(NULL),0 , NUM_WORK_ITEMS_0_1,0,0,0
+  num_iter_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sNUM_ITERATIONS_0' + r',\d*,\d*,(\d*)')
+  num_iter_search = num_iter_regex.search(log_data)
+  if num_iter_regex is not None:
+    num_iter = num_iter_search.group(1)
+    print "NUM_ITER : ", num_iter
+
+  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,avg_total_work_item,avg_hg_init_time,total_time
 
 '''
   if timer_graph_init is not None:
@@ -349,8 +375,8 @@ def main(argv):
 
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,total_time"
-    
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,host_avg_work_items,host_avg_hg_init_time,total_time"
+
 
     header_csv_list = header_csv_str.split(',')
     try:
