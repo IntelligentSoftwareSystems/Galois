@@ -84,7 +84,7 @@ glib.deleteGraphMatches.argtypes = [POINTER(NodePair)]
 glib.analyzePagerank.restype = POINTER(NodeDouble)
 glib.analyzePagerank.argtypes = [GraphPtr, c_int, c_double, KeyTy]
 glib.deleteNodeDoubles.argtypes = [POINTER(NodeDouble)]
-glib.filterNode.argtypes = [GraphPtr, KeyTy, ValTy]
+glib.filterNode.argtypes = [GraphPtr, KeyTy, ValTy, c_bool]
 glib.filterNode.restype = NodeList
 glib.deleteNodeList.argtypes = [NodeList]
 glib.createNodeList.argtypes = [c_int]
@@ -270,10 +270,10 @@ class GaloisGraph(object):
         glib.deleteNodeDoubles(pr)
         return result
 
-    def filterNode(self, key, value, numThreads):
+    def filterNode(self, key, value, isFullMatch, numThreads):
         print "=====", "filterNode", "====="
         glib.setNumThreads(numThreads)
-        l = glib.filterNode(self.graph, key, value)
+        l = glib.filterNode(self.graph, key, value, isFullMatch)
         result = []
         for j in range(l.num):
             result.append(l.nodes[j])
@@ -432,11 +432,11 @@ def testSubgraphIsomorphism():
 def testReachability():
     g = testGraphConstruction()
 
-    srcList = g.filterNode("color", "red", 3)
+    srcList = g.filterNode("color", "red", True, 3)
     assert(len(srcList) == 1)
     assert(g.getNodeIndex(srcList[0]) == "n0")
 
-    dstList = g.filterNode("id", "node 2", 2)
+    dstList = g.filterNode("id", "n[a-z]+ 2", False, 2)
     assert(len(dstList) == 1)
     assert(g.getNodeIndex(dstList[0]) == "n2")
 

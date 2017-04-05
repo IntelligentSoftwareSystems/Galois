@@ -6,7 +6,7 @@
 
 extern "C" {
 
-NodeList filterNode(Graph* g, const KeyAltTy key, const ValAltTy value);
+NodeList filterNode(Graph* g, const KeyAltTy key, const ValAltTy value, bool isFullMatch);
 
 } // extern "C"
 
