@@ -36,6 +36,7 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
+#include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include <type_traits>
 
@@ -377,6 +378,92 @@ public:
 
   void fixEndEdge(uint32_t n, uint64_t e) {
     edgeIndData[n] = e;
+  }
+
+  // perform an in-memory tranpose of the graph, replacing the original
+  // CSR to CSC
+  void transpose() {
+    EdgeDst edgeDst_old;
+    EdgeData edgeData_new;
+    EdgeIndData edgeIndData_old;
+    LargeArray< std::atomic<uint64_t> > edgeIndData_temp;
+    if (UseNumaAlloc) {
+      edgeIndData_old.allocateLocal(numNodes);
+      edgeIndData_temp.allocateLocal(numNodes);
+      edgeDst_old.allocateLocal(numEdges);
+      edgeData_new.allocateLocal(numEdges);
+    } else {
+      edgeIndData_old.allocateInterleaved(numNodes);
+      edgeIndData_temp.allocateLocal(numNodes);
+      edgeDst_old.allocateInterleaved(numEdges);
+      edgeData_new.allocateInterleaved(numEdges);
+    }
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData_old[n] = edgeIndData[n];
+        edgeIndData_temp[n] = 0;
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), Galois::numrun("0"));
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
+      [&](uint32_t e){
+        auto dst = edgeDst[e];
+        edgeDst_old[e] = dst;
+        Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
+      }, Galois::loopname("TRANSPOSE_COUNT_INCOMING_EDGES"), Galois::numrun("0"));
+    for (uint32_t n = 1; n < numNodes; ++n) {
+      edgeIndData_temp[n] += edgeIndData_temp[n-1];
+    }
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData[n] = edgeIndData_temp[n];
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), Galois::numrun("0"));
+    edgeIndData_temp[0] = 0;
+    Galois::do_all(boost::counting_iterator<uint32_t>(1), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData_temp[n] = edgeIndData[n-1];
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), Galois::numrun("0"));
+#ifndef GALOIS_TRANSPOSE_SERIAL
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t src){
+        uint64_t e;
+        if (src == 0) e = 0;
+        else e = edgeIndData_old[src-1];
+        while (e < edgeIndData_old[src]) {
+          auto dst = edgeDst_old[e];
+          auto e_new = Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
+          edgeDst[e_new] = src;
+          edgeDataCopy(edgeData_new, edgeData, e_new, e);
+          e++;
+        }
+      }, Galois::loopname("TRANSPOSE_REORDER_EDGES"), Galois::numrun("0"));
+#else
+    for (uint32_t src = 0; src < numNodes; ++src) {
+      uint64_t e;
+      if (src == 0) e = 0;
+      else e = edgeIndData_old[src-1];
+      while (e < edgeIndData_old[src]) {
+        auto dst = edgeDst_old[e];
+        auto e_new = Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
+        edgeDst[e_new] = src;
+        edgeDataCopy(edgeData_new, edgeData, e_new, e);
+        e++;
+      }
+    }
+#endif
+    if (EdgeData::has_value) {
+      Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
+        [&](uint32_t e){
+          edgeDataCopy(edgeData, edgeData_new, e, e);
+        }, Galois::loopname("TRANSPOSE_EDGEDATA_SET"), Galois::numrun("0"));
+    }
+  }
+
+  template<bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<is_non_void>::type* = 0) {
+    edgeData_new[e_new] = edgeData[e];
+  }
+
+  template<bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<!is_non_void>::type* = 0) {
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {

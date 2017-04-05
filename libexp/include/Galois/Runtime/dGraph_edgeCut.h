@@ -80,8 +80,14 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
     }
 
+    bool isLocal(uint64_t gid) const {
+      if (gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned)
+        return true;
+      return (GlobalToLocalGhostMap.find(gid) != GlobalToLocalGhostMap.end());
+    }
 
-    hGraph_edgeCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
+
+    hGraph_edgeCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
@@ -180,6 +186,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     loadEdges(base_hGraph::graph, g);
     std::cerr << "Edges loaded \n";
 
+    if (transpose) {
+      base_hGraph::graph.transpose();
+      base_hGraph::transposed = true;
+    }
 
     fill_slaveNodes(base_hGraph::slaveNodes);
     StatTimer_graph_construct.stop();

@@ -70,6 +70,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
+static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
@@ -214,7 +215,7 @@ struct InitializeGraph {
       		}
       		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+      			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
       			assert (personality == CPU);
       		#endif
       			return false;
@@ -235,11 +236,7 @@ struct InitializeGraph {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync_push<Syncer_0>("InitializeGraph", bitset_residual);
-      
-      if(_graph.is_vertex_cut()) {
-      	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph", bitset_residual);
-      }
+      _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("InitializeGraph", bitset_residual);
       
   }
 
@@ -342,7 +339,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -363,11 +360,7 @@ void static go(Graph& _graph) {
 bitset_residual.clear();
 Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
 }
-_graph.sync_push<Syncer_0>("PageRank", bitset_residual);
-
-if(_graph.is_vertex_cut()) {
-	_graph.sync_pull<SyncerPull_vertexCut_0>("PageRank", bitset_residual);
-}
+_graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -485,7 +478,7 @@ struct PageRank {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -508,11 +501,8 @@ struct PageRank {
     bitset_residual.clear();
     Galois::do_all(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
     }
-    _graph.sync_push<Syncer_0>("PageRank", bitset_residual);
+    _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
     
-    if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("PageRank", bitset_residual);
-    }
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
     }while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
@@ -600,7 +590,7 @@ int main(int argc, char** argv) {
       hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
     }
     else {
-      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
     }
 
 

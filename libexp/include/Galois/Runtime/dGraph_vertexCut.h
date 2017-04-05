@@ -76,14 +76,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-     auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
-      uint32_t old_lid;
-      if(iter != GlobalVec_ordered.end() && *iter == gid){
-        return true;
-      }
-      else{
-        return false;
-      }
+      return (GlobalVec_map.find(gid) != GlobalVec_map.end());
+    }
+
+    bool isLocal(uint64_t gid) const {
+      return (GlobalVec_map.find(gid) != GlobalVec_map.end());
     }
 
     std::string getMetaFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){

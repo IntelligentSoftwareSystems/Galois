@@ -79,6 +79,7 @@ class hGraph: public GlobalObject {
    enum SyncType { syncPush, syncPull };
 
    GraphTy graph;
+   bool transposed;
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint64_t totalSlaveNodes; // Total slave nodes from others.
@@ -107,6 +108,7 @@ class hGraph: public GlobalObject {
     return getHostID(gid);
   }
   virtual bool isOwned(uint64_t) const = 0;
+  virtual bool isLocal(uint64_t) const = 0;
   virtual bool isMaster(uint64_t gid) const {
     if(getHostID(gid) == id)
       return true;
@@ -250,7 +252,7 @@ public:
 
    //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
    hGraph(unsigned host, unsigned numHosts) :
-         GlobalObject(this), round(false), id(host), numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
+         GlobalObject(this), transposed(false), round(false), id(host), numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
 
       if (useGidMetadata) {
         if (enforce_data_mode != offsetsData) {
@@ -458,10 +460,13 @@ public:
    iterator begin() {
       return graph.begin();
    }
+
    const_iterator end() const {
+      if (transposed) return graph.end();
       return graph.begin() + numOwned;
    }
    iterator end() {
+      if (transposed) return graph.end();
       return graph.begin() + numOwned;
    }
 
@@ -1514,7 +1519,7 @@ public:
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
-     Statistic_metadata += data_mode;
+     Statistic_metadata += data_mode - Statistic_metadata.getVal(); // set, not add
    }
 
    template<typename FnTy, SyncType syncType>
@@ -1573,7 +1578,7 @@ public:
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
-     Statistic_metadata += data_mode;
+     Statistic_metadata += data_mode - Statistic_metadata.getVal(); // set, not add
    }
 
    template<typename FnTy, SyncType syncType>
@@ -1743,6 +1748,48 @@ public:
       sync_recv<FnTy, syncPull>(loopName);
 
       StatTimer_syncPull.stop();
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_forward(std::string loopName) {
+     Galois::DynamicBitSet emptyBitset;
+     sync_forward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_forward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     if (transposed) {
+       if (is_vertex_cut()) {
+         sync_push<PushFnTy>(loopName, bit_set_compute);
+       }
+       sync_pull<PullFnTy>(loopName, bit_set_compute);
+     } else {
+       sync_push<PushFnTy>(loopName, bit_set_compute);
+       if (is_vertex_cut()) {
+         sync_pull<PullFnTy>(loopName, bit_set_compute);
+       }
+     }
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_backward(std::string loopName) {
+     Galois::DynamicBitSet emptyBitset;
+     sync_backward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_backward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     if (transposed) {
+       sync_push<PushFnTy>(loopName, bit_set_compute);
+       if (is_vertex_cut()) {
+         sync_pull<PullFnTy>(loopName, bit_set_compute);
+       }
+     } else {
+       if (is_vertex_cut()) {
+         sync_push<PushFnTy>(loopName, bit_set_compute);
+       }
+       sync_pull<PullFnTy>(loopName, bit_set_compute);
+     }
    }
 
    template<typename FnTy>

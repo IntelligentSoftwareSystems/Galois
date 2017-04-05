@@ -67,6 +67,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
+static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
@@ -139,7 +140,7 @@ struct InitializeGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -200,11 +201,7 @@ struct InitializeGraph {
     bitset_dist_current.clear();
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     }
-    if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph", bitset_dist_current);
-    }
-    
-    _graph.sync_pull<SyncerPull_0>("InitializeGraph", bitset_dist_current);
+    _graph.sync_backward<Syncer_vertexCut_0, SyncerPull_0>("InitializeGraph", bitset_dist_current);
     
   }
 
@@ -221,7 +218,7 @@ Graph * graph;
 FirstItr_BFS(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
 		unsigned int __begin, __end;
-		if (_graph.isOwned(src_node)) {
+		if (_graph.isLocal(src_node)) {
 			__begin = _graph.getLID(src_node);
 			__end = __begin + 1;
 		} else {
@@ -299,7 +296,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -320,11 +317,7 @@ void static go(Graph& _graph) {
 bitset_dist_current.clear();
 Galois::do_all(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
 }
-_graph.sync_push<Syncer_0>("BFS", bitset_dist_current);
-
-if(_graph.is_vertex_cut()) {
-	_graph.sync_pull<SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
-}
+_graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
 
@@ -430,7 +423,7 @@ struct BFS {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -453,11 +446,8 @@ struct BFS {
     bitset_dist_current.clear();
     Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
     }
-    _graph.sync_push<Syncer_0>("BFS", bitset_dist_current);
-    
-    if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
-    }
+    _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
+
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
     }while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
@@ -538,7 +528,7 @@ int main(int argc, char** argv) {
       hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
     }
     else {
-      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+      hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
     }
 
 #ifdef __GALOIS_HET_CUDA__
