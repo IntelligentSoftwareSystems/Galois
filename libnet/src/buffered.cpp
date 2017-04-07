@@ -25,8 +25,9 @@
 #include "Galois/Runtime/NetworkIO.h"
 #include "Galois/Runtime/Tracer.h"
 
-#define USE_MV
+#ifdef GALOIS_USE_LC
 #define NO_AGG
+#endif
 
 #include <thread>
 #include <mutex>
@@ -317,7 +318,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   void workerThread() {
 
-#ifdef USE_MV
+#ifdef GALOIS_USE_LC
+    fprintf(stderr, "**Using LWCI Communication layer**\n");
     std::tie(netio, ID, Num) = makeNetworkIOMV();
 #else
     std::tie(netio, ID, Num) = makeNetworkIOMPI();

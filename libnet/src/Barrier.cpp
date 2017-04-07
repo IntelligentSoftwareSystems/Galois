@@ -83,8 +83,7 @@ public:
 #include <iostream>
 #include <mpi.h>
 
-#define USE_MV
-#ifdef USE_MV
+#ifdef GALOIS_USE_LC
 void __fence__();
 #endif
 
@@ -104,7 +103,7 @@ public:
   virtual void reinit(unsigned val) { }
 
   virtual void wait() {
-#ifdef USE_MV
+#ifdef GALOIS_USE_LC
     __fence__();
 #endif
 
