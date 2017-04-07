@@ -182,9 +182,9 @@ struct InitializeGraph {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
     }
-    
+
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
-    
+
   }
 
   void operator()(GNode src) const {
@@ -282,9 +282,9 @@ struct SSSP {
       if(_graph.is_vertex_cut()) {
       	_graph.sync_push<Syncer_vertexCut_0>("SSSP");
       }
-      
+
       _graph.sync_pull<SyncerPull_0>("SSSP");
-      
+
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
@@ -312,7 +312,7 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
     Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
-    Galois::StatManager statManager;
+    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -342,7 +342,7 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
       for (unsigned i=0; i<personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
+        if (personality_set.c_str()[i] == 'c')
           scalefactor.push_back(scalecpu);
         else
           scalefactor.push_back(scalegpu);
@@ -400,7 +400,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
 #ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
+      if (personality == CPU) {
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
@@ -413,6 +413,7 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+    statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

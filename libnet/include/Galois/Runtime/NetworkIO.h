@@ -29,8 +29,6 @@
 #include <tuple>
 #include <memory>
 
-#include "mv_allocator.h"
-
 namespace Galois {
 namespace Runtime {
 
@@ -40,11 +38,10 @@ public:
   struct message {
     uint32_t host;
     uint32_t tag;
-    mv_vector<uint8_t> data;
+    std::vector<uint8_t> data;
 
     message() :host(~0), tag(~0) {}
-    message(uint32_t h, uint32_t t, mv_vector<uint8_t>&& d) :host(h), tag(t), data(
-      std::move(d)) {}
+    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) :host(h), tag(t), data(d) {}
 
     bool valid() const { return !data.empty(); }
   };

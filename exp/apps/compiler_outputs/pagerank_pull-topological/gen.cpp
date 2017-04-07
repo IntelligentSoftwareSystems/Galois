@@ -248,15 +248,15 @@ struct ResetGraph {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("ResetGraph");
     }
-    
+
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_1>("ResetGraph");
     }
-    
+
     _graph.sync_pull<SyncerPull_0>("ResetGraph");
-    
+
     _graph.sync_pull<SyncerPull_1>("ResetGraph");
-    
+
   }
 
   void operator()(GNode src) const {
@@ -416,15 +416,15 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float" , "set",  ""));
     _graph.sync_push<Syncer_0>("InitializeGraph");
-    
+
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_1>("InitializeGraph");
     }
-    
+
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
-    
+
     _graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
-    
+
   }
 
   void operator()(GNode src) const {
@@ -529,9 +529,9 @@ struct PageRank {
       if(_graph.is_vertex_cut()) {
       	_graph.sync_push<Syncer_vertexCut_0>("PageRank");
       }
-      
+
       _graph.sync_pull<SyncerPull_0>("PageRank");
-      
+
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
@@ -554,7 +554,7 @@ struct PageRank {
     float diff = std::fabs(pr_value - sdata.value);
 
     if(diff > local_tolerance){
-      sdata.value = pr_value; 
+      sdata.value = pr_value;
       DGAccumulator_accum+= 1;
     }
   }
@@ -569,7 +569,7 @@ int main(int argc, char** argv) {
     std::ostringstream ss;
     ss << tolerance;
     Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
-    Galois::StatManager statManager;
+    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -599,7 +599,7 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
       for (unsigned i=0; i<personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
+        if (personality_set.c_str()[i] == 'c')
           scalefactor.push_back(scalecpu);
         else
           scalefactor.push_back(scalegpu);
@@ -656,7 +656,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
 #ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
+      if (personality == CPU) {
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).value);
@@ -669,6 +669,8 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+    statManager.reportStat();
+    Galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch (const char* c) {

@@ -28,9 +28,8 @@
 
 //#include "hash/crc32.h"
 
-#include "mv.h"
-#include "mv/helper.h"
-#include "mv_allocator.h"
+#include "lc.h"
+#include "lc/helper.h"
 
 #include <iostream>
 
@@ -42,21 +41,26 @@
 #include <fstream>
 #include <unistd.h>
 #include <vector>
+#include <list>
+
+#ifdef GALOIS_USE_VTUNE
+#include "ittnotify.h"
+#endif
 
 class NetworkIOMV;
 NetworkIOMV* __ctx;
-mvh* mv;
+lch* mv;
 
 struct mpiMessage {
-  mv_ctx ctx;
+  lc_ctx ctx;
   uint32_t rank;
   uint32_t tag;
-  mv_vector<uint8_t> buf;
+  std::vector<uint8_t> buf;
 
-  mpiMessage() {};
+  mpiMessage() { }
 
-  mpiMessage(uint32_t r, uint32_t t, mv_vector<uint8_t> &&b) :
-    rank(r), tag(t), buf(std::move(b)) {}
+  mpiMessage(uint32_t r, uint32_t t, std::vector<uint8_t> &b) :
+    rank(r), tag(t), buf(std::move(b))  {};
 };
 
 class NetworkIOMV : public Galois::Runtime::NetworkIO {
@@ -80,14 +84,18 @@ class NetworkIOMV : public Galois::Runtime::NetworkIO {
     return numTasks;
   }
 
+  std::mutex m;
+
   std::pair<int, int> initMPI() {
-    mv_open(NULL, NULL, (size_t) 1024 * 1024 * 1024, &mv);
+    m.lock();
+    lc_open((size_t) 1024 * 1024 * 1024, &mv);
+    m.unlock();
     __ctx = this;
     return std::make_pair(getID(), getNum());
   }
 
   std::deque<mpiMessage> inflight;
-  std::deque<mpiMessage> recv;
+  std::list<mpiMessage> recv;
 
 public:
 int save;
@@ -100,15 +108,18 @@ int save;
   }
 
   ~NetworkIOMV() {
-    mv_close(mv);
+    lc_close(mv);
+  }
+
+  void fence() {
+    while (!inflight.empty())
+      ;
   }
 
   void complete_send() {
     while (!inflight.empty()) {
       auto& f = inflight.front();
-      if (mv_test(&f.ctx)) {
-        inflight.pop_front();
-      } else if (mv_send_enqueue_post(mv, &f.ctx, 0)) {
+      if (lc_test(&f.ctx)) {
         inflight.pop_front();
       } else {
         break;
@@ -117,47 +128,52 @@ int save;
   }
 
   virtual void enqueue(message m) {
-    inflight.emplace_back(m.host, m.tag, std::move(m.data));
+    inflight.emplace_back(m.host, m.tag, m.data);
     auto& f = inflight.back();
-    int count = 0;
-    while (!mv_send_enqueue_init(mv, f.buf.data(), f.buf.size(), m.host, m.tag, &f.ctx)) {
+    while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, &f.ctx)) {
       progress();
     }
   }
 
-  virtual message dequeue() {
-    while (!recv.empty()) {
-      auto& m = recv.front();
-      if (mv_test(&m.ctx)) {
-        message msg{m.rank, m.tag, std::move(m.buf)};
-        recv.pop_front();
-        return std::move(msg);
-      } else {
-        break;
-      }
-    }
+  void probe() {
     recv.emplace_back();
     auto& m = recv.back();
     int size;
-    if (mv_recv_dequeue_init(mv, &size, (int*) &m.rank, (int*) &m.tag, &m.ctx)) {
+    if (lc_recv_queue(mv, &size, (int*) &m.rank, (int*) &m.tag, &m.ctx)) {
       m.buf.resize(size);
-      if (mv_recv_dequeue_post(mv, m.buf.data(), &m.ctx)) {
-        message msg{m.rank, m.tag, std::move(m.buf)};
-        recv.pop_back();
-        return std::move(msg);
-      }
+      lc_recv_queue_post(mv, m.buf.data(), &m.ctx);
     } else {
       recv.pop_back();
     }
-    return message{~0U, 0, mv_vector<uint8_t>()};
+  }
+
+  virtual message dequeue() {
+    if (!recv.empty()) {
+      for (auto it = recv.begin(); it != recv.end(); it ++) {
+        auto &m = *it;
+        if (lc_test(&m.ctx)) {
+          message msg{m.rank, m.tag, std::move(m.buf)};
+          recv.erase(it);
+          return std::move(msg);
+        }
+        lc_progress(mv);
+      }
+    }
+    return message{~0U, 0, std::vector<uint8_t>()};
   }
 
   virtual void progress() {
     complete_send();
-    mv_progress(mv);
+    probe();
+    lc_progress(mv);
   }
 
 };
+
+void __fence__()
+{
+  __ctx->fence();
+}
 
 std::tuple<std::unique_ptr<Galois::Runtime::NetworkIO>,uint32_t,uint32_t> Galois::Runtime::makeNetworkIOMV() {
   uint32_t ID, NUM;

@@ -25,6 +25,9 @@
 #include "Galois/Runtime/NetworkIO.h"
 #include "Galois/Runtime/Tracer.h"
 
+#define USE_MV
+#define NO_AGG
+
 #include <thread>
 #include <mutex>
 #include <iostream>
@@ -85,9 +88,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     //return a (moved) vector if the len bytes requested are the last len bytes of the front of the buffer queue
-    optional_t<mv_vector<uint8_t> > popVec(uint32_t len) {
+    optional_t<std::vector<uint8_t> > popVec(uint32_t len) {
       if (data[0].data.size() == frontOffset + len) {
-        mv_vector<uint8_t> retval(std::move(data[0].data));
+        std::vector<uint8_t> retval(std::move(data[0].data));
         data.pop_front();
         frontOffset = 0;
         if (data.size()) {
@@ -95,9 +98,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         } else {
           dataPresent = ~0;
         }
-        return optional_t<mv_vector<uint8_t> >(std::move(retval));
+        return optional_t<std::vector<uint8_t> >(std::move(retval));
       } else {
-        return optional_t<mv_vector<uint8_t> >();
+        return optional_t<std::vector<uint8_t> >();
       }
     }
 
@@ -127,6 +130,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   public:
     optional_t<RecvBuffer> popMsg(uint32_t tag) {
       std::lock_guard<SimpleLock> lg(qlock);
+#ifndef NO_AGG
       uint32_t len = getLenFromFront(tag);
       //      assert(len);
       if (len == ~0U || len == 0)
@@ -146,8 +150,19 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       //FIXME: This is slows things down 25%
       copyOut((char*)buf.linearData(), len);
       erase(len);
-      //      std::cerr << "p " << tag << " " << len << "\n";
       return optional_t<RecvBuffer>(std::move(buf));
+#else
+      if (data.empty() || data.front().tag != tag)
+        return optional_t<RecvBuffer>();
+
+      std::vector<uint8_t> vec(std::move(data.front().data));
+
+      data.pop_front();
+      if (!data.empty())
+        dataPresent = data.front().tag;
+
+      return optional_t<RecvBuffer>(RecvBuffer(std::move(vec), 0));
+#endif
     }
 
     //Worker thread interface
@@ -179,15 +194,14 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   };
 
-  mv_vector<recvBuffer> recvData;
+  std::vector<recvBuffer> recvData;
   std::vector<SimpleLock> recvLock;
-
 
   class sendBuffer {
     struct msg {
       uint32_t tag;
-      mv_vector<uint8_t> data;
-      msg(uint32_t t, mv_vector<uint8_t>& _data) :tag(t), data(std::move(_data)) {
+      std::vector<uint8_t> data;
+      msg(uint32_t t, std::vector<uint8_t>& _data) :tag(t), data(std::move(_data)) {
       }
     };
 
@@ -211,6 +225,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     bool ready() {
+  #ifndef NO_AGG
       if (numBytes == 0)
         return false;
       if (urgent) {
@@ -233,12 +248,16 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         return true;
       }
       return false;
+#else
+      return messages.size() > 0;
+#endif
     }
 
-    std::pair<uint32_t, mv_vector<uint8_t> > assemble() {
+    std::pair<uint32_t, std::vector<uint8_t> > assemble() {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
-        return std::make_pair(~0, mv_vector<uint8_t>());
+        return std::make_pair(~0, std::vector<uint8_t>());
+#ifndef NO_AGG
       //compute message size
       uint32_t len = 0;
       int num = 0;
@@ -252,8 +271,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         }
       }
       lg.unlock();
+
       //construct message
-      mv_vector<uint8_t> vec;
+      std::vector<uint8_t> vec;
       vec.reserve(len + num);
       //go out of our way to avoid locking out senders when making messages
       lg.lock();
@@ -270,10 +290,15 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         messages.pop_front();
       } while (vec.size() < len + num);
       numBytes -= len;
+#else
+      uint32_t tag = messages.front().tag;
+      std::vector<uint8_t> vec(std::move(messages.front().data));
+      messages.pop_front();
+#endif
       return std::make_pair(tag, std::move(vec));
     }
 
-    void add(uint32_t tag, mv_vector<uint8_t>& b) {
+    void add(uint32_t tag, std::vector<uint8_t>& b) {
       std::lock_guard<SimpleLock> lg(lock);
       if (messages.empty()) {
         std::lock_guard<SimpleLock> lg(timelock);
@@ -287,15 +312,17 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   };
 
-  mv_vector<sendBuffer> sendData;
 
-
+  std::vector<sendBuffer> sendData;
 
   void workerThread() {
-    set_me_to_last();
-    std::unique_ptr<Galois::Runtime::NetworkIO> netio;
-    // std::tie(netio, ID, Num) = makeNetworkIOMPI();
+
+#ifdef USE_MV
     std::tie(netio, ID, Num) = makeNetworkIOMV();
+#else
+    std::tie(netio, ID, Num) = makeNetworkIOMPI();
+#endif
+
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
@@ -320,7 +347,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           recvData[rdata.host].add(std::move(rdata));
         }
       }
-      handleReceives();
     }
   }
 
@@ -345,6 +371,8 @@ public:
     ready = 3;
     worker.join();
   }
+
+  std::unique_ptr<Galois::Runtime::NetworkIO> netio;
 
   virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) {
     statSendNum += 1;

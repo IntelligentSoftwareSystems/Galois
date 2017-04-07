@@ -42,7 +42,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
   struct recvBuffer {
     std::deque<uint8_t> data;
     LL::SimpleLock lock;
-
+    
     std::pair<std::deque<uint8_t>::iterator, std::deque<uint8_t>::iterator>
     nextMsg() {
       std::lock_guard<LL::SimpleLock> lg(lock);
@@ -131,8 +131,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
   }
 
   void workerThread() {
-    // std::tie(netio, ID, Num) = makeNetworkIOMPI();
-    std::tie(netio, ID, Num) = makeNetworkIOMV();
+    std::tie(netio, ID, Num) = makeNetworkIOMPI();
     ready = 1;
     while (ready != 2) {};
     while (ready != 3) {

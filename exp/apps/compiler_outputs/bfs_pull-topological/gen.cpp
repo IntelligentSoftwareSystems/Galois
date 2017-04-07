@@ -25,6 +25,8 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#define __is_trivially_copyable(type)  __has_trivial_copy(type)
+
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -182,9 +184,9 @@ struct InitializeGraph {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
     }
-    
+
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
-    
+
   }
 
   void operator()(GNode src) const {
@@ -282,9 +284,9 @@ struct BFS {
       if(_graph.is_vertex_cut()) {
       	_graph.sync_push<Syncer_vertexCut_0>("BFS");
       }
-      
+
       _graph.sync_pull<SyncerPull_0>("BFS");
-      
+
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
@@ -292,14 +294,13 @@ struct BFS {
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist;
       new_dist = dnode.dist_current + 1;
       auto old_dist = Galois::min(snode.dist_current, new_dist);
-      if (old_dist > new_dist){
+      if (old_dist > new_dist) {
         DGAccumulator_accum += 1;
       }
     }
@@ -312,7 +313,7 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
     Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
-    Galois::StatManager statManager;
+    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -342,7 +343,7 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
       for (unsigned i=0; i<personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
+        if (personality_set.c_str()[i] == 'c')
           scalefactor.push_back(scalecpu);
         else
           scalefactor.push_back(scalegpu);
@@ -399,7 +400,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
 #ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
+      if (personality == CPU) {
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
@@ -412,6 +413,7 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+    statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

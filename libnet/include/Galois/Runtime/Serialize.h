@@ -33,8 +33,6 @@
 
 #include <boost/mpl/has_xxx.hpp>
 
-#include "mv_allocator.h"
-
 #include <Galois/gdeque.h>
 #include <Galois/Runtime/Dynamic_bitset.h>
 #include <Galois/Atomic_wrapper.h>
@@ -89,7 +87,7 @@ class DeSerializeBuffer;
 
 class SerializeBuffer {
   friend DeSerializeBuffer;
-  typedef mv_vector<uint8_t> vTy;
+  typedef std::vector<uint8_t> vTy;
   vTy bufdata;
 public:
 
@@ -110,7 +108,7 @@ public:
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
     std::copy_n(c, bytes, bufdata.begin() + offset);
   }
-
+  
   //returns offset to use for insertAt
   size_t encomber(size_t bytes) {
     size_t retval = bufdata.size();
@@ -123,7 +121,7 @@ public:
   }
 
   const uint8_t* linearData() const { return bufdata.data(); }
-  mv_vector<uint8_t>& getVec() { return bufdata; }
+  std::vector<uint8_t>& getVec() { return bufdata; }
 
   vTy::const_iterator begin() const { return bufdata.cbegin(); }
   vTy::const_iterator end() const { return bufdata.cend(); }
@@ -150,15 +148,15 @@ public:
 class DeSerializeBuffer {
   friend SerializeBuffer;
 
-  mv_vector<uint8_t> bufdata;
+  std::vector<uint8_t> bufdata;
   int offset;
 public:
 
   DeSerializeBuffer() :offset(0) {}
   DeSerializeBuffer(DeSerializeBuffer&&) = default; //disable copy constructor
-  DeSerializeBuffer(mv_vector<uint8_t>&& v, uint32_t start = 0) : bufdata(std::move(v)), offset(start) {}
+  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) : bufdata(std::move(v)), offset(start) {}
 
-  explicit DeSerializeBuffer(mv_vector<uint8_t>& data) {
+  explicit DeSerializeBuffer(std::vector<uint8_t>& data) {
     bufdata.swap(data);
     offset = 0;
   }
@@ -197,7 +195,7 @@ public:
     offset += num;
   }
 
-  mv_vector<uint8_t>& getVec() { return bufdata; }
+  std::vector<uint8_t>& getVec() { return bufdata; }
 
   void* linearData() { return &bufdata[0]; }
 
@@ -205,7 +203,7 @@ public:
   size_t r_size() const { return bufdata.size() - offset; }
 
   bool atAlignment(size_t a) { return (uintptr_t)r_linearData() % a == 0; }
-
+    
 
   //Utility
 
@@ -249,7 +247,7 @@ template<typename Seq>
 size_t gSizedSeq(const Seq& seq) {
   typename Seq::size_type size = seq.size();
   typedef typename Seq::value_type T;
-  size_t tsize = std::conditional<is_memory_copyable<T>::value,
+  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
                                   std::integral_constant<size_t, sizeof(T)>,
                                   std::integral_constant<size_t, sizeof(uintptr_t)>>::type::value;
   return sizeof(size) + tsize * size;
@@ -327,7 +325,7 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   //  typedef decltype(*seq.begin()) T;
 
-  // size_t tsize = std::conditional<is_memory_copyable<T>::value,
+  // size_t tsize = std::conditional<is_memory_copyable<T>::value, 
   //   std::integral_constant<size_t, sizeof(T)>,
   //   std::integral_constant<size_t, 1>>::type::value;
   //  buf.reserve(size * tsize + sizeof(size));
@@ -433,7 +431,7 @@ namespace detail {
 
 template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
-                     typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
+                     typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) 
 {
   uint8_t* pdata = (uint8_t*)&data;
   buf.extract(pdata, sizeof(T));
@@ -442,7 +440,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, T& data,
 template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
 		     typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
-                     typename std::enable_if<has_serialize<T>::value>::type* = 0)
+                     typename std::enable_if<has_serialize<T>::value>::type* = 0) 
 {
   data.deserialize(buf);
 }

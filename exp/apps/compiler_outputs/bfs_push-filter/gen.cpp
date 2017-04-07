@@ -25,6 +25,8 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#define __is_trivially_copyable(type)  __has_trivial_copy(type)
+
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -183,9 +185,9 @@ struct InitializeGraph {
     if(_graph.is_vertex_cut()) {
     	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
     }
-    
+
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
-    
+
   }
 
   void operator()(GNode src) const {
@@ -297,7 +299,7 @@ void operator()(GNode src) const {
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = 1 + snode.dist_current;
       Galois::atomicMin(dnode.dist_current, new_dist);
-      
+
     }
   }
 
@@ -309,13 +311,13 @@ struct BFS {
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    
+
     FirstItr_BFS::go(_graph);
-    
+
     unsigned _num_iterations = 1;
-    
+
     unsigned long _num_work_items = 1;
-    do { 
+    do {
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
@@ -395,7 +397,7 @@ struct BFS {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
     _graph.sync_push<Syncer_0>("BFS");
-    
+
     if(_graph.is_vertex_cut()) {
     	_graph.sync_pull<SyncerPull_vertexCut_0>("BFS");
     }
@@ -404,7 +406,7 @@ struct BFS {
     }while(DGAccumulator_accum.reduce());
     Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);
-    
+
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -419,7 +421,7 @@ void operator()(GNode src) const {
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = 1 + snode.dist_current;
       Galois::atomicMin(dnode.dist_current, new_dist);
-      
+
     }
 
 DGAccumulator_accum+= 1;
@@ -434,7 +436,7 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
     Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
-    Galois::StatManager statManager;
+    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -464,7 +466,7 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
       for (unsigned i=0; i<personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
+        if (personality_set.c_str()[i] == 'c')
           scalefactor.push_back(scalecpu);
         else
           scalefactor.push_back(scalegpu);
@@ -499,6 +501,7 @@ int main(int argc, char** argv) {
     StatTimer_init.start();
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
 
     for(auto run = 0; run < numRuns; ++run){
@@ -522,7 +525,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
 #ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
+      if (personality == CPU) {
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
@@ -535,6 +538,8 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+    statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
+
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";

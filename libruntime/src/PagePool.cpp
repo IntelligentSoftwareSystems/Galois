@@ -29,6 +29,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
+
 #include "Galois/Runtime/PagePool.h"
 #include "Galois/Substrate/gio.h"
 #include "Galois/Substrate/SimpleLock.h"
@@ -47,12 +49,12 @@ namespace {
 struct FreeNode {
   FreeNode* next;
 };
- 
+
 typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
 typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
-class PAState {  
+class PAState {
   std::deque<std::atomic<int>> counts;
   std::vector<HeadPtrStorage> pool;
   std::unordered_map<void*, int> ownerMap;
@@ -69,7 +71,7 @@ class PAState {
   }
 
 public:
-  PAState() { 
+  PAState() {
     auto num = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
@@ -88,7 +90,7 @@ public:
     HeadPtr& hp = pool[tid].data;
     if (hp.getValue()) {
       hp.lock();
-      FreeNode* h = hp.getValue(); 
+      FreeNode* h = hp.getValue();
       if (h) {
         hp.unlock_and_set(h->next);
         return h;
