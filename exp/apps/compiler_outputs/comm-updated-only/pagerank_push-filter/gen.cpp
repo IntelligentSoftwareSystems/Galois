@@ -77,6 +77,8 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
+static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -458,21 +460,29 @@ void static go(Graph& _graph) {
 		}
 		typedef float ValTy;
 	};
+unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+unsigned int pipeSize = ceil((float)totalSize/numPipelinedPhases);
+for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
+  unsigned int __end = __begin + pipeSize;
+  if (__end > totalSize) __end = totalSize;
 #ifdef __GALOIS_HET_CUDA__
 	if (personality == GPU_CUDA) {
     bitset_residual_clear_cuda(cuda_ctx);
 		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
 		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
 		StatTimer_cuda.start();
-		FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
+		//FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
+		FirstItr_PageRank_cuda(__begin, __end, alpha, tolerance, cuda_ctx);
 		StatTimer_cuda.stop();
 	} else if (personality == CPU)
 #endif
-{
-bitset_residual.clear();
-Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+  {
+    bitset_residual.clear();
+    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+  }
+  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
 }
-_graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+_graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -597,6 +607,11 @@ struct PageRank {
     		}
     		typedef float ValTy;
     	};
+    unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+    unsigned int pipeSize = ceil((float)totalSize/numPipelinedPhases);
+    for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
+      unsigned int __end = __begin + pipeSize;
+      if (__end > totalSize) __end = totalSize;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
         bitset_residual_clear_cuda(cuda_ctx);
@@ -604,16 +619,19 @@ struct PageRank {
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
-    		PageRank_all_cuda(__retval, alpha, tolerance, cuda_ctx);
+    		//PageRank_all_cuda(__retval, alpha, tolerance, cuda_ctx);
+    		PageRank_cuda(__begin, __end, __retval, alpha, tolerance, cuda_ctx);
     		DGAccumulator_accum += __retval;
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    {
-    bitset_residual.clear();
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+      {
+        bitset_residual.clear();
+        Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+      }
+      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
     }
-    _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+    _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

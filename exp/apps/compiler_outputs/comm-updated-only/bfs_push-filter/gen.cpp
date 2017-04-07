@@ -74,6 +74,8 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
+static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -315,7 +317,7 @@ void static go(Graph& _graph) {
 #endif
 {
 bitset_dist_current.clear();
-Galois::do_all(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
 }
 _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
 
@@ -430,6 +432,11 @@ struct BFS {
     		}
     		typedef unsigned int ValTy;
     	};
+      unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+      unsigned int pipeSize = ceil((float)totalSize/numPipelinedPhases);
+      for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
+        unsigned int __end = __begin + pipeSize;
+        if (__end > totalSize) __end = totalSize;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
         bitset_dist_current_clear_cuda(cuda_ctx);
@@ -437,16 +444,19 @@ struct BFS {
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
     		int __retval = 0;
-    		BFS_all_cuda(__retval, cuda_ctx);
+    		//BFS_all_cuda(__retval, cuda_ctx);
+        BFS_cuda(__begin, __end, __retval, cuda_ctx);
     		DGAccumulator_accum += __retval;
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
     {
-    bitset_dist_current.clear();
-    Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+        bitset_dist_current.clear();
+        Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
     }
-    _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
+        _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
+      }
+    _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
 
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

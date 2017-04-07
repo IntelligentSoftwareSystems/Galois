@@ -130,6 +130,7 @@ class hGraph: public GlobalObject {
 #endif
 
 
+   uint32_t numPipelinedPhases;
    uint32_t num_recv_expected; // Number of receives expected for local completion.
    uint32_t num_run; //Keep track of number of runs.
    uint32_t num_iteration; //Keep track of number of iterations.
@@ -267,6 +268,7 @@ public:
       masterNodes.resize(numHosts);
       slaveNodes.resize(numHosts);
       //masterNodes_bitvec.resize(numHosts);
+      numPipelinedPhases = 0;
       num_recv_expected = 0;
       num_run = 0;
       num_iteration = 0;
@@ -1669,20 +1671,22 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_recv(std::string loopName) {
+   void sync_recv(std::string loopName, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      Galois::StatTimer StatTimer_RecvTime(syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier());
      StatTimer_RecvTime.start();
-     for (unsigned x = 0; x < net.Num; ++x) {
-       if (x == id)
-         continue;
-       decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
-       do {
-         net.handleReceives();
-         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
-       } while (!p);
-       syncRecvApply<FnTy, syncType>(p->first, p->second, loopName);
+     for (unsigned num = 0; num < num_messages; ++num) {
+       for (unsigned x = 0; x < net.Num; ++x) {
+         if (x == id)
+           continue;
+         decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+         do {
+           net.handleReceives();
+           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+         } while (!p);
+         syncRecvApply<FnTy, syncType>(p->first, p->second, loopName);
+       }
      }
      ++Galois::Runtime::evilPhase;
      StatTimer_RecvTime.stop();
@@ -1758,6 +1762,10 @@ public:
 
    template<typename PushFnTy, typename PullFnTy>
    void sync_forward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
+     StatTimer_syncForward.start();
+
      if (transposed) {
        if (is_vertex_cut()) {
          sync_push<PushFnTy>(loopName, bit_set_compute);
@@ -1769,6 +1777,54 @@ public:
          sync_pull<PullFnTy>(loopName, bit_set_compute);
        }
      }
+
+     StatTimer_syncForward.stop();
+   }
+
+   // just like any other sync_*, this is expected to be a collective call
+   // but it does not synchronize with other hosts
+   // nonetheless, it should be called same number of times on all hosts
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_forward_pipe(std::string loopName, Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
+     StatTimer_syncForward.start();
+
+     if (transposed) {
+       if (is_vertex_cut()) {
+         sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+       } else {
+         sync_send<PullFnTy, syncPull>(loopName, bit_set_compute);
+       }
+     } else {
+       sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+     }
+     ++numPipelinedPhases;
+
+     StatTimer_syncForward.stop();
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_forward_wait(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
+     StatTimer_syncForward.start();
+
+     if (transposed) {
+       if (is_vertex_cut()) {
+         sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+       } else {
+         sync_recv<PullFnTy, syncPull>(loopName, numPipelinedPhases);
+       }
+     } else {
+       sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+     }
+     numPipelinedPhases = 0;
+     if (is_vertex_cut()) {
+       sync_pull<PullFnTy>(loopName, bit_set_compute);
+     }
+
+     StatTimer_syncForward.stop();
    }
 
    template<typename PushFnTy, typename PullFnTy>
@@ -1779,6 +1835,10 @@ public:
 
    template<typename PushFnTy, typename PullFnTy>
    void sync_backward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
+     StatTimer_syncBackward.start();
+
      if (transposed) {
        sync_push<PushFnTy>(loopName, bit_set_compute);
        if (is_vertex_cut()) {
@@ -1790,6 +1850,54 @@ public:
        }
        sync_pull<PullFnTy>(loopName, bit_set_compute);
      }
+
+     StatTimer_syncBackward.stop();
+   }
+
+   // just like any other sync_*, this is expected to be a collective call
+   // but it does not synchronize with other hosts
+   // nonetheless, it should be called same number of times on all hosts
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_backward_pipe(std::string loopName, Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
+     StatTimer_syncBackward.start();
+
+     if (transposed) {
+       sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+     } else {
+       if (is_vertex_cut()) {
+         sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+       } else {
+         sync_send<PullFnTy, syncPull>(loopName, bit_set_compute);
+       }
+     }
+     ++numPipelinedPhases;
+
+     StatTimer_syncBackward.stop();
+   }
+
+   template<typename PushFnTy, typename PullFnTy>
+   void sync_backward_wait(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
+     StatTimer_syncBackward.start();
+
+     if (transposed) {
+       sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+     } else {
+       if (is_vertex_cut()) {
+         sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+       } else {
+         sync_recv<PullFnTy, syncPull>(loopName, numPipelinedPhases);
+       }
+     }
+     numPipelinedPhases = 0;
+     if (is_vertex_cut()) {
+       sync_pull<PullFnTy>(loopName, bit_set_compute);
+     }
+
+     StatTimer_syncBackward.stop();
    }
 
    template<typename PushFnTy, typename PullFnTy>
