@@ -91,7 +91,6 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
     if (pop)
     {
       p_value[src] = local_alpha;
-      p_nout[src] = graph.getOutDegree(src);
       if (p_nout[src] > 0)
       {
         delta = p_value[src]*(1-local_alpha)/p_nout[src];
