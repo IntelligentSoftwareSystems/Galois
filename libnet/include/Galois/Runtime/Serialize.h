@@ -55,6 +55,7 @@ using is_trivially_copyable = is_trivial<T>;
 #endif
 }
 #endif
+//#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
 namespace Galois {
 namespace Runtime {

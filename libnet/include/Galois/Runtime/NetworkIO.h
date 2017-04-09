@@ -63,6 +63,9 @@ public:
 };
 
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI();
+#ifdef GALOIS_USE_LWCI
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI();
+#endif
 
 } //namespace Runtime
 } //namespace Galois

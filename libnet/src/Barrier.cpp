@@ -81,6 +81,11 @@ public:
 */
 
 #include <iostream>
+#include <mpi.h>
+
+#ifdef GALOIS_USE_LWCI
+void __fence__();
+#endif
 
 namespace {
 class HostBarrier : public Galois::Substrate::Barrier {
@@ -98,6 +103,10 @@ public:
   virtual void reinit(unsigned val) { }
   
   virtual void wait() {
+#ifdef GALOIS_USE_LWCI
+    __fence__();
+#endif
+
     if (Galois::Substrate::ThreadPool::getTID() == 0) {
       count += Galois::Runtime::NetworkInterface::Num;
     }
@@ -112,7 +121,7 @@ public:
     //    std::cerr << "#";
     
     while (count > 0) {
-      Galois::Runtime::getSystemNetworkInterface().handleReceives();
+      net.handleReceives();
     }
     //    std::cerr << "$";
   }

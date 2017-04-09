@@ -639,7 +639,7 @@ int main(int argc, char** argv) {
     std::ostringstream ss;
     ss << tolerance;
     Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
-    Galois::StatManager statManager;
+    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -741,6 +741,8 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+
+    statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch (const char* c) {

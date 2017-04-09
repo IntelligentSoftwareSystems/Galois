@@ -25,6 +25,10 @@
 #include "Galois/Runtime/NetworkIO.h"
 #include "Galois/Runtime/Tracer.h"
 
+#ifdef GALOIS_USE_LWCI
+#define NO_AGG
+#endif
+
 #include <thread>
 #include <mutex>
 #include <iostream>
@@ -127,6 +131,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   public:
     optional_t<RecvBuffer> popMsg(uint32_t tag) {
       std::lock_guard<SimpleLock> lg(qlock);
+#ifndef NO_AGG
       uint32_t len = getLenFromFront(tag);
       //      assert(len);
       if (len == ~0U || len == 0)
@@ -148,6 +153,18 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       erase(len);
       //      std::cerr << "p " << tag << " " << len << "\n";
       return optional_t<RecvBuffer>(std::move(buf));
+#else
+      if (data.empty() || data.front().tag != tag)
+        return optional_t<RecvBuffer>();
+
+      std::vector<uint8_t> vec(std::move(data.front().data));
+
+      data.pop_front();
+      if (!data.empty())
+        dataPresent = data.front().tag;
+
+      return optional_t<RecvBuffer>(RecvBuffer(std::move(vec), 0));
+#endif
     }
 
     //Worker thread interface
@@ -211,6 +228,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     bool ready() {
+#ifndef NO_AGG
       if (numBytes == 0)
         return false;
       if (urgent) {
@@ -232,13 +250,17 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         ++statSendTimeout;
         return true;
       }
-      return false;      
+      return false;
+#else
+      return messages.size() > 0;
+#endif
     }
 
     std::pair<uint32_t, std::vector<uint8_t> > assemble() {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
         return std::make_pair(~0, std::vector<uint8_t>());
+#ifndef NO_AGG
       //compute message size
       uint32_t len = 0;
       int num = 0;
@@ -270,6 +292,11 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         messages.pop_front();
       } while (vec.size() < len + num);
       numBytes -= len;
+#else
+      uint32_t tag = messages.front().tag;
+      std::vector<uint8_t> vec(std::move(messages.front().data));
+      messages.pop_front();
+#endif
       return std::make_pair(tag, std::move(vec));
     }
 
@@ -292,8 +319,14 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   
   void workerThread() {
-    std::unique_ptr<Galois::Runtime::NetworkIO> netio;
+
+#ifdef GALOIS_USE_LWCI
+    fprintf(stderr, "**Using LWCI Communication layer**\n");
+    std::tie(netio, ID, Num) = makeNetworkIOMV();
+#else
     std::tie(netio, ID, Num) = makeNetworkIOMPI();
+#endif
+
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
@@ -342,6 +375,8 @@ public:
     ready = 3;
     worker.join();
   }
+
+  std::unique_ptr<Galois::Runtime::NetworkIO> netio;
 
   virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) {
     statSendNum += 1;

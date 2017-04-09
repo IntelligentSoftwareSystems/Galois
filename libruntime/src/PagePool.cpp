@@ -29,6 +29,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
+
 #include "Galois/Runtime/PagePool.h"
 #include "Galois/Substrate/gio.h"
 #include "Galois/Substrate/SimpleLock.h"

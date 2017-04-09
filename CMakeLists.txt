@@ -47,6 +47,7 @@ endforeach()
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
+set(USE_LWCI OFF CACHE BOOL "Use LWCI communication runtime")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
@@ -161,6 +162,12 @@ if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
+
+  if (USE_LWCI)
+    add_definitions(-DGALOIS_USE_LWCI)
+    include_directories("${LWCI_ROOT}/include")
+    set(LWCI_LIBRARY "${LWCI_ROOT}/lib/liblwci.a")
+  endif()
 
   find_package(MPI REQUIRED) # for distributed
   set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
