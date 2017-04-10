@@ -18,7 +18,7 @@ for task in $SET; do
     ntasks=4
     ntasks=$((ntasks*$1))
     sed -i "2i#SBATCH -t $3" run_bridges.sbatch
-    sed -i "2i#SBATCH --gres=gpu:4" run_bridges.sbatch
+    sed -i "2i#SBATCH --gres=gpu:k80:4" run_bridges.sbatch
     sed -i "2i#SBATCH --ntasks-per-node 4" run_bridges.sbatch
     sed -i "2i#SBATCH -N $1" run_bridges.sbatch
     sed -i "2i#SBATCH -p $QUEUE" run_bridges.sbatch
