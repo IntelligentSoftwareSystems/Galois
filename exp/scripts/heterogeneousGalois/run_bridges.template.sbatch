@@ -6,44 +6,48 @@ NUM_TASKS=$3
 PSET=$4
 THREADS=$5
 
-EXEC=$1
-execname=$(basename "$EXEC" "")
+execname=$1
+execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build/exp/apps/compiler_outputs
+EXEC=${execdir}/${execname}
 
 inputname=$2
-inputdirname=/pylon2/ci560jp/roshand/dist-inputs
+inputdir=/pylon2/ci560jp/roshand/dist-inputs
 extension=gr
 
-FLAGS=
+statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
+
+FLAGS=" -statOutputFile=${execdir}/${statname}"
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
-  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
-    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  if [[ -f "${inputdir}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
   fi
-elif [[ ($execname == *"pagerank"*) ]]; then
-  FLAGS+=" -maxIterations=125"
-fi
-if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=4"
 fi
 
-source_file=${inputdirname}/source
+source_file=${inputdir}/source
 if [[ $execname == *"cc"* ]]; then
-  inputdirname=${inputdirname}/symmetric
+  inputdir=${inputdir}/symmetric
   extension=sgr
 elif [[ $execname == *"pull"* ]]; then
-  inputdirname=${inputdirname}/transpose
+  inputdir=${inputdir}/transpose
   extension=tgr
 elif [[ $inputname == *"rmat"* ]]; then
-  inputdirname=${inputdirname}/transpose
+  inputdir=${inputdir}/transpose
   extension=tgr
   FLAGS+= " -transpose"
 fi
 grep "${inputname}.${extension}" ${source_file}
-INPUT=${inputdirname}/${inputname}.${extension}
+INPUT=${inputdir}/${inputname}.${extension}
 
 if [ -n "$ABELIAN_VERTEX_CUT" ]; then
   FLAGS+=" -enableVertexCut" 
 elif [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
   FLAGS+=" -scalegpu=4"
+fi
+if [[ $execname == *"worklist"* ]]; then
+  FLAGS+=" -cuda_wl_dup_factor=4"
+fi
+if [[ ($execname == *"pagerank"*) ]]; then
+  FLAGS+=" -maxIterations=125"
 fi
 
 RUN=mpirun
