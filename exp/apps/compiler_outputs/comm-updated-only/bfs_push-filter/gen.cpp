@@ -433,7 +433,10 @@ struct BFS {
     		typedef unsigned int ValTy;
     	};
       unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
-      unsigned int pipeSize = ceil((float)totalSize/numPipelinedPhases);
+      unsigned int pipeSize = totalSize / numPipelinedPhases;
+      assert(pipeSize > numPipelinedPhases);
+      if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
+      assert((pipeSize * numPipelinedPhases) >= totalSize);
       for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
         unsigned int __end = __begin + pipeSize;
         if (__end > totalSize) __end = totalSize;

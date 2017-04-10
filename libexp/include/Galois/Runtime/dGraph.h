@@ -1294,7 +1294,9 @@ public:
      auto activeThreads = Galois::getActiveThreads();
      std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
      Galois::on_each([&](unsigned tid, unsigned nthreads) {
-         unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
+         unsigned int block_size = bitset_comm.size() / nthreads;
+         if ((bitset_comm.size() % nthreads) > 0) ++block_size;
+         assert((block_size * nthreads) >= bitset_comm.size());
          unsigned int start = tid*block_size;
          unsigned int end = (tid+1)*block_size;
          if (end > bitset_comm.size()) end = bitset_comm.size();
@@ -1311,7 +1313,9 @@ public:
      if (bit_set_count > 0) {
        offsets.resize(bit_set_count);
        Galois::on_each([&](unsigned tid, unsigned nthreads) {
-           unsigned int block_size = ceil((float)bitset_comm.size()/nthreads);
+           unsigned int block_size = bitset_comm.size() / nthreads;
+           if ((bitset_comm.size() % nthreads) > 0) ++block_size;
+           assert((block_size * nthreads) >= bitset_comm.size());
            unsigned int start = tid*block_size;
            unsigned int end = (tid+1)*block_size;
            if (end > bitset_comm.size()) end = bitset_comm.size();
