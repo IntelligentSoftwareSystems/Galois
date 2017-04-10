@@ -321,8 +321,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   void workerThread() {
 
 #ifdef GALOIS_USE_LWCI
-    fprintf(stderr, "**Using LWCI Communication layer**\n");
     std::tie(netio, ID, Num) = makeNetworkIOLWCI();
+    if (ID == 0) fprintf(stderr, "**Using LWCI Communication layer**\n");
 #else
     std::tie(netio, ID, Num) = makeNetworkIOMPI();
 #endif
