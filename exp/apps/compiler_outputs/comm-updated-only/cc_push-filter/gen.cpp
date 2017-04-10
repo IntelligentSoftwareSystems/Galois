@@ -80,10 +80,10 @@ static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default i
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
       cll::init(CPU));
-static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
+static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for hosts on each physical node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init("c"));
 #endif
 
 struct NodeData {
@@ -498,8 +498,10 @@ int main(int argc, char** argv) {
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id]) {
+    if (num_nodes == -1) num_nodes = net.Num;
+    assert((net.Num % num_nodes) == 0);
+    if (personality_set.length() == (net.Num / num_nodes)) {
+      switch (personality_set.c_str()[my_host_id % num_nodes]) {
       case 'g':
         personality = GPU_CUDA;
         break;
@@ -515,8 +517,8 @@ int main(int argc, char** argv) {
       if ((personality == GPU_CUDA) && (gpu_device == -1)) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
-      for (unsigned i=0; i<personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
+      for (unsigned i=0; i<net.Num; ++i) {
+        if (personality_set.c_str()[i % num_nodes] == 'c') 
           scalefactor.push_back(scalecpu);
         else
           scalefactor.push_back(scalegpu);

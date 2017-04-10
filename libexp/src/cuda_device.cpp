@@ -6,12 +6,11 @@ int get_gpu_device_id(std::string personality_set, int num_nodes){
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   unsigned host_id = net.ID;
   unsigned num_hosts = net.Num;
-  assert(personality_set.length() == num_hosts);
-  if (num_nodes == -1) num_nodes = num_hosts;
-  unsigned num_gpus = std::count(personality_set.begin(), personality_set.end(), 'g');
-  if ((num_gpus % num_nodes) != 0) return -1;
-  unsigned num_gpus_per_node = num_gpus/num_nodes;
-  unsigned num_gpus_before = std::count(personality_set.begin(), personality_set.begin() + host_id, 'g');
+  unsigned num_hosts_per_node = num_hosts / num_nodes;
+  assert((num_hosts % num_nodes) == 0);
+  assert(personality_set.length() == num_hosts_per_node);
+  unsigned num_gpus_per_node = std::count(personality_set.begin(), personality_set.end(), 'g');
+  unsigned num_gpus_before = std::count(personality_set.begin(), personality_set.begin() + (host_id % num_hosts_per_node), 'g');
   return (num_gpus_before % num_gpus_per_node);
 }
 
