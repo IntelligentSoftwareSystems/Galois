@@ -461,7 +461,9 @@ struct BFS {
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
     }while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
+      Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    }
     
   }
 
@@ -491,10 +493,12 @@ Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
-    Galois::StatManager statManager(statOutputFile);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (net.ID == 0) {
+      Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
+    }
+    Galois::StatManager statManager(statOutputFile);
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();

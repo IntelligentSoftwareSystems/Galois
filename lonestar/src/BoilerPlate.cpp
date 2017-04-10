@@ -69,38 +69,35 @@ void LonestarStart(int argc, char** argv,
   numThreads = Galois::setActiveThreads(numThreads); 
   assert(enforce_metadata <= 3);
   enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
-  
-  LonestarPrintVersion();
-  std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
-  std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-  std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
-  if (desc)
-    std::cout << desc << "\n";
-  if (url)
-    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" << url << "\n";
-  std::cout << "\n";
 
-  std::ostringstream cmdout;
-  for (int i = 0; i < argc; ++i) {
-    cmdout << argv[i];
-    if (i != argc - 1)
-      cmdout << " ";
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  
+  if (net.ID == 0) {
+    LonestarPrintVersion();
+    std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
+    std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
+    std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
+    if (desc)
+      std::cout << desc << "\n";
+    if (url)
+      std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" << url << "\n";
+    std::cout << "\n";
+
+    std::ostringstream cmdout;
+    for (int i = 0; i < argc; ++i) {
+      cmdout << argv[i];
+      if (i != argc - 1)
+        cmdout << " ";
+    }
+    Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), -1);
+    Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
+    Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)net.Num, 0);
+    Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
   }
-  Galois::Runtime::reportStatGlobal("CommandLine", cmdout.str());
-  Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
-  Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
-  Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)Galois::Runtime::getSystemNetworkInterface().Num, 0);
-  Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
 
   char name[256];
   gethostname(name, 256);
-  Galois::Runtime::reportStatGlobal("Hostname", name);
-
-  Galois::Runtime::reportStatGlobal("Threads", numThreads);
-
-  Galois::Runtime::reportStatGlobal("Hosts", Galois::Runtime::getSystemNetworkInterface().Num);
-
-  Galois::Runtime::reportStatGlobal("Runs", numRuns);
+  Galois::Runtime::reportStat("(NULL)", "Hostname", name, 0);
 
   if(savegraph)
     Galois::Runtime::reportStat("(NULL)", "Saving Graph structure to:", (outputfolder + "/" + outputfile).c_str(), 0);
