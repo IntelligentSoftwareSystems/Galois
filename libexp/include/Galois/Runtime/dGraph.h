@@ -1539,8 +1539,6 @@ public:
      static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-     std::string metadata_str(syncTypeStr + "_METADATA_" + loopName +"_" + get_run_identifier());
-     Galois::Statistic Statistic_metadata(metadata_str.c_str());
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
@@ -1563,7 +1561,9 @@ public:
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
-     Statistic_metadata += data_mode - Statistic_metadata.getVal(); // set, not add
+     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + std::to_string(data_mode) + "_" + loopName + "_" + get_run_identifier());
+     Galois::Statistic Statistic_metadata(metadata_str.c_str());
+     Statistic_metadata += 1;
    }
 
    template<typename FnTy, SyncType syncType>
@@ -1573,8 +1573,6 @@ public:
      static std::vector<typename FnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-     std::string metadata_str(syncTypeStr + "_METADATA_" + loopName +"_" + get_run_identifier());
-     Galois::Statistic Statistic_metadata(metadata_str.c_str());
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
@@ -1622,7 +1620,9 @@ public:
        gSerialize(b, noData);
      }
      StatTimer_extract.stop();
-     Statistic_metadata += data_mode - Statistic_metadata.getVal(); // set, not add
+     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + std::to_string(data_mode) + "_" + loopName + "_" + get_run_identifier());
+     Galois::Statistic Statistic_metadata(metadata_str.c_str());
+     Statistic_metadata += 1;
    }
 
    template<typename FnTy, SyncType syncType>
