@@ -25,4 +25,5 @@ for input in $INPUT_DIR/*.cpp; do
 done
 if [[ $count != 0 ]]; then
   wait
+fi
 
