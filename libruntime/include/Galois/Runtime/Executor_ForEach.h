@@ -632,7 +632,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     Timer_for_each_impl.stop();
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
 
-    typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
+    typedef Galois::DGBag<value_type, decltype(helper_fn)> DBag;
     DBag dbag(helper_fn, loopName);
     auto &local_wl = DBag::get();
 

@@ -322,7 +322,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
 #ifdef GALOIS_USE_LWCI
     fprintf(stderr, "**Using LWCI Communication layer**\n");
-    std::tie(netio, ID, Num) = makeNetworkIOMV();
+    std::tie(netio, ID, Num) = makeNetworkIOLWCI();
 #else
     std::tie(netio, ID, Num) = makeNetworkIOMPI();
 #endif
