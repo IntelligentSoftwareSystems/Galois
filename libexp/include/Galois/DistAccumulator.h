@@ -104,6 +104,7 @@ public:
    }
    
    Ty read_local() {
+     if (local_mdata == 0) local_mdata = mdata.reduce();
      return local_mdata; 
    }
    
@@ -126,7 +127,7 @@ public:
     *
     ************************************************************/
    Ty reduce() {
-     local_mdata = mdata.reduce();
+     if (local_mdata == 0) local_mdata = mdata.reduce();
      global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
       Ty tmp;
