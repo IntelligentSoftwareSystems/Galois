@@ -496,12 +496,13 @@ Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager(statOutputFile);
+    {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     }
-    Galois::StatManager statManager(statOutputFile);
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
@@ -626,6 +627,7 @@ int main(int argc, char** argv) {
       Galois::Runtime::reportStat("(NULL)", "MAX DISTANCE ", (unsigned long)max_distance, 0);
     }
 
+    }
     statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
 
     return 0;

@@ -681,13 +681,14 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    Galois::StatManager statManager(statOutputFile);
+    {
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
       std::ostringstream ss;
       ss << tolerance;
       Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
     }
-    Galois::StatManager statManager(statOutputFile);
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
@@ -793,6 +794,7 @@ int main(int argc, char** argv) {
 #endif
     }
 
+    }
     statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
 
     return 0;
