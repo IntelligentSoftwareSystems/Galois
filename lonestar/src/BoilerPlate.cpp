@@ -89,7 +89,7 @@ void LonestarStart(int argc, char** argv,
       if (i != argc - 1)
         cmdout << " ";
     }
-    Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), -1);
+    Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
     Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
     Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)net.Num, 0);
     Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
