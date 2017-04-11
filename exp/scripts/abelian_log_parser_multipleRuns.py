@@ -76,7 +76,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   #Finding mean compute time over all hosts
-  do_all_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sDO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  do_all_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   do_all_all_hosts = re.findall(do_all_regex, log_data)
   num_arr = numpy.array(map(int,do_all_all_hosts))
 
@@ -122,14 +122,20 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   #Finding total mean communication time 
-  sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_.*WARD_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   sync_all_hosts = re.findall(sync_regex, log_data)
+  if sync_all_hosts is None:
+    sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+    sync_all_hosts = re.findall(sync_regex, log_data)
   num_arr = numpy.array(map(int,sync_all_hosts))
 
   sum_sync = numpy.sum(num_arr, axis=0)
 
-  sync_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sync_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_.*WARD_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   sync_firstItr_all_hosts = re.findall(sync_firstItr_regex, log_data)
+  if sync_firstItr_all_hosts is None:
+    sync_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+    sync_firstItr_all_hosts = re.findall(sync_firstItr_regex, log_data)
   num_arr_firstItr = numpy.array(map(int,sync_firstItr_all_hosts))
 
   # TOTAL SYNC TIME
@@ -191,11 +197,13 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time = round(total_time, 3)
 
 
-  #75ae6860-be9f-4498-9315-1478c78551f6,(NULL),0 , NUM_WORK_ITEMS_0_1,0,0,0
   num_iter_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sNUM_ITERATIONS_0' + r',\d*,\d*,(\d*)')
   num_iter_search = num_iter_regex.search(log_data)
   if num_iter_regex is not None:
-    num_iter = num_iter_search.group(1)
+    if num_iter_search is None:
+      num_iter = -1
+    else:
+      num_iter = num_iter_search.group(1)
     print "NUM_ITER : ", num_iter
 
   return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,load_time,total_time
