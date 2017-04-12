@@ -282,14 +282,15 @@ void Galois::Runtime::printStats(std::string fname) {
   Galois::Runtime::getHostBarrier().wait();
   //SM.get()->printDistStats(std::cout);
   //SM.get()->printStats(std::cout);
-  if (getSystemNetworkInterface().ID == 0) {
-    std::cerr << "STAT FILENAME : " << fname << "\n";
-  }
   if(fname == "")
     SM.get()->printStatsForR(std::cout, false);
   else{
     auto& out = openIfNot_output(fname);
     SM.get()->printStatsForR(out, false);
+    out.close();
   }
-  //  SM.get()->printStatsForR(std::cout, true);
+  if (getHostID() == 0) {
+    std::cerr << "STAT FILENAME : " << fname << "\n";
+  }
+  Galois::Runtime::getHostBarrier().wait();
 }

@@ -795,7 +795,7 @@ int main(int argc, char** argv) {
     }
 
     }
-    statManager.reportStat(); Galois::Runtime::getHostBarrier().wait();
+    statManager.reportStat();
 
     return 0;
   } catch (const char* c) {
