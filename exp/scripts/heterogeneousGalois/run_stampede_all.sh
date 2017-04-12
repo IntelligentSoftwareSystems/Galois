@@ -13,7 +13,7 @@ for task in $SET; do
   IFS=",";
   set $task;
   cp run_stampede.template.sbatch run_stampede.sbatch 
-  if [ $QUEUE == "GPU" ]; then # should add HET option
+  if [ $QUEUE == "gpu" ]; then # should add HET option
     sed -i "2i#SBATCH -t $2" run_stampede.sbatch
     sed -i "2i#SBATCH -p $QUEUE" run_stampede.sbatch
     sed -i "2i#SBATCH -N $1 -n $1" run_stampede.sbatch
