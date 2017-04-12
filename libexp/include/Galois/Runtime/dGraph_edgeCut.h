@@ -238,6 +238,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           }
           graph.fixEndEdge(G2L(n), cur);
         }
+        // non-owned vertices could also be traversed
+        for (uint32_t lid = base_hGraph::numOwned; lid << numNodes; ++lid) {
+          graph.fixEndEdge(lid, cur);
+        }
 
         timer.stop();
         std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
@@ -258,6 +262,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             graph.constructEdge(cur++, ldst);
           }
           graph.fixEndEdge(G2L(n), cur);
+        }
+        // non-owned vertices could also be traversed
+        for (uint32_t lid = base_hGraph::numOwned; lid << numNodes; ++lid) {
+          graph.fixEndEdge(lid, cur);
         }
       }
 
