@@ -216,7 +216,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 }
 
 template<typename DataType, SharedType sharedType, bool reset>
-void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, unsigned long long int *, unsigned int *, DataType *v, size_t *v_size, DataCommMode *data_mode, DataType i = 0) {
+void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets_comm, DataType *v, size_t *v_size, DataCommMode *data_mode, DataType i = 0) {
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {
     shared = &ctx->master;
@@ -246,6 +246,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   } else { // auto
     if ((*v_size) == 0) {
       *data_mode = noData;
+      return;
     } else if (((*v_size)*sizeof(unsigned int)) < ctx->is_updated.cpu_rd_ptr()->alloc_size()) {
       *data_mode = offsetsData;
     } else if (((*v_size)*sizeof(DataType)+ctx->is_updated.cpu_rd_ptr()->alloc_size()) < ((shared->num_nodes[from_id])*sizeof(DataType))) {
@@ -262,7 +263,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     } else {
       batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
     }
-  } else if ((*data_mode) != noData) { // bitsetData || offsetsData
+  } else { // bitsetData || offsetsData
     if (reset) {
       batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
     } else {
@@ -271,32 +272,14 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   }
 	check_cuda_kernel;
   //timer3.stop();
-
   //timer4.start();
-  uint8_t* send_buf = reinterpret_cast<uint8_t *>(v);
-  DataCommMode *data_mode_buf = reinterpret_cast<DataCommMode *>(send_buf);
-  *data_mode_buf = *data_mode;
-  if ((*data_mode) != noData) {
-    send_buf += sizeof(DataCommMode);
-    if ((*data_mode) != onlyData) { // bitsetData || offsetsData
-      size_t *v_size_buf = reinterpret_cast<size_t *>(send_buf);
-      *v_size_buf = *v_size;
-      send_buf += sizeof(size_t);
-      if ((*data_mode) == offsetsData) {
-        unsigned int *offsets_comm_buf = reinterpret_cast<unsigned int *>(send_buf);
-        ctx->offsets.copy_to_cpu(offsets_comm_buf, *v_size);
-        send_buf += sizeof(unsigned int) * (*v_size);
-      } else { // bitsetData
-        unsigned long long int *bitset_comm_buf = reinterpret_cast<unsigned long long int *>(send_buf);
-        ctx->is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_comm_buf);
-        send_buf += ctx->is_updated.cpu_rd_ptr()->alloc_size();
-      }
-    }
-    DataType *val_buf = reinterpret_cast<DataType *>(send_buf);
-    shared_data->copy_to_cpu(val_buf, *v_size);
+  if ((*data_mode) == offsetsData) {
+    ctx->offsets.copy_to_cpu(offsets_comm, *v_size);
+  } else if ((*data_mode) == bitsetData) {
+    ctx->is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_comm);
   }
+  shared_data->copy_to_cpu(v, *v_size);
   //timer4.stop();
-
   //timer.stop();
   //fprintf(stderr, "Get %u->%u: %d mode %u bitset %u indices. Time (ms): %llu + %llu + %llu + %llu = %llu\n",
   //  ctx->id, from_id, *data_mode,

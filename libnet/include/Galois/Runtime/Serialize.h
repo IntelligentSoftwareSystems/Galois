@@ -90,38 +90,20 @@ class SerializeBuffer {
   friend DeSerializeBuffer;
   typedef std::vector<uint8_t> vTy;
   vTy bufdata;
-  size_t curr_size;
 public:
 
-  SerializeBuffer() : curr_size(0) {};
+  SerializeBuffer() = default;
   SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
   //  inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
 
-  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len), curr_size(len) {}
-
-  void clear() {
-    curr_size = 0;
-    bufdata.clear();
-  }
+  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len) {}
 
   inline void push(const char c) {
-    if (curr_size == bufdata.size()) {
-      bufdata.push_back(c);
-    } else {
-      assert(curr_size < bufdata.size());
-      bufdata[curr_size] = c;
-    }
-    curr_size++;
+    bufdata.push_back(c);
   }
 
   void insert(const uint8_t* c, size_t bytes) {
-    if (curr_size == bufdata.size()) {
-      bufdata.insert(bufdata.end(), c, c+bytes);
-    } else {
-      assert((curr_size + bytes) <= bufdata.size());
-      insertAt(c, bytes, curr_size);
-    }
-    curr_size += bytes;
+    bufdata.insert(bufdata.end(), c, c+bytes);
   }
 
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
@@ -130,30 +112,13 @@ public:
   
   //returns offset to use for insertAt
   size_t encomber(size_t bytes) {
-    assert(curr_size == bufdata.size());
     size_t retval = bufdata.size();
     bufdata.resize(retval+bytes);
-    curr_size += bytes;
     return retval;
   }
 
   void reserve(size_t s) {
     bufdata.reserve(bufdata.size() + s);
-  }
-
-  void resize(size_t s) {
-    bufdata.resize(bufdata.size() + s);
-  }
-
-  void finalize(size_t s) {
-    assert(curr_size <= s);
-    curr_size = s;
-    bufdata.resize(s);
-  }
-
-  uint8_t* r_linearData() { 
-    assert(curr_size < bufdata.size());
-    return (bufdata.data() + curr_size); 
   }
 
   const uint8_t* linearData() const { return bufdata.data(); }
@@ -235,7 +200,6 @@ public:
 
   void* linearData() { return &bufdata[0]; }
 
-  uint8_t* r_linearData() { return &bufdata[offset]; }
   const uint8_t* r_linearData() const { return &bufdata[offset]; }
   size_t r_size() const { return bufdata.size() - offset; }
 
