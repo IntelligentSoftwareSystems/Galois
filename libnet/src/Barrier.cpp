@@ -46,20 +46,20 @@ class StupidDistBarrier : public Galois::Substrate::Barrier {
   }
 
 public:
-  
+
   StupidDistBarrier() : count(0) {}
-  
+
   virtual const char* name() const { return "DistBarrier"; }
 
   virtual void reinit(unsigned val) {
     localBarrier.reinit(val);
   }
-  
+
   virtual void wait() {
     if (Galois::Runtime::LL::getTID() == 0) {
       count += Galois::Runtime::NetworkInterface::Num;
     }
-    
+
     //wait at local barrier
     localBarrier.wait();
 
@@ -69,11 +69,11 @@ public:
       net.broadcastAlt(barrierLandingPad);
       --count;
     }
-    
+
     while (count > 0) {
       Galois::Runtime::doNetworkWork();
     }
-    
+
     //wait at local barrier
     localBarrier.wait();
   }
@@ -82,10 +82,6 @@ public:
 
 #include <iostream>
 #include <mpi.h>
-
-#ifdef GALOIS_USE_LWCI
-void __fence__();
-#endif
 
 namespace {
 class HostBarrier : public Galois::Substrate::Barrier {
@@ -97,20 +93,17 @@ class HostBarrier : public Galois::Substrate::Barrier {
 
 public:
   HostBarrier() : count(0) {}
-  
+
   virtual const char* name() const { return "HostBarrier"; }
 
   virtual void reinit(unsigned val) { }
-  
+
   virtual void wait() {
-#ifdef GALOIS_USE_LWCI
-    __fence__();
-#endif
 
     if (Galois::Substrate::ThreadPool::getTID() == 0) {
       count += Galois::Runtime::NetworkInterface::Num;
     }
-    
+
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (Galois::Substrate::ThreadPool::getTID() == 0) {
       //      std::cerr << "@";
@@ -119,7 +112,7 @@ public:
       --count;
     }
     //    std::cerr << "#";
-    
+
     while (count > 0) {
       net.handleReceives();
     }

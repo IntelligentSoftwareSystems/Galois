@@ -67,41 +67,25 @@ struct mpiMessage {
 
 class NetworkIOLWCI : public Galois::Runtime::NetworkIO {
 
-  static void handleError(int rc) {
-    if (rc != MPI_SUCCESS) {
-      //GALOIS_ERROR(false, "MPI ERROR");
-      MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-  }
-
   static int getID() {
-    int taskRank;
-    handleError(MPI_Comm_rank(MPI_COMM_WORLD, &taskRank));
-    return taskRank;
+    return lc_id(mv);
   }
 
   static int getNum() {
-    int numTasks;
-    handleError(MPI_Comm_size(MPI_COMM_WORLD, &numTasks));
-    return numTasks;
+    return lc_size(mv);
   }
 
-  std::mutex m;
-
   std::pair<int, int> initMPI() {
-    m.lock();
-    lc_open((size_t) 1024 * 1024 * 1024, &mv);
-    m.unlock();
+    lc_open((size_t) 128 * 1024 * 1024, &mv);
     __ctx = this;
     return std::make_pair(getID(), getNum());
   }
 
   std::deque<mpiMessage> inflight;
   std::list<mpiMessage> recv;
+  int save;
 
 public:
-int save;
-
   NetworkIOLWCI(uint32_t& ID, uint32_t& NUM) {
     auto p = initMPI();
     ID = p.first;
@@ -111,11 +95,6 @@ int save;
 
   ~NetworkIOLWCI() {
     lc_close(mv);
-  }
-
-  void fence() {
-    while (!inflight.empty())
-      ;
   }
 
   void complete_send() {
@@ -171,11 +150,6 @@ int save;
   }
 
 };
-
-void __fence__()
-{
-  __ctx->fence();
-}
 
 std::tuple<std::unique_ptr<Galois::Runtime::NetworkIO>,uint32_t,uint32_t> Galois::Runtime::makeNetworkIOLWCI() {
   uint32_t ID, NUM;
