@@ -1339,7 +1339,7 @@ public:
      if (enforce_data_mode != onlyData) {
        bitset_comm.clear();
        std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-       std::string doall_str(syncTypeStr + "_BITSET_" + loopName + "_" + get_run_identifier());
+       std::string doall_str(syncTypeStr + "_BITSET_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
          size_t lid = indices[n];
          if(bitset_compute.test(lid)){
@@ -1388,9 +1388,9 @@ public:
 
   template<typename FnTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec, size_t start = 0) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-     std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
      if (parallelize) {
+       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
           if (identity_offsets) offset = n;
@@ -1411,9 +1411,9 @@ public:
     
   template<typename FnTy, typename SeqTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
    void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq, size_t start = 0) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
-     std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName + "_" + get_run_identifier());
      if (parallelize) {
+       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
           if (identity_offsets) offset = n;
