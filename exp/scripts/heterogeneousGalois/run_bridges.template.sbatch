@@ -33,7 +33,7 @@ elif [[ $execname == *"pull"* ]]; then
 elif [[ $inputname == *"rmat"* ]]; then
   inputdir=${inputdir}/transpose
   extension=tgr
-  FLAGS+= " -transpose"
+  FLAGS+=" -transpose"
 fi
 grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdir}/${inputname}.${extension}
