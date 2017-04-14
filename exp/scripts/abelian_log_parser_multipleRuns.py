@@ -293,6 +293,12 @@ def get_basicInfo(fileName, run_identifier):
          cut_type = "edge-cut"
          break
 
+  num_nodes = hostNum
+  for index in range(2, len(cmdLine.split())):
+    split_cmdLine_devices = cmdLine.split()[index].split("=")
+    if split_cmdLine_devices[0] == '-num_nodes':
+      num_nodes = split_cmdLine_devices[-1]
+  num_hosts_per_node = int(hostNum) / int(num_nodes)
 
   devices = str(hostNum) + " CPU"
   deviceKind = "CPU"
@@ -302,7 +308,7 @@ def get_basicInfo(fileName, run_identifier):
       devices_str = split_cmdLine_devices[-1]
       cpus = devices_str.count('c')
       gpus = devices_str.count('g')
-      if str(cpus + gpus) == hostNum and gpus > 0:
+      if cpus + gpus == num_hosts_per_node and gpus > 0:
         if cpus == 0:
           devices = str(gpus) + " GPU"
           deviceKind = "GPU"
