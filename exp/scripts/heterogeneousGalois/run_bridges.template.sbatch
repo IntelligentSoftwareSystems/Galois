@@ -7,7 +7,7 @@ PSET=$4
 THREADS=$5
 
 execname=$1
-execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build/exp/apps/compiler_outputs
+execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build-lwci/exp/apps/compiler_outputs
 EXEC=${execdir}/${execname}
 
 inputname=$2
@@ -17,6 +17,10 @@ extension=gr
 statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 
 FLAGS=" -statOutputFile=${execdir}/${statname}"
+FLAGS=
+#FLAGS=" -runs=1"
+#FLAGS+=" -numPipelinedPhases=4"
+#FLAGS+=" -numPipelinedPhases=${NUM_TASKS}"
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdir}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
@@ -31,6 +35,7 @@ elif [[ $execname == *"pull"* ]]; then
   inputdir=${inputdir}/transpose
   extension=tgr
 elif [[ $inputname == *"rmat"* ]]; then
+#else
   inputdir=${inputdir}/transpose
   extension=tgr
   FLAGS+=" -transpose"
@@ -55,7 +60,7 @@ RUN=mpirun
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 # move to working directory
-WORK_DIR=/pylon1/ci4s88p/roshand/GaloisCpp
+WORK_DIR=/pylon5/ci4s88p/roshand/GaloisCpp
 cd $WORK_DIR
 
 set -x #echo on

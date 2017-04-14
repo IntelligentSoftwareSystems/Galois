@@ -21,8 +21,8 @@ for task in $SET; do
     sed -i "2i#SBATCH --ntasks-per-node 4" run_bridges.sbatch
     sed -i "2i#SBATCH -N $1" run_bridges.sbatch
     sed -i "2i#SBATCH -p $QUEUE" run_bridges.sbatch
-    sed -i "2i#SBATCH -o ${EXEC}_${INPUT}_${ntasks}_g_%j.out" run_bridges.sbatch
-    sed -i "2i#SBATCH -J ${EXEC}_${INPUT}_${ntasks}_g" run_bridges.sbatch
+    sed -i "2i#SBATCH -o ${EXEC}_${INPUT}_${1}_gggg_%j.out" run_bridges.sbatch
+    sed -i "2i#SBATCH -J ${EXEC}_${INPUT}_${1}_gggg" run_bridges.sbatch
     threads=7
     echo -n "multi-GPU-only " $EXEC $INPUT $1 $ntasks "gggg" $threads $2 " "
     sbatch run_bridges.sbatch $EXEC $INPUT $ntasks gggg $threads
