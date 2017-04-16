@@ -172,12 +172,13 @@ struct InitializeGraph {
     		#endif
     			return false;
     		}
-    		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+    		static bool reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
     			else if (personality == CPU)
     		#endif
     				{ Galois::set(node.dist_current, y); }
+          return true;
     		}
     		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -250,12 +251,13 @@ void static go(Graph& _graph) {
 		#endif
 			return false;
 		}
-		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+		static bool reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
+			if (personality == GPU_CUDA) return min_node_dist_current_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
 		#endif
-				{ Galois::min(node.dist_current, y); }
+				{ return y < Galois::min(node.dist_current, y); }
+      return false;
 		}
 		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -377,12 +379,13 @@ struct BFS {
     		#endif
     			return false;
     		}
-    		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+    		static bool reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
+    			if (personality == GPU_CUDA) return min_node_dist_current_cuda(cuda_ctx, node_id, y);
     			else if (personality == CPU)
     		#endif
-    				{ Galois::min(node.dist_current, y); }
+    				{ return y < Galois::min(node.dist_current, y); }
+          return false;
     		}
     		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__

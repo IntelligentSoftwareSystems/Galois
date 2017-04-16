@@ -57,10 +57,13 @@ void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 	dist_current[LID] += v;
 }
 
-void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+bool min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *dist_current = ctx->dist_current.data.cpu_wr_ptr();
-	if (dist_current[LID] > v)
+	if (dist_current[LID] > v) {
 		dist_current[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -122,10 +125,13 @@ void add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int
 	dist_old[LID] += v;
 }
 
-void min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+bool min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *dist_old = ctx->dist_old.data.cpu_wr_ptr();
-	if (dist_old[LID] > v)
+	if (dist_old[LID] > v) {
 		dist_old[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {

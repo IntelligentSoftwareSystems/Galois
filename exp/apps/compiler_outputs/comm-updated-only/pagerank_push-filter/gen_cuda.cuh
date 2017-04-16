@@ -61,10 +61,13 @@ void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) 
 	nout[LID] += v;
 }
 
-void min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+bool min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *nout = ctx->nout.data.cpu_wr_ptr();
-	if (nout[LID] > v)
+	if (nout[LID] > v) {
 		nout[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -126,10 +129,13 @@ void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	residual[LID] += v;
 }
 
-void min_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+bool min_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	float *residual = ctx->residual.data.cpu_wr_ptr();
-	if (residual[LID] > v)
+	if (residual[LID] > v) {
 		residual[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
@@ -191,10 +197,13 @@ void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	value[LID] += v;
 }
 
-void min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+bool min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	float *value = ctx->value.data.cpu_wr_ptr();
-	if (value[LID] > v)
+	if (value[LID] > v) {
 		value[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {

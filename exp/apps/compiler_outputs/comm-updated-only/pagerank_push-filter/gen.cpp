@@ -163,12 +163,13 @@ struct InitializeGraphNout {
       		#endif
       			return false;
       		}
-      		static void reduce (uint32_t node_id, struct PR_NodeData & node, unsigned int y) {
+      		static bool reduce (uint32_t node_id, struct PR_NodeData & node, unsigned int y) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) add_node_nout_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
       				{ Galois::add(node.nout, y); }
+            return true;
       		}
       		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -277,12 +278,13 @@ struct InitializeGraph {
       		#endif
       			return false;
       		}
-      		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+      		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
       				{ Galois::add(node.residual, y); }
+            return true;
       		}
       		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -400,12 +402,13 @@ void static go(Graph& _graph) {
 		#endif
 			return false;
 		}
-		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
 		#endif
 				{ Galois::add(node.residual, y); }
+      return true;
 		}
 		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -565,12 +568,13 @@ struct PageRank {
     		#endif
     			return false;
     		}
-    		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+    		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
     			else if (personality == CPU)
     		#endif
     				{ Galois::add(node.residual, y); }
+          return true;
     		}
     		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__

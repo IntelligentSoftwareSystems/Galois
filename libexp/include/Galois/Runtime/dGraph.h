@@ -1444,17 +1444,17 @@ public:
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
-   void set_wrapper(size_t lid, typename FnTy::ValTy val) {
+   void set_wrapper(size_t lid, typename FnTy::ValTy val, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
      FnTy::reduce(lid, d, val);
 #else
-     FnTy::reduce(lid, getData(lid), val);
+     if (FnTy::reduce(lid, getData(lid), val)) bit_set_compute.set(lid);
 #endif
    }
 
    template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
-   void set_wrapper(size_t lid, typename FnTy::ValTy val) {
+   void set_wrapper(size_t lid, typename FnTy::ValTy val, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
      FnTy::setVal(lid, d, val_vec[n]);
@@ -1464,7 +1464,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
-   void set_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec, size_t start = 0) {
+   void set_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec, Galois::DynamicBitSet& bit_set_compute, size_t start = 0) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string doall_str(syncTypeStr + "_SETVAL_" + loopName + "_" + get_run_identifier());
      if (parallelize) {
@@ -1473,7 +1473,7 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          set_wrapper<FnTy, syncType>(lid, val_vec[n - start]);
+          set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
        }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
      } else {
        for (unsigned int n = start; n < start + size; ++n) {
@@ -1481,7 +1481,7 @@ public:
           if (identity_offsets) offset = n;
           else offset = offsets[n];
           size_t lid = indices[offset];
-          set_wrapper<FnTy, syncType>(lid, val_vec[n - start]);
+          set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
        }
      }
    }
@@ -1558,7 +1558,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_extract(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
+   void sync_extract(std::string loopName, const Galois::DynamicBitSet& bit_set_compute, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
      static Galois::DynamicBitSet bit_set_comm;
      static std::vector<typename FnTy::ValTy> val_vec;
@@ -1617,7 +1617,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_send(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_send(std::string loopName, const Galois::DynamicBitSet& bit_set_compute) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      Galois::StatTimer StatTimer_SendTime(syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier());
      StatTimer_SendTime.start();
@@ -1647,7 +1647,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType, bool parallelize = true>
-   size_t syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
+   size_t syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, Galois::DynamicBitSet& bit_set_compute, std::string loopName) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      std::string set_timer_str(syncTypeStr + "_SET_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
@@ -1699,11 +1699,11 @@ public:
              assert(bit_set_count ==  bit_set_count2);
            }
            if (data_mode == onlyData) {
-             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec);
+             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
-             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, buf_start);
+             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute, buf_start);
            } else {
-             set_subset<FnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec);
+             set_subset<FnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            }
          }
        }
@@ -1713,7 +1713,7 @@ public:
    }
 
    template<typename FnTy, SyncType syncType>
-   void sync_recv(std::string loopName, unsigned int num_messages = 1) {
+   void sync_recv(std::string loopName, Galois::DynamicBitSet& bit_set_compute, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      Galois::StatTimer StatTimer_RecvTime(syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier());
@@ -1727,7 +1727,7 @@ public:
            net.handleReceives();
            p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
          } while (!p);
-         syncRecvApply<FnTy, syncType>(p->first, p->second, loopName);
+         syncRecvApply<FnTy, syncType>(p->first, p->second, bit_set_compute, loopName);
        }
      }
      ++Galois::Runtime::evilPhase;
@@ -1736,7 +1736,7 @@ public:
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
    template<typename FnTy, SyncType syncType>
-   void sync_sendrecv_exp(std::string loopName, const Galois::DynamicBitSet &bit_set_compute, size_t block_size) {
+   void sync_sendrecv_exp(std::string loopName, Galois::DynamicBitSet& bit_set_compute, size_t block_size) {
       std::atomic<unsigned> total_incoming(0);
       std::atomic<unsigned> recved_firsts(0);
       std::atomic<unsigned> sendbytes_count(0);
@@ -1810,7 +1810,7 @@ public:
           }
 
           if (p) {
-            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, loopName);
+            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, bit_set_compute, loopName);
             if (val != 0) {
               recved_firsts += 1;
               total_incoming += val;
@@ -1832,7 +1832,7 @@ public:
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         if (p) {
-          auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, loopName);
+          auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, bit_set_compute, loopName);
           if (val != 0) {
             recved_firsts += 1;
             total_incoming += val;
@@ -1853,7 +1853,7 @@ public:
    }
 
    template<typename FnTy>
-   void sync_push(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_push(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
@@ -1876,7 +1876,7 @@ public:
 #else
       sync_send<FnTy, syncPush>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPush>(loopName);
+      sync_recv<FnTy, syncPush>(loopName, bit_set_compute);
 #endif
 
       StatTimer_syncPush.stop();
@@ -1889,7 +1889,7 @@ public:
    }
 
    template<typename FnTy>
-   void sync_pull(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_pull(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
@@ -1912,7 +1912,7 @@ public:
 #else
       sync_send<FnTy, syncPull>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPull>(loopName);
+      sync_recv<FnTy, syncPull>(loopName, bit_set_compute);
 #endif
 
       StatTimer_syncPull.stop();
@@ -1925,7 +1925,7 @@ public:
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_forward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_forward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
@@ -1949,7 +1949,7 @@ public:
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
    template<typename PushFnTy, typename PullFnTy>
-   void sync_forward_pipe(std::string loopName, Galois::DynamicBitSet &bit_set_compute) {
+   void sync_forward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
@@ -1969,19 +1969,19 @@ public:
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_forward_wait(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_forward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+         sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull>(loopName, numPipelinedPhases);
+         sync_recv<PullFnTy, syncPull>(loopName, bit_set_compute, numPipelinedPhases);
        }
      } else {
-       sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+       sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
      }
      numPipelinedPhases = 0;
      if (is_vertex_cut()) {
@@ -1998,7 +1998,7 @@ public:
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_backward(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_backward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
@@ -2022,7 +2022,7 @@ public:
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
    template<typename PushFnTy, typename PullFnTy>
-   void sync_backward_pipe(std::string loopName, Galois::DynamicBitSet &bit_set_compute) {
+   void sync_backward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
@@ -2042,18 +2042,18 @@ public:
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_backward_wait(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_backward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+       sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
      } else {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush>(loopName, numPipelinedPhases);
+         sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull>(loopName, numPipelinedPhases);
+         sync_recv<PullFnTy, syncPull>(loopName, bit_set_compute, numPipelinedPhases);
        }
      }
      numPipelinedPhases = 0;
@@ -2071,7 +2071,7 @@ public:
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_switch(std::string loopName, const Galois::DynamicBitSet &bit_set_compute) {
+   void sync_switch(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      sync_push<PushFnTy>(loopName, bit_set_compute);
      sync_pull<PullFnTy>(loopName, bit_set_compute);
    }

@@ -57,10 +57,13 @@ void add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 	comp_current[LID] += v;
 }
 
-void min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+bool min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *comp_current = ctx->comp_current.data.cpu_wr_ptr();
-	if (comp_current[LID] > v)
+	if (comp_current[LID] > v) {
 		comp_current[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
@@ -122,10 +125,13 @@ void add_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int
 	comp_old[LID] += v;
 }
 
-void min_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+bool min_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *comp_old = ctx->comp_old.data.cpu_wr_ptr();
-	if (comp_old[LID] > v)
+	if (comp_old[LID] > v) {
 		comp_old[LID] = v;
+    return true;
+  }
+  return false;
 }
 
 void batch_get_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
