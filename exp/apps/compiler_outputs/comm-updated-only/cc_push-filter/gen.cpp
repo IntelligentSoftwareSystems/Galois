@@ -74,6 +74,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
 static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
+static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
 
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -300,20 +301,29 @@ assert((pipeSize * numPipelinedPhases) >= totalSize);
 for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
   unsigned int __end = __begin + pipeSize;
   if (__end > totalSize) __end = totalSize;
+  unsigned int stepTotalSize = __end - __begin;
+  unsigned int stepSize = stepTotalSize / numComputeSubsteps;
+  assert(stepSize > numComputeSubsteps);
+  if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
+  assert((stepSize * numComputeSubsteps) >= stepTotalSize);
+  for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
+    unsigned int __end2 = __begin2 + stepSize;
+    if (__end2 > __end) __end2 = __end;
 #ifdef __GALOIS_HET_CUDA__
-	if (personality == GPU_CUDA) {
-    bitset_comp_current_clear_cuda(cuda_ctx);
-		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
-		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-		StatTimer_cuda.start();
-		//FirstItr_ConnectedComp_all_cuda(cuda_ctx);
-		FirstItr_ConnectedComp_cuda(__begin, __end, cuda_ctx);
-		StatTimer_cuda.stop();
-	} else if (personality == CPU)
+    if (personality == GPU_CUDA) {
+      if (__begin2 == __begin) bitset_comp_current_clear_cuda(cuda_ctx);
+      std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      //FirstItr_ConnectedComp_all_cuda(cuda_ctx);
+      FirstItr_ConnectedComp_cuda(__begin2, __end2, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
 #endif
-  {
-    bitset_comp_current.clear();
-    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+    {
+      if (__begin2 == __begin) bitset_comp_current.clear();
+      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+    }
   }
   _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
 }
@@ -444,22 +454,31 @@ struct ConnectedComp {
     for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
       unsigned int __end = __begin + pipeSize;
       if (__end > totalSize) __end = totalSize;
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-        bitset_comp_current_clear_cuda(cuda_ctx);
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		int __retval = 0;
-    		//ConnectedComp_all_cuda(__retval, cuda_ctx);
-    		ConnectedComp_cuda(__begin, __end, __retval, cuda_ctx);
-    		DGAccumulator_accum += __retval;
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
-      {
-        bitset_comp_current.clear();
-        Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+      unsigned int stepTotalSize = __end - __begin;
+      unsigned int stepSize = stepTotalSize / numComputeSubsteps;
+      assert(stepSize > numComputeSubsteps);
+      if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
+      assert((stepSize * numComputeSubsteps) >= stepTotalSize);
+      for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
+        unsigned int __end2 = __begin2 + stepSize;
+        if (__end2 > __end) __end2 = __end;
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          if (__begin2 == __begin) bitset_comp_current_clear_cuda(cuda_ctx);
+          std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
+          Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+          StatTimer_cuda.start();
+          int __retval = 0;
+          //ConnectedComp_all_cuda(__retval, cuda_ctx);
+          ConnectedComp_cuda(__begin2, __end2, __retval, cuda_ctx);
+          DGAccumulator_accum += __retval;
+          StatTimer_cuda.stop();
+        } else if (personality == CPU)
+      #endif
+        {
+          if (__begin2 == __begin) bitset_comp_current.clear();
+          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+        }
       }
       _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
     }

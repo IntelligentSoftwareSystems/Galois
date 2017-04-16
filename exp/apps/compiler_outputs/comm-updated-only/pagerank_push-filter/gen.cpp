@@ -78,6 +78,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
 static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
+static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
 
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -469,20 +470,29 @@ assert((pipeSize * numPipelinedPhases) >= totalSize);
 for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
   unsigned int __end = __begin + pipeSize;
   if (__end > totalSize) __end = totalSize;
+  unsigned int stepTotalSize = __end - __begin;
+  unsigned int stepSize = stepTotalSize / numComputeSubsteps;
+  assert(stepSize > numComputeSubsteps);
+  if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
+  assert((stepSize * numComputeSubsteps) >= stepTotalSize);
+  for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
+    unsigned int __end2 = __begin2 + stepSize;
+    if (__end2 > __end) __end2 = __end;
 #ifdef __GALOIS_HET_CUDA__
-	if (personality == GPU_CUDA) {
-    bitset_residual_clear_cuda(cuda_ctx);
-		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
-		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-		StatTimer_cuda.start();
-		//FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
-		FirstItr_PageRank_cuda(__begin, __end, alpha, tolerance, cuda_ctx);
-		StatTimer_cuda.stop();
-	} else if (personality == CPU)
+    if (personality == GPU_CUDA) {
+      if (__begin2 == __begin) bitset_residual_clear_cuda(cuda_ctx);
+      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      //FirstItr_PageRank_all_cuda(alpha, tolerance, cuda_ctx);
+      FirstItr_PageRank_cuda(__begin2, __end2, alpha, tolerance, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
 #endif
-  {
-    bitset_residual.clear();
-    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+    {
+      if (__begin2 == __begin) bitset_residual.clear();
+      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+    }
   }
   _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
 }
@@ -625,22 +635,31 @@ struct PageRank {
     for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
       unsigned int __end = __begin + pipeSize;
       if (__end > totalSize) __end = totalSize;
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-        bitset_residual_clear_cuda(cuda_ctx);
-    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		int __retval = 0;
-    		//PageRank_all_cuda(__retval, alpha, tolerance, cuda_ctx);
-    		PageRank_cuda(__begin, __end, __retval, alpha, tolerance, cuda_ctx);
-    		DGAccumulator_accum += __retval;
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
-      {
-        bitset_residual.clear();
-        Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+      unsigned int stepTotalSize = __end - __begin;
+      unsigned int stepSize = stepTotalSize / numComputeSubsteps;
+      assert(stepSize > numComputeSubsteps);
+      if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
+      assert((stepSize * numComputeSubsteps) >= stepTotalSize);
+      for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
+        unsigned int __end2 = __begin2 + stepSize;
+        if (__end2 > __end) __end2 = __end;
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          if (__begin2 == __begin) bitset_residual_clear_cuda(cuda_ctx);
+          std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
+          Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+          StatTimer_cuda.start();
+          int __retval = 0;
+          //PageRank_all_cuda(__retval, alpha, tolerance, cuda_ctx);
+          PageRank_cuda(__begin2, __end2, __retval, alpha, tolerance, cuda_ctx);
+          DGAccumulator_accum += __retval;
+          StatTimer_cuda.stop();
+        } else if (personality == CPU)
+      #endif
+        {
+          if (__begin2 == __begin) bitset_residual.clear();
+          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+        }
       }
       _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
     }
