@@ -551,11 +551,13 @@ int main(int argc, char** argv) {
       if ((personality == GPU_CUDA) && (gpu_device == -1)) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
-      for (unsigned i=0; i<net.Num; ++i) {
-        if (personality_set.c_str()[i % num_nodes] == 'c') 
-          scalefactor.push_back(scalecpu);
-        else
-          scalefactor.push_back(scalegpu);
+      if ((scalecpu > 1) || (scalegpu > 1)) {
+        for (unsigned i=0; i<net.Num; ++i) {
+          if (personality_set.c_str()[i % num_nodes] == 'c') 
+            scalefactor.push_back(scalecpu);
+          else
+            scalefactor.push_back(scalegpu);
+        }
       }
     }
 #endif
@@ -570,7 +572,7 @@ int main(int argc, char** argv) {
           std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
         }
       }
-      hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+      hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
     }
     else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);

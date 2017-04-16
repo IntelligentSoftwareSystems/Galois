@@ -174,9 +174,9 @@ public:
     }
     if (transpose) {
       if (base_hGraph::id == 0) {
-        std::cerr << "WARNING: transpose not supported for cartesian vertex-cuts\n";
+        std::cerr << "ERROR: transpose not supported for cartesian vertex-cuts\n";
       }
-      transpose = false;
+      assert(false);
     }
 
     Galois::Statistic statGhostNodes("TotalGhostNodes");
