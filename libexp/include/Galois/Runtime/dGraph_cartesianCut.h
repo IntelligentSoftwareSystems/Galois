@@ -166,6 +166,19 @@ public:
 
   hGraph_cartesianCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
+    if (!scalefactor.empty()) {
+      if (base_hGraph::id == 0) {
+        std::cerr << "WARNING: scalefactor not supported for cartesian vertex-cuts\n";
+      }
+      scalefactor.clear();
+    }
+    if (transpose) {
+      if (base_hGraph::id == 0) {
+        std::cerr << "WARNING: transpose not supported for cartesian vertex-cuts\n";
+      }
+      transpose = false;
+    }
+
     Galois::Statistic statGhostNodes("TotalGhostNodes");
     Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
     StatTimer_graph_construct.start();
@@ -182,11 +195,6 @@ public:
     // if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
       for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
         gid2host.push_back(Galois::block_range(0U, (unsigned) g.size(), i, base_hGraph::numHosts));
-    if (!scalefactor.empty()) {
-      if (base_hGraph::id == 0) {
-        std::cerr << "WARNING: scalefactor not supported for vertex-cuts\n";
-      }
-    }
 #if 0
     } else {
       assert(scalefactor.size() == base_hGraph::numHosts);
@@ -232,10 +240,12 @@ public:
     loadEdges(base_hGraph::graph, g); // second pass of the graph file
     std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
+#if 0
     if (transpose && (numNodes > 0)) {
       base_hGraph::graph.transpose();
       base_hGraph::transposed = true;
     }
+#endif
 
     fill_slaveNodes(base_hGraph::slaveNodes);
     StatTimer_graph_construct.stop();
