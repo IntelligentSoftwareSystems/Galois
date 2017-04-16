@@ -82,6 +82,7 @@ class hGraph: public GlobalObject {
    typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
 
    enum SyncType { syncPush, syncPull };
+   enum DataflowDirection { forwardFlow, backwardFlow, exchangeFlow };
 
    GraphTy graph;
    bool transposed;
@@ -119,6 +120,17 @@ class hGraph: public GlobalObject {
   }
 #endif
 
+  // requirement: for all X and Y,
+  // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
+  // Note: templates may not be virtual, so passing types as arguments
+  virtual bool nothingToSend(unsigned host, SyncType syncType, DataflowDirection dataFlow) { // ignore dataflow direction
+     auto &sharedNodes = (syncType == syncPush) ? slaveNodes : masterNodes;
+     return (sharedNodes[host].size() == 0);
+  }
+  virtual bool nothingToRecv(unsigned host, SyncType syncType, DataflowDirection dataFlow) { // ignore dataflow direction
+     auto &sharedNodes = (syncType == syncPush) ? masterNodes : slaveNodes;
+     return (sharedNodes[host].size() == 0);
+  }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1616,7 +1628,7 @@ public:
      Statistic_metadata += 1;
    }
 
-   template<typename FnTy, SyncType syncType>
+   template<typename FnTy, SyncType syncType, DataflowDirection dataFlow = forwardFlow>
    void sync_send(std::string loopName, const Galois::DynamicBitSet& bit_set_compute) {
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
      Galois::StatTimer StatTimer_SendTime(syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier());
@@ -1626,6 +1638,7 @@ public:
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      for (unsigned h = 1; h < net.Num; ++h) {
         unsigned x = (id + h) % net.Num;
+        if (nothingToSend(x, syncType, dataFlow)) continue;
 
         Galois::Runtime::SendBuffer b;
 #ifndef __HETEROGENEOUS_GALOIS_DEPRECATED__
@@ -1712,7 +1725,7 @@ public:
      return retval;
    }
 
-   template<typename FnTy, SyncType syncType>
+   template<typename FnTy, SyncType syncType, DataflowDirection dataFlow = forwardFlow>
    void sync_recv(std::string loopName, Galois::DynamicBitSet& bit_set_compute, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
@@ -1720,8 +1733,8 @@ public:
      StatTimer_RecvTime.start();
      for (unsigned num = 0; num < num_messages; ++num) {
        for (unsigned x = 0; x < net.Num; ++x) {
-         if (x == id)
-           continue;
+         if (x == id) continue;
+         if (nothingToRecv(x, syncType, dataFlow)) continue;
          decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
          do {
            net.handleReceives();
@@ -1846,13 +1859,13 @@ public:
    }
 #endif
 
-   template<typename FnTy>
+   template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_push(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_push<FnTy>(loopName, emptyBitset);
+     sync_push(loopName, emptyBitset);
    }
 
-   template<typename FnTy>
+   template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_push(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1874,21 +1887,21 @@ public:
       size_t block_size = buffSize;
       sync_sendrecv_exp<FnTy, syncPush>(loopName, bit_set_compute, block_size);
 #else
-      sync_send<FnTy, syncPush>(loopName, bit_set_compute);
+      sync_send<FnTy, syncPush, dataFlow>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPush>(loopName, bit_set_compute);
+      sync_recv<FnTy, syncPush, dataFlow>(loopName, bit_set_compute);
 #endif
 
       StatTimer_syncPush.stop();
    }
 
-   template<typename FnTy>
+   template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_pull(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_pull<FnTy>(loopName, emptyBitset);
+     sync_pull(loopName, emptyBitset);
    }
 
-   template<typename FnTy>
+   template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_pull(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1910,9 +1923,9 @@ public:
       size_t block_size = buffSize;
       sync_sendrecv_exp<FnTy, syncPull>(loopName, bit_set_compute, block_size);
 #else
-      sync_send<FnTy, syncPull>(loopName, bit_set_compute);
+      sync_send<FnTy, syncPull, dataFlow>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPull>(loopName, bit_set_compute);
+      sync_recv<FnTy, syncPull, dataFlow>(loopName, bit_set_compute);
 #endif
 
       StatTimer_syncPull.stop();
@@ -1921,7 +1934,7 @@ public:
    template<typename PushFnTy, typename PullFnTy>
    void sync_forward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_forward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_forward(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
@@ -1932,13 +1945,13 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_push<PushFnTy>(loopName, bit_set_compute);
+         sync_push<PushFnTy, forwardFlow>(loopName, bit_set_compute);
        }
-       sync_pull<PullFnTy>(loopName, bit_set_compute);
+       sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
      } else {
-       sync_push<PushFnTy>(loopName, bit_set_compute);
+       sync_push<PushFnTy, forwardFlow>(loopName, bit_set_compute);
        if (is_vertex_cut()) {
-         sync_pull<PullFnTy>(loopName, bit_set_compute);
+         sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
        }
      }
 
@@ -1956,12 +1969,12 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+         sync_send<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute);
        } else {
-         sync_send<PullFnTy, syncPull>(loopName, bit_set_compute);
+         sync_send<PullFnTy, syncPull, forwardFlow>(loopName, bit_set_compute);
        }
      } else {
-       sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+       sync_send<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute);
      }
      ++numPipelinedPhases;
 
@@ -1976,16 +1989,16 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<PullFnTy, syncPull, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        }
      } else {
-       sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
+       sync_recv<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
      }
      numPipelinedPhases = 0;
      if (is_vertex_cut()) {
-       sync_pull<PullFnTy>(loopName, bit_set_compute);
+       sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncForward.stop();
@@ -1994,7 +2007,7 @@ public:
    template<typename PushFnTy, typename PullFnTy>
    void sync_backward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_backward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_backward(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
@@ -2004,15 +2017,15 @@ public:
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_push<PushFnTy>(loopName, bit_set_compute);
+       sync_push<PushFnTy, backwardFlow>(loopName, bit_set_compute);
        if (is_vertex_cut()) {
-         sync_pull<PullFnTy>(loopName, bit_set_compute);
+         sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
        }
      } else {
        if (is_vertex_cut()) {
-         sync_push<PushFnTy>(loopName, bit_set_compute);
+         sync_push<PushFnTy, backwardFlow>(loopName, bit_set_compute);
        }
-       sync_pull<PullFnTy>(loopName, bit_set_compute);
+       sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncBackward.stop();
@@ -2028,12 +2041,12 @@ public:
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+       sync_send<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute);
      } else {
        if (is_vertex_cut()) {
-         sync_send<PushFnTy, syncPush>(loopName, bit_set_compute);
+         sync_send<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute);
        } else {
-         sync_send<PullFnTy, syncPull>(loopName, bit_set_compute);
+         sync_send<PullFnTy, syncPull, backwardFlow>(loopName, bit_set_compute);
        }
      }
      ++numPipelinedPhases;
@@ -2048,32 +2061,32 @@ public:
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
+       sync_recv<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
      } else {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<PullFnTy, syncPull, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        }
      }
      numPipelinedPhases = 0;
      if (is_vertex_cut()) {
-       sync_pull<PullFnTy>(loopName, bit_set_compute);
+       sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncBackward.stop();
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_switch(std::string loopName) {
+   void sync_exchange(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_switch<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_exchange(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
-   void sync_switch(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     sync_push<PushFnTy>(loopName, bit_set_compute);
-     sync_pull<PullFnTy>(loopName, bit_set_compute);
+   void sync_exchange(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     sync_push<PushFnTy, exchangeFlow>(loopName, bit_set_compute);
+     sync_pull<PullFnTy, exchangeFlow>(loopName, bit_set_compute);
    }
 
    template<typename FnTy>

@@ -18,10 +18,9 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @section Contains the edge cut functionality to be used in dGraph.
+ * @section Contains the cartesian/grid vertex-cut functionality to be used in dGraph.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
- * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
 
 #include <vector>
@@ -32,13 +31,12 @@
 #include "Galois/Runtime/OfflineGraph.h"
 #include "Galois/Runtime/Serialize.h"
 
-//template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
-//class hGraph;
-
-
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+public:
+  typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
 
+private:
   uint32_t numRowHosts;
   uint32_t numColumnHosts;
   uint32_t blockSize; // number of nodes in a (square) block
@@ -58,7 +56,6 @@ class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     numColumnBlocksPerHost = numRowHosts;
     if (base_hGraph::id == 0) {
       std::cerr << "Cartesian grid: " << numRowHosts << " x " << numColumnHosts << "\n";
-      std::cerr << "Block size: " << blockSize << "\n";
     }
   }
 
@@ -66,12 +63,48 @@ class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return (base_hGraph::id / numColumnHosts);
   }
 
+  uint32_t gridRowID(unsigned id) {
+    return (id / numColumnHosts);
+  }
+
   uint32_t gridColumnID() {
     return (base_hGraph::id % numColumnHosts);
   }
 
+  uint32_t gridColumnID(unsigned id) {
+    return (id % numColumnHosts);
+  }
+
+  // called only for those hosts with which it shares nodes
+  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) {
+    if (syncType == base_hGraph::syncPush) {
+      switch(dataFlow) {
+        case base_hGraph::forwardFlow:
+          return (gridColumnID() != gridColumnID(host));
+        case base_hGraph::backwardFlow:
+          return (gridRowID() != gridRowID(host));
+        case base_hGraph::exchangeFlow:
+          return false;
+        default:
+          assert(false);
+      }
+    } else { // syncPull
+      switch(dataFlow) {
+        case base_hGraph::forwardFlow:
+          return (gridRowID() != gridRowID(host));
+        case base_hGraph::backwardFlow:
+          return (gridColumnID() != gridColumnID(host));
+        case base_hGraph::exchangeFlow:
+          return false;
+        default:
+          assert(false);
+      }
+    }
+    return false;
+  }
+
+
 public:
-  typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
   // GID = localToGlobalVector[LID]
   std::vector<uint64_t> localToGlobalVector;
   // LID = globalToLocalMap[GID]
@@ -83,16 +116,8 @@ public:
   uint32_t numNodes;
   uint64_t numEdges;
 
-  //std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
-  //  return hostNodes[host];
-  //}
-
-  std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
-    return gid2host[host];
-  }
-
   // TODO: support scalefactor
-  unsigned getHostID(uint64_t gid) const {
+  virtual unsigned getHostID(uint64_t gid) const {
     assert(gid < base_hGraph::totalNodes);
     uint32_t blockID = gid / blockSize;
     uint32_t rowID = blockID / numRowBlocksPerHost;
@@ -100,25 +125,43 @@ public:
     return (rowID * numColumnHosts) + columnID;
   }
 
-  bool isOwned(uint64_t gid) const {
+  virtual bool isOwned(uint64_t gid) const {
     if (gid >= base_hGraph::totalNodes) return false;
     return getHostID(gid) == base_hGraph::id;
   }
 
-  bool isLocal(uint64_t gid) const {
+  virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_hGraph::totalNodes);
     if (isOwned(gid))
       return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
-  uint32_t G2L(uint64_t gid) const {
+  virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
-  uint64_t L2G(uint32_t lid) const {
+  virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
+  }
+
+  // requirement: for all X and Y,
+  // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
+  // Note: templates may not be virtual, so passing types as arguments
+  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::slaveNodes : base_hGraph::masterNodes;
+    if (sharedNodes[host].size() > 0) {
+      return isNotCommunicationPartner(host, syncType, dataFlow);
+    }
+    return true;
+  }
+  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::masterNodes : base_hGraph::slaveNodes;
+    if (sharedNodes[host].size() > 0) {
+      return isNotCommunicationPartner(host, syncType, dataFlow);
+    }
+    return true;
   }
 
   hGraph_cartesianCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
