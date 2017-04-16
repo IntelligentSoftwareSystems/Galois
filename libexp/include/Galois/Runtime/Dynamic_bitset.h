@@ -65,6 +65,24 @@ namespace Galois {
       bitvec[bit_index].fetch_or(bit_offset);
     }
 
+#if 0
+    void reset(uint32_t index){
+      uint32_t bit_index = index/bits_uint64;
+      uint64_t bit_offset = 1;
+      bit_offset <<= (index%bits_uint64);
+      bitvec[bit_index].fetch_and(~bit_offset);
+    }
+#endif
+
+    // assumes bit_vector is not updated (set) in parallel
+    void bitwise_or(const DynamicBitSet& other) {
+      assert(size() == other.size());
+      auto& other_bitvec = other.get_vec();
+      for (size_t i = 0; i < bitvec.size(); ++i) {
+        bitvec[i] |= other_bitvec[i];
+      }
+    }
+
     typedef int tt_is_copyable;
   };
 } // namespace Galois
