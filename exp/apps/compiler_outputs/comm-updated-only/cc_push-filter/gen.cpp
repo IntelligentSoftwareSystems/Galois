@@ -33,7 +33,7 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_vertexCut.h"
+#include "Galois/Runtime/dGraph_cartesianCut.h"
 
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
@@ -95,7 +95,7 @@ Galois::DynamicBitSet bitset_comp_current;
 
 typedef hGraph<NodeData, void> Graph;
 typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -292,6 +292,7 @@ void static go(Graph& _graph) {
 		typedef unsigned int ValTy;
 	};
 unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+if (totalSize > 0) {
 unsigned int pipeSize = totalSize / numPipelinedPhases;
 assert(pipeSize > numPipelinedPhases);
 if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
@@ -315,6 +316,11 @@ for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
   }
   _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+}
+} else {
+for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
+  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_comp_current);
+}
 }
 _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
 
@@ -430,6 +436,7 @@ struct ConnectedComp {
     		typedef unsigned int ValTy;
     	};
     unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+    if (totalSize > 0) {
     unsigned int pipeSize = totalSize / numPipelinedPhases;
     assert(pipeSize > numPipelinedPhases);
     if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
@@ -455,6 +462,11 @@ struct ConnectedComp {
         Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
       }
       _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+    }
+    } else {
+    for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
+      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_comp_current);
+    }
     }
     _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
     
@@ -541,7 +553,7 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg;
     if(enableVCut){
-      hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+      hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
     }
     else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);

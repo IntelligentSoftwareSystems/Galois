@@ -124,7 +124,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      base_hGraph::totalOnwedNodes = base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
+      base_hGraph::totalOwnedNodes = base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
       globalOffset = gid2host[base_hGraph::id].first;
     std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::numOwned << "\n";
 
@@ -167,14 +167,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       assert(found);
     }
 
-    for(unsigned h = 0; h < hostNodes.size(); ++h){
-      std::string temp_str = ("GhostNodes_from_" + std::to_string(h));
-      Galois::Statistic temp_stat_ghosNode(temp_str);
-      uint32_t start, end;
-      std::tie(start, end) = nodes_by_host(h);
-      temp_stat_ghosNode += (end - start);
-      statGhostNodes += (end - start);
-    }
     numNodes = _numNodes = base_hGraph::numOwned + ghostMap.size();
     assert((uint64_t )base_hGraph::numOwned + (uint64_t )ghostMap.size() == (uint64_t )numNodes);
 

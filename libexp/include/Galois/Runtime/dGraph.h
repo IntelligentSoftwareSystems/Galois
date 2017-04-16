@@ -79,7 +79,7 @@ class hGraph: public GlobalObject {
    typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
    typedef typename std::conditional<BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
+   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
 
    enum SyncType { syncPush, syncPull };
 
@@ -88,7 +88,7 @@ class hGraph: public GlobalObject {
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint64_t totalSlaveNodes; // Total slave nodes from others.
-   uint64_t totalOnwedNodes; // Total owned nodes in accordance with graphlab.
+   uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint32_t total_isolatedNodes; // Calculate the total isolated nodes
@@ -105,8 +105,6 @@ class hGraph: public GlobalObject {
   virtual uint32_t G2L(uint64_t) const = 0 ;
   virtual uint64_t L2G(uint32_t) const = 0;
   virtual bool is_vertex_cut() const = 0;
-  virtual std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t) const = 0;
-  virtual std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t) const = 0;
   virtual unsigned getHostID(uint64_t) const = 0;
   virtual size_t getOwner_lid(size_t lid) const {
     auto gid = L2G(lid);
@@ -114,12 +112,6 @@ class hGraph: public GlobalObject {
   }
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
-  virtual bool isMaster(uint64_t gid) const {
-    if(getHostID(gid) == id)
-      return true;
-    else 
-      return false;
-  };
   virtual uint64_t get_local_total_nodes() const = 0;
 #if 0
   virtual void save_meta_file(std::string name) const {
@@ -448,7 +440,7 @@ public:
    }
 
    edge_iterator edge_begin(GraphNode N) {
-      return graph.edge_begin(N);
+      return graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED);
    }
 
    edge_iterator edge_end(GraphNode N) {
@@ -493,8 +485,7 @@ public:
 
   void exchange_info_init(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    //may be reusing tag, so need a barrier
-    Galois::Runtime::getHostBarrier().wait();
+    //may be reusing tag, so need a barrier before (in setup_communication)
 
     for (unsigned x = 0; x < net.Num; ++x) {
       if(x == id)
@@ -537,13 +528,13 @@ public:
       if(x == id)
         continue;
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, totalSlaveNodes, totalOnwedNodes);
+      gSerialize(b, totalSlaveNodes, totalOwnedNodes);
       net.sendTagged(x,1,b);
     }
 
     //receive and print
       uint64_t global_total_slave_nodes = totalSlaveNodes;
-      uint64_t global_total_owned_nodes = totalOnwedNodes;
+      uint64_t global_total_owned_nodes = totalOwnedNodes;
 
       for(unsigned x = 0; x < net.Num; ++x){
         if(x == id)
@@ -2638,7 +2629,7 @@ public:
         //size_t lid = (size_t)(*src);
         //size_t gid = (size_t)L2G(*src);
         size_t owner = getOwner_lid(lid);
-        for(auto e = graph.edge_begin(lid), e_end = graph.edge_end(lid); e != e_end; ++e){
+        for(auto e = graph.edge_begin(lid, Galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(lid); e != e_end; ++e){
           auto dst = graph.getEdgeDst(e);
           auto edge_wt = graph.getEdgeData(e);
           auto dst_GID = L2G(dst);

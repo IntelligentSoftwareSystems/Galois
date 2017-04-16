@@ -76,7 +76,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     bool isOwned(uint64_t gid) const {
-      return (GlobalVec_map.find(gid) != GlobalVec_map.end());
+      return (getHostID(gid) == base_hGraph::id);
     }
 
     bool isLocal(uint64_t gid) const {
@@ -120,15 +120,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       result+=std::to_string(num_hosts);
       return result;
     }
-
-    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
-      return std::make_pair<uint32_t, uint32_t>(~0,~0);
-    }
-
-    std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
-      return std::make_pair<uint64_t, uint64_t>(~0,~0);
-    }
-
 
     hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) :  base_hGraph(host, _numHosts) {
 
@@ -290,7 +281,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       std::cerr << "[ " << base_hGraph::id <<"] : OWNED : " << GlobalVec_perHost[base_hGraph::id].size() << "\n";
 
-      base_hGraph::totalOnwedNodes = GlobalVec_perHost[base_hGraph::id].size();
+      base_hGraph::totalOwnedNodes = GlobalVec_perHost[base_hGraph::id].size();
 
       assert(std::is_sorted(GlobalVec_ordered.begin(), GlobalVec_ordered.end()));
 

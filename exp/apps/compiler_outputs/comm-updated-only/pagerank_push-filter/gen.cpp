@@ -37,7 +37,7 @@
 #include "Galois/Runtime/Tracer.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_vertexCut.h"
+#include "Galois/Runtime/dGraph_cartesianCut.h"
 
 #include "Galois/DistAccumulator.h"
 
@@ -104,7 +104,7 @@ Galois::DynamicBitSet bitset_residual;
 
 typedef hGraph<PR_NodeData, void> Graph;
 typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
+typedef hGraph_cartesianCut<PR_NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -461,6 +461,7 @@ void static go(Graph& _graph) {
 		typedef float ValTy;
 	};
 unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+if (totalSize > 0) {
 unsigned int pipeSize = totalSize / numPipelinedPhases;
 assert(pipeSize > numPipelinedPhases);
 if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
@@ -484,6 +485,11 @@ for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
   }
   _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+}
+} else {
+for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
+  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_residual);
+}
 }
 _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
 
@@ -611,6 +617,7 @@ struct PageRank {
     		typedef float ValTy;
     	};
     unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
+    if (totalSize > 0) {
     unsigned int pipeSize = totalSize / numPipelinedPhases;
     assert(pipeSize > numPipelinedPhases);
     if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
@@ -636,6 +643,11 @@ struct PageRank {
         Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, PageRank{ tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
       }
       _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+    }
+    } else {
+    for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
+      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_residual);
+    }
     }
     _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
     
@@ -730,7 +742,7 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg;
     if(enableVCut){
-      hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
+      hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
     }
     else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
