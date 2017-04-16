@@ -46,8 +46,6 @@ class DGAccumulator {
 
    Galois::GAccumulator<Ty> mdata;
    Ty local_mdata, global_mdata;
-   static Ty others_mdata;
-   static unsigned num_Hosts_recvd;
 #ifdef __GALOIS_HET_OPENCL__
    cl_mem dev_data;
 #endif
@@ -115,17 +113,6 @@ public:
    /************************************************************
     *
     ************************************************************/
-  static void reduce_landingPad(uint32_t src, Galois::Runtime::RecvBuffer& buf) {
-      uint32_t x_id;
-      Ty x_mdata;
-      gDeserialize(buf, x_id, x_mdata);
-      others_mdata += x_mdata;
-      ++num_Hosts_recvd;
-   }
-
-   /************************************************************
-    *
-    ************************************************************/
    Ty reduce() {
      if (local_mdata == 0) local_mdata = mdata.reduce();
      global_mdata = local_mdata;
@@ -137,23 +124,28 @@ public:
       Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
       Galois::atomicAdd(mdata, tmp);
 #endif
-      for (auto x = 0U; x < net.Num; ++x) {
-         if (x == net.ID)
-            continue;
-         Galois::Runtime::SendBuffer b;
-         gSerialize(b, net.ID, local_mdata);
-         net.sendMsg(x, reduce_landingPad, b);
+      for (unsigned h = 1; h < net.Num; ++h) {
+        unsigned x = (net.ID + h) % net.Num;
+        Galois::Runtime::SendBuffer b;
+        gSerialize(b, local_mdata);
+        net.sendTagged(x, Galois::Runtime::evilPhase, b);
       }
-
       net.flush();
-      while (num_Hosts_recvd < (net.Num - 1)) {
-         net.handleReceives();
-      }
-      Galois::Runtime::getHostBarrier().wait();
 
-      global_mdata += others_mdata;
-      others_mdata = 0;
-      num_Hosts_recvd = 0;
+      unsigned num_Hosts_recvd = 1;
+      while (num_Hosts_recvd < net.Num) {
+        decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+        do {
+          net.handleReceives();
+          p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        } while (!p);
+        Ty x_mdata;
+        gDeserialize(p->second, x_mdata);
+        global_mdata += x_mdata;
+        ++num_Hosts_recvd;
+      }
+      ++Galois::Runtime::evilPhase;
+
       return global_mdata;
    }
    /************************************************************
@@ -185,11 +177,5 @@ public:
    }
 
 };
-
-template<typename Ty>
-Ty DGAccumulator<Ty>::others_mdata;
-
-template<typename Ty>
-unsigned DGAccumulator<Ty>::num_Hosts_recvd = 0;
 }
 #endif
