@@ -553,6 +553,12 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg;
     if(enableVCut){
+      if (numPipelinedPhases > 1) {
+        numPipelinedPhases = 1;
+        if (net.ID == 0) {
+          std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
+        }
+      }
       hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor);
     }
     else {
