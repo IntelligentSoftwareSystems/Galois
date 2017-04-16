@@ -74,15 +74,31 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     rep_factor = round(float(rep_factor), 3)
   print ("Replication factor  : ", rep_factor)
 
+  num_iter_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sNUM_ITERATIONS_0' + r',\d*,\d*,(\d*)')
+  num_iter_search = num_iter_regex.search(log_data)
+  if num_iter_regex is not None:
+    if num_iter_search is None:
+      num_iter = -1
+    else:
+      num_iter = num_iter_search.group(1)
+    print "NUM_ITER : ", num_iter
 
-  #Finding mean compute time over all hosts
-  do_all_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
-  do_all_all_hosts = re.findall(do_all_regex, log_data)
-  num_arr = numpy.array(map(int,do_all_all_hosts))
 
-  print ("NUM_ARR", num_arr)
-  sum_do_all = numpy.sum(num_arr, axis=0)
-  print "XXXX " , sum_do_all
+  #Finding mean,max,sd compute time over all hosts
+  max_do_all = 0
+  sum_do_all = 0
+  for i in range(0,int(num_iter)):
+    do_all_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_'+ re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
+    do_all_all_hosts = re.findall(do_all_regex, log_data)
+    num_arr = numpy.array(map(int,do_all_all_hosts))
+
+    #print (" COMPUTE NUM_ARR", num_arr)
+    max_compute = numpy.max(num_arr, axis=0)
+    #print ("MAX : ", max_compute)
+    max_do_all += max_compute
+    sum_do_all += numpy.sum(num_arr, axis=0)
+  print "max_do_all " , max_do_all
+  print "sum_do_all " , sum_do_all
   mean_do_all = float(sum_do_all)/float(total_hosts)
 
 
@@ -90,46 +106,69 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   #Finding mean serialization time
-  sync_extract_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._EXTRACT_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
-  sync_extract_all_hosts = re.findall(sync_extract_regex, log_data)
-  num_arr = numpy.array(map(int,sync_extract_all_hosts))
-
-  sum_extract = numpy.sum(num_arr, axis=0)
-
-  sync_extract_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._EXTRACT_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  sum_extract = 0
+  max_extract = 0
+  sync_extract_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._EXTRACT_FirstItr_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i))  + r',.*' + r',\d*,(\d*)')
   sync_extract_firstItr_all_hosts = re.findall(sync_extract_firstItr_regex, log_data)
   num_arr_firstItr = numpy.array(map(int,sync_extract_firstItr_all_hosts))
+  if(num_arr_firstItr.size > 0):
+    sum_extract += numpy.sum(num_arr_firstItr, axis=0)
+    max_extract += numpy.max(num_arr_firstItr, axis=0)
 
-  # TOTAL EXTRACT
-  sum_extract += numpy.sum(num_arr_firstItr, axis=0)
+
+  for i in range(0,int(num_iter)):
+    sync_extract_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._EXTRACT_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
+    sync_extract_all_hosts = re.findall(sync_extract_regex, log_data)
+    num_arr = numpy.array(map(int,sync_extract_all_hosts))
+    #print "extract", num_arr
+
+    if(num_arr.size > 0):
+      sum_extract += numpy.sum(num_arr, axis=0)
+      max_extract += numpy.max(num_arr, axis=0)
+
+    # TOTAL EXTRACT
   mean_exract_time = round(sum_extract/float(total_hosts),3)
 
 
   #Finding mean deserialization time
-  sync_set_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._SET_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
-  sync_set_all_hosts = re.findall(sync_set_regex, log_data)
-  num_arr = numpy.array(map(int,sync_set_all_hosts))
-
-  sum_set = numpy.sum(num_arr, axis=0)
-
+  sum_set = 0;
+  max_set = 0;
   sync_set_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._SET_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   sync_set_firstItr_all_hosts = re.findall(sync_set_firstItr_regex, log_data)
   num_arr_firstItr = numpy.array(map(int,sync_set_firstItr_all_hosts))
+  if(num_arr_firstItr.size > 0):
+    sum_set += numpy.sum(num_arr_firstItr, axis=0)
+    max_set += numpy.max(num_arr_firstItr, axis=0)
+
+  for i in range(0,int(num_iter)):
+    sync_set_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._SET_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
+    sync_set_all_hosts = re.findall(sync_set_regex, log_data)
+    num_arr = numpy.array(map(int,sync_set_all_hosts))
+    #print "set", num_arr
+
+    if(num_arr.size > 0):
+      sum_set += numpy.sum(num_arr, axis=0)
+      max_set += numpy.max(num_arr, axis=0)
 
   # TOTAL EXTRACT
-  sum_set += numpy.sum(num_arr_firstItr, axis=0)
   mean_set_time = round(sum_set/float(total_hosts),3)
 
 
-  #Finding total mean communication time 
-  sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_.*WARD_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
-  sync_all_hosts = re.findall(sync_regex, log_data)
-  if sync_all_hosts is None:
-    sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
+  #Finding total mean communication time
+  max_sync = 0
+  sum_sync = 0
+  for i in range(0,int(num_iter)):
+    sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_.*WARD_(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i))  + r',.*' + r',\d*,(\d*)')
     sync_all_hosts = re.findall(sync_regex, log_data)
-  num_arr = numpy.array(map(int,sync_all_hosts))
+    if sync_all_hosts is None:
+      sync_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._(?i)' + re.escape(benchmark) + r'_0_' + re.escape(str(i))  + r',.*' + r',\d*,(\d*)')
+      sync_all_hosts = re.findall(sync_regex, log_data)
+    num_arr = numpy.array(map(int,sync_all_hosts))
+    #print "forward", num_arr
 
-  sum_sync = numpy.sum(num_arr, axis=0)
+    if(num_arr.size > 0):
+      sum_sync += numpy.sum(num_arr, axis=0)
+      max_sync += numpy.max(num_arr, axis=0)
 
   sync_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_.*WARD_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   sync_firstItr_all_hosts = re.findall(sync_firstItr_regex, log_data)
@@ -139,24 +178,36 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   num_arr_firstItr = numpy.array(map(int,sync_firstItr_all_hosts))
 
   # TOTAL SYNC TIME
-  sum_sync += numpy.sum(num_arr_firstItr, axis=0)
+  if(num_arr_firstItr.size > 0):
+    sum_sync += numpy.sum(num_arr_firstItr, axis=0)
+    max_sync += numpy.max(num_arr_firstItr, axis=0)
   mean_sync_time = sum_sync/float(total_hosts)
   mean_sync_time = round(mean_sync_time/divisor,3)
 
-  #Finding total communication volume in bytes 
-  sync_bytes_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._SEND_BYTES_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
-  sync_bytes_all_hosts = re.findall(sync_bytes_regex, log_data)
-  num_arr = numpy.array(map(int,sync_bytes_all_hosts))
+  #Finding total communication volume in bytes
+  sum_sync_bytes = 0
+  max_sync_bytes = 0
+  for i in range(0,int(num_iter)):
+    sync_bytes_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sSYNC_PU.._SEND_BYTES_(?i)' + re.escape(benchmark) + r'_0_'+ re.escape(str(i))   +r',.*' + r',\d*,(\d*)')
+    sync_bytes_all_hosts = re.findall(sync_bytes_regex, log_data)
+    num_arr = numpy.array(map(int,sync_bytes_all_hosts))
+    #print "send", num_arr
 
-  sum_sync_bytes = numpy.sum(num_arr, axis=0)
+    if(num_arr.size > 0):
+      sum_sync_bytes += numpy.sum(num_arr, axis=0)
+      max_sync_bytes += numpy.max(num_arr, axis=0)
+
   print "BYTES : ", sum_sync_bytes
+  print "MAX BYTES : ", max_sync_bytes
 
   sync_bytes_firstItr_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sSYNC_PU.._SEND_BYTES_FirstItr_(?i)' + re.escape(benchmark) + r'_0_\d*'  +r',.*' + r',\d*,(\d*)')
   sync_bytes_firstItr_all_hosts = re.findall(sync_bytes_firstItr_regex, log_data)
   num_arr_firstItr = numpy.array(map(int,sync_bytes_firstItr_all_hosts))
 
   # TOTAL BYTES EXCHANGED
-  sum_sync_bytes += numpy.sum(num_arr_firstItr, axis=0)
+  if(num_arr_firstItr.size > 0):
+    sum_sync_bytes += numpy.sum(num_arr_firstItr, axis=0)
+    max_sync_bytes += numpy.max(num_arr_firstItr, axis=0)
   print "BYTES : ", sum_sync_bytes
   total_sync_bytes = sum_sync_bytes
 
@@ -197,16 +248,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time = round(total_time, 3)
 
 
-  num_iter_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sNUM_ITERATIONS_0' + r',\d*,\d*,(\d*)')
-  num_iter_search = num_iter_regex.search(log_data)
-  if num_iter_regex is not None:
-    if num_iter_search is None:
-      num_iter = -1
-    else:
-      num_iter = num_iter_search.group(1)
-    print "NUM_ITER : ", num_iter
-
-  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,load_time,total_time
+  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,load_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes
 
 '''
   if timer_graph_init is not None:
@@ -331,7 +373,7 @@ def main(argv):
   inputFile = ''
   forHost = ''
   outputFile = 'LOG_output.csv'
-  time_unit = 'seconds'
+  time_unit = 'milliseconds'
   try:
     opts, args = getopt.getopt(argv,"hi:n:o:md",["ifile=","node=","ofile=","milliseconds"])
   except getopt.GetoptError:
@@ -390,7 +432,7 @@ def main(argv):
 
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,load_time,total_time"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,load_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes"
 
 
     header_csv_list = header_csv_str.split(',')
