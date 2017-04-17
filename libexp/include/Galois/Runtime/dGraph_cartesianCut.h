@@ -381,7 +381,8 @@ public:
     numNodesWithEdges = base_hGraph::totalOwnedNodes;
     Galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g);
-      receiveEdges(graph, numNodesWithEdges);
+      // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
+      else if (tid == 1) receiveEdges(graph, numNodesWithEdges);
     });
     ++Galois::Runtime::evilPhase;
   }
