@@ -221,6 +221,16 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   total_work_item = numpy.sum(num_arr, axis=0)
   print total_work_item
 
+  timer_graph_init_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_GRAPH_INIT' + r',\d*,\d*,(\d*)')
+  timer_graph_init_all_hosts = re.findall(timer_graph_init_regex, log_data)
+
+  num_arr = numpy.array(map(int,timer_graph_init_all_hosts))
+  #avg_graph_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+  max_graph_init_time = numpy.max(num_arr, axis=0)
+  #avg_graph_init_time = round((avg_graph_init_time / divisor),3)
+
+  print "max_graph_init time : ", max_graph_init_time
+
 
 
   ## Get Graph_init, HG_init, total
@@ -230,15 +240,22 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   timer_hg_init_all_hosts = re.findall(timer_hg_init_regex, log_data)
 
   num_arr = numpy.array(map(int,timer_hg_init_all_hosts))
-  avg_hg_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
-  avg_hg_init_time = round((avg_hg_init_time / divisor),3)
-  load_time = avg_hg_init_time
+  #avg_hg_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+  max_hg_init_time = numpy.max(num_arr, axis=0)
+  #avg_hg_init_time = round((avg_hg_init_time / divisor),3)
+  hg_init_time = max_hg_init_time
 
-  print "avg_hg_init time : ", avg_hg_init_time
+  timer_comm_setup_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sCOMMUNICATION_SETUP_TIME' + r',\d*,\d*,(\d*)')
+  timer_comm_setup_all_hosts = re.findall(timer_comm_setup_regex, log_data)
+
+  num_arr = numpy.array(map(int,timer_comm_setup_all_hosts))
+  #avg_comm_setup_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+  max_comm_setup_time = numpy.max(num_arr, axis=0)
+  #max_comm_setup_time = round((avg_comm_setup_time / divisor),3)
+
+  print "max_comm_setup time : ", max_comm_setup_time
 
   timer_total_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sTIMER_TOTAL' + r',\d*,\d*,(\d*)')
-
-
   #timer_graph_init = timer_graph_init_regex.search(log_data)
   #timer_hg_init = timer_hg_init_regex.search(log_data)
   timer_total = timer_total_regex.search(log_data)
@@ -247,8 +264,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time /= divisor
     total_time = round(total_time, 3)
 
-
-  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,load_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes
+  return mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes,max_comm_setup_time,max_graph_init_time
 
 '''
   if timer_graph_init is not None:
@@ -432,7 +448,7 @@ def main(argv):
 
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,load_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,hg_init_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes,max_comm_setup_time,max_graph_init_time"
 
 
     header_csv_list = header_csv_str.split(',')
