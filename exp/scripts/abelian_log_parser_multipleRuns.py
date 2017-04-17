@@ -92,11 +92,12 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     do_all_all_hosts = re.findall(do_all_regex, log_data)
     num_arr = numpy.array(map(int,do_all_all_hosts))
 
-    #print (" COMPUTE NUM_ARR", num_arr)
-    max_compute = numpy.max(num_arr, axis=0)
-    #print ("MAX : ", max_compute)
-    max_do_all += max_compute
-    sum_do_all += numpy.sum(num_arr, axis=0)
+    if len(num_arr) != 0:
+      #print (" COMPUTE NUM_ARR", num_arr)
+      max_compute = numpy.max(num_arr, axis=0)
+      #print ("MAX : ", max_compute)
+      max_do_all += max_compute
+      sum_do_all += numpy.sum(num_arr, axis=0)
   print "max_do_all " , max_do_all
   print "sum_do_all " , sum_do_all
   mean_do_all = float(sum_do_all)/float(total_hosts)
