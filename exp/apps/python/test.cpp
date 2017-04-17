@@ -198,11 +198,11 @@ void testPagerank(GraphWrapper& gw) {
 void testReachability(GraphWrapper& gw) {
   setNumThreads(2);
 
-  NodeList src = filterNode(gw.g, "color", "red");
+  NodeList src = filterNode(gw.g, "color", "red", true);
   assert(1 == src.num);
   assert(gw.nodes["n0"] == src.nodes[0]);
 
-  NodeList dst = filterNode(gw.g, "id", "node 2");
+  NodeList dst = filterNode(gw.g, "id", "n[a-z]+ 2", false);
   assert(1 == dst.num);
   assert(gw.nodes["n2"] == dst.nodes[0]);
 

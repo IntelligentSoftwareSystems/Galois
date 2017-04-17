@@ -84,7 +84,7 @@ glib.deleteGraphMatches.argtypes = [POINTER(NodePair)]
 glib.analyzePagerank.restype = POINTER(NodeDouble)
 glib.analyzePagerank.argtypes = [GraphPtr, c_int, c_double, KeyTy]
 glib.deleteNodeDoubles.argtypes = [POINTER(NodeDouble)]
-glib.filterNode.argtypes = [GraphPtr, KeyTy, ValTy]
+glib.filterNode.argtypes = [GraphPtr, KeyTy, ValTy, c_bool]
 glib.filterNode.restype = NodeList
 glib.deleteNodeList.argtypes = [NodeList]
 glib.createNodeList.argtypes = [c_int]
@@ -96,6 +96,9 @@ glib.findReachableTo.restype = NodeList
 glib.findReachableBetween.argtypes = [GraphPtr, NodeList, NodeList, c_int]
 glib.findReachableBetween.restype = NodeList
 glib.coarsen.argtypes = [GraphPtr, GraphPtr, KeyTy]
+
+def setNumThreads(num):
+    glib.setNumThreads(num)
 
 class GaloisGraph(object):
     """Interface to a Galois graph"""
@@ -213,18 +216,16 @@ class GaloisGraph(object):
     def showStatistics(self):
         print self.name, ":", self.getNumNodes(), "nodes,", self.getNumEdges(), "edges"
 
-    def analyzeBFS(self, src, attr, numThreads):
+    def analyzeBFS(self, src, attr):
         print "=====", "analyzeBFS", "====="
         self.showStatistics()
         print "src =", src
-        glib.setNumThreads(numThreads)
         glib.analyzeBFS(self.graph, src, attr)
 
-    def searchSubgraph(self, gQ, numInstances, numThreads, algo):
+    def searchSubgraph(self, gQ, numInstances, algo):
         print "=====", "searchSubgraph", "====="
         self.showStatistics()
         gQ.showStatistics()
-        glib.setNumThreads(numThreads)
 
         if algo == "Ullmann":
             matches = glib.searchSubgraphUllmann(self.graph, gQ.graph, numInstances)
@@ -255,10 +256,9 @@ class GaloisGraph(object):
         glib.deleteGraphMatches(matches)
         return result
 
-    def analyzePagerank(self, topK, tolerance, attr, numThreads):
+    def analyzePagerank(self, topK, tolerance, attr):
         print "=====", "analyzePagerank", "====="
         self.showStatistics()
-        glib.setNumThreads(numThreads)
         pr = glib.analyzePagerank(self.graph, topK, tolerance, attr)
 
         result = []
@@ -270,19 +270,17 @@ class GaloisGraph(object):
         glib.deleteNodeDoubles(pr)
         return result
 
-    def filterNode(self, key, value, numThreads):
+    def filterNode(self, key, value, isFullMatch):
         print "=====", "filterNode", "====="
-        glib.setNumThreads(numThreads)
-        l = glib.filterNode(self.graph, key, value)
+        l = glib.filterNode(self.graph, key, value, isFullMatch)
         result = []
         for j in range(l.num):
             result.append(l.nodes[j])
         glib.deleteNodeList(l)
         return result
 
-    def findReachableOutward(self, root, isBackward, hop, numThreads):
+    def findReachableOutward(self, root, isBackward, hop):
         print "=====", "findReachableOutward", "====="
-        glib.setNumThreads(numThreads)
         rootL = glib.createNodeList(len(root))
         for i in range(len(root)):
             rootL.nodes[i] = root[i]
@@ -297,9 +295,8 @@ class GaloisGraph(object):
             result.append(reachL.nodes[i])
         return result
 
-    def findReachableBetween(self, srcList, dstList, hop, numThreads):
+    def findReachableBetween(self, srcList, dstList, hop):
         print "=====", "findReachableBetween", "====="
-        glib.setNumThreads(numThreads)
         srcL = glib.createNodeList(len(srcList))
         for i in range(len(srcList)):
             srcL.nodes[i] = srcList[i]
@@ -313,10 +310,9 @@ class GaloisGraph(object):
             result.append(reachL.nodes[i])
         return result
 
-    def coarsen(self, key, numThreads):
+    def coarsen(self, key):
         print "=====", "coarsen", "====="
         print "by", key
-        glib.setNumThreads(numThreads)
         cgName = self.name + " coarsened by " + key
         cg = GaloisGraph(cgName)
         glib.coarsen(self.graph, cg.graph, key)
@@ -414,7 +410,9 @@ def testSubgraphIsomorphism():
         {"g2n0": "n2", "g2n1": "n0", "g2n2": "n1"}
     ]
 
-    res_ull = g.searchSubgraph(g2, 10, 3, "Ullmann")
+    setNumThreads(3)
+
+    res_ull = g.searchSubgraph(g2, 10, "Ullmann")
     assert(len(res_ull) == 3)
     assert(res_ull[0] != res_ull[1] and res_ull[0] != res_ull[2] and res_ull[1] != res_ull[2])
     for m in res_ull:
@@ -422,7 +420,7 @@ def testSubgraphIsomorphism():
         res_map = { g2.getNodeIndex(k): g.getNodeIndex(v) for k, v in m.iteritems() }
         assert(res_map == sol_map[0] or res_map == sol_map[1] or res_map == sol_map[2])
 
-    res_vf2 = g.searchSubgraph(g2, 10, 3, "VF2")
+    res_vf2 = g.searchSubgraph(g2, 10, "VF2")
     assert(len(res_vf2) == 3)
     assert(res_vf2[0] != res_vf2[1] and res_vf2[0] != res_vf2[2] and res_vf2[1] != res_vf2[2])
     for m in res_vf2:
@@ -432,24 +430,26 @@ def testSubgraphIsomorphism():
 def testReachability():
     g = testGraphConstruction()
 
-    srcList = g.filterNode("color", "red", 3)
+    setNumThreads(3)
+    srcList = g.filterNode("color", "red", True)
     assert(len(srcList) == 1)
     assert(g.getNodeIndex(srcList[0]) == "n0")
 
-    dstList = g.filterNode("id", "node 2", 2)
+    setNumThreads(2)
+    dstList = g.filterNode("id", "n[a-z]+ 2", False)
     assert(len(dstList) == 1)
     assert(g.getNodeIndex(dstList[0]) == "n2")
 
-    fromList = g.findReachableOutward(dstList, True, 1, 2)
+    fromList = g.findReachableOutward(dstList, True, 1)
     assert(len(fromList) == 2)
     # map back to user id and get rid of ordering
     assert(set(g.getNodeIndex(v) for v in fromList) == set(["n1", "n2"]))
 
-    toList = g.findReachableOutward(srcList, False, 1, 2)
+    toList = g.findReachableOutward(srcList, False, 1)
     assert(len(toList) == 2)
     assert(set(g.getNodeIndex(v) for v in toList) == set(["n0", "n1"]))
 
-    betweenList = g.findReachableBetween(srcList, dstList, 2, 2)
+    betweenList = g.findReachableBetween(srcList, dstList, 2)
     assert(len(betweenList) == 3)
     assert(set(g.getNodeIndex(v) for v in betweenList) == set(["n0", "n1", "n2"]))
 
@@ -469,7 +469,8 @@ def testCoarsening():
     fg.addEdge(7, 8, 7)
     fg.addEdge(8, 9, 4)
 
-    cg = fg.coarsen("color", 3)
+    setNumThreads(3)
+    cg = fg.coarsen("color")
     cg_nodes = cg.getAllNodes()
     for n in cg_nodes:
         cg.setNodeIndex(n, cg.getNodeAttr(n, "color"))
@@ -485,14 +486,16 @@ def testCoarsening():
 
 def testBFS():
     g = testGraphConstruction()
-    g.analyzeBFS(g.nodeMap["n0"], "dist", 1)
+    setNumThreads(1)
+    g.analyzeBFS(g.nodeMap["n0"], "dist")
     assert(g.getNodeAttr(g.getNode("n0"), "dist") == "0")
     assert(g.getNodeAttr(g.getNode("n1"), "dist") == "1")
     assert(g.getNodeAttr(g.getNode("n2"), "dist") == "2")
 	
 def testPagerank():
     g = testGraphConstruction()
-    pr = g.analyzePagerank(10, 0.01, "pagerank", 2)
+    setNumThreads(2)
+    pr = g.analyzePagerank(10, 0.01, "pagerank")
     assert(g.getNodeIndex(pr[0][0]) == "n0")
     assert(g.getNodeIndex(pr[1][0]) == "n1")
     assert(g.getNodeIndex(pr[2][0]) == "n2")
