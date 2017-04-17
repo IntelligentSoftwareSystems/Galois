@@ -19,6 +19,7 @@ statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 FLAGS=" -statOutputFile=${execdir}/${statname}"
 FLAGS=
 #FLAGS=" -runs=1"
+#FLAGS+=" -numComputeSubsteps=4"
 #FLAGS+=" -numPipelinedPhases=4"
 #FLAGS+=" -numPipelinedPhases=${NUM_TASKS}"
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -31,6 +32,7 @@ source_file=${inputdir}/source
 if [[ $execname == *"cc"* ]]; then
   inputdir=${inputdir}/symmetric
   extension=sgr
+  FLAGS+=" -enableVertexCut"
 elif [[ $execname == *"pull"* ]]; then
   inputdir=${inputdir}/transpose
   extension=tgr
