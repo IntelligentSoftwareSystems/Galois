@@ -376,11 +376,22 @@ public:
         fprintf(stderr, "Loading edge-data while creating edges.\n");
       }
     }
+
+    std::atomic<uint32_t> numNodesWithEdges;
+    numNodesWithEdges = base_hGraph::totalOwnedNodes;
+    Galois::on_each([&](unsigned tid, unsigned nthreads){
+      if (tid == 0) loadEdgesFromFile(graph, g);
+      receiveEdges(graph, numNodesWithEdges);
+    });
+    ++Galois::Runtime::evilPhase;
+  }
+
+  template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void loadEdgesFromFile(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
     unsigned h_offset = gridRowID() * numColumnHosts;
-    static std::vector<Galois::Runtime::SendBuffer> b(numColumnHosts);
-    static size_t empty_size = 0;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    uint32_t numNodesWithEdges = dummyOwnedNodes;
+    std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
+    std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(numColumnHosts);
 
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
@@ -389,32 +400,35 @@ public:
       if (isLocal(n)) {
         lsrc = G2L(n);
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
-        if ((cur < (*graph.edge_end(lsrc))) && (lsrc < base_hGraph::numOwned)) {
-          ++numNodesWithEdges;
-        }
       }
-      for (unsigned i = 0; i < numColumnHosts; ++i) {
-        b[i].getVec().clear();
-        Galois::Runtime::gSerialize(b[i], n);
-      }
-      empty_size = b[0].size();
       auto ii = ee;
       ee = g.edge_end(n);
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        gdst_vec[i].clear();
+        gdata_vec[i].clear();
+        gdst_vec[i].reserve(std::distance(ii, ee));
+        gdata_vec[i].reserve(std::distance(ii, ee));
+      }
       for (; ii < ee; ++ii) {
         uint64_t gdst = g.getEdgeDst(ii);
+        auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
         int i = getColumnHostID(gdst);
         if ((h_offset + i) == base_hGraph::id) {
           assert(isLocal(n));
           uint32_t ldst = G2L(gdst);
-          loadEdge(graph, g, ii, ldst, cur);
+          graph.constructEdge(cur++, ldst, gdata);
         } else {
-          Galois::Runtime::gSerialize(b[i], gdst);
-          serializeEdgeData<GraphTy>(b[i], g, ii);
+          gdst_vec[i].push_back(gdst);
+          gdata_vec[i].push_back(gdata);
         }
       }
       for (unsigned i = 0; i < numColumnHosts; ++i) {
-        if (b[i].size() > empty_size) {
-          net.sendTagged(h_offset + i, Galois::Runtime::evilPhase, b[i]);
+        if (gdst_vec[i].size() > 0) {
+          Galois::Runtime::SendBuffer b;
+          Galois::Runtime::gSerialize(b, n);
+          Galois::Runtime::gSerialize(b, gdst_vec[i]);
+          Galois::Runtime::gSerialize(b, gdata_vec[i]);
+          net.sendTagged(h_offset + i, Galois::Runtime::evilPhase, b);
         }
       }
       if (isLocal(n)) {
@@ -422,68 +436,101 @@ public:
       }
     }
     net.flush();
+  }
 
-    while (numNodesWithEdges < base_hGraph::numOwned) { // can be done in parallel with sends/file-reading
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
-      } while (!p);
-      auto& rb = p->second;
-      uint64_t n;
-      Galois::Runtime::gDeserialize(rb, n);
-      assert(isLocal(n));
-      uint32_t lsrc = G2L(n);
-      uint64_t cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
-      uint64_t cur_end = *graph.edge_end(lsrc);
-      while (cur < cur_end) {
-        uint64_t gdst;
-        Galois::Runtime::gDeserialize(rb, gdst);
-        uint32_t ldst = G2L(gdst);
-        deserializeEdge(graph, rb, ldst, cur);
+  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void loadEdgesFromFile(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+    unsigned h_offset = gridRowID() * numColumnHosts;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
+
+    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+      uint32_t lsrc = 0;
+      uint64_t cur = 0;
+      if (isLocal(n)) {
+        lsrc = G2L(n);
+        cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
       }
-      ++numNodesWithEdges;
+      auto ii = ee;
+      ee = g.edge_end(n);
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        gdst_vec[i].clear();
+        gdst_vec[i].reserve(std::distance(ii, ee));
+      }
+      for (; ii < ee; ++ii) {
+        uint64_t gdst = g.getEdgeDst(ii);
+        int i = getColumnHostID(gdst);
+        if ((h_offset + i) == base_hGraph::id) {
+          assert(isLocal(n));
+          uint32_t ldst = G2L(gdst);
+          graph.constructEdge(cur++, ldst);
+        } else {
+          gdst_vec[i].push_back(gdst);
+        }
+      }
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        if (gdst_vec[i].size() > 0) {
+          Galois::Runtime::SendBuffer b;
+          Galois::Runtime::gSerialize(b, n);
+          Galois::Runtime::gSerialize(b, gdst_vec[i]);
+          net.sendTagged(h_offset + i, Galois::Runtime::evilPhase, b);
+        }
+      }
+      if (isLocal(n)) {
+        assert(cur == (*graph.edge_end(lsrc)));
+      }
     }
-    ++Galois::Runtime::evilPhase;
+    net.flush();
+  }
+
+  template<typename GraphTy>
+  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    while (numNodesWithEdges < base_hGraph::numOwned) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      net.handleReceives();
+      p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      if (p) {
+        auto& rb = p->second;
+        uint64_t n;
+        Galois::Runtime::gDeserialize(rb, n);
+        std::vector<uint64_t> gdst_vec;
+        Galois::Runtime::gDeserialize(rb, gdst_vec);
+        assert(isLocal(n));
+        uint32_t lsrc = G2L(n);
+        uint64_t cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
+        uint64_t cur_end = *graph.edge_end(lsrc);
+        assert((cur_end - cur) == gdst_vec.size());
+        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
+        ++numNodesWithEdges;
+      }
+    }
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdge(GraphTy& graph, Galois::Graph::OfflineGraph& g, 
-      Galois::Graph::OfflineGraph::edge_iterator& ii, uint32_t& ldst, uint64_t& cur) {
-    auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
-    graph.constructEdge(cur++, ldst, gdata);
+  void deserializeEdges(GraphTy& graph, Galois::Runtime::RecvBuffer& b, 
+      std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
+    std::vector<typename GraphTy::edge_data_type> gdata_vec;
+    Galois::Runtime::gDeserialize(b, gdata_vec);
+    uint64_t i = 0;
+    while (cur < cur_end) {
+      auto gdata = gdata_vec[i];
+      uint64_t gdst = gdst_vec[i++];
+      uint32_t ldst = G2L(gdst);
+      graph.constructEdge(cur++, ldst, gdata);
+    }
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdge(GraphTy& graph, Galois::Graph::OfflineGraph& g, 
-      Galois::Graph::OfflineGraph::edge_iterator& ii, uint32_t& ldst, uint64_t &cur) {
-    graph.constructEdge(cur++, ldst);
-  }
-
-  template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void serializeEdgeData(Galois::Runtime::SendBuffer& b, Galois::Graph::OfflineGraph& g, 
-      Galois::Graph::OfflineGraph::edge_iterator& ii) {
-    auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
-    Galois::Runtime::gSerialize(b, gdata);
-  }
-
-  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void serializeEdgeData(Galois::Runtime::SendBuffer& b, Galois::Graph::OfflineGraph& g, 
-      Galois::Graph::OfflineGraph::edge_iterator& ii) {
-  }
-
-  template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdge(GraphTy& graph, Galois::Runtime::RecvBuffer& b, 
-      uint32_t& ldst, uint64_t& cur) {
-    typename GraphTy::edge_data_type gdata;
-    Galois::Runtime::gDeserialize(b, gdata);
-    graph.constructEdge(cur++, ldst, gdata);
-  }
-
-  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdge(GraphTy& graph, Galois::Runtime::RecvBuffer& b, 
-      uint32_t& ldst, uint64_t& cur) {
-    graph.constructEdge(cur++, ldst);
+  void deserializeEdges(GraphTy& graph, Galois::Runtime::RecvBuffer& b, 
+      std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
+    uint64_t i = 0;
+    while (cur < cur_end) {
+      uint64_t gdst = gdst_vec[i++];
+      uint32_t ldst = G2L(gdst);
+      graph.constructEdge(cur++, ldst);
+    }
   }
 
   void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
