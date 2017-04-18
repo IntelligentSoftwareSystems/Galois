@@ -377,14 +377,20 @@ public:
       }
     }
 
+    Galois::Timer timer;
+    timer.start();
+
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_hGraph::totalOwnedNodes;
     Galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g);
       // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
-      else if (tid == 1) receiveEdges(graph, numNodesWithEdges);
+      if ((nthreads == 1) || (tid == 1)) receiveEdges(graph, numNodesWithEdges);
     });
     ++Galois::Runtime::evilPhase;
+
+    timer.stop();
+    std::cout << "[" << base_hGraph::id << "] Edge loading time : " << timer.get_usec()/1000000.0f << " seconds\n";
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
