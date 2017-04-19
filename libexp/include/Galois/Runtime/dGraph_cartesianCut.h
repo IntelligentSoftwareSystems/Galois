@@ -465,6 +465,7 @@ public:
       if (isLocal(n)) {
         lsrc = G2L(n);
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
+        Galois::Runtime::trace("2: Number of outgoing edges", n, (*graph.edge_end(lsrc)) - cur);
       }
       auto ii = ee;
       ee = g.edge_end(n);
@@ -492,6 +493,9 @@ public:
         }
       }
       if (isLocal(n)) {
+        if (cur != (*graph.edge_end(lsrc))) {
+          std::cerr << "Assertion failed: gid " << n << " lid " << lsrc << " : " << cur << " != " << (*graph.edge_end(lsrc)) << "\n";
+        }
         assert(cur == (*graph.edge_end(lsrc)));
       }
     }
