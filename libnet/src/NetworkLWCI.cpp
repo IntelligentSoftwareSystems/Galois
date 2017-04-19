@@ -44,6 +44,7 @@
 #include <unistd.h>
 #include <vector>
 #include <list>
+#include <limits>
 
 #ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
@@ -130,8 +131,15 @@ public:
 
   virtual message dequeue() {
     if (!recv.empty()) {
+      uint32_t min_tag = std::numeric_limits<uint32_t>::max();
       for (auto it = recv.begin(); it != recv.end(); it ++) {
         auto &m = *it;
+        if ((m.tag < min_tag) && (m.tag > 0)) {
+          min_tag = m.tag;
+        }
+        if (m.tag > min_tag) { // do not return messages from the next phase
+          break;
+        }
         if (lc_test(&m.ctx)) {
           message msg{m.rank, m.tag, std::move(m.buf)};
           recv.erase(it);
