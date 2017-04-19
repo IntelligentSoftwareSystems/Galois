@@ -30,6 +30,7 @@
 #include "Galois/Runtime/dGraph.h"
 #include "Galois/Runtime/OfflineGraph.h"
 #include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/Tracer.h"
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
@@ -274,6 +275,7 @@ public:
       numOutgoingEdges[i].assign(blockSize, 0);
     }
     uint64_t rowOffset = gid2host[base_hGraph::id].first;
+    assert(rowOffset == ((gridRowID() * rowBlockSize) + (gridColumnID() * blockSize)));
 
     base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
@@ -286,6 +288,7 @@ public:
         hasIncomingEdge[h].set(getColumnIndex(dst));
         numOutgoingEdges[h][src - rowOffset]++;
       }
+      Galois::Runtime::trace("1: Number of outgoing edges", src, numOutgoingEdges[gridColumnID()][src-rowOffset]);
     }
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -407,6 +410,7 @@ public:
       if (isLocal(n)) {
         lsrc = G2L(n);
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
+        Galois::Runtime::trace("2: Number of outgoing edges", n, (*graph.edge_end(lsrc)) - cur);
       }
       auto ii = ee;
       ee = g.edge_end(n);
@@ -439,6 +443,9 @@ public:
         }
       }
       if (isLocal(n)) {
+        if (cur != (*graph.edge_end(lsrc))) {
+          std::cerr << "Assertion failed: gid " << n << " lid " << lsrc << " : " << cur << " != " << (*graph.edge_end(lsrc)) << "\n";
+        }
         assert(cur == (*graph.edge_end(lsrc)));
       }
     }

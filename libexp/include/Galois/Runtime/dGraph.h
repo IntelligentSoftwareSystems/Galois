@@ -314,9 +314,8 @@ public:
    }
    void setup_communication() {
       Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
-      Galois::Runtime::getHostBarrier().wait();
+      Galois::Runtime::getHostBarrier().wait(); // so that all hosts start the timer together
       StatTimer_comm_setup.start();
-
 
       //Exchange information for memoization optimization.
       exchange_info_init();
@@ -337,7 +336,6 @@ public:
       StatTimer_comm_setup.stop();
 
       for(auto x = 0U; x < masterNodes.size(); ++x){
-        //masterNodes_bitvec[x].resize(masterNodes[x].size());
         std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
         Galois::Statistic StatMasterNodes(master_nodes_str);
         StatMasterNodes += masterNodes[x].size();
@@ -352,8 +350,6 @@ public:
         StatSlaveNodes += slaveNodes[x].size();
         totalSlaveNodes += slaveNodes[x].size();
       }
-
-      std::cout << "["<< id << "]" << "Total local nodes : " << get_local_total_nodes() << " NumOwned : "<< numOwned <<"\n"; 
 
       send_info_to_host();
    }
@@ -497,89 +493,77 @@ public:
 
   void exchange_info_init(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    //may be reusing tag, so need a barrier before (in setup_communication)
 
     for (unsigned x = 0; x < net.Num; ++x) {
-      if(x == id)
-        continue;
+      if(x == id) continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, (uint64_t)slaveNodes[x].size(), slaveNodes[x]);
-      net.sendTagged(x, 1, b);
-      std::cout << " number of slaves from : " << x << " : " << slaveNodes[x].size() << "\n";
-   }
+      gSerialize(b, slaveNodes[x]);
+      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+    }
 
     //receive
     for (unsigned x = 0; x < net.Num; ++x) {
-      if(x == id)
-        continue;
+      if(x == id) continue;
 
-      decltype(net.recieveTagged(1, nullptr)) p;
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(1, nullptr);
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
       } while(!p);
 
-      uint64_t numItems;
-      Galois::Runtime::gDeserialize(p->second, numItems);
       Galois::Runtime::gDeserialize(p->second, masterNodes[p->first]);
-      std::cout << "from : " << p->first << " -> " << numItems << " --> " << masterNodes[p->first].size() << "\n";
     }
-
-    //may be reusing tag, so need a barrier
-    Galois::Runtime::getHostBarrier().wait();
-   }
+    ++Galois::Runtime::evilPhase;
+  }
 
   void send_info_to_host(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    //may be reusing tag, so need a barrier
-    Galois::Runtime::getHostBarrier().wait();
 
-    //send info to host 0, msg tagged with 1
+    //send info to host
     for(unsigned x = 0; x < net.Num; ++x){
-      if(x == id)
-        continue;
+      if(x == id) continue;
+
       Galois::Runtime::SendBuffer b;
       gSerialize(b, totalSlaveNodes, totalOwnedNodes);
-      net.sendTagged(x,1,b);
+      net.sendTagged(x, Galois::Runtime::evilPhase, b);
     }
 
-    //receive and print
-      uint64_t global_total_slave_nodes = totalSlaveNodes;
-      uint64_t global_total_owned_nodes = totalOwnedNodes;
+    //receive
+    uint64_t global_total_slave_nodes = totalSlaveNodes;
+    uint64_t global_total_owned_nodes = totalOwnedNodes;
 
-      for(unsigned x = 0; x < net.Num; ++x){
-        if(x == id)
-          continue;
-        decltype(net.recieveTagged(1, nullptr)) p;
-        do{
-          net.handleReceives();
-          p = net.recieveTagged(1, nullptr);
-        }while(!p);
+    for(unsigned x = 0; x < net.Num; ++x){
+      if(x == id) continue;
 
-        uint64_t total_slave_nodes_from_others;
-        uint64_t total_owned_nodes_from_others;
-        Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others, total_owned_nodes_from_others);
-        global_total_slave_nodes += total_slave_nodes_from_others;
-        global_total_owned_nodes += total_owned_nodes_from_others;
-      }
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do{
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      }while(!p);
 
-      if (net.ID == 0) {
-        float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
-        Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
+      uint64_t total_slave_nodes_from_others;
+      uint64_t total_owned_nodes_from_others;
+      Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others, total_owned_nodes_from_others);
+      global_total_slave_nodes += total_slave_nodes_from_others;
+      global_total_owned_nodes += total_owned_nodes_from_others;
+    }
+    ++Galois::Runtime::evilPhase;
+
+    //print 
+    if (net.ID == 0) {
+      float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
 
 
-        float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
-        Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
+      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
+      Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
 
-        Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
-        Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
-        Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
-        Galois::Runtime::reportStat("(NULL)", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes, 0);
-      }
-    //may be reusing tag, so need a barrier
-    Galois::Runtime::getHostBarrier().wait();
-
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes, 0);
+    }
   }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -1682,7 +1666,7 @@ public:
          if (data_mode != onlyData) {
            Galois::Runtime::gDeserialize(buf, bit_set_count);
            if (data_mode == offsetsData) {
-             offsets.resize(bit_set_count);
+             //offsets.resize(bit_set_count);
              Galois::Runtime::gDeserialize(buf, offsets);
              if (useGidMetadata) {
                convert_gid_to_lid<syncType>(loopName, offsets);
@@ -1697,7 +1681,7 @@ public:
            }
          }
 
-         val_vec.resize(bit_set_count);
+         //val_vec.resize(bit_set_count);
          Galois::Runtime::gDeserialize(buf, val_vec);
 
 #ifdef __HETEROGENEOUS_GALOIS_DEPRECATED__

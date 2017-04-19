@@ -618,7 +618,7 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        Galois::Runtime::getHostBarrier().wait();
+        //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
       }
