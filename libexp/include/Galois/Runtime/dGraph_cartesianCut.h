@@ -38,8 +38,8 @@ public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
 
 private:
-  uint32_t numRowHosts;
-  uint32_t numColumnHosts;
+  unsigned numRowHosts;
+  unsigned numColumnHosts;
   uint32_t blockSize; // number of nodes in a (square) block
 
   uint32_t dummyOwnedNodes; // owned nodes without outgoing edges
@@ -56,19 +56,19 @@ private:
     }
   }
 
-  uint32_t gridRowID() {
+  unsigned gridRowID() {
     return (base_hGraph::id / numColumnHosts);
   }
 
-  uint32_t gridRowID(unsigned id) {
+  unsigned gridRowID(unsigned id) {
     return (id / numColumnHosts);
   }
 
-  uint32_t gridColumnID() {
+  unsigned gridColumnID() {
     return (base_hGraph::id % numColumnHosts);
   }
 
-  uint32_t gridColumnID(unsigned id) {
+  unsigned gridColumnID(unsigned id) {
     return (id % numColumnHosts);
   }
 
@@ -119,7 +119,6 @@ public:
   // LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
   //LID Node owned by host i. Stores ghost nodes from each host.
-  //std::vector<std::pair<uint32_t, uint32_t> > hostNodes; // for reading graph only
   std::vector<std::pair<uint64_t, uint64_t>> gid2host; // for reading graph only
 
   uint32_t numNodes;
@@ -128,7 +127,7 @@ public:
   // TODO: support scalefactor
   virtual unsigned getHostID(uint64_t gid) const {
     assert(gid < base_hGraph::totalNodes);
-    uint32_t blockID = gid / blockSize;
+    unsigned blockID = gid / blockSize;
     return blockID;
   }
 
@@ -171,7 +170,7 @@ public:
     return true;
   }
 
-  hGraph_cartesianCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
+  hGraph_cartesianCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) : base_hGraph(host, _numHosts) {
 
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
@@ -223,7 +222,7 @@ public:
     }
 #endif
 
-    std::vector<uint32_t> prefixSumOfEdges;
+    std::vector<uint64_t> prefixSumOfEdges;
     loadStatistics(g, prefixSumOfEdges); // first pass of the graph file
 
     std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::totalOwnedNodes << "\n";
@@ -262,7 +261,7 @@ public:
     StatTimer_graph_construct_comm.stop();
   }
 
-  void loadStatistics(Galois::Graph::OfflineGraph& g, std::vector<uint32_t>& prefixSumOfEdges) {
+  void loadStatistics(Galois::Graph::OfflineGraph& g, std::vector<uint64_t>& prefixSumOfEdges) {
     auto columnBlockSize = numRowHosts * blockSize;
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -270,7 +269,7 @@ public:
     }
 
     auto rowBlockSize = numColumnHosts * blockSize;
-    std::vector<std::vector<uint32_t> > numOutgoingEdges(numColumnHosts);
+    std::vector<std::vector<uint64_t> > numOutgoingEdges(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       numOutgoingEdges[i].assign(blockSize, 0);
     }
@@ -350,7 +349,7 @@ public:
       }
     }
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
-    for (uint32_t i = 0; i < numRowHosts; ++i) {
+    for (unsigned i = 0; i < numRowHosts; ++i) {
       auto dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
       auto dst_end = dst + blockSize;
       if (dst_end > base_hGraph::totalNodes) dst_end = base_hGraph::totalNodes;
@@ -566,7 +565,7 @@ public:
         }
       }
     }
-    for (uint32_t i = 0; i < numRowHosts; ++i) {
+    for (unsigned i = 0; i < numRowHosts; ++i) {
       auto dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
       auto dst_end = dst + blockSize;
       if (dst_end > base_hGraph::totalNodes) dst_end = base_hGraph::totalNodes;
