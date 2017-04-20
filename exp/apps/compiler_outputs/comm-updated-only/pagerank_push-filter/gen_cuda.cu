@@ -285,7 +285,7 @@ __global__ void PageRankCopy(CSRGraph graph, unsigned int __nowned, unsigned int
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void FirstItr_PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_residual_old, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -322,9 +322,10 @@ __global__ void FirstItr_PageRank(CSRGraph graph, DynamicBitset *is_updated, uns
     // FP: "9 -> 10;
     if (pop)
     {
-      if (p_residual[src] > 0)
+      if (p_residual_old[src] > 0)
       {
-        residual_old = atomicExch(&p_residual[src], 0.0);
+        residual_old = p_residual_old[src];
+        p_residual_old[src] = 0;
         p_value[src] += residual_old;
         if (p_nout[src] > 0)
         {
@@ -508,7 +509,7 @@ __global__ void FirstItr_PageRank(CSRGraph graph, DynamicBitset *is_updated, uns
   }
   // FP: "105 -> 106;
 }
-__global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Sum ret_val)
+__global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_residual_old, float * p_value, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -548,9 +549,10 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
     // FP: "9 -> 10;
     if (pop)
     {
-      if (p_residual[src] > local_tolerance)
+      if (p_residual_old[src] > local_tolerance)
       {
-        residual_old = atomicExch(&p_residual[src], 0.0);
+        residual_old = p_residual_old[src];
+        p_residual_old[src] = 0; 
         p_value[src] += residual_old;
         if (p_nout[src] > 0)
         {
@@ -826,7 +828,7 @@ void FirstItr_PageRank_cuda(unsigned int  __begin, unsigned int  __end, const fl
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_PageRank <<<blocks, __tb_FirstItr_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  FirstItr_PageRank <<<blocks, __tb_FirstItr_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->residual_old.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -850,7 +852,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, c
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _rv);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->residual_old.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
