@@ -96,6 +96,7 @@ static const float alpha = (1.0 - 0.85);
 //static const float TOLERANCE = 0.01;
 struct PR_NodeData {
   float value;
+  float residual_old;
   std::atomic<float> residual;
   std::atomic<unsigned int> nout;
 
@@ -374,6 +375,32 @@ struct InitializeGraph {
   }
 };
 
+struct PageRankCopy {
+  Graph* graph;
+
+  PageRankCopy(Graph* _g): graph(_g){}
+  void static go(Graph& _graph) {
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      PageRankCopy_all_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
+    {
+      Galois::do_all(_graph.begin(), _graph.end(), PageRankCopy{ &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()));
+    }
+  }
+
+  void operator()(WorkItem src) const {
+    PR_NodeData& sdata = graph->getData(src);
+    sdata.residual_old += sdata.residual;
+    sdata.residual = 0;
+  }
+};
+
 struct FirstItr_PageRank{
 const float & local_alpha;
 cll::opt<float> & local_tolerance;
@@ -511,8 +538,9 @@ Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identi
 }
 void operator()(WorkItem src) const {
     PR_NodeData& sdata = graph->getData(src);
-    if (sdata.residual > 0) {
-    float residual_old = sdata.residual.exchange(0.0);
+    if (sdata.residual_old > 0) {
+    float residual_old = sdata.residual_old;
+    sdata.residual_old = 0;
     sdata.value += residual_old;
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
@@ -539,12 +567,14 @@ struct PageRank {
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g): local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
     
+    PageRankCopy::go(_graph);
     FirstItr_PageRank::go(_graph);
     
     unsigned _num_iterations = 1;
     
     do { 
      _graph.set_num_iter(_num_iterations);
+    PageRankCopy::go(_graph);
     DGAccumulator_accum.reset();
     	struct Syncer_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
@@ -687,8 +717,9 @@ struct PageRank {
 void operator()(WorkItem src) const {
     PR_NodeData& sdata = graph->getData(src);
 
-    if(sdata.residual > this->local_tolerance){
-        float residual_old = sdata.residual.exchange(0.0);
+    if(sdata.residual_old > this->local_tolerance){
+    float residual_old = sdata.residual_old;
+    sdata.residual_old = 0;
     sdata.value += residual_old;
     //sdata.residual = residual_old;
     if (sdata.nout > 0){

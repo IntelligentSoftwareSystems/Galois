@@ -66,5 +66,7 @@ void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const float 
 void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context *ctx);
 void PageRank_cuda(unsigned int __begin, unsigned int __end, int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
 void PageRank_all_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
+void PageRankCopy_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
+void PageRankCopy_all_cuda(struct CUDA_Context *ctx);
 void ResetGraph_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
 void ResetGraph_all_cuda(struct CUDA_Context *ctx);

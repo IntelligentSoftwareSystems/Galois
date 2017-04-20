@@ -265,6 +265,26 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
   }
   // FP: "101 -> 102;
 }
+__global__ void PageRankCopy(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_residual, float * p_residual_old)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = __tb_InitializeGraphNout;
+  index_type src_end;
+  // FP: "1 -> 2;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
+  {
+    bool pop  = src < __end;
+    if (pop)
+    {
+      p_residual_old[src] += p_residual[src];
+      p_residual[src] = 0;
+    }
+  }
+  // FP: "8 -> 9;
+}
 __global__ void FirstItr_PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
@@ -775,6 +795,26 @@ void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context * c
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(0, ctx->nowned, local_alpha, ctx);
+  // FP: "2 -> 3;
+}
+void PageRankCopy_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  // FP: "3 -> 4;
+  kernel_sizing(blocks, threads);
+  // FP: "4 -> 5;
+  PageRankCopy <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->residual_old.data.gpu_wr_ptr());
+  // FP: "5 -> 6;
+  check_cuda_kernel;
+  // FP: "6 -> 7;
+}
+void PageRankCopy_all_cuda(struct CUDA_Context * ctx)
+{
+  // FP: "1 -> 2;
+  PageRankCopy_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
 void FirstItr_PageRank_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
