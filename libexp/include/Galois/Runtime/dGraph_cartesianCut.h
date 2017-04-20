@@ -42,7 +42,7 @@ private:
   unsigned numColumnHosts;
   uint32_t blockSize; // number of nodes in a (square) block
 
-  uint32_t dummyOwnedNodes; // owned nodes without outgoing edges
+  uint32_t dummyOutgoingNodes; // nodes without outgoing edges that are stored with nodes having outgoing edges (to preserve original ordering locality)
 
   // factorize numHosts such that difference between factors is minimized
   void factorize_hosts() {
@@ -287,7 +287,6 @@ public:
         hasIncomingEdge[h].set(getColumnIndex(dst));
         numOutgoingEdges[h][src - rowOffset]++;
       }
-      Galois::Runtime::trace("1: Number of outgoing edges", src, numOutgoingEdges[gridColumnID()][src-rowOffset]);
     }
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -326,7 +325,7 @@ public:
     uint64_t src = rowOffset;
     numNodes = 0;
     numEdges = 0;
-    dummyOwnedNodes = 0;
+    dummyOutgoingNodes = 0;
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
         bool createNode = false;
@@ -335,10 +334,10 @@ public:
           numEdges += numOutgoingEdges[i][j];
         } else if (isOwned(src)) {
           createNode = true;
-          ++dummyOwnedNodes;
         } else if ((gridColumnID() == getColumnHostID(src)) 
           && hasIncomingEdge[0].test(getColumnIndex(src))) {
           createNode = true;
+          ++dummyOutgoingNodes;
         }
         if (createNode) {
           localToGlobalVector.push_back(src);
@@ -383,7 +382,7 @@ public:
     timer.start();
 
     std::atomic<uint32_t> numNodesWithEdges;
-    numNodesWithEdges = base_hGraph::totalOwnedNodes;
+    numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
     Galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g);
       // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
@@ -409,7 +408,6 @@ public:
       if (isLocal(n)) {
         lsrc = G2L(n);
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
-        Galois::Runtime::trace("2: Number of outgoing edges", n, (*graph.edge_end(lsrc)) - cur);
       }
       auto ii = ee;
       ee = g.edge_end(n);
@@ -442,9 +440,6 @@ public:
         }
       }
       if (isLocal(n)) {
-        if (cur != (*graph.edge_end(lsrc))) {
-          std::cerr << "Assertion failed: gid " << n << " lid " << lsrc << " : " << cur << " != " << (*graph.edge_end(lsrc)) << "\n";
-        }
         assert(cur == (*graph.edge_end(lsrc)));
       }
     }
@@ -464,7 +459,6 @@ public:
       if (isLocal(n)) {
         lsrc = G2L(n);
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
-        Galois::Runtime::trace("2: Number of outgoing edges", n, (*graph.edge_end(lsrc)) - cur);
       }
       auto ii = ee;
       ee = g.edge_end(n);
@@ -492,9 +486,6 @@ public:
         }
       }
       if (isLocal(n)) {
-        if (cur != (*graph.edge_end(lsrc))) {
-          std::cerr << "Assertion failed: gid " << n << " lid " << lsrc << " : " << cur << " != " << (*graph.edge_end(lsrc)) << "\n";
-        }
         assert(cur == (*graph.edge_end(lsrc)));
       }
     }
