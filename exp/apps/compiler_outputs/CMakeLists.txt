@@ -340,6 +340,14 @@ if(USE_GGC)
   target_link_libraries(sssp_push-filter_comm-updated-only_cuda ggrt)
 endif()
 
+app(pagerank_pull-topological_comm-updated-only comm-updated-only/pagerank_pull-topological/gen.cpp DISTSAFE)
+if(USE_GGC)
+  target_compile_definitions(pagerank_pull-topological_comm-updated-only PRIVATE __GALOIS_HET_CUDA__=1)
+  target_link_libraries(pagerank_pull-topological_comm-updated-only pagerank_pull-topological_comm-updated-only_cuda galois_exp)
+  cuda_add_library(pagerank_pull-topological_comm-updated-only_cuda comm-updated-only/pagerank_pull-topological/gen_cuda.cu)
+  target_link_libraries(pagerank_pull-topological_comm-updated-only_cuda ggrt)
+endif()
+
 #### CheckPointing ####
 app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP PRIVATE __HETEROGENEOUS_GALOIS_DEPRECATED__=1)

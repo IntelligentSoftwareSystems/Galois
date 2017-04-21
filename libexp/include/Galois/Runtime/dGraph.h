@@ -1445,7 +1445,9 @@ public:
      CLNodeDataWrapper d = clGraph.getDataW(lid);
      FnTy::reduce(lid, d, val);
 #else
-     if (FnTy::reduce(lid, getData(lid), val)) bit_set_compute.set(lid);
+     if (FnTy::reduce(lid, getData(lid), val)) {
+       if (bit_set_compute.size() != 0) bit_set_compute.set(lid);
+     }
 #endif
    }
 
@@ -1918,7 +1920,7 @@ public:
    template<typename PushFnTy, typename PullFnTy>
    void sync_forward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_forward(loopName, emptyBitset);
+     sync_forward<PushFnTy, PullFnTy>(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
@@ -1991,7 +1993,7 @@ public:
    template<typename PushFnTy, typename PullFnTy>
    void sync_backward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_backward(loopName, emptyBitset);
+     sync_backward<PushFnTy, PullFnTy>(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
@@ -2064,7 +2066,7 @@ public:
    template<typename PushFnTy, typename PullFnTy>
    void sync_exchange(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_exchange(loopName, emptyBitset);
+     sync_exchange<PushFnTy, PullFnTy>(loopName, emptyBitset);
    }
 
    template<typename PushFnTy, typename PullFnTy>
