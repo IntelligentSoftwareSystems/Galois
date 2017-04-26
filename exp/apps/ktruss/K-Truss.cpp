@@ -126,14 +126,12 @@ struct ComputeEdgeSupport {
 
   void operator()(GNode n) {
     Galois::MethodFlag unprotected = Galois::MethodFlag::UNPROTECTED;
-    auto& id = g.getData(n, unprotected);
 
     for (auto e: g.edges(n, unprotected)) {
       auto dst = g.getEdgeDst(e);
-      auto& dstId = g.getData(dst, unprotected);
 
       // symmetry breaking
-      if (id > dstId) {
+      if (n > dst) {
         continue;
       }
 
@@ -184,8 +182,7 @@ struct RemoveEdgeLessSupportJ {
     auto& support = g.getEdgeData(e);
     support--;
     if (support < j) {
-      auto n1Id = g.getData(n1), n2Id = g.getData(n2);
-      auto src = (n1Id < n2Id) ? n1 : n2;
+      auto src = (n1 < n2) ? n1 : n2;
       auto dst = (src == n1) ? n2 : n1;
       ctx.push(std::make_pair(src, g.findEdge(src, dst)));
     }
