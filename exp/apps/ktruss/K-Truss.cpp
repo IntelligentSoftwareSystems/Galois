@@ -227,7 +227,7 @@ struct AsyncAlgo {
     }
 
     void operator() (Edge e, Galois::UserContext<Edge>& ctx) {
-      auto src = e.first, dst = g.getEdgeDst(e.second);
+      auto src = e.first, dst = e.second->first();
       auto ei = g.findEdge(src, dst);
       if (ei == g.edge_end(src)) {
         // e is invalid
@@ -406,8 +406,8 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  if(fromK < 2 || toK < 2) {
-    std::cerr << "fromK and toK must be >= 2" << std::endl;
+  if (fromK < 2 || toK < fromK) {
+    std::cerr << "2 <= fromK <= toK" << std::endl;
     return -1;
   }
 
