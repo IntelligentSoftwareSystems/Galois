@@ -84,7 +84,7 @@ template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
   std::string outName = algoName + "-" + std::to_string(k) + "-truss.txt";
   std::ofstream of(outName);
-  Galois::MethodFlag unprotected = Galois::MethodFlag::UNPROTECTED;
+  auto unprotected = Galois::MethodFlag::UNPROTECTED;
   for (auto n: g) {
     auto id = g.getData(n, unprotected);
     for (auto e: g.edges(n, unprotected)) {
@@ -126,7 +126,7 @@ struct ListEdge {
       auto dst = g.getEdgeDst(e);
       // symmetry breaking
       if (n < dst) {
-        w.push_back(std::make_pair(n, e));
+        w.push_back(std::make_pair(n, dst));
       }
     }
   }
@@ -145,7 +145,7 @@ struct AsyncAlgo {
   typedef Galois::Graph::FirstGraph<unsigned int, unsigned int, false>
     ::template with_sorted_neighbors<true>::type Graph;
   typedef Graph::GraphNode GNode;
-  typedef std::pair<GNode, Graph::edge_iterator> Edge;
+  typedef std::pair<GNode, GNode> Edge;
   typedef Galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "async"; }
@@ -181,8 +181,12 @@ struct AsyncAlgo {
     PickUnsupportedEdge(Graph& g, EdgeVec& r, unsigned int j): g(g), r(r), j(j) {}
 
     void operator() (Edge e) {
-      Galois::MethodFlag unprotected = Galois::MethodFlag::UNPROTECTED;
-      auto src = e.first, dst = g.getEdgeDst(e.second);
+      auto unprotected = Galois::MethodFlag::UNPROTECTED;
+      auto src = e.first, dst = e.second;
+      auto ei = g.findEdge(src, dst);
+      if (ei == g.edge_end(src)) {
+        return;
+      }
 
       using Iter = typename Graph::edge_iterator;
       auto l = [=] (Iter i) { return (this->g).getEdgeDst(i); };
@@ -198,7 +202,7 @@ struct AsyncAlgo {
         support
       );
 
-      g.getEdgeData(e.second) = support.get();
+      g.getEdgeData(ei) = support.get();
       if (support.get() < j) {
         r.push_back(e);
 //        std::cout << "edge " << g.getData(src) << " -> " << g.getData(dst) << ": " << g.getEdgeData(e.second) << " < " << j << std::endl;
@@ -222,12 +226,12 @@ struct AsyncAlgo {
       if (support < j) {
         auto src = (n1 < n2) ? n1 : n2;
         auto dst = (n1 < n2) ? n2 : n1;
-        ctx.push(std::make_pair(src, g.findEdge(src, dst)));
+        ctx.push(std::make_pair(src, dst));
       }
     }
 
     void operator() (Edge e, Galois::UserContext<Edge>& ctx) {
-      auto src = e.first, dst = e.second->first();
+      auto src = e.first, dst = e.second;
       auto ei = g.findEdge(src, dst);
       if (ei == g.edge_end(src)) {
         // e is invalid
@@ -302,7 +306,7 @@ struct BSPAlgo {
     ::template with_sorted_neighbors<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
-  typedef std::pair<GNode, Graph::edge_iterator> Edge;
+  typedef std::pair<GNode, GNode> Edge;
   typedef Galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "bsp"; }
@@ -315,8 +319,12 @@ struct BSPAlgo {
     PickUnsupportedEdge(Graph& g, EdgeVec& r, EdgeVec& s, unsigned int j): g(g), r(r), s(s), j(j) {}
 
     void operator() (Edge e) {
-      Galois::MethodFlag unprotected = Galois::MethodFlag::UNPROTECTED;
-      auto src = e.first, dst = g.getEdgeDst(e.second);
+      auto unprotected = Galois::MethodFlag::UNPROTECTED;
+      auto src = e.first, dst = e.second;
+      auto ei = g.findEdge(src, dst, unprotected);
+      if (ei == g.edge_end(src)) {
+        return;
+      }
 
       using Iter = typename Graph::edge_iterator;
       auto l = [=] (Iter i) { return (this->g).getEdgeDst(i); };
@@ -363,8 +371,9 @@ struct BSPAlgo {
         break;
       }
 
+      auto flag = Galois::MethodFlag::UNPROTECTED;
       for (auto e: unsupported) {
-        g.removeEdge(e.first, e.second, Galois::MethodFlag::UNPROTECTED);
+        g.removeEdge(e.first, g.findEdge(e.first, e.second, flag), flag);
       }
       unsupported.clear();
       cur->clear();
