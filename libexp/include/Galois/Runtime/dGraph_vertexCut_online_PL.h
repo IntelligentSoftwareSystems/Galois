@@ -64,7 +64,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
 
     std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
-    std::vector<std::vector<std::pair<uint64_t, uint64_t>>> assigned_edges_perhost;
+    // To send edges to different hosts: #Src #Dst
+    std::vector<std::vector<uint64_t>> assigned_edges_perhost;
 
 
     //EXPERIMENT
@@ -208,21 +209,23 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       uint32_t edgeNum_threshold = 100; //node with < threshold edges is small else is big.
 
       assigned_edges_perhost.resize(base_hGraph::numHosts);
-      for(auto n = gid2host[base_hGraph::id].first; n != gid2host[base_hGraph::id].second; ++n){
-        auto num_edges = std::distance(g.edge_begin(n), g.edge_end(n));
+      for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
+        auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
         if(num_edges > edgeNum_threshold){
           //Assign edges for high degree nodes to the destination
-          for(auto ee = g.edge_begin(n), ee_end = g.edge_end(n); ee != ee_end; ++ee){
+          for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
             auto dst = g.getEdgeDst(ee);
             auto h = find_hostID(dst);
-            assigned_edges_perhost[h].push_back(std::make_pair(n,dst));
+            assigned_edges_perhost[h].push_back(src);
+            assigned_edges_perhost[h].push_back(dst);
           }
         }
         else{
           //keep all edges with the source node
-          for(auto ee = g.edge_begin(n), ee_end = g.edge_end(n); ee != ee_end; ++ee){
+          for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
             auto dst = g.getEdgeDst(ee);
-            assigned_edges_perhost[base_hGraph::id].push_back(std::make_pair(n,dst));
+            assigned_edges_perhost[base_hGraph::id].push_back(src);
+            assigned_edges_perhost[base_hGraph::id].push_back(dst);
           }
         }
       }
@@ -233,7 +236,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         check_numEdges += assigned_edges_perhost[h].size();
       }
 
-      assert(check_numEdges == numEdges_distribute);
+      assert(check_numEdges == 2*numEdges_distribute);
 
       std::cerr << "exchange_edges started\n";
       exchange_edges();
@@ -427,10 +430,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //Fill GlobalVec_perHost and slaveNodes vetors using assigned_edges_perhost.
       numEdges = 0;
       for(auto h = 0; h < base_hGraph::numHosts; ++h){
-        for(auto i_pair : assigned_edges_perhost[h]){
-          host_edges_map[i_pair.first].push_back(i_pair.second);
-          nodesOnHost_set.insert(i_pair.first);
-          nodesOnHost_set.insert(i_pair.second);
+        for(auto i = 0; i  < assigned_edges_perhost[h].size(); i += 2){
+          host_edges_map[assigned_edges_perhost[h][i]].push_back(assigned_edges_perhost[h][i + 1]);
+          nodesOnHost_set.insert(assigned_edges_perhost[h][i]);
+          nodesOnHost_set.insert(assigned_edges_perhost[h][i + 1]);
           numEdges++;
         }
       }
