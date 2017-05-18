@@ -174,8 +174,14 @@ class GaloisGraph(object):
     def addEdge(self, eid, srcid, dstid):
         src = self.nodeMap[srcid]
         dst = self.nodeMap[dstid]
-        e = glib.addEdge(self.graph, src, dst)
-        self.setEdgeIndex(e, eid)
+        if eid in self.edgeMap:
+            e = self.edgeMap[eid]
+            if e.src != src or e.dst != dst:
+                print eid, ":", "(", srcid, "->", dstid, ") and (", self.invNodeMap[e.src], "->", self.invNodeMap[e.dst], ")"
+                raise Exception("one edge id for different src/dst pairs")
+        else:
+            e = glib.addEdge(self.graph, src, dst)
+            self.setEdgeIndex(e, eid)
         return e
 
     def getEdge(self, eid):
