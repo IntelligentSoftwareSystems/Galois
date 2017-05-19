@@ -34,9 +34,14 @@
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
 #include "Galois/Runtime/dGraph_cartesianCut.h"
+#include "Galois/Runtime/dGraph_vertexCut_online_PL.h"
 
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
+
+enum VertexCut {
+  PL_VCUT, CART_VCUT
+};
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_device.h"
@@ -77,6 +82,11 @@ static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut fo
 static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
 static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
 
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(100));
+static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
+       cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
+       cll::init(PL_VCUT));
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -100,6 +110,7 @@ Galois::DynamicBitSet bitset_dist_current;
 
 typedef hGraph<NodeData, void> Graph;
 typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
@@ -572,7 +583,10 @@ int main(int argc, char** argv) {
           std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
         }
       }
-      hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
+      if(vertexcut == CART_VCUT)
+        hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
+      else if(vertexcut == PL_VCUT)
+        hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, VCutThreshold);
     }
     else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
