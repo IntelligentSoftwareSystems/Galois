@@ -28,3 +28,4 @@ makeTest(ADD_TARGET netbandmpi DISTSAFE)
 
 #app(TestNetBandWidth netbandwidth.cpp DISTSAFE)
 makeTest(ADD_TARGET vertexCut DISTSAFE)
+makeTest(ADD_TARGET serialize-vectors DISTSAFE)
