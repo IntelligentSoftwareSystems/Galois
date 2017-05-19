@@ -264,10 +264,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_graph_construct.stop();
 
-      std::cerr << base_hGraph::id << "Edges loaded \n";
+      std::cerr << base_hGraph::id << " Edges loaded \n";
 
       StatTimer_graph_construct_comm.start();
       base_hGraph::setup_communication();
+      std::cerr << base_hGraph::id << " setup_communication done \n";
       StatTimer_graph_construct_comm.stop();
 
 
@@ -281,23 +282,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       //send and clear assigned_edges_perhost to receive from other hosts
-      std::cerr << net.ID << " , " << base_hGraph::id << "\n";
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
 
-        if(base_hGraph::id==0)
-          std::cerr << "INSIDE : " << x <<"\n";
         Galois::Runtime::SendBuffer b;
         gSerialize(b, assigned_edges_perhost[x]);
-        if(base_hGraph::id==0)
-          std::cerr << "serialize done : " << x <<"\n";
         net.sendTagged(x, Galois::Runtime::evilPhase, b);
         assigned_edges_perhost[x].clear();
-        std::stringstream ss;
-        ss <<" sending from : " <<  base_hGraph::id << " to : " << x << "\n";
-        std::cout << ss.str() << "\n";
       }
-
 
       //receive
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -309,9 +301,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while(!p);
 
-        std::stringstream ss;
-        ss <<" received on : " <<  base_hGraph::id << " from : " << x << "\n";
-        std::cout << ss.str();
         Galois::Runtime::gDeserialize(p->second, assigned_edges_perhost[p->first]);
       }
       ++Galois::Runtime::evilPhase;
@@ -319,7 +308,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     uint32_t find_hostID(uint64_t gid){
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
-        if(gid >= gid2host[h].first && gid <= gid2host[h].second)
+        if(gid >= gid2host[h].first && gid < gid2host[h].second)
           return h;
         else
           continue;
@@ -424,7 +413,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       std::vector<std::vector<uint64_t>> GlobalVec_perHost(base_hGraph::numHosts);
       std::vector<std::vector<uint32_t>> OwnerVec_perHost(base_hGraph::numHosts);
-      std::set<uint32_t> nodesOnHost_set;
+      std::vector<uint64_t> nodesOnHost_vec;
 
 
       //Fill GlobalVec_perHost and slaveNodes vetors using assigned_edges_perhost.
@@ -432,21 +421,26 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for(auto h = 0; h < base_hGraph::numHosts; ++h){
         for(auto i = 0; i  < assigned_edges_perhost[h].size(); i += 2){
           host_edges_map[assigned_edges_perhost[h][i]].push_back(assigned_edges_perhost[h][i + 1]);
-          nodesOnHost_set.insert(assigned_edges_perhost[h][i]);
-          nodesOnHost_set.insert(assigned_edges_perhost[h][i + 1]);
+          nodesOnHost_vec.push_back(assigned_edges_perhost[h][i]);
+          nodesOnHost_vec.push_back(assigned_edges_perhost[h][i + 1]);
           numEdges++;
         }
       }
 
+
       /*base_hGraph::totalOwnedNodes = base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;*/
       //Isolated nodes
-      for(auto n = gid2host[base_hGraph::id].first; n != gid2host[base_hGraph::id].second; ++n){
-        nodesOnHost_set.insert(n);
+      for(auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n){
+        nodesOnHost_vec.push_back(n);
       }
 
-      numNodes = nodesOnHost_set.size();
+      // Only keep unique node ids in vector
+      std::sort(nodesOnHost_vec.begin(), nodesOnHost_vec.end());
+      nodesOnHost_vec.erase(std::unique(nodesOnHost_vec.begin(), nodesOnHost_vec.end()), nodesOnHost_vec.end());
 
-      for(auto i : nodesOnHost_set){
+      numNodes = nodesOnHost_vec.size();
+
+      for(auto i : nodesOnHost_vec){
         // Need to add both source and destination nodes
         // Source : i_pair.first
         // Destination : i_pair.second
@@ -456,14 +450,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         slaveNodes[owner].push_back(i);
       }
 
-
-
-#if 0
-      //sort per host global vector for G2L
-      for(auto i = 0; i < base_hGraph::numHosts; ++i){
-        std::sort(GlobalVec_perHost[i].begin(), GlobalVec_perHost[i].end());
-      }
-#endif
 
       hostNodes.resize(base_hGraph::numHosts);
       uint32_t counter = 0;
