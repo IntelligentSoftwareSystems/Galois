@@ -158,22 +158,23 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
 
-    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false) :  base_hGraph(host, _numHosts) {
+    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false, uint32_t VCutTheshold = 100) :  base_hGraph(host, _numHosts) {
 
       Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT PL", 0, 0);
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
-      Galois::StatTimer StatTimer_distributed_edges("TIMER_DISTRIBUTE_EDGES");
-      Galois::StatTimer StatTimer_distributed_edges_policy("TIMER_DISTRIBUTE_EDGES_POLICY");
-      Galois::StatTimer StatTimer_distributed_edges_map("TIMER_DISTRIBUTE_EDGES_MAP");
+      Galois::StatTimer StatTimer_local_distributed_edges("TIMER_LOCAL_DISTRIBUTE_EDGES");
+      Galois::StatTimer StatTimer_exchange_edges("TIMER_EXCHANGE_EDGES");
+      Galois::StatTimer StatTimer_fill_local_slaveNodes("TIMER_FILL_LOCAL_SLAVENODES");
       Galois::StatTimer StatTimer_distributed_edges_test_set_bit("TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT");
-      Galois::StatTimer StatTimer_distributed_edges_get_dst("TIMER_DISTRIBUTE_EDGES_GET_DST");
+      Galois::StatTimer StatTimer_allocate_local_DS("TIMER_ALLOCATE_LOCAL_DS");
       Galois::StatTimer StatTimer_distributed_edges_get_edges("TIMER_DISTRIBUTE_EDGES_GET_EDGES");
       Galois::StatTimer StatTimer_distributed_edges_inner_loop("TIMER_DISTRIBUTE_EDGES_INNER_LOOP");
       Galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
 
+      StatTimer_local_distributed_edges.start();
       Galois::Graph::OfflineGraph g(filename);
 
       base_hGraph::totalNodes = g.size();
@@ -211,23 +212,32 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
       assigned_edges_perhost.resize(base_hGraph::numHosts);
-      assign_edges<EdgeTy>(g, numEdges_distribute);
+      assign_edges<EdgeTy>(g, numEdges_distribute, VCutTheshold);
+      StatTimer_local_distributed_edges.stop();
 
       std::cerr << "exchange_edges started\n";
+      StatTimer_exchange_edges.start();
       exchange_edges();
+      StatTimer_exchange_edges.stop();
       std::cerr << "exchange_edges done\n";
 
+      std::cerr << "fill_slaveNodes started\n";
+      StatTimer_fill_local_slaveNodes.start();
       fill_slaveNodes(base_hGraph::slaveNodes);
+      StatTimer_fill_local_slaveNodes.stop();
       std::cerr << "fill_slaveNodes done\n";
 
       std::cerr << "numNodes : " << numNodes << " , numEdges : " << numEdges << "\n";
 
       base_hGraph::numOwned = numNodes;
 
+      std::cerr << "Allocate local graph DS : start\n";
+      StatTimer_allocate_local_DS.start();
       base_hGraph::graph.allocateFrom(numNodes, numEdges);
       std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
+      StatTimer_allocate_local_DS.stop();
       std::cerr << "Construct nodes done\n";
 
 
@@ -243,21 +253,20 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_graph_construct_comm.start();
       base_hGraph::setup_communication();
-      std::cerr << base_hGraph::id << " setup_communication done \n";
       StatTimer_graph_construct_comm.stop();
+      std::cerr << base_hGraph::id << " setup_communication done \n";
 
 
     }
 
     //Edge type is not void.
     template<typename GraphEdgeTy, typename std::enable_if<!std::is_void<GraphEdgeTy>::value>::type* = nullptr>
-      void assign_edges(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute){
+      void assign_edges(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute, uint32_t VCutTheshold){
 
         //Go over assigned nodes and distribute edges.
-        uint32_t edgeNum_threshold = 100; //node with < threshold edges is small else is big.
         for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
         auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
-        if(num_edges > edgeNum_threshold){
+        if(num_edges > VCutTheshold){
           //Assign edges for high degree nodes to the destination
           for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
             auto gdst = g.getEdgeDst(ee);
@@ -292,13 +301,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     //Edge type is void.
     template<typename GraphEdgeTy, typename std::enable_if<std::is_void<GraphEdgeTy>::value>::type* = nullptr>
-      void assign_edges(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute){
+      void assign_edges(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute, uint32_t VCutTheshold){
 
         //Go over assigned nodes and distribute edges.
-        uint32_t edgeNum_threshold = 100; //node with < threshold edges is small else is big.
         for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
         auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
-        if(num_edges > edgeNum_threshold){
+        if(num_edges > VCutTheshold){
           //Assign edges for high degree nodes to the destination
           for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
             auto gdst = g.getEdgeDst(ee);
@@ -391,7 +399,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
       void loadEdges(GraphTy& graph) {
-        fprintf(stderr, "Loading void edge-data while creating edges.\n");
+        fprintf(stderr, "Loading edge-data while creating edges.\n");
         uint64_t cur = 0;
 
         auto map_end = host_edges_map.end();
