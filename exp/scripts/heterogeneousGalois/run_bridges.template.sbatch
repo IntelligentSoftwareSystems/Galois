@@ -25,7 +25,11 @@ FLAGS=
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdir}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
+
   fi
+if [[ $execname == *"pagerank"* ]]; then
+  FLAGS+=" --tol=0.000001"
+  FLAGS+= " --engine_opts max_iterations=1000 --engine plsync "
 fi
 
 source_file=${inputdir}/source
@@ -57,9 +61,10 @@ if [[ ($execname == *"pagerank"*) ]]; then
   FLAGS+=" -maxIterations=125"
 fi
 
+
 RUN=mpirun
 
-source $HOME/GaloisCpp/load_modules_dist_hetero.sh
+#source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 # move to working directory
 WORK_DIR=/pylon5/ci4s88p/roshand/GaloisCpp
@@ -67,6 +72,7 @@ cd $WORK_DIR
 
 set -x #echo on
 MV2_USE_LAZY_MEM_UNREGISTER=0 MV2_ENABLE_AFFINITY=0 GALOIS_DO_NOT_BIND_THREADS=1 $RUN -np $NUM_TASKS $EXEC ${INPUT} -pset=$PSET -t=$THREADS -num_nodes=$SLURM_NNODES $FLAGS
+
 set +x #echo off
 
 echo "Algorithm: " $execname

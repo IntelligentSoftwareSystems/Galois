@@ -6,6 +6,10 @@ SET=$3
 QUEUE=$4
 HET=$5 # not supported for now
 
+#EXECDIR=/pylon2/ci4s88p/roshand/GaloisCpp-build/exp/apps/compiler_outputs
+EXECDIR=/pylon2/ci4s88p/ggill/others/powerlyra/release/toolkits/graph_analytics
+STAT_DIR=/pylon2/ci4s88p/ggill/others/powerlyra/release/toolkits/graph_analytics/LOG_RUNS
+
 SET="${SET%\"}"
 SET="${SET#\"}"
 
