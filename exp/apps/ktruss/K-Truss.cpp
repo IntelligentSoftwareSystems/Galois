@@ -107,7 +107,7 @@ public:
   counter& operator++() { ++num; return *this; }
   counter  operator++(int) { auto retval = *this; ++num; return retval; }
   T& operator*() { return dummy; }
-  unsigned int get() { return num; } //FIXME: always return 0 for BSPAlgo. why?
+  unsigned int get() { return num; }
 };
 
 template<typename Algo>
@@ -192,7 +192,8 @@ struct AsyncAlgo {
       auto l = [=] (Iter i) { return (this->g).getEdgeDst(i); };
       counter<GNode> support;
 
-      std::set_intersection(
+      // keep the counter from set intersection, otherwise copies are destroyed
+      support = std::set_intersection(
         // Galois::NoDerefIterator lets dereference return the wrapped iterator itself
         // boost::make_transform_iterator gives an iterator, dereferenced to func(in_iter)
         boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_begin(src, unprotected)), l),
@@ -330,7 +331,7 @@ struct BSPAlgo {
       auto l = [=] (Iter i) { return (this->g).getEdgeDst(i); };
       counter<GNode> support;
 
-      std::set_intersection(
+      support = std::set_intersection(
         // Galois::NoDerefIterator lets dereference return the wrapped iterator itself
         // boost::make_transform_iterator gives an iterator, dereferenced to func(in_iter)
         boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_begin(src, unprotected)), l),
@@ -340,12 +341,12 @@ struct BSPAlgo {
         support
       );
 
-//      std::cout << "|intersection| = " << support.get() << std::endl;
       if (support.get() < j) {
         r.push_back(e);
-//        std::cout << "edge " << g.getData(src) << " -> " << g.getData(dst) << ": " << g.getEdgeData(e.second) << " < " << j << std::endl;
+//        std::cout << "edge " << g.getData(src) << " -> " << g.getData(dst) << ": " << support.get() << " < " << j << std::endl;
       } else {
         s.push_back(e);
+//        std::cout << "edge " << g.getData(src) << " -> " << g.getData(dst) << ": " << support.get() << " >= " << j << std::endl;
       }
     }
   };
@@ -359,13 +360,18 @@ struct BSPAlgo {
     work[0] = ListAllEdges<BSPAlgo>(g);
     cur = &work[0];
     next = &work[1];
-    
+
     while (true) {
+      std::cout << "cur->size() = " << std::distance(cur->begin(), cur->end()) << std::endl;
+
       // pick out all edges in less than k-2 triangles
       Galois::do_all_local(*cur, 
         PickUnsupportedEdge{g, unsupported, *next, k-2}, 
         Galois::do_all_steal<true>()
       );
+
+      std::cout << "next->size() = " << std::distance(next->begin(), next->end()) << std::endl;
+      std::cout << "unsupported.size() = " << std::distance(unsupported.begin(), unsupported.end()) << std::endl;
 
       if (!std::distance(unsupported.begin(), unsupported.end())) {
         break;
