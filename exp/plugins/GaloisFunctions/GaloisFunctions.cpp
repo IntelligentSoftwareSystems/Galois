@@ -481,14 +481,14 @@ namespace {
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
                 SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
-                SSAfter << "\n}\n";
+                //SSAfter << "\n}\n";
                 rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               }
               SSAfter.str(string());
               SSAfter.clear();
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_pull"){
                 SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_vertexCut_" << i << ", SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");";
-                SSAfter << "\n}\n";
+                //SSAfter << "\n}\n";
                 rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               }
               SSAfter.str(string());
@@ -972,14 +972,14 @@ namespace {
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
                 SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
-                SSAfter << "\n}\n";
+                //SSAfter << "\n}\n";
                 rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               }
               SSAfter.str(string());
               SSAfter.clear();
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_pull"){
                 SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_vertexCut_" << i << ", SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");";
-                SSAfter << "\n}\n";
+                //SSAfter << "\n}\n";
                 rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               }
               SSAfter.str(string());
