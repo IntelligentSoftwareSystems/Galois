@@ -102,9 +102,24 @@ namespace Galois {
   }
 
   template<typename Ty>
+  void resetVec(Ty& a_arr) {
+    //std::for_each(a_arr.begin(), a_arr.end(),[](Ty &ele){ele = 0;} ); 
+    std::fill(a_arr.begin(), a_arr.end(), 0);
+  }
+
+  template<typename Ty>
+  void pairWiseAvg_vec(Ty& a_arr, Ty& b_arr) {
+    for(unsigned i = 0; i < a_arr.size(); ++i) {
+      a_arr[i] = (a_arr[i] + b_arr[i])/2.0;
+    }
+  }
+
+  template<typename Ty>
   void resetVec(std::vector<Ty>& a_vec) {
     std::for_each(a_vec.begin(), a_vec.end(),[](Ty &ele){ele = 0;} ); 
   }
+
+
 
   //like std::inner_product
   template<typename ItrTy, typename Ty >
@@ -115,5 +130,15 @@ namespace Galois {
     }
     return init_value;
   }
+
+  //like std::inner_product
+    template<typename ItrTy, typename Ty >
+    Ty innerProduct(ItrTy& a_arr, ItrTy& b_arr, Ty init_value) {
+      auto jj = b_arr.begin();
+      for(auto ii = a_arr.begin(); ii != a_arr.end(); ++ii, ++jj){
+        init_value += (*ii) * (*jj);
+      }
+      return init_value;
+    }
 }//End namespace Galois
 #endif

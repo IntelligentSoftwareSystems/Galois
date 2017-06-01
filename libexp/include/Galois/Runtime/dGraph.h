@@ -88,6 +88,7 @@ class hGraph: public GlobalObject {
    bool transposed;
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
+   uint64_t totalEdges;
    uint64_t totalSlaveNodes; // Total slave nodes from others.
    uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
@@ -282,6 +283,7 @@ public:
       num_recv_expected = 0;
       num_run = 0;
       num_iteration = 0;
+      totalEdges = 0;
 
       //uint32_t numNodes;
       //uint64_t numEdges;
@@ -2584,6 +2586,9 @@ public:
 #endif
 
 
+   uint64_t get_totalEdges() const {
+	   return totalEdges;
+   }
    void reset_num_iter(uint32_t runNum){
       num_run = runNum;
    }
