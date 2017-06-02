@@ -100,6 +100,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Graph::OfflineGraph g(filename);
 
       base_hGraph::totalNodes = g.size();
+      base_hGraph::totalEdges = g.sizeEdges();
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
       //compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
