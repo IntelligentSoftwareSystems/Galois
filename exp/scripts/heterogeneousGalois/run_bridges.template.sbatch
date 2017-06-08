@@ -1,20 +1,29 @@
 #!/bin/bash
-#SBATCH --mail-user=roshan@cs.utexas.edu
+#SBATCH --mail-user=gill@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
+#SBATCH --mail-type=begin
 NUM_TASKS=$3
 PSET=$4
 THREADS=$5
+VCUT=$6
 
 execname=$1
-execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build-lwci/exp/apps/compiler_outputs
+#execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build-lwci/exp/apps/compiler_outputs
+execdir=/pylon2/ci4s88p/ggill/build_dist_hetero_new/release/exp/apps/compiler_outputs
 EXEC=${execdir}/${execname}
 
 inputname=$2
 inputdir=/pylon2/ci560jp/roshand/dist-inputs
 extension=gr
 
-statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
+if [[ "$ABELIAN_VERTEX_CUT" == 1 ]]; then
+   stat_ext="vcut_$VCUT"
+else
+   stat_ext="ecut"
+fi
+
+statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${stat_ext}_${SLURM_JOB_ID}.stats
 
 FLAGS=" -statOutputFile=${execdir}/${statname}"
 FLAGS=
@@ -25,13 +34,8 @@ FLAGS=
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdir}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
-
   fi
-if [[ $execname == *"pagerank"* ]]; then
-  FLAGS+=" --tol=0.000001"
-  FLAGS+= " --engine_opts max_iterations=1000 --engine plsync "
 fi
-
 source_file=${inputdir}/source
 if [[ $execname == *"cc"* ]]; then
   inputdir=${inputdir}/symmetric
@@ -49,7 +53,8 @@ fi
 grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdir}/${inputname}.${extension}
 
-if [ -n "$ABELIAN_VERTEX_CUT" ]; then
+#if [ -n "$ABELIAN_VERTEX_CUT" ]; then
+if [[ "$ABELIAN_VERTEX_CUT" == 1 ]]; then
   FLAGS+=" -enableVertexCut" 
 elif [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
   FLAGS+=" -scalegpu=4"
@@ -61,13 +66,14 @@ if [[ ($execname == *"pagerank"*) ]]; then
   FLAGS+=" -maxIterations=125"
 fi
 
-
+FLAGS+=" -vertexcut=$VCUT"
 RUN=mpirun
 
 #source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 # move to working directory
-WORK_DIR=/pylon5/ci4s88p/roshand/GaloisCpp
+#WORK_DIR=/pylon5/ci4s88p/roshand/GaloisCpp
+WORK_DIR=/pylon5/ci4s88p/ggill/GaloisCpp
 cd $WORK_DIR
 
 set -x #echo on
