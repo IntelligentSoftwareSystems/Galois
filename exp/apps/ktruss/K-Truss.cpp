@@ -68,7 +68,8 @@ static const unsigned int removed = 0x1;
 //   << 1 to track # triangles an edge supports, 
 //   >> 1 when computing edge supports
 typedef Galois::Graph::LC_CSR_Graph<void, unsigned int>
-  ::template with_numa_alloc<true>::type Graph;
+  ::template with_numa_alloc<true>::type
+  ::template with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 typedef std::pair<GNode, GNode> Edge;
