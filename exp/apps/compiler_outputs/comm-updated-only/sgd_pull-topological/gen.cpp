@@ -78,6 +78,7 @@ static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source 
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+static cll::opt<bool> bipartite("bipartite", cll::desc("Is graph bipartite? if yes, it expects first N nodes to have edges."), cll::init(true));
 
 static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(100));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
@@ -119,10 +120,10 @@ typedef hGraph_vertexCut<NodeData, double> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, double> Graph_cartesianCut;
 #endif
 
-typedef hGraph<NodeData, uint64_t> Graph;
-typedef hGraph_edgeCut<NodeData, uint64_t> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, uint64_t> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, uint64_t> Graph_cartesianCut;
+typedef hGraph<NodeData, uint32_t> Graph;
+typedef hGraph_edgeCut<NodeData, uint32_t> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, uint32_t> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, uint32_t> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -149,18 +150,6 @@ double calcPrediction (const NodeData& movie_data, const NodeData& user_data) {
 
   double pred = Galois::innerProduct(movie_data.latent_vector, user_data.latent_vector, 0.0); //init_value; //(double) Galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
   double p = pred;
-
-#if 0
-  if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-
-	  if(p > 0){
-		  std::stringstream ss;
-      	  //ss << movie_data.latent_vector[0] << " , " << user_data.latent_vector[0] <<"\n";
-      	  ss << p << " , " <<  pred << " , " << Galois::innerProduct(movie_data.latent_vector, user_data.latent_vector, 0.0) <<"\n";
-      	  std::cout << ss.str();
-	  }
-   }
-#endif
 
   pred = std::min (MAXVAL, pred);
   pred = std::max (MINVAL, pred);
@@ -618,6 +607,7 @@ struct SGD {
       
 
       	//_graph.sync_forward<Syncer_vertexCut_2, SyncerPull_0>("SGD");
+      	_graph.sync_exchange<Syncer_vertexCut_2, SyncerPull_0>("SGD");
 
 
       Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"));
@@ -627,7 +617,7 @@ struct SGD {
     }while((iteration < maxIterations) && (rms_normalized > 10));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXNUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
+      Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
     }
   }
 
@@ -642,44 +632,8 @@ struct SGD {
       auto& ddata = graph->getData(dst);
       auto& user_node = ddata.latent_vector;
       double edge_rating = graph->getEdgeData(dst);
-#if 0
-      if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-
-    	  std::stringstream ss;
-    	  ss << movie_node[0] << " , " << user_node[0] << " , edge rating : " << edge_rating <<"\n";
-    	  std::cout << ss.str();
-      }
-#endif
-
-#if 0
-      //doGradientUpdate
-        double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
-        double cur_error = edge_rating - old_dp;
-        assert(cur_error < 1000 && cur_error > -1000);
-
-        for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
-          double prevUser = user_node[i];
-          double prevMovie = movie_node[i];
-
-          user_node[i] += step_size * (cur_error * prevMovie - LAMBDA * prevUser);
-          assert(std::isnormal(user_node[i]));
-          movie_node[i] += step_size * (cur_error * prevUser - LAMBDA * prevMovie);
-          assert(std::isnormal(movie_node[i]));
-        }
 
      double cur_error2 = edge_rating - calcPrediction(sdata, ddata);
-     std::stringstream ss;
-     ss << " E : " << cur_error << " , " << cur_error2 << "\n";
-     std::cout << ss.str();
-     if(std::abs(cur_error - cur_error2) > 4){
-      std::cerr << "A" << std::abs(cur_error - cur_error2) << "\n";
-      DGAccumulator_accum+= 1;
-     }
-#endif
-     double cur_error2 = edge_rating - calcPrediction(sdata, ddata);
-     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-         //std::cout << " calcPred : " << calcPrediction(sdata, ddata) << "\n";
-     }
      DGAccumulator_accum += (cur_error2*cur_error2);
     }
   }
@@ -742,7 +696,7 @@ int main(int argc, char** argv) {
         hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, VCutThreshold);
    }
    else {
-    hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
+    hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, bipartite);
    }
 
 #ifdef __GALOIS_HET_CUDA__
