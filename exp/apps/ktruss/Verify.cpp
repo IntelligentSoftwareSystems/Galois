@@ -128,15 +128,15 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
   return std::make_pair(numNodes.reduce(), numEdges.reduce());
 }
 
-size_t countValidEqual(Graph& g, GNode src, GNode dst) {
-  size_t retval = 0;
+bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
+  size_t numValidEqual = 0;
   auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
     srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
     dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
     dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
 
   while (true) {
-    // find the first valid edge
+  // find the first valid edge
     while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
       ++srcI;
     }
@@ -145,7 +145,7 @@ size_t countValidEqual(Graph& g, GNode src, GNode dst) {
     }
 
     if (srcI == srcE || dstI == dstE) {
-      return retval;
+      return numValidEqual >= j;
     }
 
     // check for intersection
@@ -155,12 +155,15 @@ size_t countValidEqual(Graph& g, GNode src, GNode dst) {
     } else if (dN < sN) {
       ++dstI;
     } else {
-      retval += 1;
+      numValidEqual += 1;
+      if (numValidEqual >= j) {
+        return true;
+      }
       ++srcI;
       ++dstI;
     }
   }
-  return retval;
+  return numValidEqual >= j;
 }
 
 int main(int argc, char **argv) {
@@ -190,8 +193,8 @@ int main(int argc, char **argv) {
   std::cout << validNum.second << " valid edges" << std::endl;
 
   // every valid node should have at least trussNum-1 valid neighbors
-  // so # valid edges >= smallest # undirected edges among valid nodes
-  assert((validNum.first * (trussNum-1) / 2) <= valid.second);
+  // so # valid edges >= smallest # directed edges among valid nodes
+  assert((validNum.first * (trussNum-1)) <= valid.second * 2);
 
   // symmetry breaking: 
   // consider only edges (i, j) where i < j
@@ -212,11 +215,11 @@ int main(int argc, char **argv) {
   // 2. removed edges whose support >= trussNum-2
   Galois::do_all_local(work, 
     [&g, &shouldBeInvalid, &shouldBeValid] (Edge e) {
-       auto support = countValidEqual(g, e.first, e.second);
+       bool isSupportEnough = isSupportNoLessThanJ(g, e.first, e.second, trussNum-2);
        bool isRemoved = g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) & 0x1;
-       if (!isRemoved && support < trussNum-2) {
+       if (!isRemoved && !isSupportEnough) {
          shouldBeInvalid.push_back(e);
-       } else if (isRemoved && support >= trussNum-2) {
+       } else if (isRemoved && isSupportEnough) {
          shouldBeValid.push_back(e);
        }
     },

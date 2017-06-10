@@ -110,42 +110,6 @@ size_t countValidNodes(G& g) {
   return numNodes.reduce();
 }
 
-template<typename G>
-size_t countValidEqual(G& g, typename G::GraphNode src, typename G::GraphNode dst) {
-  size_t retval = 0;
-  auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-    srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-    dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-    dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
-
-  while (true) {
-    // find the first valid edge
-    while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
-      ++srcI;
-    }
-    while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
-      ++dstI;
-    }
-
-    if (srcI == srcE || dstI == dstE) {
-      return retval;
-    }
-
-    // check for intersection
-    auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
-    if (sN < dN) {
-      ++srcI;
-    } else if (dN < sN) {
-      ++dstI;
-    } else {
-      retval += 1;
-      ++srcI;
-      ++dstI;
-    }
-  }
-  return retval;
-}
-
 template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
   std::string outName = algoName + "-" + std::to_string(k) + "-truss.edgelist";
@@ -175,19 +139,57 @@ struct BSPAlgo {
 
   std::string name() { return "bsp"; }
 
+  bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
+    size_t numValidEqual = 0;
+    auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
+      srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
+      dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
+      dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
+
+    while (true) {
+      // find the first valid edge
+      while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
+        ++srcI;
+      }
+      while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
+        ++dstI;
+      }
+
+      if (srcI == srcE || dstI == dstE) {
+        return numValidEqual >= j;
+      }
+
+      // check for intersection
+      auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
+      if (sN < dN) {
+        ++srcI;
+      } else if (dN < sN) {
+        ++dstI;
+      } else {
+        numValidEqual += 1;
+        if (numValidEqual >= j) {
+          return true;
+        }
+        ++srcI;
+        ++dstI;
+      }
+    }
+    return numValidEqual >= j;
+  }
+
   struct PickUnsupportedEdges {
+    BSPAlgo *algo;
     Graph& g;
     unsigned int j;
     EdgeVec& r;
     EdgeVec& s;
-    PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s): g(g), j(j), r(r), s(s) {}
+
+    PickUnsupportedEdges(BSPAlgo *algo, Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s)
+      : algo(algo), g(g), j(j), r(r), s(s) {}
 
     void operator()(Edge e) {
-      if (countValidEqual(g, e.first, e.second) < j) {
-        r.push_back(e);
-      } else {
-        s.push_back(e);
-      }
+      EdgeVec& w = algo->isSupportNoLessThanJ(g, e.first, e.second, j) ? s : r;
+      w.push_back(e);
     }
   };
 
@@ -221,7 +223,7 @@ struct BSPAlgo {
       std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
 
       Galois::do_all_local(*cur, 
-        PickUnsupportedEdges{g, k-2, unsupported, *next},
+        PickUnsupportedEdges{this, g, k-2, unsupported, *next},
         Galois::do_all_steal<true>()
       );
 
