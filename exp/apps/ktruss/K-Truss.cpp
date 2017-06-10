@@ -63,18 +63,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 static const unsigned int valid = 0x0;
 static const unsigned int removed = 0x1;
 
-// edge weight: (# triangles supported << 1) | removal
-//   set LSB of an edge weight to indicate the removal of the edge.
-//   << 1 to track # triangles an edge supports, 
-//   >> 1 when computing edge supports
-typedef Galois::Graph::LC_CSR_Graph<void, unsigned int>
-  ::template with_numa_alloc<true>::type
-  ::template with_no_lockable<true>::type Graph;
-typedef Graph::GraphNode GNode;
-
-typedef std::pair<GNode, GNode> Edge;
-typedef Galois::InsertBag<Edge> EdgeVec;
-
 template<typename Graph>
 void initialize(Graph& g) {
   g.sortAllEdgesByDst();
@@ -108,7 +96,7 @@ size_t countValidNodes(G& g) {
   Galois::GAccumulator<size_t> numNodes;
 
   Galois::do_all_local(g, 
-    [&g, &numNodes] (GNode n) {
+    [&g, &numNodes] (typename G::GraphNode n) {
       for (auto e: g.edges(n)) {
         if (!(g.getEdgeData(e) & removed)) {
           numNodes += 1;
@@ -158,12 +146,12 @@ size_t countValidEqual(G& g, typename G::GraphNode src, typename G::GraphNode ds
   return retval;
 }
 
+template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
   std::string outName = algoName + "-" + std::to_string(k) + "-truss.txt";
   std::ofstream of(outName);
-  auto unprotected = Galois::MethodFlag::UNPROTECTED;
   for (auto n: g) {
-    for (auto e: g.edges(n, unprotected)) {
+    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
       if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
         of << n << " " << dst << std::endl;
@@ -173,6 +161,18 @@ void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
 }
 
 struct BSPAlgo {
+  // edge weight: (# triangles supported << 1) | removal
+  //   set LSB of an edge weight to indicate the removal of the edge.
+  //   << 1 to track # triangles an edge supports, 
+  //   >> 1 when computing edge supports
+  typedef Galois::Graph::LC_CSR_Graph<void, unsigned int>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+
+  typedef std::pair<GNode, GNode> Edge;
+  typedef Galois::InsertBag<Edge> EdgeVec;
+
   std::string name() { return "bsp"; }
 
   struct PickUnsupportedEdges {
@@ -216,7 +216,9 @@ struct BSPAlgo {
     size_t iter = 0;
 
     while (true) {
-      std::cout << "Iteration " << iter << ": " << std::distance(cur->begin(), cur->end()) << " edges" << std::endl;
+      std::cout << "Iteration " << iter << ": ";
+      std::cout << countValidNodes(g) << " valid nodes, ";
+      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
 
       Galois::do_all_local(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
@@ -242,14 +244,14 @@ struct BSPAlgo {
       ++iter;
     } 
 
-    std::cout << "Ends at iteration " << iter << " with " << countValidNodes(g) << " nodes." << std::endl;
+    std::cout << "Ends at iteration " << iter << std::endl;
   } // end operator()
 }; // end struct BSPAlgo
 
 template<typename Algo>
 void run() {
   Algo algo;
-  Graph g;
+  typename Algo::Graph g;
 
   Galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
