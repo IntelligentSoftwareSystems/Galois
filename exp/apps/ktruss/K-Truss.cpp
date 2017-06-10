@@ -139,56 +139,55 @@ struct BSPAlgo {
 
   std::string name() { return "bsp"; }
 
-  bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
-    size_t numValidEqual = 0;
-    auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-      srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-      dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-      dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
-
-    while (true) {
-      // find the first valid edge
-      while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
-        ++srcI;
-      }
-      while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
-        ++dstI;
-      }
-
-      if (srcI == srcE || dstI == dstE) {
-        return numValidEqual >= j;
-      }
-
-      // check for intersection
-      auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
-      if (sN < dN) {
-        ++srcI;
-      } else if (dN < sN) {
-        ++dstI;
-      } else {
-        numValidEqual += 1;
-        if (numValidEqual >= j) {
-          return true;
-        }
-        ++srcI;
-        ++dstI;
-      }
-    }
-    return numValidEqual >= j;
-  }
-
   struct PickUnsupportedEdges {
-    BSPAlgo *algo;
     Graph& g;
     unsigned int j;
     EdgeVec& r;
     EdgeVec& s;
 
-    PickUnsupportedEdges(BSPAlgo *algo, Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s)
-      : algo(algo), g(g), j(j), r(r), s(s) {}
+    PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s)
+      : g(g), j(j), r(r), s(s) {}
+
+    bool isSupportNoLessThanJ(GNode src, GNode dst) {
+      size_t numValidEqual = 0;
+      auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
+        srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
+        dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
+        dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
+
+      while (true) {
+        // find the first valid edge
+        while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
+          ++srcI;
+        }
+        while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
+          ++dstI;
+        }
+
+        if (srcI == srcE || dstI == dstE) {
+          return numValidEqual >= j;
+        }
+
+        // check for intersection
+        auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
+        if (sN < dN) {
+          ++srcI;
+        } else if (dN < sN) {
+          ++dstI;
+        } else {
+          numValidEqual += 1;
+          if (numValidEqual >= j) {
+            return true;
+          }
+          ++srcI;
+          ++dstI;
+        }
+      }
+      return numValidEqual >= j;
+    }
 
     void operator()(Edge e) {
-      EdgeVec& w = algo->isSupportNoLessThanJ(g, e.first, e.second, j) ? s : r;
+      EdgeVec& w = isSupportNoLessThanJ(e.first, e.second) ? s : r;
       w.push_back(e);
     }
   };
@@ -223,7 +222,7 @@ struct BSPAlgo {
       std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
 
       Galois::do_all_local(*cur, 
-        PickUnsupportedEdges{this, g, k-2, unsupported, *next},
+        PickUnsupportedEdges{g, k-2, unsupported, *next},
         Galois::do_all_steal<true>()
       );
 
