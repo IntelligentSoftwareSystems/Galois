@@ -60,8 +60,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::async, "async", "Asynchronous"), 
     clEnumValEnd), cll::init(Algo::bsp));
 
-static const unsigned int valid = 0x0;
-static const unsigned int removed = 0x1;
+static const uint32_t valid = 0x0;
+static const uint32_t removed = 0x1;
 
 template<typename Graph>
 void initialize(Graph& g) {
@@ -148,7 +148,7 @@ size_t countValidEqual(G& g, typename G::GraphNode src, typename G::GraphNode ds
 
 template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
-  std::string outName = algoName + "-" + std::to_string(k) + "-truss.txt";
+  std::string outName = algoName + "-" + std::to_string(k) + "-truss.edgelist";
   std::ofstream of(outName);
   for (auto n: g) {
     for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
@@ -165,7 +165,7 @@ struct BSPAlgo {
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
   //   >> 1 when computing edge supports
-  typedef Galois::Graph::LC_CSR_Graph<void, unsigned int>
+  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;

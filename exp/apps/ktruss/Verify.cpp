@@ -50,14 +50,14 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"
 static cll::opt<std::string> trussFile("trussFile", cll::desc("edgelist to for the trusses"), cll::Required);
 static cll::opt<unsigned int> trussNum("trussNum", cll::desc("verify for maximal trussNum-trusses"), cll::Required);
 
-static const unsigned int valid = 0x0;
-static const unsigned int removed = 0x1;
+static const uint32_t valid = 0x0;
+static const uint32_t removed = 0x1;
 
 // edge weight: (# triangles supported << 1) | removal
 //   set LSB of an edge weight to indicate the removal of the edge.
 //   << 1 to track # triangles an edge supports, 
 //   >> 1 when computing edge supports
-typedef Galois::Graph::LC_CSR_Graph<void, unsigned int>
+typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
   ::template with_numa_alloc<true>::type 
   ::template with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -179,11 +179,12 @@ int main(int argc, char **argv) {
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
   Galois::Graph::readGraph(g, filename);
+  std::cout << "Read " << g.size() << " nodes" << std::endl;
+
   initialize(g);
   readTruss(g);
 //  printGraph(g);
 
-  std::cout << "Read " << g.size() << " nodes" << std::endl;
   auto validNum = countValidNodesAndEdges(g);
   std::cout << validNum.first << " valid nodes" << std::endl;
   std::cout << validNum.second << " valid edges" << std::endl;
