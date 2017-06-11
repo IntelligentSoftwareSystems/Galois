@@ -80,11 +80,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
     std::vector<uint64_t> numEdges_per_host;
     std::vector<std::pair<uint64_t, uint64_t>> gid2host;
+    std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
 
     Galois::VecBool gid_vecBool;
 
     uint64_t globalOffset;
     uint32_t numNodes;
+    bool isBipartite;
+    uint64_t last_nodeID_withEdges_bipartite;
     uint64_t numEdges;
 
     unsigned getHostID(uint64_t gid) const {
@@ -158,7 +161,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
 
-    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false, uint32_t VCutTheshold = 100) :  base_hGraph(host, _numHosts) {
+    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false, uint32_t VCutTheshold = 100, bool bipartite = false) :  base_hGraph(host, _numHosts) {
 
       Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT PL", 0, 0);
 
@@ -176,14 +179,29 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_local_distributed_edges.start();
       Galois::Graph::OfflineGraph g(filename);
+      isBipartite = bipartite;
 
+      uint64_t numNodes_to_divide = 0;
+      if(isBipartite){
+    	  for(auto n = 0; n < g.size(); ++n){
+    		  if(std::distance(g.edge_begin(n), g.edge_end(n))){
+                  ++numNodes_to_divide;
+                  last_nodeID_withEdges_bipartite = n;
+    		  }
+    	  }
+      }
+      else {
+    	  numNodes_to_divide = g.size();
+      }
+
+      std::cout << "Nodes to divide : " <<  numNodes_to_divide << "\n";
       base_hGraph::totalNodes = g.size();
       base_hGraph::totalEdges = g.sizeEdges();
-      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
+      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << " , Total edges : " << base_hGraph::totalEdges << "\n";
       //compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::block_range(0U, (unsigned) g.size(), i, base_hGraph::numHosts));
+          gid2host.push_back(Galois::block_range(0U, (unsigned)numNodes_to_divide, i, base_hGraph::numHosts));
       } else {
         assert(scalefactor.size() == base_hGraph::numHosts);
         unsigned numBlocks = 0;
@@ -191,7 +209,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           numBlocks += scalefactor[i];
         std::vector<std::pair<uint64_t, uint64_t>> blocks;
         for (unsigned i = 0; i < numBlocks; ++i)
-          blocks.push_back(Galois::block_range(0U, (unsigned) g.size(), i, numBlocks));
+          blocks.push_back(Galois::block_range(0U, (unsigned)numNodes_to_divide, i, numBlocks));
         std::vector<unsigned> prefixSums;
         prefixSums.push_back(0);
         for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
@@ -203,9 +221,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      /*base_hGraph::totalOwnedNodes = base_hGraph::numOwned = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;*/
-      globalOffset = gid2host[base_hGraph::id].first;
-      //std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::numOwned << "\n";
+      if(isBipartite){
+    	  uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
+    	  for (unsigned i = 0; i < base_hGraph::numHosts; ++i){
+    	    auto p = Galois::block_range(0U, (unsigned)numNodes_without_edges, i, base_hGraph::numHosts);
+    	    std::cout << " last node : " << last_nodeID_withEdges_bipartite << ", " << p.first << " , " << p.second << "\n";
+    	    gid2host_withoutEdges.push_back(std::make_pair(last_nodeID_withEdges_bipartite + p.first + 1, last_nodeID_withEdges_bipartite + p.second + 1));
+          }
+        //numOwned_withoutEdges = (gid2host_withoutEdges[base_hGraph::id].second - gid2host_withoutEdges[base_hGraph::id].first);
+        //base_hGraph::totalOwnedNodes = base_hGraph::numOwned = (gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first) + (gid2host_withoutEdges[base_hGraph::id].second - gid2host_withoutEdges[base_hGraph::id].first);
+      }
+
 
       uint64_t numEdges_distribute = g.edge_begin(gid2host[base_hGraph::id].second) - g.edge_begin(gid2host[base_hGraph::id].first); // depends on Offline graph impl
       std::cerr << "[" << base_hGraph::id << "] Total edges to distribute : " << numEdges_distribute << "\n";
@@ -369,6 +395,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
         if(gid >= gid2host[h].first && gid < gid2host[h].second)
           return h;
+        else if(isBipartite && (gid >= gid2host_withoutEdges[h].first && gid < gid2host_withoutEdges[h].second))
+          return h;
         else
           continue;
       }
@@ -474,6 +502,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //Isolated nodes
       for(auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n){
         nodesOnHost_vec.push_back(n);
+      }
+
+      if(isBipartite){
+        // Isolated nodes for bipartite graphs nodes without edges.
+        for(auto n = gid2host_withoutEdges[base_hGraph::id].first; n < gid2host_withoutEdges[base_hGraph::id].second; ++n){
+          nodesOnHost_vec.push_back(n);
+        }
       }
 
       // Only keep unique node ids in vector
