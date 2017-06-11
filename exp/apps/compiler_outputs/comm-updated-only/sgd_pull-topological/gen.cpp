@@ -693,7 +693,7 @@ int main(int argc, char** argv) {
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
       else if(vertexcut == PL_VCUT)
-        hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, VCutThreshold);
+        hg = new Graph_vertexCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, VCutThreshold, bipartite);
    }
    else {
     hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose, bipartite);
