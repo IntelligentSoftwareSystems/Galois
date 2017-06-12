@@ -239,7 +239,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
       assigned_edges_perhost.resize(base_hGraph::numHosts);
+      std::cerr << "assign_edges started\n";
       assign_edges<EdgeTy>(g, numEdges_distribute, VCutTheshold);
+      std::cerr << "assign_edges done\n";
       StatTimer_local_distributed_edges.stop();
 
       std::cerr << "exchange_edges started\n";
