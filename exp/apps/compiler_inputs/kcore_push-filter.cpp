@@ -1,4 +1,4 @@
-/** TODO -*- C++ -*-
+/**-*- C++ -*-
  * @file
  * @section License
  *
@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Compute TODO on distributed Galois using worklist.
+ * Compute KCore on distributed Galois using top-filter.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -139,7 +139,7 @@ const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
 struct NodeData {
   std::atomic<unsigned int> current_degree;
   std::atomic<unsigned int> trim;
-  std::atomic<unsigned int> flag;
+  bool flag;
 };
 
 typedef hGraph<NodeData, void> Graph;
@@ -152,6 +152,7 @@ typedef typename Graph::GraphNode GNode;
 /* Functors for running the algorithm */
 /******************************************************************************/
 
+/* Initialize: initial field setup */
 struct InitializeGraph1 {
   Graph *graph;
 
@@ -162,17 +163,19 @@ struct InitializeGraph1 {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
+    InitializeGraph2::go(_graph);
   }
 
   /* Setup intial fields */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    src_data.flag = 1;
+    src_data.flag = true;
     src_data.trim = 0;
     src_data.current_degree = 0;
   }
 };
 
+/* Degree counting */
 struct InitializeGraph2 {
   Graph *graph;
 
@@ -204,24 +207,34 @@ struct InitializeGraph2 {
  * if it is */
 struct KCoreStep1 {
   Graph* graph;
+  static Galois::DGAccumulator<int> DGAccumulator_accum;
 
   KCoreStep1(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    using namespace Galois::WorkList;
-    // TODO do we need this?
-    typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
+    //using namespace Galois::WorkList;
+    unsigned iteration = 0;
+    
+    do {
+      _graph.set_num_iter(iteration);
+      DGAccumulator_accum.reset();
+
+      Galois::do_all(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
                      Galois::loopname("KCoreStep1"));
+      KCoreStep2::go(_graph);
+
+      iteration++;
+    } while ((iterations < maxIterations) && DGAccumulator_accum.reduce());
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
     NodeData& src_data = graph->getData(src);
 
-    // do nothing if this node is dead
-    if (src_data.flag != 0) {
+    // only if node is alive we do things
+    if (src_data.flag) {
       if (src_data.current_degree < k_core_num) {
         // set flag to 0 (false) and increment trim on outgoing neighbors
-        Galois::atomicMin(src_data, 0);
+        src_data.flag = false;
+        DGAccumulator_accum += 1;
 
         for (auto current_edge = graph->edge_begin(src), 
                   end_edge = graph->edge_end(src);
@@ -231,7 +244,6 @@ struct KCoreStep1 {
            GNode dst = graph->getEdgeDst(current_edge);
            auto& dst_data = graph->getData(dst);
            Galois::atomicAdd(dst_data.trim, 1);
-           ctx.push(graph->getGID(dst)); // push onto worklist
         }
       }
     }
@@ -243,24 +255,22 @@ struct KCoreStep1 {
 struct KCoreStep2 {
   Graph* graph;
 
-  KCoreStep1(Graph* _graph) : graph(_graph){}
+  KCoreStep2(Graph* _graph) : graph(_graph){}
+
   void static go(Graph& _graph){
-    using namespace Galois::WorkList;
-    // TODO do we need this?
-    typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
-                     Galois::loopname("KCoreStep1"));
+    //using namespace Galois::WorkList;
+    Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
+                   Galois::loopname("KCoreStep2"));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
     NodeData& src_data = graph->getData(src);
 
-    // do nothing if this node is dead, else update degree with trim value
-    if (src_data.flag != 0) {
-      if (src_data.trim >= 0) {
-        unsigned int new_degree = src_data.current_degree - src_data.trim;
-        Galois::atomicMin(src_data.current_degree, new_degree);
-        Galois::atomicMin(src_data.trim, 0);
+    // only update if node is alive (no point otherwise)
+    if (src_data.flag) {
+      if (src_data.trim > 0) {
+        src_data.current_degree = src_data.current_degree - src_data.trim;
+        src_data.trim = 0;
       }
     }
   }
@@ -345,22 +355,18 @@ int main(int argc, char** argv) {
 #endif
     StatTimer_hg_init.stop();
 
-    // TODO deal with more than 1 init + op
     std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
     StatTimer_graph_init.start();
       InitializeGraph1::go((*h_graph));
-      InitializeGraph2::go((*h_graph));
     StatTimer_graph_init.stop();
 
     for (auto run = 0; run < numRuns; ++run) {
-      // TODO change names i..e BFS
       std::cout << "[" << net.ID << "] KCoreStep1::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-        // TODO
-        BFS::go((*h_graph));
+        KCoreStep1::go((*h_graph));
       StatTimer_main.stop();
 
       // re-init graph for next run
