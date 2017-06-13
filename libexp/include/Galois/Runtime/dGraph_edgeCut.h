@@ -105,7 +105,14 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
 
-    hGraph_edgeCut(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false, bool bipartite = false) : base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
+    hGraph_edgeCut(const std::string& filename, 
+                   const std::string& partitionFolder, 
+                   unsigned host, 
+                   unsigned _numHosts, 
+                   std::vector<unsigned> scalefactor, 
+                   bool transpose = false, 
+                   bool bipartite = false) : 
+                    base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
