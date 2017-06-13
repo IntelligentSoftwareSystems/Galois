@@ -1,1 +1,1 @@
-app(GateSizing GateSizing.cpp)
+app(GateSizing GateSizing.cpp FileReader.cpp)
