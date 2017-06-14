@@ -78,9 +78,6 @@ static cll::opt<std::string> partFolder("partFolder",
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
-static cll::opt<unsigned int> src_node("srcNodeId", 
-                                       cll::desc("ID of the source node"),
-                                       cll::init(0));
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
@@ -133,7 +130,7 @@ const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
 
 
 /******************************************************************************/
-/* Graph structure declarations */
+/* Graph structure declarations + other inits */
 /******************************************************************************/
 
 struct NodeData {
@@ -148,6 +145,9 @@ typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 
+// bitset for tracking updates
+Galois::DynamicBitSet bitset_dist_current;
+
 /******************************************************************************/
 /* Functors for running the algorithm */
 /******************************************************************************/
@@ -161,9 +161,91 @@ struct InitializeGraph2 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
+    struct SyncPushCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.current_degree;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return Galois::atomicAdd(node.current_degree, y);
+      }
+
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.current_degree;
+  		}
+
+  		static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        node.current_degree = y;
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+
+    bitset_dist_current.clear();
+
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
-                   Galois::loopname("InitializeGraph"), 
+                   Galois::loopname("InitializeGraph2"), 
                    Galois::numrun(_graph.get_run_identifier()));
+
+    _graph.sync_forward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+      "InitializeGraph2", bitset_dist_current);
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -176,6 +258,8 @@ struct InitializeGraph2 {
       GNode dest_node = graph->getEdgeDst(current_edge);
       NodeData& dest_data = graph->getData(dest_node);
       Galois::atomicAdd(dest_data.current_degree, (unsigned int)1);
+
+      bitset_dist_current.set(dest_node);
     }
   }
 };
@@ -189,9 +273,94 @@ struct InitializeGraph1 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
+    struct SyncPushCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.current_degree;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return Galois::set(node.current_degree, y);                         
+      }
+
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.current_degree;
+  		}
+
+  		static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        node.current_degree = y;
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    bitset_dist_current.clear();
+
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph1{&_graph}, 
-                   Galois::loopname("InitializeGraph"), 
+                   Galois::loopname("InitializeGraph1"), 
                    Galois::numrun(_graph.get_run_identifier()));
+
+    // backward because it defaults to pull (i.e. I want master to broadcast
+    // its value to slaves; it shouldn't matter which direction in you choose
+    // in any case)
+    _graph.sync_backward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+      "InitializeGraph1", bitset_dist_current);
+
+    // make sure everything is initialized
     InitializeGraph2::go(_graph);
   }
 
@@ -201,6 +370,8 @@ struct InitializeGraph1 {
     src_data.flag = true;
     src_data.trim = 0;
     src_data.current_degree = 0;
+
+    bitset_dist_current.set(src);
   }
 };
 
@@ -214,7 +385,6 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    //using namespace Galois::WorkList;
     Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
                    Galois::loopname("KCoreStep2"));
   }
@@ -241,15 +411,98 @@ struct KCoreStep1 {
 
   KCoreStep1(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    //using namespace Galois::WorkList;
+    struct SyncPushTrim {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.trim;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return Galois::atomicAdd(node.trim, y);
+      }
+
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        Galois::set(node.trim, (unsigned int)0);
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullTrim {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+  			return node.trim;
+  		}
+
+  		static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        Galois::set(node.trim, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
     unsigned iterations = 0;
     
     do {
       _graph.set_num_iter(iterations);
+
+      bitset_dist_current.clear();
       DGAccumulator_accum.reset();
 
       Galois::do_all(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
                      Galois::loopname("KCoreStep1"));
+      
+      // do the trim sync
+      _graph.sync_forward<SyncPushTrim, SyncPullTrim>("KCoreStep1",
+                                                      bitset_dist_current);
+
+      // handle trimming (locally)
       KCoreStep2::go(_graph);
 
       iterations++;
@@ -274,6 +527,8 @@ struct KCoreStep1 {
            GNode dst = graph->getEdgeDst(current_edge);
            auto& dst_data = graph->getData(dst);
            Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+
+           bitset_dist_current.set(dst);
         }
       }
     }
@@ -359,6 +614,9 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+
+    bitset_dist_current.resize(h_graph->get_local_total_nodes());
+
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
