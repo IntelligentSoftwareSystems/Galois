@@ -29,19 +29,22 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/TypeTraits.h"
 #include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include "Verilog.h"
+
 #include <utility>
 #include <vector>
 #include <algorithm>
 #include <iostream>
-
-#include <iostream>
 #include <fstream>
+#include <string>
+#include <unordered_set>
+#include <unordered_map>
 
 const char* name = "Gate Sizing";
 const char* desc = 0;
@@ -54,35 +57,57 @@ static cll::opt<std::string> outputCircuit("out", cll::desc("path to the gate-si
 static cll::opt<std::string> sdc("sdc", cll::desc("path to the sdc file"));
 
 static double maxDelay = 0.0;
+static std::string moduleName;
+
+struct Pin {
+  std::string portName;
+};
 
 struct Node {
-  ;
+  std::string gateName;
+  std::string gateType;
+  Pin outPin;
+  Pin wireName;
 };
 
 struct Edge {
-  ;
+  Pin inPin;
 };
 
 //typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
-typedef Galois::Graph::FirstGraph<std::string, std::string, true, true> Graph;
+typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
 typedef Graph::GraphNode GNode;
+
+Graph graph;
+std::unordered_map<std::string, GNode> nodeMap;
+std::unordered_set<GNode> primaryInputs, primaryOutputs;
 
 void readCellLib() {
   ;
 }
 
-void readCircuit() {
-  ;
-}
-
 void readSDC() {
   if (!sdc.empty()) {
-    ifstream ifs(sdc);
-    maxDelay = 0.0; // parse from sdc
+    std::ifstream ifs(sdc);
+    if (ifs.is_open()) {
+      std::string s1, s2;
+      ifs >> s1 >> s2 >> maxDelay;
+      std::cout << "maxDelay = " << maxDelay << std::endl;
+    } else {
+      std::cout << "Cannot open " << sdc << ". Set maxDelay = 0.0" << std::endl;
+    }
   }
 }
 
+void constructCircuitGraph(VerilogModule& v) {
+
+}
+
 void doGateSizing() {
+
+}
+
+void printGraph() {
 
 }
 
@@ -98,13 +123,17 @@ int main(int argc, char** argv) {
   T.start();
 
   readCellLib();
-  readCircuit();
+  VerilogModule vModule(inputCircuit);
+  vModule.printVerilogModule();
   readSDC();
 
+  constructCircuitGraph(vModule);
   doGateSizing();
+  printGraph();
   writeCircuit();
 
   T.stop();
 
   return 0;
 }
+
