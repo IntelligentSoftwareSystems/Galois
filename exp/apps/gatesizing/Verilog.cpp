@@ -5,6 +5,7 @@ VerilogModule::~VerilogModule() {
   for (auto item: inputs) {
      delete item.second;
   }
+
   for (auto item: outputs) {
     delete item.second;
   }

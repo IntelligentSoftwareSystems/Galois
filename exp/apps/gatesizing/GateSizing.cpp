@@ -35,6 +35,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include "CellLib.h"
 #include "Verilog.h"
 
 #include <utility>
@@ -82,10 +83,6 @@ Graph graph;
 std::unordered_map<std::string, GNode> nodeMap;
 std::unordered_set<GNode> primaryInputs, primaryOutputs;
 
-void readCellLib() {
-  ;
-}
-
 void readSDC() {
   if (!sdc.empty()) {
     std::ifstream ifs(sdc);
@@ -122,7 +119,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T("TotalTime");
   T.start();
 
-  readCellLib();
+  CellLib cellLib(lib);
   VerilogModule vModule(inputCircuit);
   vModule.printVerilogModule();
   readSDC();

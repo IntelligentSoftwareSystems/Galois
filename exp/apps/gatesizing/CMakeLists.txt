@@ -1,1 +1,1 @@
-app(GateSizing GateSizing.cpp FileReader.cpp Verilog.cpp)
+app(GateSizing GateSizing.cpp FileReader.cpp Verilog.cpp CellLib.cpp)
