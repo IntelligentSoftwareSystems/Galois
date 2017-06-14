@@ -72,6 +72,7 @@ enum ConvertMode {
   gr2sorteddstgr,
   gr2sortedparentdegreegr,
   gr2sortedweightgr,
+  gr2sortedbfsgr,
   gr2streegr,
   gr2tgr,
   gr2treegr,
@@ -144,6 +145,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2sorteddstgr, "Sort outgoing edges of binary gr by edge destination"),
       clEnumVal(gr2sortedparentdegreegr, "Sort nodes by degree of parent"),
       clEnumVal(gr2sortedweightgr, "Sort outgoing edges of binary gr by edge weight"),
+      clEnumVal(gr2sortedbfsgr, "Sort nodes by a BFS traversal from the source (greedy)"),
       clEnumVal(gr2streegr, "Convert binary gr to strongly connected graph by adding symmetric tree overlay"),
       clEnumVal(gr2tgr, "Transpose binary gr"),
       clEnumVal(gr2treegr, "Overlay tree"),
@@ -154,6 +156,8 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
       clEnumVal(svmlight2gr, "Convert svmlight file to binary gr"),
       clEnumValEnd), cll::Required);
+static cll::opt<uint32_t> sourceNode("sourceNode", 
+    cll::desc("Source node ID for BFS traversal"), cll::init(0));
 static cll::opt<int> numParts("numParts", 
     cll::desc("number of parts to partition graph into"), cll::init(64));
 static cll::opt<int> maxValue("maxValue",
@@ -702,7 +706,66 @@ struct RandomizeNodes: public Conversion {
     outputPermutation(perm);
 
     out.toFile(outfilename);
-    printStatus(graph.size(), graph.sizeEdges());
+    printStatus(out.size(), out.sizeEdges());
+  }
+};
+
+struct SortByBFS: public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef Galois::LargeArray<GNode> Permutation;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    Permutation perm;
+    perm.create(graph.size());
+    GNode perm_index = 0;
+
+    // perform a BFS traversal
+    std::vector<GNode> curr, next;
+    Galois::LargeArray<bool> visited;
+    visited.create(graph.size());
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode node = *ii;
+      visited[node] = false;
+    }
+    GNode src = sourceNode;
+    visited[src] = true;
+    next.push_back(src);
+    while (!next.empty()) {
+      size_t wl_size = next.size();
+      curr.resize(wl_size);
+      std::copy(next.begin(), next.end(), curr.begin());
+      next.clear();
+      for (size_t i = 0; i < wl_size; ++i) {
+        GNode node = curr[i];
+        perm[node] = perm_index++;
+        for (Graph::edge_iterator jj = graph.edge_begin(node), ej = graph.edge_end(node); jj != ej; ++jj) {
+          GNode dst = graph.getEdgeDst(jj);
+          if (visited[dst] == false) {
+            visited[dst] = true;
+            next.push_back(dst);
+          }
+        }
+      }
+    }
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode node = *ii;
+      if (visited[node] == false) {
+        perm[node] = perm_index++;
+      }
+    }
+    assert(perm_index == graph.size());
+
+    Graph out;
+    Galois::Graph::permute<EdgeTy>(graph, perm, out);
+    outputPermutation(perm);
+
+    out.toFile(outfilename);
+    printStatus(out.size(), out.sizeEdges());
   }
 };
 
@@ -2377,6 +2440,7 @@ int main(int argc, char** argv) {
     case gr2sorteddstgr: convert<SortEdges<IdLess, false> >(); break; 
     case gr2sortedparentdegreegr: convert<SortByHighDegreeParent>(); break;
     case gr2sortedweightgr: convert<SortEdges<WeightLess, true> >(); break;
+    case gr2sortedbfsgr: convert<SortByBFS>(); break;
     case gr2streegr: convert<AddTree<true>>(); break; 
     case gr2tgr: convert<Transpose>(); break;
     case gr2treegr: convert<AddTree<false>>(); break; 
