@@ -348,6 +348,8 @@ if(USE_GGC)
   target_link_libraries(pagerank_pull-topological_comm-updated-only_cuda ggrt)
 endif()
 
+app(kcore_push-filter kcore_push-filter/gen.cpp DISTSAFE)
+
 #### CheckPointing ####
 app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP PRIVATE __HETEROGENEOUS_GALOIS_DEPRECATED__=1)
