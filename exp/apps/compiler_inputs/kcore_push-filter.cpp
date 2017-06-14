@@ -152,15 +152,44 @@ typedef typename Graph::GraphNode GNode;
 /* Functors for running the algorithm */
 /******************************************************************************/
 
+/* Degree counting
+ * Called by InitializeGraph1 */
+struct InitializeGraph2 {
+  Graph *graph;
+
+  InitializeGraph2(Graph* _graph) : graph(_graph){}
+
+  /* Initialize the entire graph node-by-node */
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
+                   Galois::loopname("InitializeGraph"), 
+                   Galois::numrun(_graph.get_run_identifier()));
+  }
+
+  /* Calculate degree of nodes by checking how many nodes have it as a dest and
+   * adding for every dest */
+  void operator()(GNode src) const {
+    for (auto current_edge = graph->edge_begin(src), 
+              end_edge = graph->edge_end(src);
+         current_edge != end_edge;
+         current_edge++) {
+      GNode dest_node = graph->getEdgeDst(current_edge);
+      NodeData& dest_data = graph->getData(dest_node);
+      Galois::atomicAdd(dest_data.current_degree, (unsigned int)1);
+    }
+  }
+};
+
+
 /* Initialize: initial field setup */
 struct InitializeGraph1 {
   Graph *graph;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+  InitializeGraph1(Graph* _graph) : graph(_graph){}
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph1{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
     InitializeGraph2::go(_graph);
@@ -175,30 +204,31 @@ struct InitializeGraph1 {
   }
 };
 
-/* Degree counting */
-struct InitializeGraph2 {
-  Graph *graph;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+/* Use the trim value (i.e. number of incident nodes that have been removed)
+ * to update degrees.
+ * Called by KCoreStep1 */
+struct KCoreStep2 {
+  Graph* graph;
 
-  /* Initialize the entire graph node-by-node */
-  void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
-                   Galois::loopname("InitializeGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+  KCoreStep2(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph){
+    //using namespace Galois::WorkList;
+    Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
+                   Galois::loopname("KCoreStep2"));
   }
 
-  /* Calculate degree of nodes by checking how many nodes have it as a dest and
-   * adding for every dest */
   void operator()(GNode src) const {
-    for (auto current_edge = graph.edge_begin(src), 
-              end_edge = graph.edge_end(src);
-         current_edge != end_edge;
-         current_edge++;) {
-      GNode dest_node = graph->getEdgeDst(current_edge);
-      NodeData& dest_data = graph->getData(dest_node);
-      Galois::atomicAdd(dest_data.current_degree, 1);
-    }
+    NodeData& src_data = graph->getData(src);
+
+    // only update if node is alive (no point otherwise)
+    //if (src_data.flag) {
+      if (src_data.trim > 0) {
+        src_data.current_degree -= src_data.trim;
+        src_data.trim = 0;
+      }
+    //}
   }
 };
 
@@ -212,21 +242,21 @@ struct KCoreStep1 {
   KCoreStep1(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     //using namespace Galois::WorkList;
-    unsigned iteration = 0;
+    unsigned iterations = 0;
     
     do {
-      _graph.set_num_iter(iteration);
+      _graph.set_num_iter(iterations);
       DGAccumulator_accum.reset();
 
       Galois::do_all(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
                      Galois::loopname("KCoreStep1"));
       KCoreStep2::go(_graph);
 
-      iteration++;
+      iterations++;
     } while ((iterations < maxIterations) && DGAccumulator_accum.reduce());
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     // only if node is alive we do things
@@ -243,39 +273,15 @@ struct KCoreStep1 {
 
            GNode dst = graph->getEdgeDst(current_edge);
            auto& dst_data = graph->getData(dst);
-           Galois::atomicAdd(dst_data.trim, 1);
+           Galois::atomicAdd(dst_data.trim, (unsigned int)1);
         }
       }
     }
   }
 };
- 
-/* Use the trim value (i.e. number of incident nodes that have been removed)
- * to update degrees */
-struct KCoreStep2 {
-  Graph* graph;
 
-  KCoreStep2(Graph* _graph) : graph(_graph){}
-
-  void static go(Graph& _graph){
-    //using namespace Galois::WorkList;
-    Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
-                   Galois::loopname("KCoreStep2"));
-  }
-
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
-    NodeData& src_data = graph->getData(src);
-
-    // only update if node is alive (no point otherwise)
-    if (src_data.flag) {
-      if (src_data.trim > 0) {
-        src_data.current_degree = src_data.current_degree - src_data.trim;
-        src_data.trim = 0;
-      }
-    }
-  }
-};
-
+// accumulator initialization (?; required or the linking complains)
+Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Main method for running */
@@ -373,7 +379,7 @@ int main(int argc, char** argv) {
       if ((run + 1) != numRuns) {
         Galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
-        InitializeGraph::go((*h_graph));
+        InitializeGraph1::go((*h_graph));
       }
     }
 
@@ -386,10 +392,13 @@ int main(int argc, char** argv) {
 #endif
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                         (*h_graph).getData(*ii).dist_current);
+            // prints the flag and current (out) degree of a node
+            Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
+                                         (*h_graph).getData(*ii).flag,
+                                         (*h_graph).getData(*ii).current_degree);
         }
 #ifdef __GALOIS_HET_CUDA__
+      // TODO (Loc) I haven't handled this yet
       } else if (personality == GPU_CUDA) {
         for(auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
