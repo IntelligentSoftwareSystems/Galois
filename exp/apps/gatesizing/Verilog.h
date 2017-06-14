@@ -2,6 +2,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#ifndef GALOIS_VERILOG_H
+#define GALOIS_VERILOG_H
+
 struct VerilogGate;
 struct VerilogWire;
 
@@ -35,4 +38,6 @@ struct VerilogModule {
 
   void printVerilogModule();
 };
+
+#endif // GALOIS_VERILOG_H
 

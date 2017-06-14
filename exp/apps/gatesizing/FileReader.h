@@ -2,6 +2,9 @@
 #include <string>
 #include <fstream>
 
+#ifndef GALOIS_FILEREADER_H
+#define GALOIS_FILEREADER_H
+
 class FileReader {
   char *buffer, *bufferEnd, *cursor;
   size_t fileSize;
@@ -21,4 +24,6 @@ public:
   ~FileReader();
   std::string nextToken();
 };
+
+#endif // GALOIS_FILEREADER_H
 
