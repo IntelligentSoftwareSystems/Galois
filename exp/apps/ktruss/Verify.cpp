@@ -237,7 +237,8 @@ int main(int argc, char **argv) {
     for (auto e: shouldBeValid) {
       std::cerr << "(" << e.first << ", " << e.second << ") should be valid" << std::endl;
     }
-    GALOIS_DIE("Verification failed!");
+    std::cerr << "Verification failed!" << std::endl;
+    return 1;
   }
 
   return 0;
