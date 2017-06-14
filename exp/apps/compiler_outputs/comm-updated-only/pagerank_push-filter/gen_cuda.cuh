@@ -9,7 +9,7 @@
 struct CUDA_Context : public CUDA_Context_Common {
 	struct CUDA_Context_Field<unsigned int> nout;
 	struct CUDA_Context_Field<float> residual;
-	struct CUDA_Context_Field<float> residual_old;
+	struct CUDA_Context_Field<float> delta;
 	struct CUDA_Context_Field<float> value;
 };
 
@@ -28,13 +28,13 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 	size_t mem_usage = mem_usage_CUDA_common(g, num_hosts);
 	mem_usage += mem_usage_CUDA_field(&ctx->nout, g, num_hosts);
 	mem_usage += mem_usage_CUDA_field(&ctx->residual, g, num_hosts);
-	mem_usage += mem_usage_CUDA_field(&ctx->residual_old, g, num_hosts);
+	mem_usage += mem_usage_CUDA_field(&ctx->delta, g, num_hosts);
 	mem_usage += mem_usage_CUDA_field(&ctx->value, g, num_hosts);
 	printf("[%d] Host memory for communication context: %3u MB\n", ctx->id, mem_usage/1048756);
 	load_graph_CUDA_common(ctx, g, num_hosts);
 	load_graph_CUDA_field(ctx, &ctx->nout, num_hosts);
 	load_graph_CUDA_field(ctx, &ctx->residual, num_hosts);
-	load_graph_CUDA_field(ctx, &ctx->residual_old, num_hosts);
+	load_graph_CUDA_field(ctx, &ctx->delta, num_hosts);
 	load_graph_CUDA_field(ctx, &ctx->value, num_hosts);
 	reset_CUDA_context(ctx);
 }
@@ -42,7 +42,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->nout.data.zero_gpu();
 	ctx->residual.data.zero_gpu();
-	ctx->residual_old.data.zero_gpu();
+	ctx->delta.data.zero_gpu();
 	ctx->value.data.zero_gpu();
 }
 
