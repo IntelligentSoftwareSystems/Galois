@@ -364,3 +364,5 @@ app(bfs_pull-topological_DiskCP_tmpfs_noFsync checkpointing/bfs_pull-topological
 target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs_noFsync PRIVATE __HETEROGENEOUS_GALOIS_DEPRECATED__=1)
 target_compile_definitions(bfs_pull-topological_DiskCP_tmpfs_noFsync PRIVATE __TMPFS__=1 __CHECKPOINT__NO_FSYNC__=1)
 
+#### SGD EXP ####
+app(sgd_pull-topological_comm-updated-only comm-updated-only/sgd_pull-topological/gen.cpp DISTSAFE)
