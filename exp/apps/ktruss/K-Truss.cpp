@@ -54,6 +54,7 @@ static const char* url = "k_truss";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<unsigned int> trussNum("trussNum", cll::desc("report trussNum-trusses"), cll::Required);
+static cll::opt<std::string> outName("o", cll::desc("output file for the edgelist of resulting truss"));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), 
   cll::values(
     clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"), 
@@ -112,8 +113,16 @@ size_t countValidNodes(G& g) {
 
 template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
-  std::string outName = algoName + "-" + std::to_string(k) + "-truss.edgelist";
+  if (outName.empty()) {
+    return;
+  }
+
   std::ofstream of(outName);
+  if (!of.is_open()) {
+    std::cerr << "Cannot open " << outName << " for output." << std::endl;
+    return;
+  }
+
   for (auto n: g) {
     for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
