@@ -37,6 +37,7 @@
 
 #include "CellLib.h"
 #include "Verilog.h"
+#include "Sdc.h"
 
 #include <utility>
 #include <vector>
@@ -55,24 +56,12 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputCircuit(cll::Positional, cll::desc("<input .v>"), cll::Required);
 static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"), cll::Required);
 static cll::opt<std::string> outputCircuit("out", cll::desc("path to the gate-sized .v"), cll::Required);
-static cll::opt<std::string> sdc("sdc", cll::desc("path to the sdc file"));
-
-static double maxDelay = 0.0;
-static std::string moduleName;
-
-struct Pin {
-  std::string portName;
-};
+static cll::opt<std::string> sdcFile("sdc", cll::desc("path to the sdc file"));
 
 struct Node {
-  std::string gateName;
-  std::string gateType;
-  Pin outPin;
-  Pin wireName;
 };
 
 struct Edge {
-  Pin inPin;
 };
 
 //typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
@@ -80,21 +69,6 @@ typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
-std::unordered_map<std::string, GNode> nodeMap;
-std::unordered_set<GNode> primaryInputs, primaryOutputs;
-
-void readSDC() {
-  if (!sdc.empty()) {
-    std::ifstream ifs(sdc);
-    if (ifs.is_open()) {
-      std::string s1, s2;
-      ifs >> s1 >> s2 >> maxDelay;
-      std::cout << "maxDelay = " << maxDelay << std::endl;
-    } else {
-      std::cout << "Cannot open " << sdc << ". Set maxDelay = 0.0" << std::endl;
-    }
-  }
-}
 
 void constructCircuitGraph(VerilogModule& v) {
 
@@ -116,17 +90,20 @@ int main(int argc, char** argv) {
   T.start();
 
   CellLib cellLib(lib);
-  //cellLib.printCellLibDebug();
+  cellLib.printCellLibDebug();
   VerilogModule vModule(inputCircuit, cellLib);
-  //vModule.printVerilogModuleDebug();
-  readSDC();
+  vModule.printVerilogModuleDebug();
+  SDC sdc(sdcFile);
+  sdc.printSdcDebug();
 
   constructCircuitGraph(vModule);
+  printGraph();
+
   doGateSizing();
   printGraph();
-  vModule.writeVerilogModule(outputCircuit);
 
   T.stop();
+  vModule.writeVerilogModule(outputCircuit);
 
   return 0;
 }
