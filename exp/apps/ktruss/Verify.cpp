@@ -136,7 +136,7 @@ bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
     dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
 
   while (true) {
-  // find the first valid edge
+    // find the first valid edge
     while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
       ++srcI;
     }
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
 
   // every valid node should have at least trussNum-1 valid neighbors
   // so # valid edges >= smallest # directed edges among valid nodes
-  assert((validNum.first * (trussNum-1)) <= valid.second * 2);
+  assert((validNum.first * (trussNum-1)) <= validNum.second * 2);
 
   // symmetry breaking: 
   // consider only edges (i, j) where i < j
