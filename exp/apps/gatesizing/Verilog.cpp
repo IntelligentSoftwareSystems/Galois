@@ -19,7 +19,7 @@ VerilogModule::~VerilogModule() {
   }
 }
 
-VerilogModule::VerilogModule(std::string inName) {
+VerilogModule::VerilogModule(std::string inName, CellLib& cellLib) {
   char delimiters[] = {
     '(', ')',
     ',', ':', ';', 
@@ -46,25 +46,15 @@ VerilogModule::VerilogModule(std::string inName) {
       } while (token != ";");
     }
 
-    // input port1, port2, ..., portN;
-    else if (token == "input") {
+    // input/output port1, port2, ..., portN;
+    else if (token == "input" || token == "output") {
+      auto& primary = (token == "input") ? inputs : outputs;
       for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
         VerilogPin *pin = new VerilogPin;
+        pin->name = token;
         pin->gate = nullptr;
         pin->wire = nullptr;
-        pin->name = token;
-        inputs.insert({token, pin});
-      }
-    }
-
-    // output port1, port2, ..., portN;
-    else if (token == "output") {
-      for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
-        VerilogPin *pin = new VerilogPin;
-        pin->gate = nullptr;
-        pin->wire = nullptr;
-        pin->name = token;
-        outputs.insert({token, pin});
+        primary.insert({token, pin});
       }
     }
 
@@ -74,6 +64,7 @@ VerilogModule::VerilogModule(std::string inName) {
         VerilogWire *wire = new VerilogWire;
         wire->name = token;
         wire->root = nullptr;
+        wire->wireLoad = cellLib.defaultWireLoad;
         wires.insert({token, wire});
       }
     }
@@ -85,14 +76,13 @@ VerilogModule::VerilogModule(std::string inName) {
     // logic gates: gateType gateName ( .port1 (wire1), .port2 (wire2), ... .portN (wireN) );
     else {
       VerilogGate *gate = new VerilogGate;
-      gate->typeName = token;
+      gate->cell = cellLib.cells.at(token);
       gate->name = fRd.nextToken();
       gates.insert({gate->name, gate});
       fRd.nextToken(); // get "("
 
       // get pins and wire connections
-      token = fRd.nextToken();
-      while (token != ")") {
+      for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
         if (token[0] != '.') {
           std::cerr << "Error: expecting .pinName(wrieName)" << std::endl;
           std::abort();
@@ -101,19 +91,18 @@ VerilogModule::VerilogModule(std::string inName) {
         VerilogPin *pin = new VerilogPin;
         pin->name = token.substr(1);
         pin->gate = gate;
+
         fRd.nextToken(); // get "("
         pin->wire = wires.at(fRd.nextToken());
         fRd.nextToken(); // get ")"
 
-        // output is the last pin
-        // FIXME: should connect according to cell lib instead of ordering
-        token = fRd.nextToken();
-        if (token == ")") {
+        auto cellPin = gate->cell->cellPins.at(pin->name);
+        if (cellPin->pinType == PIN_OUTPUT) {
           pin->wire->root = pin;
-          gate->outPin = pin;
+          gate->outPins.insert(pin);
         }
-        else {
-          pin->wire->leaves.insert(pin);      
+        else if (cellPin->pinType == PIN_INPUT) {
+          pin->wire->leaves.insert(pin);
           gate->inPins.insert(pin);
         }
       }
@@ -137,7 +126,7 @@ VerilogModule::VerilogModule(std::string inName) {
   }
 }
 
-void VerilogModule::printVerilogModule() {
+void VerilogModule::printVerilogModuleDebug() {
   std::cout << "module " << name << std::endl;
   for (auto item: inputs) {
     auto i = item.second;
@@ -154,14 +143,14 @@ void VerilogModule::printVerilogModule() {
     std::cout << "wire " << w->name << ": from ";
     // input/output wires don't have gates
     if (w->root->gate) {
-      std::cout << w->root->gate->name << ".";
+      std::cout << w->root->gate->cell->name << ".";
     }
     std::cout << w->root->name << " to ";
 
     for (auto p: w->leaves) {
       // input/output wires don't have gates
       if (p->gate) {
-        std::cout << p->gate->name << ".";
+        std::cout << p->gate->cell->name << ".";
       }
       std::cout << p->name << " ";
     }
@@ -170,12 +159,14 @@ void VerilogModule::printVerilogModule() {
 
   for (auto item: gates) {
     auto g = item.second;
-    std::cout << "gate: " << g->typeName << " " << g->name << "(";
+    std::cout << "gate: " << g->cell->name << " " << g->name << "(";
     for (auto p: g->inPins) {
-      std::cout << "." << p->name << " (" << p->wire->name << "), ";
+      std::cout << "." << p->name << " (" << p->wire->name << ") ";
     }
-    auto p = g->outPin;
-    std::cout << "." << p->name << "(" << p->wire->name << "));" << std::endl;
+    for (auto p: g->outPins) {
+      std::cout << "." << p->name << " (" << p->wire->name << ") ";
+    }
+    std::cout << ");" << std::endl;
   }
 }
 
