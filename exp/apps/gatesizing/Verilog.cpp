@@ -172,3 +172,107 @@ void VerilogModule::printVerilogModuleDebug() {
   }
 }
 
+static void writeVerilogIOs(std::ofstream& of, std::string portTypeName, std::unordered_map<std::string, VerilogPin *>& ports) {
+  // input/output port1, port2, ...;
+  of << "  " << portTypeName << " ";
+  size_t i = 0, num = ports.size();
+  for (auto item: ports) {
+    of << item.second->name;
+    num--;
+    i++;
+    if (num) {
+      of << ", ";
+      if (0 == i % 10) {
+        of << "\n      ";
+      }
+    }
+    else {
+      of << ";" << std::endl;
+    }
+  }
+}
+
+static void writeVerilogWires(std::ofstream& of, std::unordered_map<std::string, VerilogWire *>& wires) {
+  size_t i = 0, num = wires.size();
+
+  // wire wire1, wire2, ...;
+  of << "  wire ";
+  for (auto item: wires) {
+    of << item.second->name;
+    num--;
+    i++;
+    if (num) {
+      of << ((0 == i % 10) ? ";\n  wire " : ", ");
+    }
+    else {
+      of << ";" << std::endl;
+    }
+  }
+}
+
+void VerilogModule::writeVerilogModule(std::string outName) {
+  std::ofstream of(outName);
+  if (!of.is_open()) {
+    std::cerr << "Cannot open " << outName << " to write." << std::endl;
+    return;
+  }
+
+  size_t i = 0, num;
+
+  // module moduleName (port1, port2, ...);
+  of << "module " << name << "(";
+  num = inputs.size() + outputs.size();
+  for (auto item: inputs) {
+    of << item.second->name;
+    num--;
+    i++;
+    if (num) {
+      of << ", ";
+      if (0 == i % 10) {
+        of << "\n    ";
+      }
+    }
+    else {
+      of << ");" << std::endl;
+    }
+  }
+  for (auto item: outputs) {
+    of << item.second->name;
+    num--;
+    i++;
+    if (num) {
+      of << ", ";
+      if (0 == i % 10) {
+        of << "\n    ";
+      }
+    }
+    else {
+      of << ");" << std::endl;
+    }
+  }
+
+  writeVerilogIOs(of, "input", inputs);
+  writeVerilogIOs(of, "output", outputs);
+
+  writeVerilogWires(of, wires);
+
+  for (auto item: gates) {
+    auto g = item.second;
+    of << "  " << g->cell->name << " " << g->name << "(";
+    num = g->cell->cellPins.size();
+    for (auto p: g->inPins) {
+      of << "." << p->name << " (" << p->wire->name << ")";
+      num--;
+      of << ((num) ? ", " : ");");
+    }
+    for (auto p: g->outPins) {
+      of << "." << p->name << " (" << p->wire->name << ")";
+      num--;
+      of << ((num) ? ", " : ");");
+    }
+    of << std::endl;
+  }
+
+  of << "endmodule" << std::endl;
+}
+

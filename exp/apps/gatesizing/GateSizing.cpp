@@ -108,10 +108,6 @@ void printGraph() {
 
 }
 
-void writeCircuit() {
-
-}
-
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
@@ -120,15 +116,15 @@ int main(int argc, char** argv) {
   T.start();
 
   CellLib cellLib(lib);
-  cellLib.printCellLibDebug();
+  //cellLib.printCellLibDebug();
   VerilogModule vModule(inputCircuit, cellLib);
-  vModule.printVerilogModuleDebug();
+  //vModule.printVerilogModuleDebug();
   readSDC();
 
   constructCircuitGraph(vModule);
   doGateSizing();
   printGraph();
-  writeCircuit();
+  vModule.writeVerilogModule(outputCircuit);
 
   T.stop();
 

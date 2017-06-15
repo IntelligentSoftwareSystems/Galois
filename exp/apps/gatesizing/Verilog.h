@@ -40,6 +40,7 @@ struct VerilogModule {
   ~VerilogModule();
 
   void printVerilogModuleDebug();
+  void writeVerilogModule(std::string outName);
 };
 
 #endif // GALOIS_VERILOG_H
