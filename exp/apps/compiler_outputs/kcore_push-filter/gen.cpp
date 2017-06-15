@@ -25,6 +25,10 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+/******************************************************************************/
+/* This was manually genereted, not compiler generated */
+/******************************************************************************/
+
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -650,6 +654,12 @@ int main(int argc, char** argv) {
             Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
                                          (*h_graph).getData(*ii).flag,
                                          (*h_graph).getData(*ii).current_degree);
+
+          if (!((*h_graph).getData(*ii).flag)) {
+            assert((*h_graph).getData(*ii).current_degree < k_core_num);
+          } else {
+            assert((*h_graph).getData(*ii).current_degree >= k_core_num);
+          }
         }
 #ifdef __GALOIS_HET_CUDA__
       // TODO (Loc) I haven't handled this yet

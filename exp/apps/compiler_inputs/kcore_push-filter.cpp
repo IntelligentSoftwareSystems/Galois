@@ -78,9 +78,6 @@ static cll::opt<std::string> partFolder("partFolder",
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
-static cll::opt<unsigned int> src_node("srcNodeId", 
-                                       cll::desc("ID of the source node"),
-                                       cll::init(0));
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
@@ -128,8 +125,6 @@ static cll::opt<int> num_nodes("num_nodes",
                                 "host automatically"), 
                       cll::init(-1));
 #endif
-
-const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
 
 
 /******************************************************************************/
@@ -292,8 +287,6 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
                                 (unsigned long)maxIterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
-                                (unsigned long)src_node, 0);
     Galois::StatManager statManager;
 
 
@@ -391,11 +384,17 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
+          if ((*h_graph).isOwned((*h_graph).getGID(*ii)))
             // prints the flag and current (out) degree of a node
             Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
                                          (*h_graph).getData(*ii).flag,
                                          (*h_graph).getData(*ii).current_degree);
+
+          if (!((*h_graph).getData(*ii).flag)) {
+            assert((*h_graph).getData(*ii).current_degree < k_core_num);
+          } else {
+            assert((*h_graph).getData(*ii).current_degree >= k_core_num);
+          }
         }
 #ifdef __GALOIS_HET_CUDA__
       // TODO (Loc) I haven't handled this yet
