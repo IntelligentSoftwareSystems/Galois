@@ -126,8 +126,6 @@ static cll::opt<int> num_nodes("num_nodes",
                       cll::init(-1));
 #endif
 
-const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
-
 
 /******************************************************************************/
 /* Graph structure declarations + other inits */
@@ -547,8 +545,6 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
                                 (unsigned long)maxIterations, 0);
-    Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
-                                (unsigned long)src_node, 0);
     Galois::StatManager statManager;
 
 
