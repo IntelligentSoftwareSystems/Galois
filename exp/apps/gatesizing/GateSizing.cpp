@@ -43,9 +43,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <unordered_set>
 #include <unordered_map>
 
 const char* name = "Gate Sizing";
@@ -81,8 +79,87 @@ typedef Graph::GraphNode GNode;
 
 Graph graph;
 
-void constructCircuitGraph(VerilogModule& v) {
+std::unordered_map<VerilogPin *, GNode> nodeMap;
+GNode dummySrc, dummySink;
 
+void constructCircuitGraph() {
+  auto unprotected = Galois::MethodFlag::UNPROTECTED;
+
+  dummySrc = graph.createNode();
+  graph.addNode(dummySrc, unprotected);
+  graph.getData(dummySrc, unprotected).pin = nullptr;
+
+  dummySink = graph.createNode();
+  graph.addNode(dummySink, unprotected);
+  graph.getData(dummySink, unprotected).pin = nullptr;
+
+  // create nodes for all input pins 
+  // and connect dummySrc to them
+  for (auto item: vModule.inputs) {
+    auto pin = item.second;
+    auto n = graph.createNode();
+    nodeMap.insert({pin, n});
+
+    graph.addNode(n, unprotected);
+    graph.getData(n, unprotected).pin = pin;
+
+    auto e = graph.addMultiEdge(dummySrc, n, unprotected);
+    graph.getEdgeData(e).wire = nullptr;
+  }
+
+  // create nodes for all output pins 
+  // and connect them to dummySink
+  for (auto item: vModule.outputs) {
+    auto pin = item.second;
+    auto n = graph.createNode();
+    nodeMap.insert({pin, n});
+
+    graph.addNode(n, unprotected);
+    graph.getData(n, unprotected).pin = pin;
+
+    auto e = graph.addMultiEdge(n, dummySink, unprotected);
+    graph.getEdgeData(e).wire = nullptr;
+  }
+
+  // create pins for all gates 
+  // and connect all their inputs to all their outputs
+  for (auto item: vModule.gates) {
+    auto gate = item.second;
+
+    for (auto pin: gate->outPins) {
+      auto n = graph.createNode();
+      nodeMap.insert({pin, n});
+
+      graph.addNode(n, unprotected);
+      graph.getData(n, unprotected).pin = pin;
+    }
+
+    for (auto pin: gate->inPins) {
+      auto n = graph.createNode();
+      nodeMap.insert({pin, n});
+
+      graph.addNode(n, unprotected);
+      graph.getData(n, unprotected).pin = pin;
+
+      auto inPinNode = nodeMap.at(pin);
+      for (auto outPin: gate->outPins) {
+        auto outPinNode = nodeMap.at(outPin);
+        auto e = graph.addMultiEdge(inPinNode, outPinNode, unprotected);
+        graph.getEdgeData(e).wire = nullptr;
+      }
+    }
+  } // end for all gates
+
+  // connect pins according to verilog wires
+  for (auto item: vModule.wires) {
+    auto wire = item.second;
+    auto rootNode = nodeMap.at(wire->root);
+    for (auto leaf: wire->leaves) {
+      auto leafNode = nodeMap.at(leaf);
+      auto e = graph.addMultiEdge(rootNode, leafNode, unprotected);
+      graph.getEdgeData(e).wire = wire;
+    }
+  }
 }
 
 void doGateSizing() {
@@ -90,7 +167,69 @@ void doGateSizing() {
 }
 
 void printGraph() {
+  auto unprotected = Galois::MethodFlag::UNPROTECTED;
 
+  for (auto n: graph) {
+    std::cout << "node: ";
+    auto pin = graph.getData(n, unprotected).pin;
+    if (pin) {
+      if (pin->gate) {
+        std::cout << pin->gate->name << ".";
+      }
+      std::cout << pin->name;
+    }
+    else {
+      if (!std::distance(graph.edge_begin(n, unprotected), graph.edge_end(n, unprotected))) {
+        std::cout << "dummySink";
+      }
+      else if (!std::distance(graph.in_edge_begin(n, unprotected), graph.in_edge_end(n, unprotected))) {
+        std::cout << "dummySrc";
+      }
+    }
+    std::cout << std::endl;
+
+    for (auto oe: graph.edges(n)) {
+      auto pin = graph.getData(graph.getEdgeDst(oe), unprotected).pin;
+      std::cout << "  outgoing edge to ";
+      if (pin) {
+        if (pin->gate) {
+          std::cout << pin->gate->name << ".";
+        }
+        std::cout << pin->name;
+      }
+      else {
+        std::cout << "dummySink";
+      }
+
+      auto wire = graph.getEdgeData(oe).wire;
+      if (wire) {
+        std::cout << " (wire " << wire->name << ")";
+      }
+
+      std::cout << std::endl;
+   }
+
+   for (auto ie: graph.in_edges(n)) {
+      auto pin = graph.getData(graph.getEdgeDst(ie), unprotected).pin;
+      std::cout << "  incoming edge from ";
+      if (pin) {
+        if (pin->gate) {
+          std::cout << pin->gate->name << ".";
+        }
+        std::cout << pin->name;
+      }
+      else {
+        std::cout << "dummySrc";
+      }
+
+      auto wire = graph.getEdgeData(ie).wire;
+      if (wire) {
+        std::cout << " (wire " << wire->name << ")";
+      }
+
+      std::cout << std::endl;
+    }
+  }
 }
 
 int main(int argc, char** argv) {
@@ -102,21 +241,26 @@ int main(int argc, char** argv) {
 
   cellLib.read(lib);
   cellLib.printCellLibDebug();
+  std::cout << "cell library parsed\n" << std::endl;
 
   vModule.read(inputCircuit, &cellLib);
   vModule.printVerilogModuleDebug();
+  std::cout << "verilog module parsed\n" << std::endl;
 
   sdc.read(sdcFile, &cellLib);
   sdc.printSdcDebug();
+  std::cout << "sdc module parsed\n" << std::endl;
 
-  constructCircuitGraph(vModule);
+  constructCircuitGraph();
   printGraph();
+  std::cout << "graph constructed\n" << std::endl;
 
   doGateSizing();
-  printGraph();
+//  printGraph();
 
   T.stop();
   vModule.writeVerilogModule(outputCircuit);
+  std::cout << "verilog module written\n" << std::endl;
 
   return 0;
 }
