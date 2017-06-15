@@ -90,7 +90,6 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
   fRd.nextToken(); // get "{"
 
   std::string relatedPinName;
-  TimingSense sense;
   for (std::string token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
     if (token == "related_pin") {
       fRd.nextToken(); // get ":"
@@ -103,14 +102,15 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
     else if (token == "timing_sense") {
       fRd.nextToken(); // get ":"
       token = fRd.nextToken();
+      auto inPin = cell->inPins.at(relatedPinName);
       if (token == "positive_unate") {
-        sense = TIMING_SENSE_POSITIVE_UNATE;
+        inPin->tSense = TIMING_SENSE_POSITIVE_UNATE;
       }
       else if (token == "negative_unate") {
-        sense = TIMING_SENSE_NEGATIVE_UNATE;
+        inPin->tSense = TIMING_SENSE_NEGATIVE_UNATE;
       }
       else {
-        sense = TIMING_SENSE_NON_UNATE;
+        inPin->tSense = TIMING_SENSE_NON_UNATE;
       }
       fRd.nextToken(); // get ";"
     }
@@ -138,7 +138,6 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
 
         LUT *lut = new LUT;
         lut->lutTemplate = cellLib->lutTemplates.at(fRd.nextToken());
-        lut->tSense = sense;
         mapping.insert({relatedPinName, lut});
 
         fRd.nextToken(); // get ")"
@@ -193,6 +192,7 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
 
   CellPin *cellPin = new CellPin;
   cellPin->name = fRd.nextToken();
+  cellPin->tSense = TIMING_SENSE_UNDEFINED;
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -427,6 +427,11 @@ void CellLib::printCellLib() {
       std::cout << "  pin (" << pin->name << ") {" << std::endl;
       std::cout << "    direction: input" << std::endl;
       std::cout << "    capacitance: " << pin->capacitance << std::endl;
+      std::cout << "    timing sense: ";
+      std::cout << ((pin->tSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
+                    (pin->tSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
+                    (pin->tSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
+                   ) << std::endl;
       std::cout << "  }" << std::endl;
     }
 

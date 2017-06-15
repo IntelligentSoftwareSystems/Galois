@@ -30,13 +30,13 @@ struct LutTemplate {
 
 struct LUT {
   LutTemplate *lutTemplate;
-  TimingSense tSense;
   std::vector<std::vector<float> > index, value;
 };
 
 struct CellPin {
   std::string name;
   float capacitance;
+  TimingSense tSense;
   std::unordered_map<std::string, LUT *> cellRise, cellFall, riseTransition, fallTransition;
   std::unordered_map<std::string, LUT *> risePower, fallPower;
 };
