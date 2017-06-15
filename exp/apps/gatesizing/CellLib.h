@@ -79,7 +79,7 @@ struct CellLib {
   CellLib(std::string inName);
   ~CellLib();
 
-  void printCellLib();
+  void printCellLibDebug();
 };
 
 #endif // GALOIS_CELLLIB_H

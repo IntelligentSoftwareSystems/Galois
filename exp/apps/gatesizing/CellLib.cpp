@@ -477,7 +477,7 @@ static void printCell(Cell *c) {
   std::cout << "  }" << std::endl;
 }
 
-void CellLib::printCellLib() {
+void CellLib::printCellLibDebug() {
   std::cout << "library " << name << std::endl;
 
   for (auto item: wireLoads) {

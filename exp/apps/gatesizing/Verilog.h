@@ -34,8 +34,9 @@ struct VerilogModule {
   std::unordered_map<std::string, VerilogPin *> inputs, outputs;
   std::unordered_map<std::string, VerilogGate *> gates;
   std::unordered_map<std::string, VerilogWire *> wires;
+  CellLib& cellLib;
 
-  VerilogModule(std::string inName, CellLib& cellLib);
+  VerilogModule(std::string inName, CellLib& lib);
   ~VerilogModule();
 
   void printVerilogModuleDebug();

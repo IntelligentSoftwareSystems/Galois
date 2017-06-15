@@ -19,7 +19,9 @@ VerilogModule::~VerilogModule() {
   }
 }
 
-VerilogModule::VerilogModule(std::string inName, CellLib& cellLib) {
+VerilogModule::VerilogModule(std::string inName, CellLib& lib)
+  :cellLib(lib)
+{
   char delimiters[] = {
     '(', ')',
     ',', ':', ';', 
