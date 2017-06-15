@@ -84,7 +84,7 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
   } // end for token
 } // end readLutTemplate
 
-static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, CellPin *cellPin) {
+static void readLutForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, CellPin *cellPin) {
   fRd.nextToken(); // get "("
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -179,13 +179,19 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
       }
     }
 
+    else if (token == "fall_constraint" || token == "rise_constraint") {
+      do {
+        token = fRd.nextToken();
+      } while (token != "}");
+    }
+
     else {
       do {
         token = fRd.nextToken();
       } while (token != ";");
     }
   } // end for token
-} // end readTableForCellPin
+} // end readLutForCellPin
 
 static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
   fRd.nextToken(); // get "("
@@ -220,7 +226,7 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
     }
 
     else if (token == "timing" || token == "internal_power") {
-      readTableForCellPin(fRd, cellLib, cell, cellPin);
+      readLutForCellPin(fRd, cellLib, cell, cellPin);
     }
 
     else {
@@ -239,7 +245,6 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
   cellLib->cells.insert({cell->name, cell});
   std::string cellFamilyName = cell->name.substr(0, cell->name.find("_"));
   cellLib->cellFamilies[cellFamilyName].insert({cell->name, cell});
-  std::cout << cell->name << " in " << cellFamilyName << std::endl;
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
