@@ -10,7 +10,6 @@ static void readWireLoad(FileReader& fRd, CellLib *cellLib) {
   WireLoad *wireLoad = new WireLoad;
   wireLoad->name = fRd.nextToken();
   cellLib->wireLoads.insert({wireLoad->name, wireLoad});
-  std::cout << "wire " << wireLoad->name << std::endl;
 
   fRd.nextToken(); // get "\""
   fRd.nextToken(); // get ")"
@@ -46,7 +45,6 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
   LutTemplate *lutTemplate = new LutTemplate;
   lutTemplate->name = fRd.nextToken();
   cellLib->lutTemplates.insert({lutTemplate->name, lutTemplate});
-  std::cout << "lutTemplate: " << lutTemplate->name << std::endl;
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -114,6 +112,7 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
       else {
         sense = TIMING_SENSE_NON_UNATE;
       }
+      fRd.nextToken(); // get ";"
     }
 
     else if (token == "cell_fall" || token == "cell_rise" 
@@ -164,7 +163,7 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
 
             std::vector<float> v;
             for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
-              if (token == "\\") {
+             if (token == "\\") {
                 lut->value.push_back(v);
                 v.clear();
               } else if (token == "\"") {
@@ -174,7 +173,7 @@ static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, C
               }
             }
             lut->value.push_back(v);
-
+            v.clear();
             fRd.nextToken(); // get ";"
           }
         } // end for token
@@ -283,7 +282,6 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
 static void readCellLibBody(FileReader& fRd, CellLib *cellLib) {
   // parse until hits the end "}" of library
   for (std::string token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
-    std::cout << "token = " << token << std::endl;
     if (token == "wire_load") {
       readWireLoad(fRd, cellLib);
     }
@@ -301,7 +299,6 @@ static void readCellLibBody(FileReader& fRd, CellLib *cellLib) {
     }
 
     else if (token == "cell") {
-      return;
       readCell(fRd, cellLib);
     }
 
@@ -374,8 +371,8 @@ static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
   std::cout << "      value (" << std::endl;
   for (size_t j = 0; j < lut->value.size(); j++) {
     std::cout << "        ";
-    for (size_t k = 0; k < lut->index[j].size(); k++) {
-      std::cout << lut->index[j][k] << " ";
+    for (size_t k = 0; k < lut->value[j].size(); k++) {
+      std::cout << lut->value[j][k] << " ";
     }
     std::cout << std::endl;
   }
@@ -415,8 +412,9 @@ void CellLib::printCellLib() {
     for (size_t i = 0; i < lutT->dim.size(); i++) {
       std::cout << "  index_" << i << ": " << lutT->dim[i] << std::endl;
     }
+    std::cout << "}" << std::endl;
   }
-/*
+
   for (auto item: cells) {
     auto c = item.second;
     std::cout << "cell (" << c->name << ") {" << std::endl;
@@ -468,7 +466,6 @@ void CellLib::printCellLib() {
 
     std::cout << "}" << std::endl;
   }
-*/
 }
 
 CellLib::~CellLib() {
