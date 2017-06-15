@@ -58,10 +58,21 @@ static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"), c
 static cll::opt<std::string> outputCircuit("out", cll::desc("path to the gate-sized .v"), cll::Required);
 static cll::opt<std::string> sdcFile("sdc", cll::desc("path to the sdc file"));
 
+// do not call clear() unless you are constructing new instances
+static CellLib cellLib;
+static VerilogModule vModule;
+static SDC sdc;
+
 struct Node {
+  VerilogPin *pin;
+  float slew, capacitance;
+  float arrivalTime, requiredTime, slack;
+  float internalPower, netPower;
 };
 
 struct Edge {
+  VerilogWire *wire;
+  bool isRise;
 };
 
 //typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
@@ -89,11 +100,13 @@ int main(int argc, char** argv) {
   Galois::StatTimer T("TotalTime");
   T.start();
 
-  CellLib cellLib(lib);
+  cellLib.read(lib);
   cellLib.printCellLibDebug();
-  VerilogModule vModule(inputCircuit, cellLib);
+
+  vModule.read(inputCircuit, &cellLib);
   vModule.printVerilogModuleDebug();
-  SDC sdc(sdcFile, cellLib);
+
+  sdc.read(sdcFile, &cellLib);
   sdc.printSdcDebug();
 
   constructCircuitGraph(vModule);

@@ -76,9 +76,11 @@ struct CellLib {
 
   WireLoad *defaultWireLoad;
 
-  CellLib(std::string inName);
+  CellLib();
   ~CellLib();
 
+  void read(std::string inName);
+  void clear();
   void printCellLibDebug();
 };
 

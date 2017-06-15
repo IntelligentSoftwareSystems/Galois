@@ -3,9 +3,10 @@
 #include <fstream>
 #include <iostream>
 
-SDC::SDC(std::string inName, CellLib& lib)
-  :cellLib(lib)
+void SDC::read(std::string inName, CellLib *lib)
 {
+  cellLib = lib;
+
   targetDelay = 0.0;
   if (!inName.empty()) {
     std::ifstream ifs(inName);
@@ -17,11 +18,18 @@ SDC::SDC(std::string inName, CellLib& lib)
     }
   }
 
-  primaryInputSlew = cellLib.cells.at("INV_X4")->outPins.at("ZN")->cellRise.at("A")->index[0][3];
-  primaryOutputCapacitance = 2.0 * cellLib.cells.at("INV_X1")->inPins.at("A")->capacitance;
+  primaryInputSlew = cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellRise.at("A")->index[0][3];
+  primaryOutputCapacitance = 2.0 * cellLib->cells.at("INV_X1")->inPins.at("A")->capacitance;
+}
+
+void SDC::clear() {
+}
+
+SDC::SDC() {
 }
 
 SDC::~SDC() {
+  clear();
 }
 
 void SDC::printSdcDebug() {

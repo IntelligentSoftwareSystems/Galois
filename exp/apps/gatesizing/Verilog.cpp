@@ -1,7 +1,7 @@
 #include "Verilog.h"
 #include "FileReader.h"
 
-VerilogModule::~VerilogModule() {
+void VerilogModule::clear() {
   for (auto item: inputs) {
      delete item.second;
   }
@@ -19,9 +19,11 @@ VerilogModule::~VerilogModule() {
   }
 }
 
-VerilogModule::VerilogModule(std::string inName, CellLib& lib)
-  :cellLib(lib)
-{
+VerilogModule::~VerilogModule() {
+  clear();
+}
+
+void VerilogModule::read(std::string inName, CellLib *lib) {
   char delimiters[] = {
     '(', ')',
     ',', ':', ';', 
@@ -38,6 +40,7 @@ VerilogModule::VerilogModule(std::string inName, CellLib& lib)
   };
 
   FileReader fRd(inName, delimiters, sizeof(delimiters), separators, sizeof(separators));
+  cellLib = lib;
 
   for (std::string token = fRd.nextToken(); token != ""; token = fRd.nextToken()) {
     // module moduleName(port1, port2, ...);
@@ -66,7 +69,7 @@ VerilogModule::VerilogModule(std::string inName, CellLib& lib)
         VerilogWire *wire = new VerilogWire;
         wire->name = token;
         wire->root = nullptr;
-        wire->wireLoad = cellLib.defaultWireLoad;
+        wire->wireLoad = cellLib->defaultWireLoad;
         wires.insert({token, wire});
       }
     }
@@ -78,7 +81,7 @@ VerilogModule::VerilogModule(std::string inName, CellLib& lib)
     // logic gates: gateType gateName ( .port1 (wire1), .port2 (wire2), ... .portN (wireN) );
     else {
       VerilogGate *gate = new VerilogGate;
-      gate->cell = cellLib.cells.at(token);
+      gate->cell = cellLib->cells.at(token);
       gate->name = fRd.nextToken();
       gates.insert({gate->name, gate});
       fRd.nextToken(); // get "("
@@ -126,6 +129,9 @@ VerilogModule::VerilogModule(std::string inName, CellLib& lib)
     i->wire = wire;
     wire->leaves.insert(i);
   }
+}
+
+VerilogModule::VerilogModule() {
 }
 
 void VerilogModule::printVerilogModuleDebug() {

@@ -343,7 +343,7 @@ static void readCellLib(FileReader& fRd, CellLib *cellLib) {
   }
 }
 
-CellLib::CellLib(std::string inName) {
+void CellLib::read(std::string inName) {
   char delimiters[] = {
     '(', ')',
     ',', ':', ';', 
@@ -500,7 +500,7 @@ void CellLib::printCellLibDebug() {
   }
 }
 
-CellLib::~CellLib() {
+void CellLib::clear() {
   for (auto item: wireLoads) {
     delete item.second;
   }
@@ -538,4 +538,11 @@ CellLib::~CellLib() {
 
     delete c;
   }
+}
+
+CellLib::CellLib() {
+}
+
+CellLib::~CellLib() {
+  clear();
 }

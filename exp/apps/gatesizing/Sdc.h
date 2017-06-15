@@ -10,11 +10,13 @@ struct SDC {
   float primaryInputSlew;
   float primaryOutputCapacitance;
 
-  CellLib& cellLib;
+  CellLib *cellLib;
 
-  SDC(std::string inName, CellLib& lib);
+  SDC();
   ~SDC();
 
+  void read(std::string inName, CellLib *lib);
+  void clear();
   void printSdcDebug();
 };
 
