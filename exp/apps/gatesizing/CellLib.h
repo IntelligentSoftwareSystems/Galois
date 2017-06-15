@@ -55,8 +55,11 @@ struct WireLoad {
 };
 
 struct CellLib {
+  typedef std::unordered_map<std::string, Cell *> CellMap;
+
   std::string name;
-  std::unordered_map<std::string, Cell *> cells;
+  CellMap cells;
+  std::unordered_map<std::string, CellMap> cellFamilies;
   std::unordered_map<std::string, LutTemplate *> lutTemplates;
   std::unordered_map<std::string, WireLoad *> wireLoads;
 

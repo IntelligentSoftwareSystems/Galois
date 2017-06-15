@@ -237,6 +237,9 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
   Cell *cell = new Cell;
   cell->name = fRd.nextToken();
   cellLib->cells.insert({cell->name, cell});
+  std::string cellFamilyName = cell->name.substr(0, cell->name.find("_"));
+  cellLib->cellFamilies[cellFamilyName].insert({cell->name, cell});
+  std::cout << cell->name << " in " << cellFamilyName << std::endl;
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -357,29 +360,6 @@ CellLib::CellLib(std::string inName) {
   readCellLib(fRd, this);
 }
 
-static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
-  std::cout << "    " << tableName << "(" << pinName << ", " << lut->lutTemplate->name << ") {" << std::endl;
-
-  for (size_t j = 0; j < lut->index.size(); j++) {
-    std::cout << "      index_" << j << " (";
-    for (size_t k = 0; k < lut->index[j].size(); k++) {
-      std::cout << " " << lut->index[j][k];
-    }
-    std::cout << " )" << std::endl;
-  }
-
-  std::cout << "      value (" << std::endl;
-  for (size_t j = 0; j < lut->value.size(); j++) {
-    std::cout << "        ";
-    for (size_t k = 0; k < lut->value[j].size(); k++) {
-      std::cout << lut->value[j][k] << " ";
-    }
-    std::cout << std::endl;
-  }
-  std::cout << "      )" << std::endl;
-  std::cout << "    }" << std::endl;
-}
-
 static void printWireLoad(WireLoad *w) {
   std::cout << "wire_load (" << w->name << ") {" << std::endl;
   std::cout << "  capacitance: " << w->capacitance << std::endl;
@@ -408,36 +388,59 @@ static void printLutTemplate(LutTemplate *lutT) {
   std::cout << "}" << std::endl;
 }
 
+static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
+  std::cout << "      " << tableName << "(" << pinName << ", " << lut->lutTemplate->name << ") {" << std::endl;
+
+  for (size_t j = 0; j < lut->index.size(); j++) {
+    std::cout << "        index_" << j << " (";
+    for (size_t k = 0; k < lut->index[j].size(); k++) {
+      std::cout << " " << lut->index[j][k];
+    }
+    std::cout << " )" << std::endl;
+  }
+
+  std::cout << "        value (" << std::endl;
+  for (size_t j = 0; j < lut->value.size(); j++) {
+    std::cout << "          ";
+    for (size_t k = 0; k < lut->value[j].size(); k++) {
+      std::cout << lut->value[j][k] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << "        )" << std::endl;
+  std::cout << "      }" << std::endl;
+}
+
 static void printCell(Cell *c) {
-  std::cout << "cell (" << c->name << ") {" << std::endl;
-  std::cout << "  drive_strength: " << c->driveStrength << std::endl;
-  std::cout << "  area: " << c->area << std::endl;
-  std::cout << "  cell_leakage_power: " << c->cellLeakagePower << std::endl;
+  std::cout << "  cell (" << c->name << ") {" << std::endl;
+  std::cout << "    drive_strength: " << c->driveStrength << std::endl;
+  std::cout << "    area: " << c->area << std::endl;
+  std::cout << "    cell_leakage_power: " << c->cellLeakagePower << std::endl;
 
   for (auto item: c->inPins) {
     auto pin = item.second;
-    std::cout << "  pin (" << pin->name << ") {" << std::endl;
-    std::cout << "    direction: input" << std::endl;
-    std::cout << "    capacitance: " << pin->capacitance << std::endl;
-    std::cout << "    timing sense: ";
+    std::cout << "    pin (" << pin->name << ") {" << std::endl;
+    std::cout << "      direction: input" << std::endl;
+    std::cout << "      capacitance: " << pin->capacitance << std::endl;
+    std::cout << "      timing sense: ";
     std::cout << ((pin->tSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
                   (pin->tSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
                   (pin->tSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
                  ) << std::endl;
-    std::cout << "  }" << std::endl;
+    std::cout << "    }" << std::endl;
   }
 
   for (auto item: c->internalPins) {
     auto pin = item.second;
-    std::cout << "  pin (" << pin->name << ") {" << std::endl;
-    std::cout << "    direction: internal" << std::endl;
-    std::cout << "  }" << std::endl;
+    std::cout << "    pin (" << pin->name << ") {" << std::endl;
+    std::cout << "      direction: internal" << std::endl;
+    std::cout << "    }" << std::endl;
   }
 
   for (auto item: c->outPins) {
     auto pin = item.second;
-    std::cout << "  pin (" << pin->name << ") {" << std::endl;
-    std::cout << "    direction: output" << std::endl;
+    std::cout << "    pin (" << pin->name << ") {" << std::endl;
+    std::cout << "      direction: output" << std::endl;
 
     for (auto i: pin->cellRise) {
       printLUT(i.second, "cell_rise", i.first);
@@ -457,10 +460,10 @@ static void printCell(Cell *c) {
     for (auto i: pin->risePower) {
       printLUT(i.second, "rise_power", i.first);
     }
-    std::cout << "  }" << std::endl;
+    std::cout << "    }" << std::endl;
   }
 
-  std::cout << "}" << std::endl;
+  std::cout << "  }" << std::endl;
 }
 
 void CellLib::printCellLib() {
@@ -476,8 +479,13 @@ void CellLib::printCellLib() {
     printLutTemplate(item.second);
   }
 
-  for (auto item: cells) {
-    printCell(item.second);
+  for (auto item: cellFamilies) {
+    std::cout << "Cell Family " << item.first << " {" << std::endl;
+    auto& cf = item.second;
+    for (auto i: cf) {
+      printCell(i.second);
+    }
+    std::cout << "}" << std::endl;
   }
 }
 
