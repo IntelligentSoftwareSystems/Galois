@@ -380,96 +380,104 @@ static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
   std::cout << "    }" << std::endl;
 }
 
+static void printWireLoad(WireLoad *w) {
+  std::cout << "wire_load (" << w->name << ") {" << std::endl;
+  std::cout << "  capacitance: " << w->capacitance << std::endl;
+  std::cout << "  resistance: " << w->resistance << std::endl;
+  std::cout << "  slope: " << w->slope << std::endl;
+  for (auto i: w->fanoutLength) {
+    std::cout << "  fanout_length(" << i.first << ", " << i.second << ")" << std::endl;
+  }
+  std::cout << "}" << std::endl;
+}
+
+static void printLutTemplate(LutTemplate *lutT) {
+  std::cout << "lu_table_template (" << lutT->name << ") {" << std::endl;
+  for (size_t i = 0; i < lutT->var.size(); i++) {
+    std::cout << "  variable_" << i << ": ";
+    std::cout << ((lutT->var[i] == LUT_VAR_INPUT_NET_TRANSITION) ? "input_net_transition" :
+                  (lutT->var[i] == LUT_VAR_TOTAL_OUTPUT_NET_CAPACITANCE) ? "total_output_capacitance" : 
+                  (lutT->var[i] == LUT_VAR_CONSTRAINED_PIN_TRANSITION) ? "constrained_pin_transition" : 
+                  (lutT->var[i] == LUT_VAR_RELATED_PIN_TRANSITION) ? "related_pin_transition" : "undefined");
+    std::cout << std::endl;
+  }
+
+  for (size_t i = 0; i < lutT->dim.size(); i++) {
+    std::cout << "  index_" << i << ": " << lutT->dim[i] << std::endl;
+  }
+  std::cout << "}" << std::endl;
+}
+
+static void printCell(Cell *c) {
+  std::cout << "cell (" << c->name << ") {" << std::endl;
+  std::cout << "  drive_strength: " << c->driveStrength << std::endl;
+  std::cout << "  area: " << c->area << std::endl;
+  std::cout << "  cell_leakage_power: " << c->cellLeakagePower << std::endl;
+
+  for (auto item: c->inPins) {
+    auto pin = item.second;
+    std::cout << "  pin (" << pin->name << ") {" << std::endl;
+    std::cout << "    direction: input" << std::endl;
+    std::cout << "    capacitance: " << pin->capacitance << std::endl;
+    std::cout << "    timing sense: ";
+    std::cout << ((pin->tSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
+                  (pin->tSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
+                  (pin->tSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
+                 ) << std::endl;
+    std::cout << "  }" << std::endl;
+  }
+
+  for (auto item: c->internalPins) {
+    auto pin = item.second;
+    std::cout << "  pin (" << pin->name << ") {" << std::endl;
+    std::cout << "    direction: internal" << std::endl;
+    std::cout << "  }" << std::endl;
+  }
+
+  for (auto item: c->outPins) {
+    auto pin = item.second;
+    std::cout << "  pin (" << pin->name << ") {" << std::endl;
+    std::cout << "    direction: output" << std::endl;
+
+    for (auto i: pin->cellRise) {
+      printLUT(i.second, "cell_rise", i.first);
+    }
+    for (auto i: pin->cellFall) {
+      printLUT(i.second, "cell_fall", i.first);
+    }
+    for (auto i: pin->fallTransition) {
+      printLUT(i.second, "fall_transition", i.first);
+    }
+    for (auto i: pin->riseTransition) {
+      printLUT(i.second, "rise_transition", i.first);
+    }
+    for (auto i: pin->fallPower) {
+      printLUT(i.second, "fall_power", i.first);
+    }
+    for (auto i: pin->risePower) {
+      printLUT(i.second, "rise_power", i.first);
+    }
+    std::cout << "  }" << std::endl;
+  }
+
+  std::cout << "}" << std::endl;
+}
+
 void CellLib::printCellLib() {
   std::cout << "library " << name << std::endl;
 
   for (auto item: wireLoads) {
-    auto w = item.second;
-    std::cout << "wire_load (" << w->name << ") {" << std::endl;
-    std::cout << "  capacitance: " << w->capacitance << std::endl;
-    std::cout << "  resistance: " << w->resistance << std::endl;
-    std::cout << "  slope: " << w->slope << std::endl;
-    for (auto i: w->fanoutLength) {
-      std::cout << "  fanout_length(" << i.first << ", " << i.second << ")" << std::endl;
-    }
-    std::cout << "}" << std::endl;
+    printWireLoad(item.second);
   }
 
   std::cout << "default_wire_load: " << defaultWireLoad->name << std::endl;
 
   for (auto item: lutTemplates) {
-    auto lutT = item.second;
-    std::cout << "lu_table_template (" << lutT->name << ") {" << std::endl;
-    for (size_t i = 0; i < lutT->var.size(); i++) {
-      std::cout << "  variable_" << i << ": ";
-      std::cout << ((lutT->var[i] == LUT_VAR_INPUT_NET_TRANSITION) ? "input_net_transition" :
-                    (lutT->var[i] == LUT_VAR_TOTAL_OUTPUT_NET_CAPACITANCE) ? "total_output_capacitance" : 
-                    (lutT->var[i] == LUT_VAR_CONSTRAINED_PIN_TRANSITION) ? "constrained_pin_transition" : 
-                    (lutT->var[i] == LUT_VAR_RELATED_PIN_TRANSITION) ? "related_pin_transition" : "undefined");
-      std::cout << std::endl;
-    }
-
-    for (size_t i = 0; i < lutT->dim.size(); i++) {
-      std::cout << "  index_" << i << ": " << lutT->dim[i] << std::endl;
-    }
-    std::cout << "}" << std::endl;
+    printLutTemplate(item.second);
   }
 
   for (auto item: cells) {
-    auto c = item.second;
-    std::cout << "cell (" << c->name << ") {" << std::endl;
-    std::cout << "  drive_strength: " << c->driveStrength << std::endl;
-    std::cout << "  area: " << c->area << std::endl;
-    std::cout << "  cell_leakage_power: " << c->cellLeakagePower << std::endl;
-
-    for (auto item: c->inPins) {
-      auto pin = item.second;
-      std::cout << "  pin (" << pin->name << ") {" << std::endl;
-      std::cout << "    direction: input" << std::endl;
-      std::cout << "    capacitance: " << pin->capacitance << std::endl;
-      std::cout << "    timing sense: ";
-      std::cout << ((pin->tSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
-                    (pin->tSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
-                    (pin->tSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
-                   ) << std::endl;
-      std::cout << "  }" << std::endl;
-    }
-
-    for (auto item: c->internalPins) {
-      auto pin = item.second;
-      std::cout << "  pin (" << pin->name << ") {" << std::endl;
-      std::cout << "    direction: internal" << std::endl;
-      std::cout << "  }" << std::endl;
-    }
-
-    for (auto item: c->outPins) {
-      auto pin = item.second;
-      std::cout << "  pin (" << pin->name << ") {" << std::endl;
-      std::cout << "    direction: output" << std::endl;
-
-      for (auto i: pin->cellRise) {
-        printLUT(i.second, "cell_rise", i.first);
-      }
-      for (auto i: pin->cellFall) {
-        printLUT(i.second, "cell_fall", i.first);
-      }
-      for (auto i: pin->fallTransition) {
-        printLUT(i.second, "fall_transition", i.first);
-      }
-      for (auto i: pin->riseTransition) {
-        printLUT(i.second, "rise_transition", i.first);
-      }
-      for (auto i: pin->fallPower) {
-        printLUT(i.second, "fall_power", i.first);
-      }
-      for (auto i: pin->risePower) {
-        printLUT(i.second, "rise_power", i.first);
-      }
-
-      std::cout << "  }" << std::endl;
-    }
-
-    std::cout << "}" << std::endl;
+    printCell(item.second);
   }
 }
 
