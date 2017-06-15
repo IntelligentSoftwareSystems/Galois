@@ -199,6 +199,9 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
   CellPin *cellPin = new CellPin;
   cellPin->name = fRd.nextToken();
   cellPin->tSense = TIMING_SENSE_UNDEFINED;
+  cellPin->pinType = PIN_UNDEFINED;
+  cellPin->cell = cell;
+  cell->cellPins.insert({cellPin->name, cellPin});
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -208,12 +211,15 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
       fRd.nextToken(); // get ":"
       token = fRd.nextToken();
       if (token == "input") {
+        cellPin->pinType = PIN_INPUT;
         cell->inPins.insert({cellPin->name, cellPin});
       }
       else if (token == "output") {
+        cellPin->pinType = PIN_OUTPUT;
         cell->outPins.insert({cellPin->name, cellPin});
       }
       else if (token == "internal") {
+        cellPin->pinType = PIN_INTERNAL;
         cell->internalPins.insert({cellPin->name, cellPin});
       }
       fRd.nextToken(); // get ";"
@@ -243,8 +249,8 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
   Cell *cell = new Cell;
   cell->name = fRd.nextToken();
   cellLib->cells.insert({cell->name, cell});
-  std::string cellFamilyName = cell->name.substr(0, cell->name.find("_"));
-  cellLib->cellFamilies[cellFamilyName].insert({cell->name, cell});
+  cell->familyName = cell->name.substr(0, cell->name.find("_"));
+  cellLib->cellFamilies[cell->familyName].insert({cell->name, cell});
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -417,7 +423,7 @@ static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
 }
 
 static void printCell(Cell *c) {
-  std::cout << "  cell (" << c->name << ") {" << std::endl;
+  std::cout << "  cell (" << c->name << " in " << c->familyName << ") {" << std::endl;
   std::cout << "    drive_strength: " << c->driveStrength << std::endl;
   std::cout << "    area: " << c->area << std::endl;
   std::cout << "    cell_leakage_power: " << c->cellLeakagePower << std::endl;

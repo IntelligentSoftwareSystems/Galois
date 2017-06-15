@@ -22,6 +22,13 @@ enum TimingSense {
   TIMING_SENSE_UNDEFINED
 };
 
+enum PinType {
+  PIN_OUTPUT,
+  PIN_INPUT,
+  PIN_INTERNAL,
+  PIN_UNDEFINED
+};
+
 struct LutTemplate {
   std::string name;
   std::vector<LutVar> var;
@@ -33,19 +40,23 @@ struct LUT {
   std::vector<std::vector<float> > index, value;
 };
 
+struct Cell;
+
 struct CellPin {
   std::string name;
   float capacitance;
   TimingSense tSense;
+  PinType pinType;
+  Cell *cell;
   std::unordered_map<std::string, LUT *> cellRise, cellFall, riseTransition, fallTransition;
   std::unordered_map<std::string, LUT *> risePower, fallPower;
 };
 
 struct Cell {
-  std::string name;
+  std::string name, familyName;
   float area, cellLeakagePower;
   size_t driveStrength;
-  std::unordered_map<std::string, CellPin *> outPins, inPins, internalPins;
+  std::unordered_map<std::string, CellPin *> outPins, inPins, internalPins, cellPins;
 };
 
 struct WireLoad {
