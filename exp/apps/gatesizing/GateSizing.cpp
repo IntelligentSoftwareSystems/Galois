@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
   cellLib.printCellLibDebug();
   VerilogModule vModule(inputCircuit, cellLib);
   vModule.printVerilogModuleDebug();
-  SDC sdc(sdcFile);
+  SDC sdc(sdcFile, cellLib);
   sdc.printSdcDebug();
 
   constructCircuitGraph(vModule);
