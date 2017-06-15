@@ -120,6 +120,7 @@ int main(int argc, char** argv) {
   T.start();
 
   CellLib cellLib(lib);
+  cellLib.printCellLib();
   VerilogModule vModule(inputCircuit);
   vModule.printVerilogModule();
   readSDC();

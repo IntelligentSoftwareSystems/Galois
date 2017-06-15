@@ -10,6 +10,7 @@ static void readWireLoad(FileReader& fRd, CellLib *cellLib) {
   WireLoad *wireLoad = new WireLoad;
   wireLoad->name = fRd.nextToken();
   cellLib->wireLoads.insert({wireLoad->name, wireLoad});
+  std::cout << "wire " << wireLoad->name << std::endl;
 
   fRd.nextToken(); // get "\""
   fRd.nextToken(); // get ")"
@@ -45,6 +46,7 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
   LutTemplate *lutTemplate = new LutTemplate;
   lutTemplate->name = fRd.nextToken();
   cellLib->lutTemplates.insert({lutTemplate->name, lutTemplate});
+  std::cout << "lutTemplate: " << lutTemplate->name << std::endl;
 
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -68,6 +70,7 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
       else {
         lutTemplate->var.push_back(LUT_VAR_UNDEFINED);
       }
+      fRd.nextToken(); // get ";"
     }
     else if (token == "index_1" || token == "index_2") {
       fRd.nextToken(); // get "("
@@ -77,14 +80,13 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
         dimension++;
       }
       lutTemplate->dim.push_back(dimension);
-      fRd.nextToken(); // get "\""
       fRd.nextToken(); // get ")"
       fRd.nextToken(); // get ";" 
     }
   } // end for token
 } // end readLutTemplate
 
-static void readTimingTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, CellPin *cellPin) {
+static void readTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, CellPin *cellPin) {
   fRd.nextToken(); // get "("
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
@@ -114,8 +116,69 @@ static void readTimingTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *c
       }
     }
 
-    else if (token == "cell_rise") {
-      
+    else if (token == "cell_fall" || token == "cell_rise" 
+             || token == "fall_transition" || token == "rise_transition"
+             || token == "fall_power" || token == "rise_power") {
+
+      auto& mapping = (token == "cell_fall") ? cellPin->cellFall : 
+                      (token == "cell_rise") ? cellPin->cellRise :
+                      (token == "fall_transition") ? cellPin->fallTransition : 
+                      (token == "rise_transition") ? cellPin->riseTransition :
+                      (token == "fall_power") ? cellPin->fallPower : cellPin->risePower;
+
+      // skip the mapping if it exists
+      if (mapping.count(relatedPinName)) {
+        do {
+          token = fRd.nextToken();
+        } while (token != "}");
+      }
+
+      // read in the table
+      else {
+        fRd.nextToken(); // get "("
+
+        LUT *lut = new LUT;
+        lut->lutTemplate = cellLib->lutTemplates.at(fRd.nextToken());
+        lut->tSense = sense;
+        mapping.insert({relatedPinName, lut});
+
+        fRd.nextToken(); // get ")"
+        fRd.nextToken(); // get "{"
+
+        for (token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
+          if (token == "index_1" || token == "index_2") {
+            fRd.nextToken(); // get "("
+            fRd.nextToken(); // get "\""
+
+            std::vector<float> v;
+            for (token = fRd.nextToken(); token != "\""; token = fRd.nextToken()) {
+              v.push_back(stof(token));
+            }
+            lut->index.push_back(v);
+
+            fRd.nextToken(); // get ")"
+            fRd.nextToken(); // get ";"            
+          }
+          else if (token == "values") {
+            fRd.nextToken(); // get "("
+
+            std::vector<float> v;
+            for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
+              if (token == "\\") {
+                lut->value.push_back(v);
+                v.clear();
+              } else if (token == "\"") {
+                // skip
+              } else {
+                v.push_back(stof(token));
+              }
+            }
+            lut->value.push_back(v);
+
+            fRd.nextToken(); // get ";"
+          }
+        } // end for token
+      }
     }
 
     else {
@@ -124,7 +187,7 @@ static void readTimingTableForCellPin(FileReader& fRd, CellLib *cellLib, Cell *c
       } while (token != ";");
     }
   } // end for token
-} // end readTimingTableForCellPin
+} // end readTableForCellPin
 
 static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
   fRd.nextToken(); // get "("
@@ -157,12 +220,8 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
       fRd.nextToken(); // get ";"
     }
 
-    else if (token == "timing") {
-      readTimingTableForCellPin(fRd, cellLib, cell, cellPin);
-    }
-
-    else if (token == "internal_power") {
-//      readPowerTableForCellPin(fRd, cellLib, cell, cellPin);
+    else if (token == "timing" || token == "internal_power") {
+      readTableForCellPin(fRd, cellLib, cell, cellPin);
     }
 
     else {
@@ -207,7 +266,7 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
     }
 
     else if (token == "pg_pin" || token == "leakage_power" 
-      || token == "statetable" || token == "ff" || token == "latch") {
+             || token == "statetable" || token == "ff" || token == "latch") {
       do {
         token = fRd.nextToken();
       } while (token != "}");
@@ -224,6 +283,7 @@ static void readCell(FileReader& fRd, CellLib *cellLib) {
 static void readCellLibBody(FileReader& fRd, CellLib *cellLib) {
   // parse until hits the end "}" of library
   for (std::string token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
+    std::cout << "token = " << token << std::endl;
     if (token == "wire_load") {
       readWireLoad(fRd, cellLib);
     }
@@ -241,7 +301,14 @@ static void readCellLibBody(FileReader& fRd, CellLib *cellLib) {
     }
 
     else if (token == "cell") {
+      return;
       readCell(fRd, cellLib);
+    }
+
+    else if (token == "operating_conditions") {
+      do {
+        token = fRd.nextToken();
+      } while (token != "}");
     }
 
     else {
@@ -282,10 +349,164 @@ CellLib::CellLib(std::string inName) {
   };
 
   FileReader fRd(inName, delimiters, sizeof(delimiters), separators, sizeof(separators));
-  std::cout << "CellLib " << inName << std::endl;
+
+  // put scalar lut_template in
+  LutTemplate *scalar = new LutTemplate;
+  scalar->name = "scalar";
+  scalar->var.push_back(LUT_VAR_UNDEFINED);
+  scalar->dim.push_back(1);
+  lutTemplates.insert({scalar->name, scalar});
+
   readCellLib(fRd, this);
-  std::cout << "End CellLib" << inName << std::endl;
+}
+
+static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
+  std::cout << "    " << tableName << "(" << pinName << ", " << lut->lutTemplate->name << ") {" << std::endl;
+
+  for (size_t j = 0; j < lut->index.size(); j++) {
+    std::cout << "      index_" << j << " (";
+    for (size_t k = 0; k < lut->index[j].size(); k++) {
+      std::cout << " " << lut->index[j][k];
+    }
+    std::cout << " )" << std::endl;
+  }
+
+  std::cout << "      value (" << std::endl;
+  for (size_t j = 0; j < lut->value.size(); j++) {
+    std::cout << "        ";
+    for (size_t k = 0; k < lut->index[j].size(); k++) {
+      std::cout << lut->index[j][k] << " ";
+    }
+    std::cout << std::endl;
+  }
+  std::cout << "      )" << std::endl;
+  std::cout << "    }" << std::endl;
+}
+
+void CellLib::printCellLib() {
+  std::cout << "library " << name << std::endl;
+
+  for (auto item: wireLoads) {
+    auto w = item.second;
+    std::cout << "wire_load (" << w->name << ") {" << std::endl;
+    std::cout << "  capacitance: " << w->capacitance << std::endl;
+    std::cout << "  resistance: " << w->resistance << std::endl;
+    std::cout << "  slope: " << w->slope << std::endl;
+    for (auto i: w->fanoutLength) {
+      std::cout << "  fanout_length(" << i.first << ", " << i.second << ")" << std::endl;
+    }
+    std::cout << "}" << std::endl;
+  }
+
+  std::cout << "default_wire_load: " << defaultWireLoad->name << std::endl;
+
+  for (auto item: lutTemplates) {
+    auto lutT = item.second;
+    std::cout << "lu_table_template (" << lutT->name << ") {" << std::endl;
+    for (size_t i = 0; i < lutT->var.size(); i++) {
+      std::cout << "  variable_" << i << ": ";
+      std::cout << ((lutT->var[i] == LUT_VAR_INPUT_NET_TRANSITION) ? "input_net_transition" :
+                    (lutT->var[i] == LUT_VAR_TOTAL_OUTPUT_NET_CAPACITANCE) ? "total_output_capacitance" : 
+                    (lutT->var[i] == LUT_VAR_CONSTRAINED_PIN_TRANSITION) ? "constrained_pin_transition" : 
+                    (lutT->var[i] == LUT_VAR_RELATED_PIN_TRANSITION) ? "related_pin_transition" : "undefined");
+      std::cout << std::endl;
+    }
+
+    for (size_t i = 0; i < lutT->dim.size(); i++) {
+      std::cout << "  index_" << i << ": " << lutT->dim[i] << std::endl;
+    }
+  }
+/*
+  for (auto item: cells) {
+    auto c = item.second;
+    std::cout << "cell (" << c->name << ") {" << std::endl;
+    std::cout << "  drive_strength: " << c->driveStrength << std::endl;
+    std::cout << "  area: " << c->area << std::endl;
+    std::cout << "  cell_leakage_power: " << c->cellLeakagePower << std::endl;
+
+    for (auto item: c->inPins) {
+      auto pin = item.second;
+      std::cout << "  pin (" << pin->name << ") {" << std::endl;
+      std::cout << "    direction: input" << std::endl;
+      std::cout << "    capacitance: " << pin->capacitance << std::endl;
+      std::cout << "  }" << std::endl;
+    }
+
+    for (auto item: c->internalPins) {
+      auto pin = item.second;
+      std::cout << "  pin (" << pin->name << ") {" << std::endl;
+      std::cout << "    direction: internal" << std::endl;
+      std::cout << "  }" << std::endl;
+    }
+
+    for (auto item: c->outPins) {
+      auto pin = item.second;
+      std::cout << "  pin (" << pin->name << ") {" << std::endl;
+      std::cout << "    direction: output" << std::endl;
+
+      for (auto i: pin->cellRise) {
+        printLUT(i.second, "cell_rise", i.first);
+      }
+      for (auto i: pin->cellFall) {
+        printLUT(i.second, "cell_fall", i.first);
+      }
+      for (auto i: pin->fallTransition) {
+        printLUT(i.second, "fall_transition", i.first);
+      }
+      for (auto i: pin->riseTransition) {
+        printLUT(i.second, "rise_transition", i.first);
+      }
+      for (auto i: pin->fallPower) {
+        printLUT(i.second, "fall_power", i.first);
+      }
+      for (auto i: pin->risePower) {
+        printLUT(i.second, "rise_power", i.first);
+      }
+
+      std::cout << "  }" << std::endl;
+    }
+
+    std::cout << "}" << std::endl;
+  }
+*/
 }
 
 CellLib::~CellLib() {
+  for (auto item: wireLoads) {
+    delete item.second;
+  }
+
+  for (auto item: lutTemplates) {
+    delete item.second;
+  }
+
+  for (auto item: cells) {
+    auto c = item.second;
+
+    for (auto i: c->outPins) {
+      auto pin = i.second;
+
+      // free LUTs
+      for (auto j: pin->cellRise) {
+        delete j.second;
+      }
+      for (auto j: pin->cellFall) {
+        delete j.second;
+      }
+      for (auto j: pin->riseTransition) {
+        delete j.second;
+      }
+      for (auto j: pin->fallTransition) {
+        delete j.second;
+      }
+      for (auto j: pin->risePower) {
+        delete j.second;
+      }
+      for (auto j: pin->fallPower) {
+        delete j.second;
+      }
+    }
+
+    delete c;
+  }
 }

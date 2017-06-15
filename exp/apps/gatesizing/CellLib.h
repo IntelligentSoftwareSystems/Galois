@@ -30,7 +30,7 @@ struct LutTemplate {
 
 struct LUT {
   LutTemplate *lutTemplate;
-  TimingSense sense;
+  TimingSense tSense;
   std::vector<std::vector<float> > index, value;
 };
 
@@ -64,6 +64,8 @@ struct CellLib {
 
   CellLib(std::string inName);
   ~CellLib();
+
+  void printCellLib();
 };
 
 #endif // GALOIS_CELLLIB_H
