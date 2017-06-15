@@ -145,14 +145,14 @@ void VerilogModule::printVerilogModuleDebug() {
     std::cout << "wire " << w->name << ": from ";
     // input/output wires don't have gates
     if (w->root->gate) {
-      std::cout << w->root->gate->cell->name << ".";
+      std::cout << w->root->gate->name << ".";
     }
     std::cout << w->root->name << " to ";
 
     for (auto p: w->leaves) {
       // input/output wires don't have gates
       if (p->gate) {
-        std::cout << p->gate->cell->name << ".";
+        std::cout << p->gate->name << ".";
       }
       std::cout << p->name << " ";
     }
