@@ -350,6 +350,8 @@ endif()
 
 app(kcore_push-filter kcore_push-filter/gen.cpp DISTSAFE)
 
+app(bc bc/gen.cpp DISTSAFE)
+
 #### CheckPointing ####
 app(bfs_pull-topological_DiskCP checkpointing/bfs_pull-topological/gen.cpp DISTSAFE)
 target_compile_definitions(bfs_pull-topological_DiskCP PRIVATE __HETEROGENEOUS_GALOIS_DEPRECATED__=1)
