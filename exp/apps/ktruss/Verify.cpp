@@ -72,7 +72,7 @@ void initialize(Graph& g) {
   Galois::do_all_local(
     g, 
     [&g] (typename Graph::GraphNode N) { 
-      for (auto e: g.edges(N)) {
+      for (auto e: g.edges(N, Galois::MethodFlag::UNPROTECTED)) {
         g.getEdgeData(e) = removed;
       }
     },
@@ -98,7 +98,7 @@ void readTruss(Graph& g) {
 void printGraph(Graph& g) {
   for (auto n: g) {
     std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n)) {
+    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n) continue;
       std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
@@ -112,7 +112,7 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
   Galois::do_all_local(g, 
     [&g, &numNodes, &numEdges] (GNode n) {
       size_t numN = 0;
-      for (auto e: g.edges(n)) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
           if (g.getEdgeDst(e) > n) {
             numEdges += 1;
@@ -200,7 +200,7 @@ int main(int argc, char **argv) {
   // consider only edges (i, j) where i < j
   Galois::do_all_local(g, 
     [&g, &work] (GNode n) {
-      for (auto e: g.edges(n)) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         auto dst = g.getEdgeDst(e);
         if (dst > n) {
           work.push_back(std::make_pair(n, dst));

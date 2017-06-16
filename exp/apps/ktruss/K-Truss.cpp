@@ -74,7 +74,7 @@ void initialize(Graph& g) {
   Galois::do_all_local(
     g, 
     [&g] (typename Graph::GraphNode N) { 
-      for (auto e: g.edges(N)) {
+      for (auto e: g.edges(N, Galois::MethodFlag::UNPROTECTED)) {
         g.getEdgeData(e) = valid;
       }
     },
@@ -86,7 +86,7 @@ template<typename Graph>
 void printGraph(Graph& g) {
   for (auto n: g) {
     std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n)) {
+    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n) continue;
       std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
@@ -100,7 +100,7 @@ size_t countValidNodes(G& g) {
 
   Galois::do_all_local(g, 
     [&g, &numNodes] (typename G::GraphNode n) {
-      for (auto e: g.edges(n)) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
           numNodes += 1;
           break;
@@ -133,6 +133,20 @@ void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
       }
     }
   }
+}
+
+template<typename G>
+bool isValidDegreeNoLessThanJ(G& g, typename G::GraphNode n, unsigned int j) {
+  size_t numValid = 0;
+  for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    if (!(g.getEdgeData(e) & removed)) {
+      numValid += 1;
+      if (numValid >= j) {
+        return true;
+      }
+    }
+  }
+  return numValid >= j;
 }
 
 template<typename G>
@@ -216,7 +230,7 @@ struct BSPAlgo {
     // consider only edges (i, j) where i < j
     Galois::do_all_local(g, 
       [&g, cur] (GNode n) {
-        for (auto e: g.edges(n)) {
+        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             cur->push_back(std::make_pair(n, dst));
@@ -307,7 +321,7 @@ struct BSPImprovedAlgo {
     // consider only edges (i, j) where i < j
     Galois::do_all_local(g, 
       [&g, cur] (GNode n) {
-        for (auto e: g.edges(n)) {
+        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             cur->push_back(std::make_pair(n, dst));
