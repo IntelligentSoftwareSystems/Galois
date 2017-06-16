@@ -124,8 +124,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Graph::OfflineGraph g(filename);
 
       uint64_t numNodes_to_divide = 0;
-      if(isBipartite){
-    	  for(auto n = 0; n < g.size(); ++n){
+      if (isBipartite) {
+    	  for (unsigned int n = 0; n < g.size(); ++n){
     		  if(std::distance(g.edge_begin(n), g.edge_end(n))){
                   ++numNodes_to_divide;
                   last_nodeID_withEdges_bipartite = n;

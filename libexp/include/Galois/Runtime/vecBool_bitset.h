@@ -42,7 +42,7 @@ namespace Galois {
 
       uint32_t bit_count(uint64_t n) const {
         uint32_t set_bit_count = 0;
-        for(auto k = 0; k < size_each; ++k){
+        for(uint32_t k = 0; k < size_each; ++k){
           if(is_set(n,k)){
             set_bit_count++;
           }
@@ -50,7 +50,7 @@ namespace Galois {
         return set_bit_count;
       }
       uint32_t find_first(uint64_t n) const {
-        for(auto k = 0; k < size_each; ++k){
+        for(uint32_t k = 0; k < size_each; ++k){
           if(is_set(n,k)){
             return k;
           }
