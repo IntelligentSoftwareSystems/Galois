@@ -62,7 +62,9 @@ static CellLib cellLib;
 static VerilogModule vModule;
 static SDC sdc;
 
-Graph graph;
+void doStaticTimingAnalysis() {
+
+}
 
 void doGateSizing() {
 
@@ -76,27 +78,30 @@ int main(int argc, char** argv) {
   T.start();
 
   cellLib.read(lib);
-  cellLib.printCellLibDebug();
-  std::cout << "cell library parsed\n" << std::endl;
+//  cellLib.printCellLibDebug();
+  std::cout << "parsed cell library" << std::endl;
 
   vModule.read(inputCircuit, &cellLib);
-  vModule.printVerilogModuleDebug();
-  std::cout << "verilog module parsed\n" << std::endl;
+//  vModule.printVerilogModuleDebug();
+  std::cout << "parsed verilog module" << std::endl;
 
   sdc.read(sdcFile, &cellLib);
-  sdc.printSdcDebug();
-  std::cout << "sdc module parsed\n" << std::endl;
+//  sdc.printSdcDebug();
+  std::cout << "parsed sdc file" << std::endl;
 
   constructCircuitGraph(graph, vModule);
+  initializeCircuitGraph(graph, sdc);
   printCircuitGraph(graph);
-  std::cout << "graph constructed\n" << std::endl;
+  std::cout << "constructed circuit graph" << std::endl;
 
+  doStaticTimingAnalysis();
   doGateSizing();
+//  vModule.printVerilogModuleDebug();
 //  printCircuitGraph(graph);
 
   T.stop();
   vModule.writeVerilogModule(outputCircuit);
-  std::cout << "verilog module written\n" << std::endl;
+  std::cout << "wrote modified verilog module" << std::endl;
 
   return 0;
 }
