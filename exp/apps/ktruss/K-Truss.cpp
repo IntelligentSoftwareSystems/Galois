@@ -135,6 +135,45 @@ void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
   }
 }
 
+template<typename G>
+bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode dst, unsigned int j) {
+  size_t numValidEqual = 0;
+  auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
+    srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
+    dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
+    dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
+
+  while (true) {
+  // find the first valid edge
+    while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
+      ++srcI;
+    }
+    while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
+      ++dstI;
+    }
+
+    if (srcI == srcE || dstI == dstE) {
+      return numValidEqual >= j;
+    }
+
+    // check for intersection
+    auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
+    if (sN < dN) {
+      ++srcI;
+    } else if (dN < sN) {
+      ++dstI;
+    } else {
+      numValidEqual += 1;
+      if (numValidEqual >= j) {
+        return true;
+      }
+      ++srcI;
+      ++dstI;
+    }
+  }
+  return numValidEqual >= j;
+}
+
 struct BSPAlgo {
   // edge weight: (# triangles supported << 1) | removal
   //   set LSB of an edge weight to indicate the removal of the edge.
@@ -159,46 +198,8 @@ struct BSPAlgo {
     PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r, EdgeVec& s)
       : g(g), j(j), r(r), s(s) {}
 
-    bool isSupportNoLessThanJ(GNode src, GNode dst) {
-      size_t numValidEqual = 0;
-      auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-        srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-        dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-        dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
-
-      while (true) {
-        // find the first valid edge
-        while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
-          ++srcI;
-        }
-        while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
-          ++dstI;
-        }
-
-        if (srcI == srcE || dstI == dstE) {
-          return numValidEqual >= j;
-        }
-
-        // check for intersection
-        auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
-        if (sN < dN) {
-          ++srcI;
-        } else if (dN < sN) {
-          ++dstI;
-        } else {
-          numValidEqual += 1;
-          if (numValidEqual >= j) {
-            return true;
-          }
-          ++srcI;
-          ++dstI;
-        }
-      }
-      return numValidEqual >= j;
-    }
-
     void operator()(Edge e) {
-      EdgeVec& w = isSupportNoLessThanJ(e.first, e.second) ? s : r;
+      EdgeVec& w = isSupportNoLessThanJ(g, e.first, e.second, j) ? s : r;
       w.push_back(e);
     }
   };
@@ -283,46 +284,8 @@ struct BSPImprovedAlgo {
     KeepSupportedEdges(Graph& g, unsigned int j, EdgeVec& s)
       : g(g), j(j), s(s) {}
 
-    bool isSupportNoLessThanJ(GNode src, GNode dst) {
-      size_t numValidEqual = 0;
-      auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-        srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-        dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-        dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
-
-      while (true) {
-        // find the first valid edge
-        while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
-          ++srcI;
-        }
-        while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
-          ++dstI;
-        }
-
-        if (srcI == srcE || dstI == dstE) {
-          return numValidEqual >= j;
-        }
-
-        // check for intersection
-        auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
-        if (sN < dN) {
-          ++srcI;
-        } else if (dN < sN) {
-          ++dstI;
-        } else {
-          numValidEqual += 1;
-          if (numValidEqual >= j) {
-            return true;
-          }
-          ++srcI;
-          ++dstI;
-        }
-      }
-      return numValidEqual >= j;
-    }
-
     void operator()(Edge e) {
-      if (isSupportNoLessThanJ(e.first, e.second)) {
+      if (isSupportNoLessThanJ(g, e.first, e.second, j)) {
         s.push_back(e);
       } else {
         g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
