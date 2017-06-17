@@ -17,14 +17,15 @@ class KtrussGaloisBase(graph_bmk):
 
     def get_run_spec(self, bmkinput):
         x = bmk2.RunSpec(self, bmkinput)
-        k = 3
+        k = int(self.config['k'])
+        t = int(self.config['t'])
 
         x.set_binary(self.props._cwd, 'k-truss')
         x.set_arg(bmkinput.props.file, bmk2.AT_INPUT_FILE)
         assert self.algo is not None
         x.set_arg('-algo=%s' % (self.algo,), bmk2.AT_OPAQUE)
         x.set_arg('-trussNum=%d' % (k,), bmk2.AT_OPAQUE)
-        x.set_arg("-t=%d" % (1,), bmk2.AT_OPAQUE)
+        x.set_arg("-t=%d" % (t,), bmk2.AT_OPAQUE)
         x.set_arg('-o=@output', bmk2.AT_TEMPORARY_OUTPUT)
         x.set_checker(bmk2.ExternalChecker(get_ktruss_checker(bmkinput, k)))
 

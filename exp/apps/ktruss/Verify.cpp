@@ -50,7 +50,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"
 static cll::opt<std::string> trussFile("trussFile", cll::desc("edgelist for the trusses"), cll::Required);
 static cll::opt<unsigned int> trussNum("trussNum", cll::desc("verify for maximal trussNum-trusses"), cll::Required);
 static cll::opt<unsigned int> ktrussNodes("trussNodes", cll::desc("truss nodes for verification"), cll::Required);
-static cll::opt<unsigned int> ktrussEdges("trussEdges", cll::desc("truss edges for verification"), cll::Required);
+static cll::opt<unsigned int> ktrussEdges("trussEdges", cll::desc("truss edges for verification"), cll::Required); // must be undirected edge count, i.e. counting (n1, n2) and (n2, n1) as 1 edge
 
 static const uint32_t valid = 0x0;
 static const uint32_t removed = 0x1;
