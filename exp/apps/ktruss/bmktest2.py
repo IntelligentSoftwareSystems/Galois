@@ -2,9 +2,9 @@ import bmk2
 from bmkprops import graph_bmk, PERF_RE, get_ktruss_checker
 import os
 
-class KtrussGaloisBSP(graph_bmk):
+class KtrussGaloisBase(graph_bmk):
     bmk = "ktruss"
-    variant = "galois+bsp"
+    algo = None
 
     def filter_inputs(self, inputs):
         def finput(x):
@@ -21,7 +21,8 @@ class KtrussGaloisBSP(graph_bmk):
 
         x.set_binary(self.props._cwd, 'k-truss')
         x.set_arg(bmkinput.props.file, bmk2.AT_INPUT_FILE)
-        x.set_arg('-algo=bsp', bmk2.AT_OPAQUE)
+        assert self.algo is not None
+        x.set_arg('-algo=%s' % (self.algo,), bmk2.AT_OPAQUE)
         x.set_arg('-trussNum=%d' % (k,), bmk2.AT_OPAQUE)
         x.set_arg("-t=%d" % (1,), bmk2.AT_OPAQUE)
         x.set_arg('-o=@output', bmk2.AT_TEMPORARY_OUTPUT)
@@ -30,5 +31,24 @@ class KtrussGaloisBSP(graph_bmk):
         x.set_perf(bmk2.PerfRE(r"^\(NULL\),.*, Time,0,0,(?P<time_ms>[0-9]+)$"))
         return x
 
+class KtrussGaloisBSP(KtrussGaloisBase):
+    variant = "galois+bsp"
+    algo = "bsp"
+
+class KtrussGaloisBSPIm(KtrussGaloisBase):
+    variant = "galois+bspIm"
+    algo = "bspIm"
+
+class KtrussGaloisBSPCoreThenTruss(KtrussGaloisBase):
+    variant = "galois+bspCoreThenTruss"
+    algo = "bspCoreThenTruss"
+
+class KtrussGaloisAsync(KtrussGaloisBase):
+    variant = "galois+async"
+    algo = "async"
+
         
-BINARIES = [KtrussGaloisBSP()]
+BINARIES = [KtrussGaloisBSP(),
+            KtrussGaloisBSPIm(),
+            KtrussGaloisBSPCoreThenTruss(),
+            KtrussGaloisAsync(),]
