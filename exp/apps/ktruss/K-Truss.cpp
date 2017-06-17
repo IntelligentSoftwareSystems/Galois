@@ -196,10 +196,7 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode
 // 3. Remove unsupported edges in a separated loop.
 // 4. Go back to 1.
 struct BSPAlgo {
-  // edge weight: (# triangles supported << 1) | removal
-  //   set LSB of an edge weight to indicate the removal of the edge.
-  //   << 1 to track # triangles an edge supports, 
-  //   >> 1 when computing edge supports
+  // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
@@ -287,10 +284,7 @@ struct BSPAlgo {
 // 2. If all edges are kept, done.
 // 3. Go back to 3.
 struct BSPImprovedAlgo {
-  // edge weight: (# triangles supported << 1) | removal
-  //   set LSB of an edge weight to indicate the removal of the edge.
-  //   << 1 to track # triangles an edge supports, 
-  //   >> 1 when computing edge supports
+  // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
@@ -382,10 +376,7 @@ struct BSPImprovedAlgo {
 //    b. If all edges are kept, done.
 //    c. Go back to a.
 struct BSPCoreThenTrussAlgo {
-  // edge weight: (# triangles supported << 1) | removal
-  //   set LSB of an edge weight to indicate the removal of the edge.
-  //   << 1 to track # triangles an edge supports, 
-  //   >> 1 when computing edge supports
+  // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
@@ -529,6 +520,64 @@ struct BSPCoreThenTrussAlgo {
   } // end operator()
 }; // end struct BSPCoreThenTrussAlgo
 
+// AsyncAlgo:
+// 1. Compute support for all edges and pick out unsupported ones.
+// 2. Remove unsupported edges, decrease the support for affected edges and pick out those becomeing unsupported.
+// 3. Repeat 2. until no more unsupported edges are found.
+struct AsyncAlgo {
+  // edge weight: (# triangles supported << 1) | removal
+  //   set LSB of an edge weight to indicate the removal of the edge.
+  //   << 1 to track # triangles an edge supports, 
+  //   >> 1 when computing edge supports
+  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+    ::template with_numa_alloc<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+
+  typedef std::pair<GNode, GNode> Edge;
+  typedef Galois::InsertBag<Edge> EdgeVec;
+
+  std::string name() { return "async"; }
+
+  struct PickUnsupportedEdges {
+    Graph& g;
+    unsigned int j;
+    EdgeVec& r;
+
+    PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r)
+      : g(g), j(j), r(r) {}
+
+    void operator()(Edge e) {
+      if (!isSupportNoLessThanJ(g, e.first, e.second, j)) {
+        r.push_back(e);
+      }
+    }
+  };
+
+  void operator()(Graph& g, unsigned int k) {
+    if (0 == k-2) {
+      return;
+    }
+
+    EdgeVec work, unsupported;
+
+    // symmetry breaking: 
+    // consider only edges (i, j) where i < j
+    Galois::do_all_local(g, 
+      [&g, &work] (GNode n) {
+        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+          auto dst = g.getEdgeDst(e);
+          if (dst > n) {
+            work.push_back(std::make_pair(n, dst));
+          }
+        }
+      },
+      Galois::do_all_steal<true>()
+    );
+
+    //Galois::for_each();
+  } // end operator()
+}; // end AsyncAlgo
+
 template<typename Algo>
 void run() {
   Algo algo;
@@ -570,7 +619,7 @@ int main(int argc, char **argv) {
   case bspCoreThenTruss:
     run<BSPCoreThenTrussAlgo>();
   case async: 
-//    run<AsyncAlgo>(); 
+    run<AsyncAlgo>(); 
     break;
   default: 
     std::cerr << "Unknown algorithm\n"; 
