@@ -17,7 +17,8 @@ class KtrussGaloisBase(graph_bmk):
 
     def get_run_spec(self, bmkinput):
         x = bmk2.RunSpec(self, bmkinput)
-        k = int(self.config['k'])
+
+        k, ec = get_ktruss_checker(bmkinput, self.config['k'])
         t = int(self.config['t'])
 
         x.set_binary(self.props._cwd, 'k-truss')
@@ -27,7 +28,7 @@ class KtrussGaloisBase(graph_bmk):
         x.set_arg('-trussNum=%d' % (k,), bmk2.AT_OPAQUE)
         x.set_arg("-t=%d" % (t,), bmk2.AT_OPAQUE)
         x.set_arg('-o=@output', bmk2.AT_TEMPORARY_OUTPUT)
-        x.set_checker(bmk2.ExternalChecker(get_ktruss_checker(bmkinput, k)))
+        x.set_checker(bmk2.ExternalChecker(ec))
 
         x.set_perf(bmk2.PerfRE(r"^\(NULL\),.*, Time,0,0,(?P<time_ms>[0-9]+)$"))
         return x
