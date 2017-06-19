@@ -49,8 +49,8 @@ static const char* url = nullptr;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string> trussFile("trussFile", cll::desc("edgelist for the trusses"), cll::Required);
 static cll::opt<unsigned int> trussNum("trussNum", cll::desc("verify for maximal trussNum-trusses"), cll::Required);
-static cll::opt<unsigned int> ktrussNodes("trussNodes", cll::desc("truss nodes for verification"), cll::Required);
-static cll::opt<unsigned int> ktrussEdges("trussEdges", cll::desc("truss edges for verification"), cll::Required); // must be undirected edge count, i.e. counting (n1, n2) and (n2, n1) as 1 edge
+static cll::opt<unsigned int> ktrussNodes("trussNodes", cll::desc("truss nodes for verification"), cll::init(0));
+static cll::opt<unsigned int> ktrussEdges("trussEdges", cll::desc("truss edges for verification"), cll::init(0)); // must be undirected edge count, i.e. counting (n1, n2) and (n2, n1) as 1 edge
 
 static const uint32_t valid = 0x0;
 static const uint32_t removed = 0x1;
@@ -112,7 +112,7 @@ void readTruss(Graph& g) {
   
   std::cout << "read " << edges << " unique edges" << std::endl;
   
-  if(edges != ktrussEdges) {
+  if(ktrussEdges && edges != ktrussEdges) {
     std::cerr << "edges read not equal to -trussEdges=" << ktrussEdges << std::endl;
     GALOIS_DIE("Verification error");
   }
