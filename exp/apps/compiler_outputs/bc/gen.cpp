@@ -83,7 +83,6 @@ static cll::opt<bool> verify("verify",
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
                              cll::init(false));
-
 static cll::opt<bool> enableVCut("enableVertexCut", 
                                  cll::desc("Use vertex cut for graph " 
                                            "partitioning."), 
@@ -130,7 +129,6 @@ static unsigned int src_node = 0;
 /******************************************************************************/
 
 struct NodeData {
-
   // SSSP vars
   std::atomic<unsigned int> current_length;
   unsigned int old_length;
@@ -138,10 +136,13 @@ struct NodeData {
   // Betweeness centrality vars
   std::atomic<unsigned int> num_shortest_paths;
   std::atomic<unsigned int> num_successors;
+  std::atomic<unsigned int> num_predecessors;
+
   std::atomic<float> dependency;
   std::atomic<unsigned int> trim;
+  bool propogation_flag;
 
-  std::atomic<unsigned int> betweeness_centrality;
+  std::atomic<float> betweeness_centrality;
 };
 
 // second type (unsigned int) for edge weights
@@ -181,7 +182,7 @@ struct InitializeIteration {
 
   /* Reset graph metadata node-by-node */
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeIteration{&_graph}, 
                    Galois::loopname("InitializeIteration"), 
                    Galois::numrun(_graph.get_run_identifier()));
   }
@@ -195,9 +196,13 @@ struct InitializeIteration {
     src_data.old_length = (graph->getGID(src) == src_node) ? 0 : infinity;
 
     src_data.trim = 0;
+    src_data.propogation_flag = false;
 
-    src_data.num_shortest_paths = 0; // TODO verify if diff. for source
+    // set num to 1 on source so that it can propogate it across nodes later
+    // note source will not have sigma accessed anyways (at least it shouldn't)
+    src_data.num_shortest_paths = (graph->getGID(src) == src_node) ? 1 : 0;
     src_data.num_successors = 0;
+    src_data.num_predecessors = 0;
     src_data.dependency = 0;
   }
 };
@@ -224,8 +229,11 @@ struct SSSP {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
-      unsigned int new_dist = graph->getEdgeData(current_edge) + 
-                              src_data.current_length;
+      //unsigned int new_dist = graph->getEdgeData(current_edge) + 
+      //                        src_data.current_length;
+      // TODO change this back later 
+      // BFS simulation
+      unsigned int new_dist = 1 + src_data.current_length;
 
       Galois::atomicMin(dst_data.current_length, new_dist);
 
@@ -239,22 +247,22 @@ struct SSSP {
 
 /* Struct to get number of shortest paths as well as successors on the
  * SSSP DAG */
-struct ShortestPathsAndSuccessors {
+struct PredAndSucc {
   Graph* graph;
 
-  ShortestPathsAndSuccessors(Graph* _graph) : graph(_graph){}
+  PredAndSucc(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
     // Loop over all nodes in graph
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   ShortestPathsAndSuccessors(&_graph), 
-                   Galois::loopname("ShortestPathsAndSuccessors"));
+                   PredAndSucc(&_graph), 
+                   Galois::loopname("PredAndSucc"));
   }
 
   /* Summary:
    * Look at outgoing edges; see if dest is on a shortest path from src node.
    * If it is, increment the number of successors on src by 1 and
-   * increment # of shortest paths on dest by 1 
+   * increment # of pred on dest by 1 
    * (pull + push)
    * Read from dest
    * Writes to src and dest
@@ -272,16 +280,125 @@ struct ShortestPathsAndSuccessors {
          ++current_edge) {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
-      unsigned int edge_weight = graph->getEdgeData(current_edge);
+
+      // TODO change BFS back when done testing
+      //unsigned int edge_weight = graph->getEdgeData(current_edge);
+      unsigned int edge_weight = 1;
 
       if ((src_data.current_length + edge_weight) == dst_data.current_length) {
         // dest on shortest path with this node as predecessor
         Galois::atomicAdd(src_data.num_successors, (unsigned int)1);
-        Galois::atomicAdd(dst_data.num_shortest_paths, (unsigned int)1);
+        Galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
       }
     }
   }
 };
+
+/* Uses an incremented trim value to decrement the predecessor: the trim value
+ * has to be synchronized across ALL nodes (including slaves) */
+struct PredecessorDecrement {
+  Graph* graph;
+
+  PredecessorDecrement(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), PredecessorDecrement{&_graph}, 
+                   Galois::loopname("PredecessorDecrement"), 
+                   Galois::numrun(_graph.get_run_identifier()));
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    // decrement predecessor by trim then reset
+    // NOTE: trim needs to be synchronized in a previous operator
+    if (src_data.trim > 0) {
+      if (src_data.trim > src_data.num_predecessors) {
+        std::cout << "ISSUE P: src " << src << " " << src_data.trim << " " << 
+                                  src_data.num_predecessors << "\n";
+        //abort();                                    
+      }
+
+      src_data.num_predecessors -= src_data.trim;
+      src_data.trim = 0;
+
+      if (src_data.num_predecessors == 0) {
+        src_data.propogation_flag = false;
+      }
+    }
+  }
+};
+
+
+/* Calculate the number of shortest paths for each node */
+struct NumShortestPaths {
+  Graph* graph;
+  static Galois::DGAccumulator<int> work_accumulator;
+
+  NumShortestPaths(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    unsigned int iterations = 0;
+    
+    do {
+      _graph.set_num_iter(iterations);
+      work_accumulator.reset();
+
+      Galois::do_all(_graph.begin(), _graph.end(), 
+                     NumShortestPaths(&_graph), 
+                     Galois::loopname("NumShortestPaths"));
+
+      // do predecessor decrementing using trim
+      PredecessorDecrement::go(_graph);
+
+      iterations++;
+    } while ((iterations < maxIterations) && work_accumulator.reduce());
+
+  }
+
+  /* If a source has no more predecessors, then its shortest path value is
+   * complete.
+   *
+   * Propogate the shortest path value through all outgoing edges where this
+   * source is a predecessor in the DAG, then
+   * set a flag saying that we should not propogate it any more (otherwise you
+   * send extra).
+   *
+   * Additionally, decrement the predecessor field on the destination nodes of
+   * the outgoing edges.
+   */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (src_data.num_predecessors == 0 && !src_data.propogation_flag &&
+        src_data.num_successors > 0) {
+      for (auto current_edge = graph->edge_begin(src), 
+                end_edge = graph->edge_end(src); 
+           current_edge != end_edge; 
+           ++current_edge) {
+        GNode dst = graph->getEdgeDst(current_edge);
+        auto& dst_data = graph->getData(dst);
+
+        // TODO change back from BFS
+        //unsigned int edge_weight = graph->getEdgeData(current_edge);
+        unsigned int edge_weight = 1;
+
+        if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+          work_accumulator += 1;
+          // add my num shortest paths to dest's num shortest paths
+          Galois::atomicAdd(dst_data.num_shortest_paths,
+                            src_data.num_shortest_paths.load());
+          
+          // increment dst trim so it can decrement predecessor
+          Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+        }
+      }
+
+      src_data.propogation_flag = true;
+    }
+  }
+};
+Galois::DGAccumulator<int> NumShortestPaths::work_accumulator;
 
 /* Uses an incremented trim value to decrement the successor: the trim value
  * has to be synchronized across ALL nodes (including slaves) */
@@ -299,16 +416,26 @@ struct SuccessorDecrement {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
+    if (src_data.num_successors == 0 && !src_data.propogation_flag) {
+      assert(src_data.trim == 0);
+      src_data.propogation_flag = true;
+    } else if (src_data.trim > 0) {
     // decrement successor by trim then reset
     // NOTE: trim needs to be synchronized in a previous operator
-    if (src_data.trim > 0) {
+      if (src_data.trim > src_data.num_successors) {
+        std::cout << "ISSUE: src " << src << " " << src_data.trim << " " << 
+                                  src_data.num_successors << "\n";
+        //abort();                                    
+      }
+
       src_data.num_successors -= src_data.trim;
       src_data.trim = 0;
 
       // multiply dependency by # of shortest paths to finalize if no more 
-      // successors
+      // successors, then set prop flag to false so it can propogate the value
       if (src_data.num_successors == 0) {
         src_data.dependency = src_data.dependency * src_data.num_shortest_paths;
+        src_data.propogation_flag = false;
       }
     }
   }
@@ -333,6 +460,7 @@ struct DependencyPropogation {
       Galois::do_all(_graph.begin(), _graph.end(), 
                      DependencyPropogation(&_graph), 
                      Galois::loopname("DependencyPropogation"));
+
       // do successor decrementing using trim
       SuccessorDecrement::go(_graph);
 
@@ -359,7 +487,17 @@ struct DependencyPropogation {
    *
    * This is pull based, no? */
   void operator()(GNode src) const {
+    // IGNORE THE SOURCE NODE OF THIS CURRENT ITERATION OF SSSP
+    if (graph->getGID(src) == src_node) {
+      return;
+    }
+
     NodeData& src_data = graph->getData(src);
+
+    // do not redo computation if src has no successors left
+    if (src_data.num_successors == 0) {
+      return;
+    }
 
     for (auto current_edge = graph->edge_begin(src), 
               end_edge = graph->edge_end(src); 
@@ -367,13 +505,17 @@ struct DependencyPropogation {
          ++current_edge) {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
-      unsigned int edge_weight = graph->getEdgeData(current_edge);
+      // TODO change back from BFS
+      //unsigned int edge_weight = graph->getEdgeData(current_edge);
+      unsigned int edge_weight = 1;
 
       // only operate if a dst has no more successors (i.e. delta finalized
-      // for this round)
-      if (dst_data.num_successors == 0) {
+      // for this round) + if it hasn't propogated the value yet (i.e. because
+      // successors become 0 in the last do_all round)
+      if (dst_data.num_successors == 0 && !dst_data.propogation_flag) {
         // dest on shortest path with this node as predecessor
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+          work_accumulator += 1;
 
           // increment my trim for later use to decrement successor
           Galois::atomicAdd(src_data.trim, (unsigned int)1);
@@ -395,13 +537,13 @@ struct BC {
   BC(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    // NOTE: kill this loop if you just want to run BC with 1 source node for
-    // SSSP
-    // TODO: find a way to loop over all nodes for SSSP; do_all maybe, but not
-    // in parallel?
-    //for (auto i = _graph.begin(); i != _graph.end(); i++) {
+    // TODO: don't do all nodes but only some since this takes a long time 
+    // otherwise?
+    //for (uint64_t i = 0; i < _graph.totalNodes; i++) {
+    for (uint64_t i = 0; i < 1; i++) {
       // change source nodes for this iteration of SSSP
-      //src_node = _graph.getGID(i);
+      std::cout << "SSSP source node " << i << "\n";
+      src_node = i;
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -409,9 +551,11 @@ struct BC {
       // get SSSP on the current graph (sync should be handled in it)
       SSSP::go(_graph);
 
-      // calculate the num of shortest paths for each node after SSSP
-      // convergence + count the num of successors on SSSP DAG for each node
-      ShortestPathsAndSuccessors::go(_graph);
+      // calculate the succ/pred for all nodes in the SSSP DAG
+      PredAndSucc::go(_graph);
+
+      // calculate the number of shortest paths for each node
+      NumShortestPaths::go(_graph);
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph);
@@ -420,7 +564,7 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
       Galois::do_all(_graph.begin(), _graph.end(), BC(&_graph), 
                      Galois::loopname("BC"));
-    //}
+    }
   }
 
   /* adds dependency measure to BC measure (dependencies should be finalized,
@@ -428,7 +572,8 @@ struct BC {
   void operator()(GNode src) const {
     NodeData& src_node = graph->getData(src);
 
-    src_node.betweeness_centrality += src_node.dependency;
+    src_node.betweeness_centrality = src_node.betweeness_centrality + 
+                                     src_node.dependency;
   }
 };
  
@@ -537,10 +682,16 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
+        char test[100];
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                 (*h_graph).getData(*ii).betweeness_centrality);
+          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
+            sprintf(test, "%lu %.6f\n", (*h_graph).getGID(*ii),
+                    (*h_graph).getData(*ii).betweeness_centrality.load());
+            Galois::Runtime::printOutput(test);
+            // outputs betweenness centrality
+            //Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+            //                     (*h_graph).getData(*ii).betweeness_centrality);
+          }
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA) {
