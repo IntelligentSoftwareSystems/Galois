@@ -94,14 +94,14 @@ void readTruss(Graph& g) {
   unsigned int edges = 0;
   while (edgelist >> n1 >> n2) {
     auto e = g.findEdgeSortedByDst(n1, n2);
-    if(g.getEdgeData(e) & valid) {      
+    if(valid == g.getEdgeData(e)) {
       std::cout << "ignoring duplicate edge" << n1 << ", " << n2 << std::endl;
       continue;
     }
     g.getEdgeData(e) = valid;
 
     e = g.findEdgeSortedByDst(n2, n1);
-    if(g.getEdgeData(e) & valid) {
+    if(valid == g.getEdgeData(e)) {
       std::cout << "duplicate edge (rev) " << n2 << ", " << n1 << std::endl;
       continue;
     }
