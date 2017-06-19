@@ -44,7 +44,8 @@ enum Algo {
   bsp,
   bspIm,
   bspCoreThenTruss,
-  async
+  async,
+  asyncCoreThenTruss
 };
 
 namespace cll = llvm::cl;
@@ -59,11 +60,12 @@ static cll::opt<unsigned int> trussNum("trussNum", cll::desc("report trussNum-tr
 static cll::opt<std::string> outName("o", cll::desc("output file for the edgelist of resulting truss"));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), 
   cll::values(
-    clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"), 
-    clEnumValN(Algo::bspIm, "bspIm", "Bulk-synchronous parallel improved"),
+    clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel"), 
+    clEnumValN(Algo::bspIm, "bspIm", "Bulk-synchronous parallel improved (default)"),
     clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss", "Compute k-1 core and then k-truss in bspIm way"),
     clEnumValN(Algo::async, "async", "Asynchronous"), 
-    clEnumValEnd), cll::init(Algo::bsp));
+    clEnumValN(Algo::asyncCoreThenTruss, "asyncCoreThenTruss", "Compute k-1 core and then k-truss in async way"),
+    clEnumValEnd), cll::init(Algo::bspIm));
 
 static const uint32_t valid = 0x0;
 static const uint32_t removed = 0x1;
@@ -115,6 +117,24 @@ size_t countValidNodes(G& g) {
   return numNodes.reduce();
 }
 
+template<typename G>
+size_t countValidEdges(G& g) {
+  Galois::GAccumulator<size_t> numEdges;
+
+  Galois::do_all_local(g, 
+    [&g, &numEdges] (typename G::GraphNode n) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        if (n < g.getEdgeDst(e) && !(g.getEdgeData(e) & removed)) {
+          numEdges += 1;
+        }
+      }
+    },
+    Galois::do_all_steal<true>()
+  );
+
+  return numEdges.reduce();
+}
+
 template<typename Graph>
 void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
   if (outName.empty()) {
@@ -160,7 +180,7 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode
     dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
 
   while (true) {
-  // find the first valid edge
+    // find the first valid edge
     while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
       ++srcI;
     }
@@ -520,6 +540,42 @@ struct BSPCoreThenTrussAlgo {
   } // end operator()
 }; // end struct BSPCoreThenTrussAlgo
 
+template<typename G>
+std::deque<typename G::GraphNode> getValidCommonNeighbors(G& g,
+  typename G::GraphNode src, typename G::GraphNode dst, Galois::MethodFlag flag = Galois::MethodFlag::WRITE)
+{
+  auto srcI = g.edge_begin(src, flag), srcE = g.edge_end(src, flag), 
+    dstI = g.edge_begin(dst, flag), dstE = g.edge_end(dst, flag);
+  std::deque<typename G::GraphNode> commonNeighbors;
+
+  while (true) {
+    // find the first valid edge
+    while (srcI != srcE && (g.getEdgeData(srcI) & removed)) {
+      ++srcI;
+    }
+    while (dstI != dstE && (g.getEdgeData(dstI) & removed)) {
+      ++dstI;
+    }
+
+    if (srcI == srcE || dstI == dstE) {
+      break;
+    }
+
+    // check for intersection
+    auto sN = g.getEdgeDst(srcI), dN = g.getEdgeDst(dstI);
+    if (sN < dN) {
+      ++srcI;
+    } else if (dN < sN) {
+      ++dstI;
+    } else {
+      commonNeighbors.push_back(sN);
+      ++srcI;
+      ++dstI;
+    }
+  }
+  return commonNeighbors;
+}
+
 // AsyncAlgo:
 // 1. Compute support for all edges and pick out unsupported ones.
 // 2. Remove unsupported edges, decrease the support for affected edges and pick out those becomeing unsupported.
@@ -547,9 +603,57 @@ struct AsyncAlgo {
       : g(g), j(j), r(r) {}
 
     void operator()(Edge e) {
-      if (!isSupportNoLessThanJ(g, e.first, e.second, j)) {
+      auto src = e.first, dst = e.second;
+      std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst, Galois::MethodFlag::UNPROTECTED);
+      auto numValidCommonNeighbors = commonNeighbors.size();
+      g.getEdgeData(g.findEdgeSortedByDst(src, dst)) = (numValidCommonNeighbors << 1);
+      g.getEdgeData(g.findEdgeSortedByDst(dst, src)) = (numValidCommonNeighbors << 1);
+      if (numValidCommonNeighbors < j) {
         r.push_back(e);
       }
+    }
+  };
+
+  struct PropagateEdgeRemoval {
+    Graph& g;
+    unsigned int j;
+
+    PropagateEdgeRemoval(Graph& g, unsigned int j): g(g), j(j) {}
+
+    void removeUnsupportedEdge(GNode src, GNode dst, Galois::UserContext<Edge>& ctx) {
+      auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
+      auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
+
+      auto oldSupport = (oeData >> 1), newSupport = oldSupport - 1;
+      if (!oldSupport || newSupport < j) {
+        ctx.push(std::make_pair(src, dst));
+      }
+      if (!oldSupport) {
+        oeData = (newSupport << 1);
+        ieData = (newSupport << 1);
+      }
+    }
+
+    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
+      auto src = e.first, dst = e.second;
+      auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
+      auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
+
+      // already removed
+      if (oeData & removed) {
+        return;
+      }
+
+      // propagate edge removal
+      std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst);
+      for (auto n: commonNeighbors) {
+        removeUnsupportedEdge(((n < src) ? n : src), ((n < src) ? src: n), ctx);
+        removeUnsupportedEdge(((n < dst) ? n : dst), ((n < dst) ? dst: n), ctx);
+      }
+ 
+      // edge removal
+      oeData = removed;
+      ieData = removed;
     }
   };
 
@@ -573,6 +677,18 @@ struct AsyncAlgo {
       },
       Galois::do_all_steal<true>()
     );
+    std::cout << "begin: " << countValidNodes(g) << " nodes, " << countValidEdges(g) << " edges" << std::endl;
+
+    Galois::do_all_local(work, 
+      PickUnsupportedEdges{g, k-2, unsupported},
+      Galois::do_all_steal<true>()
+    );
+
+    Galois::for_each_local(unsupported,
+      PropagateEdgeRemoval{g, k-2},
+      Galois::loopname("PropagateEdgeRemoval")
+    );
+    std::cout << "end: " << countValidNodes(g) << " nodes, " << countValidEdges(g) << " edges" << std::endl;
 
     //Galois::for_each();
   } // end operator()
@@ -620,6 +736,9 @@ int main(int argc, char **argv) {
     run<BSPCoreThenTrussAlgo>();
   case async: 
     run<AsyncAlgo>(); 
+    break;
+  case asyncCoreThenTruss:
+//    run<AsyncCoreThenTrussAlgo>();
     break;
   default: 
     std::cerr << "Unknown algorithm\n"; 
