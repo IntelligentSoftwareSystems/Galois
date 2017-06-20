@@ -36,7 +36,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include <iostream>
-#include <deque>
+#include <unordered_set>
 #include <algorithm>
 #include <fstream>
 
@@ -92,6 +92,7 @@ void readTruss(Graph& g) {
 
   unsigned int n1, n2;
   unsigned int edges = 0;
+  std::unordered_set<unsigned int> nodes;
   while (edgelist >> n1 >> n2) {
     auto e = g.findEdgeSortedByDst(n1, n2);
     if(valid == g.getEdgeData(e)) {
@@ -108,6 +109,8 @@ void readTruss(Graph& g) {
     g.getEdgeData(e) = valid;
     
     edges++;
+    nodes.insert(n1);
+    nodes.insert(n2);
   }
   
   std::cout << "read " << edges << " unique edges" << std::endl;
@@ -117,8 +120,10 @@ void readTruss(Graph& g) {
     GALOIS_DIE("Verification error");
   }
 
-  // TODO: also verify node count
-
+  if(ktrussNodes && nodes.size() != ktrussNodes) {
+    std::cerr << "nodes read not equal to -trussNodes=" << ktrussNodes << std::endl;
+    GALOIS_DIE("Verification error");
+  }
 }
 
 void printGraph(Graph& g) {
