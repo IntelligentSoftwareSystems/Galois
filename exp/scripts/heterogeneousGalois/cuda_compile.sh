@@ -73,5 +73,5 @@ else
   echo "Generated files: gen_cuda.py gen_cuda.h gen_cuda.cuh gen_cuda.cu" 
 fi
 
-rm -f cdep_Entry-*.dot
+rm -f Entry-*.dot cdep_Entry-*.dot
 
