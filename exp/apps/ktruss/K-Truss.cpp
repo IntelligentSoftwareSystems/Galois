@@ -734,6 +734,7 @@ int main(int argc, char **argv) {
     break;
   case bspCoreThenTruss:
     run<BSPCoreThenTrussAlgo>();
+    break;
   case async: 
     run<AsyncAlgo>(); 
     break;
