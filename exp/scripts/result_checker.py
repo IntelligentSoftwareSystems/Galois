@@ -1,5 +1,6 @@
 #### Script to check the output of algorithms:
 ### Author: Gurbinder Gill (gurbinder533@gmail.com)
+### Modified to calculate error by Loc Hoang
 ### python script.py masterFile allfile*
 ### expects files in the follwing format:
 ###### nodeID nodeFieldVal
@@ -8,24 +9,53 @@
 
 import sys
 
-tolerance=0.0001
+tolerance = 0.01
 
 def check_results(masterFile, otherFiles, offset, errors, mrows):
+  global_error = 0
+  global_error_squared = 0
+  num_nodes = 0
+
   with open(masterFile) as mfile, open(otherFiles) as ofile:
     mfile.seek(offset)
+
+
     for line2 in ofile:
       line1 = mfile.readline()
       offset = offset + len(line1)
       split_line1 = line1.split(' ')
       split_line2 = line2.split(' ')
+
       while (split_line1[0] < split_line2[0]):
         print "MISSING ROW: ", split_line1[0]
         mrows = mrows + 1
         line1 = mfile.readline()
         offset = offset + len(line1)
         split_line1 = line1.split(' ')
+
       if (split_line1[0] == split_line2[0]):
-        if(abs(float(split_line1[1]) - float(split_line2[1])) > tolerance):
+        # absolute value of difference in fields
+        field_difference = abs(float(split_line1[1]) - float(split_line2[1]))
+
+
+        # Loc: ignore this, I was trying something with percentages
+        #percent_error = 0
+        #
+        #if (float(split_line1[1]) == 0):
+        #  if (field_difference != 0):
+        #      print("ERROR: CORRECT RESULT SUPPOSED TO BE ZERO")
+        #      print line1;
+        #      print line2;
+        #      raise Exception()
+        #else:
+        #  percent_error = (field_difference / float(split_line1[1])) - 1.0
+
+        global_error_squared += (field_difference * field_difference)
+        num_nodes += 1
+
+        #print(global_error_squared)
+        
+        if (field_difference > tolerance):
           print "NOT MATCHED \n";
           print line1;
           print line2;
@@ -34,20 +64,23 @@ def check_results(masterFile, otherFiles, offset, errors, mrows):
         print "OFFSET MISMATCH: ", split_line1[0], split_line2[0]
         return (-1, errors, mrows);
 
-
+  print("Mean error squared is %f\n" % (global_error_squared / num_nodes))
   return (offset, errors, mrows);
 
 def main(masterFile, allFiles_arr):
   offset = 0;
   errors = 0;
   mrows = 0;
+
   for i in range(0 , len(allFiles_arr)):
     print allFiles_arr[i]
     print offset
-    offset, errors, mrows = check_results(masterFile, allFiles_arr[i], offset, errors, mrows)
-    if(offset == -1):
+    offset, errors, mrows = check_results(masterFile, allFiles_arr[i], offset, 
+                                          errors, mrows)
+    if (offset == -1):
       break;
-  if(offset != -1):
+
+  if (offset != -1):
     mfile = open(masterFile)
     mfile.seek(offset)
     old_mrows=mrows
@@ -56,14 +89,18 @@ def main(masterFile, allFiles_arr):
     if mrows > old_mrows:
       print "INCOMPLETE OUTPUT FILE"
   print "No of offsets/rows missing", mrows;
+
   if (errors > 0):
     print "No of mismatches", errors;
     print "\nFAILED\n";
-  if(offset == -1):
+
+  if (offset == -1):
     print "\nOFFSET NOT CORRECT\n";
+
   if (errors > 0) or (offset == -1):
     print allFiles_arr[i];
     return -1;
+
   return 0;
 
 if __name__ == "__main__":
@@ -73,5 +110,6 @@ if __name__ == "__main__":
   allFiles_arr = arg[2:]
   print allFiles_arr
   ret = main(masterFile, allFiles_arr)
+
   if(ret == 0):
     print "\nSUCCESS\n";
