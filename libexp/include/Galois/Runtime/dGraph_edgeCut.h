@@ -35,7 +35,7 @@
 //class hGraph;
 
 
-template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool isBipartite = false, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   public:
@@ -50,7 +50,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
     uint32_t numOwned_withoutEdges;
-    bool isBipartite;
     uint64_t last_nodeID_withEdges_bipartite;
     uint64_t globalOffset_bipartite;
 
@@ -100,7 +99,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     // Return is gid is present locally (owned or mirror).
     bool isLocal(uint64_t gid) const {
-      return isOwned(gid);
+      if (isOwned(gid)) return true;
       return (GlobalToLocalGhostMap.find(gid) != GlobalToLocalGhostMap.end());
     }
 
@@ -110,15 +109,13 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned> scalefactor, 
-                   bool transpose = false, 
-                   bool bipartite = false) : 
+                   bool transpose = false) : 
                     base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       StatTimer_graph_construct.start();
       Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
-      isBipartite = bipartite;
       uint32_t _numNodes;
       uint64_t _numEdges;
       Galois::Graph::OfflineGraph g(filename);
@@ -143,7 +140,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          //gid2host.push_back(Galois::block_range(0U, (unsigned) g.size(), i, base_hGraph::numHosts));
           gid2host.push_back(Galois::block_range(0U, (unsigned) numNodes_to_divide, i, base_hGraph::numHosts));
       } else {
         assert(scalefactor.size() == base_hGraph::numHosts);
@@ -152,7 +148,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           numBlocks += scalefactor[i];
         std::vector<std::pair<uint64_t, uint64_t>> blocks;
         for (unsigned i = 0; i < numBlocks; ++i)
-          //blocks.push_back(Galois::block_range(0U, (unsigned) g.size(), i, numBlocks));
           blocks.push_back(Galois::block_range(0U, (unsigned) numNodes_to_divide, i, numBlocks));
         std::vector<unsigned> prefixSums;
         prefixSums.push_back(0);
@@ -256,7 +251,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   uint32_t G2L(uint64_t gid) const {
-    //if (gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned)
     if (gid >= globalOffset && gid < globalOffset + numOwned_withEdges)
       return gid - globalOffset;
 
@@ -275,7 +269,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   uint64_t L2G(uint32_t lid) const {
     assert(lid < numNodes);
-    //if (lid < base_hGraph::numOwned)
     if (lid < numOwned_withEdges)
       return lid + globalOffset;
     if(isBipartite){
