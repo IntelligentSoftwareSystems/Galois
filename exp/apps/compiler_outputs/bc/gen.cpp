@@ -81,8 +81,8 @@ static cll::opt<std::string> partFolder("partFolder",
                                         cll::desc("path to partitionFolder"),
                                         cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 10000"), 
-                               cll::init(10000));
+                               cll::desc("Maximum iterations: Default 1000000"), 
+                               cll::init(1000000));
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
@@ -226,12 +226,14 @@ struct InitializeIteration {
     src_data.old_length = (graph->getGID(src) == current_src_node) ? 0 : infinity;
 
     src_data.trim = 0;
-    // true = "I have propogated i.e. don't propogate
+    // set to true = "I have propogated" i.e. don't propogate anymore
+    // set to false = "I have not propogated and/or I cannot propogate"
     src_data.propogation_flag = false; 
 
     // set num to 1 on source so that it can propogate it across nodes later
     // note source will not have sigma accessed anyways (at least it shouldn't)
     src_data.num_shortest_paths = (graph->getGID(src) == current_src_node) ? 1 : 0;
+
     src_data.num_successors = 0;
     src_data.num_predecessors = 0;
     src_data.dependency = 0;
@@ -250,7 +252,6 @@ struct InitializeIteration {
  * different */
 struct FirstIterationSSSP {
   Graph* graph;
-  static Galois::DGAccumulator<unsigned int> work_accumulator;
   FirstIterationSSSP(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
@@ -270,13 +271,13 @@ struct FirstIterationSSSP {
                    FirstIterationSSSP(&_graph),
                    Galois::loopname("FirstIterationSSSP"));
 
-    // WRITE DST current length
     current_length_flags.dst_write = true;
   }
 
   /* Does SSSP, push/filter based */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
+
     for (auto current_edge = graph->edge_begin(src), 
               end_edge = graph->edge_end(src); 
          current_edge != end_edge; 
@@ -295,7 +296,7 @@ struct FirstIterationSSSP {
   }
 };
 
-/* Sub struct for running SSSP */
+/* Sub struct for running SSSP (beyond 1st iteration) */
 struct SSSP {
   Graph* graph;
   static Galois::DGAccumulator<unsigned int> work_accumulator;
@@ -367,28 +368,39 @@ struct SSSP {
     };
 
     FirstIterationSSSP::go(_graph);
+
+    // starts at 1 since FirstSSSP takes care of the first one
     unsigned int iterations = 1;
 
     do {
       _graph.set_num_iter(iterations);
       work_accumulator.reset();
 
-      // READ SRC op; only care if dst was written
+      // READ SRC current length; only care if dst was written
       if (current_length_flags.dst_write) {
         // reduce to master
         _graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP");
         resetFlags(current_length_flags);
       }
 
+      // READ SRC old length; unnecessary as you will never write to dest'
+      // old_length
+      //if (old_length_flags.dst_write) {
+      //  _graph....
+      //}
+
       Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
                      Galois::loopname("SSSP"));
-      iterations++;
 
       // WRITE SRC old length (but we don't need to sync it as old length
-      // isn't used in any other op ever)
-      // WRITE DEST current length
+      // isn't written on dst, only src)
+      //old_length_flags.dst_write = true; // note this isn't declared yet
+
       current_length_flags.dst_write = true;
-    } while ((iterations < maxIterations) && work_accumulator.reduce());
+
+      iterations++;
+
+    } while (work_accumulator.reduce());
   }
 
   /* Does SSSP, push/filter based */
@@ -419,8 +431,7 @@ struct SSSP {
 };
 Galois::DGAccumulator<unsigned int> SSSP::work_accumulator;
 
-/* Struct to get number of shortest paths as well as successors on the
- * SSSP DAG */
+/* Struct to get pred and succon the SSSP DAG */
 struct PredAndSucc {
   Graph* graph;
 
@@ -491,8 +502,7 @@ struct PredAndSucc {
       typedef unsigned int ValTy;
     };
 
-    // READ SRC current length and READ DST current length: dst needs updated
-    // value
+    // READ SRC current length and READ DST current length
     if (current_length_flags.src_write && current_length_flags.dst_write) {
       _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
       resetFlags(current_length_flags);
@@ -503,6 +513,7 @@ struct PredAndSucc {
       _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } 
+
     //else {
     //  // TODO verify this
     //  // no new write has occured
@@ -510,21 +521,19 @@ struct PredAndSucc {
     //  // value: do a broadcast (e.g. in 1 op, src is read after dst is
     //  // written, so flags are reset, but in that op no writes occur:
     //  // then, once you get to a new op, you will never update dst unless
-    //  // the flag is set)
+    //  // the flag is set so dst holds the incorrect value)
     //  // TODO: also, find a way to make it more efficient instead of a
-    //  // broadcast every round like what it's doing now
+    //  // broadcast every round like what it would be doing if this code
+    //  // was active
     //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
     //}
 
-
     // Loop over all nodes in graph iteratively
-    Galois::do_all(_graph.begin(), _graph.end(), 
-                   PredAndSucc(&_graph), 
+    Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(&_graph), 
                    Galois::loopname("PredAndSucc"));
 
     num_successors_flags.src_write = true;
     num_predecessors_flags.dst_write = true;
-
   }
 
   /* Summary:
@@ -633,9 +642,9 @@ struct PredecessorDecrement {
 
     // READ SRC trim
     if (trim_flags.dst_write) {
-        // reduce to master
-        _graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
-        resetFlags(trim_flags);
+      // reduce to master
+      _graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
+      resetFlags(trim_flags);
     }
 
     Galois::do_all(_graph.begin(), _graph.end(), PredecessorDecrement{&_graph}, 
@@ -655,13 +664,13 @@ struct PredecessorDecrement {
       if (src_data.trim > src_data.num_predecessors) {
         std::cout << "ISSUE P: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_predecessors << "\n";
-        //abort();                                    
+        abort();                                    
       }
 
       src_data.num_predecessors -= src_data.trim;
       src_data.trim = 0;
 
-      // if I JUST hit 0 predecessors, set the flag to false (i.e. says
+      // if I hit 0 predecessors, set the flag to false (i.e. says
       // I need to propogate my value)
       // TODO: actually, at the moment, it's set to false by default (otherwise
       // nodes that already have 0 will be ignored in the first iteration),
@@ -970,10 +979,10 @@ struct NumShortestPaths {
 
       // READ SRC succ (as optimization; otherwise it will loop over no edges 
       // anyways)
-      if (num_successors_flags.dst_write) {
-        _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
-        resetFlags(num_successors_flags);
-      }
+      //if (num_successors_flags.dst_write) {
+      //  _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
+      //  resetFlags(num_successors_flags);
+      //}
 
       // READ SRC pred
       if (num_predecessors_flags.dst_write) {
@@ -1019,8 +1028,6 @@ struct NumShortestPaths {
                      NumShortestPaths(&_graph), 
                      Galois::loopname("NumShortestPaths"));
 
-      // set flags for NumShortestPaths operation
-
       trim_flags.dst_write = true;
       num_shortest_paths_flags.dst_write = true;
       propogation_flag_flags.src_write = true;
@@ -1029,8 +1036,7 @@ struct NumShortestPaths {
       PredecessorDecrement::go(_graph);
 
       iterations++;
-
-    } while ((iterations < maxIterations) && work_accumulator.reduce());
+    } while (work_accumulator.reduce());
 
   }
 
@@ -1048,8 +1054,7 @@ struct NumShortestPaths {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (src_data.num_predecessors == 0 && !src_data.propogation_flag &&
-        src_data.num_successors > 0) {
+    if (src_data.num_predecessors == 0 && !src_data.propogation_flag) {
       for (auto current_edge = graph->edge_begin(src), 
                 end_edge = graph->edge_end(src); 
            current_edge != end_edge; 
@@ -1078,6 +1083,28 @@ struct NumShortestPaths {
   }
 };
 Galois::DGAccumulator<unsigned int> NumShortestPaths::work_accumulator;
+
+
+/* Loop over all nodes and set the prop flag to false in prep for more
+ * propogation later*/
+struct PropFlagReset {
+  Graph* graph;
+
+  PropFlagReset(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), PropFlagReset{&_graph}, 
+                   Galois::loopname("PropFlagReset"), 
+                   Galois::numrun(_graph.get_run_identifier()));
+
+    propogation_flag_flags.src_write = true;
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+    src_data.propogation_flag = false;
+  }
+};
 
 /* Uses an incremented trim value to decrement the successor: the trim value
  * has to be synchronized across ALL nodes (including slaves) */
@@ -1119,7 +1146,6 @@ struct SuccessorDecrement {
       src_data.propogation_flag = true;
     } else if (src_data.trim > 0) {
     // decrement successor by trim then reset
-    // NOTE: trim needs to be synchronized in a previous operator
       if (src_data.trim > src_data.num_successors) {
         std::cout << "ISSUE: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_successors << "\n";
@@ -1132,7 +1158,8 @@ struct SuccessorDecrement {
       // multiply dependency by # of shortest paths to finalize if no more 
       // successors, then set prop flag to false so it can propogate the value
       if (src_data.num_successors == 0) {
-        src_data.dependency = src_data.dependency * src_data.num_shortest_paths;
+        // TODO revert back to this if necessary
+        //src_data.dependency = src_data.dependency * src_data.num_shortest_paths;
         src_data.propogation_flag = false;
       }
     }
@@ -1426,6 +1453,73 @@ struct DependencyPropogation {
 
     };
 
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Dependency
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushDependency {
+    	static float extract(uint32_t node_id, const struct NodeData & node) {
+      	return node.dependency;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, float y) {
+        return Galois::atomicAdd(node.dependency, y);
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        Galois::set(node.dependency, (float)0);
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullDependency {
+  		static float extract(uint32_t node_id, const struct NodeData & node) {
+  			return node.dependency;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned long long int *b,
+                                unsigned int *o, unsigned int *y, size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         float y) {
+        Galois::set(node.dependency, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+
     ////////////////////////////////////////////////////////////////////////////
 
     unsigned int iterations = 0;
@@ -1481,7 +1575,7 @@ struct DependencyPropogation {
         abort();
       }
 
-      // READ DST # shortest paths
+      // READ SRC/DST # shortest paths
       if (num_shortest_paths_flags.src_write && 
           num_shortest_paths_flags.dst_write) {
         _graph.sync_exchange<SyncPushPaths, 
@@ -1497,6 +1591,21 @@ struct DependencyPropogation {
         resetFlags(num_shortest_paths_flags);
       }
 
+      // READ DST dependency
+      if (dependency_flags.src_write && dependency_flags.dst_write) {
+        _graph.sync_exchange<SyncPushDependency, 
+                             SyncPullDependency>("DependencyPropogation");
+        resetFlags(dependency_flags);
+      } else if (dependency_flags.src_write) {
+        _graph.sync_backward<SyncPushDependency, 
+                             SyncPullDependency>("DependencyPropogation");
+        resetFlags(dependency_flags);
+      } else if (dependency_flags.dst_write) {
+        _graph.sync_exchange<SyncPushDependency, 
+                             SyncPullDependency>("DependencyPropogation");
+        resetFlags(dependency_flags);
+      }
+
       Galois::do_all(_graph.begin(), _graph.end(), 
                      DependencyPropogation(&_graph), 
                      Galois::loopname("DependencyPropogation"));
@@ -1508,7 +1617,7 @@ struct DependencyPropogation {
       SuccessorDecrement::go(_graph);
 
       iterations++;
-    } while ((iterations < maxIterations) && work_accumulator.reduce());
+    } while (work_accumulator.reduce());
   }
 
   /* Summary:
@@ -1530,15 +1639,12 @@ struct DependencyPropogation {
    *
    * This is pull based, no? */
   void operator()(GNode src) const {
-    // IGNORE THE SOURCE NODE OF THIS CURRENT ITERATION OF SSSP
-    if (graph->getGID(src) == current_src_node) {
-      return;
-    }
-
     NodeData& src_data = graph->getData(src);
 
-    // do not redo computation if src has no successors left
-    if (src_data.num_successors == 0) {
+    // IGNORE THE SOURCE NODE OF THIS CURRENT ITERATION OF SSSP
+    // + do not redo computation if src has no successors left
+    if (graph->getGID(src) == current_src_node || 
+        src_data.num_successors == 0) {
       return;
     }
 
@@ -1551,6 +1657,8 @@ struct DependencyPropogation {
       // TODO change back from BFS
       //unsigned int edge_weight = graph->getEdgeData(current_edge);
       unsigned int edge_weight = 1;
+      //std::cout << "dest " << graph->getGID(dst) << " " 
+      //          << dst_data.propogation_flag << "\n";
 
       // only operate if a dst has no more successors (i.e. delta finalized
       // for this round) + if it hasn't propogated the value yet (i.e. because
@@ -1568,8 +1676,11 @@ struct DependencyPropogation {
           //}
 
           // update my dependency
+          // TODO revert to saving multiplication till the end if necessary
           src_data.dependency = src_data.dependency +
-              ((1 + dst_data.dependency) / dst_data.num_shortest_paths);
+              (((float)src_data.num_shortest_paths / 
+               (float)dst_data.num_shortest_paths) *
+              (float)(1.0 + dst_data.dependency));
         }
       }
     }
@@ -1584,13 +1695,14 @@ struct BC {
 
   void static go(Graph& _graph){
     // TODO: currently only does 1 node because all nodes takes too long
-    //for (uint64_t i = 0; i < _graph.totalNodes; i++) {
-    for (uint64_t i = 0; i < 1; i++) {
+    for (uint64_t i = 0; i < _graph.totalNodes; i++) {
+    //for (uint64_t i = 0; i < 2; i++) {
       // change source nodes for this iteration of SSSP
-      if (i % 5000 == 0) {
-        std::cout << "SSSP source node " << i << "\n";
-      }
+      //if (i % 5000 == 0) {
+      //  std::cout << "SSSP source node " << i << "\n";
+      //}
       current_src_node = i;
+      std::cout << "SSSP source node " << i << "\n";
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -1603,6 +1715,9 @@ struct BC {
 
       // calculate the number of shortest paths for each node
       NumShortestPaths::go(_graph);
+
+      // RESET PROP FLAG
+      PropFlagReset::go(_graph);
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph);
@@ -1627,6 +1742,9 @@ struct BC {
    * i.e. no unprocessed successors on the node) */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
+
+    //std::cout << "node num-" << (graph->getGID(src)) << " dep: " << 
+    //              src_data.dependency << "\n";
 
     src_data.betweeness_centrality = src_data.betweeness_centrality + 
                                      src_data.dependency;
