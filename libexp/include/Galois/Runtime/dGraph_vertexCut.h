@@ -194,10 +194,16 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         fprintf(stderr, "Loading edge-data while creating edges.\n");
         uint64_t cur = 0;
 
-        for (unsigned int n = 0; n < base_hGraph::numOwned; ++n){
+        for (uint64_t n = 0; n < base_hGraph::numOwned; ++n){
           auto gid = L2G(n);
-          auto iter = std::lower_bound(GlobalVec_ordered.begin(), GlobalVec_ordered.end(), gid);
-          uint32_t old_lid;
+          auto iter = std::lower_bound(GlobalVec_ordered.begin(), 
+                                       GlobalVec_ordered.end(), gid);
+
+          // assign to 0; it will get reassigned to something sensible if 
+          // the program continues execution due to the assert/if statements
+          // below
+          uint32_t old_lid = 0;
+
           assert(*iter == gid);
           if (*iter == gid) {
             old_lid = (iter - GlobalVec_ordered.begin());

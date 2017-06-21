@@ -109,7 +109,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     bool isOwned(uint64_t gid) const {
       for(auto i : hostNodes){
-        if (i.first != (unsigned int)(~0)) {
+        if (i.first != (uint64_t)(~0)) {
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
           if(iter != GlobalVec.end() && *iter == gid)
             return true;
@@ -187,7 +187,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       uint64_t numNodes_to_divide = 0;
       if (isBipartite) {
-    	  for (unsigned int n = 0; n < g.size(); ++n){
+    	  for (uint64_t n = 0; n < g.size(); ++n){
     		  if(std::distance(g.edge_begin(n), g.edge_end(n))){
                   ++numNodes_to_divide;
                   last_nodeID_withEdges_bipartite = n;
@@ -686,7 +686,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         //auto p = host_edges_map.begin();
         auto map_end = host_edges_map.end();
-        for (unsigned int l = 0; l < base_hGraph::numOwned; ++l){
+        for (uint64_t l = 0; l < base_hGraph::numOwned; ++l){
           auto p = host_edges_map.find(L2G(l));
           if( p != map_end){
             for(auto n : (*p).second)
@@ -700,8 +700,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     template<typename GraphEdgeTy, typename std::enable_if<!std::is_void<GraphEdgeTy>::value>::type* = nullptr>
     void fill_edge_map(std::vector<uint64_t>& nodesOnHost_vec){
       numEdges = 0;
-      for(auto h = 0; h < base_hGraph::numHosts; ++h){
-        for(auto i = 0; i  < assigned_edges_perhost[h].size(); i += 3){
+      for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
+        for(uint64_t i = 0; i  < assigned_edges_perhost[h].size(); i += 3){
           host_edges_map[assigned_edges_perhost[h][i]].push_back(std::make_pair(assigned_edges_perhost[h][i + 1],assigned_edges_perhost[h][i + 2]));
 
           nodesOnHost_vec.push_back(assigned_edges_perhost[h][i]);
@@ -715,8 +715,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     template<typename GraphEdgeTy, typename std::enable_if<std::is_void<GraphEdgeTy>::value>::type* = nullptr>
     void fill_edge_map(std::vector<uint64_t>& nodesOnHost_vec){
       numEdges = 0;
-      for(unsigned int h = 0; h < base_hGraph::numHosts; ++h){
-        for(unsigned int i = 0; i  < assigned_edges_perhost[h].size(); i += 2) {
+      for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
+        for(uint64_t  i = 0; i  < assigned_edges_perhost[h].size(); i += 2) {
           host_edges_map[assigned_edges_perhost[h][i]].push_back(assigned_edges_perhost[h][i + 1]);
 
           nodesOnHost_vec.push_back(assigned_edges_perhost[h][i]);
@@ -767,7 +767,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       hostNodes.resize(base_hGraph::numHosts);
       uint32_t counter = 0;
-      for(unsigned int i = 0; i < base_hGraph::numHosts; i++){
+      for(uint32_t i = 0; i < base_hGraph::numHosts; i++){
         if(GlobalVec_perHost[i].size() > 0){
           hostNodes[i] = std::make_pair(counter, GlobalVec_perHost[i].size() + counter);
           counter += GlobalVec_perHost[i].size();
