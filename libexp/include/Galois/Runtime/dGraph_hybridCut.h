@@ -20,7 +20,6 @@
  *
  * @section Contains the vertex cut functionality to be used in dGraph.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
@@ -36,10 +35,8 @@
 #include "Galois/Graphs/FileGraph.h"
 #include <sstream>
 
-//template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
-//class hGraph;
 
-#define BATCH_MSG_SIZE 100
+#define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
@@ -251,7 +248,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       ss_cout.str(std::string());
       ss_cout.clear();
       StatTimer_exchange_edges.start();
+
       assign_send_receive_edges(g, numEdges_distribute, VCutTheshold);
+
       StatTimer_exchange_edges.stop();
 
       ss_cout << base_hGraph::id << " : assign_send_receive_edges done\n";

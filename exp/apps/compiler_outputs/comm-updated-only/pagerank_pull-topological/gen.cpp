@@ -36,7 +36,7 @@
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
 #include "Galois/Runtime/dGraph_cartesianCut.h"
-#include "Galois/Runtime/dGraph_vertexCut_online_PL.h"
+#include "Galois/Runtime/dGraph_hybridCut.h"
 
 #include "Galois/DistAccumulator.h"
 
