@@ -34,6 +34,7 @@
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
 
+
 template<typename NodeTy, typename EdgeTy, bool isBipartite = false, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
@@ -117,7 +118,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       uint32_t _numNodes;
       uint64_t _numEdges;
-      Galois::Graph::ParallelOfflineGraph g(filename);
+      Galois::Graph::OfflineGraph g(filename);
 
       uint64_t numNodes_to_divide = 0;
       if (isBipartite) {
@@ -180,33 +181,21 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     _numEdges = g.edge_begin(gid2host[base_hGraph::id].second) - g.edge_begin(gid2host[base_hGraph::id].first); // depends on Offline graph impl
     std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
 
-    Galois::DynamicBitSet ghosts;
-    ghosts.resize(g.size());
-    std::vector<uint64_t> offsets;
-    offsets.assign(Galois::getActiveThreads(), 0);
-    g.parallel_read_vertex(gid2host[base_hGraph::id].first, gid2host[base_hGraph::id].second, 
-        [&](Galois::Graph::OfflineGraph& og, Galois::Graph::OfflineGraph::edge_iterator& ii, 
-          uint64_t n, unsigned tid) {
-      auto ee = og.edge_end(n);
+    std::vector<bool> ghosts(g.size());
+
+    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+      auto ii = ee;
+      ee = g.edge_end(n);
       for (; ii < ee; ++ii) {
-        ghosts.set(og.getEdgeDst(ii));
-        ++offsets[tid];
+        ghosts[g.getEdgeDst(ii)] = true;
       }
-    });
-    // prefix sum
-    for (unsigned i = 1; i < Galois::getActiveThreads(); ++i) {
-      offsets[i] += offsets[i-1];
     }
-    // shift
-    for (int i = Galois::getActiveThreads() - 1; i > 0; --i) {
-      offsets[i] = offsets[i-1];
-    }
-    offsets[0] = 0;
+    std::cerr << "[" << base_hGraph::id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
     for (uint64_t x = 0; x < g.size(); ++x)
-      if (ghosts.test(x) && !isOwned(x))
+      if (ghosts[x] && !isOwned(x))
         ghostMap.push_back(x);
-    ghosts.resize(0); // free-up memory
     std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << ghostMap.size() << "\n";
 
     hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
@@ -246,7 +235,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     base_hGraph::graph.constructNodes();
     //std::cerr << "Construct nodes done\n";
-    loadEdges(base_hGraph::graph, g, offsets);
+    loadEdges(base_hGraph::graph, g);
     std::cerr << "Edges loaded \n";
 
     if (transpose) {
@@ -290,26 +279,30 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-    void loadEdges(GraphTy& graph, Galois::Graph::ParallelOfflineGraph& g, std::vector<uint64_t>& offsets) {
+    void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
 
+      uint64_t cur = 0;
       Galois::Timer timer;
+      std::cout <<"["<<base_hGraph::id<<"]PRE :: NumSeeks ";
+        g.num_seeks();
+        g.reset_seek_counters();
         timer.start();
-        g.parallel_read_vertex(gid2host[base_hGraph::id].first, gid2host[base_hGraph::id].second, 
-            [&](Galois::Graph::OfflineGraph& og, Galois::Graph::OfflineGraph::edge_iterator& ii, 
-              uint64_t n, unsigned tid) {
-          auto ee = og.edge_end(n);
+        auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+        for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+          auto ii = ee;
+          ee = g.edge_end(n);
           for (; ii < ee; ++ii) {
-            auto gdst = og.getEdgeDst(ii);
+            auto gdst = g.getEdgeDst(ii);
             decltype(gdst) ldst = G2L(gdst);
-            auto gdata = og.getEdgeData<typename GraphTy::edge_data_type>(ii);
-            graph.constructEdge(offsets[tid]++, ldst, gdata);
+            auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
+            graph.constructEdge(cur++, ldst, gdata);
           }
-          graph.fixEndEdge(G2L(n), offsets[tid]);
-        });
+          graph.fixEndEdge(G2L(n), cur);
+        }
         // non-owned vertices could also be traversed
         for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
-          graph.fixEndEdge(lid, offsets[Galois::getActiveThreads() - 1]);
+          graph.fixEndEdge(lid, cur);
         }
 
         timer.stop();
@@ -317,28 +310,25 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
     template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void loadEdges(GraphTy& graph, Galois::Graph::ParallelOfflineGraph& g, std::vector<uint64_t>& offsets) {
-      Galois::Timer timer;
-        timer.start();
+      void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+        std::cout << "n :" << g.size() <<"\n";
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
-        g.parallel_read_vertex(gid2host[base_hGraph::id].first, gid2host[base_hGraph::id].second, 
-            [&](Galois::Graph::OfflineGraph& og, Galois::Graph::OfflineGraph::edge_iterator& ii, 
-              uint64_t n, unsigned tid) {
-          auto ee = og.edge_end(n);
+        uint64_t cur = 0;
+        auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+        for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+          auto ii = ee;
+          ee = g.edge_end(n);
           for (; ii < ee; ++ii) {
-            auto gdst = og.getEdgeDst(ii);
+            auto gdst = g.getEdgeDst(ii);
             decltype(gdst) ldst = G2L(gdst);
-            graph.constructEdge(offsets[tid]++, ldst);
+            graph.constructEdge(cur++, ldst);
           }
-          graph.fixEndEdge(G2L(n), offsets[tid]);
-        });
+          graph.fixEndEdge(G2L(n), cur);
+        }
         // non-owned vertices could also be traversed
         for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
-          graph.fixEndEdge(lid, offsets[Galois::getActiveThreads() - 1]);
+          graph.fixEndEdge(lid, cur);
         }
-
-        timer.stop();
-        std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
       }
 
 
