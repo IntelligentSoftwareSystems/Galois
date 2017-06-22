@@ -13,9 +13,14 @@ inputname=$2
 extension=gr
 
 outputdirname=/workspace/dist-outputs
+#outputdirname=/net/ohm/export/cdgc/dist-outputs
 IFS='_' read -ra EXECP <<< "$execname"
 problem=${EXECP[0]}
 OUTPUT=${outputdirname}/${inputname}.${problem}
+# kcore output files have a number at the end specifying kcore number
+if [[ $execname == *"kcore"* ]]; then
+  OUTPUT=${outputdirname}/${inputname}.${problem}100
+fi
 
 MPI=mpiexec
 LOG=.verify_log
@@ -28,6 +33,10 @@ if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
 fi
 if [[ $execname == *"worklist"* ]]; then
   FLAGS+=" -cuda_wl_dup_factor=3"
+fi
+# kcore flag
+if [[ $execname == *"kcore"* ]]; then
+  FLAGS+=" -kcore=100"
 fi
 
 source_file=${inputdirname}/source
