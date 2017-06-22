@@ -9,11 +9,12 @@ INPUTS=( "rmat15" "rmat20" "rmat24" "road-USA" )
 
 rm -f $LOG
 
+current_dir=$(dirname "$0")
 for input in "${INPUTS[@]}"
 do
   for EXEC in "${EXECS[@]}"
   do
-    ./verify.sh ${EXEC} ${input}
+    $current_dir/verify.sh ${EXEC} ${input}
   done
 done
 
