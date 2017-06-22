@@ -183,7 +183,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       // std::cerr << "A " << m.host << " " << m.tag << " " << m.data.size() << "\n";
 
       data.push_back(std::move(m));
-      assert(data.back().data.size() != std::count(data.back().data.begin(), data.back().data.end(), 0));
+
+      assert(data.back().data.size() != 
+             (unsigned int)std::count(data.back().data.begin(), 
+                                      data.back().data.end(), 0));
     }
 
     bool hasData(uint32_t tag) {
@@ -346,7 +349,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         NetworkIO::message rdata = netio->dequeue();
         if (rdata.data.size()) {
           ++statRecvDequeued;
-          assert(rdata.data.size() != std::count(rdata.data.begin(), rdata.data.end(), 0));
+          assert(rdata.data.size() != 
+                 (unsigned int)std::count(rdata.data.begin(), 
+                                          rdata.data.end(), 0));
           Galois::Runtime::trace("BufferedRecieving", rdata.host, rdata.tag, Galois::Runtime::printVec(rdata.data));
           recvData[rdata.host].add(std::move(rdata));
         }

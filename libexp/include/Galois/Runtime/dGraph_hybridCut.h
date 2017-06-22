@@ -668,7 +668,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         uint64_t cur = 0;
 
         auto map_end = host_edges_map.end();
-        for(auto l = 0; l < base_hGraph::numOwned; ++l){
+        for(uint64_t l = 0; l < base_hGraph::numOwned; ++l){
           auto p = host_edges_map.find(L2G(l));
           if( p != map_end){
             for(auto n : (*p).second)
