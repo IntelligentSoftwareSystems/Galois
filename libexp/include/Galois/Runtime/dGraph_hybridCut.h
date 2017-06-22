@@ -58,7 +58,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     std::vector<NodeInfo> localToGlobalMap_meta;
     std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
-    std::vector<size_t> GlobalVec; //Global Id's sorted vector.
+    std::vector<uint64_t> GlobalVec; //Global Id's sorted vector.
     std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
 
     std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
@@ -107,9 +107,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     bool isOwned(uint64_t gid) const {
       for(auto i : hostNodes){
         if (i.first != (uint64_t)(~0)) {
+          assert(i.first < GlobalVec.size());
+          assert(i.second <= GlobalVec.size());
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
-          if(iter != GlobalVec.end() && *iter == gid)
+          if((iter != (GlobalVec.begin() + i.second)) && (*iter == gid)){
             return true;
+          }
         }
       }
       return false;
