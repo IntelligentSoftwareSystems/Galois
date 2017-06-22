@@ -1,4 +1,4 @@
-/** -*- C++ -*-
+/** Betweeness Centrality -*- C++ -*-
  * @file
  * @section License
  *
@@ -25,7 +25,6 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // IMPORTANT: THIS CODE ONLY WORKS FOR OUTGOING EDGE CUTS AT THE MOMENT
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +37,9 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_vertexCut.h"
+//#include "Galois/Runtime/dGraph_vertexCut.h"
+#include "Galois/Runtime/dGraph_cartesianCut.h"
+#include "Galois/Runtime/dGraph_hybridCut.h"
 
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
@@ -51,6 +52,8 @@ struct CUDA_Context *cuda_ctx;
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
 };
+
+kasldjfl
 std::string personality_str(Personality p) {
    switch (p) {
    case CPU:
@@ -64,6 +67,10 @@ std::string personality_str(Personality p) {
    return "";
 }
 #endif
+
+enum VertexCut {
+  PL_VCUT, CART_VCUT
+};
 
 static const char* const name = "Betweeness Centrality - "
                                 "Distributed Heterogeneous.";
@@ -83,6 +90,10 @@ static cll::opt<std::string> partFolder("partFolder",
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 1000000"), 
                                cll::init(1000000));
+static cll::opt<bool> transpose("transpose", 
+                                cll::desc("transpose the graph in memory after "
+                                          "partitioning"),
+                                cll::init(false));
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
@@ -91,6 +102,20 @@ static cll::opt<bool> enableVCut("enableVertexCut",
                                  cll::desc("Use vertex cut for graph " 
                                            "partitioning."), 
                                  cll::init(false));
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
+                                            cll::desc("Threshold for high "
+                                                      "degree edges."),
+                                            cll::init(100));
+static cll::opt<VertexCut> vertexcut("vertexcut", 
+                                     cll::desc("Type of vertex cut."),
+                                     cll::values(clEnumValN(PL_VCUT, "pl_vcut",
+                                                        "Powerlyra Vertex Cut"),
+                                                 clEnumValN(CART_VCUT, 
+                                                   "cart_vcut", 
+                                                   "Cartesian Vertex Cut"),
+                                                 clEnumValEnd),
+                                     cll::init(PL_VCUT));
+
 #ifdef __GALOIS_HET_CUDA__
 // If running on both CPUs and GPUs, below is included
 static cll::opt<int> gpudevice("gpu", 
@@ -147,10 +172,8 @@ struct NodeData {
   std::atomic<unsigned int> trim;
   std::atomic<float> betweeness_centrality;
 
-
   // used to determine if data has been propogated yet
   bool propogation_flag; // not sync'd
-
 };
 
 struct WriteStatus {
@@ -176,6 +199,7 @@ WriteStatus dependency_flags;
 typedef hGraph<NodeData, unsigned int> Graph;
 typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -196,7 +220,7 @@ struct InitializeGraph {
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
-   * reset bc measure */
+   * Reset bc measure */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
     src_data.betweeness_centrality = 0;
@@ -299,7 +323,7 @@ struct FirstIterationSSSP {
 /* Sub struct for running SSSP (beyond 1st iteration) */
 struct SSSP {
   Graph* graph;
-  static Galois::DGAccumulator<unsigned int> work_accumulator;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
   SSSP(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
@@ -374,7 +398,7 @@ struct SSSP {
 
     do {
       _graph.set_num_iter(iterations);
-      work_accumulator.reset();
+      DGAccumulator_accum.reset();
 
       // READ SRC current length; only care if dst was written
       if (current_length_flags.dst_write) {
@@ -383,7 +407,7 @@ struct SSSP {
         resetFlags(current_length_flags);
       }
 
-      // READ SRC old length; unnecessary as you will never write to dest'
+      // READ SRC old length; unnecessary as you will never write to dest
       // old_length
       //if (old_length_flags.dst_write) {
       //  _graph....
@@ -400,7 +424,7 @@ struct SSSP {
 
       iterations++;
 
-    } while (work_accumulator.reduce());
+    } while (DGAccumulator_accum.reduce());
   }
 
   /* Does SSSP, push/filter based */
@@ -425,11 +449,11 @@ struct SSSP {
         Galois::atomicMin(dst_data.current_length, new_dist);
       }
 
-      work_accumulator += 1;
+      DGAccumulator_accum += 1;
     }
   }
 };
-Galois::DGAccumulator<unsigned int> SSSP::work_accumulator;
+Galois::DGAccumulator<unsigned int> SSSP::DGAccumulator_accum;
 
 /* Struct to get pred and succon the SSSP DAG */
 struct PredAndSucc {
@@ -540,9 +564,6 @@ struct PredAndSucc {
    * Look at outgoing edges; see if dest is on a shortest path from src node.
    * If it is, increment the number of successors on src by 1 and
    * increment # of pred on dest by 1 
-   * (pull + push)
-   * Read from dest and src
-   * Writes to src and dest
    */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
@@ -662,7 +683,7 @@ struct PredecessorDecrement {
     // decrement predecessor by trim then reset
     if (src_data.trim > 0) {
       if (src_data.trim > src_data.num_predecessors) {
-        std::cout << "ISSUE P: src " << src << " " << src_data.trim << " " << 
+        std::cerr << "ISSUE P: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_predecessors << "\n";
         abort();                                    
       }
@@ -686,7 +707,7 @@ struct PredecessorDecrement {
 /* Calculate the number of shortest paths for each node */
 struct NumShortestPaths {
   Graph* graph;
-  static Galois::DGAccumulator<unsigned int> work_accumulator;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
 
   NumShortestPaths(Graph* _graph) : graph(_graph){}
 
@@ -969,7 +990,7 @@ struct NumShortestPaths {
 
     do {
       _graph.set_num_iter(iterations);
-      work_accumulator.reset();
+      DGAccumulator_accum.reset();
 
       // READ SRC # shortest paths
       if (num_shortest_paths_flags.dst_write) {
@@ -1036,7 +1057,7 @@ struct NumShortestPaths {
       PredecessorDecrement::go(_graph);
 
       iterations++;
-    } while (work_accumulator.reduce());
+    } while (DGAccumulator_accum.reduce());
 
   }
 
@@ -1067,7 +1088,7 @@ struct NumShortestPaths {
         unsigned int edge_weight = 1;
 
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
-          work_accumulator += 1;
+          DGAccumulator_accum += 1;
           // add my num shortest paths to dest's num shortest paths
           Galois::atomicAdd(dst_data.num_shortest_paths,
                             src_data.num_shortest_paths.load());
@@ -1082,7 +1103,7 @@ struct NumShortestPaths {
     }
   }
 };
-Galois::DGAccumulator<unsigned int> NumShortestPaths::work_accumulator;
+Galois::DGAccumulator<unsigned int> NumShortestPaths::DGAccumulator_accum;
 
 
 /* Loop over all nodes and set the prop flag to false in prep for more
@@ -1117,7 +1138,7 @@ struct SuccessorDecrement {
     // READ SRC trim; note at this stage we don't increment dst trim anymore
     // so this shouldn't matter
     if (trim_flags.dst_write) {
-      std::cout << "BIG ISSUE, shouldn't be incrementing trim on dst\n";
+      std::cerr << "BIG ISSUE, shouldn't be incrementing trim on dst\n";
       abort();
       // SHOULD NEVER GET IN HERE AT THIS POINT
       //_graph.sync_forward<SyncPushTrim, SyncPullTrim>("SuccessorDecrement");
@@ -1147,7 +1168,7 @@ struct SuccessorDecrement {
     } else if (src_data.trim > 0) {
     // decrement successor by trim then reset
       if (src_data.trim > src_data.num_successors) {
-        std::cout << "ISSUE: src " << src << " " << src_data.trim << " " << 
+        std::cerr << "ISSUE: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_successors << "\n";
         //abort();                                    
       }
@@ -1170,7 +1191,7 @@ struct SuccessorDecrement {
  * calculation */
 struct DependencyPropogation {
   Graph* graph;
-  static Galois::DGAccumulator<unsigned int> work_accumulator;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
 
   DependencyPropogation(Graph* _graph) : graph(_graph){}
 
@@ -1407,7 +1428,7 @@ struct DependencyPropogation {
         // in the first place as you shouldn't be reducing flags in this
         // algorithm)
         node.propogation_flag = y || node.propogation_flag;
-        std::cout << "reducing a flag, shouldn't do this!\n";
+        std::cerr << "reducing a flag, shouldn't do this!\n";
         abort();
         return false;
       }
@@ -1526,12 +1547,12 @@ struct DependencyPropogation {
     
     do {
       _graph.set_num_iter(iterations);
-      work_accumulator.reset();
+      DGAccumulator_accum.reset();
 
       // READ SRC/DST succ
       if (num_successors_flags.src_write && num_successors_flags.dst_write) {
         // big problem: shouldn't be writing to dst succ anymore
-        std::cout << "num successors dst flag set\n";
+        std::cerr << "num successors dst flag set\n";
         abort();
       } else if (num_successors_flags.src_write) {
         _graph.sync_backward<SyncPushSucc, 
@@ -1539,7 +1560,7 @@ struct DependencyPropogation {
         resetFlags(num_successors_flags);
       } else if (num_successors_flags.dst_write) {
         // big problem: shouldn't be writing to dst succ anymore
-        std::cout << "num successors dst flag set\n";
+        std::cerr << "num successors dst flag set\n";
         abort();
       }
 
@@ -1563,7 +1584,7 @@ struct DependencyPropogation {
       if (propogation_flag_flags.src_write && 
           propogation_flag_flags.dst_write) {
         // big problem: shouldn't be writing to dst flag EVER
-        std::cout << "propogation flag dst flag set\n";
+        std::cerr << "propogation flag dst flag set\n";
         abort();
       } else if (propogation_flag_flags.src_write) {
         _graph.sync_backward<SyncPushFlag, 
@@ -1571,7 +1592,7 @@ struct DependencyPropogation {
         resetFlags(propogation_flag_flags);
       } else if (propogation_flag_flags.dst_write) {
         // big problem: shouldn't be writing to dst flag EVER
-        std::cout << "propogation flag dst flag set\n";
+        std::cerr << "propogation flag dst flag set\n";
         abort();
       }
 
@@ -1617,7 +1638,7 @@ struct DependencyPropogation {
       SuccessorDecrement::go(_graph);
 
       iterations++;
-    } while (work_accumulator.reduce());
+    } while (DGAccumulator_accum.reduce());
   }
 
   /* Summary:
@@ -1666,7 +1687,7 @@ struct DependencyPropogation {
       if (dst_data.num_successors == 0 && !dst_data.propogation_flag) {
         // dest on shortest path with this node as predecessor
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
-          work_accumulator += 1;
+          DGAccumulator_accum += 1;
 
           // increment my trim for later use to decrement successor
           Galois::atomicAdd(src_data.trim, (unsigned int)1);
@@ -1686,7 +1707,7 @@ struct DependencyPropogation {
     }
   }
 };
-Galois::DGAccumulator<unsigned int> DependencyPropogation::work_accumulator;
+Galois::DGAccumulator<unsigned int> DependencyPropogation::DGAccumulator_accum;
 
 struct BC {
   Graph* graph;
@@ -1724,7 +1745,7 @@ struct BC {
 
       // READ SRC dependencies
       if (dependency_flags.dst_write) {
-        std::cout << "dependency shouldn't be written on dst\n";
+        std::cerr << "dependency shouldn't be written on dst\n";
         abort();
       }
 
@@ -1758,20 +1779,28 @@ struct BC {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                (unsigned long)maxIterations, 0);
     Galois::StatManager statManager;
 
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (net.ID == 0) {
+      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+                                  (unsigned long)maxIterations, 0);
+    }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
+
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
-#ifdef __GALOIS_HET_CUDA__
+  #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
+
+    if (num_nodes == -1) num_nodes = net.Num;
+    assert((net.Num % num_nodes) == 0);
+
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -1793,22 +1822,27 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
 
-      for (unsigned i = 0; i < personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
-          scalefactor.push_back(scalecpu);
-        else
-          scalefactor.push_back(scalegpu);
+      if ((scalecpu > 1) || (scalegpu > 1)) {
+        for (unsigned i = 0; i < net.Num; ++i) {
+          if (personality_set.c_str()[i % num_nodes] == 'c') 
+            scalefactor.push_back(scalecpu);
+          else
+            scalefactor.push_back(scalegpu);
+        }
       }
     }
-#endif
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+  #endif
 
     StatTimer_hg_init.start();
 
     Graph* h_graph;
     if (enableVCut) {
-      h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num,
-                               scalefactor);
+      if (vertexcut == CART_VCUT)
+        h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
+                                         scalefactor, transpose);
+      else if (vertexcut == PL_VCUT)
+        h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
+                                      scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
                              scalefactor);
@@ -1854,16 +1888,16 @@ int main(int argc, char** argv) {
 
     // Verify, i.e. print out graph data for examination
     if (verify) {
+      char test[100];
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
-        char test[100];
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
             //sprintf(test, "%lu %.6f %u\n", (*h_graph).getGID(*ii),
             //        (*h_graph).getData(*ii).betweeness_centrality.load(),
             //        (*h_graph).getData(*ii).current_length.load());
-            sprintf(test, "%lu %.6f\n", (*h_graph).getGID(*ii),
+            sprintf(test, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     (*h_graph).getData(*ii).betweeness_centrality.load());
             Galois::Runtime::printOutput(test);
             // outputs betweenness centrality
@@ -1873,11 +1907,12 @@ int main(int argc, char** argv) {
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA) {
-        // TODO not changed yet
-        for(auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                     get_node_dist_current_cuda(cuda_ctx, *ii));
+            sprintf(test, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                    get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
+
+            Galois::Runtime::printOutput(test);
         }
       }
 #endif
