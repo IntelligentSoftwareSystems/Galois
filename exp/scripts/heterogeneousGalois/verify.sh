@@ -8,12 +8,14 @@ execdirname="."
 execname=$1
 EXEC=${execdirname}/${execname}
 
-inputdirname=/workspace/dist-inputs
+#inputdirname=/workspace/dist-inputs
+inputdirname=/net/ohm/export/cdgc/dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/workspace/dist-outputs
-#outputdirname=/net/ohm/export/cdgc/dist-outputs
+#outputdirname=/workspace/dist-outputs
+outputdirname=/net/ohm/export/cdgc/dist-outputs
+
 IFS='_' read -ra EXECP <<< "$execname"
 problem=${EXECP[0]}
 OUTPUT=${outputdirname}/${inputname}.${problem}
@@ -25,7 +27,9 @@ fi
 MPI=mpiexec
 LOG=.verify_log
 
-FLAGS=
+#FLAGS=" -maxIterations=200"
+#FLAGS+=" -numComputeSubsteps=8"
+#FLAGS+=" -numPipelinedPhases=8"
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
@@ -44,8 +48,13 @@ if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
 elif [[ $execname == *"pull"* ]]; then
-  inputdirname=${inputdirname}/transpose
-  extension=tgr
+  FLAGS+=" -transpose"
+  #inputdirname=${inputdirname}/transpose
+  #extension=tgr
+#elif [[ $inputname == *"rmat"* ]]; then
+#  inputdirname=${inputdirname}/transpose
+#  extension=tgr
+#  FLAGS+=" -transpose"
 fi
 grep "${inputname}.${extension}" ${source_file} >>$LOG
 INPUT=${inputdirname}/${inputname}.${extension}
@@ -59,18 +68,26 @@ hostname=`hostname`
 
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   # assumes only 2 GPUs device available
-  SET="g,1,2 gg,2,2 c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
+  #SET="g,1,48 gg,2,24 gggg,4,12 gggggg,6,8 c,1,48 cc,2,24 cccc,4,12 cccccccc,8,6 cccccccccccccccc,16,3"
+  SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 else
-  SET="c,1,16 cc,2,8 cccc,4,4 cccccccc,8,2"
+  #SET="c,1,48 cc,2,24 cccc,4,12 cccccccc,8,6 cccccccccccccccc,16,3"
+  SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 fi
 
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2; do
+for partition in 1 2 3; do
   if [ $partition -eq 2 ]; then
     if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
       FLAGS+=" -enableVertexCut"
+    else
+      break
+    fi
+  elif [ $partition -eq 3 ]; then
+    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
+      FLAGS+=" -vertexcut=cart_vcut"
     else
       break
     fi
@@ -79,26 +96,34 @@ for partition in 1 2; do
     old_ifs=$IFS
     IFS=",";
     set $task;
-    PFLAGS=$FLAGS
+    if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
+      PFLAGS="-pset=$1 -num_nodes=1"
+    else
+      PFLAGS=""
+    fi
+    PFLAGS+=$FLAGS
     if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
       PFLAGS+=" -scalegpu=3"
     fi
     rm -f output_*.log
-    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG
-    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -pset=$1 -t=$3 ${PFLAGS} -num_nodes=1 -verify -runs=1" >>$LOG 2>&1
-    outputs="output_${hostname}_0.log"
-    i=1
-    while [ $i -lt $2 ]; do
-      outputs+=" output_${hostname}_${i}.log"
-      let i=i+1
-    done
-    eval "sort -n ${outputs} -o output_${hostname}_0.log"
+    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG
+    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG 2>&1
+    #outputs="output_${hostname}_0.log"
+    #i=1
+    #while [ $i -lt $2 ]; do
+    #  outputs+=" output_${hostname}_${i}.log"
+    #  let i=i+1
+    #done
+    #eval "sort -nu ${outputs} -o output_${hostname}_*.log"
+    eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
     eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
-      if [ $partition -eq 2 ]; then
-        failed_cases+="vertex-cut $1 devices with $3 threads; "
+      if [ $partition -eq 3 ]; then
+        failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 2 ]; then
+        failed_cases+="powerlyra vertex-cut $1 devices with $3 threads; "
       else
         failed_cases+="edge-cut $1 devices with $3 threads; "
       fi
