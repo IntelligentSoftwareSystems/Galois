@@ -282,7 +282,7 @@ struct FirstIterationSSSP {
     // only called once after init, so no sync necessary before running the op
     // (since all nodes should have been reset already)
 		unsigned int __begin, __end;
-		if (_graph.isOwned(current_src_node)) {
+		if (_graph.isLocal(current_src_node)) {
 			__begin = _graph.getLID(current_src_node);
 			__end = __begin + 1;
 		} else {
