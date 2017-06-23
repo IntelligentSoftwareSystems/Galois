@@ -699,6 +699,8 @@ void run() {
   Algo algo;
   typename Algo::Graph g;
 
+  Galois::reportPageAlloc("MeminfoPre");
+
   Galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
@@ -711,6 +713,7 @@ void run() {
   T.start();
   algo(g, trussNum);
   T.stop();
+  Galois::reportPageAlloc("MeminfoPost");
   reportKTruss(g, trussNum, algo.name());
 }
 
