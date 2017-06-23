@@ -267,9 +267,9 @@ struct BSPAlgo {
     size_t iter = 0;
 
     while (true) {
-      std::cout << "Iteration " << iter << ": ";
-      std::cout << countValidNodes(g) << " valid nodes, ";
-      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
+//      std::cout << "Iteration " << iter << ": ";
+//      std::cout << countValidNodes(g) << " valid nodes, ";
+//      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
 
       Galois::do_all_local(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
@@ -295,7 +295,7 @@ struct BSPAlgo {
       ++iter;
     } 
 
-    std::cout << "Ends at iteration " << iter << std::endl;
+//    std::cout << "Ends at iteration " << iter << std::endl;
   } // end operator()
 }; // end struct BSPAlgo
 
@@ -361,9 +361,9 @@ struct BSPImprovedAlgo {
 
     // remove unsupported edges until no more edges can be removed
     while (true) {
-      std::cout << "Iteration " << iter << ": ";
-      std::cout << countValidNodes(g) << " valid nodes, ";
-      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
+//      std::cout << "Iteration " << iter << ": ";
+//      std::cout << countValidNodes(g) << " valid nodes, ";
+//      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
 
       Galois::do_all_local(*cur, 
         KeepSupportedEdges{g, k-2, *next},
@@ -382,7 +382,7 @@ struct BSPImprovedAlgo {
       ++iter;
     } 
 
-    std::cout << "Ends at iteration " << iter << std::endl;
+//    std::cout << "Ends at iteration " << iter << std::endl;
   } // end operator()
 }; // end struct BSPImprovedAlgo
 
@@ -460,8 +460,8 @@ struct BSPCoreThenTrussAlgo {
     Galois::StatTimer TCore("Reduce_to_k-1_core");
     TCore.start();
 
-    std::cout << "Core iteration " << iter << ": ";
-    std::cout << nCurSize << " valid nodes" << std::endl;
+//    std::cout << "Core iteration " << iter << ": ";
+//    std::cout << nCurSize << " valid nodes" << std::endl;
 
     // reduce to k-1 core
     Galois::do_all_local(g, 
@@ -476,8 +476,8 @@ struct BSPCoreThenTrussAlgo {
       std::swap(nCur, nNext);
       ++iter;
 
-      std::cout << "Core iteration " << iter << ": ";
-      std::cout << nCurSize << " valid nodes" << std::endl;
+//      std::cout << "Core iteration " << iter << ": ";
+//      std::cout << nCurSize << " valid nodes" << std::endl;
 
       Galois::do_all_local(*nCur, 
         KeepValidNodes{g, k-1, *nNext}, 
@@ -486,7 +486,7 @@ struct BSPCoreThenTrussAlgo {
       nNextSize = std::distance(nNext->begin(), nNext->end());
     }
 
-    std::cout << "Ends core computation at iteration " << iter << std::endl;
+//    std::cout << "Ends core computation at iteration " << iter << std::endl;
     TCore.stop();
 
     iter = 0;
@@ -514,9 +514,9 @@ struct BSPCoreThenTrussAlgo {
 
     // remove unsupported edges until no more edges can be removed
     while (true) {
-      std::cout << "Truss iteration " << iter << ": ";
-      std::cout << countValidNodes(g) << " valid nodes, ";
-      std::cout << eCurSize << " valid edges" << std::endl;
+//      std::cout << "Truss iteration " << iter << ": ";
+//      std::cout << countValidNodes(g) << " valid nodes, ";
+//      std::cout << eCurSize << " valid edges" << std::endl;
 
       Galois::do_all_local(*eCur,
         KeepSupportedEdges{g, k-2, *eNext},
@@ -535,7 +535,7 @@ struct BSPCoreThenTrussAlgo {
       ++iter;
     }
 
-    std::cout << "Ends truss computation at iteration " << iter << std::endl;
+//    std::cout << "Ends truss computation at iteration " << iter << std::endl;
     TTruss.stop();
   } // end operator()
 }; // end struct BSPCoreThenTrussAlgo
