@@ -361,10 +361,18 @@ public:
   }
 
   void constructNodes() {
+#ifndef GALOIS_GRAPH_CONSTRUCT_SERIAL
     for (uint32_t x = 0; x < numNodes; ++x) {
       nodeData.constructAt(x);
       this->outOfLineConstructAt(x);
     }
+#else
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t x){
+        nodeData.constructAt(x);
+        this->outOfLineConstructAt(x);
+      }, Galois::loopname("CONSTRUCT_NODES"), Galois::numrun("0"));
+#endif
   }
 
   void constructEdge(uint64_t e, uint32_t dst, const typename EdgeData::value_type& val) {

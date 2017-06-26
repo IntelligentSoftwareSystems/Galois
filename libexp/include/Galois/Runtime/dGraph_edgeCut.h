@@ -279,80 +279,70 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-    void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-      fprintf(stderr, "Loading edge-data while creating edges.\n");
+  void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+    fprintf(stderr, "Loading edge-data while creating edges.\n");
 
-      uint64_t cur = 0;
-      Galois::Timer timer;
-      std::cout <<"["<<base_hGraph::id<<"]PRE :: NumSeeks ";
-        g.num_seeks();
-        g.reset_seek_counters();
-        timer.start();
-        auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
-        for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
-          auto ii = ee;
-          ee = g.edge_end(n);
-          for (; ii < ee; ++ii) {
-            auto gdst = g.getEdgeDst(ii);
-            decltype(gdst) ldst = G2L(gdst);
-            auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
-            graph.constructEdge(cur++, ldst, gdata);
-          }
-          graph.fixEndEdge(G2L(n), cur);
-        }
-        // non-owned vertices could also be traversed
-        for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
-          graph.fixEndEdge(lid, cur);
-        }
-
-        timer.stop();
-        std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
+    uint64_t cur = 0;
+    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+      auto ii = ee;
+      ee = g.edge_end(n);
+      for (; ii < ee; ++ii) {
+        auto gdst = g.getEdgeDst(ii);
+        decltype(gdst) ldst = G2L(gdst);
+        auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
+        graph.constructEdge(cur++, ldst, gdata);
       }
+      graph.fixEndEdge(G2L(n), cur);
+    }
+    // non-owned vertices could also be traversed
+    for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
+      graph.fixEndEdge(lid, cur);
+    }
+  }
 
-    template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-        std::cout << "n :" << g.size() <<"\n";
-        fprintf(stderr, "Loading void edge-data while creating edges.\n");
-        uint64_t cur = 0;
-        auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
-        for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
-          auto ii = ee;
-          ee = g.edge_end(n);
-          for (; ii < ee; ++ii) {
-            auto gdst = g.getEdgeDst(ii);
-            decltype(gdst) ldst = G2L(gdst);
-            graph.constructEdge(cur++, ldst);
-          }
-          graph.fixEndEdge(G2L(n), cur);
-        }
-        // non-owned vertices could also be traversed
-        for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
-          graph.fixEndEdge(lid, cur);
-        }
+  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+    fprintf(stderr, "Loading void edge-data while creating edges.\n");
+    uint64_t cur = 0;
+    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+      auto ii = ee;
+      ee = g.edge_end(n);
+      for (; ii < ee; ++ii) {
+        auto gdst = g.getEdgeDst(ii);
+        decltype(gdst) ldst = G2L(gdst);
+        graph.constructEdge(cur++, ldst);
       }
+      graph.fixEndEdge(G2L(n), cur);
+    }
+    // non-owned vertices could also be traversed
+    for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
+      graph.fixEndEdge(lid, cur);
+    }
+  }
 
-
-    void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
-      for(uint32_t h = 0; h < hostNodes.size(); ++h){
-        uint32_t start, end;
-        std::tie(start, end) = nodes_by_host(h);
-        for(; start != end; ++start){
-          slaveNodes[h].push_back(L2G(start));
-        }
+  void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+    for(uint32_t h = 0; h < hostNodes.size(); ++h){
+      uint32_t start, end;
+      std::tie(start, end) = nodes_by_host(h);
+      for(; start != end; ++start){
+        slaveNodes[h].push_back(L2G(start));
       }
     }
+  }
 
-    std::string getPartitionFileName(const std::string& filename, const std::string & basename, unsigned hostID, unsigned num_hosts){
-      return filename;
-    }
+  std::string getPartitionFileName(const std::string& filename, const std::string & basename, unsigned hostID, unsigned num_hosts){
+    return filename;
+  }
 
-    bool is_vertex_cut() const{
-      return false;
-    }
+  bool is_vertex_cut() const{
+    return false;
+  }
 
-    uint64_t get_local_total_nodes() const {
-      return (base_hGraph::numOwned + base_hGraph::totalSlaveNodes);
-    }
+  uint64_t get_local_total_nodes() const {
+    return (base_hGraph::numOwned + base_hGraph::totalSlaveNodes);
+  }
 
 };
 
