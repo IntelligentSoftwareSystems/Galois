@@ -123,6 +123,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor) :  base_hGraph(host, _numHosts) {
 
+      if (!scalefactor.empty()) {
+        if (base_hGraph::id == 0) {
+          std::cerr << "WARNING: scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n";
+        }
+        scalefactor.clear();
+      }
+
 
       Galois::Runtime::reportStat("(NULL)", "VERTEX CUT", 0, 0);
       Galois::Statistic statGhostNodes("TotalGhostNodes");
