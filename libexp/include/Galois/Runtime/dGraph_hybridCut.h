@@ -123,8 +123,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     bool isOwned(uint64_t gid) const {
       for(auto i : hostNodes){
         if (i.first != (uint64_t)(~0)) {
-          assert(i.first < GlobalVec.size());
-          assert(i.second <= GlobalVec.size());
+          //assert(i.first < GlobalVec.size());
+          //assert(i.second <= GlobalVec.size());
           auto iter = std::lower_bound(GlobalVec.begin() + i.first, GlobalVec.begin() + i.second, gid);
           if((iter != (GlobalVec.begin() + i.second)) && (*iter == gid)){
             return true;
@@ -642,6 +642,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             }
           }
         }
+
         net.flush();
       }
 

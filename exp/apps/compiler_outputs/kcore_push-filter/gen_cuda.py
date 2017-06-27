@@ -49,7 +49,7 @@ CDecl([("bool", "pop", " = src < __end")]),
 If("pop", [
 If("p_trim[src] > 0",
 [
-CBlock(["p_current_degree[src] -= p_trim[src]"]),
+CBlock(["p_current_degree[src] = p_current_degree[src] - p_trim[src]"]),
 CBlock(["p_trim[src] = 0"]),
 ]),
 ]),
