@@ -169,7 +169,7 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_updates_cuda(cuda_ctx, node_id);
@@ -207,7 +207,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned long ValTy;
     	};
-    	struct SyncerPull_1 {
+    	struct Broadcast_1 {
     		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_edge_offset_cuda(cuda_ctx, node_id);
@@ -245,7 +245,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned long ValTy;
     	};
-    	struct SyncerPull_2 {
+    	struct Broadcast_2 {
         //static std::vector<double> extract(uint32_t node_id, const struct NodeData & node) {
     		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -284,7 +284,7 @@ struct InitializeGraph {
     		}
     		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_updates_cuda(cuda_ctx, node_id);
@@ -325,7 +325,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned long ValTy;
     	};
-    	struct Syncer_vertexCut_1 {
+    	struct Reduce_1 {
     		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_edge_offset_cuda(cuda_ctx, node_id);
@@ -366,7 +366,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned long ValTy;
     	};
-    	struct Syncer_vertexCut_2 {
+    	struct Reduce_2 {
     		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
@@ -417,11 +417,11 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
 
-    	_graph.sync_forward<Syncer_vertexCut_0, SyncerPull_0>("InitializeGraph");
-    	_graph.sync_forward<Syncer_vertexCut_1, SyncerPull_1>("InitializeGraph");
-    	_graph.sync_forward<Syncer_vertexCut_2, SyncerPull_2>("InitializeGraph");
+    	_graph.sync_forward<Reduce_0, Broadcast_0>("InitializeGraph");
+    	_graph.sync_forward<Reduce_1, Broadcast_1>("InitializeGraph");
+    	_graph.sync_forward<Reduce_2, Broadcast_2>("InitializeGraph");
 
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "updates" , "unsigned long" , "set",  ""), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "edge_offset" , "unsigned long" , "set",  ""), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "updates" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "edge_offset" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "set",  ""));
   }
 
   void operator()(GNode src) const {
@@ -507,13 +507,13 @@ struct SGD {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      	struct SyncerPull_0 {
+      	struct Broadcast_0 {
       		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
       			assert (personality == CPU);
       		#endif
-      			//std::cout << "SGD:: SyncerPull_0\n";
+      			//std::cout << "SGD:: Broadcast_0\n";
       			return node.latent_vector;
       		}
       		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
@@ -547,7 +547,7 @@ struct SGD {
       		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
       	};
 
-      	struct Syncer_vertexCut_2 {
+      	struct Reduce_2 {
       		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
@@ -606,11 +606,11 @@ struct SGD {
       #endif
       
 
-      	//_graph.sync_forward<Syncer_vertexCut_2, SyncerPull_0>("SGD");
-      	_graph.sync_exchange<Syncer_vertexCut_2, SyncerPull_0>("SGD");
+      	//_graph.sync_forward<Reduce_2, Broadcast_0>("SGD");
+      	_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
 
 
-      Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"));
+      Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"));
       ++iteration;
       rms_normalized = std::sqrt(DGAccumulator_accum.reduce()/_graph.get_totalEdges());
       std::cout << " RMS Normalized  : " << rms_normalized << "\n";

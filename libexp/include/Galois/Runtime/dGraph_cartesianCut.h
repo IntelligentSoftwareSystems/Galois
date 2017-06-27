@@ -86,7 +86,7 @@ private:
 
   // called only for those hosts with which it shares nodes
   bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) {
-    if (syncType == base_hGraph::syncPush) {
+    if (syncType == base_hGraph::syncReduce) {
       switch(dataFlow) {
         case base_hGraph::forwardFlow:
           return (gridColumnID() != gridColumnID(host));
@@ -97,7 +97,7 @@ private:
         default:
           assert(false);
       }
-    } else { // syncPull
+    } else { // syncBroadcast
       switch(dataFlow) {
         case base_hGraph::forwardFlow:
           return (gridRowID() != gridRowID(host));
@@ -156,14 +156,14 @@ public:
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
   virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
-    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
+    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, dataFlow);
     }
     return true;
   }
   virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
-    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
+    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, dataFlow);
     }

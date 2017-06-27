@@ -106,7 +106,7 @@ struct InitializeGraph {
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph){
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -137,7 +137,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -179,12 +179,12 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
+    	_graph.reduce<Reduce_0>("InitializeGraph");
     }
     
-    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+    _graph.broadcast<Broadcast_0>("InitializeGraph");
     
   }
 
@@ -207,7 +207,7 @@ void static go(Graph& _graph) {
 			__begin = 0;
 			__end = 0;
 		}
-	struct Syncer_0 {
+	struct Reduce_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -240,7 +240,7 @@ void static go(Graph& _graph) {
 		}
 		typedef unsigned int ValTy;
 	};
-	struct SyncerPull_vertexCut_0 {
+	struct Broadcast_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -280,11 +280,11 @@ void static go(Graph& _graph) {
 		StatTimer_cuda.stop();
 	} else if (personality == CPU)
 #endif
-Galois::do_all(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
-_graph.sync_push<Syncer_0>("FirstItr_BFS");
+Galois::do_all(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), FirstItr_BFS{&_graph}, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+_graph.reduce<Reduce_0>("FirstItr_BFS");
 
 if(_graph.is_vertex_cut()) {
-	_graph.sync_pull<SyncerPull_vertexCut_0>("FirstItr_BFS");
+	_graph.broadcast<Broadcast_0>("FirstItr_BFS");
 }
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
@@ -319,7 +319,7 @@ struct BFS {
     do { 
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -352,7 +352,7 @@ struct BFS {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -394,11 +394,11 @@ struct BFS {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
-    _graph.sync_push<Syncer_0>("BFS");
+    Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+    _graph.reduce<Reduce_0>("BFS");
     
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("BFS");
+    	_graph.broadcast<Broadcast_0>("BFS");
     }
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

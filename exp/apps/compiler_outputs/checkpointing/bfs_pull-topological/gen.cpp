@@ -107,7 +107,7 @@ struct InitializeGraph {
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -138,7 +138,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -180,12 +180,12 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
+    	_graph.reduce<Reduce_0>("InitializeGraph");
     }
     
-    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+    _graph.broadcast<Broadcast_0>("InitializeGraph");
     
   }
 
@@ -205,7 +205,7 @@ struct BFS {
     do{
       _graph.set_num_iter(iteration);
       DGAccumulator_accum.reset();
-      	struct SyncerPull_0 {
+      	struct Broadcast_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -236,7 +236,7 @@ struct BFS {
       		}
       		typedef unsigned int ValTy;
       	};
-      	struct Syncer_vertexCut_0 {
+      	struct Reduce_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -284,25 +284,25 @@ struct BFS {
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "min",  ""));
+      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "min",  ""));
       if(_graph.is_vertex_cut()) {
-      	_graph.sync_push<Syncer_vertexCut_0>("BFS");
+      	_graph.reduce<Reduce_0>("BFS");
       }
       
-      _graph.sync_pull<SyncerPull_0>("BFS");
+      _graph.broadcast<Broadcast_0>("BFS");
 
       //checkpoint
       std::string checkpoint_timer_str("TIME_CHKPNT_" + _graph.get_run_identifier());
       Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
       StatTimer_checkpoint.start();
-      _graph.checkpoint<Syncer_vertexCut_0>("BFS");
+      _graph.checkpoint<Reduce_0>("BFS");
       StatTimer_checkpoint.stop();
 
 #if 0
       if(Galois::Runtime::getSystemNetworkInterface().ID == 0){
         //if(recovery && iteration == 2){
           std::cerr << "xxxxxxxxxxxxxxxxxxx CRASHED xxxxxxxxxxxxxxxxxxxxx\n";
-          _graph.checkpoint_apply<Syncer_vertexCut_0>("BFS");
+          _graph.checkpoint_apply<Reduce_0>("BFS");
           std::cerr << "xxxxxxxxxxxxxxxxxxx RECOVERED xxxxxxxxxxxxxxxxxxx\n";
         //}
       }
@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
     if(recovery){
       Galois::StatTimer StatTimer_recover("TIME_TO_RECOVER");
       StatTimer_recover.start();
-      (*hg).checkpoint_apply<Syncer_vertexCut_0>("BFS");
+      (*hg).checkpoint_apply<Reduce_0>("BFS");
       StatTimer_recover.stop();
     }
 #endif

@@ -109,7 +109,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -147,7 +147,7 @@ struct ResetGraph {
     		}
     		typedef float ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -196,12 +196,12 @@ struct ResetGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float" , "set",  ""));
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0>("ResetGraph");
+    	_graph.reduce<Reduce_0>("ResetGraph");
     }
     
-    _graph.sync_pull<SyncerPull_0>("ResetGraph");
+    _graph.broadcast<Broadcast_0>("ResetGraph");
     
   }
 
@@ -219,7 +219,7 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -264,7 +264,7 @@ struct InitializeGraph {
     		}
     		typedef float ValTy;
     	};
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -311,11 +311,11 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
-    _graph.sync_push<Syncer_0>("InitializeGraph");
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+    _graph.reduce<Reduce_0>("InitializeGraph");
     
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_pull<SyncerPull_vertexCut_0>("InitializeGraph");
+    	_graph.broadcast<Broadcast_0>("InitializeGraph");
     }
     
   }
@@ -348,7 +348,7 @@ struct PageRank {
     do{
       _graph.set_num_iter(iteration);
       DGAccumulator_accum.reset();
-      	struct Syncer_0 {
+      	struct Reduce_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -393,7 +393,7 @@ struct PageRank {
       		}
       		typedef float ValTy;
       	};
-      	struct SyncerPull_vertexCut_0 {
+      	struct Broadcast_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -442,11 +442,11 @@ struct PageRank {
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
-      _graph.sync_push<Syncer_0>("PageRank");
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      _graph.reduce<Reduce_0>("PageRank");
       
       if(_graph.is_vertex_cut()) {
-      	_graph.sync_pull<SyncerPull_vertexCut_0>("PageRank");
+      	_graph.broadcast<Broadcast_0>("PageRank");
       }
       
       ++iteration;

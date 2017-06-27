@@ -105,7 +105,7 @@ struct InitializeGraph {
 
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -147,8 +147,8 @@ struct InitializeGraph {
     		InitializeGraph_cuda(infinity, src_node, cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
-    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
+    _graph.broadcast<Broadcast_0>("InitializeGraph");
     
   }
 
@@ -167,7 +167,7 @@ struct BFS {
     iteration = 0;
     do{
       DGAccumulator_accum.reset();
-      	struct Syncer_0 {
+      	struct Reduce_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -211,7 +211,7 @@ struct BFS {
       		}
       		typedef unsigned int ValTy;
       	};
-      	struct SyncerPull_0 {
+      	struct Broadcast_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -255,10 +255,10 @@ struct BFS {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
-      _graph.sync_push<Syncer_0>("BFS");
+      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  "std::numeric_limits<unsigned int>::max()"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
+      _graph.reduce<Reduce_0>("BFS");
       
-      _graph.sync_pull<SyncerPull_0>("BFS");
+      _graph.broadcast<Broadcast_0>("BFS");
       
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
