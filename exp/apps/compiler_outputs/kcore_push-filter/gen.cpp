@@ -25,10 +25,10 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+
 /******************************************************************************/
 /* This was manually genereted, not compiler generated */
 /******************************************************************************/
-
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -37,7 +37,9 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_vertexCut.h"
+//#include "Galois/Runtime/dGraph_vertexCut.h"
+#include "Galois/Runtime/dGraph_cartesianCut.h"
+#include "Galois/Runtime/dGraph_hybridCut.h"
 
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
@@ -50,6 +52,7 @@ struct CUDA_Context *cuda_ctx;
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
 };
+
 std::string personality_str(Personality p) {
    switch (p) {
    case CPU:
@@ -63,6 +66,11 @@ std::string personality_str(Personality p) {
    return "";
 }
 #endif
+
+enum VertexCut {
+  PL_VCUT, CART_VCUT
+};
+
 
 static const char* const name = "KCore - Distributed Heterogeneous "
                                 "with Worklist.";
@@ -86,11 +94,28 @@ static cll::opt<bool> verify("verify",
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
                              cll::init(false));
-
+static cll::opt<bool> transpose("transpose", 
+                                cll::desc("transpose the graph in memory after "
+                                          "partitioning"),
+                                cll::init(false));
 static cll::opt<bool> enableVCut("enableVertexCut", 
                                  cll::desc("Use vertex cut for graph " 
                                            "partitioning."), 
                                  cll::init(false));
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
+                                            cll::desc("Threshold for high "
+                                                      "degree edges."),
+                                            cll::init(100));
+static cll::opt<VertexCut> vertexcut("vertexcut", 
+                                     cll::desc("Type of vertex cut."),
+                                     cll::values(clEnumValN(PL_VCUT, "pl_vcut",
+                                                        "Powerlyra Vertex Cut"),
+                                                 clEnumValN(CART_VCUT, 
+                                                   "cart_vcut", 
+                                                   "Cartesian Vertex Cut"),
+                                                 clEnumValEnd),
+                                     cll::init(PL_VCUT));
+
 // required k specification for k-core
 static cll::opt<unsigned int> k_core_num("kcore",
                                      cll::desc("KCore value"),
@@ -144,6 +169,7 @@ struct NodeData {
 typedef hGraph<NodeData, void> Graph;
 typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -166,6 +192,11 @@ struct InitializeGraph2 {
     struct SyncPushCurrentDegree {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.current_degree;
   		}
 
@@ -175,16 +206,39 @@ struct InitializeGraph2 {
                                       unsigned int *y, 
                                       size_t *s, 
                                       DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                                   data_mode); 
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.current_degree, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_current_degree_cuda(cuda_ctx, node_id, y);
+          return true;
+        }
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { Galois::add(node.current_degree, y); return true;}
       }
 
       static bool reduce_batch(unsigned from_id, 
@@ -193,12 +247,21 @@ struct InitializeGraph2 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+        // TODO do I need a reset? not if there's only one round of degree
+        // counting...
       }
-
 
       typedef unsigned int ValTy;
     };
@@ -206,6 +269,11 @@ struct InitializeGraph2 {
     struct SyncPullCurrentDegree {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.current_degree;
   		}
 
@@ -215,15 +283,36 @@ struct InitializeGraph2 {
                                 unsigned int *y,
                                 size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
   		}
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
   		}
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_degree_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         node.current_degree = y;
       }
 
@@ -233,19 +322,43 @@ struct InitializeGraph2 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
       typedef unsigned int ValTy;
     };
 
-
     bitset_dist_current.clear();
 
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
+                           (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph2_all_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
                    Galois::loopname("InitializeGraph2"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA)
+      _graph.sync_forward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+        "InitializeGraph2");
+    else if (personality == CPU)
+  #endif
     _graph.sync_forward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
       "InitializeGraph2", bitset_dist_current);
   }
@@ -258,6 +371,12 @@ struct InitializeGraph2 {
          current_edge != end_edge;
          current_edge++) {
       GNode dest_node = graph->getEdgeDst(current_edge);
+
+      //if (graph->getGID(dest_node) == 350208) {
+      //  std::cout << "[" << graph->id << "]" <<
+      //            "src is " << graph->getGID(src) << "\n";
+      //}
+
       NodeData& dest_data = graph->getData(dest_node);
       Galois::atomicAdd(dest_data.current_degree, (unsigned int)1);
 
@@ -278,6 +397,11 @@ struct InitializeGraph1 {
     struct SyncPushCurrentDegree {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.current_degree;
   		}
 
@@ -287,16 +411,39 @@ struct InitializeGraph1 {
                                       unsigned int *y, 
                                       size_t *s, 
                                       DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                                   data_mode); 
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::set(node.current_degree, y);                         
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_current_degree_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.current_degree, y); return true; }
       }
 
       static bool reduce_batch(unsigned from_id, 
@@ -305,6 +452,14 @@ struct InitializeGraph1 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
@@ -317,6 +472,11 @@ struct InitializeGraph1 {
     struct SyncPullCurrentDegree {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.current_degree;
   		}
 
@@ -326,15 +486,36 @@ struct InitializeGraph1 {
                                 unsigned int *y,
                                 size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
   		}
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
   		}
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_degree_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         node.current_degree = y;
       }
 
@@ -344,6 +525,15 @@ struct InitializeGraph1 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
@@ -352,6 +542,16 @@ struct InitializeGraph1 {
 
     bitset_dist_current.clear();
 
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
+                           (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph1_all_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph1{&_graph}, 
                    Galois::loopname("InitializeGraph1"), 
                    Galois::numrun(_graph.get_run_identifier()));
@@ -359,8 +559,15 @@ struct InitializeGraph1 {
     // backward because it defaults to pull (i.e. I want master to broadcast
     // its value to slaves; it shouldn't matter which direction in you choose
     // in any case)
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA)
+      _graph.sync_backward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+        "InitializeGraph1");
+    else if (personality == CPU)
+  #endif
     _graph.sync_backward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
       "InitializeGraph1", bitset_dist_current);
+
 
     // make sure everything is initialized
     InitializeGraph2::go(_graph);
@@ -387,20 +594,36 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
+                           (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+
+      //for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+      //  if ((_graph).isOwned((_graph).getGID(*ii))) 
+      //    Galois::Runtime::printOutput("% % t: % %\n", (_graph).getGID(*ii), 
+      //                             get_node_flag_cuda(cuda_ctx, *ii),
+      //                             get_node_trim_cuda(cuda_ctx, *ii),
+      //                             (get_node_current_degree_cuda(cuda_ctx, *ii)));
+      //}
+
+      StatTimer_cuda.start();
+      KCoreStep2_all_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
     Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
                    Galois::loopname("KCoreStep2"));
   }
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-
-    // only update if node is alive (no point otherwise)
-    //if (src_data.flag) {
-      if (src_data.trim > 0) {
-        src_data.current_degree -= src_data.trim;
-        src_data.trim = 0;
-      }
-    //}
+    // note even dead nodes can have trim updated
+    if (src_data.trim > 0) {
+      src_data.current_degree = src_data.current_degree - src_data.trim;
+      src_data.trim = 0;
+    }
   }
 };
 
@@ -408,14 +631,22 @@ struct KCoreStep2 {
 /* Step that determines if a node is dead and updates its neighbors' trim
  * if it is */
 struct KCoreStep1 {
-  Graph* graph;
+  cll::opt<unsigned int>& local_k_core_num;
   static Galois::DGAccumulator<int> DGAccumulator_accum;
+  Graph* graph;
 
-  KCoreStep1(Graph* _graph) : graph(_graph){}
+  KCoreStep1(cll::opt<unsigned int>& _kcore, Graph* _graph) : 
+    local_k_core_num(_kcore), graph(_graph){}
+
   void static go(Graph& _graph){
     struct SyncPushTrim {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_trim_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.trim;
   		}
 
@@ -425,16 +656,41 @@ struct KCoreStep1 {
                                       unsigned int *y, 
                                       size_t *s, 
                                       DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_trim_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.trim, y);
+      #ifdef __GALOIS_HET_CUDA__
+
+        if (personality == GPU_CUDA) {
+          add_node_trim_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.trim, y); return true; }
       }
 
       static bool reduce_batch(unsigned from_id, 
@@ -443,10 +699,25 @@ struct KCoreStep1 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_trim_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.trim, (unsigned int)0);
       }
 
@@ -456,6 +727,11 @@ struct KCoreStep1 {
     struct SyncPullTrim {
   		static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_trim_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
   			return node.trim;
   		}
 
@@ -465,15 +741,36 @@ struct KCoreStep1 {
                                 unsigned int *y,
                                 size_t *s, 
                                 DataCommMode *data_mode) {
+
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
   		}
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
   		}
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_trim_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.trim, y);
       }
 
@@ -483,6 +780,14 @@ struct KCoreStep1 {
                                unsigned int *y, 
                                size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
@@ -493,30 +798,58 @@ struct KCoreStep1 {
     
     do {
       _graph.set_num_iter(iterations);
-
       bitset_dist_current.clear();
       DGAccumulator_accum.reset();
 
-      Galois::do_all(_graph.begin(), _graph.end(), KCoreStep1(&_graph), 
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
+                             (_graph.get_run_identifier()));
+        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        StatTimer_cuda.start();
+        int __retval = 0;
+        KCoreStep1_all_cuda(__retval, k_core_num, cuda_ctx);
+        DGAccumulator_accum += __retval;
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
+    #endif
+      Galois::do_all(_graph.begin(), _graph.end(), 
+                     KCoreStep1(k_core_num, &_graph), 
                      Galois::loopname("KCoreStep1"));
       
       // do the trim sync
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA)
+        _graph.sync_forward<SyncPushTrim, SyncPullTrim>("KCoreStep1");
+      else if (personality == CPU)
+    #endif
       _graph.sync_forward<SyncPushTrim, SyncPullTrim>("KCoreStep1",
                                                       bitset_dist_current);
-
       // handle trimming (locally)
       KCoreStep2::go(_graph);
 
       iterations++;
     } while ((iterations < maxIterations) && DGAccumulator_accum.reduce());
+    //} while ((iterations < maxIterations));
   }
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
+    // slave node is being screwy with me
+
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+    //if (graph->getGID(src) == 350208) {
+    //  std::cout << "[" << graph->id << "]" <<
+    //    "bad flag is " << src_data.flag << "\n";
+    //  std::cout << "[" << graph->id << "]" <<
+    //    "bad cur degree is" << src_data.current_degree << "\n";
+    //}
+
     // only if node is alive we do things
     if (src_data.flag) {
-      if (src_data.current_degree < k_core_num) {
+      if (src_data.current_degree < local_k_core_num) {
         // set flag to 0 (false) and increment trim on outgoing neighbors
         src_data.flag = false;
         DGAccumulator_accum += 1;
@@ -527,6 +860,19 @@ struct KCoreStep1 {
              ++current_edge) {
 
            GNode dst = graph->getEdgeDst(current_edge);
+
+           //if (graph->getGID(dst) == graph->getGID(src)) {
+           //  std::cout << "selfedge " << graph->getGID(dst) << "\n";
+           //}
+           //if (graph->getGID(src) == 350208) {
+           //  std::cout << "[" << net.Num << "]" <<
+           //               "dst " << graph->getGID(dst) << "\n";
+           //}
+           //if (graph->getGID(dst) == 482304) {
+           //  std::cout << "[" << net.Num << "]" <<
+           //               "dst to badnode src " << graph->getGID(src) << "\n";
+           //}
+
            auto& dst_data = graph->getData(dst);
            Galois::atomicAdd(dst_data.trim, (unsigned int)1);
 
@@ -536,7 +882,6 @@ struct KCoreStep1 {
     }
   }
 };
-
 // accumulator initialization (?; required or the linking complains)
 Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 
@@ -545,22 +890,31 @@ Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 /******************************************************************************/
 
 int main(int argc, char** argv) {
+
   try {
     LonestarStart(argc, argv, name, desc, url);
-    Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                (unsigned long)maxIterations, 0);
     Galois::StatManager statManager;
 
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (net.ID == 0) {
+      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+                                  (unsigned long)maxIterations, 0);
+    }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
+
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
-#ifdef __GALOIS_HET_CUDA__
+  #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
+
+    if (num_nodes == -1) num_nodes = net.Num;
+    assert((net.Num % num_nodes) == 0);
+
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -582,28 +936,35 @@ int main(int argc, char** argv) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
 
-      for (unsigned i = 0; i < personality_set.length(); ++i) {
-        if (personality_set.c_str()[i] == 'c') 
-          scalefactor.push_back(scalecpu);
-        else
-          scalefactor.push_back(scalegpu);
+      if ((scalecpu > 1) || (scalegpu > 1)) {
+        for (unsigned i = 0; i < net.Num; ++i) {
+          if (personality_set.c_str()[i % num_nodes] == 'c') 
+            scalefactor.push_back(scalecpu);
+          else
+            scalefactor.push_back(scalegpu);
+        }
       }
     }
-#endif
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+  #endif
 
     StatTimer_hg_init.start();
 
+
     Graph* h_graph;
+
     if (enableVCut) {
-      h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num,
-                               scalefactor);
+      if (vertexcut == CART_VCUT)
+        h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
+                                         scalefactor, transpose);
+      else if (vertexcut == PL_VCUT)
+        h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
+                                      scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
                              scalefactor);
     }
 
-#ifdef __GALOIS_HET_CUDA__
+  #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
@@ -613,7 +974,7 @@ int main(int argc, char** argv) {
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
-#endif
+  #endif
 
     bitset_dist_current.resize(h_graph->get_local_total_nodes());
 
@@ -645,10 +1006,43 @@ int main(int argc, char** argv) {
 
     // Verify, i.e. print out graph data for examination
     if (verify) {
-#ifdef __GALOIS_HET_CUDA__
+    #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
-#endif
+    #endif
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+          //if (((*h_graph).getGID(*ii)) == 1041456) {
+          //  if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
+          //    Galois::Runtime::printOutput("own% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
+          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //}
+
+          //if (((*h_graph).getGID(*ii)) == 1042179) {
+          //  if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
+          //    Galois::Runtime::printOutput("own% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
+          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //}
+
+          //if (((*h_graph).getGID(*ii)) == 482304) {
+          //  if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
+          //    Galois::Runtime::printOutput("own% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
+          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //                                 (*h_graph).getData(*ii).flag,
+          //                                 (*h_graph).getData(*ii).current_degree);
+          //}
+
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             // prints the flag and current (out) degree of a node
             Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
@@ -661,16 +1055,16 @@ int main(int argc, char** argv) {
             assert((*h_graph).getData(*ii).current_degree >= k_core_num);
           }
         }
-#ifdef __GALOIS_HET_CUDA__
-      // TODO (Loc) I haven't handled this yet
+    #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA) {
         for(auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                     get_node_dist_current_cuda(cuda_ctx, *ii));
+            Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
+                                     get_node_flag_cuda(cuda_ctx, *ii),
+                                     (get_node_current_degree_cuda(cuda_ctx, *ii)));
         }
       }
-#endif
+    #endif
     }
     return 0;
   } catch(const char* c) {

@@ -349,6 +349,12 @@ if(USE_GGC)
 endif()
 
 app(kcore_push-filter kcore_push-filter/gen.cpp DISTSAFE)
+if(USE_GGC)
+  target_compile_definitions(kcore_push-filter PRIVATE __GALOIS_HET_CUDA__=1)
+  target_link_libraries(kcore_push-filter kcore_push-filter_cuda galois_exp)
+  cuda_add_library(kcore_push-filter_cuda kcore_push-filter/gen_cuda.cu)
+  target_link_libraries(kcore_push-filter_cuda ggrt)
+endif()
 
 app(bc bc/gen.cpp DISTSAFE)
 

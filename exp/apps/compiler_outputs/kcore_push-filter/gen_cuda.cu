@@ -240,7 +240,7 @@ __global__ void KCoreStep2(CSRGraph graph, unsigned int __nowned, unsigned int _
     {
       if (p_trim[src] > 0)
       {
-        p_current_degree[src] -= p_trim[src];
+        p_current_degree[src] = p_current_degree[src] - p_trim[src];
         p_trim[src] = 0;
       }
     }
@@ -287,7 +287,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __nowned, unsigned int _
         {
           p_flag[src] = false;
           ret_val.do_return( 1);
-          continue;
+          //continue;
         }
         else
         {
