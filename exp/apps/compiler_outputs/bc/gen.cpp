@@ -26,7 +26,7 @@
  */
 
 ////////////////////////////////////////////////////////////////////////////////
-// IMPORTANT: THIS CODE ONLY WORKS FOR OUTGOING EDGE CUTS AT THE MOMENT
+// IMPORTANT: THIS CODE ONLY WORKS FOR OUTGOING EDGE CUTS
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>
@@ -37,7 +37,6 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-//#include "Galois/Runtime/dGraph_vertexCut.h"
 #include "Galois/Runtime/dGraph_cartesianCut.h"
 #include "Galois/Runtime/dGraph_hybridCut.h"
 
@@ -53,7 +52,6 @@ enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
 };
 
-kasldjfl
 std::string personality_str(Personality p) {
    switch (p) {
    case CPU:
@@ -72,7 +70,7 @@ enum VertexCut {
   PL_VCUT, CART_VCUT
 };
 
-static const char* const name = "Betweeness Centrality - "
+static const char* const name = "Betweeness Centrality (OEC) - "
                                 "Distributed Heterogeneous.";
 static const char* const desc = "Betweeness Centrality on Distributed Galois.";
 static const char* const url = 0;
@@ -115,6 +113,13 @@ static cll::opt<VertexCut> vertexcut("vertexcut",
                                                    "Cartesian Vertex Cut"),
                                                  clEnumValEnd),
                                      cll::init(PL_VCUT));
+static cll::opt<bool> singleSourceBC("singleSource", 
+                                cll::desc("Use for single source BC"),
+                                cll::init(false));
+static cll::opt<unsigned int> singleSourceNode("srcNodeId", 
+                                cll::desc("Source node used for single source "
+                                          "betweeness-centraility"),
+                                cll::init(0));
 
 #ifdef __GALOIS_HET_CUDA__
 // If running on both CPUs and GPUs, below is included
@@ -158,7 +163,6 @@ static unsigned int current_src_node = 0;
 /******************************************************************************/
 
 struct NodeData {
-
   // SSSP vars
   std::atomic<unsigned int> current_length;
 
@@ -166,14 +170,14 @@ struct NodeData {
 
   // Betweeness centrality vars
   std::atomic<unsigned int> num_shortest_paths;
-  std::atomic<unsigned int> num_successors;
+  unsigned int num_successors;
   std::atomic<unsigned int> num_predecessors;
-  std::atomic<float> dependency;
   std::atomic<unsigned int> trim;
-  std::atomic<float> betweeness_centrality;
+  float dependency;
+  float betweeness_centrality;
 
   // used to determine if data has been propogated yet
-  bool propogation_flag; // not sync'd
+  bool propogation_flag;
 };
 
 struct WriteStatus {
@@ -187,6 +191,7 @@ static void resetFlags(WriteStatus& flag_object) {
   flag_object.dst_write = false;
 }
 
+// Flags for keeping track of reads/writes on src/dest
 WriteStatus current_length_flags;
 WriteStatus num_successors_flags;
 WriteStatus num_predecessors_flags;
@@ -195,13 +200,18 @@ WriteStatus trim_flags;
 WriteStatus propogation_flag_flags;
 WriteStatus dependency_flags;
 
-// second type (unsigned int) for edge weights
+// second type (unsigned int) is for edge weights
 typedef hGraph<NodeData, unsigned int> Graph;
 typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
+
+// bitset for tracking updates
+Galois::DynamicBitSet bitset_update;
+Galois::DynamicBitSet bitset_update_succ;
+Galois::DynamicBitSet bitset_update_flag;
 
 /******************************************************************************/
 /* Functors for running the algorithm */
@@ -217,6 +227,11 @@ struct InitializeGraph {
     Galois::do_all(_graph.begin(), _graph.ghost_end(), InitializeGraph{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
+    // technically I would set the betweeness-cent flag here, but assuming
+    // OEC only it will never matter as we never read/write from dst's bet-cet
+    // measure
+    // TODO technically a reset should be broadcast as it's a non reduction
+    // write
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -229,38 +244,679 @@ struct InitializeGraph {
 
 /* This is used to reset node data when switching to a difference source */
 struct InitializeIteration {
+  const unsigned int &local_infinity;
+  const unsigned int &local_current_src_node;
   Graph *graph;
 
-  InitializeIteration(Graph* _graph) : graph(_graph){}
+  InitializeIteration(const unsigned int &_local_infinity,
+                      const unsigned int &_local_current_src_node,
+                      Graph* _graph) : 
+                       local_infinity(_local_infinity),
+                       local_current_src_node(_local_current_src_node),
+                       graph(_graph){}
 
   /* Reset graph metadata node-by-node */
   void static go(Graph& _graph) {
-    // sync unnecessary if I loop through all nodes (using ghost_end)
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), InitializeIteration{&_graph}, 
-                   Galois::loopname("InitializeIteration"), 
-                   Galois::numrun(_graph.get_run_identifier()));
-  }
+    ////////////////////////////////////////////////////////////////////////////
+    // Trim
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushTrim {
+      typedef unsigned int ValTy;
 
-  /* Functor passed into the Galois operator to carry out reset of node data
-   * (aside from betweeness centrality measure */
-  void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+        return node.trim;
+      }
 
-    src_data.current_length = (graph->getGID(src) == current_src_node) ? 0 : infinity;
-    src_data.old_length = (graph->getGID(src) == current_src_node) ? 0 : infinity;
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
 
-    src_data.trim = 0;
-    // set to true = "I have propogated" i.e. don't propogate anymore
-    // set to false = "I have not propogated and/or I cannot propogate"
-    src_data.propogation_flag = false; 
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
 
-    // set num to 1 on source so that it can propogate it across nodes later
-    // note source will not have sigma accessed anyways (at least it shouldn't)
-    src_data.num_shortest_paths = (graph->getGID(src) == current_src_node) ? 1 : 0;
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return false;
+      }
 
-    src_data.num_successors = 0;
-    src_data.num_predecessors = 0;
-    src_data.dependency = 0;
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+    };
+
+    struct SyncPullTrim {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_trim_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.trim;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned long long int *b,
+                                unsigned int *o, unsigned int *y, size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_trim_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.trim, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // # short paths
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushPaths {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+        return 0;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        Galois::set(node.num_shortest_paths, (unsigned int)0);
+      }
+    };
+
+    struct SyncPullPaths {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_shortest_paths_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+
+        return node.num_shortest_paths;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned long long int *b,
+                                unsigned int *o, unsigned int *y, size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_shortest_paths_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.num_shortest_paths, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Succ
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushSucc {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+        return 0;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+    };
+
+    struct SyncPullSucc {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_successors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_successors;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_successors_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.num_successors, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Pred
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushPred {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+        return node.num_predecessors;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        Galois::set(node.num_predecessors, (unsigned int)0);
+      }
+    };
+
+    struct SyncPullPred {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_predecessors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_predecessors;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_predecessors_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_predecessors_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.num_predecessors, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Lengths
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushLength {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+        return 0;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+    };
+
+    struct SyncPullLength {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_length_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.current_length, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Flag
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushFlag {
+      typedef unsigned int ValTy;
+      //typedef bool ValTy; TODO for some reason this causes issues
+
+      static bool extract(uint32_t node_id, const struct NodeData & node) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         bool y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        node.propogation_flag = false;
+      }
+    };
+
+    struct SyncPullFlag {
+      typedef unsigned int ValTy;
+      //typedef bool ValTy; TODO for some reason this causes issues
+
+      static bool extract(uint32_t node_id, const struct NodeData & node) {
+        return node.propogation_flag;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned long long int *b,
+                                unsigned int *o, unsigned int *y, size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, bool y) {
+        Galois::set(node.propogation_flag, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+    };
+
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Dependency
+    ////////////////////////////////////////////////////////////////////////////
+    struct SyncPushDependency {
+      typedef unsigned int ValTy;
+      //typedef float ValTy; TODO for some reason this causes issues
+
+      static float extract(uint32_t node_id, const struct NodeData & node) {
+        return 0.0;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, float y) {
+        return true;
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        Galois::set(node.dependency, (float)0);
+      }
+    };
+
+    struct SyncPullDependency {
+      typedef unsigned int ValTy;
+      //typedef float ValTy; TODO for some reason this causes issues
+
+      static float extract(uint32_t node_id, const struct NodeData & node) {
+        return node.dependency;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned long long int *b,
+                                unsigned int *o, unsigned int *y, size_t *s, 
+                                DataCommMode *data_mode) {
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         float y) {
+        Galois::set(node.dependency, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+        return false;
+      }
+    };
+
+
+    ////////////////////////////////////////////////////////////////////////////
 
     resetFlags(propogation_flag_flags);
     resetFlags(current_length_flags);
@@ -269,6 +925,49 @@ struct InitializeIteration {
     resetFlags(trim_flags);
     resetFlags(num_shortest_paths_flags);
     resetFlags(dependency_flags);
+
+    Galois::do_all(_graph.begin(), _graph.end(), 
+                   InitializeIteration{infinity, current_src_node, &_graph},
+                   Galois::loopname("InitializeIteration"), 
+                   Galois::numrun(_graph.get_run_identifier()));
+
+    // broadcast ALL reset values (inefficient, but this is initialization +
+    // it's to guarantee a hard reset on slave nodes because otherwise in this
+    // scheme you now have to track non-reduce writes, which these are)
+
+    // note the pushes structures' reduce has been set to ignore (i.e.
+    // push reduce does nothing as I'm only interested in the broadcast)
+    _graph.sync_backward<SyncPushLength, SyncPullLength>("InitializeIteration");
+    _graph.sync_backward<SyncPushFlag, SyncPullFlag>("InitializeIteration");
+    _graph.sync_backward<SyncPushSucc, SyncPullSucc>("InitializeIteration");
+    _graph.sync_backward<SyncPushPred, SyncPullPred>("InitializeIteration");
+    _graph.sync_backward<SyncPushTrim, SyncPullTrim>("InitializeIteration");
+    _graph.sync_backward<SyncPushPaths, SyncPullPaths>("InitializeIteration");
+    _graph.sync_backward<SyncPushDependency, 
+                         SyncPullDependency>("InitializeIteration");
+  }
+
+  /* Functor passed into the Galois operator to carry out reset of node data
+   * (aside from betweeness centrality measure */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    src_data.current_length = (graph->getGID(src) == local_current_src_node) ?  0 : local_infinity;
+    src_data.old_length = (graph->getGID(src) == local_current_src_node) ?  0 : local_infinity;
+
+    src_data.trim = 0;
+
+    // set to true = "I have propogated" i.e. don't propogate anymore
+    // set to false = "I have not propogated and/or I cannot propogate"
+    src_data.propogation_flag = false; 
+
+    // set num to 1 on source so that it can propogate it across nodes later
+    // note source will not have sigma accessed anyways (at least it shouldn't)
+    src_data.num_shortest_paths = (graph->getGID(src) == local_current_src_node) ?  1 : 0;
+
+    src_data.num_successors = 0;
+    src_data.num_predecessors = 0;
+    src_data.dependency = 0;
   }
 };
 
@@ -279,16 +978,155 @@ struct FirstIterationSSSP {
   FirstIterationSSSP(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    // only called once after init, so no sync necessary before running the op
-    // (since all nodes should have been reset already)
-		unsigned int __begin, __end;
-		if (_graph.isLocal(current_src_node)) {
-			__begin = _graph.getLID(current_src_node);
-			__end = __begin + 1;
-		} else {
-			__begin = 0;
-			__end = 0;
-		}
+    struct SyncPushLength {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, unsigned int *y, 
+                                      size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          min_node_current_length_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        return y < Galois::min(node.current_length, y);
+      }
+
+      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
+                               unsigned int *o, unsigned int *y, size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_min_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+    };
+
+    struct SyncPullLength {
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_length_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.current_length, y);
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+    };
+
+    unsigned int __begin, __end;
+    if (_graph.isLocal(current_src_node)) {
+      __begin = _graph.getLID(current_src_node);
+      __end = __begin + 1;
+    } else {
+      __begin = 0;
+      __end = 0;
+    }
+
+    bitset_update.clear();
 
     Galois::do_all(boost::make_counting_iterator(__begin), 
                    boost::make_counting_iterator(__end), 
@@ -316,6 +1154,8 @@ struct FirstIterationSSSP {
       unsigned int new_dist = 1 + src_data.current_length;
 
       Galois::atomicMin(dst_data.current_length, new_dist);
+
+      bitset_update.set(dst);
     }
   }
 };
@@ -328,67 +1168,142 @@ struct SSSP {
 
   void static go(Graph& _graph){
     struct SyncPushLength {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.current_length;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicMin(node.current_length, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          min_node_current_length_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        return y < Galois::min(node.current_length, y);
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_min_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullLength {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.current_length;
-  		}
+      typedef unsigned int ValTy;
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_length_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.current_length, y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
 
     FirstIterationSSSP::go(_graph);
@@ -404,14 +1319,21 @@ struct SSSP {
       if (current_length_flags.dst_write) {
         // reduce to master
         _graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP");
+        //_graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP", 
+        //                                                   bitset_update);
         resetFlags(current_length_flags);
       }
+
+      // READ DST OLD LENGTH (for optimization purposes, you could only set
+      // bitset where old length > new length... TODO?
 
       // READ SRC old length; unnecessary as you will never write to dest
       // old_length
       //if (old_length_flags.dst_write) {
       //  _graph....
       //}
+
+      bitset_update.clear();
 
       Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
                      Galois::loopname("SSSP"));
@@ -447,6 +1369,9 @@ struct SSSP {
         unsigned int new_dist = 1 + src_data.current_length;
 
         Galois::atomicMin(dst_data.current_length, new_dist);
+        // TODO could optimize this bitset to only set if old length
+        // is greater than new length, but extra sync may be required...
+        bitset_update.set(dst);
       }
 
       DGAccumulator_accum += 1;
@@ -463,68 +1388,144 @@ struct PredAndSucc {
 
   void static go(Graph& _graph){
     struct SyncPushLength {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.current_length;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicMin(node.current_length, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          min_node_current_length_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        return y < Galois::min(node.current_length, y);
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_min_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullLength {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.current_length;
-  		}
+      typedef unsigned int ValTy;
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_current_length_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.current_length;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_length_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_length_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.current_length, y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
+    ////////////////////////////////////////////////////////////////////////////
 
     // READ SRC current length and READ DST current length
     if (current_length_flags.src_write && current_length_flags.dst_write) {
@@ -552,6 +1553,7 @@ struct PredAndSucc {
     //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
     //}
 
+    bitset_update.clear();
     // Loop over all nodes in graph iteratively
     Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(&_graph), 
                    Galois::loopname("PredAndSucc"));
@@ -581,8 +1583,10 @@ struct PredAndSucc {
 
       if ((src_data.current_length + edge_weight) == dst_data.current_length) {
         // dest on shortest path with this node as predecessor
-        Galois::atomicAdd(src_data.num_successors, (unsigned int)1);
+        Galois::add(src_data.num_successors, (unsigned int)1);
         Galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
+
+        bitset_update_succ.set(src);
       }
     }
   }
@@ -597,76 +1601,160 @@ struct PredecessorDecrement {
 
   void static go(Graph& _graph) {
     struct SyncPushTrim {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.trim;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_trim_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.trim;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_trim_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.trim, y);
+      #ifdef __GALOIS_HET_CUDA__
+
+        if (personality == GPU_CUDA) {
+          add_node_trim_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { Galois::add(node.trim, y); return true; }
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_trim_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.trim, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullTrim {
-  		static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-  			return node.trim;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_trim_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.trim;
+      }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_trim_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_trim_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.trim, y);
       }
 
       static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
 
     // READ SRC trim
     if (trim_flags.dst_write) {
       // reduce to master
+      //_graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement", 
+      //                                                bitset_update);
       _graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
+
       resetFlags(trim_flags);
     }
+
+    // DO NOT DO A BITSET RESET HERE BECAUSE IT WILL BE REUSED BY THE NEXT STEP
+    // (updates to trim and pred are on the same nodes)
 
     Galois::do_all(_graph.begin(), _graph.end(), PredecessorDecrement{&_graph}, 
                    Galois::loopname("PredecessorDecrement"), 
@@ -684,7 +1772,7 @@ struct PredecessorDecrement {
     if (src_data.trim > 0) {
       if (src_data.trim > src_data.num_predecessors) {
         std::cerr << "ISSUE P: src " << src << " " << src_data.trim << " " << 
-                                  src_data.num_predecessors << "\n";
+                                     src_data.num_predecessors << "\n";
         abort();                                    
       }
 
@@ -716,274 +1804,455 @@ struct NumShortestPaths {
     // # short paths
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushPaths {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.num_shortest_paths;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_shortest_paths_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_shortest_paths;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o,
+                                                       y, s, data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.num_shortest_paths, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_num_shortest_paths_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        Galois::add(node.num_shortest_paths, y); return true;
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                                 data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_num_shortest_paths_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_shortest_paths, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullPaths {
-  		static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-  			return node.num_shortest_paths;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_shortest_paths_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+
+        return node.num_shortest_paths;
+      }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_shortest_paths_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_shortest_paths, y);
       }
 
       static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
-
     ////////////////////////////////////////////////////////////////////////////
     // Succ
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushSucc {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.num_successors;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_successors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_successors;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.num_successors, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_num_successors_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.num_successors, y); return true; }
       }
 
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_successors, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullSucc {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.num_successors;;
-  		}
+      typedef unsigned int ValTy;
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_successors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_successors;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_successors_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_successors, y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
-
     ////////////////////////////////////////////////////////////////////////////
     // Pred
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushPred {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.num_predecessors;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_predecessors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_predecessors;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_num_predecessors_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.num_predecessors, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_num_predecessors_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.num_predecessors, y); return true; }
       }
 
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_predecessors, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullPred {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.num_predecessors;;
-  		}
+      typedef unsigned int ValTy;
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_predecessors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_predecessors;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_predecessors_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_predecessors_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_predecessors, y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-      }
-
-      typedef unsigned int ValTy;
     };
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Lengths
-    ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushLength {
-    	static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-      	return node.current_length;
-  		}
-
-      static bool extract_reset_batch(unsigned from_id, 
-                                      unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
-        return false;
-      }
-
-      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
-        return false;
-      }
-
-      static bool reduce(uint32_t node_id, struct NodeData & node, 
-                         unsigned int y) {
-        return Galois::atomicMin(node.current_length, y);
-      }
-
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
-                               DataCommMode data_mode) {
-        return false;
-      }
-
-      static void reset (uint32_t node_id, struct NodeData & node) {
-      }
-
-      typedef unsigned int ValTy;
-    };
-
-    struct SyncPullLength {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.current_length;
-  		}
-
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
-                                DataCommMode *data_mode) {
-        return false;
-  		}
-
-      static bool extract_batch(unsigned from_id, unsigned int *y) {
-        return false;
-  		}
-
-      static void setVal(uint32_t node_id, struct NodeData & node, 
-                         unsigned int y) {
-        Galois::set(node.current_length, y);
-      }
-
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
-                               DataCommMode data_mode) {
-        return false;
-      }
-
-      typedef unsigned int ValTy;
-    };
-
-
     ////////////////////////////////////////////////////////////////////////////
 
     unsigned int iterations = 0;
@@ -998,13 +2267,6 @@ struct NumShortestPaths {
         resetFlags(num_shortest_paths_flags);
       }
 
-      // READ SRC succ (as optimization; otherwise it will loop over no edges 
-      // anyways)
-      //if (num_successors_flags.dst_write) {
-      //  _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
-      //  resetFlags(num_successors_flags);
-      //}
-
       // READ SRC pred
       if (num_predecessors_flags.dst_write) {
         _graph.sync_forward<SyncPushPred, SyncPullPred>("NumShortestPaths");
@@ -1012,38 +2274,35 @@ struct NumShortestPaths {
       }
 
       // READ SRC current length and READ DST current length
-      if (current_length_flags.src_write && current_length_flags.dst_write) {
-        _graph.sync_exchange<SyncPushLength, 
-                             SyncPullLength>("NumShortestPaths");
-        resetFlags(current_length_flags);
-      } else if (current_length_flags.src_write) {
-        _graph.sync_backward<SyncPushLength, 
-                             SyncPullLength>("NumShortestPaths");
-        resetFlags(current_length_flags);
-      } else if (current_length_flags.dst_write) {
-        _graph.sync_exchange<SyncPushLength, 
-                             SyncPullLength>("NumShortestPaths");
-        resetFlags(current_length_flags);
-      } 
-      //else {
-      //  // TODO verify this
-      //  // no new write has occured
-      //  // HOWEVER, it's possible that dst may not have the most up to date
-      //  // value: do a broadcast (e.g. in 1 op, src is read after dst is
-      //  // written, so flags are reset, but in that op no writes occur:
-      //  // then, once you get to a new op, you will never update dst unless
-      //  // the flag is set)
-      //  // TODO: also, find a way to make it more efficient instead of a
-      //  // broadcast every round like what it's doing now
-      //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
-      //}
+      // NOTE: It should never get in here since current length at this point 
+      // will no longer be updated
+      //if (current_length_flags.src_write && current_length_flags.dst_write) {
+      //  _graph.sync_exchange<SyncPushLength, 
+      //                       SyncPullLength>("NumShortestPaths");
+      //  resetFlags(current_length_flags);
+      //} else if (current_length_flags.src_write) {
+      //  _graph.sync_backward<SyncPushLength, 
+      //                       SyncPullLength>("NumShortestPaths");
+      //  resetFlags(current_length_flags);
+      //} else if (current_length_flags.dst_write) {
+      //  _graph.sync_exchange<SyncPushLength, 
+      //                       SyncPullLength>("NumShortestPaths");
+      //  resetFlags(current_length_flags);
+      //} 
 
+      // READ SRC succ (only if you want optimization; not activated here)
+      //if (num_successors_flags.dst_write) {
+      //  _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
+      //  resetFlags(num_successors_flags);
+      //}
       // READ SRC prop flag; should never happen since we never write to 
       // dst flag before this
       //if (propogation_flag_flags.dst_write) {
       //  _graph.sync_forward<SyncPushFlag, SyncPullFlag>("NumShortestPaths");
       //  resetFlags(propogation_flag_flags);
       //}
+      
+      bitset_update.clear();
 
       Galois::do_all(_graph.begin(), _graph.end(), 
                      NumShortestPaths(&_graph), 
@@ -1087,14 +2346,17 @@ struct NumShortestPaths {
         //unsigned int edge_weight = graph->getEdgeData(current_edge);
         unsigned int edge_weight = 1;
 
+        unsigned int to_add = src_data.num_shortest_paths;
+
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
-          DGAccumulator_accum += 1;
           // add my num shortest paths to dest's num shortest paths
-          Galois::atomicAdd(dst_data.num_shortest_paths,
-                            src_data.num_shortest_paths.load());
+          Galois::atomicAdd(dst_data.num_shortest_paths, to_add);
           
           // increment dst trim so it can decrement predecessor
           Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+          bitset_update.set(dst);
+
+          DGAccumulator_accum += 1;
         }
       }
 
@@ -1107,7 +2369,7 @@ Galois::DGAccumulator<unsigned int> NumShortestPaths::DGAccumulator_accum;
 
 
 /* Loop over all nodes and set the prop flag to false in prep for more
- * propogation later*/
+ * propogation later */
 struct PropFlagReset {
   Graph* graph;
 
@@ -1124,6 +2386,7 @@ struct PropFlagReset {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
     src_data.propogation_flag = false;
+    bitset_update_flag.set(src);
   }
 };
 
@@ -1168,13 +2431,14 @@ struct SuccessorDecrement {
     } else if (src_data.trim > 0) {
     // decrement successor by trim then reset
       if (src_data.trim > src_data.num_successors) {
-        std::cerr << "ISSUE: src " << src << " " << src_data.trim << " " << 
+        std::cerr << "ISSUEsucc: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_successors << "\n";
-        //abort();                                    
+        abort();                                    
       }
 
       src_data.num_successors -= src_data.trim;
       src_data.trim = 0;
+      bitset_update_succ.set(src);
 
       // multiply dependency by # of shortest paths to finalize if no more 
       // successors, then set prop flag to false so it can propogate the value
@@ -1182,6 +2446,7 @@ struct SuccessorDecrement {
         // TODO revert back to this if necessary
         //src_data.dependency = src_data.dependency * src_data.num_shortest_paths;
         src_data.propogation_flag = false;
+        bitset_update_flag.set(src);
       }
     }
   }
@@ -1190,10 +2455,14 @@ struct SuccessorDecrement {
 /* Do dependency propogation which is required for betweeness centraility
  * calculation */
 struct DependencyPropogation {
+  const unsigned int &local_current_src_node;
   Graph* graph;
   static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
 
-  DependencyPropogation(Graph* _graph) : graph(_graph){}
+  DependencyPropogation(const unsigned int &_local_current_src_node,
+                        Graph* _graph) : 
+                          local_current_src_node(_local_current_src_node),
+                          graph(_graph){}
 
   /* Look at all nodes to do propogation until no more work is done */
   void static go(Graph& _graph) {
@@ -1201,215 +2470,313 @@ struct DependencyPropogation {
     // # short paths
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushPaths {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.num_shortest_paths;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_shortest_paths_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_shortest_paths;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o,
+                                                       y, s, data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.num_shortest_paths, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_num_shortest_paths_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        Galois::add(node.num_shortest_paths, y); return true;
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                                 data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_num_shortest_paths_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_shortest_paths, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullPaths {
-  		static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-  			return node.num_shortest_paths;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_shortest_paths_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+
+        return node.num_shortest_paths;
+      }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_shortest_paths_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_shortest_paths_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_shortest_paths, y);
       }
 
       static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
 
     ////////////////////////////////////////////////////////////////////////////
     // Succ
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushSucc {
-    	static unsigned int extract(uint32_t node_id, 
+      typedef unsigned int ValTy;
+
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
-      	return node.num_successors;
-  		}
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_successors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_successors;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
-        return Galois::atomicAdd(node.num_successors, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_num_successors_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.num_successors, y); return true; }
       }
 
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_successors, (unsigned int)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullSucc {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.num_successors;;
-  		}
+      typedef unsigned int ValTy;
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_num_successors_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.num_successors;
+      }
+
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_num_successors_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_num_successors_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.num_successors, y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
-      typedef unsigned int ValTy;
-    };
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Lengths
-    ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushLength {
-    	static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-      	return node.current_length;
-  		}
-
-      static bool extract_reset_batch(unsigned from_id, 
-                                      unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
-        return false;
-      }
-
-      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
-        return false;
-      }
-
-      static bool reduce(uint32_t node_id, struct NodeData & node, 
-                         unsigned int y) {
-        return Galois::atomicMin(node.current_length, y);
-      }
-
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
-                               DataCommMode data_mode) {
-        return false;
-      }
-
-      static void reset (uint32_t node_id, struct NodeData & node) {
-      }
-
-      typedef unsigned int ValTy;
-    };
-
-    struct SyncPullLength {
-  		static unsigned int extract(uint32_t node_id, 
-                                  const struct NodeData & node) {
-  			return node.current_length;
-  		}
-
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
-                                DataCommMode *data_mode) {
-        return false;
-  		}
-
-      static bool extract_batch(unsigned from_id, unsigned int *y) {
-        return false;
-  		}
-
-      static void setVal(uint32_t node_id, struct NodeData & node, 
-                         unsigned int y) {
-        Galois::set(node.current_length, y);
-      }
-
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
-                               DataCommMode data_mode) {
-        return false;
-      }
-
-      typedef unsigned int ValTy;
     };
 
     ////////////////////////////////////////////////////////////////////////////
     // Flag
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushFlag {
-      // TODO is this supposed to be changed?
       typedef unsigned int ValTy;
 
-    	static bool extract(uint32_t node_id, const struct NodeData & node) {
-      	return node.propogation_flag;
-  		}
+      static bool extract(uint32_t node_id, const struct NodeData & node) {
+        return node.propogation_flag;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
@@ -1424,10 +2791,8 @@ struct DependencyPropogation {
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          bool y) {
-        // always reduce to true (actually shouldn't even get here
-        // in the first place as you shouldn't be reducing flags in this
-        // algorithm)
-        node.propogation_flag = y || node.propogation_flag;
+        // shouldn't even get here in the first place as you shouldn't be 
+        // reducing flags in this algorithm)
         std::cerr << "reducing a flag, shouldn't do this!\n";
         abort();
         return false;
@@ -1445,22 +2810,21 @@ struct DependencyPropogation {
     };
 
     struct SyncPullFlag {
-      // TODO is this supposed to be changed?
       typedef unsigned int ValTy;
 
       static bool extract(uint32_t node_id, const struct NodeData & node) {
-  			return node.propogation_flag;
-  		}
+        return node.propogation_flag;
+      }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, bool y) {
         Galois::set(node.propogation_flag, y);
@@ -1479,9 +2843,11 @@ struct DependencyPropogation {
     // Dependency
     ////////////////////////////////////////////////////////////////////////////
     struct SyncPushDependency {
-    	static float extract(uint32_t node_id, const struct NodeData & node) {
-      	return node.dependency;
-  		}
+      typedef unsigned int ValTy;
+
+      static float extract(uint32_t node_id, const struct NodeData & node) {
+        return node.dependency;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
@@ -1495,7 +2861,7 @@ struct DependencyPropogation {
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, float y) {
-        return Galois::atomicAdd(node.dependency, y);
+        Galois::add(node.dependency, y); return true;
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
@@ -1507,24 +2873,24 @@ struct DependencyPropogation {
       static void reset (uint32_t node_id, struct NodeData & node) {
         Galois::set(node.dependency, (float)0);
       }
-
-      typedef unsigned int ValTy;
     };
 
     struct SyncPullDependency {
-  		static float extract(uint32_t node_id, const struct NodeData & node) {
-  			return node.dependency;
-  		}
+      typedef unsigned int ValTy;
+
+      static float extract(uint32_t node_id, const struct NodeData & node) {
+        return node.dependency;
+      }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          float y) {
@@ -1536,8 +2902,6 @@ struct DependencyPropogation {
                                DataCommMode data_mode) {
         return false;
       }
-
-      typedef unsigned int ValTy;
     };
 
 
@@ -1557,28 +2921,39 @@ struct DependencyPropogation {
       } else if (num_successors_flags.src_write) {
         _graph.sync_backward<SyncPushSucc, 
                              SyncPullSucc>("DependencyPropogation");
+        //_graph.sync_backward<SyncPushSucc, 
+        //                     SyncPullSucc>("DependencyPropogation", 
+        //                                   bitset_update_succ);
         resetFlags(num_successors_flags);
+        bitset_update_succ.clear();
       } else if (num_successors_flags.dst_write) {
         // big problem: shouldn't be writing to dst succ anymore
         std::cerr << "num successors dst flag set\n";
         abort();
       }
 
-      // READ SRC/DST current length; note at this point it shouldn't matter
+      // READ SRC/DST current length; 
+      // NOTE at this point it shouldn't matter
       // anymore as they should have been sync'd already
-      if (current_length_flags.src_write && current_length_flags.dst_write) {
-        _graph.sync_exchange<SyncPushLength, 
-                             SyncPullLength>("DependencyPropogation");
-        resetFlags(current_length_flags);
-      } else if (current_length_flags.src_write) {
-        _graph.sync_backward<SyncPushLength, 
-                             SyncPullLength>("DependencyPropogation");
-        resetFlags(current_length_flags);
-      } else if (current_length_flags.dst_write) {
-        _graph.sync_exchange<SyncPushLength, 
-                             SyncPullLength>("DependencyPropogation");
-        resetFlags(current_length_flags);
-      } 
+      //if (current_length_flags.src_write && current_length_flags.dst_write) {
+      //  std::cerr << "in current length src/dst\n";
+      //  abort();
+      //  _graph.sync_exchange<SyncPushLength, 
+      //                       SyncPullLength>("DependencyPropogation");
+      //  resetFlags(current_length_flags);
+      //} else if (current_length_flags.src_write) {
+      //  std::cerr << "in current length src\n";
+      //  abort();
+      //  _graph.sync_backward<SyncPushLength, 
+      //                       SyncPullLength>("DependencyPropogation");
+      //  resetFlags(current_length_flags);
+      //} else if (current_length_flags.dst_write) {
+      //  std::cerr << "in current length dst\n";
+      //  abort();
+      //  _graph.sync_exchange<SyncPushLength, 
+      //                       SyncPullLength>("DependencyPropogation");
+      //  resetFlags(current_length_flags);
+      //} 
 
       // READ DST prop flag
       if (propogation_flag_flags.src_write && 
@@ -1589,6 +2964,10 @@ struct DependencyPropogation {
       } else if (propogation_flag_flags.src_write) {
         _graph.sync_backward<SyncPushFlag, 
                              SyncPullFlag>("DependencyPropogation");
+        //_graph.sync_backward<SyncPushFlag, 
+        //                     SyncPullFlag>("DependencyPropogation",
+        //                                   bitset_update_flag);
+        bitset_update_flag.clear();
         resetFlags(propogation_flag_flags);
       } else if (propogation_flag_flags.dst_write) {
         // big problem: shouldn't be writing to dst flag EVER
@@ -1599,36 +2978,57 @@ struct DependencyPropogation {
       // READ SRC/DST # shortest paths
       if (num_shortest_paths_flags.src_write && 
           num_shortest_paths_flags.dst_write) {
+        // should never get in here
+        std::cerr << "num short paths src\n";
+        abort();
         _graph.sync_exchange<SyncPushPaths, 
                              SyncPullPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.src_write) {
+        // should never get in here
+        std::cerr << "num short paths src\n";
+        abort();
         _graph.sync_backward<SyncPushPaths, 
                              SyncPullPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.dst_write) {
         _graph.sync_exchange<SyncPushPaths, 
                              SyncPullPaths>("DependencyPropogation");
+        //_graph.sync_exchange<SyncPushPaths, 
+        //                     SyncPullPaths>("DependencyPropogation",
+        //                                    bitset_update);
         resetFlags(num_shortest_paths_flags);
       }
 
       // READ DST dependency
       if (dependency_flags.src_write && dependency_flags.dst_write) {
+        // shouldn't get here
+        std::cerr << "dep dst\n";
+        abort();
         _graph.sync_exchange<SyncPushDependency, 
                              SyncPullDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       } else if (dependency_flags.src_write) {
         _graph.sync_backward<SyncPushDependency, 
                              SyncPullDependency>("DependencyPropogation");
+        //_graph.sync_backward<SyncPushDependency, 
+        //                     SyncPullDependency>("DependencyPropogation",
+        //                                         bitset_update);
+
         resetFlags(dependency_flags);
       } else if (dependency_flags.dst_write) {
+        // shouldn't get here
+        std::cerr << "dep dst\n";
+        abort();
         _graph.sync_exchange<SyncPushDependency, 
                              SyncPullDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       }
 
+      bitset_update.clear();
+
       Galois::do_all(_graph.begin(), _graph.end(), 
-                     DependencyPropogation(&_graph), 
+                     DependencyPropogation(current_src_node, &_graph), 
                      Galois::loopname("DependencyPropogation"));
 
       dependency_flags.src_write = true;
@@ -1657,15 +3057,13 @@ struct DependencyPropogation {
    *
    * dest to src flow for successors
    * dest to src flow for delta
-   *
-   * This is pull based, no? */
+   **/
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     // IGNORE THE SOURCE NODE OF THIS CURRENT ITERATION OF SSSP
     // + do not redo computation if src has no successors left
-    if (graph->getGID(src) == current_src_node || 
-        src_data.num_successors == 0) {
+    if (graph->getGID(src) == local_current_src_node || src_data.num_successors == 0) {
       return;
     }
 
@@ -1687,21 +3085,17 @@ struct DependencyPropogation {
       if (dst_data.num_successors == 0 && !dst_data.propogation_flag) {
         // dest on shortest path with this node as predecessor
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
-          DGAccumulator_accum += 1;
-
           // increment my trim for later use to decrement successor
           Galois::atomicAdd(src_data.trim, (unsigned int)1);
 
-          //if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-          //  std::cout << "dst short " << dst_data.num_shortest_paths << "\n";
-          //}
-
           // update my dependency
-          // TODO revert to saving multiplication till the end if necessary
-          src_data.dependency = src_data.dependency +
-              (((float)src_data.num_shortest_paths / 
-               (float)dst_data.num_shortest_paths) *
-              (float)(1.0 + dst_data.dependency));
+          // TODO revert to saving multiplication till the end?
+          // cuda gen makes me have all of this in one line; quite annoying..
+          src_data.dependency = src_data.dependency + (((float)src_data.num_shortest_paths / (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency));
+
+          bitset_update.set(src);
+
+          DGAccumulator_accum += 1;
         }
       }
     }
@@ -1715,13 +3109,23 @@ struct BC {
   BC(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    // TODO: currently only does 1 node because all nodes takes too long
-    for (uint64_t i = 0; i < _graph.totalNodes; i++) {
-    //for (uint64_t i = 0; i < 2; i++) {
+    uint64_t start_i;
+    uint64_t end_i;
+
+    if (singleSourceBC) {
+      start_i = singleSourceNode;
+      end_i = singleSourceNode + 1;
+    } else {
+      start_i = 0;
+      end_i = _graph.totalNodes;
+    }
+
+    for (uint64_t i = start_i; i < end_i; i++) {
       // change source nodes for this iteration of SSSP
       //if (i % 5000 == 0) {
       //  std::cout << "SSSP source node " << i << "\n";
       //}
+
       current_src_node = i;
       std::cout << "SSSP source node " << i << "\n";
 
@@ -1755,7 +3159,7 @@ struct BC {
                      Galois::loopname("BC"));
 
       // WRITE SRC bc; unnecessary to set since you will never write
-      // bc dst
+      // bc dst + it's over
     }
   }
 
@@ -1764,11 +3168,7 @@ struct BC {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    //std::cout << "node num-" << (graph->getGID(src)) << " dep: " << 
-    //              src_data.dependency << "\n";
-
-    src_data.betweeness_centrality = src_data.betweeness_centrality + 
-                                     src_data.dependency;
+    src_data.betweeness_centrality = src_data.betweeness_centrality + src_data.dependency;
   }
 };
  
@@ -1809,7 +3209,7 @@ int main(int argc, char** argv) {
           personality = GPU_CUDA;
           break;
         case 'o':
-          assert(0); // o currently not supported (apparently)
+          assert(0); // o currently not supported
           personality = GPU_OPENCL;
           break;
         case 'c':
@@ -1848,7 +3248,7 @@ int main(int argc, char** argv) {
                              scalefactor);
     }
 
-#ifdef __GALOIS_HET_CUDA__
+  #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
@@ -1858,7 +3258,12 @@ int main(int argc, char** argv) {
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
-#endif
+  #endif
+
+    bitset_update.resize(h_graph->get_local_total_nodes());
+    bitset_update_succ.resize(h_graph->get_local_total_nodes());
+    bitset_update_flag.resize(h_graph->get_local_total_nodes());
+
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
@@ -1894,11 +3299,11 @@ int main(int argc, char** argv) {
 #endif
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
-            //sprintf(test, "%lu %.6f %u\n", (*h_graph).getGID(*ii),
-            //        (*h_graph).getData(*ii).betweeness_centrality.load(),
+            //sprintf(test, "%lu %.9f %u\n", (*h_graph).getGID(*ii),
+            //        (*h_graph).getData(*ii).betweeness_centrality,
             //        (*h_graph).getData(*ii).current_length.load());
             sprintf(test, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                    (*h_graph).getData(*ii).betweeness_centrality.load());
+                    (*h_graph).getData(*ii).betweeness_centrality);
             Galois::Runtime::printOutput(test);
             // outputs betweenness centrality
             //Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 

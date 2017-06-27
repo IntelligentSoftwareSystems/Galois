@@ -190,15 +190,15 @@ struct InitializeGraph2 {
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
     struct SyncPushCurrentDegree {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_current_degree_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.current_degree;
-  		}
+        return node.current_degree;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
@@ -267,17 +267,17 @@ struct InitializeGraph2 {
     };
 
     struct SyncPullCurrentDegree {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_current_degree_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.current_degree;
-  		}
+        return node.current_degree;
+      }
 
-  		static bool extract_batch(unsigned from_id,
+      static bool extract_batch(unsigned from_id,
                                 unsigned long long int *b,
                                 unsigned int *o,
                                 unsigned int *y,
@@ -292,7 +292,7 @@ struct InitializeGraph2 {
         assert (personality == CPU);
       #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
@@ -304,7 +304,7 @@ struct InitializeGraph2 {
       #endif
 
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
@@ -395,15 +395,15 @@ struct InitializeGraph1 {
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
     struct SyncPushCurrentDegree {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_current_degree_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.current_degree;
-  		}
+        return node.current_degree;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
@@ -470,17 +470,17 @@ struct InitializeGraph1 {
     };
 
     struct SyncPullCurrentDegree {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_current_degree_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.current_degree;
-  		}
+        return node.current_degree;
+      }
 
-  		static bool extract_batch(unsigned from_id,
+      static bool extract_batch(unsigned from_id,
                                 unsigned long long int *b,
                                 unsigned int *o,
                                 unsigned int *y,
@@ -495,7 +495,7 @@ struct InitializeGraph1 {
         assert (personality == CPU);
       #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
@@ -507,7 +507,7 @@ struct InitializeGraph1 {
       #endif
 
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
@@ -640,15 +640,15 @@ struct KCoreStep1 {
 
   void static go(Graph& _graph){
     struct SyncPushTrim {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_trim_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.trim;
-  		}
+        return node.trim;
+      }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
@@ -669,7 +669,6 @@ struct KCoreStep1 {
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
-
         if (personality == GPU_CUDA) {
           batch_get_reset_node_trim_cuda(cuda_ctx, from_id, y, 0);
           return true;
@@ -682,7 +681,6 @@ struct KCoreStep1 {
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
       #ifdef __GALOIS_HET_CUDA__
-
         if (personality == GPU_CUDA) {
           add_node_trim_cuda(cuda_ctx, node_id, y);
           return true;
@@ -725,23 +723,22 @@ struct KCoreStep1 {
     };
 
     struct SyncPullTrim {
-  		static unsigned int extract(uint32_t node_id, 
+      static unsigned int extract(uint32_t node_id, 
                                   const struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
-  			if (personality == GPU_CUDA) 
+        if (personality == GPU_CUDA) 
           return get_node_trim_cuda(cuda_ctx, node_id);
-  			assert (personality == CPU);
+        assert (personality == CPU);
       #endif
-  			return node.trim;
-  		}
+        return node.trim;
+      }
 
-  		static bool extract_batch(unsigned from_id,
+      static bool extract_batch(unsigned from_id,
                                 unsigned long long int *b,
                                 unsigned int *o,
                                 unsigned int *y,
                                 size_t *s, 
                                 DataCommMode *data_mode) {
-
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           batch_get_node_trim_cuda(cuda_ctx, from_id, b, o, y, s,
@@ -751,7 +748,7 @@ struct KCoreStep1 {
         assert (personality == CPU);
       #endif
         return false;
-  		}
+      }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
@@ -762,7 +759,7 @@ struct KCoreStep1 {
         assert (personality == CPU);
       #endif
         return false;
-  		}
+      }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          unsigned int y) {
