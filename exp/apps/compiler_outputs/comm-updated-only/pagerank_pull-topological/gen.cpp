@@ -125,7 +125,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -156,14 +156,14 @@ struct ResetGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		typedef int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -173,14 +173,14 @@ struct ResetGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_nout_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_nout_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -214,9 +214,9 @@ struct ResetGraph {
     	} else if (personality == CPU)
     #endif
       {
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("ResetGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int" , "set",  ""));
       }
-    	_graph.sync_exchange<Syncer_vertexCut_0, SyncerPull_0>("ResetGraph");
+    	_graph.sync_exchange<Reduce_0, Broadcast_0>("ResetGraph");
     
   }
 
@@ -233,7 +233,7 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -279,7 +279,7 @@ struct InitializeGraph {
     		}
     		typedef int ValTy;
     	};
-      struct SyncerPull_1 {
+      struct Broadcast_1 {
         static float extract(uint32_t node_id, const struct PR_NodeData & node) {
         #ifdef __GALOIS_HET_CUDA__
           if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
@@ -310,14 +310,14 @@ struct InitializeGraph {
         }
         static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_set_slave_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          if (personality == GPU_CUDA) { batch_set_mirror_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
           assert (personality == CPU);
         #endif
           return false;
         }
         typedef float ValTy;
       };
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -348,14 +348,14 @@ struct InitializeGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		typedef int ValTy;
     	};
-      struct Syncer_vertexCut_1 {
+      struct Reduce_1 {
         static float extract(uint32_t node_id, const struct PR_NodeData & node) {
         #ifdef __GALOIS_HET_CUDA__
           if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
@@ -365,14 +365,14 @@ struct InitializeGraph {
         }
         static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          if (personality == GPU_CUDA) { batch_get_mirror_node_value_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
           assert (personality == CPU);
         #endif
           return false;
         }
         static bool extract_reset_batch(unsigned from_id, float *y) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_get_slave_node_value_cuda(cuda_ctx, from_id, y); return true; }
+          if (personality == GPU_CUDA) { batch_get_mirror_node_value_cuda(cuda_ctx, from_id, y); return true; }
           assert (personality == CPU);
         #endif
           return false;
@@ -406,10 +406,10 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
       {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "add",  "0"));
       }
-    _graph.sync_backward<Syncer_vertexCut_1, SyncerPull_1>("InitializeGraph");
-    _graph.sync_exchange<Syncer_0, SyncerPull_vertexCut_0>("InitializeGraph");
+    _graph.sync_backward<Reduce_1, Broadcast_1>("InitializeGraph");
+    _graph.sync_exchange<Reduce_0, Broadcast_0>("InitializeGraph");
     
   }
 
@@ -431,7 +431,7 @@ struct PageRank_partial {
   void static go(Graph& _graph) {
 
 
-      struct Syncer_vertexCut_0 {
+      struct Reduce_0 {
         static float extract(uint32_t node_id, const struct PR_NodeData & node) {
         #ifdef __GALOIS_HET_CUDA__
           if (personality == GPU_CUDA) return get_node_sum_cuda(cuda_ctx, node_id);
@@ -441,14 +441,14 @@ struct PageRank_partial {
         }
         static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_get_slave_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          if (personality == GPU_CUDA) { batch_get_mirror_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
           assert (personality == CPU);
         #endif
           return false;
         }
         static bool extract_reset_batch(unsigned from_id, float *y) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_get_slave_node_sum_cuda(cuda_ctx, from_id, y); return true; }
+          if (personality == GPU_CUDA) { batch_get_mirror_node_sum_cuda(cuda_ctx, from_id, y); return true; }
           assert (personality == CPU);
         #endif
           return false;
@@ -472,7 +472,7 @@ struct PageRank_partial {
         }
         typedef float ValTy;
       };
-      struct SyncerPull_0 {
+      struct Broadcast_0 {
         static float extract(uint32_t node_id, const struct PR_NodeData & node) {
         #ifdef __GALOIS_HET_CUDA__
           if (personality == GPU_CUDA) return get_node_sum_cuda(cuda_ctx, node_id);
@@ -503,7 +503,7 @@ struct PageRank_partial {
         }
         static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
         #ifdef __GALOIS_HET_CUDA__
-          if (personality == GPU_CUDA) { batch_set_slave_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+          if (personality == GPU_CUDA) { batch_set_mirror_node_sum_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
           assert (personality == CPU);
         #endif
           return false;
@@ -542,14 +542,14 @@ struct PageRank_partial {
             Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank_partial { &_graph }, Galois::loopname("PageRank_partial"), Galois::numrun(_graph.get_run_identifier()));
           }
         }
-        _graph.sync_backward_pipe<Syncer_vertexCut_0, SyncerPull_0>("PageRank", bitset_sum);
+        _graph.sync_backward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_sum);
       }
       } else {
       for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-        _graph.sync_backward_pipe<Syncer_vertexCut_0, SyncerPull_0>("PageRank", bitset_sum);
+        _graph.sync_backward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_sum);
       }
       }
-      _graph.sync_backward_wait<Syncer_vertexCut_0, SyncerPull_0>("PageRank", bitset_sum);
+      _graph.sync_backward_wait<Reduce_0, Broadcast_0>("PageRank", bitset_sum);
   }
 
   void operator()(GNode src)const {

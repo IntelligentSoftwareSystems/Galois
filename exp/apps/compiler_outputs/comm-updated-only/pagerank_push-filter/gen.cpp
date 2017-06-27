@@ -153,7 +153,7 @@ struct InitializeGraphNout {
 
   InitializeGraphNout(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-      	struct Syncer_0 {
+      	struct Reduce_0 {
       		static unsigned int extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -199,7 +199,7 @@ struct InitializeGraphNout {
       		}
       		typedef unsigned int ValTy;
       	};
-      	struct SyncerPull_vertexCut_0 {
+      	struct Broadcast_0 {
       		static unsigned int extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
@@ -230,7 +230,7 @@ struct InitializeGraphNout {
       		}
       		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_slave_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+      			if (personality == GPU_CUDA) { batch_set_mirror_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
       			assert (personality == CPU);
       		#endif
       			return false;
@@ -249,9 +249,9 @@ struct InitializeGraphNout {
       #endif
       {
       bitset_residual.clear();
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
-      _graph.sync_exchange<Syncer_0, SyncerPull_vertexCut_0>("InitializeGraphNout", bitset_residual);
+      _graph.sync_exchange<Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
       
   }
 
@@ -268,7 +268,7 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-      	struct Syncer_0 {
+      	struct Reduce_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -314,7 +314,7 @@ struct InitializeGraph {
       		}
       		typedef float ValTy;
       	};
-      	struct SyncerPull_vertexCut_0 {
+      	struct Broadcast_0 {
       		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -345,7 +345,7 @@ struct InitializeGraph {
       		}
       		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+      			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
       			assert (personality == CPU);
       		#endif
       			return false;
@@ -364,9 +364,9 @@ struct InitializeGraph {
       #endif
       {
       bitset_residual.clear();
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("InitializeGraph", bitset_residual);
+      _graph.sync_forward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
       
   }
 
@@ -424,7 +424,7 @@ struct FirstItr_PageRank{
 Graph * graph;
 FirstItr_PageRank(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
-	struct Syncer_0 {
+	struct Reduce_0 {
 		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -470,7 +470,7 @@ void static go(Graph& _graph) {
 		}
 		typedef float ValTy;
 	};
-	struct SyncerPull_vertexCut_0 {
+	struct Broadcast_0 {
 		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -501,7 +501,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -538,17 +538,17 @@ for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
 #endif
     {
       if (__begin2 == __begin) bitset_residual.clear();
-      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
   }
-  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
 }
 } else {
 for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_residual);
+  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_residual);
 }
 }
-_graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+_graph.sync_forward_wait<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -583,7 +583,7 @@ struct PageRank {
      _graph.set_num_iter(_num_iterations);
     PageRankCopy::go(_graph);
     DGAccumulator_accum.reset();
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -629,7 +629,7 @@ struct PageRank {
     		}
     		typedef float ValTy;
     	};
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
@@ -660,7 +660,7 @@ struct PageRank {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -699,17 +699,17 @@ struct PageRank {
       #endif
         {
           if (__begin2 == __begin) bitset_residual.clear();
-          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
       }
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
     }
     } else {
     for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_residual);
+      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_residual);
     }
     }
-    _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("PageRank", bitset_residual);
+    _graph.sync_forward_wait<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

@@ -118,7 +118,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -149,14 +149,14 @@ struct InitializeGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -166,14 +166,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -209,9 +209,9 @@ struct InitializeGraph {
     #endif
     {
     bitset_comp_current.clear();
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     }
-    _graph.sync_backward<Syncer_vertexCut_0, SyncerPull_0>("InitializeGraph", bitset_comp_current);
+    _graph.sync_backward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_comp_current);
     
   }
 
@@ -227,7 +227,7 @@ struct FirstItr_ConnectedComp{
 Graph * graph;
 FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
-	struct Syncer_0 {
+	struct Reduce_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -237,14 +237,14 @@ void static go(Graph& _graph) {
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -268,7 +268,7 @@ void static go(Graph& _graph) {
 		}
 		typedef unsigned int ValTy;
 	};
-	struct SyncerPull_vertexCut_0 {
+	struct Broadcast_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -299,7 +299,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -336,17 +336,17 @@ for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
 #endif
     {
       if (__begin2 == __begin) bitset_comp_current.clear();
-      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
     }
   }
-  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
 }
 } else {
 for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-  _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_comp_current);
+  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_comp_current);
 }
 }
-_graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+_graph.sync_forward_wait<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -372,7 +372,6 @@ struct ConnectedComp {
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> dChunk;
     
     FirstItr_ConnectedComp::go(_graph);
     
@@ -381,7 +380,7 @@ struct ConnectedComp {
     do { 
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -391,14 +390,14 @@ struct ConnectedComp {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -422,7 +421,7 @@ struct ConnectedComp {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
@@ -453,7 +452,7 @@ struct ConnectedComp {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -492,17 +491,17 @@ struct ConnectedComp {
       #endif
         {
           if (__begin2 == __begin) bitset_comp_current.clear();
-          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
         }
       }
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
     }
     } else {
     for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_comp_current);
+      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_comp_current);
     }
     }
-    _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("ConnectedComp", bitset_comp_current);
+    _graph.sync_forward_wait<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

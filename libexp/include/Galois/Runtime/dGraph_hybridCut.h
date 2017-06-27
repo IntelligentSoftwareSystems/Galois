@@ -215,7 +215,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       Galois::StatTimer StatTimer_local_distributed_edges("TIMER_LOCAL_DISTRIBUTE_EDGES");
       Galois::StatTimer StatTimer_exchange_edges("TIMER_EXCHANGE_EDGES");
-      Galois::StatTimer StatTimer_fill_local_slaveNodes("TIMER_FILL_LOCAL_SLAVENODES");
+      Galois::StatTimer StatTimer_fill_local_mirrorNodes("TIMER_FILL_LOCAL_MIRRORNODES");
       Galois::StatTimer StatTimer_distributed_edges_test_set_bit("TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT");
       Galois::StatTimer StatTimer_allocate_local_DS("TIMER_ALLOCATE_LOCAL_DS");
       Galois::StatTimer StatTimer_distributed_edges_get_edges("TIMER_DISTRIBUTE_EDGES_GET_EDGES");
@@ -292,12 +292,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_exchange_edges.start();
 
       std::vector<uint64_t> prefixSumOfEdges;
-      assign_edges_phase1(g, numEdges_distribute, VCutTheshold, prefixSumOfEdges, base_hGraph::slaveNodes);
+      assign_edges_phase1(g, numEdges_distribute, VCutTheshold, prefixSumOfEdges, base_hGraph::mirrorNodes);
 
 #if 0
       if(base_hGraph::id == 0)
       for(auto i = 0; i < base_hGraph::numHosts; ++i){
-        std::cerr << "SLAVE : " << base_hGraph::slaveNodes[i].size() <<"\n";
+        std::cerr << "MIRROR : " << base_hGraph::mirrorNodes[i].size() <<"\n";
       }
 #endif
       
@@ -337,7 +337,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       /*****************************************
        * Communication PreProcessing:
-       * Exchange slaves and master nodes among
+       * Exchange mirrors and master nodes among
        * hosts
        ****************************************/
       print_string(" : Setup communication start");
@@ -376,7 +376,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     // Just calculating the number of edges to send to other hosts
-    void assign_edges_phase1(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute, uint32_t VCutTheshold, std::vector<uint64_t>& prefixSumOfEdges, std::vector<std::vector<size_t>>& slaveNodes){
+    void assign_edges_phase1(Galois::Graph::OfflineGraph& g, uint64_t numEdges_distribute, uint32_t VCutTheshold, std::vector<uint64_t>& prefixSumOfEdges, std::vector<std::vector<size_t>>& mirrorNodes){
       //Go over assigned nodes and distribute edges.
 
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -493,15 +493,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for (uint64_t x = 0; x < g.size(); ++x){
         if (ghosts[x] && !isOwned(x)){
           auto h = find_hostID(x);
-          slaveNodes[h].push_back(x);
+          mirrorNodes[h].push_back(x);
         }
       }
 
 #if 0
       if(base_hGraph::id == 0){
         std::cout << "\n\n";
-        for(auto i : slaveNodes[1]){
-          std::cout << "HHSLAVE : : " << i << "\t";
+        for(auto i : mirrorNodes[1]){
+          std::cout << "HHMIRROR : : " << i << "\t";
         }
       }
 #endif
@@ -737,7 +737,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
 
 #if 0
-    void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+    void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
 
       std::vector<std::vector<uint64_t>> GlobalVec_perHost(base_hGraph::numHosts);
       std::vector<std::vector<uint32_t>> OwnerVec_perHost(base_hGraph::numHosts);
@@ -745,7 +745,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
       fill_edge_map<EdgeTy>(nodesOnHost_vec);
-      //Fill GlobalVec_perHost and slaveNodes vetors using assigned_edges_perhost.
+      //Fill GlobalVec_perHost and mirrorNodes vetors using assigned_edges_perhost.
 
       //Isolated nodes
       for(auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n){
@@ -772,7 +772,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         auto owner = find_hostID(i);
         GlobalVec_perHost[owner].push_back(i);
         OwnerVec_perHost[owner].push_back(owner);
-        slaveNodes[owner].push_back(i);
+        mirrorNodes[owner].push_back(i);
       }
 
       //release memory held by nodesOnHost_vec

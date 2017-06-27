@@ -14,16 +14,16 @@ struct CUDA_Context_Common {
   CSRGraphTy hg;
   CSRGraphTy gg;
   struct CUDA_Context_Shared master;
-  struct CUDA_Context_Shared slave;
-  DeviceOnly<unsigned int> offsets; // union across master/slave of all hosts 
-  Shared<DynamicBitset> is_updated; // union across master/slave of all hosts 
+  struct CUDA_Context_Shared mirror;
+  DeviceOnly<unsigned int> offsets; // union across master/mirror of all hosts 
+  Shared<DynamicBitset> is_updated; // union across master/mirror of all hosts 
 };
 
 template<typename Type>
 struct CUDA_Context_Field { 
   Shared<Type> data;
   Shared<DynamicBitset> is_updated;
-  DeviceOnly<Type> shared_data; // union across master/slave of all hosts
+  DeviceOnly<Type> shared_data; // union across master/mirror of all hosts
 };
 
 bool init_CUDA_context_common(struct CUDA_Context_Common *ctx, int device) {
@@ -59,7 +59,7 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
   memcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);
   if(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);
   if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
-  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
   ctx->master.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
   memcpy(ctx->master.num_nodes, g.num_master_nodes, sizeof(unsigned int) * num_hosts);
   ctx->master.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
@@ -72,16 +72,16 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
       max_shared_size = ctx->master.num_nodes[h];
     }
   }
-  ctx->slave.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
-  memcpy(ctx->slave.num_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
-  ctx->slave.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+  ctx->mirror.num_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
+  memcpy(ctx->mirror.num_nodes, g.num_mirror_nodes, sizeof(unsigned int) * num_hosts);
+  ctx->mirror.nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
   for(uint32_t h = 0; h < num_hosts; ++h){
-    if (ctx->slave.num_nodes[h] > 0) {
-      ctx->slave.nodes[h].alloc(ctx->slave.num_nodes[h]);
-      memcpy(ctx->slave.nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->slave.num_nodes[h]);
+    if (ctx->mirror.num_nodes[h] > 0) {
+      ctx->mirror.nodes[h].alloc(ctx->mirror.num_nodes[h]);
+      memcpy(ctx->mirror.nodes[h].cpu_wr_ptr(), g.mirror_nodes[h], sizeof(unsigned int) * ctx->mirror.num_nodes[h]);
     }
-    if (ctx->slave.num_nodes[h] > max_shared_size) {
-      max_shared_size = ctx->slave.num_nodes[h];
+    if (ctx->mirror.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->mirror.num_nodes[h];
     }
   }
   ctx->offsets.alloc(max_shared_size);
@@ -93,7 +93,7 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
 
 size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {
   size_t mem_usage = 0;
-  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
   mem_usage += num_hosts * sizeof(unsigned int);
   mem_usage += num_hosts * sizeof(Shared<unsigned int>);
   for(uint32_t h = 0; h < num_hosts; ++h){
@@ -107,11 +107,11 @@ size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {
   mem_usage += num_hosts * sizeof(unsigned int);
   mem_usage += num_hosts * sizeof(Shared<unsigned int>);
   for(uint32_t h = 0; h < num_hosts; ++h){
-    if (g.num_slave_nodes[h] > 0) {
-      mem_usage += g.num_slave_nodes[h] * sizeof(unsigned int);
+    if (g.num_mirror_nodes[h] > 0) {
+      mem_usage += g.num_mirror_nodes[h] * sizeof(unsigned int);
     }
-    if (g.num_slave_nodes[h] > max_shared_size) {
-      max_shared_size = g.num_slave_nodes[h];
+    if (g.num_mirror_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_mirror_nodes[h];
     }
   }
   mem_usage += max_shared_size * sizeof(unsigned int);
@@ -122,15 +122,15 @@ size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {
 template<typename Type>
 void load_graph_CUDA_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<Type> *field, unsigned num_hosts) {
   field->data.alloc(ctx->hg.nnodes);
-  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
   for(uint32_t h = 0; h < num_hosts; ++h){
     if (ctx->master.num_nodes[h] > max_shared_size) {
       max_shared_size = ctx->master.num_nodes[h];
     }
   }
   for(uint32_t h = 0; h < num_hosts; ++h){
-    if (ctx->slave.num_nodes[h] > max_shared_size) {
-      max_shared_size = ctx->slave.num_nodes[h];
+    if (ctx->mirror.num_nodes[h] > max_shared_size) {
+      max_shared_size = ctx->mirror.num_nodes[h];
     }
   }
   field->shared_data.alloc(max_shared_size);
@@ -142,15 +142,15 @@ template<typename Type>
 size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type> *field, MarshalGraph &g, unsigned num_hosts) {
   size_t mem_usage = 0;
   mem_usage += g.nnodes * sizeof(Type);
-  size_t max_shared_size = 0; // for union across master/slave of all hosts
+  size_t max_shared_size = 0; // for union across master/mirror of all hosts
   for(uint32_t h = 0; h < num_hosts; ++h){
     if (g.num_master_nodes[h] > max_shared_size) {
       max_shared_size = g.num_master_nodes[h];
     }
   }
   for(uint32_t h = 0; h < num_hosts; ++h){
-    if (g.num_slave_nodes[h] > max_shared_size) {
-      max_shared_size = g.num_slave_nodes[h];
+    if (g.num_mirror_nodes[h] > max_shared_size) {
+      max_shared_size = g.num_mirror_nodes[h];
     }
   }
   mem_usage += max_shared_size * sizeof(Type);

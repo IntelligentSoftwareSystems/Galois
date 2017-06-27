@@ -162,7 +162,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::graph.constructNodes();
       //std::cerr << "Construct nodes done\n";
-      fill_slaveNodes(base_hGraph::slaveNodes);
+      fill_mirrorNodes(base_hGraph::mirrorNodes);
 
       loadEdges(base_hGraph::graph, g);
       std::cerr <<"[" << base_hGraph::id << "] Edges loaded \n";
@@ -274,7 +274,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-    void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+    void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
 
       std::vector<std::vector<size_t>> GlobalVec_perHost(base_hGraph::numHosts);
       std::vector<std::vector<size_t>> OwnerVec_perHost(base_hGraph::numHosts);
@@ -282,7 +282,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       for(auto info : localToGlobalMap_meta){
         assert(info.owner_id >= 0 && info.owner_id < base_hGraph::numHosts);
-        slaveNodes[info.owner_id].push_back(info.global_id);
+        mirrorNodes[info.owner_id].push_back(info.global_id);
 
         GlobalVec_ordered.push_back(info.global_id);
         GlobalVec_perHost[info.owner_id].push_back(info.global_id);

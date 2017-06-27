@@ -81,7 +81,7 @@ class hGraph: public GlobalObject {
 
    typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
 
-   enum SyncType { syncPush, syncPull };
+   enum SyncType { syncReduce, syncBroadcast };
    enum DataflowDirection { forwardFlow, backwardFlow, exchangeFlow };
 
    GraphTy graph;
@@ -89,7 +89,7 @@ class hGraph: public GlobalObject {
    bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint64_t totalEdges;
-   uint64_t totalSlaveNodes; // Total slave nodes from others.
+   uint64_t totalMirrorNodes; // Total mirror nodes from others.
    uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
@@ -100,8 +100,8 @@ class hGraph: public GlobalObject {
    //ghost cell ID translation
 
   //memoization optimization
-  std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
-  std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
+  std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
+  std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For broadcast
 
   /****** VIRTUAL FUNCTIONS *********/
   virtual uint32_t G2L(uint64_t) const = 0 ;
@@ -125,11 +125,11 @@ class hGraph: public GlobalObject {
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
   virtual bool nothingToSend(unsigned host, SyncType syncType, DataflowDirection dataFlow) { // ignore dataflow direction
-     auto &sharedNodes = (syncType == syncPush) ? slaveNodes : masterNodes;
+     auto &sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
      return (sharedNodes[host].size() == 0);
   }
   virtual bool nothingToRecv(unsigned host, SyncType syncType, DataflowDirection dataFlow) { // ignore dataflow direction
-     auto &sharedNodes = (syncType == syncPush) ? masterNodes : slaveNodes;
+     auto &sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
      return (sharedNodes[host].size() == 0);
   }
 
@@ -225,7 +225,7 @@ public:
      void syncRecvApply_ck(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
        auto& net = Galois::Runtime::getSystemNetworkInterface();
        std::string set_timer_str("SYNC_SET_" + loopName + "_" + get_run_identifier());
-       std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + get_run_identifier());
+       std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + loopName + "_" + get_run_identifier());
        Galois::StatTimer StatTimer_set(set_timer_str.c_str());
        StatTimer_set.start();
 
@@ -277,7 +277,7 @@ public:
 #endif
       total_isolatedNodes = 0;
       masterNodes.resize(numHosts);
-      slaveNodes.resize(numHosts);
+      mirrorNodes.resize(numHosts);
       //masterNodes_bitvec.resize(numHosts);
       numPipelinedPhases = 0;
       num_recv_expected = 0;
@@ -329,11 +329,11 @@ public:
              }, Galois::loopname("MASTER_NODES"), Galois::numrun(get_run_identifier()));
       }
 
-      for(uint32_t h = 0; h < slaveNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
+      for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
+         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
              [&](uint32_t n){
-             slaveNodes[h][n] = G2L(slaveNodes[h][n]);
-             }, Galois::loopname("SLAVE_NODES"), Galois::numrun(get_run_identifier()));
+             mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
+             }, Galois::loopname("MIRROR_NODES"), Galois::numrun(get_run_identifier()));
       }
       StatTimer_comm_setup.stop();
 
@@ -343,14 +343,14 @@ public:
         StatMasterNodes += masterNodes[x].size();
       }
 
-      totalSlaveNodes = 0;
-      for(auto x = 0U; x < slaveNodes.size(); ++x){
-        std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
+      totalMirrorNodes = 0;
+      for(auto x = 0U; x < mirrorNodes.size(); ++x){
+        std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
         if(x == id)
           continue;
-        Galois::Statistic StatSlaveNodes(slave_nodes_str);
-        StatSlaveNodes += slaveNodes[x].size();
-        totalSlaveNodes += slaveNodes[x].size();
+        Galois::Statistic StatMirrorNodes(mirror_nodes_str);
+        StatMirrorNodes += mirrorNodes[x].size();
+        totalMirrorNodes += mirrorNodes[x].size();
       }
 
       send_info_to_host();
@@ -359,12 +359,12 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
    void simulate_communication() {
      for (int i = 0; i < 10; ++i) {
-     simulate_sync_pull("");
-     simulate_sync_push("");
+     simulate_broadcast("");
+     simulate_reduce("");
 
 #ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
-     simulate_bare_mpi_sync_pull("");
-     simulate_bare_mpi_sync_push("");
+     simulate_bare_mpi_broadcast("");
+     simulate_bare_mpi_reduce("");
 #endif
      }
    }
@@ -500,7 +500,7 @@ public:
       if(x == id) continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, slaveNodes[x]);
+      gSerialize(b, mirrorNodes[x]);
       net.sendTagged(x, Galois::Runtime::evilPhase, b);
     }
 
@@ -527,12 +527,12 @@ public:
       if(x == id) continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, totalSlaveNodes, totalOwnedNodes);
+      gSerialize(b, totalMirrorNodes, totalOwnedNodes);
       net.sendTagged(x, Galois::Runtime::evilPhase, b);
     }
 
     //receive
-    uint64_t global_total_slave_nodes = totalSlaveNodes;
+    uint64_t global_total_mirror_nodes = totalMirrorNodes;
     uint64_t global_total_owned_nodes = totalOwnedNodes;
 
     for(unsigned x = 0; x < net.Num; ++x){
@@ -544,26 +544,26 @@ public:
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
       }while(!p);
 
-      uint64_t total_slave_nodes_from_others;
+      uint64_t total_mirror_nodes_from_others;
       uint64_t total_owned_nodes_from_others;
-      Galois::Runtime::gDeserialize(p->second, total_slave_nodes_from_others, total_owned_nodes_from_others);
-      global_total_slave_nodes += total_slave_nodes_from_others;
+      Galois::Runtime::gDeserialize(p->second, total_mirror_nodes_from_others, total_owned_nodes_from_others);
+      global_total_mirror_nodes += total_mirror_nodes_from_others;
       global_total_owned_nodes += total_owned_nodes_from_others;
     }
     ++Galois::Runtime::evilPhase;
 
     //print 
     if (net.ID == 0) {
-      float replication_factor = (float)(global_total_slave_nodes + totalNodes)/(float)totalNodes;
+      float replication_factor = (float)(global_total_mirror_nodes + totalNodes)/(float)totalNodes;
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), std::to_string(replication_factor), 0);
 
 
-      float replication_factor_new = (float)(global_total_slave_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
+      float replication_factor_new = (float)(global_total_mirror_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
       Galois::Runtime::reportStat("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), std::to_string(replication_factor_new), 0);
 
       Galois::Runtime::reportStat("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes, 0);
-      Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_slave_nodes, 0);
+      Galois::Runtime::reportStat("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_mirror_nodes, 0);
       Galois::Runtime::reportStat("(NULL)", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes, 0);
     }
   }
@@ -573,23 +573,23 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_pull(std::string loopName, bool mem_copy = false) {
+   void simulate_bare_mpi_broadcast(std::string loopName, bool mem_copy = false) {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
-      Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
-      std::string timer_str("SIMULATE_MPI_SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
-      Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
-      std::string timer_barrier_str("SIMULATE_MPI_SYNC_PULL_BARRIER_" + loopName + "_" + std::to_string(num_run));
-      Galois::StatTimer StatTimerBarrier_syncPull(timer_barrier_str.c_str());
-      std::string extract_timer_str("SIMULATE_MPI_SYNC_PULL_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_BROADCAST_" + loopName + "_" + std::to_string(num_run));
+      Galois::Statistic SyncBroadcast_send_bytes(statSendBytes_str);
+      std::string timer_str("SIMULATE_MPI_BROADCAST_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str());
+      std::string timer_barrier_str("SIMULATE_MPI_BROADCAST_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimerBarrier_syncBroadcast(timer_barrier_str.c_str());
+      std::string extract_timer_str("SIMULATE_MPI_BROADCAST_EXTRACT_" + loopName +"_" + std::to_string(num_run));
       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
-      std::string set_timer_str("SIMULATE_MPI_SYNC_PULL_SET_" + loopName +"_" + std::to_string(num_run));
+      std::string set_timer_str("SIMULATE_MPI_BROADCAST_SET_" + loopName +"_" + std::to_string(num_run));
       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
-      StatTimer_syncPull.start();
+      StatTimer_syncBroadcast.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       std::vector<MPI_Request> requests(2 * net.Num);
@@ -630,7 +630,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("BROADCAST_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -643,7 +643,7 @@ public:
 
          StatTimer_extract.stop();
 
-         SyncPull_send_bytes += size;
+         SyncBroadcast_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          if (mem_copy)
            MPI_Isend((uint8_t *)bs[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
@@ -659,7 +659,7 @@ public:
       rb.resize(net.Num);
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -677,12 +677,12 @@ public:
            MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
-      StatTimerBarrier_syncPull.start();
+      StatTimerBarrier_syncBroadcast.start();
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
-      StatTimerBarrier_syncPull.stop();
+      StatTimerBarrier_syncBroadcast.stop();
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -698,7 +698,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-               uint32_t localID = slaveNodes[x][n];
+               uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
                CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -707,7 +707,7 @@ public:
 #else
                FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("BROADCAST_SET"), Galois::numrun(get_run_identifier()));
           }
 #endif
 
@@ -715,29 +715,29 @@ public:
       }
 
       //std::cerr << "[" << id << "]" << "pull mpi done\n";
-      StatTimer_syncPull.stop();
+      StatTimer_syncBroadcast.stop();
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_push(std::string loopName, bool mem_copy = false) {
+   void simulate_bare_mpi_reduce(std::string loopName, bool mem_copy = false) {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
-      Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
-      std::string timer_str("SIMULATE_MPI_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
-      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
-      std::string timer_barrier_str("SIMULATE_MPI_SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run));
-      Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
-      std::string extract_timer_str("SIMULATE_MPI_SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      std::string statSendBytes_str("SIMULATE_MPI_SEND_BYTES_REDUCE_" + loopName + "_" + std::to_string(num_run));
+      Galois::Statistic SyncReduce_send_bytes(statSendBytes_str);
+      std::string timer_str("SIMULATE_MPI_REDUCE_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
+      std::string timer_barrier_str("SIMULATE_MPI_REDUCE_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      Galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str());
+      std::string extract_timer_str("SIMULATE_MPI_REDUCE_EXTRACT_" + loopName +"_" + std::to_string(num_run));
       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
-      std::string set_timer_str("SIMULATE_MPI_SYNC_PUSH_SET_" + loopName +"_" + std::to_string(num_run));
+      std::string set_timer_str("SIMULATE_MPI_REDUCE_SET_" + loopName +"_" + std::to_string(num_run));
       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
-      StatTimer_syncPush.start();
+      StatTimer_syncReduce.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       std::vector<MPI_Request> requests(2 * net.Num);
@@ -751,7 +751,7 @@ public:
       sb.resize(net.Num);
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -770,7 +770,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -780,7 +780,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("REDUCE_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -793,7 +793,7 @@ public:
 
          StatTimer_extract.stop();
 
-         SyncPush_send_bytes += size;
+         SyncReduce_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          if (mem_copy)
            MPI_Isend((uint8_t *)bs[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
@@ -827,9 +827,9 @@ public:
            MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
-      StatTimerBarrier_syncPush.start();
+      StatTimerBarrier_syncReduce.start();
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
-      StatTimerBarrier_syncPush.stop();
+      StatTimerBarrier_syncReduce.stop();
 
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
@@ -856,7 +856,7 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("REDUCE_SET"), Galois::numrun(get_run_identifier()));
          }
 #endif
 
@@ -864,21 +864,21 @@ public:
       }
       
       //std::cerr << "[" << id << "]" << "push mpi done\n";
-      StatTimer_syncPush.stop();
+      StatTimer_syncReduce.stop();
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_pull_serialized() {
+   void simulate_bare_mpi_broadcast_serialized() {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
-      Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
+      Galois::StatTimer StatTimer_syncBroadcast("SIMULATE_MPI_BROADCAST");
+      Galois::Statistic SyncBroadcast_send_bytes("SIMULATE_MPI_BROADCAST_SEND_BYTES");
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
-      StatTimer_syncPull.start();
+      StatTimer_syncBroadcast.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       std::vector<MPI_Request> requests(2 * net.Num);
@@ -910,7 +910,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("BROADCAST_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -919,14 +919,14 @@ public:
          Galois::Runtime::gSerialize(sb[x], val_vec);
          assert(size == sb[x].size());
          
-         SyncPull_send_bytes += size;
+         SyncBroadcast_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          MPI_Isend(sb[x].linearData(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       Galois::Runtime::RecvBuffer rb[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -944,7 +944,7 @@ public:
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
          //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
@@ -957,7 +957,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-               uint32_t localID = slaveNodes[x][n];
+               uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
                CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -966,27 +966,27 @@ public:
 #else
                FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("BROADCAST_SET"), Galois::numrun(get_run_identifier()));
           }
 #endif
       }
 
       //std::cerr << "[" << id << "]" << "pull mpi done\n";
-      StatTimer_syncPull.stop();
+      StatTimer_syncBroadcast.stop();
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_bare_mpi_sync_push_serialized() {
+   void simulate_bare_mpi_reduce_serialized() {
       //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-      Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
-      Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
+      Galois::StatTimer StatTimer_syncReduce("SIMULATE_MPI_REDUCE");
+      Galois::Statistic SyncReduce_send_bytes("SIMULATE_MPI_REDUCE_SEND_BYTES");
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
 #endif
-      StatTimer_syncPush.start();
+      StatTimer_syncReduce.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       std::vector<MPI_Request> requests(2 * net.Num);
@@ -994,7 +994,7 @@ public:
 
       Galois::Runtime::SendBuffer sb[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -1010,7 +1010,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -1020,7 +1020,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("REDUCE_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1029,7 +1029,7 @@ public:
          Galois::Runtime::gSerialize(sb[x], val_vec);
          assert(size == sb[x].size());
 
-         SyncPush_send_bytes += size;
+         SyncReduce_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          MPI_Isend(sb[x].linearData(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
@@ -1075,13 +1075,13 @@ public:
 #else
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-               }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("REDUCE_SET"), Galois::numrun(get_run_identifier()));
          }
 #endif
       }
       
       //std::cerr << "[" << id << "]" << "push mpi done\n";
-      StatTimer_syncPush.stop();
+      StatTimer_syncReduce.stop();
    }
 #endif
 #endif
@@ -1104,7 +1104,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
      if (!FnTy::setVal_batch(from_id, val_vec.data())) {
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-           uint32_t localID = slaveNodes[from_id][n];
+           uint32_t localID = mirrorNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
            {
            CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -1113,7 +1113,7 @@ public:
 #else
            FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
-           }, Galois::loopname("SYNC_PULL_SET"), Galois::numrun(get_run_identifier()));
+           }, Galois::loopname("BROADCAST_SET"), Galois::numrun(get_run_identifier()));
       }
 #endif
    }
@@ -1143,7 +1143,7 @@ public:
 #else
        FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
-           }, Galois::loopname("SYNC_PUSH_SET"), Galois::numrun(get_run_identifier()));
+           }, Galois::loopname("REDUCE_SET"), Galois::numrun(get_run_identifier()));
      }
 #endif
    }
@@ -1151,19 +1151,19 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_sync_pull(std::string loopName) {
+   void simulate_broadcast(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPull<FnTy>;
 #else
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPull;
 #endif
-      Galois::StatTimer StatTimer_syncPull("SIMULATE_NET_SYNC_PULL");
-      Galois::Statistic SyncPull_send_bytes("SIMULATE_NET_SYNC_PULL_SEND_BYTES");
+      Galois::StatTimer StatTimer_syncBroadcast("SIMULATE_NET_BROADCAST");
+      Galois::Statistic SyncBroadcast_send_bytes("SIMULATE_NET_BROADCAST_SEND_BYTES");
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       Galois::Runtime::getHostBarrier().wait();
 #endif
-      StatTimer_syncPull.start();
+      StatTimer_syncBroadcast.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -1191,7 +1191,7 @@ public:
 #endif
                val_vec[n] = val;
 
-               }, Galois::loopname("SYNC_PULL_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("BROADCAST_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1199,36 +1199,36 @@ public:
 
          gSerialize(b, val_vec);
 
-         SyncPull_send_bytes += b.size();
+         SyncBroadcast_send_bytes += b.size();
          net.sendMsg(x, syncRecv, b);
       }
       //Will force all messages to be processed before continuing
       net.flush();
 
       Galois::Runtime::getHostBarrier().wait();
-      StatTimer_syncPull.stop();
+      StatTimer_syncBroadcast.stop();
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    template<typename FnTy>
 #endif
-   void simulate_sync_push(std::string loopName) {
+   void simulate_reduce(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPush<FnTy>;
 #else
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPush;
 #endif
-      Galois::StatTimer StatTimer_syncPush("SIMULATE_NET_SYNC_PUSH");
-      Galois::Statistic SyncPush_send_bytes("SIMULATE_NET_SYNC_PUSH_SEND_BYTES");
+      Galois::StatTimer StatTimer_syncReduce("SIMULATE_NET_REDUCE");
+      Galois::Statistic SyncReduce_send_bytes("SIMULATE_NET_REDUCE_SEND_BYTES");
 
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       Galois::Runtime::getHostBarrier().wait();
 #endif
-      StatTimer_syncPush.start();
+      StatTimer_syncReduce.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -1244,7 +1244,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, val_vec.data())) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -1254,7 +1254,7 @@ public:
                 FnTy::reset(lid, getData(lid));
 #endif
                 val_vec[n] = val;
-               }, Galois::loopname("SYNC_PUSH_EXTRACT"), Galois::numrun(get_run_identifier()));
+               }, Galois::loopname("REDUCE_EXTRACT"), Galois::numrun(get_run_identifier()));
          }
 #else
          val_vec[0] = 1;
@@ -1262,7 +1262,7 @@ public:
 
          gSerialize(b, val_vec);
 
-         SyncPush_send_bytes += b.size();
+         SyncReduce_send_bytes += b.size();
          net.sendMsg(x, syncRecv, b);
       }
       //Will force all messages to be processed before continuing
@@ -1270,13 +1270,13 @@ public:
 
       Galois::Runtime::getHostBarrier().wait();
 
-      StatTimer_syncPush.stop();
+      StatTimer_syncReduce.stop();
    }
 #endif
 
    template<SyncType syncType>
    void get_offsets_from_bitset(const std::string &loopName, const Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str());
      StatTimer_offsets.start();
@@ -1327,7 +1327,7 @@ public:
    void get_bitset_and_offsets(const std::string &loopName, const std::vector<size_t> &indices, const Galois::DynamicBitSet &bitset_compute, Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count, DataCommMode &data_mode) {
      if (enforce_data_mode != onlyData) {
        bitset_comm.clear();
-       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
        std::string doall_str(syncTypeStr + "_BITSET_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
          size_t lid = indices[n];
@@ -1352,7 +1352,7 @@ public:
      }
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    typename FnTy::ValTy extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1365,7 +1365,7 @@ public:
      return val;
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    typename FnTy::ValTy  extract_wrapper(size_t lid) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1378,7 +1378,7 @@ public:
   template<typename FnTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
   void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec, size_t start = 0) {
      if (parallelize) {
-       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
        std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
@@ -1401,7 +1401,7 @@ public:
   template<typename FnTy, typename SeqTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
    void extract_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, Galois::Runtime::SendBuffer& b, SeqTy lseq, size_t start = 0) {
      if (parallelize) {
-       std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
        std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
           unsigned int offset;
@@ -1421,27 +1421,27 @@ public:
      }
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::extract_reset_batch(x, v.data());
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::extract_batch(x, v.data());
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    bool extract_batch_wrapper(unsigned x, Galois::DynamicBitSet &b, std::vector<unsigned int> &o, std::vector<typename FnTy::ValTy> &v, size_t &s, DataCommMode& data_mode) {
      return FnTy::extract_reset_batch(x, (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), &s, &data_mode);
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    bool extract_batch_wrapper(unsigned x, Galois::DynamicBitSet &b, std::vector<unsigned int> &o, std::vector<typename FnTy::ValTy> &v, size_t &s, DataCommMode& data_mode) {
      return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), &s, &data_mode);
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    void set_wrapper(size_t lid, typename FnTy::ValTy val, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1453,7 +1453,7 @@ public:
 #endif
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    void set_wrapper(size_t lid, typename FnTy::ValTy val, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_HET_OPENCL__
      CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1465,7 +1465,7 @@ public:
 
    template<typename FnTy, SyncType syncType, bool identity_offsets = false, bool parallelize = true>
    void set_subset(const std::string &loopName, const std::vector<size_t> &indices, size_t size, const std::vector<unsigned int> &offsets, std::vector<typename FnTy::ValTy> &val_vec, Galois::DynamicBitSet& bit_set_compute, size_t start = 0) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string doall_str(syncTypeStr + "_SETVAL_" + loopName + "_" + get_run_identifier());
      if (parallelize) {
        Galois::do_all(boost::counting_iterator<unsigned int>(start), boost::counting_iterator<unsigned int>(start + size), [&](unsigned int n){
@@ -1486,29 +1486,29 @@ public:
      }
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::reduce_batch(x, v.data());
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
      return FnTy::setVal_batch(x, v.data());
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPush>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncReduce>::type* = nullptr>
    bool set_batch_wrapper(unsigned x, Galois::DynamicBitSet &b, std::vector<unsigned int> &o, std::vector<typename FnTy::ValTy> &v, size_t &s, DataCommMode& data_mode) {
      return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), s, data_mode);
    }
 
-   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncPull>::type* = nullptr>
+   template<typename FnTy, SyncType syncType, typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
    bool set_batch_wrapper(unsigned x, Galois::DynamicBitSet &b, std::vector<unsigned int> &o, std::vector<typename FnTy::ValTy> &v, size_t &s, DataCommMode& data_mode) {
      return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), s, data_mode);
    }
 
    template<SyncType syncType>
    void convert_lid_to_gid(const std::string &loopName, std::vector<unsigned int> &offsets) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string doall_str(syncTypeStr + "_LID2GID_" + loopName + "_" + get_run_identifier());
      Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(offsets.size()), [&](unsigned int n){
          offsets[n] = static_cast<uint32_t>(getGID(offsets[n]));
@@ -1517,7 +1517,7 @@ public:
 
    template<SyncType syncType>
    void convert_gid_to_lid(const std::string &loopName, std::vector<unsigned int> &offsets) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string doall_str(syncTypeStr + "_GID2LID_" + loopName + "_" + get_run_identifier());
      Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(offsets.size()), [&](unsigned int n){
          offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
@@ -1529,7 +1529,7 @@ public:
      uint32_t num = indices.size();
      static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
@@ -1563,7 +1563,7 @@ public:
      static Galois::DynamicBitSet bit_set_comm;
      static std::vector<typename FnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
      StatTimer_extract.start();
@@ -1589,8 +1589,8 @@ public:
        size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
        size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
        std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + loopName +"_" + get_run_identifier());
-       Galois::Statistic SyncPush_saved_bytes(statSavedBytes_str);
-       if (redundant_size > bit_set_size) SyncPush_saved_bytes += redundant_size-bit_set_size;
+       Galois::Statistic SyncReduce_saved_bytes(statSavedBytes_str);
+       if (redundant_size > bit_set_size) SyncReduce_saved_bytes += redundant_size-bit_set_size;
        if (data_mode == noData) {
          gSerialize(b, data_mode);
        } else if (data_mode == offsetsData) {
@@ -1618,10 +1618,10 @@ public:
 
    template<typename FnTy, SyncType syncType, DataflowDirection dataFlow = forwardFlow>
    void sync_send(std::string loopName, const Galois::DynamicBitSet& bit_set_compute) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      Galois::StatTimer StatTimer_SendTime(syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier());
      StatTimer_SendTime.start();
-     auto &sharedNodes = (syncType == syncPush) ? slaveNodes : masterNodes;
+     auto &sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      for (unsigned h = 1; h < net.Num; ++h) {
@@ -1637,8 +1637,8 @@ public:
           sync_extract<FnTy, syncType>(loopName, x, sharedNodes[x], b);
 
         std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + loopName + "_" + get_run_identifier());
-        Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
-        SyncPush_send_bytes += b.size();
+        Galois::Statistic SyncReduce_send_bytes(statSendBytes_str);
+        SyncReduce_send_bytes += b.size();
         net.sendTagged(x, Galois::Runtime::evilPhase, b);
      }
      //Will force all messages to be processed before continuing
@@ -1649,14 +1649,14 @@ public:
 
    template<typename FnTy, SyncType syncType, bool parallelize = true>
    size_t syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, Galois::DynamicBitSet& bit_set_compute, std::string loopName) {
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string set_timer_str(syncTypeStr + "_SET_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
      StatTimer_set.start();
      static Galois::DynamicBitSet bit_set_comm;
      static std::vector<typename FnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
-     auto &sharedNodes = (syncType == syncPush) ? masterNodes : slaveNodes;
+     auto &sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
 
      uint32_t num = sharedNodes[from_id].size();
      size_t buf_start = 0;
@@ -1716,7 +1716,7 @@ public:
    template<typename FnTy, SyncType syncType, DataflowDirection dataFlow = forwardFlow>
    void sync_recv(std::string loopName, Galois::DynamicBitSet& bit_set_compute, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
-     std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      Galois::StatTimer StatTimer_RecvTime(syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier());
      StatTimer_RecvTime.start();
      for (unsigned num = 0; num < num_messages; ++num) {
@@ -1743,7 +1743,7 @@ public:
       std::atomic<unsigned> sendbytes_count(0);
       std::atomic<unsigned> msg_received(0);
 
-      std::string syncTypeStr = (syncType == syncPush) ? "SYNC_PUSH" : "SYNC_PULL";
+      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
       std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + loopName + "_" + get_run_identifier());
       std::string send_timer_str(syncTypeStr + "_SEND_" + loopName + "_" + get_run_identifier());
       std::string tryrecv_timer_str(syncTypeStr + "_TRYRECV_" + loopName + "_" + get_run_identifier());
@@ -1760,7 +1760,7 @@ public:
 
       StatTimer_mainLoop.start();
 
-      auto& sharedNodes = (syncType == syncPush) ? slaveNodes : masterNodes;
+      auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       std::mutex m;
@@ -1848,84 +1848,84 @@ public:
 #endif
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
-   void sync_push(std::string loopName) {
+   void reduce(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_push(loopName, emptyBitset);
+     reduce<FnTy, dataFlow>(loopName, emptyBitset);
    }
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
-   void sync_push(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   void reduce(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_sync_push<FnTy>(loopName);
+        simulate_reduce<FnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_sync_push<FnTy>(loopName);
+        simulate_bare_mpi_reduce<FnTy>(loopName);
         return;
       }
 #endif
 #endif
  
-      std::string timer_str("SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
-      StatTimer_syncPush.start();
+      std::string timer_str("REDUCE_" + loopName + "_" + get_run_identifier());
+      Galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
+      StatTimer_syncReduce.start();
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
       size_t block_size = buffSize;
-      sync_sendrecv_exp<FnTy, syncPush>(loopName, bit_set_compute, block_size);
+      sync_sendrecv_exp<FnTy, syncReduce>(loopName, bit_set_compute, block_size);
 #else
-      sync_send<FnTy, syncPush, dataFlow>(loopName, bit_set_compute);
+      sync_send<FnTy, syncReduce, dataFlow>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPush, dataFlow>(loopName, bit_set_compute);
+      sync_recv<FnTy, syncReduce, dataFlow>(loopName, bit_set_compute);
 #endif
 
-      StatTimer_syncPush.stop();
+      StatTimer_syncReduce.stop();
    }
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
-   void sync_pull(std::string loopName) {
+   void broadcast(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_pull(loopName, emptyBitset);
+     broadcast<FnTy, dataFlow>(loopName, emptyBitset);
    }
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
-   void sync_pull(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   void broadcast(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_sync_pull<FnTy>(loopName);
+        simulate_broadcast<FnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_sync_pull<FnTy>(loopName);
+        simulate_bare_mpi_broadcast<FnTy>(loopName);
         return;
       }
 #endif
 #endif
  
-      std::string timer_str("SYNC_PULL_" + loopName + "_" + get_run_identifier());
-      Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
-      StatTimer_syncPull.start();
+      std::string timer_str("BROADCAST_" + loopName + "_" + get_run_identifier());
+      Galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str());
+      StatTimer_syncBroadcast.start();
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
       size_t block_size = buffSize;
-      sync_sendrecv_exp<FnTy, syncPull>(loopName, bit_set_compute, block_size);
+      sync_sendrecv_exp<FnTy, syncBroadcast>(loopName, bit_set_compute, block_size);
 #else
-      sync_send<FnTy, syncPull, dataFlow>(loopName, bit_set_compute);
+      sync_send<FnTy, syncBroadcast, dataFlow>(loopName, bit_set_compute);
 
-      sync_recv<FnTy, syncPull, dataFlow>(loopName, bit_set_compute);
+      sync_recv<FnTy, syncBroadcast, dataFlow>(loopName, bit_set_compute);
 #endif
 
-      StatTimer_syncPull.stop();
+      StatTimer_syncBroadcast.stop();
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_forward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_forward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_forward<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_forward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
@@ -1933,13 +1933,13 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_push<PushFnTy, forwardFlow>(loopName, bit_set_compute);
+         reduce<ReduceFnTy, forwardFlow>(loopName, bit_set_compute);
        }
-       sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
+       broadcast<BroadcastFnTy, forwardFlow>(loopName, bit_set_compute);
      } else {
-       sync_push<PushFnTy, forwardFlow>(loopName, bit_set_compute);
+       reduce<ReduceFnTy, forwardFlow>(loopName, bit_set_compute);
        if (is_vertex_cut()) {
-         sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
+         broadcast<BroadcastFnTy, forwardFlow>(loopName, bit_set_compute);
        }
      }
 
@@ -1949,7 +1949,7 @@ public:
    // just like any other sync_*, this is expected to be a collective call
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_forward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
@@ -1957,19 +1957,19 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_send<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute);
+         sync_send<ReduceFnTy, syncReduce, forwardFlow>(loopName, bit_set_compute);
        } else {
-         sync_send<PullFnTy, syncPull, forwardFlow>(loopName, bit_set_compute);
+         sync_send<BroadcastFnTy, syncBroadcast, forwardFlow>(loopName, bit_set_compute);
        }
      } else {
-       sync_send<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute);
+       sync_send<ReduceFnTy, syncReduce, forwardFlow>(loopName, bit_set_compute);
      }
      ++numPipelinedPhases;
 
      StatTimer_syncForward.stop();
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_forward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
@@ -1977,43 +1977,43 @@ public:
 
      if (transposed) {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<ReduceFnTy, syncReduce, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<BroadcastFnTy, syncBroadcast, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        }
      } else {
-       sync_recv<PushFnTy, syncPush, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+       sync_recv<ReduceFnTy, syncReduce, forwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
      }
      numPipelinedPhases = 0;
      if (is_vertex_cut()) {
-       sync_pull<PullFnTy, forwardFlow>(loopName, bit_set_compute);
+       broadcast<BroadcastFnTy, forwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncForward.stop();
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_backward(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_backward<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_backward<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_backward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_push<PushFnTy, backwardFlow>(loopName, bit_set_compute);
+       reduce<ReduceFnTy, backwardFlow>(loopName, bit_set_compute);
        if (is_vertex_cut()) {
-         sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
+         broadcast<BroadcastFnTy, backwardFlow>(loopName, bit_set_compute);
        }
      } else {
        if (is_vertex_cut()) {
-         sync_push<PushFnTy, backwardFlow>(loopName, bit_set_compute);
+         reduce<ReduceFnTy, backwardFlow>(loopName, bit_set_compute);
        }
-       sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
+       broadcast<BroadcastFnTy, backwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncBackward.stop();
@@ -2022,19 +2022,19 @@ public:
    // just like any other sync_*, this is expected to be a collective call
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_backward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_send<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute);
+       sync_send<ReduceFnTy, syncReduce, backwardFlow>(loopName, bit_set_compute);
      } else {
        if (is_vertex_cut()) {
-         sync_send<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute);
+         sync_send<ReduceFnTy, syncReduce, backwardFlow>(loopName, bit_set_compute);
        } else {
-         sync_send<PullFnTy, syncPull, backwardFlow>(loopName, bit_set_compute);
+         sync_send<BroadcastFnTy, syncBroadcast, backwardFlow>(loopName, bit_set_compute);
        }
      }
      ++numPipelinedPhases;
@@ -2042,77 +2042,77 @@ public:
      StatTimer_syncBackward.stop();
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_backward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
      if (transposed) {
-       sync_recv<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+       sync_recv<ReduceFnTy, syncReduce, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
      } else {
        if (is_vertex_cut()) {
-         sync_recv<PushFnTy, syncPush, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<ReduceFnTy, syncReduce, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        } else {
-         sync_recv<PullFnTy, syncPull, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
+         sync_recv<BroadcastFnTy, syncBroadcast, backwardFlow>(loopName, bit_set_compute, numPipelinedPhases);
        }
      }
      numPipelinedPhases = 0;
      if (is_vertex_cut()) {
-       sync_pull<PullFnTy, backwardFlow>(loopName, bit_set_compute);
+       broadcast<BroadcastFnTy, backwardFlow>(loopName, bit_set_compute);
      }
 
      StatTimer_syncBackward.stop();
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_exchange(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_exchange<PushFnTy, PullFnTy>(loopName, emptyBitset);
+     sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
-   template<typename PushFnTy, typename PullFnTy>
+   template<typename ReduceFnTy, typename BroadcastFnTy>
    void sync_exchange(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     sync_push<PushFnTy, exchangeFlow>(loopName, bit_set_compute);
-     sync_pull<PullFnTy, exchangeFlow>(loopName, bit_set_compute);
+     reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
+     broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
    }
 
    template<typename FnTy>
-   void sync_push_ck(std::string loopName) {
+   void reduce_ck(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_sync_push<FnTy>(loopName);
+        simulate_reduce<FnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_sync_push<FnTy>(loopName);
+        simulate_bare_mpi_reduce<FnTy>(loopName);
         return;
       }
 #endif
 #endif
-      std::string extract_timer_str("SYNC_PUSH_EXTRACT_" + loopName +"_" + get_run_identifier());
-      std::string timer_str("SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-      std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + get_run_identifier());
-      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-      std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + get_run_identifier());
-      Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
-      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
-      Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
+      std::string extract_timer_str("REDUCE_EXTRACT_" + loopName +"_" + get_run_identifier());
+      std::string timer_str("REDUCE_" + loopName + "_" + get_run_identifier());
+      std::string timer_barrier_str("REDUCE_BARRIER_" + loopName + "_" + get_run_identifier());
+      std::string statSendBytes_str("SEND_BYTES_REDUCE_" + loopName + "_" + get_run_identifier());
+      std::string doall_str("LAMBDA::REDUCE_" + loopName + "_" + get_run_identifier());
+      Galois::Statistic SyncReduce_send_bytes(statSendBytes_str);
+      Galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
+      Galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str());
       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
 
-      std::string statChkPtBytes_str("CHECKPOINT_BYTES_SYNC_PUSH_" + loopName +"_" + get_run_identifier());
+      std::string statChkPtBytes_str("CHECKPOINT_BYTES_REDUCE_" + loopName +"_" + get_run_identifier());
       Galois::Statistic checkpoint_bytes(statChkPtBytes_str);
 
-      std::string checkpoint_timer_str("TIME_CHECKPOINT_SYNC_PUSH_MEM_" + get_run_identifier());
+      std::string checkpoint_timer_str("TIME_CHECKPOINT_REDUCE_MEM_" + get_run_identifier());
       Galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
 
 
-      StatTimer_syncPush.start();
+      StatTimer_syncReduce.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       for (unsigned h = 1; h < net.Num; ++h) {
          unsigned x = (id + h) % net.Num;
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
 
          Galois::Runtime::SendBuffer b;
 
@@ -2122,7 +2122,7 @@ public:
          if(num > 0 ){
            if (!FnTy::extract_reset_batch(x, val_vec.data())) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                  uint32_t lid = slaveNodes[x][n];
+                  uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                   CLNodeDataWrapper d = clGraph.getDataW(lid);
                   auto val = FnTy::extract(lid, getData(lid, d));
@@ -2145,7 +2145,7 @@ public:
          */
 
 
-      SyncPush_send_bytes += b.size();
+      SyncReduce_send_bytes += b.size();
       auto send_bytes = b.size();
 
       StatTimer_checkpoint.start();
@@ -2183,7 +2183,7 @@ public:
       }
       ++Galois::Runtime::evilPhase;
 
-      StatTimer_syncPush.stop();
+      StatTimer_syncReduce.stop();
 
    }
 
@@ -2443,7 +2443,7 @@ public:
     std::string help_str;
     gDeserialize(b, from_id, help_str);
 
-    //send back the slaveNode for from_id.
+    //send back the mirrorNode for from_id.
 
   }
 
@@ -2548,15 +2548,15 @@ public:
           m.master_nodes[h] = NULL;
         }
       }
-      m.num_slave_nodes = (unsigned int *) calloc(slaveNodes.size(), sizeof(unsigned int));;
-      m.slave_nodes = (unsigned int **) calloc(slaveNodes.size(), sizeof(unsigned int *));;
-      for(uint32_t h = 0; h < slaveNodes.size(); ++h){
-        m.num_slave_nodes[h] = slaveNodes[h].size();
-        if (slaveNodes[h].size() > 0) {
-          m.slave_nodes[h] = (unsigned int *) calloc(slaveNodes[h].size(), sizeof(unsigned int));;
-          std::copy(slaveNodes[h].begin(), slaveNodes[h].end(), m.slave_nodes[h]);
+      m.num_mirror_nodes = (unsigned int *) calloc(mirrorNodes.size(), sizeof(unsigned int));;
+      m.mirror_nodes = (unsigned int **) calloc(mirrorNodes.size(), sizeof(unsigned int *));;
+      for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
+        m.num_mirror_nodes[h] = mirrorNodes[h].size();
+        if (mirrorNodes[h].size() > 0) {
+          m.mirror_nodes[h] = (unsigned int *) calloc(mirrorNodes[h].size(), sizeof(unsigned int));;
+          std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(), m.mirror_nodes[h]);
         } else {
-          m.slave_nodes[h] = NULL;
+          m.mirror_nodes[h] = NULL;
         }
       }
 

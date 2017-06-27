@@ -86,7 +86,7 @@ private:
 
   // called only for those hosts with which it shares nodes
   bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) {
-    if (syncType == base_hGraph::syncPush) {
+    if (syncType == base_hGraph::syncReduce) {
       switch(dataFlow) {
         case base_hGraph::forwardFlow:
           return (gridColumnID() != gridColumnID(host));
@@ -97,7 +97,7 @@ private:
         default:
           assert(false);
       }
-    } else { // syncPull
+    } else { // syncBroadcast
       switch(dataFlow) {
         case base_hGraph::forwardFlow:
           return (gridRowID() != gridRowID(host));
@@ -156,14 +156,14 @@ public:
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
   virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
-    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::slaveNodes : base_hGraph::masterNodes;
+    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, dataFlow);
     }
     return true;
   }
   virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
-    auto &sharedNodes = (syncType == base_hGraph::syncPush) ? base_hGraph::masterNodes : base_hGraph::slaveNodes;
+    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, dataFlow);
     }
@@ -253,7 +253,7 @@ public:
     }
 #endif
 
-    fill_slaveNodes(base_hGraph::slaveNodes);
+    fill_mirrorNodes(base_hGraph::mirrorNodes);
     StatTimer_graph_construct.stop();
 
     StatTimer_graph_construct_comm.start();
@@ -541,18 +541,18 @@ public:
     }
   }
 
-  void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+  void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
     auto rowBlockSize = numColumnHosts * blockSize;
     uint64_t rowOffset = gridRowID() * rowBlockSize;
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t src = rowOffset + (i * blockSize);
       auto h = getHostID(src);
       if (h == base_hGraph::id) continue;
-      slaveNodes[h].reserve(slaveNodes[h].size() + blockSize);
+      mirrorNodes[h].reserve(mirrorNodes[h].size() + blockSize);
       auto src_end = src + blockSize;
       for (; src < src_end; ++src) {
         if (globalToLocalMap.find(src) != globalToLocalMap.end()) {
-          slaveNodes[h].push_back(src);
+          mirrorNodes[h].push_back(src);
         }
       }
     }
@@ -564,10 +564,10 @@ public:
         auto h = getHostID(dst);
         assert(h == getHostID(dst_end-1));
         assert(h != base_hGraph::id);
-        slaveNodes[h].reserve(slaveNodes[h].size() + blockSize);
+        mirrorNodes[h].reserve(mirrorNodes[h].size() + blockSize);
         for (; dst < dst_end; ++dst) {
           if (globalToLocalMap.find(dst) != globalToLocalMap.end()) {
-            slaveNodes[h].push_back(dst);
+            mirrorNodes[h].push_back(dst);
           }
         }
       } else { // also a source

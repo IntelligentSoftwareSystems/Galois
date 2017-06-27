@@ -243,7 +243,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::transposed = true;
     }
 
-    fill_slaveNodes(base_hGraph::slaveNodes);
+    fill_mirrorNodes(base_hGraph::mirrorNodes);
     StatTimer_graph_construct.stop();
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
@@ -322,12 +322,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 
-  void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+  void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
     for(uint32_t h = 0; h < hostNodes.size(); ++h){
       uint32_t start, end;
       std::tie(start, end) = nodes_by_host(h);
       for(; start != end; ++start){
-        slaveNodes[h].push_back(L2G(start));
+        mirrorNodes[h].push_back(L2G(start));
       }
     }
   }
@@ -341,7 +341,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   uint64_t get_local_total_nodes() const {
-    return (base_hGraph::numOwned + base_hGraph::totalSlaveNodes);
+    return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
   }
 
 };

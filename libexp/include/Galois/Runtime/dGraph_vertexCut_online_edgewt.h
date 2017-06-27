@@ -74,7 +74,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     std::vector<uint64_t> numNodes_per_host;
     //std::vector<uint64_t> Nodes_isolated;
     //std::vector<std::vector<uint64_t>> master_mapping;
-    //std::vector<std::vector<uint64_t>> slave_mapping;
+    //std::vector<std::vector<uint64_t>> mirror_mapping;
     //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
 
     //XXX: Use EdgeTy to determine if need to load edge weights or not.
@@ -312,8 +312,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::graph.constructNodes();
       std::cerr << "Construct nodes done\n";
 
-      fill_slaveNodes(base_hGraph::slaveNodes);
-      std::cerr << "fill_slaveNodes done\n";
+      fill_mirrorNodes(base_hGraph::mirrorNodes);
+      std::cerr << "fill_mirrorNodes done\n";
 
       // free the memory 
       gid_vecBool.clear();
@@ -412,7 +412,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
 
 
-    void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+    void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
 
       std::vector<std::vector<uint64_t>> GlobalVec_perHost(base_hGraph::numHosts);
       std::vector<std::vector<uint32_t>> OwnerVec_perHost(base_hGraph::numHosts);
@@ -457,7 +457,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         if(gid_vecBool.is_set(i, base_hGraph::id)){
           GlobalVec_perHost[owner].push_back(i);
           OwnerVec_perHost[owner].push_back(owner);
-          slaveNodes[owner].push_back(i);
+          mirrorNodes[owner].push_back(i);
         }
       }
 
