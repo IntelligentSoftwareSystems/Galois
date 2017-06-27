@@ -1850,7 +1850,7 @@ public:
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_push(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_push(loopName, emptyBitset);
+     sync_push<FnTy, dataFlow>(loopName, emptyBitset);
    }
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
@@ -1886,7 +1886,7 @@ public:
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
    void sync_pull(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_pull(loopName, emptyBitset);
+     sync_pull<FnTy, dataFlow>(loopName, emptyBitset);
    }
 
    template<typename FnTy, DataflowDirection dataFlow = forwardFlow>
