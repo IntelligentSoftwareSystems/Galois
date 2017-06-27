@@ -208,7 +208,7 @@ struct InitializeGraph2 {
                                       DataCommMode *data_mode) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
-          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
                                                    data_mode); 
           return true;
         }
@@ -220,7 +220,7 @@ struct InitializeGraph2 {
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, y);
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, y);
           return true;
         }
         assert (personality == CPU);
@@ -413,7 +413,7 @@ struct InitializeGraph1 {
                                       DataCommMode *data_mode) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
-          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
                                                    data_mode); 
           return true;
         }
@@ -425,7 +425,7 @@ struct InitializeGraph1 {
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          batch_get_slave_node_current_degree_cuda(cuda_ctx, from_id, y);
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, y);
           return true;
         }
         assert (personality == CPU);
@@ -557,7 +557,7 @@ struct InitializeGraph1 {
                    Galois::numrun(_graph.get_run_identifier()));
 
     // backward because it defaults to pull (i.e. I want master to broadcast
-    // its value to slaves; it shouldn't matter which direction in you choose
+    // its value to mirrors; it shouldn't matter which direction in you choose
     // in any case)
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA)
@@ -836,7 +836,7 @@ struct KCoreStep1 {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // slave node is being screwy with me
+    // mirror node is being screwy with me
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -1016,7 +1016,7 @@ int main(int argc, char** argv) {
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
-          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //     Galois::Runtime::printOutput("mirror% % %\n", (*h_graph).getGID(*ii), 
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //}
@@ -1027,7 +1027,7 @@ int main(int argc, char** argv) {
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
-          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //     Galois::Runtime::printOutput("mirror% % %\n", (*h_graph).getGID(*ii), 
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //}
@@ -1038,7 +1038,7 @@ int main(int argc, char** argv) {
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //  else if ((*h_graph).isLocal((*h_graph).getGID(*ii)))
-          //     Galois::Runtime::printOutput("slave% % %\n", (*h_graph).getGID(*ii), 
+          //     Galois::Runtime::printOutput("mirror% % %\n", (*h_graph).getGID(*ii), 
           //                                 (*h_graph).getData(*ii).flag,
           //                                 (*h_graph).getData(*ii).current_degree);
           //}

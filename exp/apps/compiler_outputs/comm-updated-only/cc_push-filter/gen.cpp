@@ -149,7 +149,7 @@ struct InitializeGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -166,14 +166,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -237,14 +237,14 @@ void static go(Graph& _graph) {
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -299,7 +299,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -391,14 +391,14 @@ struct ConnectedComp {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_comp_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -453,7 +453,7 @@ struct ConnectedComp {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_comp_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;

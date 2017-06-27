@@ -21,7 +21,7 @@ struct MarshalGraph {
   edge_data_type *edge_data;
   unsigned int *num_master_nodes;
   unsigned int **master_nodes;
-  unsigned int *num_slave_nodes;
-  unsigned int **slave_nodes;
+  unsigned int *num_mirror_nodes;
+  unsigned int **mirror_nodes;
 };
 

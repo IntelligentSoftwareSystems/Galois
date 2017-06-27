@@ -294,14 +294,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_updates_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_updates_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -335,14 +335,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_edge_offset_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_edge_offset_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -376,14 +376,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, std::array<double, LATENT_VECTOR_SIZE> *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_latent_vector_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_latent_vector_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;

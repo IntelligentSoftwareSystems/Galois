@@ -215,12 +215,12 @@ class DS_edgeCut {
       }
 
 
-    void fill_slaveNodes(std::vector<std::vector<size_t>>& slaveNodes){
+    void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
       for(uint32_t h = 0; h < hostNodes.size(); ++h){
         uint32_t start, end;
         std::tie(start, end) = nodes_by_host(h);
         for(; start != end; ++start){
-          slaveNodes[h].push_back(L2G(start));
+          mirrorNodes[h].push_back(L2G(start));
         }
       }
     }

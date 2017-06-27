@@ -589,7 +589,7 @@ struct PredAndSucc {
 };
 
 /* Uses an incremented trim value to decrement the predecessor: the trim value
- * has to be synchronized across ALL nodes (including slaves) */
+ * has to be synchronized across ALL nodes (including mirrors) */
 struct PredecessorDecrement {
   Graph* graph;
 
@@ -1128,7 +1128,7 @@ struct PropFlagReset {
 };
 
 /* Uses an incremented trim value to decrement the successor: the trim value
- * has to be synchronized across ALL nodes (including slaves) */
+ * has to be synchronized across ALL nodes (including mirrors) */
 struct SuccessorDecrement {
   Graph* graph;
 

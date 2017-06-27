@@ -76,7 +76,7 @@ class hGraph: public GlobalObject {
    //ghost cell ID translation
 
   //memoization optimization
-  std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
+  std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For sync_push
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
 
 
@@ -246,7 +246,7 @@ public:
       std::string doall_str("LAMBDA::SYNC_PULL_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      uint32_t num = slaveNodes[from_id].size();
+      uint32_t num = mirrorNodes[from_id].size();
 
       StatTimer_set.start();
 
@@ -257,7 +257,7 @@ public:
 
         if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-              uint32_t localID = slaveNodes[from_id][n];
+              uint32_t localID = mirrorNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
               {
               CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -312,7 +312,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #endif
 #endif
       masterNodes.resize(numHosts);
-      slaveNodes.resize(numHosts);
+      mirrorNodes.resize(numHosts);
       num_recv_expected = 0;
       num_iter_push = 0;
       num_iter_pull = 0;
@@ -323,7 +323,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       //std::cerr << "Offline Graph Done\n";
 
       masterNodes.resize(numHosts);
-      slaveNodes.resize(numHosts);
+      mirrorNodes.resize(numHosts);
       num_recv_expected = 0;
       num_iter_push = 0;
       num_iter_pull = 0;
@@ -446,14 +446,14 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       Galois::Runtime::getHostBarrier().wait();
       StatTimer_comm_setup.start();
 
-      DS.fill_slaveNodes(slaveNodes);
+      DS.fill_mirrorNodes(mirrorNodes);
 
 #if 0
       for(uint32_t h = 0; h < DS.hostNodes.size(); ++h){
         uint32_t start, end;
         std::tie(start, end) = DS.nodes_by_host(h);
         for(; start != end; ++start){
-          slaveNodes[h].push_back(L2G(start));
+          mirrorNodes[h].push_back(L2G(start));
         }
       }
 #endif
@@ -468,11 +468,11 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
              }, Galois::loopname("MASTER_NODES"));
       }
 
-      for(uint32_t h = 0; h < slaveNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
+      for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
+         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
              [&](uint32_t n){
-             slaveNodes[h][n] = DS.G2L(slaveNodes[h][n]);
-             }, Galois::loopname("SLAVE_NODES"));
+             mirrorNodes[h][n] = DS.G2L(mirrorNodes[h][n]);
+             }, Galois::loopname("MIRROR_NODES"));
       }
 
       for(auto x = 0; x < masterNodes.size(); ++x){
@@ -481,10 +481,10 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
         StatMasterNodes += masterNodes[x].size();
       }
 
-      for(auto x = 0; x < slaveNodes.size(); ++x){
-        std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
-        Galois::Statistic StatSlaveNodes(slave_nodes_str);
-        StatSlaveNodes += slaveNodes[x].size();
+      for(auto x = 0; x < mirrorNodes.size(); ++x){
+        std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
+        Galois::Statistic StatMirrorNodes(mirror_nodes_str);
+        StatMirrorNodes += mirrorNodes[x].size();
       }
 
       StatTimer_comm_setup.stop();
@@ -634,9 +634,9 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
         continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, (uint64_t)slaveNodes[x].size(), slaveNodes[x]);
+      gSerialize(b, (uint64_t)mirrorNodes[x].size(), mirrorNodes[x]);
       net.sendTagged(x, 1, b);
-      std::cout << " number of slaves from : " << x << " : " << slaveNodes[x].size() << "\n";
+      std::cout << " number of mirrors from : " << x << " : " << mirrorNodes[x].size() << "\n";
    }
 
     //receive
@@ -751,7 +751,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       rb.resize(net.Num);
       std::vector<uint8_t> b[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -774,7 +774,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       StatTimerBarrier_syncPull.stop();
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -790,7 +790,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-               uint32_t localID = slaveNodes[x][n];
+               uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
                CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -843,7 +843,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       sb.resize(net.Num);
       std::vector<uint8_t> bs[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -862,7 +862,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -1018,7 +1018,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 
       Galois::Runtime::RecvBuffer rb[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1036,7 +1036,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
          //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
@@ -1049,7 +1049,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-               uint32_t localID = slaveNodes[x][n];
+               uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
                CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -1086,7 +1086,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 
       Galois::Runtime::SendBuffer sb[net.Num];
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -1102,7 +1102,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -1197,7 +1197,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
      if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-           uint32_t localID = slaveNodes[from_id][n];
+           uint32_t localID = mirrorNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
            {
            CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -1322,7 +1322,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id) || (num == 0))
            continue;
 
@@ -1338,7 +1338,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint32_t lid = slaveNodes[x][n];
+                uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
                 auto val = FnTy::extract(lid, getData(lid, d));
@@ -1397,7 +1397,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
       for (unsigned x = 0; x < net.Num; ++x) {
-         uint32_t num = slaveNodes[x].size();
+         uint32_t num = mirrorNodes[x].size();
          if((x == id))
            continue;
 
@@ -1409,7 +1409,7 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
 
            if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                  uint32_t lid = slaveNodes[x][n];
+                  uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                   CLNodeDataWrapper d = clGraph.getDataW(lid);
                   auto val = FnTy::extract(lid, getData(lid, d));
@@ -1609,15 +1609,15 @@ template<bool V> hGraph_w(const std::string& filename, unsigned host, unsigned n
           m.master_nodes[h] = NULL;
         }
       }
-      m.num_slave_nodes = (unsigned int *) calloc(DS.hostNodes.size(), sizeof(unsigned int));;
-      m.slave_nodes = (unsigned int **) calloc(DS.hostNodes.size(), sizeof(unsigned int *));;
+      m.num_mirror_nodes = (unsigned int *) calloc(DS.hostNodes.size(), sizeof(unsigned int));;
+      m.mirror_nodes = (unsigned int **) calloc(DS.hostNodes.size(), sizeof(unsigned int *));;
       for(uint32_t h = 0; h < DS.hostNodes.size(); ++h){
-        m.num_slave_nodes[h] = slaveNodes[h].size();
-        if (slaveNodes[h].size() > 0) {
-          m.slave_nodes[h] = (unsigned int *) calloc(slaveNodes[h].size(), sizeof(unsigned int));;
-          std::copy(slaveNodes[h].begin(), slaveNodes[h].end(), m.slave_nodes[h]);
+        m.num_mirror_nodes[h] = mirrorNodes[h].size();
+        if (mirrorNodes[h].size() > 0) {
+          m.mirror_nodes[h] = (unsigned int *) calloc(mirrorNodes[h].size(), sizeof(unsigned int));;
+          std::copy(mirrorNodes[h].begin(), mirrorNodes[h].end(), m.mirror_nodes[h]);
         } else {
-          m.slave_nodes[h] = NULL;
+          m.mirror_nodes[h] = NULL;
         }
       }
 
