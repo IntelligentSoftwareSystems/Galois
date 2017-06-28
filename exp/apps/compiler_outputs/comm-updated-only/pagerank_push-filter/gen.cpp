@@ -251,7 +251,7 @@ struct InitializeGraphNout {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
-      _graph.sync_exchange<Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
+      _graph.sync<writeSource, readSource, Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
       
   }
 
