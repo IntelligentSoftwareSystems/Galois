@@ -216,7 +216,7 @@ struct InitializeGraph {
     bitset_dist_current.clear();
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     }
-    _graph.sync_backward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_dist_current);
+    _graph.sync<writeSource, readDestination, Reduce_0, Broadcast_0>("InitializeGraph", bitset_dist_current);
     
   }
 
@@ -333,7 +333,7 @@ void static go(Graph& _graph) {
 bitset_dist_current.clear();
 Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
 }
-_graph.sync_forward<Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
+_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
 
@@ -446,49 +446,23 @@ struct SSSP {
     		}
     		typedef unsigned int ValTy;
     	};
-    unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
-    if (totalSize > 0) {
-    unsigned int pipeSize = totalSize / numPipelinedPhases;
-    assert(pipeSize > numPipelinedPhases);
-    if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
-    assert((pipeSize * numPipelinedPhases) >= totalSize);
-    for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
-      unsigned int __end = __begin + pipeSize;
-      if (__end > totalSize) __end = totalSize;
-      unsigned int stepTotalSize = __end - __begin;
-      unsigned int stepSize = stepTotalSize / numComputeSubsteps;
-      assert(stepSize > numComputeSubsteps);
-      if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
-      assert((stepSize * numComputeSubsteps) >= stepTotalSize);
-      for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
-        unsigned int __end2 = __begin2 + stepSize;
-        if (__end2 > __end) __end2 = __end;
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          if (__begin2 == __begin) bitset_dist_current_clear_cuda(cuda_ctx);
+          bitset_dist_current_clear_cuda(cuda_ctx);
           std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
           int __retval = 0;
-          //SSSP_all_cuda(__retval, cuda_ctx);
-          SSSP_cuda(__begin2, __end2, __retval, cuda_ctx);
+          SSSP_all_cuda(__retval, cuda_ctx);
           DGAccumulator_accum += __retval;
           StatTimer_cuda.stop();
         } else if (personality == CPU)
       #endif
         {
-          if (__begin2 == __begin) bitset_dist_current.clear();
-          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, SSSP (&_graph), Galois::loopname("SSSP"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+          bitset_dist_current.clear();
+          Galois::do_all(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("SSSP"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
         }
-      }
-      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
-    }
-    } else {
-    for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_dist_current);
-    }
-    }
-    _graph.sync_forward_wait<Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
+    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
@@ -575,13 +549,13 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg;
-    if(enableVCut){
-      if (numPipelinedPhases > 1) {
-        numPipelinedPhases = 1;
-        if (net.ID == 0) {
-          std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
-        }
+    if (numPipelinedPhases > 1) {
+      numPipelinedPhases = 1;
+      if (net.ID == 0) {
+        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
       }
+    }
+    if(enableVCut){
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
       else if(vertexcut == PL_VCUT)

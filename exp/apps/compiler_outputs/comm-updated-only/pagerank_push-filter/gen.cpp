@@ -251,7 +251,7 @@ struct InitializeGraphNout {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
-      _graph.sync_exchange<Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
+      _graph.sync<writeSource, readSource, Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
       
   }
 
@@ -366,7 +366,7 @@ struct InitializeGraph {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync_forward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
+      _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
       
   }
 
@@ -508,47 +508,21 @@ void static go(Graph& _graph) {
 		}
 		typedef float ValTy;
 	};
-unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
-if (totalSize > 0) {
-unsigned int pipeSize = totalSize / numPipelinedPhases;
-assert(pipeSize > numPipelinedPhases);
-if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
-assert((pipeSize * numPipelinedPhases) >= totalSize);
-for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
-  unsigned int __end = __begin + pipeSize;
-  if (__end > totalSize) __end = totalSize;
-  unsigned int stepTotalSize = __end - __begin;
-  unsigned int stepSize = stepTotalSize / numComputeSubsteps;
-  assert(stepSize > numComputeSubsteps);
-  if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
-  assert((stepSize * numComputeSubsteps) >= stepTotalSize);
-  for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
-    unsigned int __end2 = __begin2 + stepSize;
-    if (__end2 > __end) __end2 = __end;
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      if (__begin2 == __begin) bitset_residual_clear_cuda(cuda_ctx);
+      bitset_residual_clear_cuda(cuda_ctx);
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      //FirstItr_PageRank_all_cuda(cuda_ctx);
-      FirstItr_PageRank_cuda(__begin2, __end2, cuda_ctx);
+      FirstItr_PageRank_all_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
     {
-      if (__begin2 == __begin) bitset_residual.clear();
-      Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      bitset_residual.clear();
+      Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
-  }
-  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
-}
-} else {
-for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-  _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_residual);
-}
-}
-_graph.sync_forward_wait<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -667,49 +641,23 @@ struct PageRank {
     		}
     		typedef float ValTy;
     	};
-    unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
-    if (totalSize > 0) {
-    unsigned int pipeSize = totalSize / numPipelinedPhases;
-    assert(pipeSize > numPipelinedPhases);
-    if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
-    assert((pipeSize * numPipelinedPhases) >= totalSize);
-    for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
-      unsigned int __end = __begin + pipeSize;
-      if (__end > totalSize) __end = totalSize;
-      unsigned int stepTotalSize = __end - __begin;
-      unsigned int stepSize = stepTotalSize / numComputeSubsteps;
-      assert(stepSize > numComputeSubsteps);
-      if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
-      assert((stepSize * numComputeSubsteps) >= stepTotalSize);
-      for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
-        unsigned int __end2 = __begin2 + stepSize;
-        if (__end2 > __end) __end2 = __end;
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          if (__begin2 == __begin) bitset_residual_clear_cuda(cuda_ctx);
+          bitset_residual_clear_cuda(cuda_ctx);
           std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
           int __retval = 0;
-          //PageRank_all_cuda(__retval, cuda_ctx);
-          PageRank_cuda(__begin2, __end2, __retval, cuda_ctx);
+          PageRank_all_cuda(__retval, cuda_ctx);
           DGAccumulator_accum += __retval;
           StatTimer_cuda.stop();
         } else if (personality == CPU)
       #endif
         {
-          if (__begin2 == __begin) bitset_residual.clear();
-          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+          bitset_residual.clear();
+          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
-      }
-      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
-    }
-    } else {
-    for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-      _graph.sync_forward_pipe<Reduce_0, Broadcast_0>("BFS", bitset_residual);
-    }
-    }
-    _graph.sync_forward_wait<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
@@ -795,13 +743,13 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg;
-    if(enableVCut){
-      if (numPipelinedPhases > 1) {
-        numPipelinedPhases = 1;
-        if (net.ID == 0) {
-          std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
-        }
+    if (numPipelinedPhases > 1) {
+      numPipelinedPhases = 1;
+      if (net.ID == 0) {
+        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
       }
+    }
+    if(enableVCut){
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
       else if(vertexcut == PL_VCUT)

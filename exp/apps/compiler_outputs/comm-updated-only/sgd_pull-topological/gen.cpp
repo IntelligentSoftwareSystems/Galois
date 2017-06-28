@@ -417,9 +417,9 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
 
-    	_graph.sync_forward<Reduce_0, Broadcast_0>("InitializeGraph");
-    	_graph.sync_forward<Reduce_1, Broadcast_1>("InitializeGraph");
-    	_graph.sync_forward<Reduce_2, Broadcast_2>("InitializeGraph");
+    	_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph");
+    	_graph.sync<writeDestination, readSource, Reduce_1, Broadcast_1>("InitializeGraph");
+    	_graph.sync<writeDestination, readSource, Reduce_2, Broadcast_2>("InitializeGraph");
 
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "updates" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "edge_offset" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "set",  ""));
   }
@@ -606,7 +606,7 @@ struct SGD {
       #endif
       
 
-      	//_graph.sync_forward<Reduce_2, Broadcast_0>("SGD");
+      	//_graph.sync<writeDestination, readSource, Reduce_2, Broadcast_0>("SGD");
       	_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
 
 
