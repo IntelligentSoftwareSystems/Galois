@@ -717,7 +717,8 @@ __global__ void PredecessorDecrement(CSRGraph graph, unsigned int __nowned, unsi
       {
         if (p_trim[src] > p_num_predecessors[src])
         {
-          abort();
+          // DANGER
+          //abort();
         }
         p_num_predecessors[src] -= p_trim[src];
         p_trim[src] = 0;
@@ -965,7 +966,8 @@ __global__ void SuccessorDecrement(CSRGraph graph, unsigned int __nowned, unsign
         {
           if (p_trim[src] > p_num_successors[src])
           {
-            abort();
+            // DANGER
+            //abort();
           }
           p_num_successors[src] -= p_trim[src];
           p_trim[src] = 0;
