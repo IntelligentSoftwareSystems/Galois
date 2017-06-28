@@ -85,26 +85,28 @@ private:
   }
 
   // called only for those hosts with which it shares nodes
-  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) {
+  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     if (syncType == base_hGraph::syncReduce) {
-      switch(dataFlow) {
-        case base_hGraph::forwardFlow:
-          return (gridColumnID() != gridColumnID(host));
-        case base_hGraph::backwardFlow:
+      switch(writeLocation) {
+        case writeSource:
           return (gridRowID() != gridRowID(host));
-        case base_hGraph::exchangeFlow:
-          return false;
+        case writeDestination:
+          return (gridColumnID() != gridColumnID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
           assert(false);
       }
     } else { // syncBroadcast
-      switch(dataFlow) {
-        case base_hGraph::forwardFlow:
+      switch(readLocation) {
+        case readSource:
           return (gridRowID() != gridRowID(host));
-        case base_hGraph::backwardFlow:
+        case readDestination:
           return (gridColumnID() != gridColumnID(host));
-        case base_hGraph::exchangeFlow:
-          return false;
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
           assert(false);
       }
@@ -155,17 +157,17 @@ public:
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, dataFlow);
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
-  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, dataFlow);
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
