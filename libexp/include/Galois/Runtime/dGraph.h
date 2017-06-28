@@ -1934,6 +1934,10 @@ public:
    template<WriteLocation writeLocation, ReadLocation readLocation, 
      typename ReduceFnTy, typename BroadcastFnTy>
    void sync(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_sync(timer_str.c_str());
+     StatTimer_sync.start();
+
      if (writeLocation == writeSource) {
        if (readLocation == readSource) {
          if (transposed || is_vertex_cut()) {
@@ -1975,6 +1979,8 @@ public:
          sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
        }
      }
+
+     StatTimer_sync.stop();
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
