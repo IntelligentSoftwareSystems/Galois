@@ -209,9 +209,9 @@ typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
 typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates
-Galois::DynamicBitSet bitset_update;
-Galois::DynamicBitSet bitset_update_succ;
-Galois::DynamicBitSet bitset_update_flag;
+//Galois::DynamicBitSet bitset_update;
+//Galois::DynamicBitSet bitset_update_succ;
+//Galois::DynamicBitSet bitset_update_flag;
 
 /******************************************************************************/
 /* Functors for running the algorithm */
@@ -260,7 +260,7 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // Trim
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushTrim {
+    struct ReduceTrim {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -294,7 +294,7 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullTrim {
+    struct BroadcastTrim {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -360,7 +360,7 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // # short paths
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushPaths {
+    struct ReducePaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -395,7 +395,7 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullPaths {
+    struct BroadcastPaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -463,7 +463,7 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // Succ
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushSucc {
+    struct ReduceSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -497,7 +497,7 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullSucc {
+    struct BroadcastSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -569,7 +569,7 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // Pred
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushPred {
+    struct ReducePred {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -604,7 +604,7 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullPred {
+    struct BroadcastPred {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -676,7 +676,7 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // Lengths
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushLength {
+    struct ReduceLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -710,7 +710,7 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullLength {
+    struct BroadcastLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -782,78 +782,134 @@ struct InitializeIteration {
     ////////////////////////////////////////////////////////////////////////////
     // Flag
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushFlag {
+    struct ReduceFlag {
       typedef unsigned int ValTy;
-      //typedef bool ValTy; TODO for some reason this causes issues
 
       static bool extract(uint32_t node_id, const struct NodeData & node) {
-        return false;
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_propogation_flag_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
+        return node.propogation_flag;
       }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool reduce(uint32_t node_id, struct NodeData & node, 
                          bool y) {
-        return true;
+        // shouldn't even get here in the first place as you shouldn't be 
+        // reducing flags in this algorithm)
+        //std::cout << "reducing a flag, shouldn't do this!\n";
+        abort();
+        return false;
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+        //std::cout << "reducing a flag, shouldn't do this!\n";
+        abort();
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+        //std::cout << "flags shouldn't be pushed/reset!\n";
+        abort();
         node.propogation_flag = false;
       }
     };
 
-    struct SyncPullFlag {
+    struct BroadcastFlag {
       typedef unsigned int ValTy;
-      //typedef bool ValTy; TODO for some reason this causes issues
 
       static bool extract(uint32_t node_id, const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_propogation_flag_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.propogation_flag;
       }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_propogation_flag_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
       static void setVal(uint32_t node_id, struct NodeData & node, bool y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_propogation_flag_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.propogation_flag, y);
       }
 
       static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
     };
-
-
     ////////////////////////////////////////////////////////////////////////////
     // Dependency
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushDependency {
-      typedef unsigned int ValTy;
-      //typedef float ValTy; TODO for some reason this causes issues
+    struct ReduceDependency {
+      typedef float ValTy; 
 
       static float extract(uint32_t node_id, const struct NodeData & node) {
         return 0.0;
@@ -861,12 +917,12 @@ struct InitializeIteration {
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
+                                      unsigned int *o, float *y, 
                                       size_t *s, DataCommMode *data_mode) {
         return false;
       }
 
-      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      static bool extract_reset_batch(unsigned from_id, float *y) {
         return false;
       }
 
@@ -875,7 +931,7 @@ struct InitializeIteration {
       }
 
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+                               unsigned int *o, float *y, size_t s, 
                                DataCommMode data_mode) {
         return false;
       }
@@ -885,37 +941,73 @@ struct InitializeIteration {
       }
     };
 
-    struct SyncPullDependency {
-      typedef unsigned int ValTy;
-      //typedef float ValTy; TODO for some reason this causes issues
+    struct BroadcastDependency {
+      typedef float ValTy;
 
       static float extract(uint32_t node_id, const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_dependency_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.dependency;
       }
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                float *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
-      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      static bool extract_batch(unsigned from_id, float *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_dependency_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          float y) {
-        Galois::set(node.dependency, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_dependency_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.dependency, (float)y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               float *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
     };
-
-
     ////////////////////////////////////////////////////////////////////////////
 
     resetFlags(propogation_flag_flags);
@@ -937,14 +1029,14 @@ struct InitializeIteration {
 
     // note the pushes structures' reduce has been set to ignore (i.e.
     // push reduce does nothing as I'm only interested in the broadcast)
-    _graph.sync_backward<SyncPushLength, SyncPullLength>("InitializeIteration");
-    _graph.sync_backward<SyncPushFlag, SyncPullFlag>("InitializeIteration");
-    _graph.sync_backward<SyncPushSucc, SyncPullSucc>("InitializeIteration");
-    _graph.sync_backward<SyncPushPred, SyncPullPred>("InitializeIteration");
-    _graph.sync_backward<SyncPushTrim, SyncPullTrim>("InitializeIteration");
-    _graph.sync_backward<SyncPushPaths, SyncPullPaths>("InitializeIteration");
-    _graph.sync_backward<SyncPushDependency, 
-                         SyncPullDependency>("InitializeIteration");
+    _graph.sync_backward<ReduceLength, BroadcastLength>("InitializeIteration");
+    _graph.sync_backward<ReduceFlag, BroadcastFlag>("InitializeIteration");
+    _graph.sync_backward<ReduceSucc, BroadcastSucc>("InitializeIteration");
+    _graph.sync_backward<ReducePred, BroadcastPred>("InitializeIteration");
+    _graph.sync_backward<ReduceTrim, BroadcastTrim>("InitializeIteration");
+    _graph.sync_backward<ReducePaths, BroadcastPaths>("InitializeIteration");
+    _graph.sync_backward<ReduceDependency, 
+                         BroadcastDependency>("InitializeIteration");
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -978,7 +1070,7 @@ struct FirstIterationSSSP {
   FirstIterationSSSP(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    struct SyncPushLength {
+    struct ReduceLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1048,7 +1140,7 @@ struct FirstIterationSSSP {
       }
     };
 
-    struct SyncPullLength {
+    struct BroadcastLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1126,7 +1218,7 @@ struct FirstIterationSSSP {
       __end = 0;
     }
 
-    bitset_update.clear();
+    //bitset_update.clear();
 
     Galois::do_all(boost::make_counting_iterator(__begin), 
                    boost::make_counting_iterator(__end), 
@@ -1155,7 +1247,7 @@ struct FirstIterationSSSP {
 
       Galois::atomicMin(dst_data.current_length, new_dist);
 
-      bitset_update.set(dst);
+      //bitset_update.set(dst);
     }
   }
 };
@@ -1167,7 +1259,7 @@ struct SSSP {
   SSSP(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    struct SyncPushLength {
+    struct ReduceLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1237,7 +1329,7 @@ struct SSSP {
       }
     };
 
-    struct SyncPullLength {
+    struct BroadcastLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1318,8 +1410,8 @@ struct SSSP {
       // READ SRC current length; only care if dst was written
       if (current_length_flags.dst_write) {
         // reduce to master
-        _graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP");
-        //_graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP", 
+        _graph.sync_forward<ReduceLength, BroadcastLength>("SSSP");
+        //_graph.sync_forward<ReduceLength, BroadcastLength>("SSSP", 
         //                                                   bitset_update);
         resetFlags(current_length_flags);
       }
@@ -1333,7 +1425,7 @@ struct SSSP {
       //  _graph....
       //}
 
-      bitset_update.clear();
+      //bitset_update.clear();
 
       Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
                      Galois::loopname("SSSP"));
@@ -1371,7 +1463,7 @@ struct SSSP {
         Galois::atomicMin(dst_data.current_length, new_dist);
         // TODO could optimize this bitset to only set if old length
         // is greater than new length, but extra sync may be required...
-        bitset_update.set(dst);
+        //bitset_update.set(dst);
       }
 
       DGAccumulator_accum += 1;
@@ -1387,7 +1479,7 @@ struct PredAndSucc {
   PredAndSucc(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    struct SyncPushLength {
+    struct ReduceLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1457,7 +1549,7 @@ struct PredAndSucc {
       }
     };
 
-    struct SyncPullLength {
+    struct BroadcastLength {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1525,17 +1617,18 @@ struct PredAndSucc {
         return false;
       }
     };
+
     ////////////////////////////////////////////////////////////////////////////
 
     // READ SRC current length and READ DST current length
     if (current_length_flags.src_write && current_length_flags.dst_write) {
-      _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
+      _graph.sync_exchange<ReduceLength, BroadcastLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } else if (current_length_flags.src_write) {
-      _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
+      _graph.sync_backward<ReduceLength, BroadcastLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } else if (current_length_flags.dst_write) {
-      _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
+      _graph.sync_exchange<ReduceLength, BroadcastLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } 
 
@@ -1550,10 +1643,10 @@ struct PredAndSucc {
     //  // TODO: also, find a way to make it more efficient instead of a
     //  // broadcast every round like what it would be doing if this code
     //  // was active
-    //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
+    //  _graph.sync_backward<ReduceLength, BroadcastLength>("PredAndSucc");
     //}
 
-    bitset_update.clear();
+    //bitset_update.clear();
     // Loop over all nodes in graph iteratively
     Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(&_graph), 
                    Galois::loopname("PredAndSucc"));
@@ -1586,7 +1679,7 @@ struct PredAndSucc {
         Galois::add(src_data.num_successors, (unsigned int)1);
         Galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
 
-        bitset_update_succ.set(src);
+        //bitset_update_succ.set(src);
       }
     }
   }
@@ -1600,7 +1693,7 @@ struct PredecessorDecrement {
   PredecessorDecrement(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    struct SyncPushTrim {
+    struct ReduceTrim {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1680,7 +1773,7 @@ struct PredecessorDecrement {
       }
     };
 
-    struct SyncPullTrim {
+    struct BroadcastTrim {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1746,9 +1839,9 @@ struct PredecessorDecrement {
     // READ SRC trim
     if (trim_flags.dst_write) {
       // reduce to master
-      //_graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement", 
+      //_graph.sync_forward<ReduceTrim, BroadcastTrim>("PredecessorDecrement", 
       //                                                bitset_update);
-      _graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
+      _graph.sync_forward<ReduceTrim, BroadcastTrim>("PredecessorDecrement");
 
       resetFlags(trim_flags);
     }
@@ -1771,8 +1864,8 @@ struct PredecessorDecrement {
     // decrement predecessor by trim then reset
     if (src_data.trim > 0) {
       if (src_data.trim > src_data.num_predecessors) {
-        std::cerr << "ISSUE P: src " << src << " " << src_data.trim << " " << 
-                                     src_data.num_predecessors << "\n";
+        //std::cout << "ISSUE P: src " << src << " " << src_data.trim << " " << 
+                                     //src_data.num_predecessors << "\n";
         abort();                                    
       }
 
@@ -1803,7 +1896,7 @@ struct NumShortestPaths {
     ////////////////////////////////////////////////////////////////////////////
     // # short paths
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushPaths {
+    struct ReducePaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1882,7 +1975,7 @@ struct NumShortestPaths {
       }
     };
 
-    struct SyncPullPaths {
+    struct BroadcastPaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -1949,7 +2042,7 @@ struct NumShortestPaths {
     ////////////////////////////////////////////////////////////////////////////
     // Succ
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushSucc {
+    struct ReduceSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2024,7 +2117,7 @@ struct NumShortestPaths {
       static void reset (uint32_t node_id, struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
+          set_node_num_successors_cuda(cuda_ctx, node_id, 0);
         }
         else if (personality == CPU)
       #endif
@@ -2032,7 +2125,7 @@ struct NumShortestPaths {
       }
     };
 
-    struct SyncPullSucc {
+    struct BroadcastSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2103,7 +2196,7 @@ struct NumShortestPaths {
     ////////////////////////////////////////////////////////////////////////////
     // Pred
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushPred {
+    struct ReducePred {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2186,7 +2279,7 @@ struct NumShortestPaths {
       }
     };
 
-    struct SyncPullPred {
+    struct BroadcastPred {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2252,6 +2345,7 @@ struct NumShortestPaths {
         assert (personality == CPU);
       #endif
         return false;
+      }
     };
     ////////////////////////////////////////////////////////////////////////////
 
@@ -2263,13 +2357,13 @@ struct NumShortestPaths {
 
       // READ SRC # shortest paths
       if (num_shortest_paths_flags.dst_write) {
-        _graph.sync_forward<SyncPushPaths, SyncPullPaths>("NumShortestPaths");
+        _graph.sync_forward<ReducePaths, BroadcastPaths>("NumShortestPaths");
         resetFlags(num_shortest_paths_flags);
       }
 
       // READ SRC pred
       if (num_predecessors_flags.dst_write) {
-        _graph.sync_forward<SyncPushPred, SyncPullPred>("NumShortestPaths");
+        _graph.sync_forward<ReducePred, BroadcastPred>("NumShortestPaths");
         resetFlags(num_predecessors_flags);
       }
 
@@ -2277,32 +2371,32 @@ struct NumShortestPaths {
       // NOTE: It should never get in here since current length at this point 
       // will no longer be updated
       //if (current_length_flags.src_write && current_length_flags.dst_write) {
-      //  _graph.sync_exchange<SyncPushLength, 
-      //                       SyncPullLength>("NumShortestPaths");
+      //  _graph.sync_exchange<ReduceLength, 
+      //                       BroadcastLength>("NumShortestPaths");
       //  resetFlags(current_length_flags);
       //} else if (current_length_flags.src_write) {
-      //  _graph.sync_backward<SyncPushLength, 
-      //                       SyncPullLength>("NumShortestPaths");
+      //  _graph.sync_backward<ReduceLength, 
+      //                       BroadcastLength>("NumShortestPaths");
       //  resetFlags(current_length_flags);
       //} else if (current_length_flags.dst_write) {
-      //  _graph.sync_exchange<SyncPushLength, 
-      //                       SyncPullLength>("NumShortestPaths");
+      //  _graph.sync_exchange<ReduceLength, 
+      //                       BroadcastLength>("NumShortestPaths");
       //  resetFlags(current_length_flags);
       //} 
 
       // READ SRC succ (only if you want optimization; not activated here)
       //if (num_successors_flags.dst_write) {
-      //  _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
+      //  _graph.sync_forward<ReduceSucc, BroadcastSucc>("NumShortestPaths");
       //  resetFlags(num_successors_flags);
       //}
       // READ SRC prop flag; should never happen since we never write to 
       // dst flag before this
       //if (propogation_flag_flags.dst_write) {
-      //  _graph.sync_forward<SyncPushFlag, SyncPullFlag>("NumShortestPaths");
+      //  _graph.sync_forward<ReduceFlag, BroadcastFlag>("NumShortestPaths");
       //  resetFlags(propogation_flag_flags);
       //}
       
-      bitset_update.clear();
+      //bitset_update.clear();
 
       Galois::do_all(_graph.begin(), _graph.end(), 
                      NumShortestPaths(&_graph), 
@@ -2354,7 +2448,7 @@ struct NumShortestPaths {
           
           // increment dst trim so it can decrement predecessor
           Galois::atomicAdd(dst_data.trim, (unsigned int)1);
-          bitset_update.set(dst);
+          //bitset_update.set(dst);
 
           DGAccumulator_accum += 1;
         }
@@ -2386,7 +2480,7 @@ struct PropFlagReset {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
     src_data.propogation_flag = false;
-    bitset_update_flag.set(src);
+    //bitset_update_flag.set(src);
   }
 };
 
@@ -2401,10 +2495,10 @@ struct SuccessorDecrement {
     // READ SRC trim; note at this stage we don't increment dst trim anymore
     // so this shouldn't matter
     if (trim_flags.dst_write) {
-      std::cerr << "BIG ISSUE, shouldn't be incrementing trim on dst\n";
+      //std::cout << "BIG ISSUE, shouldn't be incrementing trim on dst\n";
       abort();
       // SHOULD NEVER GET IN HERE AT THIS POINT
-      //_graph.sync_forward<SyncPushTrim, SyncPullTrim>("SuccessorDecrement");
+      //_graph.sync_forward<ReduceTrim, BroadcastTrim>("SuccessorDecrement");
       //resetFlags(trim_flags);
     }
 
@@ -2431,14 +2525,14 @@ struct SuccessorDecrement {
     } else if (src_data.trim > 0) {
     // decrement successor by trim then reset
       if (src_data.trim > src_data.num_successors) {
-        std::cerr << "ISSUEsucc: src " << src << " " << src_data.trim << " " << 
+        //std::cout << "ISSUEsucc: src " << src << " " << src_data.trim << " " << 
                                   src_data.num_successors << "\n";
         abort();                                    
       }
 
       src_data.num_successors -= src_data.trim;
       src_data.trim = 0;
-      bitset_update_succ.set(src);
+      //bitset_update_succ.set(src);
 
       // multiply dependency by # of shortest paths to finalize if no more 
       // successors, then set prop flag to false so it can propogate the value
@@ -2446,7 +2540,7 @@ struct SuccessorDecrement {
         // TODO revert back to this if necessary
         //src_data.dependency = src_data.dependency * src_data.num_shortest_paths;
         src_data.propogation_flag = false;
-        bitset_update_flag.set(src);
+        //bitset_update_flag.set(src);
       }
     }
   }
@@ -2469,7 +2563,7 @@ struct DependencyPropogation {
     ////////////////////////////////////////////////////////////////////////////
     // # short paths
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushPaths {
+    struct ReducePaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2548,7 +2642,7 @@ struct DependencyPropogation {
       }
     };
 
-    struct SyncPullPaths {
+    struct BroadcastPaths {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2616,7 +2710,7 @@ struct DependencyPropogation {
     ////////////////////////////////////////////////////////////////////////////
     // Succ
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushSucc {
+    struct ReduceSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2691,7 +2785,7 @@ struct DependencyPropogation {
       static void reset (uint32_t node_id, struct NodeData & node) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
+          set_node_num_successors_cuda(cuda_ctx, node_id, 0);
         }
         else if (personality == CPU)
       #endif
@@ -2699,7 +2793,7 @@ struct DependencyPropogation {
       }
     };
 
-    struct SyncPullSucc {
+    struct BroadcastSucc {
       typedef unsigned int ValTy;
 
       static unsigned int extract(uint32_t node_id, 
@@ -2771,10 +2865,15 @@ struct DependencyPropogation {
     ////////////////////////////////////////////////////////////////////////////
     // Flag
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushFlag {
+    struct ReduceFlag {
       typedef unsigned int ValTy;
 
       static bool extract(uint32_t node_id, const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_propogation_flag_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.propogation_flag;
       }
 
@@ -2782,10 +2881,25 @@ struct DependencyPropogation {
                                       unsigned long long int *b, 
                                       unsigned int *o, unsigned int *y, 
                                       size_t *s, DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
@@ -2793,7 +2907,7 @@ struct DependencyPropogation {
                          bool y) {
         // shouldn't even get here in the first place as you shouldn't be 
         // reducing flags in this algorithm)
-        std::cerr << "reducing a flag, shouldn't do this!\n";
+        //std::cout << "reducing a flag, shouldn't do this!\n";
         abort();
         return false;
       }
@@ -2801,109 +2915,234 @@ struct DependencyPropogation {
       static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+        //std::cout << "reducing a flag, shouldn't do this!\n";
+        abort();
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+        //std::cout << "flags shouldn't be pushed/reset!\n";
+        abort();
         node.propogation_flag = false;
       }
     };
 
-    struct SyncPullFlag {
+    struct BroadcastFlag {
       typedef unsigned int ValTy;
 
       static bool extract(uint32_t node_id, const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_propogation_flag_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.propogation_flag;
       }
 
       static bool extract_batch(unsigned from_id, unsigned long long int *b,
                                 unsigned int *o, unsigned int *y, size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_propogation_flag_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
         return false;
       }
 
       static void setVal(uint32_t node_id, struct NodeData & node, bool y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_propogation_flag_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
         Galois::set(node.propogation_flag, y);
       }
 
       static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
                                unsigned int *o, unsigned int *y, size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
-
     };
-
 
     ////////////////////////////////////////////////////////////////////////////
     // Dependency
     ////////////////////////////////////////////////////////////////////////////
-    struct SyncPushDependency {
-      typedef unsigned int ValTy;
+    struct ReduceDependency {
+      typedef float ValTy;
 
-      static float extract(uint32_t node_id, const struct NodeData & node) {
+      static float extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_dependency_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.dependency;
       }
 
       static bool extract_reset_batch(unsigned from_id, 
                                       unsigned long long int *b, 
-                                      unsigned int *o, unsigned int *y, 
-                                      size_t *s, DataCommMode *data_mode) {
+                                      unsigned int *o, 
+                                      float *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_reset_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                         data_mode, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
-      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      static bool extract_reset_batch(unsigned from_id, float *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_reset_node_dependency_cuda(cuda_ctx, from_id, y, 0);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
-      static bool reduce(uint32_t node_id, struct NodeData & node, float y) {
-        Galois::add(node.dependency, y); return true;
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         float y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_dependency_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.dependency, y); return true; }
       }
 
-      static bool reduce_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               float *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+
+          batch_add_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void reset (uint32_t node_id, struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          set_node_dependency_cuda(cuda_ctx, node_id, 0);
+        }
+        else if (personality == CPU)
+      #endif
         Galois::set(node.dependency, (float)0);
       }
     };
 
-    struct SyncPullDependency {
-      typedef unsigned int ValTy;
+    struct BroadcastDependency {
+      typedef float ValTy;
 
-      static float extract(uint32_t node_id, const struct NodeData & node) {
+      static float extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) 
+          return get_node_dependency_cuda(cuda_ctx, node_id);
+        assert (personality == CPU);
+      #endif
         return node.dependency;
       }
 
-      static bool extract_batch(unsigned from_id, unsigned long long int *b,
-                                unsigned int *o, unsigned int *y, size_t *s, 
+      static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                float *y,
+                                size_t *s, 
                                 DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s,
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
-      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      static bool extract_batch(unsigned from_id, float *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_dependency_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
 
       static void setVal(uint32_t node_id, struct NodeData & node, 
                          float y) {
-        Galois::set(node.dependency, y);
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_dependency_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        Galois::set(node.dependency, (float)y);
       }
 
-      static bool setVal_batch(unsigned from_id, unsigned long long int *b, 
-                               unsigned int *o, unsigned int *y, size_t s, 
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               float *y, 
+                               size_t s, 
                                DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                   data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
         return false;
       }
     };
-
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -2916,19 +3155,19 @@ struct DependencyPropogation {
       // READ SRC/DST succ
       if (num_successors_flags.src_write && num_successors_flags.dst_write) {
         // big problem: shouldn't be writing to dst succ anymore
-        std::cerr << "num successors dst flag set\n";
+        //std::cout << "num successors dst flag set\n";
         abort();
       } else if (num_successors_flags.src_write) {
-        _graph.sync_backward<SyncPushSucc, 
-                             SyncPullSucc>("DependencyPropogation");
-        //_graph.sync_backward<SyncPushSucc, 
-        //                     SyncPullSucc>("DependencyPropogation", 
+        _graph.sync_backward<ReduceSucc, 
+                             BroadcastSucc>("DependencyPropogation");
+        //_graph.sync_backward<ReduceSucc, 
+        //                     BroadcastSucc>("DependencyPropogation", 
         //                                   bitset_update_succ);
         resetFlags(num_successors_flags);
-        bitset_update_succ.clear();
+        //bitset_update_succ.clear();
       } else if (num_successors_flags.dst_write) {
         // big problem: shouldn't be writing to dst succ anymore
-        std::cerr << "num successors dst flag set\n";
+        //std::cout << "num successors dst flag set\n";
         abort();
       }
 
@@ -2936,22 +3175,22 @@ struct DependencyPropogation {
       // NOTE at this point it shouldn't matter
       // anymore as they should have been sync'd already
       //if (current_length_flags.src_write && current_length_flags.dst_write) {
-      //  std::cerr << "in current length src/dst\n";
+      //  std::cout << "in current length src/dst\n";
       //  abort();
-      //  _graph.sync_exchange<SyncPushLength, 
-      //                       SyncPullLength>("DependencyPropogation");
+      //  _graph.sync_exchange<ReduceLength, 
+      //                       BroadcastLength>("DependencyPropogation");
       //  resetFlags(current_length_flags);
       //} else if (current_length_flags.src_write) {
-      //  std::cerr << "in current length src\n";
+      //  std::cout << "in current length src\n";
       //  abort();
-      //  _graph.sync_backward<SyncPushLength, 
-      //                       SyncPullLength>("DependencyPropogation");
+      //  _graph.sync_backward<ReduceLength, 
+      //                       BroadcastLength>("DependencyPropogation");
       //  resetFlags(current_length_flags);
       //} else if (current_length_flags.dst_write) {
-      //  std::cerr << "in current length dst\n";
+      //  std::cout << "in current length dst\n";
       //  abort();
-      //  _graph.sync_exchange<SyncPushLength, 
-      //                       SyncPullLength>("DependencyPropogation");
+      //  _graph.sync_exchange<ReduceLength, 
+      //                       BroadcastLength>("DependencyPropogation");
       //  resetFlags(current_length_flags);
       //} 
 
@@ -2959,19 +3198,19 @@ struct DependencyPropogation {
       if (propogation_flag_flags.src_write && 
           propogation_flag_flags.dst_write) {
         // big problem: shouldn't be writing to dst flag EVER
-        std::cerr << "propogation flag dst flag set\n";
+        //std::cout << "propogation flag dst flag set\n";
         abort();
       } else if (propogation_flag_flags.src_write) {
-        _graph.sync_backward<SyncPushFlag, 
-                             SyncPullFlag>("DependencyPropogation");
-        //_graph.sync_backward<SyncPushFlag, 
-        //                     SyncPullFlag>("DependencyPropogation",
+        _graph.sync_backward<ReduceFlag, 
+                             BroadcastFlag>("DependencyPropogation");
+        //_graph.sync_backward<ReduceFlag, 
+        //                     BroadcastFlag>("DependencyPropogation",
         //                                   bitset_update_flag);
-        bitset_update_flag.clear();
+        //bitset_update_flag.clear();
         resetFlags(propogation_flag_flags);
       } else if (propogation_flag_flags.dst_write) {
         // big problem: shouldn't be writing to dst flag EVER
-        std::cerr << "propogation flag dst flag set\n";
+        //std::cout << "propogation flag dst flag set\n";
         abort();
       }
 
@@ -2979,23 +3218,23 @@ struct DependencyPropogation {
       if (num_shortest_paths_flags.src_write && 
           num_shortest_paths_flags.dst_write) {
         // should never get in here
-        std::cerr << "num short paths src\n";
+        //std::cout << "num short paths src\n";
         abort();
-        _graph.sync_exchange<SyncPushPaths, 
-                             SyncPullPaths>("DependencyPropogation");
+        _graph.sync_exchange<ReducePaths, 
+                             BroadcastPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.src_write) {
         // should never get in here
-        std::cerr << "num short paths src\n";
+        //std::cout << "num short paths src\n";
         abort();
-        _graph.sync_backward<SyncPushPaths, 
-                             SyncPullPaths>("DependencyPropogation");
+        _graph.sync_backward<ReducePaths, 
+                             BroadcastPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.dst_write) {
-        _graph.sync_exchange<SyncPushPaths, 
-                             SyncPullPaths>("DependencyPropogation");
-        //_graph.sync_exchange<SyncPushPaths, 
-        //                     SyncPullPaths>("DependencyPropogation",
+        _graph.sync_exchange<ReducePaths, 
+                             BroadcastPaths>("DependencyPropogation");
+        //_graph.sync_exchange<ReducePaths, 
+        //                     BroadcastPaths>("DependencyPropogation",
         //                                    bitset_update);
         resetFlags(num_shortest_paths_flags);
       }
@@ -3003,29 +3242,29 @@ struct DependencyPropogation {
       // READ DST dependency
       if (dependency_flags.src_write && dependency_flags.dst_write) {
         // shouldn't get here
-        std::cerr << "dep dst\n";
+        //std::cout << "dep dst\n";
         abort();
-        _graph.sync_exchange<SyncPushDependency, 
-                             SyncPullDependency>("DependencyPropogation");
+        _graph.sync_exchange<ReduceDependency, 
+                             BroadcastDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       } else if (dependency_flags.src_write) {
-        _graph.sync_backward<SyncPushDependency, 
-                             SyncPullDependency>("DependencyPropogation");
-        //_graph.sync_backward<SyncPushDependency, 
-        //                     SyncPullDependency>("DependencyPropogation",
+        _graph.sync_backward<ReduceDependency, 
+                             BroadcastDependency>("DependencyPropogation");
+        //_graph.sync_backward<ReduceDependency, 
+        //                     BroadcastDependency>("DependencyPropogation",
         //                                         bitset_update);
 
         resetFlags(dependency_flags);
       } else if (dependency_flags.dst_write) {
         // shouldn't get here
-        std::cerr << "dep dst\n";
+        //std::cout << "dep dst\n";
         abort();
-        _graph.sync_exchange<SyncPushDependency, 
-                             SyncPullDependency>("DependencyPropogation");
+        _graph.sync_exchange<ReduceDependency, 
+                             BroadcastDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       }
 
-      bitset_update.clear();
+      //bitset_update.clear();
 
       Galois::do_all(_graph.begin(), _graph.end(), 
                      DependencyPropogation(current_src_node, &_graph), 
@@ -3093,7 +3332,7 @@ struct DependencyPropogation {
           // cuda gen makes me have all of this in one line; quite annoying..
           src_data.dependency = src_data.dependency + (((float)src_data.num_shortest_paths / (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency));
 
-          bitset_update.set(src);
+          //bitset_update.set(src);
 
           DGAccumulator_accum += 1;
         }
@@ -3149,7 +3388,7 @@ struct BC {
 
       // READ SRC dependencies
       if (dependency_flags.dst_write) {
-        std::cerr << "dependency shouldn't be written on dst\n";
+        //std::cout << "dependency shouldn't be written on dst\n";
         abort();
       }
 
@@ -3260,9 +3499,9 @@ int main(int argc, char** argv) {
     }
   #endif
 
-    bitset_update.resize(h_graph->get_local_total_nodes());
-    bitset_update_succ.resize(h_graph->get_local_total_nodes());
-    bitset_update_flag.resize(h_graph->get_local_total_nodes());
+    //bitset_update.resize(h_graph->get_local_total_nodes());
+    //bitset_update_succ.resize(h_graph->get_local_total_nodes());
+    //bitset_update_flag.resize(h_graph->get_local_total_nodes());
 
     StatTimer_hg_init.stop();
 
@@ -3324,7 +3563,7 @@ int main(int argc, char** argv) {
     }
     return 0;
   } catch(const char* c) {
-    std::cerr << "Error: " << c << "\n";
+    std::cout << "Error: " << c << "\n";
     return 1;
   }
 }
