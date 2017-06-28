@@ -74,8 +74,8 @@ static cll::opt<unsigned> buffSize("sendBuffSize", cll::desc("max size for send 
 llvm::cl::opt<bool> useGidMetadata("useGidMetadata", llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), llvm::cl::init(false));
 
 // TODO: write/read at both source and destination
-enum WriteLocation { writeSource, writeDestination };
-enum ReadLocation { readSource, readDestination };
+enum WriteLocation { writeSource, writeDestination, writeAny };
+enum ReadLocation { readSource, readDestination, readAny };
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
@@ -1939,16 +1939,40 @@ public:
          if (transposed || is_vertex_cut()) {
            sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
          }
-       } else { // readDestination
+       } else if (readLocation == readDestination) {
          sync_backward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+       } else { // readAny
+         if (transposed || is_vertex_cut()) {
+           reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
+         }
+         broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
        }
-     } else { // writeDestination
+     } else if (writeLocation == writeDestination) {
        if (readLocation == readSource) {
          sync_forward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
-       } else { // readDestination
+       } else if (readLocation == readDestination) {
          if (!transposed || is_vertex_cut()) {
            sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
          }
+       } else { // readAny
+         if (!transposed || is_vertex_cut()) {
+           reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
+         }
+         broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
+       }
+     } else { // writeAny
+       if (readLocation == readSource) {
+         reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
+         if (transposed || is_vertex_cut()) {
+           broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
+         }
+       } else if (readLocation == readDestination) {
+         reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
+         if (!transposed || is_vertex_cut()) {
+           broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
+         }
+       } else { // readAny
+         sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
        }
      }
    }
