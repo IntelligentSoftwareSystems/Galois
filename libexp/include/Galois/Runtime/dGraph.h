@@ -1941,10 +1941,10 @@ public:
      if (writeLocation == writeSource) {
        if (readLocation == readSource) {
          if (transposed || is_vertex_cut()) {
-           sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+           sync_any_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
          }
        } else if (readLocation == readDestination) {
-         sync_backward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_src_to_dst<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
        } else { // readAny
          if (transposed || is_vertex_cut()) {
            reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
@@ -1953,10 +1953,10 @@ public:
        }
      } else if (writeLocation == writeDestination) {
        if (readLocation == readSource) {
-         sync_forward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_dst_to_src<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
        } else if (readLocation == readDestination) {
          if (!transposed || is_vertex_cut()) {
-           sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+           sync_any_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
          }
        } else { // readAny
          if (!transposed || is_vertex_cut()) {
@@ -1976,7 +1976,7 @@ public:
            broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
          }
        } else { // readAny
-         sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_any_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
        }
      }
 
@@ -1984,14 +1984,14 @@ public:
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_forward(std::string loopName) {
+   void sync_dst_to_src(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_forward<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
+     sync_dst_to_src<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_forward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+   void sync_dst_to_src(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_dst_to_src_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
 
@@ -2014,8 +2014,8 @@ public:
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_forward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+   void sync_dst_to_src_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_dst_to_src_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
 
@@ -2034,8 +2034,8 @@ public:
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_forward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_FORWARD_" + loopName + "_" + get_run_identifier());
+   void sync_dst_to_src_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_dst_to_src_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncForward(timer_str.c_str());
      StatTimer_syncForward.start();
 
@@ -2057,14 +2057,14 @@ public:
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_backward(std::string loopName) {
+   void sync_src_to_dst(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_backward<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
+     sync_src_to_dst<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_backward(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+   void sync_src_to_dst(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_src_to_dst_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
@@ -2087,8 +2087,8 @@ public:
    // but it does not synchronize with other hosts
    // nonetheless, it should be called same number of times on all hosts
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_backward_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+   void sync_src_to_dst_pipe(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_src_to_dst_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
@@ -2107,8 +2107,8 @@ public:
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_backward_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
-     std::string timer_str("SYNC_BACKWARD_" + loopName + "_" + get_run_identifier());
+   void sync_src_to_dst_wait(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     std::string timer_str("sync_src_to_dst_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_syncBackward(timer_str.c_str());
      StatTimer_syncBackward.start();
 
@@ -2130,13 +2130,13 @@ public:
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_exchange(std::string loopName) {
+   void sync_any_to_any(std::string loopName) {
      Galois::DynamicBitSet emptyBitset;
-     sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
+     sync_any_to_any<ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_exchange(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   void sync_any_to_any(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
      reduce<ReduceFnTy, exchangeFlow>(loopName, bit_set_compute);
      broadcast<BroadcastFnTy, exchangeFlow>(loopName, bit_set_compute);
    }
