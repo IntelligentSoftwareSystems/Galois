@@ -299,9 +299,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
-    // FP: "6 -> 7;
     bool pop  = src < __end;
-    // FP: "7 -> 8;
     if (pop)
     {
       if (p_old_length[src] > p_current_length[src])
@@ -313,51 +311,34 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
         pop = false;
       }
     }
-    // FP: "12 -> 13;
-    // FP: "15 -> 16;
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "16 -> 17;
     __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "17 -> 18;
     _np_closure[threadIdx.x].src = src;
-    // FP: "18 -> 19;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "21 -> 22;
-    // FP: "22 -> 23;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "23 -> 24;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "24 -> 25;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "27 -> 28;
     __syncthreads();
-    // FP: "28 -> 29;
     while (true)
     {
-      // FP: "29 -> 30;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "32 -> 33;
       __syncthreads();
-      // FP: "33 -> 34;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "34 -> 35;
         __syncthreads();
-        // FP: "35 -> 36;
         break;
       }
-      // FP: "37 -> 38;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -366,20 +347,15 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "40 -> 41;
       __syncthreads();
-      // FP: "41 -> 42;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "42 -> 43;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "45 -> 46;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "46 -> 47;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type current_edge;
@@ -387,22 +363,23 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
         {
           index_type dst;
           unsigned int new_dist;
+          unsigned int old;
           dst = graph.getAbsDestination(current_edge);
           new_dist = 1 + p_current_length[src];
-          atomicMin(&p_current_length[dst], new_dist);
+          old = atomicMin(&p_current_length[dst], new_dist);
+          if (old > new_dist)
+          {
+            ret_val.do_return( 1);
+            //continue;
+          }
         }
       }
-      // FP: "55 -> 56;
       __syncthreads();
     }
-    // FP: "57 -> 58;
 
-    // FP: "58 -> 59;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "59 -> 60;
       const int _np_laneid = cub::LaneId();
-      // FP: "60 -> 61;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -428,34 +405,30 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           {
             index_type dst;
             unsigned int new_dist;
+            unsigned int old;
             dst = graph.getAbsDestination(current_edge);
             new_dist = 1 + p_current_length[src];
-            atomicMin(&p_current_length[dst], new_dist);
+            old = atomicMin(&p_current_length[dst], new_dist);
+            if (old > new_dist)
+            {
+              ret_val.do_return( 1);
+              //continue;
+            }
           }
         }
       }
-      // FP: "79 -> 80;
       __syncthreads();
-      // FP: "80 -> 81;
     }
 
-    // FP: "81 -> 82;
     __syncthreads();
-    // FP: "82 -> 83;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "83 -> 84;
     while (_np.work())
     {
-      // FP: "84 -> 85;
       int _np_i =0;
-      // FP: "85 -> 86;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "86 -> 87;
       __syncthreads();
-      // FP: "87 -> 88;
 
-      // FP: "88 -> 89;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type current_edge;
@@ -465,23 +438,22 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
         {
           index_type dst;
           unsigned int new_dist;
+          unsigned int old;
           dst = graph.getAbsDestination(current_edge);
           new_dist = 1 + p_current_length[src];
-          atomicMin(&p_current_length[dst], new_dist);
+          old = atomicMin(&p_current_length[dst], new_dist);
+          if (old > new_dist)
+          {
+            ret_val.do_return( 1);
+            //continue;
+          }
         }
       }
-      // FP: "98 -> 99;
       _np.execute_round_done(ITSIZE);
-      // FP: "99 -> 100;
       __syncthreads();
     }
-    // FP: "101 -> 102;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
-    // FP: "102 -> 103;
-    ret_val.do_return( 1);
-    // FP: "103 -> 104;
-    continue;
   }
   ret_val.thread_exit<_br>(_ts);
 }
@@ -717,7 +689,8 @@ __global__ void PredecessorDecrement(CSRGraph graph, unsigned int __nowned, unsi
       {
         if (p_trim[src] > p_num_predecessors[src])
         {
-          // DANGER
+          // shouldn't get here
+          //continue;
           //abort();
         }
         p_num_predecessors[src] -= p_trim[src];
@@ -966,7 +939,8 @@ __global__ void SuccessorDecrement(CSRGraph graph, unsigned int __nowned, unsign
         {
           if (p_trim[src] > p_num_successors[src])
           {
-            // DANGER
+            // shouldn't get here
+            //continue;
             //abort();
           }
           p_num_successors[src] -= p_trim[src];
@@ -1017,7 +991,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
     {
       if (graph.node_data[src] == local_current_src_node || p_num_successors[src] == 0)
       {
-        // Loc added this in
+        // added in lieu of return in actual code
         continue;
       }
     }
@@ -1082,7 +1056,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
               atomicAdd(&p_trim[src], (unsigned int)1);
               p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
               ret_val.do_return( 1);
-              continue;
+              //continue;
             }
           }
         }
@@ -1127,7 +1101,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
                 atomicAdd(&p_trim[src], (unsigned int)1);
                 p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
                 ret_val.do_return( 1);
-                continue;
+                //continue;
               }
             }
           }
@@ -1163,7 +1137,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
               atomicAdd(&p_trim[src], (unsigned int)1);
               p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
               ret_val.do_return( 1);
-              continue;
+              //continue;
             }
           }
         }
