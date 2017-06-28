@@ -120,7 +120,7 @@ struct InitializeGraph {
   cll::opt<unsigned int> &local_src_node;
   Graph *graph;
 
-  InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
+  InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph){
     	struct Broadcast_0 {
