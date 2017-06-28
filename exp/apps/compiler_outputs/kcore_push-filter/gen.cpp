@@ -355,11 +355,11 @@ struct InitializeGraph2 {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA)
-      _graph.sync_forward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+      _graph.sync<writeDestination, readSource, SyncPushCurrentDegree, SyncPullCurrentDegree>(
         "InitializeGraph2");
     else if (personality == CPU)
   #endif
-    _graph.sync_forward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+    _graph.sync<writeDestination, readSource, SyncPushCurrentDegree, SyncPullCurrentDegree>(
       "InitializeGraph2", bitset_dist_current);
   }
 
@@ -561,11 +561,11 @@ struct InitializeGraph1 {
     // in any case)
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA)
-      _graph.sync_backward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+      _graph.sync<writeSource, readDestination, SyncPushCurrentDegree, SyncPullCurrentDegree>(
         "InitializeGraph1");
     else if (personality == CPU)
   #endif
-    _graph.sync_backward<SyncPushCurrentDegree, SyncPullCurrentDegree>(
+    _graph.sync<writeSource, readDestination, SyncPushCurrentDegree, SyncPullCurrentDegree>(
       "InitializeGraph1", bitset_dist_current);
 
 
@@ -820,10 +820,10 @@ struct KCoreStep1 {
       // do the trim sync
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA)
-        _graph.sync_forward<SyncPushTrim, SyncPullTrim>("KCoreStep1");
+        _graph.sync<writeDestination, readSource, SyncPushTrim, SyncPullTrim>("KCoreStep1");
       else if (personality == CPU)
     #endif
-      _graph.sync_forward<SyncPushTrim, SyncPullTrim>("KCoreStep1",
+      _graph.sync<writeDestination, readSource, SyncPushTrim, SyncPullTrim>("KCoreStep1",
                                                       bitset_dist_current);
       // handle trimming (locally)
       KCoreStep2::go(_graph);

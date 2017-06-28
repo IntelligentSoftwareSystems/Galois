@@ -366,7 +366,7 @@ struct InitializeGraph {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync_forward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
+      _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
       
   }
 
@@ -522,7 +522,7 @@ void static go(Graph& _graph) {
       bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
-_graph.sync_forward<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -657,7 +657,7 @@ struct PageRank {
           bitset_residual.clear();
           Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
-    _graph.sync_forward<Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

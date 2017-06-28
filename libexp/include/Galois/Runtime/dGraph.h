@@ -22,6 +22,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
 
 #include "Galois/gstl.h"
@@ -71,6 +72,10 @@ static cll::opt<unsigned> buffSize("sendBuffSize", cll::desc("max size for send 
 #endif
 
 llvm::cl::opt<bool> useGidMetadata("useGidMetadata", llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), llvm::cl::init(false));
+
+// TODO: write/read at both source and destination
+enum WriteLocation { writeSource, writeDestination };
+enum ReadLocation { readSource, readDestination };
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
@@ -1917,6 +1922,35 @@ public:
 #endif
 
       StatTimer_syncBroadcast.stop();
+   }
+
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     typename ReduceFnTy, typename BroadcastFnTy>
+   void sync(std::string loopName) {
+     Galois::DynamicBitSet emptyBitset;
+     sync<writeLocation, readLocation, ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
+   }
+
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     typename ReduceFnTy, typename BroadcastFnTy>
+   void sync(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     if (writeLocation == writeSource) {
+       if (readLocation == readSource) {
+         if (transposed || is_vertex_cut()) {
+           sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         }
+       } else { // readDestination
+         sync_backward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+       }
+     } else { // writeDestination
+       if (readLocation == readSource) {
+         sync_forward<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+       } else { // readDestination
+         if (!transposed || is_vertex_cut()) {
+           sync_exchange<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         }
+       }
+     }
    }
 
    template<typename ReduceFnTy, typename BroadcastFnTy>

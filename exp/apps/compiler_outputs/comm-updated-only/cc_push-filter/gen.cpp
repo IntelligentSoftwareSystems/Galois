@@ -211,7 +211,7 @@ struct InitializeGraph {
     bitset_comp_current.clear();
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     }
-    _graph.sync_backward<Reduce_0, Broadcast_0>("InitializeGraph", bitset_comp_current);
+    _graph.sync<writeSource, readDestination, Reduce_0, Broadcast_0>("InitializeGraph", bitset_comp_current);
     
   }
 
@@ -320,7 +320,7 @@ void static go(Graph& _graph) {
       bitset_comp_current.clear();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
     }
-_graph.sync_forward<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
+_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -449,7 +449,7 @@ struct ConnectedComp {
         bitset_comp_current.clear();
         Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
       }
-    _graph.sync_forward<Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
+    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("ConnectedComp", bitset_comp_current);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
