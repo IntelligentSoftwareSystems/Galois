@@ -222,7 +222,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::StatTimer StatTimer_distributed_edges_inner_loop("TIMER_DISTRIBUTE_EDGES_INNER_LOOP");
       Galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
 
-      StatTimer_local_distributed_edges.start();
+      StatTimer_graph_construct.start();
       std::stringstream ss_cout;
       {
       Galois::Graph::OfflineGraph g(filename);
@@ -249,7 +249,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
           gid2host.push_back(Galois::block_range(0U, (unsigned)numNodes_to_divide, i, base_hGraph::numHosts));
-      } 
+      }
 #if 0
       else {
         assert(scalefactor.size() == base_hGraph::numHosts);
@@ -325,10 +325,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       print_string(" : loadEdges : start");
 
       loadEdges(base_hGraph::graph, g, numEdges_distribute, VCutTheshold);
+      StatTimer_exchange_edges.stop();
+
+      StatTimer_graph_construct.stop();
       print_string(" : loadEdges : done");
       }
 
-      StatTimer_exchange_edges.stop();
       ss_cout << base_hGraph::id << " : assign_send_receive_edges done\n";
 
       /*******************************************/
