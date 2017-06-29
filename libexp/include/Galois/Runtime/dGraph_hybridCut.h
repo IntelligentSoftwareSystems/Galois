@@ -337,6 +337,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       Galois::Runtime::getHostBarrier().wait();
 
+      if (transpose && (numNodes > 0)) {
+        base_hGraph::graph.transpose();
+        base_hGraph::transposed = true;
+      }
+
+
       /*****************************************
        * Communication PreProcessing:
        * Exchange mirrors and master nodes among
