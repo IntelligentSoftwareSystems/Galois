@@ -20,14 +20,14 @@ struct CUDA_Context {
 	CSRGraphTy gg;
 	unsigned int *num_master_nodes; // per host
 	Shared<unsigned int> *master_nodes; // per host
-	unsigned int *num_slave_nodes; // per host
-	Shared<unsigned int> *slave_nodes; // per host
+	unsigned int *num_mirror_nodes; // per host
+	Shared<unsigned int> *mirror_nodes; // per host
 	Shared<int> nout;
 	Shared<int> *master_nout; // per host
-	Shared<int> *slave_nout; // per host
+	Shared<int> *mirror_nout; // per host
 	Shared<float> value;
 	Shared<float> *master_value; // per host
-	Shared<float> *slave_value; // per host
+	Shared<float> *mirror_value; // per host
 };
 
 int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -60,30 +60,30 @@ void batch_get_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, int *v
 	memcpy(v, ctx->master_nout[from_id].cpu_rd_ptr(), sizeof(int) * ctx->num_master_nodes[from_id]);
 }
 
-void batch_get_slave_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, int *v) {
+void batch_get_mirror_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, int *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr());
+	batch_get_subset<int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr());
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_nout[from_id].cpu_rd_ptr(), sizeof(int) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_nout[from_id].cpu_rd_ptr(), sizeof(int) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_get_reset_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, int *v, int i) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr(), i);
+	batch_get_reset_subset<int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_nout[from_id].gpu_wr_ptr(true), ctx->nout.gpu_rd_ptr(), i);
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_nout[from_id].cpu_rd_ptr(), sizeof(int) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_nout[from_id].cpu_rd_ptr(), sizeof(int) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_set_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, int *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_nout[from_id].cpu_wr_ptr(true), v, sizeof(int) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_nout[from_id].gpu_rd_ptr(), ctx->nout.gpu_wr_ptr());
+	memcpy(ctx->mirror_nout[from_id].cpu_wr_ptr(true), v, sizeof(int) * ctx->num_mirror_nodes[from_id]);
+	batch_set_subset<int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_nout[from_id].gpu_rd_ptr(), ctx->nout.gpu_wr_ptr());
 	check_cuda_kernel;
 }
 
@@ -135,30 +135,30 @@ void batch_get_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float
 	memcpy(v, ctx->master_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_master_nodes[from_id]);
 }
 
-void batch_get_slave_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
+void batch_get_mirror_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr());
+	batch_get_subset<float> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr());
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_get_reset_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v, float i) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr(), i);
+	batch_get_reset_subset<float> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_value[from_id].gpu_wr_ptr(true), ctx->value.gpu_rd_ptr(), i);
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_value[from_id].cpu_rd_ptr(), sizeof(float) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_set_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, float *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_value[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<float> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_value[from_id].gpu_rd_ptr(), ctx->value.gpu_wr_ptr());
+	memcpy(ctx->mirror_value[from_id].cpu_wr_ptr(true), v, sizeof(float) * ctx->num_mirror_nodes[from_id]);
+	batch_set_subset<float> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_value[from_id].gpu_rd_ptr(), ctx->value.gpu_wr_ptr());
 	check_cuda_kernel;
 }
 
@@ -233,17 +233,17 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 			ctx->master_value[h].alloc(ctx->num_master_nodes[h]);
 		}
 	}
-	ctx->num_slave_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
-	memcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
-	ctx->slave_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave_nout = (Shared<int> *) calloc(num_hosts, sizeof(Shared<int>));
-	ctx->slave_value = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
+	ctx->num_mirror_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
+	memcpy(ctx->num_mirror_nodes, g.num_mirror_nodes, sizeof(unsigned int) * num_hosts);
+	ctx->mirror_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+	ctx->mirror_nout = (Shared<int> *) calloc(num_hosts, sizeof(Shared<int>));
+	ctx->mirror_value = (Shared<float> *) calloc(num_hosts, sizeof(Shared<float>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
-		if (ctx->num_slave_nodes[h] > 0) {
-			ctx->slave_nodes[h].alloc(ctx->num_slave_nodes[h]);
-			memcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->num_slave_nodes[h]);
-			ctx->slave_nout[h].alloc(ctx->num_slave_nodes[h]);
-			ctx->slave_value[h].alloc(ctx->num_slave_nodes[h]);
+		if (ctx->num_mirror_nodes[h] > 0) {
+			ctx->mirror_nodes[h].alloc(ctx->num_mirror_nodes[h]);
+			memcpy(ctx->mirror_nodes[h].cpu_wr_ptr(), g.mirror_nodes[h], sizeof(unsigned int) * ctx->num_mirror_nodes[h]);
+			ctx->mirror_nout[h].alloc(ctx->num_mirror_nodes[h]);
+			ctx->mirror_value[h].alloc(ctx->num_mirror_nodes[h]);
 		}
 	}
 	graph.copy_to_gpu(ctx->gg);

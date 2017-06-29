@@ -108,7 +108,7 @@ struct InitializeGraph {
   InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -146,7 +146,7 @@ struct InitializeGraph {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -156,14 +156,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -195,12 +195,12 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
-    	_graph.sync_push<Syncer_vertexCut_0>("InitializeGraph");
+    	_graph.reduce<Reduce_0>("InitializeGraph");
     }
     
-    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+    _graph.broadcast<Broadcast_0>("InitializeGraph");
     
   }
 
@@ -213,7 +213,7 @@ struct InitializeGraph {
 template <typename GraphTy>
 struct Get_info_functor : public Galois::op_tag {
 	GraphTy &graph;
-	struct Syncer_0 {
+	struct Reduce_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -223,14 +223,14 @@ struct Get_info_functor : public Galois::op_tag {
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -253,7 +253,7 @@ struct Get_info_functor : public Galois::op_tag {
 		}
 		typedef unsigned int ValTy;
 	};
-	struct SyncerPull_vertexCut_0 {
+	struct Broadcast_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -315,10 +315,10 @@ struct Get_info_functor : public Galois::op_tag {
 	}
 	void static sync_graph_static(Graph& _graph) {
 
-		_graph.sync_push<Syncer_0>("SSSP");
+		_graph.reduce<Reduce_0>("SSSP");
 
 if(_graph.is_vertex_cut()) {
-	_graph.sync_pull<SyncerPull_vertexCut_0>("SSSP");
+	_graph.broadcast<Broadcast_0>("SSSP");
 }
 	}
 };
@@ -330,7 +330,6 @@ struct SSSP {
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> dChunk;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		auto __sync_functor = Get_info_functor<Graph>(_graph);
@@ -393,7 +392,7 @@ struct SSSP {
     			__begin = 0;
     			__end = 0;
     		}
-    Galois::for_each(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), SSSP (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));	}
+    Galois::for_each(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), SSSP (&_graph), Galois::workList_version(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));	}
     
   }
 

@@ -9,7 +9,7 @@
 #define check_cuda_kernel check_cuda(cudaGetLastError());
 #endif
 
-enum SharedType { sharedMaster, sharedSlave };
+enum SharedType { sharedMaster, sharedMirror };
 enum UpdateOp { setOp, addOp, minOp };
 
 void kernel_sizing(dim3 &blocks, dim3 &threads) {
@@ -202,8 +202,8 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {
     shared = &ctx->master;
-  } else { // sharedSlave
-    shared = &ctx->slave;
+  } else { // sharedMirror
+    shared = &ctx->mirror;
   }
   DeviceOnly<DataType> *shared_data = &field->shared_data;
 	dim3 blocks;
@@ -236,8 +236,8 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {
     shared = &ctx->master;
-  } else { // sharedSlave
-    shared = &ctx->slave;
+  } else { // sharedMirror
+    shared = &ctx->mirror;
   }
   DeviceOnly<DataType> *shared_data = &field->shared_data;
 	dim3 blocks;
@@ -310,8 +310,8 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {
     shared = &ctx->master;
-  } else { // sharedSlave
-    shared = &ctx->slave;
+  } else { // sharedMirror
+    shared = &ctx->mirror;
   }
   DeviceOnly<DataType> *shared_data = &field->shared_data;
 	dim3 blocks;

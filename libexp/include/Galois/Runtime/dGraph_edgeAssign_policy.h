@@ -128,7 +128,7 @@ if(!is_assigned(src) && !is_assigned(dst)){
               else {
                 assign_node(dst, dst_host);
                 master_mapping[src_host] = src;
-                slave_mapping[dst_host] = src;
+                mirror_mapping[dst_host] = src;
               }
           
             if(!is_assigned(src) && is_assigned(dst)){

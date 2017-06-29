@@ -13,7 +13,7 @@ void set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
-void batch_get_slave_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
+void batch_get_mirror_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i);
 void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
@@ -23,7 +23,7 @@ void set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int
 void add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void batch_get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
-void batch_get_slave_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
+void batch_get_mirror_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_get_reset_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i);
 void batch_set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);

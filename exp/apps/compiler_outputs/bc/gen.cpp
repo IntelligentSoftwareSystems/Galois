@@ -403,7 +403,7 @@ struct SSSP {
       // READ SRC current length; only care if dst was written
       if (current_length_flags.dst_write) {
         // reduce to master
-        _graph.sync_forward<SyncPushLength, SyncPullLength>("SSSP");
+        _graph.sync<writeDestination, readSource, SyncPushLength, SyncPullLength>("SSSP");
         resetFlags(current_length_flags);
       }
 
@@ -531,7 +531,7 @@ struct PredAndSucc {
       _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } else if (current_length_flags.src_write) {
-      _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
+      _graph.sync<writeSource, readDestination, SyncPushLength, SyncPullLength>("PredAndSucc");
       resetFlags(current_length_flags);
     } else if (current_length_flags.dst_write) {
       _graph.sync_exchange<SyncPushLength, SyncPullLength>("PredAndSucc");
@@ -549,7 +549,7 @@ struct PredAndSucc {
     //  // TODO: also, find a way to make it more efficient instead of a
     //  // broadcast every round like what it would be doing if this code
     //  // was active
-    //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
+    //  _graph.sync<writeSource, readDestination, SyncPushLength, SyncPullLength>("PredAndSucc");
     //}
 
     // Loop over all nodes in graph iteratively
@@ -589,7 +589,7 @@ struct PredAndSucc {
 };
 
 /* Uses an incremented trim value to decrement the predecessor: the trim value
- * has to be synchronized across ALL nodes (including slaves) */
+ * has to be synchronized across ALL nodes (including mirrors) */
 struct PredecessorDecrement {
   Graph* graph;
 
@@ -664,7 +664,7 @@ struct PredecessorDecrement {
     // READ SRC trim
     if (trim_flags.dst_write) {
       // reduce to master
-      _graph.sync_forward<SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
+      _graph.sync<writeDestination, readSource, SyncPushTrim, SyncPullTrim>("PredecessorDecrement");
       resetFlags(trim_flags);
     }
 
@@ -994,20 +994,20 @@ struct NumShortestPaths {
 
       // READ SRC # shortest paths
       if (num_shortest_paths_flags.dst_write) {
-        _graph.sync_forward<SyncPushPaths, SyncPullPaths>("NumShortestPaths");
+        _graph.sync<writeDestination, readSource, SyncPushPaths, SyncPullPaths>("NumShortestPaths");
         resetFlags(num_shortest_paths_flags);
       }
 
       // READ SRC succ (as optimization; otherwise it will loop over no edges 
       // anyways)
       //if (num_successors_flags.dst_write) {
-      //  _graph.sync_forward<SyncPushSucc, SyncPullSucc>("NumShortestPaths");
+      //  _graph.sync<writeDestination, readSource, SyncPushSucc, SyncPullSucc>("NumShortestPaths");
       //  resetFlags(num_successors_flags);
       //}
 
       // READ SRC pred
       if (num_predecessors_flags.dst_write) {
-        _graph.sync_forward<SyncPushPred, SyncPullPred>("NumShortestPaths");
+        _graph.sync<writeDestination, readSource, SyncPushPred, SyncPullPred>("NumShortestPaths");
         resetFlags(num_predecessors_flags);
       }
 
@@ -1017,7 +1017,7 @@ struct NumShortestPaths {
                              SyncPullLength>("NumShortestPaths");
         resetFlags(current_length_flags);
       } else if (current_length_flags.src_write) {
-        _graph.sync_backward<SyncPushLength, 
+        _graph.sync<writeSource, readDestination, SyncPushLength, 
                              SyncPullLength>("NumShortestPaths");
         resetFlags(current_length_flags);
       } else if (current_length_flags.dst_write) {
@@ -1035,13 +1035,13 @@ struct NumShortestPaths {
       //  // the flag is set)
       //  // TODO: also, find a way to make it more efficient instead of a
       //  // broadcast every round like what it's doing now
-      //  _graph.sync_backward<SyncPushLength, SyncPullLength>("PredAndSucc");
+      //  _graph.sync<writeSource, readDestination, SyncPushLength, SyncPullLength>("PredAndSucc");
       //}
 
       // READ SRC prop flag; should never happen since we never write to 
       // dst flag before this
       //if (propogation_flag_flags.dst_write) {
-      //  _graph.sync_forward<SyncPushFlag, SyncPullFlag>("NumShortestPaths");
+      //  _graph.sync<writeDestination, readSource, SyncPushFlag, SyncPullFlag>("NumShortestPaths");
       //  resetFlags(propogation_flag_flags);
       //}
 
@@ -1128,7 +1128,7 @@ struct PropFlagReset {
 };
 
 /* Uses an incremented trim value to decrement the successor: the trim value
- * has to be synchronized across ALL nodes (including slaves) */
+ * has to be synchronized across ALL nodes (including mirrors) */
 struct SuccessorDecrement {
   Graph* graph;
 
@@ -1141,7 +1141,7 @@ struct SuccessorDecrement {
       std::cerr << "BIG ISSUE, shouldn't be incrementing trim on dst\n";
       abort();
       // SHOULD NEVER GET IN HERE AT THIS POINT
-      //_graph.sync_forward<SyncPushTrim, SyncPullTrim>("SuccessorDecrement");
+      //_graph.sync<writeDestination, readSource, SyncPushTrim, SyncPullTrim>("SuccessorDecrement");
       //resetFlags(trim_flags);
     }
 
@@ -1555,7 +1555,7 @@ struct DependencyPropogation {
         std::cerr << "num successors dst flag set\n";
         abort();
       } else if (num_successors_flags.src_write) {
-        _graph.sync_backward<SyncPushSucc, 
+        _graph.sync<writeSource, readDestination, SyncPushSucc, 
                              SyncPullSucc>("DependencyPropogation");
         resetFlags(num_successors_flags);
       } else if (num_successors_flags.dst_write) {
@@ -1571,7 +1571,7 @@ struct DependencyPropogation {
                              SyncPullLength>("DependencyPropogation");
         resetFlags(current_length_flags);
       } else if (current_length_flags.src_write) {
-        _graph.sync_backward<SyncPushLength, 
+        _graph.sync<writeSource, readDestination, SyncPushLength, 
                              SyncPullLength>("DependencyPropogation");
         resetFlags(current_length_flags);
       } else if (current_length_flags.dst_write) {
@@ -1587,7 +1587,7 @@ struct DependencyPropogation {
         std::cerr << "propogation flag dst flag set\n";
         abort();
       } else if (propogation_flag_flags.src_write) {
-        _graph.sync_backward<SyncPushFlag, 
+        _graph.sync<writeSource, readDestination, SyncPushFlag, 
                              SyncPullFlag>("DependencyPropogation");
         resetFlags(propogation_flag_flags);
       } else if (propogation_flag_flags.dst_write) {
@@ -1603,7 +1603,7 @@ struct DependencyPropogation {
                              SyncPullPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.src_write) {
-        _graph.sync_backward<SyncPushPaths, 
+        _graph.sync<writeSource, readDestination, SyncPushPaths, 
                              SyncPullPaths>("DependencyPropogation");
         resetFlags(num_shortest_paths_flags);
       } else if (num_shortest_paths_flags.dst_write) {
@@ -1618,7 +1618,7 @@ struct DependencyPropogation {
                              SyncPullDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       } else if (dependency_flags.src_write) {
-        _graph.sync_backward<SyncPushDependency, 
+        _graph.sync<writeSource, readDestination, SyncPushDependency, 
                              SyncPullDependency>("DependencyPropogation");
         resetFlags(dependency_flags);
       } else if (dependency_flags.dst_write) {

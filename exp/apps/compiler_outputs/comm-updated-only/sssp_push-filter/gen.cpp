@@ -120,10 +120,10 @@ struct InitializeGraph {
   cll::opt<unsigned int> &local_src_node;
   Graph *graph;
 
-  InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
+  InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -154,14 +154,14 @@ struct InitializeGraph {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct Syncer_vertexCut_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -171,14 +171,14 @@ struct InitializeGraph {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -214,9 +214,9 @@ struct InitializeGraph {
     #endif
     {
     bitset_dist_current.clear();
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     }
-    _graph.sync_backward<Syncer_vertexCut_0, SyncerPull_0>("InitializeGraph", bitset_dist_current);
+    _graph.sync<writeSource, readDestination, Reduce_0, Broadcast_0>("InitializeGraph", bitset_dist_current);
     
   }
 
@@ -240,7 +240,7 @@ void static go(Graph& _graph) {
 			__begin = 0;
 			__end = 0;
 		}
-	struct Syncer_0 {
+	struct Reduce_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -250,14 +250,14 @@ void static go(Graph& _graph) {
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
 		}
 		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -281,7 +281,7 @@ void static go(Graph& _graph) {
 		}
 		typedef unsigned int ValTy;
 	};
-	struct SyncerPull_vertexCut_0 {
+	struct Broadcast_0 {
 		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -312,7 +312,7 @@ void static go(Graph& _graph) {
 		}
 		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
 		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+			if (personality == GPU_CUDA) { batch_set_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
 			assert (personality == CPU);
 		#endif
 			return false;
@@ -331,9 +331,9 @@ void static go(Graph& _graph) {
 #endif
 {
 bitset_dist_current.clear();
-Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
 }
-_graph.sync_forward<Syncer_0, SyncerPull_vertexCut_0>("SSSP", bitset_dist_current);
+_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
 
@@ -359,7 +359,6 @@ struct SSSP {
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> dChunk;
     
     FirstItr_SSSP::go(_graph);
     
@@ -368,7 +367,7 @@ struct SSSP {
     do { 
      _graph.set_num_iter(_num_iterations);
     DGAccumulator_accum.reset();
-    	struct Syncer_0 {
+    	struct Reduce_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -378,14 +377,14 @@ struct SSSP {
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_slave_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
+    			if (personality == GPU_CUDA) { batch_get_mirror_node_dist_current_cuda(cuda_ctx, from_id, y); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
@@ -409,7 +408,7 @@ struct SSSP {
     		}
     		typedef unsigned int ValTy;
     	};
-    	struct SyncerPull_vertexCut_0 {
+    	struct Broadcast_0 {
     		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
@@ -440,56 +439,30 @@ struct SSSP {
     		}
     		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
     		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_slave_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
+    			if (personality == GPU_CUDA) { batch_set_mirror_node_dist_current_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
     			assert (personality == CPU);
     		#endif
     			return false;
     		}
     		typedef unsigned int ValTy;
     	};
-    unsigned int totalSize = std::distance(_graph.begin(), _graph.end());
-    if (totalSize > 0) {
-    unsigned int pipeSize = totalSize / numPipelinedPhases;
-    assert(pipeSize > numPipelinedPhases);
-    if ((totalSize % numPipelinedPhases) > 0) ++pipeSize;
-    assert((pipeSize * numPipelinedPhases) >= totalSize);
-    for (unsigned int __begin = 0; __begin < totalSize; __begin+=pipeSize) {
-      unsigned int __end = __begin + pipeSize;
-      if (__end > totalSize) __end = totalSize;
-      unsigned int stepTotalSize = __end - __begin;
-      unsigned int stepSize = stepTotalSize / numComputeSubsteps;
-      assert(stepSize > numComputeSubsteps);
-      if ((stepTotalSize % numComputeSubsteps) > 0) ++stepSize;
-      assert((stepSize * numComputeSubsteps) >= stepTotalSize);
-      for (unsigned int __begin2 = __begin; __begin2 < __end; __begin2+=stepSize) {
-        unsigned int __end2 = __begin2 + stepSize;
-        if (__end2 > __end) __end2 = __end;
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          if (__begin2 == __begin) bitset_dist_current_clear_cuda(cuda_ctx);
+          bitset_dist_current_clear_cuda(cuda_ctx);
           std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
           int __retval = 0;
-          //SSSP_all_cuda(__retval, cuda_ctx);
-          SSSP_cuda(__begin2, __end2, __retval, cuda_ctx);
+          SSSP_all_cuda(__retval, cuda_ctx);
           DGAccumulator_accum += __retval;
           StatTimer_cuda.stop();
         } else if (personality == CPU)
       #endif
         {
-          if (__begin2 == __begin) bitset_dist_current.clear();
-          Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, SSSP (&_graph), Galois::loopname("SSSP"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
+          bitset_dist_current.clear();
+          Galois::do_all(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("SSSP"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
         }
-      }
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("SSSP", bitset_dist_current);
-    }
-    } else {
-    for (unsigned int __begin = 0; __begin < numPipelinedPhases; ++__begin) {
-      _graph.sync_forward_pipe<Syncer_0, SyncerPull_vertexCut_0>("BFS", bitset_dist_current);
-    }
-    }
-    _graph.sync_forward_wait<Syncer_0, SyncerPull_vertexCut_0>("SSSP", bitset_dist_current);
+    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
@@ -576,13 +549,13 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg;
-    if(enableVCut){
-      if (numPipelinedPhases > 1) {
-        numPipelinedPhases = 1;
-        if (net.ID == 0) {
-          std::cerr << "WARNING: numPipelinedPhases is not supported for vertex-cut\n";
-        }
+    if (numPipelinedPhases > 1) {
+      numPipelinedPhases = 1;
+      if (net.ID == 0) {
+        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
       }
+    }
+    if(enableVCut){
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile,partFolder, net.ID, net.Num, scalefactor, transpose);
       else if(vertexcut == PL_VCUT)

@@ -20,11 +20,11 @@ struct CUDA_Context {
 	CSRGraphTy gg;
 	unsigned int *num_master_nodes; // per host
 	Shared<unsigned int> *master_nodes; // per host
-	unsigned int *num_slave_nodes; // per host
-	Shared<unsigned int> *slave_nodes; // per host
+	unsigned int *num_mirror_nodes; // per host
+	Shared<unsigned int> *mirror_nodes; // per host
 	Shared<unsigned int> dist_current;
 	Shared<unsigned int> *master_dist_current; // per host
-	Shared<unsigned int> *slave_dist_current; // per host
+	Shared<unsigned int> *mirror_dist_current; // per host
 };
 
 unsigned int get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -57,30 +57,30 @@ void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	memcpy(v, ctx->master_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
 }
 
-void batch_get_slave_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
+void batch_get_mirror_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_dist_current[from_id].gpu_wr_ptr(true), ctx->dist_current.gpu_rd_ptr());
+	batch_get_subset<unsigned int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_dist_current[from_id].gpu_wr_ptr(true), ctx->dist_current.gpu_rd_ptr());
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	batch_get_reset_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_dist_current[from_id].gpu_wr_ptr(true), ctx->dist_current.gpu_rd_ptr(), i);
+	batch_get_reset_subset<unsigned int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_dist_current[from_id].gpu_wr_ptr(true), ctx->dist_current.gpu_rd_ptr(), i);
 	check_cuda_kernel;
-	memcpy(v, ctx->slave_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
+	memcpy(v, ctx->mirror_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_mirror_nodes[from_id]);
 }
 
 void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(ctx->gg, blocks, threads);
-	memcpy(ctx->slave_dist_current[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
-	batch_set_subset<unsigned int> <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_dist_current[from_id].gpu_rd_ptr(), ctx->dist_current.gpu_wr_ptr());
+	memcpy(ctx->mirror_dist_current[from_id].cpu_wr_ptr(true), v, sizeof(unsigned int) * ctx->num_mirror_nodes[from_id]);
+	batch_set_subset<unsigned int> <<<blocks, threads>>>(ctx->num_mirror_nodes[from_id], ctx->mirror_nodes[from_id].gpu_rd_ptr(), ctx->mirror_dist_current[from_id].gpu_rd_ptr(), ctx->dist_current.gpu_wr_ptr());
 	check_cuda_kernel;
 }
 
@@ -153,15 +153,15 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 			ctx->master_dist_current[h].alloc(ctx->num_master_nodes[h]);
 		}
 	}
-	ctx->num_slave_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
-	memcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);
-	ctx->slave_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
-	ctx->slave_dist_current = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+	ctx->num_mirror_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));
+	memcpy(ctx->num_mirror_nodes, g.num_mirror_nodes, sizeof(unsigned int) * num_hosts);
+	ctx->mirror_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
+	ctx->mirror_dist_current = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));
 	for(uint32_t h = 0; h < num_hosts; ++h){
-		if (ctx->num_slave_nodes[h] > 0) {
-			ctx->slave_nodes[h].alloc(ctx->num_slave_nodes[h]);
-			memcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->num_slave_nodes[h]);
-			ctx->slave_dist_current[h].alloc(ctx->num_slave_nodes[h]);
+		if (ctx->num_mirror_nodes[h] > 0) {
+			ctx->mirror_nodes[h].alloc(ctx->num_mirror_nodes[h]);
+			memcpy(ctx->mirror_nodes[h].cpu_wr_ptr(), g.mirror_nodes[h], sizeof(unsigned int) * ctx->num_mirror_nodes[h]);
+			ctx->mirror_dist_current[h].alloc(ctx->num_mirror_nodes[h]);
 		}
 	}
 	graph.copy_to_gpu(ctx->gg);
