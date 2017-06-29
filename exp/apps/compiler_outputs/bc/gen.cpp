@@ -25,10 +25,6 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-////////////////////////////////////////////////////////////////////////////////
-// IMPORTANT: THIS CODE ONLY WORKS FOR OUTGOING EDGE CUTS
-////////////////////////////////////////////////////////////////////////////////
-
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -196,7 +192,7 @@ typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
-// bitset for tracking updates
+// bitsets for tracking updates
 //Galois::DynamicBitSet bitset_update;
 //Galois::DynamicBitSet bitset_update_succ;
 //Galois::DynamicBitSet bitset_update_flag;
@@ -221,22 +217,12 @@ struct InitializeGraph {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    // sync unnecessary if I loop through all nodes (using ghost_end)
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), InitializeGraph{&_graph}, 
+
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
-
-    // TODO fix this
-    //_graph.sync<writeSource, readDestination, 
-    //            Reduce_betweeness_centrality, 
-    //            Broadcast_betweeness_centrality>("InitializeIteration");
-    // TODO set reduce
-
-    // technically I would set the betweeness-cent flag here, but assuming
-    // OEC only it will never matter as we never read/write from dst's bet-cet
-    // measure
-    // TODO technically a reset should be broadcast as it's a non reduction
-    // write
+    // doesn't need to be sync'd on destinations: we never read it on 
+    // destination nor write to it
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -277,29 +263,25 @@ struct InitializeIteration {
                    Galois::loopname("InitializeIteration"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
-    // broadcast ALL reset values (inefficient, but this is initialization +
-    // it's to guarantee a hard reset on slave nodes because otherwise in this
-    // scheme you now have to track non-reduce writes, which these are)
+    // broadcast ALL reset values (inefficient, but this is initialization)
 
-    // note the pushes structures' reduce has been set to ignore (i.e.
-    // push reduce does nothing as I'm only interested in the broadcast)
     // TODO set reduce
-    _graph.sync<writeSource, readDestination, 
-                ReduceLength, BroadcastLength>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                ReduceSet_propogation_flag, Broadcast_propogation_flag>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_current_length, 
+                Broadcast_current_length>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_propogation_flag, 
+                Broadcast_propogation_flag>("InitializeIteration");
     _graph.sync<writeSource, readDestination, ReduceSet_num_successors, 
                 Broadcast_num_successors>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                ReducePred, BroadcastPred>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                ReduceTrim, BroadcastTrim>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                ReducePaths, BroadcastPaths>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                ReduceDependency, BroadcastDependency>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, 
-                Reduce_old_length, Broadcast_old_length>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_old_length,
+                Broadcast_old_length>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_num_predecessors, 
+                Broadcast_num_predecessors>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_trim,
+                Broadcast_trim>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_num_shortest_paths,
+                Broadcast_num_shortest_paths>("InitializeIteration");
+    _graph.sync<writeSource, readDestination, ReduceSet_dependency,
+                Broadcast_dependency>("InitializeIteration");
 
   }
 
@@ -363,7 +345,7 @@ struct FirstIterationSSSP {
 
     // Next op will read src, current length
     _graph.sync<writeDestination, readSource, 
-                ReduceLength, BroadcastLength>("FirstIterationSSSP");
+                Reduce_current_length, Broadcast_current_length>("FirstIterationSSSP");
   }
 
   /* Does SSSP, push/filter based */
@@ -427,14 +409,14 @@ struct SSSP {
       
       // Next iter will read src, current length
       _graph.sync<writeDestination, readSource, 
-                  ReduceLength, BroadcastLength>("SSSP");
+                  Reduce_current_length, Broadcast_current_length>("SSSP");
 
       iterations++;
     } while (DGAccumulator_accum.reduce());
 
     // Next op will also read at dest; do sync now
     _graph.sync<writeDestination, readDestination, 
-                ReduceLength, BroadcastLength>("SSSP");
+                Reduce_current_length, Broadcast_current_length>("SSSP");
   }
 
   /* Does SSSP, push/filter based */
@@ -494,7 +476,7 @@ struct PredAndSucc {
 
     // sync for use in NumShortPath calculation
     _graph.sync<writeDestination, readSource, 
-                ReducePred, BroadcastPred>("PredAndSucc");
+                Reduce_num_predecessors, Broadcast_num_predecessors>("PredAndSucc");
 
     // sync now for later DependencyPropogation use (read src/dst)
     _graph.sync<writeSource, readAny, Reduce_num_successors, 
@@ -574,7 +556,7 @@ struct PredecessorDecrement {
         abort();                                    
       }
 
-      src_data.num_predecessors -= src_data.trim;
+      src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
       src_data.trim = 0;
 
       // if I hit 0 predecessors, set the flag to false (i.e. says
@@ -623,9 +605,9 @@ struct NumShortestPaths {
                      Galois::loopname("NumShortestPaths"));
 
       _graph.sync<writeDestination, readSource, 
-                  ReduceTrim, BroadcastTrim>("NumShortestPaths");
-      _graph.sync<writeDestination, readSource, 
-                  ReducePaths, BroadcastPaths>("NumShortestPaths");
+                  Reduce_trim, Broadcast_trim>("NumShortestPaths");
+      _graph.sync<writeDestination, readSource, Reduce_num_shortest_paths, 
+                  Broadcast_num_shortest_paths>("NumShortestPaths");
 
       // do predecessor decrementing using trim
       PredecessorDecrement::go(_graph);
@@ -634,8 +616,8 @@ struct NumShortestPaths {
     } while (DGAccumulator_accum.reduce());
 
     // at this point # short paths read on dest as well for next ops
-    _graph.sync<writeDestination, readDestination, 
-                ReducePaths, BroadcastPaths>("NumShortestPaths");
+    _graph.sync<writeDestination, readDestination, Reduce_num_shortest_paths, 
+                Broadcast_num_shortest_paths>("NumShortestPaths");
 
   }
 
@@ -757,7 +739,7 @@ struct SuccessorDecrement {
         abort();                                    
       }
 
-      src_data.num_successors -= src_data.trim;
+      src_data.num_successors = src_data.num_successors - src_data.trim;
       src_data.trim = 0;
       //bitset_update_succ.set(src);
 
@@ -813,22 +795,22 @@ struct DependencyPropogation {
       std::cout << "testing\n";
 
       // sync trim
-      _graph.sync<writeSource, readSource, ReduceTrim, 
-                  BroadcastTrim>("DependencyPropogation");
+      _graph.sync<writeSource, readSource, Reduce_trim, 
+                  Broadcast_trim>("DependencyPropogation");
 
       // do successor decrementing using trim
       SuccessorDecrement::go(_graph);
 
       // sync dependency
-      _graph.sync<writeSource, readDestination, ReduceDependency,
-                  BroadcastDependency>("DependencyPropogation");
+      _graph.sync<writeSource, readDestination, Reduce_dependency,
+                  Broadcast_dependency>("DependencyPropogation");
 
       iterations++;
     } while (DGAccumulator_accum.reduce());
 
     // grab final dependencies for bc calculation next step
-    _graph.sync<writeSource, readSource, ReduceDependency,
-                BroadcastDependency>("DependencyPropogation");
+    _graph.sync<writeSource, readSource, Reduce_dependency,
+                Broadcast_dependency>("DependencyPropogation");
   }
 
 
@@ -1030,7 +1012,8 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
 
-    Graph* h_graph;
+    Graph* h_graph = nullptr;
+
     if (enableVCut) {
       if (vertexcut == CART_VCUT)
         h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
