@@ -82,8 +82,8 @@ static cll::opt<std::string> partFolder("partFolder",
                                         cll::desc("path to partitionFolder"),
                                         cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 1000000"), 
-                               cll::init(1000000));
+                               cll::desc("Maximum iterations: Default 10000"), 
+                               cll::init(10000));
 static cll::opt<bool> transpose("transpose", 
                                 cll::desc("transpose the graph in memory after "
                                           "partitioning"),
@@ -179,11 +179,6 @@ struct NodeData {
 // sync structures
 #include "gen_sync.h"
 
-struct WriteStatus {
-  bool src_write;
-  bool dst_write;
-};
-
 // second type (unsigned int) is for edge weights
 typedef hGraph<NodeData, unsigned int> Graph;
 typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
@@ -263,9 +258,9 @@ struct InitializeIteration {
                    Galois::loopname("InitializeIteration"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
-    // broadcast ALL reset values (inefficient, but this is initialization)
+    //printf("infinity + 1 is %u\n", infinity + 1);
 
-    // TODO set reduce
+    // broadcast ALL reset values (inefficient, but this is initialization)
     _graph.sync<writeSource, readDestination, ReduceSet_current_length, 
                 Broadcast_current_length>("InitializeIteration");
     _graph.sync<writeSource, readDestination, ReduceSet_propogation_flag, 
@@ -282,7 +277,6 @@ struct InitializeIteration {
                 Broadcast_num_shortest_paths>("InitializeIteration");
     _graph.sync<writeSource, readDestination, ReduceSet_dependency,
                 Broadcast_dependency>("InitializeIteration");
-
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -334,7 +328,7 @@ struct FirstIterationSSSP {
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        FirstIterationSSSP_all_cuda(cuda_ctx);
+        FirstIterationSSSP_cuda(__begin, __end, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -344,8 +338,27 @@ struct FirstIterationSSSP {
                    Galois::loopname("FirstIterationSSSP"));
 
     // Next op will read src, current length
-    _graph.sync<writeDestination, readSource, 
-                Reduce_current_length, Broadcast_current_length>("FirstIterationSSSP");
+    _graph.sync<writeDestination, readSource, Reduce_current_length, 
+                Broadcast_current_length>("FirstIterationSSSP");
+
+    //Galois::Runtime::printOutput("mark1");
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) 
+    //      sprintf(test, "len %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_current_length_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) 
+    //      sprintf(test, "len %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).current_length.load());
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
   }
 
   /* Does SSSP, push/filter based */
@@ -385,6 +398,8 @@ struct SSSP {
     // starts at 1 since FirstSSSP takes care of the first one
     unsigned int iterations = 1;
 
+    unsigned int accum_result;
+
     do {
       _graph.set_num_iter(iterations);
       DGAccumulator_accum.reset();
@@ -407,16 +422,42 @@ struct SSSP {
       Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
                      Galois::loopname("SSSP"));
       
-      // Next iter will read src, current length
-      _graph.sync<writeDestination, readSource, 
-                  Reduce_current_length, Broadcast_current_length>("SSSP");
 
       iterations++;
-    } while (DGAccumulator_accum.reduce());
 
-    // Next op will also read at dest; do sync now
-    _graph.sync<writeDestination, readDestination, 
-                Reduce_current_length, Broadcast_current_length>("SSSP");
+      accum_result = DGAccumulator_accum.reduce();
+
+      if (accum_result) {
+        // sync on source
+        _graph.sync<writeDestination, readSource, Reduce_current_length, 
+                    Broadcast_current_length>("SSSP");
+
+      } else {
+        // sync both
+        _graph.sync<writeDestination, readAny, Reduce_current_length, 
+                    Broadcast_current_length>("SSSP");
+      }
+    } while (accum_result);
+    //} while (iterations < maxIterations);
+
+    //Galois::Runtime::printOutput("mark2");
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) 
+    //      sprintf(test, "len %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_current_length_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) 
+    //      sprintf(test, "len %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).current_length.load());
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
   }
 
   /* Does SSSP, push/filter based */
@@ -481,6 +522,42 @@ struct PredAndSucc {
     // sync now for later DependencyPropogation use (read src/dst)
     _graph.sync<writeSource, readAny, Reduce_num_successors, 
                 Broadcast_num_successors>("PredAndSucc");
+
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "succ %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_num_successors_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "succ %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).num_successors);
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
+
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "pred %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_num_predecessors_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "pred %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).num_predecessors.load());
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
   }
 
   /* Summary:
@@ -582,6 +659,8 @@ struct NumShortestPaths {
   void static go(Graph& _graph) {
     unsigned int iterations = 0;
 
+    unsigned int accum_result;
+
     do {
       _graph.set_num_iter(iterations);
       DGAccumulator_accum.reset();
@@ -606,19 +685,41 @@ struct NumShortestPaths {
 
       _graph.sync<writeDestination, readSource, 
                   Reduce_trim, Broadcast_trim>("NumShortestPaths");
-      _graph.sync<writeDestination, readSource, Reduce_num_shortest_paths, 
-                  Broadcast_num_shortest_paths>("NumShortestPaths");
-
       // do predecessor decrementing using trim
       PredecessorDecrement::go(_graph);
 
       iterations++;
-    } while (DGAccumulator_accum.reduce());
 
-    // at this point # short paths read on dest as well for next ops
-    _graph.sync<writeDestination, readDestination, Reduce_num_shortest_paths, 
-                Broadcast_num_shortest_paths>("NumShortestPaths");
+      accum_result = DGAccumulator_accum.reduce();
 
+      if (accum_result) {
+        // sync on source
+        _graph.sync<writeDestination, readSource, Reduce_num_shortest_paths, 
+                    Broadcast_num_shortest_paths>("NumShortestPaths");
+      } else {
+        // sync both
+        _graph.sync<writeDestination, readAny, Reduce_num_shortest_paths, 
+                    Broadcast_num_shortest_paths>("NumShortestPaths");
+      }
+    } while (accum_result);
+
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "paths %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_num_shortest_paths_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "paths %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).num_shortest_paths.load());
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
   }
 
   /* If a source has no more predecessors, then its shortest path value is
@@ -679,6 +780,16 @@ struct PropFlagReset {
   PropFlagReset(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_PropFlagReset_" + 
+                             (_graph.get_run_identifier()));
+        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        StatTimer_cuda.start();
+        PropFlagReset_all_cuda(cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
+    #endif
     Galois::do_all(_graph.begin(), _graph.end(), PropFlagReset{&_graph}, 
                    Galois::loopname("PropFlagReset"), 
                    Galois::numrun(_graph.get_run_identifier()));
@@ -772,6 +883,8 @@ struct DependencyPropogation {
 
     unsigned int iterations = 0;
     
+    unsigned int accum_result;
+
     do {
       _graph.set_num_iter(iterations);
       DGAccumulator_accum.reset();
@@ -786,13 +899,13 @@ struct DependencyPropogation {
         int __retval = 0;
         DependencyPropogation_all_cuda(__retval, current_src_node, cuda_ctx);
         DGAccumulator_accum += __retval;
+        //printf("retval is %d\n", __retval);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       Galois::do_all(_graph.begin(), _graph.end(), 
                      DependencyPropogation(current_src_node, &_graph), 
                      Galois::loopname("DependencyPropogation"));
-      std::cout << "testing\n";
 
       // sync trim
       _graph.sync<writeSource, readSource, Reduce_trim, 
@@ -801,36 +914,91 @@ struct DependencyPropogation {
       // do successor decrementing using trim
       SuccessorDecrement::go(_graph);
 
-      // sync dependency
-      _graph.sync<writeSource, readDestination, Reduce_dependency,
-                  Broadcast_dependency>("DependencyPropogation");
 
       iterations++;
-    } while (DGAccumulator_accum.reduce());
+      accum_result = DGAccumulator_accum.reduce();
 
-    // grab final dependencies for bc calculation next step
-    _graph.sync<writeSource, readSource, Reduce_dependency,
-                Broadcast_dependency>("DependencyPropogation");
+      if (accum_result) {
+        // sync dependency
+        _graph.sync<writeSource, readDestination, Reduce_dependency,
+                    Broadcast_dependency>("DependencyPropogation");
+
+      } else {
+        // sync dep  on source for bc read
+        // TODO do you need to sync on dest anymore?
+        _graph.sync<writeSource, readSource, Reduce_dependency,
+                    Broadcast_dependency>("DependencyPropogation");
+      }
+    } while (accum_result);
+    //} while (iterations < maxIterations);
+
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "dep %lu %f\n", (_graph).getGID(*ii),
+    //              get_node_dependency_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "dep %lu %f\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).dependency);
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "succ %lu %u\n", (_graph).getGID(*ii),
+    //              get_node_num_successors_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "succ %lu %u\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).num_successors);
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "flag %lu %d\n", (_graph).getGID(*ii),
+    //              get_node_propogation_flag_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
+    //    if ((_graph).isOwned((_graph).getGID(*ii))) 
+    //      sprintf(test, "flag %lu %d\n", (_graph).getGID(*ii),
+    //              _graph.getData(*ii).propogation_flag);
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
   }
 
-
   /* Summary:
-   * TOP based, but can filter if successors = 0; can do trim based decrement
-   * like kcore
    * if we have outgoing edges...
    * for each node, check if dest of edge has no successors + check if on 
    * shortest path with src as predeccesor
    *
    * if yes, then decrement src successors by 1 + grab dest delta + dest num 
-   * shortest * paths and use it to increment src own delta (1 / dest short 
-   * paths * (1 + delta of dest)
+   * shortest * paths and use it to increment src own delta
    **/
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     // IGNORE THE SOURCE NODE OF THIS CURRENT ITERATION OF SSSP
     // + do not redo computation if src has no successors left
-    if (!(graph->getGID(src) == local_current_src_node || src_data.num_successors == 0)) {
+    if (src_data.num_successors > 0 && graph->getGID(src) != local_current_src_node) {
       for (auto current_edge = graph->edge_begin(src), 
                 end_edge = graph->edge_end(src); 
            current_edge != end_edge; 
@@ -855,7 +1023,8 @@ struct DependencyPropogation {
             // update my dependency
             // TODO revert to saving multiplication till the end?
             // cuda gen causes this all to be on one line; annoying
-            src_data.dependency = src_data.dependency + (((float)src_data.num_shortest_paths / (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency));
+            //src_data.dependency = src_data.dependency + (((float)src_data.num_shortest_paths / (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency));
+            Galois::add(src_data.dependency, (((float)src_data.num_shortest_paths / (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency)));
 
             //bitset_update.set(src);
 
@@ -896,28 +1065,27 @@ struct BC {
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
-      std::cout << "InitIter done\n";
+      //std::cout << "InitIter done\n";
 
       // get SSSP on the current graph
       SSSP::go(_graph);
-      std::cout << "SSSP done\n";
+      //std::cout << "SSSP done\n";
 
-      // calculate the succ/pred for all nodes in the SSSP DAG
+      //// calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
-      std::cout << "PredSucc done\n";
+      //std::cout << "PredSucc done\n";
 
-      // calculate the number of shortest paths for each node
+      //// calculate the number of shortest paths for each node
       NumShortestPaths::go(_graph);
-      std::cout << "NumShortPaths done\n";
+      //std::cout << "NumShortPaths done\n";
 
-      // RESET PROP FLAG
+      //// RESET PROP FLAG
       PropFlagReset::go(_graph);
-      std::cout << "PropFlagReset done\n";
+      //std::cout << "PropFlagReset done\n";
 
-      // do between-cent calculations for this iteration 
+      //// do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph);
-      std::cout << "DepProp done\n";
-
+      //std::cout << "DepProp done\n";
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
@@ -945,7 +1113,7 @@ struct BC {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    src_data.betweeness_centrality = src_data.betweeness_centrality + src_data.dependency;
+    Galois::add(src_data.betweeness_centrality, src_data.dependency);
   }
 };
  

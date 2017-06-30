@@ -357,12 +357,12 @@ if(USE_GGC)
 endif()
 
 app(bc bc/gen.cpp DISTSAFE)
-#if(USE_GGC)
-#  target_compile_definitions(bc PRIVATE __GALOIS_HET_CUDA__=1)
-#  target_link_libraries(bc bc_cuda galois_exp)
-#  cuda_add_library(bc_cuda bc/gen_cuda.cu)
-#  target_link_libraries(bc_cuda ggrt)
-#endif()
+if(USE_GGC)
+  target_compile_definitions(bc PRIVATE __GALOIS_HET_CUDA__=1)
+  target_link_libraries(bc bc_cuda galois_exp)
+  cuda_add_library(bc_cuda bc/gen_cuda.cu)
+  target_link_libraries(bc_cuda ggrt)
+endif()
 
 
 #### CheckPointing ####

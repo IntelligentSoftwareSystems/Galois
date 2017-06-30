@@ -101,8 +101,8 @@ struct ReduceSet_num_shortest_paths {
                                   DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -113,7 +113,7 @@ struct ReduceSet_num_shortest_paths {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_num_shortest_paths_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_num_shortest_paths_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -287,7 +287,6 @@ struct Reduce_num_successors {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-
       batch_add_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
@@ -329,8 +328,8 @@ struct ReduceSet_num_successors {
                                   DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -341,7 +340,7 @@ struct ReduceSet_num_successors {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_num_successors_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_num_successors_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -370,7 +369,6 @@ struct ReduceSet_num_successors {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-
       batch_set_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
                                          data_mode);
       return true;
@@ -521,7 +519,6 @@ struct Reduce_num_predecessors {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-
       batch_add_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
@@ -531,7 +528,7 @@ struct Reduce_num_predecessors {
     return false;
   }
 
-  static void reset (uint32_t node_id, struct NodeData & node) {
+  static void reset(uint32_t node_id, struct NodeData & node) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       set_node_num_predecessors_cuda(cuda_ctx, node_id, 0);
@@ -563,8 +560,8 @@ struct ReduceSet_num_predecessors {
                                   DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -575,7 +572,7 @@ struct ReduceSet_num_predecessors {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_num_predecessors_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_num_predecessors_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -679,7 +676,7 @@ struct Broadcast_num_predecessors {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       batch_set_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
-                               data_mode);
+                                           data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -792,8 +789,7 @@ struct ReduceSet_trim {
                                   DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -804,7 +800,7 @@ struct ReduceSet_trim {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_trim_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_trim_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -932,8 +928,8 @@ struct Reduce_current_length {
                                   size_t *s, DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -944,7 +940,7 @@ struct Reduce_current_length {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_current_length_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -952,8 +948,7 @@ struct Reduce_current_length {
     return false;
   }
 
-  static bool reduce(uint32_t node_id, struct NodeData & node, 
-                     ValTy y) {
+  static bool reduce(uint32_t node_id, struct NodeData & node, ValTy y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       return min_node_current_length_cuda(cuda_ctx, node_id, y);
@@ -1002,8 +997,8 @@ struct ReduceSet_current_length {
                                   size_t *s, DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -1014,7 +1009,7 @@ struct ReduceSet_current_length {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_current_length_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_current_length_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -1145,8 +1140,8 @@ struct ReduceSet_old_length {
                                   size_t *s, DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_old_length_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_old_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -1157,7 +1152,7 @@ struct ReduceSet_old_length {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_old_length_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_old_length_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);
@@ -1286,8 +1281,9 @@ struct ReduceSet_propogation_flag {
                                   size_t *s, DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, 
-                                                 (bool*)y, s, data_mode, 0);
+      batch_get_mirror_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, 
+                                                  (bool*)y, s, data_mode);
+                                                  
       return true;
     }
     assert (personality == CPU);
@@ -1298,8 +1294,7 @@ struct ReduceSet_propogation_flag {
   static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_propogation_flag_cuda(cuda_ctx, from_id, 
-                                                 (bool*)y, 0);
+      batch_get_mirror_node_propogation_flag_cuda(cuda_ctx, from_id, (bool*)y);
       return true;
     }
     assert (personality == CPU);
@@ -1507,8 +1502,8 @@ struct ReduceSet_dependency {
                                   DataCommMode *data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) { 
-      batch_get_reset_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
-                                     data_mode, 0);
+      batch_get_mirror_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                     data_mode);
       return true;
     }
     assert (personality == CPU);
@@ -1519,7 +1514,7 @@ struct ReduceSet_dependency {
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_get_reset_node_dependency_cuda(cuda_ctx, from_id, y, 0);
+      batch_get_mirror_node_dependency_cuda(cuda_ctx, from_id, y);
       return true;
     }
     assert (personality == CPU);

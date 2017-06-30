@@ -689,11 +689,9 @@ __global__ void PredecessorDecrement(CSRGraph graph, unsigned int __nowned, unsi
       {
         if (p_trim[src] > p_num_predecessors[src])
         {
-          // shouldn't get here
-          //continue;
           //abort();
         }
-        p_num_predecessors[src] -= p_trim[src];
+        p_num_predecessors[src] = p_num_predecessors[src] - p_trim[src];
         p_trim[src] = 0;
         if (p_num_predecessors[src] == 0)
         {
@@ -807,7 +805,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
             atomicAdd(&p_num_shortest_paths[dst], to_add);
             atomicAdd(&p_trim[dst], (unsigned int)1);
             ret_val.do_return( 1);
-            continue;
+            //continue;
           }
         }
       }
@@ -851,7 +849,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
               atomicAdd(&p_num_shortest_paths[dst], to_add);
               atomicAdd(&p_trim[dst], (unsigned int)1);
               ret_val.do_return( 1);
-              continue;
+              //continue;
             }
           }
         }
@@ -886,7 +884,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
             atomicAdd(&p_num_shortest_paths[dst], to_add);
             atomicAdd(&p_trim[dst], (unsigned int)1);
             ret_val.do_return( 1);
-            continue;
+            //continue;
           }
         }
       }
@@ -935,20 +933,20 @@ __global__ void SuccessorDecrement(CSRGraph graph, unsigned int __nowned, unsign
       if (p_num_successors[src] == 0 && !p_propogation_flag[src])
       {
         p_propogation_flag[src] = true;
-        if (p_trim[src] > 0)
+        continue;
+      }
+      // Had to edit this here
+      if (p_trim[src] > 0)
+      {
+        if (p_trim[src] > p_num_successors[src])
         {
-          if (p_trim[src] > p_num_successors[src])
-          {
-            // shouldn't get here
-            //continue;
-            //abort();
-          }
-          p_num_successors[src] -= p_trim[src];
-          p_trim[src] = 0;
-          if (p_num_successors[src] == 0)
-          {
-            p_propogation_flag[src] = false;
-          }
+          //abort();
+        }
+        p_num_successors[src] = p_num_successors[src] - p_trim[src];
+        p_trim[src] = 0;
+        if (p_num_successors[src] == 0)
+        {
+          p_propogation_flag[src] = false;
         }
       }
     }
@@ -989,10 +987,12 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
     bool pop  = src < __end;
     if (pop)
     {
-      if (graph.node_data[src] == local_current_src_node || p_num_successors[src] == 0)
+      if (p_num_successors[src] > 0 && graph.node_data[src] != local_current_src_node)
       {
-        // added in lieu of return in actual code
-        continue;
+      }
+      else
+      {
+        pop = false;
       }
     }
     struct NPInspector1 _np = {0,0,0,0,0,0};
@@ -1054,7 +1054,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
             if ((p_current_length[src] + edge_weight) == p_current_length[dst])
             {
               atomicAdd(&p_trim[src], (unsigned int)1);
-              p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
+              atomicAdd(&p_dependency[src], (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst])));
               ret_val.do_return( 1);
               //continue;
             }
@@ -1099,7 +1099,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
               if ((p_current_length[src] + edge_weight) == p_current_length[dst])
               {
                 atomicAdd(&p_trim[src], (unsigned int)1);
-                p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
+                atomicAdd(&p_dependency[src], (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst])));
                 ret_val.do_return( 1);
                 //continue;
               }
@@ -1135,7 +1135,7 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
             if ((p_current_length[src] + edge_weight) == p_current_length[dst])
             {
               atomicAdd(&p_trim[src], (unsigned int)1);
-              p_dependency[src] = p_dependency[src] + (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst]));
+              atomicAdd(&p_dependency[src], (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst])));
               ret_val.do_return( 1);
               //continue;
             }
