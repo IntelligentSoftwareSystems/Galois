@@ -249,7 +249,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   if (enforce_data_mode != onlyData) {
     //timer1.start();
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
-    ctx->is_updated.cpu_rd_ptr()->clear();
+    ctx->is_updated.cpu_rd_ptr()->reset_all();
     batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
     check_cuda_kernel;
     //timer1.stop();

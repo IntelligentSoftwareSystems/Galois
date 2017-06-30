@@ -391,7 +391,7 @@ public:
   // perform an in-memory tranpose of the graph, replacing the original
   // CSR to CSC
   void transpose() {
-    Galois::StatTimer timer("GRAPH_TRANSPOSE");
+    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
     timer.start();
 
     EdgeDst edgeDst_old;

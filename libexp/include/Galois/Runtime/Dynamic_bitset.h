@@ -36,6 +36,7 @@ namespace Galois {
       assert(bits_uint64 == 64); // compatibility with other devices
       num_bits = n;
       bitvec.resize(std::ceil((float)n/bits_uint64));
+      reset_all();
     }
 
     size_t size() const {
@@ -46,8 +47,37 @@ namespace Galois {
       return bitvec.size() * sizeof(uint64_t);
     }
 
-    void clear(){
+    void reset_all(){
       std::fill(bitvec.begin(), bitvec.end(), 0);
+    }
+
+    // inclusive range
+    void reset_range(uint64_t begin, uint64_t end){
+      assert(begin <= (num_bits - 1));
+      assert(end <= (num_bits - 1));
+      uint64_t vec_begin = ceil((float)begin/bits_uint64);
+      uint64_t vec_end;
+      if (end == (num_bits - 1)) vec_end = bitvec.size();
+      else vec_end = (end+1)/bits_uint64; // floor
+      if (vec_begin < vec_end) {
+        std::fill(bitvec.begin() + vec_begin, bitvec.begin() + vec_end, 0);
+      }
+      vec_begin *= bits_uint64;
+      vec_end *= bits_uint64;
+      if (begin < vec_begin) {
+        uint64_t diff = vec_begin - begin;
+        assert(diff < 64);
+        uint64_t mask = (1 << (64 - diff)) - 1;
+        uint32_t bit_index = begin/bits_uint64;
+        bitvec[bit_index] &= mask;
+      }
+      if (end >= vec_end) {
+        uint64_t diff = end - vec_end + 1;
+        assert(diff < 64);
+        uint64_t mask = (1 << diff) - 1;
+        uint32_t bit_index = end/bits_uint64;
+        bitvec[bit_index] &= ~mask;
+      }
     }
 
     // assumes bit_vector is not updated (set) in parallel

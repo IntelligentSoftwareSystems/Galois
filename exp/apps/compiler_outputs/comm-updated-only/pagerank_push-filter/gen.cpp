@@ -248,7 +248,7 @@ struct InitializeGraphNout {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.clear();
+      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
       _graph.sync<writeSource, readSource, Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
@@ -363,7 +363,7 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.clear();
+      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
       _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
@@ -519,7 +519,7 @@ void static go(Graph& _graph) {
     } else if (personality == CPU)
 #endif
     {
-      bitset_residual.clear();
+      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
 _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
@@ -654,7 +654,7 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          bitset_residual.clear();
+          bitset_residual.reset_all();
           Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
     _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);

@@ -213,7 +213,7 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     {
-    bitset_dist_current.clear();
+    bitset_dist_current.reset_all();
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "set",  ""));
     }
     _graph.sync<writeSource, readDestination, Reduce_0, Broadcast_0>("InitializeGraph", bitset_dist_current);
@@ -330,7 +330,7 @@ void static go(Graph& _graph) {
 	} else if (personality == CPU)
 #endif
 {
-bitset_dist_current.clear();
+bitset_dist_current.reset_all();
 Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
 }
 _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);
@@ -459,7 +459,7 @@ struct SSSP {
         } else if (personality == CPU)
       #endif
         {
-          bitset_dist_current.clear();
+          bitset_dist_current.reset_all();
           Galois::do_all(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("SSSP"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
         }
     _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("SSSP", bitset_dist_current);

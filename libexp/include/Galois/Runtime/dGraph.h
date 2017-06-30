@@ -1329,7 +1329,7 @@ public:
    template<typename FnTy, SyncType syncType>
    void get_bitset_and_offsets(const std::string &loopName, const std::vector<size_t> &indices, const Galois::DynamicBitSet &bitset_compute, Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count, DataCommMode &data_mode) {
      if (enforce_data_mode != onlyData) {
-       bitset_comm.clear();
+       bitset_comm.reset_all();
        std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
        std::string doall_str(syncTypeStr + "_BITSET_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {

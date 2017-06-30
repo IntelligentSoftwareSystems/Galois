@@ -337,7 +337,7 @@ struct InitializeGraph2 {
       typedef unsigned int ValTy;
     };
 
-    bitset_dist_current.clear();
+    bitset_dist_current.reset_all();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -540,7 +540,7 @@ struct InitializeGraph1 {
       typedef unsigned int ValTy;
     };
 
-    bitset_dist_current.clear();
+    bitset_dist_current.reset_all();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -798,7 +798,7 @@ struct KCoreStep1 {
     
     do {
       _graph.set_num_iter(iterations);
-      bitset_dist_current.clear();
+      bitset_dist_current.reset_all();
       DGAccumulator_accum.reset();
 
     #ifdef __GALOIS_HET_CUDA__

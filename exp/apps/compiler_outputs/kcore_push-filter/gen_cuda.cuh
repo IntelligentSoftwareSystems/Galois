@@ -43,7 +43,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 }
 
 void bitset_current_degree_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->current_degree.is_updated.cpu_rd_ptr()->clear();
+	ctx->current_degree.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -104,7 +104,7 @@ void batch_min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_
 }
 
 void bitset_flag_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->flag.is_updated.cpu_rd_ptr()->clear();
+	ctx->flag.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 bool get_node_flag_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -165,7 +165,7 @@ void batch_min_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 }
 
 void bitset_trim_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->trim.is_updated.cpu_rd_ptr()->clear();
+	ctx->trim.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID) {

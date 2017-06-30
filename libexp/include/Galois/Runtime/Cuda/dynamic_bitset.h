@@ -34,7 +34,7 @@ public:
     num_bits = nbits;
     size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMalloc(&bit_vector, bit_vector_size * sizeof(unsigned long long int)));
-    clear();
+    reset_all();
   }
 
   void resize(size_t nbits) {
@@ -51,7 +51,7 @@ public:
     return bit_vector_size * sizeof(unsigned long long int);
   }
 
-  void clear() {
+  void reset_all() {
     size_t bit_vector_size = ceil((float)num_bits/64);
     CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, bit_vector_size * sizeof(unsigned long long int)));
   }
@@ -69,6 +69,15 @@ public:
     unsigned long long int bit_offset = 1;
     bit_offset <<= (id%64);
     atomicOr(&bit_vector[bit_index], bit_offset);
+  }
+
+  __device__ void batch_reset(const size_t bit_index) {
+    bit_vector[bit_index] = 0;
+  }
+
+  // assumes different indices are updated in parallel
+  __device__ void batch_bitwise_and(const size_t bit_index, const unsigned long long int mask) {
+    bit_vector[bit_index] &= mask;
   }
 
   void copy_to_cpu(unsigned long long int *bit_vector_cpu_copy) {
