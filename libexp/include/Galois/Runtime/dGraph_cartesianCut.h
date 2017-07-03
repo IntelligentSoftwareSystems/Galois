@@ -585,6 +585,7 @@ public:
   }
 
   bool is_vertex_cut() const{
+    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
     return true;
   }
 
