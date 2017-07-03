@@ -606,6 +606,7 @@ struct AsyncAlgo {
       auto src = e.first, dst = e.second;
       std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst, Galois::MethodFlag::UNPROTECTED);
       auto numValidCommonNeighbors = commonNeighbors.size();
+
       g.getEdgeData(g.findEdgeSortedByDst(src, dst)) = (numValidCommonNeighbors << 1);
       g.getEdgeData(g.findEdgeSortedByDst(dst, src)) = (numValidCommonNeighbors << 1);
       if (numValidCommonNeighbors < j) {
@@ -624,13 +625,18 @@ struct AsyncAlgo {
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
 
+      auto isRemoved = oeData & removed;
       auto oldSupport = (oeData >> 1), newSupport = oldSupport - 1;
+
+      // decrement support and avoid underflow
+      if (oldSupport) {
+        oeData = (newSupport << 1) | isRemoved;
+        ieData = (newSupport << 1) | isRemoved;
+      }
+
+      // enqueue unsupported edge
       if (!oldSupport || newSupport < j) {
         ctx.push(std::make_pair(src, dst));
-      }
-      if (!oldSupport) {
-        oeData = (newSupport << 1);
-        ieData = (newSupport << 1);
       }
     }
 
@@ -639,10 +645,14 @@ struct AsyncAlgo {
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
 
-      // already removed
+      // avoid repeated processing
       if (oeData & removed) {
         return;
       }
+
+      // mark as removed
+      oeData = removed;
+      ieData = removed;
 
       // propagate edge removal
       std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst);
@@ -650,10 +660,6 @@ struct AsyncAlgo {
         removeUnsupportedEdge(((n < src) ? n : src), ((n < src) ? src: n), ctx);
         removeUnsupportedEdge(((n < dst) ? n : dst), ((n < dst) ? dst: n), ctx);
       }
- 
-      // edge removal
-      oeData = removed;
-      ieData = removed;
     }
   };
 
@@ -683,6 +689,7 @@ struct AsyncAlgo {
       PickUnsupportedEdges{g, k-2, unsupported},
       Galois::do_all_steal<true>()
     );
+    std::cout << "pick out " << std::distance(unsupported.begin(), unsupported.end()) << " unsupported edges" << std::endl;
 
     Galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
