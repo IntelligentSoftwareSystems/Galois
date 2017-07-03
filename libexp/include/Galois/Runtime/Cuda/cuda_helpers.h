@@ -206,7 +206,7 @@ void reset_bitset_field(struct CUDA_Context_Field<DataType> *field, size_t begin
   const DynamicBitset* bitset_cpu = field->is_updated.cpu_rd_ptr();
   assert(begin <= (bitset_cpu->size() - 1));
   assert(end <= (bitset_cpu->size() - 1));
-  size_t vec_begin = ceil((float)begin/64);
+  size_t vec_begin = (begin+63)/64;
   size_t vec_end;
   if (end == (bitset_cpu->size() - 1)) vec_end = bitset_cpu->vec_size();
   else vec_end = (end+1)/64; // floor

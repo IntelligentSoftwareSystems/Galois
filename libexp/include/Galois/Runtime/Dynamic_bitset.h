@@ -35,7 +35,7 @@ namespace Galois {
     void resize(uint64_t n){
       assert(bits_uint64 == 64); // compatibility with other devices
       num_bits = n;
-      bitvec.resize(std::ceil((float)n/bits_uint64));
+      bitvec.resize((n + bits_uint64 - 1)/bits_uint64);
       reset();
     }
 
@@ -55,7 +55,7 @@ namespace Galois {
     void reset(size_t begin, size_t end){
       assert(begin <= (num_bits - 1));
       assert(end <= (num_bits - 1));
-      size_t vec_begin = ceil((float)begin/bits_uint64);
+      size_t vec_begin = (begin + bits_uint64 - 1)/bits_uint64;
       size_t vec_end;
       if (end == (num_bits - 1)) vec_end = bitvec.size();
       else vec_end = (end+1)/bits_uint64; // floor

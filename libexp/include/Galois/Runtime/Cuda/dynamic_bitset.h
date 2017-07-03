@@ -46,7 +46,7 @@ public:
   }
 
   __device__ __host__ size_t vec_size() const {
-    size_t bit_vector_size = ceil((float)num_bits/64);
+    size_t bit_vector_size = (num_bits + 63)/64;
     return bit_vector_size;
   }
 
