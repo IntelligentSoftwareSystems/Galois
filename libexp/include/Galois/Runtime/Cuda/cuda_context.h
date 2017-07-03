@@ -115,7 +115,7 @@ size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {
     }
   }
   mem_usage += max_shared_size * sizeof(unsigned int);
-  mem_usage += ceil((float)max_shared_size/64) * sizeof(unsigned long long int);
+  mem_usage += ((max_shared_size+63)/64) * sizeof(unsigned long long int);
   return mem_usage;
 }
 
@@ -154,7 +154,7 @@ size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type> *field, MarshalGraph
     }
   }
   mem_usage += max_shared_size * sizeof(Type);
-  mem_usage += ceil((float)g.nnodes/64) * sizeof(unsigned long long int);
+  mem_usage += ((g.nnodes+63)/64) * sizeof(unsigned long long int);
   return mem_usage;
 }
 

@@ -10,7 +10,9 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 
 void reset_CUDA_context(struct CUDA_Context *ctx);
 
-void bitset_nout_clear_cuda(struct CUDA_Context *ctx);
+void get_bitset_nout_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
+void bitset_nout_reset_cuda(struct CUDA_Context *ctx);
+void bitset_nout_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end);
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
@@ -26,7 +28,9 @@ void batch_set_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 void batch_add_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode);
 
-void bitset_residual_clear_cuda(struct CUDA_Context *ctx);
+void get_bitset_residual_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
+void bitset_residual_reset_cuda(struct CUDA_Context *ctx);
+void bitset_residual_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end);
 float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v);
 void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v);

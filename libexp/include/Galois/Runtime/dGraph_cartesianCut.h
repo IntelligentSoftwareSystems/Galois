@@ -85,26 +85,28 @@ private:
   }
 
   // called only for those hosts with which it shares nodes
-  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) {
+  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     if (syncType == base_hGraph::syncReduce) {
-      switch(dataFlow) {
-        case base_hGraph::forwardFlow:
-          return (gridColumnID() != gridColumnID(host));
-        case base_hGraph::backwardFlow:
+      switch(writeLocation) {
+        case writeSource:
           return (gridRowID() != gridRowID(host));
-        case base_hGraph::exchangeFlow:
-          return false;
+        case writeDestination:
+          return (gridColumnID() != gridColumnID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
           assert(false);
       }
     } else { // syncBroadcast
-      switch(dataFlow) {
-        case base_hGraph::forwardFlow:
+      switch(readLocation) {
+        case readSource:
           return (gridRowID() != gridRowID(host));
-        case base_hGraph::backwardFlow:
+        case readDestination:
           return (gridColumnID() != gridColumnID(host));
-        case base_hGraph::exchangeFlow:
-          return false;
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
           assert(false);
       }
@@ -155,17 +157,17 @@ public:
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, dataFlow);
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
-  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, typename base_hGraph::DataflowDirection dataFlow) { // ignore dataflow direction
+  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, dataFlow);
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
@@ -583,11 +585,30 @@ public:
   }
 
   bool is_vertex_cut() const{
+    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
     return true;
   }
 
   uint64_t get_local_total_nodes() const {
     return numNodes;
+  }
+
+  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+    size_t first_owned = G2L(gid2host[base_hGraph::id].first);
+    size_t last_owned = G2L(gid2host[base_hGraph::id].second - 1);
+    assert(first_owned <= last_owned);
+    assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
+    if (syncType == base_hGraph::syncBroadcast) { // reset masters
+      bitset_reset_range(first_owned, last_owned);
+    } else { // reset mirrors
+      assert(syncType == base_hGraph::syncReduce);
+      if (first_owned > 0) {
+        bitset_reset_range(0, first_owned - 1);
+      }
+      if (last_owned < (numNodes - 1)) {
+        bitset_reset_range(last_owned + 1, numNodes - 1);
+      }
+    }
   }
 
 };

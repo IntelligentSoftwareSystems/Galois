@@ -191,7 +191,156 @@ struct InitializeGraph2 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    bitset_dist_current.clear();
+    struct SyncPushCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
+  			return node.current_degree;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                                   data_mode); 
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_current_degree_cuda(cuda_ctx, node_id, y);
+          return true;
+        }
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { Galois::add(node.current_degree, y); return true;}
+      }
+
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+        // TODO do I need a reset? not if there's only one round of degree
+        // counting...
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
+  			return node.current_degree;
+  		}
+
+  		static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_degree_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        node.current_degree = y;
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    bitset_dist_current.reset_all();
+>>>>>>> 419f19c17bd226c90fae0477a7d84d4ff284d1ee
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -248,7 +397,157 @@ struct InitializeGraph1 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
+<<<<<<< HEAD
     bitset_dist_current.clear();
+=======
+    struct SyncPushCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
+  			return node.current_degree;
+  		}
+
+      static bool extract_reset_batch(unsigned from_id, 
+                                      unsigned long long int *b, 
+                                      unsigned int *o, 
+                                      unsigned int *y, 
+                                      size_t *s, 
+                                      DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                                   data_mode); 
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_mirror_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static bool reduce(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          add_node_current_degree_cuda(cuda_ctx, node_id, y);
+          return true;
+        } 
+        //else if (personality == CPU)
+        assert(personality == CPU);
+      #endif
+        { return Galois::add(node.current_degree, y); return true; }
+      }
+
+      static bool reduce_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_add_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
+
+      static void reset (uint32_t node_id, struct NodeData & node) {
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    struct SyncPullCurrentDegree {
+  		static unsigned int extract(uint32_t node_id, 
+                                  const struct NodeData & node) {
+      #ifdef __GALOIS_HET_CUDA__
+  			if (personality == GPU_CUDA) 
+          return get_node_current_degree_cuda(cuda_ctx, node_id);
+  			assert (personality == CPU);
+      #endif
+  			return node.current_degree;
+  		}
+
+  		static bool extract_batch(unsigned from_id,
+                                unsigned long long int *b,
+                                unsigned int *o,
+                                unsigned int *y,
+                                size_t *s, 
+                                DataCommMode *data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s,
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+  		}
+
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_current_degree_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
+        return false;
+  		}
+
+      static void setVal(uint32_t node_id, struct NodeData & node, 
+                         unsigned int y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA)
+          set_node_current_degree_cuda(cuda_ctx, node_id, y);
+        else if (personality == CPU)
+      #endif
+        node.current_degree = y;
+      }
+
+      static bool setVal_batch(unsigned from_id, 
+                               unsigned long long int *b, 
+                               unsigned int *o, 
+                               unsigned int *y, 
+                               size_t s, 
+                               DataCommMode data_mode) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_current_degree_cuda(cuda_ctx, from_id, b, o, y, s, 
+                                             data_mode);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+
+        return false;
+      }
+
+      typedef unsigned int ValTy;
+    };
+
+    bitset_dist_current.reset_all();
+>>>>>>> 419f19c17bd226c90fae0477a7d84d4ff284d1ee
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -347,7 +646,7 @@ struct KCoreStep1 {
     
     do {
       _graph.set_num_iter(iterations);
-      bitset_dist_current.clear();
+      bitset_dist_current.reset_all();
       DGAccumulator_accum.reset();
 
     #ifdef __GALOIS_HET_CUDA__

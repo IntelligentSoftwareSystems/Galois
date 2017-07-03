@@ -39,7 +39,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 }
 
 void bitset_dist_current_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->dist_current.is_updated.cpu_rd_ptr()->clear();
+	ctx->dist_current.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -100,7 +100,7 @@ void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 }
 
 void bitset_dist_old_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->dist_old.is_updated.cpu_rd_ptr()->clear();
+	ctx->dist_old.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID) {

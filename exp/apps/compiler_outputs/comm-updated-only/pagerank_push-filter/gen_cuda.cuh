@@ -46,8 +46,16 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->value.data.zero_gpu();
 }
 
-void bitset_nout_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->nout.is_updated.cpu_rd_ptr()->clear();
+void get_bitset_nout_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->nout.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_nout_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->nout.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_nout_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->nout, begin, end);
 }
 
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -114,8 +122,16 @@ void batch_min_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void bitset_residual_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->residual.is_updated.cpu_rd_ptr()->clear();
+void get_bitset_residual_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->residual.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_residual_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->residual.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_residual_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->residual, begin, end);
 }
 
 float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -183,7 +199,7 @@ void batch_min_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 }
 
 void bitset_value_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->value.is_updated.cpu_rd_ptr()->clear();
+	ctx->value.is_updated.cpu_rd_ptr()->reset();
 }
 
 float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {

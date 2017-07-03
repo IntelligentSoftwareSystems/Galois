@@ -222,7 +222,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::StatTimer StatTimer_distributed_edges_inner_loop("TIMER_DISTRIBUTE_EDGES_INNER_LOOP");
       Galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
 
-      StatTimer_local_distributed_edges.start();
+      StatTimer_graph_construct.start();
       std::stringstream ss_cout;
       {
       Galois::Graph::OfflineGraph g(filename);
@@ -249,7 +249,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
           gid2host.push_back(Galois::block_range(0U, (unsigned)numNodes_to_divide, i, base_hGraph::numHosts));
-      } 
+      }
 #if 0
       else {
         assert(scalefactor.size() == base_hGraph::numHosts);
@@ -325,15 +325,23 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       print_string(" : loadEdges : start");
 
       loadEdges(base_hGraph::graph, g, numEdges_distribute, VCutTheshold);
+      StatTimer_exchange_edges.stop();
+
+      StatTimer_graph_construct.stop();
       print_string(" : loadEdges : done");
       }
 
-      StatTimer_exchange_edges.stop();
       ss_cout << base_hGraph::id << " : assign_send_receive_edges done\n";
 
       /*******************************************/
 
       Galois::Runtime::getHostBarrier().wait();
+
+      if (transpose && (numNodes > 0)) {
+        base_hGraph::graph.transpose();
+        base_hGraph::transposed = true;
+      }
+
 
       /*****************************************
        * Communication PreProcessing:
@@ -397,6 +405,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         num_assigned_edges_perhost[i] = 0;
       }
 
+      base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
       uint64_t globalOffset = gid2host[base_hGraph::id].first;
       for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
         auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
@@ -826,6 +835,24 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     uint64_t get_local_total_nodes() const {
       return (base_hGraph::numOwned);
+    }
+
+    void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+      size_t first_owned = G2L(gid2host[base_hGraph::id].first);
+      size_t last_owned = G2L(gid2host[base_hGraph::id].second - 1);
+      assert(first_owned <= last_owned);
+      assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
+      if (syncType == base_hGraph::syncBroadcast) { // reset masters
+        bitset_reset_range(first_owned, last_owned);
+      } else { // reset mirrors
+        assert(syncType == base_hGraph::syncReduce);
+        if (first_owned > 0) {
+          bitset_reset_range(0, first_owned - 1);
+        }
+        if (last_owned < (numNodes - 1)) {
+          bitset_reset_range(last_owned + 1, numNodes - 1);
+        }
+      }
     }
 
     void print_string(std::string s){

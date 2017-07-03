@@ -43,7 +43,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 }
 
 void bitset_nout_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->nout.is_updated.cpu_rd_ptr()->clear();
+	ctx->nout.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -104,7 +104,7 @@ void batch_min_node_nout_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 }
 
 void bitset_residual_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->residual.is_updated.cpu_rd_ptr()->clear();
+	ctx->residual.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -165,7 +165,7 @@ void batch_min_node_residual_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 }
 
 void bitset_value_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->value.is_updated.cpu_rd_ptr()->clear();
+	ctx->value.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {

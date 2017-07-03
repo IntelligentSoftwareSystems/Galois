@@ -10,7 +10,9 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hos
 
 void reset_CUDA_context(struct CUDA_Context *ctx);
 
-void bitset_comp_current_clear_cuda(struct CUDA_Context *ctx);
+void get_bitset_comp_current_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
+void bitset_comp_current_reset_cuda(struct CUDA_Context *ctx);
+void bitset_comp_current_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end);
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);

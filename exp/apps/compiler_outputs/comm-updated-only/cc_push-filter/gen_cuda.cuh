@@ -38,8 +38,16 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->comp_old.data.zero_gpu();
 }
 
-void bitset_comp_current_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->comp_current.is_updated.cpu_rd_ptr()->clear();
+void get_bitset_comp_current_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->comp_current.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_comp_current_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->comp_current.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_comp_current_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->comp_current, begin, end);
 }
 
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -107,7 +115,7 @@ void batch_min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 }
 
 void bitset_comp_old_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->comp_old.is_updated.cpu_rd_ptr()->clear();
+	ctx->comp_old.is_updated.cpu_rd_ptr()->reset();
 }
 
 unsigned int get_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID) {

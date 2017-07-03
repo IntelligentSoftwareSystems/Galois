@@ -47,7 +47,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 }
 
 void bitset_comp_current_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->comp_current.is_updated.cpu_rd_ptr()->clear();
+	ctx->comp_current.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 unsigned int get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID) {

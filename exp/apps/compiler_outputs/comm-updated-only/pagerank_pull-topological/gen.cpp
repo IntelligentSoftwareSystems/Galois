@@ -538,7 +538,7 @@ struct PageRank_partial {
           } else if (personality == CPU)
         #endif
           {
-            if (__begin2 == __begin) bitset_sum.clear();
+            if (__begin2 == __begin) bitset_sum.reset_all();
             Galois::do_all(_graph.begin() + __begin2, _graph.begin() + __end2, PageRank_partial { &_graph }, Galois::loopname("PageRank_partial"), Galois::numrun(_graph.get_run_identifier()));
           }
         }

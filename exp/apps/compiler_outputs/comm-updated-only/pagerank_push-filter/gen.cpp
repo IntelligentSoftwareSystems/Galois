@@ -112,6 +112,7 @@ struct PR_NodeData {
 };
 
 Galois::DynamicBitSet bitset_residual;
+Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<PR_NodeData, void> Graph;
 typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
@@ -121,6 +122,8 @@ typedef hGraph_cartesianCut<PR_NodeData, void> Graph_cartesianCut;
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
+
+#include "gen_sync.hh"
 
 struct ResetGraph {
   Graph* graph;
@@ -153,93 +156,8 @@ struct InitializeGraphNout {
 
   InitializeGraphNout(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-      	struct Reduce_0 {
-      		static unsigned int extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.nout;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, 0); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_nout_cuda(cuda_ctx, from_id, y, 0); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool reduce (uint32_t node_id, struct PR_NodeData & node, unsigned int y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) add_node_nout_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ Galois::add(node.nout, y); }
-            return true;
-      		}
-      		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_add_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, 0);
-      			else if (personality == CPU)
-      		#endif
-      				{ node.nout = 0; }
-      		}
-      		typedef unsigned int ValTy;
-      	};
-      	struct Broadcast_0 {
-      		static unsigned int extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.nout;
-      		}
-      		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_batch(unsigned from_id, unsigned int *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_nout_cuda(cuda_ctx, from_id, y); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void setVal (uint32_t node_id, struct PR_NodeData & node, unsigned int y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				node.nout = y;
-      		}
-      		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned int *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_mirror_node_nout_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		typedef unsigned int ValTy;
-      	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-          bitset_nout_clear_cuda(cuda_ctx);
       		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraphNout_" + (_graph.get_run_identifier()));
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
@@ -248,17 +166,16 @@ struct InitializeGraphNout {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
-      _graph.sync<writeSource, readSource, Reduce_0, Broadcast_0>("InitializeGraphNout", bitset_residual);
+      _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout, Bitset_nout>("InitializeGraphNout");
       
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     Galois::atomicAdd(sdata.nout, (unsigned int) std::distance(graph->edge_begin(src), graph->edge_end(src)));
-    bitset_residual.set(src);
+    bitset_nout.set(src);
   }
 };
 
@@ -268,93 +185,8 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-      	struct Reduce_0 {
-      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.residual;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, 0); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, float *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ Galois::add(node.residual, y); }
-            return true;
-      		}
-      		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_add_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
-      			else if (personality == CPU)
-      		#endif
-      				{ node.residual = 0; }
-      		}
-      		typedef float ValTy;
-      	};
-      	struct Broadcast_0 {
-      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.residual;
-      		}
-      		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_batch(unsigned from_id, float *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, y); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				node.residual = y;
-      		}
-      		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		typedef float ValTy;
-      	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-          bitset_residual_clear_cuda(cuda_ctx);
       		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
@@ -363,10 +195,9 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph", bitset_residual);
+      _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("InitializeGraph");
       
   }
 
@@ -424,93 +255,8 @@ struct FirstItr_PageRank{
 Graph * graph;
 FirstItr_PageRank(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
-	struct Reduce_0 {
-		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-			assert (personality == CPU);
-		#endif
-			return node.residual;
-		}
-		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, 0); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		static bool extract_reset_batch(unsigned from_id, float *y) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
-			else if (personality == CPU)
-		#endif
-				{ Galois::add(node.residual, y); }
-      return true;
-		}
-		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_add_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
-			else if (personality == CPU)
-		#endif
-				{ node.residual = 0; }
-		}
-		typedef float ValTy;
-	};
-	struct Broadcast_0 {
-		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-			assert (personality == CPU);
-		#endif
-			return node.residual;
-		}
-		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		static bool extract_batch(unsigned from_id, float *y) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, y); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
-			else if (personality == CPU)
-		#endif
-				node.residual = y;
-		}
-		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-		#ifdef __GALOIS_HET_CUDA__
-			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-			assert (personality == CPU);
-		#endif
-			return false;
-		}
-		typedef float ValTy;
-	};
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      bitset_residual_clear_cuda(cuda_ctx);
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -519,10 +265,9 @@ void static go(Graph& _graph) {
     } else if (personality == CPU)
 #endif
     {
-      bitset_residual.clear();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
-_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+_graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -557,93 +302,8 @@ struct PageRank {
      _graph.set_num_iter(_num_iterations);
     PageRankCopy::go(_graph);
     DGAccumulator_accum.reset();
-    	struct Reduce_0 {
-    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.residual;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, 0); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, float *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				{ Galois::add(node.residual, y); }
-          return true;
-    		}
-    		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_add_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
-    			else if (personality == CPU)
-    		#endif
-    				{ node.residual = 0; }
-    		}
-    		typedef float ValTy;
-    	};
-    	struct Broadcast_0 {
-    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.residual;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_batch(unsigned from_id, float *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_residual_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				node.residual = y;
-    		}
-    		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, float *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_mirror_node_residual_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		typedef float ValTy;
-    	};
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          bitset_residual_clear_cuda(cuda_ctx);
           std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
@@ -654,10 +314,9 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          bitset_residual.clear();
           Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
-    _graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("PageRank", bitset_residual);
+    _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
@@ -772,6 +431,7 @@ int main(int argc, char** argv) {
     }
 #endif
     bitset_residual.resize(hg->get_local_total_nodes());
+    bitset_nout.resize(hg->get_local_total_nodes());
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";

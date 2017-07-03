@@ -35,7 +35,8 @@ namespace Galois {
     void resize(uint64_t n){
       assert(bits_uint64 == 64); // compatibility with other devices
       num_bits = n;
-      bitvec.resize(std::ceil((float)n/bits_uint64));
+      bitvec.resize((n + bits_uint64 - 1)/bits_uint64);
+      reset();
     }
 
     size_t size() const {
@@ -46,28 +47,57 @@ namespace Galois {
       return bitvec.size() * sizeof(uint64_t);
     }
 
-    void clear(){
+    void reset(){
       std::fill(bitvec.begin(), bitvec.end(), 0);
     }
 
+    // inclusive range
+    void reset(size_t begin, size_t end){
+      assert(begin <= (num_bits - 1));
+      assert(end <= (num_bits - 1));
+      size_t vec_begin = (begin + bits_uint64 - 1)/bits_uint64;
+      size_t vec_end;
+      if (end == (num_bits - 1)) vec_end = bitvec.size();
+      else vec_end = (end+1)/bits_uint64; // floor
+      if (vec_begin < vec_end) {
+        std::fill(bitvec.begin() + vec_begin, bitvec.begin() + vec_end, 0);
+      }
+      vec_begin *= bits_uint64;
+      vec_end *= bits_uint64;
+      if (begin < vec_begin) {
+        size_t diff = vec_begin - begin;
+        assert(diff < 64);
+        uint64_t mask = (1 << (64 - diff)) - 1;
+        size_t bit_index = begin/bits_uint64;
+        bitvec[bit_index] &= mask;
+      }
+      if (end >= vec_end) {
+        size_t diff = end - vec_end + 1;
+        assert(diff < 64);
+        uint64_t mask = (1 << diff) - 1;
+        size_t bit_index = end/bits_uint64;
+        bitvec[bit_index] &= ~mask;
+      }
+    }
+
     // assumes bit_vector is not updated (set) in parallel
-    bool test(uint32_t index) const {
-      uint32_t bit_index = index/bits_uint64;
+    bool test(size_t index) const {
+      size_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
       bit_offset <<= (index%bits_uint64);
       return ((bitvec[bit_index] & bit_offset) != 0);
     }
 
-    void set(uint32_t index){
-      uint32_t bit_index = index/bits_uint64;
+    void set(size_t index){
+      size_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
       bit_offset <<= (index%bits_uint64);
       bitvec[bit_index].fetch_or(bit_offset);
     }
 
 #if 0
-    void reset(uint32_t index){
-      uint32_t bit_index = index/bits_uint64;
+    void reset(size_t index){
+      size_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
       bit_offset <<= (index%bits_uint64);
       bitvec[bit_index].fetch_and(~bit_offset);
@@ -84,6 +114,20 @@ namespace Galois {
     }
 
     typedef int tt_is_copyable;
+  };
+
+  static Galois::DynamicBitSet EmptyBitset;
+
+  struct InvalidBitsetFnTy {
+    static bool is_valid() {
+      return false;
+    }
+    static Galois::DynamicBitSet& get() {
+      return EmptyBitset;
+    }
+    // inclusive range
+    static void reset_range(size_t begin, size_t end) {
+    }
   };
 } // namespace Galois
 #endif

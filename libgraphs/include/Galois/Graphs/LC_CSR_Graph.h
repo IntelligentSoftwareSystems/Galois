@@ -391,10 +391,13 @@ public:
   // perform an in-memory tranpose of the graph, replacing the original
   // CSR to CSC
   void transpose() {
+    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
+    timer.start();
+
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;
     EdgeIndData edgeIndData_old;
-    LargeArray< std::atomic<uint64_t> > edgeIndData_temp;
+    EdgeIndData edgeIndData_temp;
     if (UseNumaAlloc) {
       edgeIndData_old.allocateLocal(numNodes);
       edgeIndData_temp.allocateLocal(numNodes);
@@ -411,12 +414,11 @@ public:
         edgeIndData_old[n] = edgeIndData[n];
         edgeIndData_temp[n] = 0;
       }, Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), Galois::numrun("0"));
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
-      [&](uint32_t e){
+    for (uint64_t e = 0; e < numEdges; ++e) { // parallelization makes this slower
         auto dst = edgeDst[e];
         edgeDst_old[e] = dst;
-        Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
-      }, Galois::loopname("TRANSPOSE_COUNT_INCOMING_EDGES"), Galois::numrun("0"));
+        ++edgeIndData_temp[dst];
+    }
     for (uint32_t n = 1; n < numNodes; ++n) {
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
     }
@@ -429,40 +431,26 @@ public:
       [&](uint32_t n){
         edgeIndData_temp[n] = edgeIndData[n-1];
       }, Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), Galois::numrun("0"));
-#ifndef GALOIS_TRANSPOSE_SERIAL
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
-      [&](uint32_t src){
-        uint64_t e;
-        if (src == 0) e = 0;
-        else e = edgeIndData_old[src-1];
-        while (e < edgeIndData_old[src]) {
-          auto dst = edgeDst_old[e];
-          auto e_new = Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
-          edgeDst[e_new] = src;
-          edgeDataCopy(edgeData_new, edgeData, e_new, e);
-          e++;
-        }
-      }, Galois::loopname("TRANSPOSE_REORDER_EDGES"), Galois::numrun("0"));
-#else
-    for (uint32_t src = 0; src < numNodes; ++src) {
+    for (uint32_t src = 0; src < numNodes; ++src) { // parallelization makes this slower
       uint64_t e;
       if (src == 0) e = 0;
       else e = edgeIndData_old[src-1];
       while (e < edgeIndData_old[src]) {
         auto dst = edgeDst_old[e];
-        auto e_new = Galois::atomicAdd(edgeIndData_temp[dst], (uint64_t)1);
+        auto e_new = edgeIndData_temp[dst]++;
         edgeDst[e_new] = src;
         edgeDataCopy(edgeData_new, edgeData, e_new, e);
         e++;
       }
     }
-#endif
     if (EdgeData::has_value) {
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
         [&](uint32_t e){
           edgeDataCopy(edgeData, edgeData_new, e, e);
         }, Galois::loopname("TRANSPOSE_EDGEDATA_SET"), Galois::numrun("0"));
     }
+
+    timer.stop();
   }
 
   template<bool is_non_void = EdgeData::has_value>
