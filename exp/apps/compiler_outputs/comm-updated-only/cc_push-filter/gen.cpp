@@ -122,7 +122,6 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-        bitset_comp_current_clear_cuda(cuda_ctx);
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
@@ -131,10 +130,9 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     {
-    bitset_comp_current.reset_all();
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     }
-    _graph.sync<writeSource, readDestination, Reduce_set_comp_current, Broadcast_comp_current>("InitializeGraph", bitset_comp_current);
+    _graph.sync<writeSource, readDestination, Reduce_set_comp_current, Broadcast_comp_current, Bitset_comp_current>("InitializeGraph");
     
   }
 
@@ -152,7 +150,6 @@ FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      bitset_comp_current_clear_cuda(cuda_ctx);
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -161,10 +158,9 @@ void static go(Graph& _graph) {
     } else if (personality == CPU)
 #endif
     {
-      bitset_comp_current.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
     }
-_graph.sync<writeDestination, readSource, Reduce_min_comp_current, Broadcast_comp_current>("ConnectedComp", bitset_comp_current);
+_graph.sync<writeDestination, readSource, Reduce_min_comp_current, Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -200,7 +196,6 @@ struct ConnectedComp {
     DGAccumulator_accum.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        bitset_comp_current_clear_cuda(cuda_ctx);
         std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -211,10 +206,9 @@ struct ConnectedComp {
       } else if (personality == CPU)
     #endif
       {
-        bitset_comp_current.reset_all();
         Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), Galois::loopname("ConnectedComp"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Galois::numrun(_graph.get_run_identifier()));
       }
-    _graph.sync<writeDestination, readSource, Reduce_min_comp_current, Broadcast_comp_current>("ConnectedComp", bitset_comp_current);
+    _graph.sync<writeDestination, readSource, Reduce_min_comp_current, Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;

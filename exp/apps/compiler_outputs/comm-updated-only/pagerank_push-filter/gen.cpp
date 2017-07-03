@@ -112,6 +112,7 @@ struct PR_NodeData {
 };
 
 Galois::DynamicBitSet bitset_residual;
+Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<PR_NodeData, void> Graph;
 typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
@@ -157,7 +158,6 @@ struct InitializeGraphNout {
   void static go(Graph& _graph) {
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-          bitset_nout_clear_cuda(cuda_ctx);
       		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraphNout_" + (_graph.get_run_identifier()));
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
@@ -166,17 +166,16 @@ struct InitializeGraphNout {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
-      _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout>("InitializeGraphNout", bitset_residual);
+      _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout, Bitset_nout>("InitializeGraphNout");
       
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     Galois::atomicAdd(sdata.nout, (unsigned int) std::distance(graph->edge_begin(src), graph->edge_end(src)));
-    bitset_residual.set(src);
+    bitset_nout.set(src);
   }
 };
 
@@ -188,7 +187,6 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-          bitset_residual_clear_cuda(cuda_ctx);
       		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
       		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       		StatTimer_cuda.start();
@@ -197,10 +195,9 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       {
-      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
-      _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual>("InitializeGraph", bitset_residual);
+      _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("InitializeGraph");
       
   }
 
@@ -260,7 +257,6 @@ FirstItr_PageRank(Graph * _graph):graph(_graph){}
 void static go(Graph& _graph) {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      bitset_residual_clear_cuda(cuda_ctx);
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -269,10 +265,9 @@ void static go(Graph& _graph) {
     } else if (personality == CPU)
 #endif
     {
-      bitset_residual.reset_all();
       Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
-_graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual>("PageRank", bitset_residual);
+_graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
 
 Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), _graph.end() - _graph.begin(), 0);
 
@@ -309,7 +304,6 @@ struct PageRank {
     DGAccumulator_accum.reset();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          bitset_residual_clear_cuda(cuda_ctx);
           std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
@@ -320,10 +314,9 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          bitset_residual.reset_all();
           Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
-    _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual>("PageRank", bitset_residual);
+    _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
     
     Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
     ++_num_iterations;
@@ -438,6 +431,7 @@ int main(int argc, char** argv) {
     }
 #endif
     bitset_residual.resize(hg->get_local_total_nodes());
+    bitset_nout.resize(hg->get_local_total_nodes());
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";

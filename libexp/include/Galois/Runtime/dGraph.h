@@ -136,6 +136,8 @@ class hGraph: public GlobalObject {
      return (sharedNodes[host].size() == 0);
   }
 
+  virtual void reset_bitset(SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const = 0;
+
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
   unsigned comm_mode; // Communication mode: 0 - original, 1 - simulated net, 2 - simulated bare MPI
@@ -1277,6 +1279,8 @@ public:
    }
 #endif
 
+private:
+
    template<SyncType syncType>
    void get_offsets_from_bitset(const std::string &loopName, const Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count) {
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
@@ -1329,7 +1333,7 @@ public:
    template<typename FnTy, SyncType syncType>
    void get_bitset_and_offsets(const std::string &loopName, const std::vector<size_t> &indices, const Galois::DynamicBitSet &bitset_compute, Galois::DynamicBitSet &bitset_comm, std::vector<unsigned int> &offsets, size_t &bit_set_count, DataCommMode &data_mode) {
      if (enforce_data_mode != onlyData) {
-       bitset_comm.reset_all();
+       bitset_comm.reset();
        std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
        std::string doall_str(syncTypeStr + "_BITSET_" + loopName);
        Galois::do_all(boost::counting_iterator<unsigned int>(0), boost::counting_iterator<unsigned int>(indices.size()), [&](unsigned int n) {
@@ -1527,10 +1531,10 @@ public:
      }, Galois::loopname(doall_str.c_str()), Galois::numrun(get_run_identifier()));
    }
 
-   template<typename FnTy, SyncType syncType>
+   template<SyncType syncType, typename SyncFnTy>
    void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
-     static std::vector<typename FnTy::ValTy> val_vec; //sometimes wasteful
+     static std::vector<typename SyncFnTy::ValTy> val_vec; //sometimes wasteful
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
@@ -1541,12 +1545,12 @@ public:
        data_mode = onlyData;
        val_vec.resize(num);
 
-       bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, val_vec);
+       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, val_vec);
 
        if (!batch_succeeded) {
          gSerialize(b, onlyData);
-         auto lseq = gSerializeLazySeq(b, num, (std::vector<typename FnTy::ValTy>*)nullptr);
-         extract_subset<FnTy, decltype(lseq), syncType, true, true>(loopName, indices, num, offsets, b, lseq);
+         auto lseq = gSerializeLazySeq(b, num, (std::vector<typename SyncFnTy::ValTy>*)nullptr);
+         extract_subset<SyncFnTy, decltype(lseq), syncType, true, true>(loopName, indices, num, offsets, b, lseq);
        } else {
          gSerialize(b, onlyData, val_vec);
        }
@@ -1560,11 +1564,11 @@ public:
      Statistic_metadata += 1;
    }
 
-   template<typename FnTy, SyncType syncType>
-   void sync_extract(std::string loopName, const Galois::DynamicBitSet& bit_set_compute, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
+   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+   void sync_extract(std::string loopName, unsigned from_id, std::vector<size_t> &indices, Galois::Runtime::SendBuffer &b) {
      uint32_t num = indices.size();
      static Galois::DynamicBitSet bit_set_comm;
-     static std::vector<typename FnTy::ValTy> val_vec;
+     static std::vector<typename SyncFnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + loopName +"_" + get_run_identifier());
@@ -1577,19 +1581,20 @@ public:
        val_vec.resize(num);
        size_t bit_set_count = 0;
 
-       bool batch_succeeded = extract_batch_wrapper<FnTy, syncType>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
+       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
 
        if (!batch_succeeded) {
-         get_bitset_and_offsets<FnTy, syncType>(loopName, indices, bit_set_compute, bit_set_comm, offsets, bit_set_count, data_mode);
+         const Galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get();
+         get_bitset_and_offsets<SyncFnTy, syncType>(loopName, indices, bit_set_compute, bit_set_comm, offsets, bit_set_count, data_mode);
          if (data_mode == onlyData) {
            bit_set_count = indices.size();
-           extract_subset<FnTy, syncType, true, true>(loopName, indices, bit_set_count, offsets, val_vec);
+           extract_subset<SyncFnTy, syncType, true, true>(loopName, indices, bit_set_count, offsets, val_vec);
          } else if (data_mode != noData) { // bitsetData or offsetsData
-           extract_subset<FnTy, syncType, false, true>(loopName, indices, bit_set_count, offsets, val_vec);
+           extract_subset<SyncFnTy, syncType, false, true>(loopName, indices, bit_set_count, offsets, val_vec);
          }
        }
 
-       size_t redundant_size = (num - bit_set_count)*sizeof(typename FnTy::ValTy);
+       size_t redundant_size = (num - bit_set_count)*sizeof(typename SyncFnTy::ValTy);
        size_t bit_set_size = (bit_set_comm.get_vec().size()*sizeof(uint64_t));
        std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + loopName +"_" + get_run_identifier());
        Galois::Statistic SyncReduce_saved_bytes(statSavedBytes_str);
@@ -1619,8 +1624,9 @@ public:
      Statistic_metadata += 1;
    }
 
-   template<typename FnTy, SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation>
-   void sync_send(std::string loopName, const Galois::DynamicBitSet& bit_set_compute) {
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+   void sync_send(std::string loopName) {
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      Galois::StatTimer StatTimer_SendTime(syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier());
      StatTimer_SendTime.start();
@@ -1632,12 +1638,10 @@ public:
         if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
         Galois::Runtime::SendBuffer b;
-#ifndef __HETEROGENEOUS_GALOIS_DEPRECATED__
-        if (bit_set_compute.size() != 0)
-          sync_extract<FnTy, syncType>(loopName, bit_set_compute, x, sharedNodes[x], b);
-        else
-#endif
-          sync_extract<FnTy, syncType>(loopName, x, sharedNodes[x], b);
+        if (BitsetFnTy::is_valid())
+          sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sharedNodes[x], b);
+        else                     
+          sync_extract<syncType, SyncFnTy>(loopName, x, sharedNodes[x], b);
 
         std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + loopName + "_" + get_run_identifier());
         Galois::Statistic SyncReduce_send_bytes(statSendBytes_str);
@@ -1647,17 +1651,21 @@ public:
      //Will force all messages to be processed before continuing
      net.flush();
 
+     if (BitsetFnTy::is_valid()) {
+       reset_bitset(syncType, &BitsetFnTy::reset_range);
+     }
+
      StatTimer_SendTime.stop();
    }
 
-   template<typename FnTy, SyncType syncType, bool parallelize = true>
-   size_t syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, Galois::DynamicBitSet& bit_set_compute, std::string loopName) {
+   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool parallelize = true>
+   size_t syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, std::string loopName) {
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      std::string set_timer_str(syncTypeStr + "_SET_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_set(set_timer_str.c_str());
      StatTimer_set.start();
      static Galois::DynamicBitSet bit_set_comm;
-     static std::vector<typename FnTy::ValTy> val_vec;
+     static std::vector<typename SyncFnTy::ValTy> val_vec;
      static std::vector<unsigned int> offsets;
      auto &sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
 
@@ -1691,23 +1699,20 @@ public:
          //val_vec.resize(bit_set_count);
          Galois::Runtime::gDeserialize(buf, val_vec);
 
-#ifdef __HETEROGENEOUS_GALOIS_DEPRECATED__
-         bool batch_succeeded = set_batch_wrapper<FnTy, syncType>(from_id, val_vec);
-#else
-         bool batch_succeeded = set_batch_wrapper<FnTy, syncType>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
-#endif
+         bool batch_succeeded = set_batch_wrapper<SyncFnTy, syncType>(from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
          if (!batch_succeeded) {
+           Galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get();
            if (data_mode == bitsetData) {
              size_t bit_set_count2;
              get_offsets_from_bitset<syncType>(loopName, bit_set_comm, offsets, bit_set_count2);
              assert(bit_set_count ==  bit_set_count2);
            }
            if (data_mode == onlyData) {
-             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
+             set_subset<SyncFnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
-             set_subset<FnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute, buf_start);
+             set_subset<SyncFnTy, syncType, true, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute, buf_start);
            } else {
-             set_subset<FnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
+             set_subset<SyncFnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            }
          }
        }
@@ -1716,8 +1721,9 @@ public:
      return retval;
    }
 
-   template<typename FnTy, SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation>
-   void sync_recv(std::string loopName, Galois::DynamicBitSet& bit_set_compute, unsigned int num_messages = 1) {
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+   void sync_recv(std::string loopName, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
      Galois::StatTimer StatTimer_RecvTime(syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier());
@@ -1731,7 +1737,7 @@ public:
            net.handleReceives();
            p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
          } while (!p);
-         syncRecvApply<FnTy, syncType>(p->first, p->second, bit_set_compute, loopName);
+         syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second, loopName);
        }
      }
      ++Galois::Runtime::evilPhase;
@@ -1851,15 +1857,16 @@ public:
 #endif
 
    // reduce from mirrors to master
-   template<typename FnTy, WriteLocation writeLocation, ReadLocation readLocation>
-   void reduce(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     typename ReduceFnTy, typename BitsetFnTy>
+   void reduce(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_reduce<FnTy>(loopName);
+        simulate_reduce<ReduceFnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_reduce<FnTy>(loopName);
+        simulate_bare_mpi_reduce<ReduceFnTy>(loopName);
         return;
       }
 #endif
@@ -1871,32 +1878,27 @@ public:
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
       size_t block_size = buffSize;
-      sync_sendrecv_exp<FnTy, syncReduce>(loopName, bit_set_compute, block_size);
+      sync_sendrecv_exp<ReduceFnTy, syncReduce>(loopName, bit_set_compute, block_size);
 #else
-      sync_send<FnTy, syncReduce, writeLocation, readLocation>(loopName, bit_set_compute);
-
-      sync_recv<FnTy, syncReduce, writeLocation, readLocation>(loopName, bit_set_compute);
+      sync_send<writeLocation, readLocation, syncReduce, ReduceFnTy, BitsetFnTy>(loopName);
+                                                         
+      sync_recv<writeLocation, readLocation, syncReduce, ReduceFnTy, BitsetFnTy>(loopName);
 #endif
 
       StatTimer_syncReduce.stop();
    }
 
-   template<typename FnTy, WriteLocation writeLocation = writeAny, ReadLocation readLocation = readAny>
-   void reduce(std::string loopName) {
-     Galois::DynamicBitSet emptyBitset;
-     reduce<FnTy, writeLocation, readLocation>(loopName, emptyBitset);
-   }
-
    // broadcast from master to mirrors
-   template<typename FnTy, WriteLocation writeLocation, ReadLocation readLocation>
-   void broadcast(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<WriteLocation writeLocation, ReadLocation readLocation, 
+     typename BroadcastFnTy, typename BitsetFnTy>
+   void broadcast(std::string loopName) {
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       if (comm_mode == 1) {
-        simulate_broadcast<FnTy>(loopName);
+        simulate_broadcast<BroadcastFnTy>(loopName);
         return;
       } else if (comm_mode == 2) {
-        simulate_bare_mpi_broadcast<FnTy>(loopName);
+        simulate_bare_mpi_broadcast<BroadcastFnTy>(loopName);
         return;
       }
 #endif
@@ -1908,20 +1910,14 @@ public:
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
       size_t block_size = buffSize;
-      sync_sendrecv_exp<FnTy, syncBroadcast>(loopName, bit_set_compute, block_size);
+      sync_sendrecv_exp<BroadcastFnTy, syncBroadcast>(loopName, block_size);
 #else
-      sync_send<FnTy, syncBroadcast, writeLocation, readLocation>(loopName, bit_set_compute);
-
-      sync_recv<FnTy, syncBroadcast, writeLocation, readLocation>(loopName, bit_set_compute);
+      sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, BitsetFnTy>(loopName);
+                                                            
+      sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, BitsetFnTy>(loopName);
 #endif
 
       StatTimer_syncBroadcast.stop();
-   }
-
-   template<typename FnTy, WriteLocation writeLocation = writeAny, ReadLocation readLocation = readAny>
-   void broadcast(std::string loopName) {
-     Galois::DynamicBitSet emptyBitset;
-     broadcast<FnTy, writeLocation, readLocation>(loopName, emptyBitset);
    }
 
    // OEC - outgoing edge-cut : source of any edge is master
@@ -1932,150 +1928,145 @@ public:
    // reduce - mirrors to master
    // broadcast - master to mirrors
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_src_to_src(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_src_to_src(std::string loopName) {
      // do nothing for OEC
      // reduce and broadcast for IEC, CVC, UVC
      if (transposed || is_vertex_cut()) {
-       reduce<ReduceFnTy, writeSource, readSource>(loopName, bit_set_compute);
-       broadcast<BroadcastFnTy, writeSource, readSource>(loopName, bit_set_compute);
+       reduce<writeSource, readSource, ReduceFnTy, BitsetFnTy>(loopName);
+       broadcast<writeSource, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_src_to_dst(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_src_to_dst(std::string loopName) {
      // only broadcast for OEC
      // only reduce for IEC
      // reduce and broadcast for CVC, UVC
      if (transposed) {
-       reduce<ReduceFnTy, writeSource, readDestination>(loopName, bit_set_compute);
+       reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
        if (is_vertex_cut()) {
-         broadcast<BroadcastFnTy, writeSource, readDestination>(loopName, bit_set_compute);
+         broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy>(loopName);
        }
      } else {
        if (is_vertex_cut()) {
-         reduce<ReduceFnTy, writeSource, readDestination>(loopName, bit_set_compute);
+         reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
        }
-       broadcast<BroadcastFnTy, writeSource, readDestination>(loopName, bit_set_compute);
+       broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy>(loopName);
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_src_to_any(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_src_to_any(std::string loopName) {
      // only broadcast for OEC
      // reduce and broadcast for IEC, CVC, UVC
      if (transposed || is_vertex_cut()) {
-       reduce<ReduceFnTy, writeSource, readAny>(loopName, bit_set_compute);
+       reduce<writeSource, readAny, ReduceFnTy, BitsetFnTy>(loopName);
      }
-     broadcast<BroadcastFnTy, writeSource, readAny>(loopName, bit_set_compute);
+     broadcast<writeSource, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_dst_to_src(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_dst_to_src(std::string loopName) {
      // only reduce for OEC
      // only broadcast for IEC
      // reduce and broadcast for CVC, UVC
      if (transposed) {
        if (is_vertex_cut()) {
-         reduce<ReduceFnTy, writeDestination, readSource>(loopName, bit_set_compute);
+         reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy>(loopName);
        }
-       broadcast<BroadcastFnTy, writeDestination, readSource>(loopName, bit_set_compute);
+       broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
      } else {
-       reduce<ReduceFnTy, writeDestination, readSource>(loopName, bit_set_compute);
+       reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy>(loopName);
        if (is_vertex_cut()) {
-         broadcast<BroadcastFnTy, writeDestination, readSource>(loopName, bit_set_compute);
+         broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
        }
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_dst_to_dst(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_dst_to_dst(std::string loopName) {
      // do nothing for IEC
      // reduce and broadcast for OEC, CVC, UVC
      if (!transposed || is_vertex_cut()) {
-       reduce<ReduceFnTy, writeDestination, readDestination>(loopName, bit_set_compute);
-       broadcast<BroadcastFnTy, writeDestination, readDestination>(loopName, bit_set_compute);
+       reduce<writeDestination, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
+       broadcast<writeDestination, readDestination, BroadcastFnTy, BitsetFnTy>(loopName);
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_dst_to_any(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_dst_to_any(std::string loopName) {
      // only broadcast for IEC
      // reduce and broadcast for OEC, CVC, UVC
      if (!transposed || is_vertex_cut()) {
-       reduce<ReduceFnTy, writeDestination, readAny>(loopName, bit_set_compute);
+       reduce<writeDestination, readAny, ReduceFnTy, BitsetFnTy>(loopName);
      }
-     broadcast<BroadcastFnTy, writeDestination, readAny>(loopName, bit_set_compute);
+     broadcast<writeDestination, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_any_to_src(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_any_to_src(std::string loopName) {
      // only reduce for OEC
      // reduce and broadcast for IEC, CVC, UVC
-     reduce<ReduceFnTy, writeAny, readSource>(loopName, bit_set_compute);
+     reduce<writeAny, readSource, ReduceFnTy, BitsetFnTy>(loopName);
      if (transposed || is_vertex_cut()) {
-       broadcast<BroadcastFnTy, writeAny, readSource>(loopName, bit_set_compute);
+       broadcast<writeAny, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_any_to_dst(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_any_to_dst(std::string loopName) {
      // only reduce for IEC
      // reduce and broadcast for OEC, CVC, UVC
-     reduce<ReduceFnTy, writeAny, readDestination>(loopName, bit_set_compute);
+     reduce<writeAny, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
      if (!transposed || is_vertex_cut()) {
-       broadcast<BroadcastFnTy, writeAny, readDestination>(loopName, bit_set_compute);
+       broadcast<writeAny, readDestination, BroadcastFnTy, BitsetFnTy>(loopName);
      }
    }
 
-   template<typename ReduceFnTy, typename BroadcastFnTy>
-   void sync_any_to_any(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+   void sync_any_to_any(std::string loopName) {
      // reduce and broadcast for OEC, IEC, CVC, UVC
-     reduce<ReduceFnTy, writeAny, readAny>(loopName, bit_set_compute);
-     broadcast<BroadcastFnTy, writeAny, readAny>(loopName, bit_set_compute);
+     reduce<writeAny, readAny, ReduceFnTy, BitsetFnTy>(loopName);
+     broadcast<writeAny, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
    }
 
+public:
+
    template<WriteLocation writeLocation, ReadLocation readLocation, 
-     typename ReduceFnTy, typename BroadcastFnTy>
-   void sync(std::string loopName, Galois::DynamicBitSet& bit_set_compute) {
+     typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy = Galois::InvalidBitsetFnTy>
+   void sync(std::string loopName) {
      std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
      Galois::StatTimer StatTimer_sync(timer_str.c_str());
      StatTimer_sync.start();
 
      if (writeLocation == writeSource) {
        if (readLocation == readSource) {
-         sync_src_to_src<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else if (readLocation == readDestination) {
-         sync_src_to_dst<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else { // readAny
-         sync_src_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        }
      } else if (writeLocation == writeDestination) {
        if (readLocation == readSource) {
-         sync_dst_to_src<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else if (readLocation == readDestination) {
-         sync_dst_to_dst<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else { // readAny
-         sync_dst_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        }
      } else { // writeAny
        if (readLocation == readSource) {
-         sync_any_to_src<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else if (readLocation == readDestination) {
-         sync_any_to_dst<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        } else { // readAny
-         sync_any_to_any<ReduceFnTy, BroadcastFnTy>(loopName, bit_set_compute);
+         sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
        }
      }
 
      StatTimer_sync.stop();
-   }
-
-   template<WriteLocation writeLocation, ReadLocation readLocation, 
-     typename ReduceFnTy, typename BroadcastFnTy>
-   void sync(std::string loopName) {
-     Galois::DynamicBitSet emptyBitset;
-     sync<writeLocation, readLocation, ReduceFnTy, BroadcastFnTy>(loopName, emptyBitset);
    }
 
    // just like any other sync_*, this is expected to be a collective call

@@ -170,3 +170,41 @@ struct Broadcast_residual {
   }
   typedef float ValTy;
 };
+
+struct Bitset_residual {
+  static bool is_valid() {
+    return true;
+  }
+  static Galois::DynamicBitSet& get() {
+    if (personality == GPU_CUDA) get_bitset_residual_cuda(cuda_ctx, (unsigned long long int *)bitset_residual.get_vec().data());
+    return bitset_residual;
+  }
+  // inclusive range
+  static void reset_range(size_t begin, size_t end) {
+    if (personality == GPU_CUDA) {
+      bitset_residual_reset_cuda(cuda_ctx, begin, end);
+    } else {
+      assert (personality == CPU);
+      bitset_residual.reset(begin, end);
+    }
+  }
+};
+
+struct Bitset_nout {
+  static bool is_valid() {
+    return true;
+  }
+  static Galois::DynamicBitSet& get() {
+    if (personality == GPU_CUDA) get_bitset_nout_cuda(cuda_ctx, (unsigned long long int *)bitset_nout.get_vec().data());
+    return bitset_nout;
+  }
+  // inclusive range
+  static void reset_range(size_t begin, size_t end) {
+    if (personality == GPU_CUDA) {
+      bitset_nout_reset_cuda(cuda_ctx, begin, end);
+    } else {
+      assert (personality == CPU);
+      bitset_nout.reset(begin, end);
+    }
+  }
+};

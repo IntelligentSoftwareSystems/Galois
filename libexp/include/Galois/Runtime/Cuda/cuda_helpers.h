@@ -181,6 +181,64 @@ __global__ void batch_get_subset_bitset(index_type subset_size, const unsigned i
 	}
 }
 
+// inclusive range
+__global__ void bitset_reset_range(DynamicBitset * __restrict__ bitset, size_t vec_begin, size_t vec_end, bool test1, size_t bit_index1, uint64_t mask1, bool test2, size_t bit_index2, uint64_t mask2) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	for (size_t src = vec_begin + tid; src < vec_end; src += nthreads) {
+    bitset->batch_reset(src);
+  }
+  if (tid == 0) {
+    if (test1) {
+      bitset->batch_bitwise_and(bit_index1, mask1);
+    }
+    if (test2) {
+      bitset->batch_bitwise_and(bit_index2, mask2);
+    }
+  }
+}
+
+template<typename DataType>
+void reset_bitset_field(struct CUDA_Context_Field<DataType> *field, size_t begin, size_t end) {
+	dim3 blocks;
+	dim3 threads;
+	kernel_sizing(blocks, threads);
+  const DynamicBitset* bitset_cpu = field->is_updated.cpu_rd_ptr();
+  assert(begin <= (bitset_cpu->size() - 1));
+  assert(end <= (bitset_cpu->size() - 1));
+  size_t vec_begin = ceil((float)begin/64);
+  size_t vec_end;
+  if (end == (bitset_cpu->size() - 1)) vec_end = bitset_cpu->vec_size();
+  else vec_end = (end+1)/64; // floor
+  size_t begin2 = vec_begin * 64;
+  size_t end2 = vec_end * 64;
+  bool test1; 
+  size_t bit_index1;
+  uint64_t mask1;
+  if (begin < begin2) {
+    test1 = true;
+    bit_index1 = begin/64;
+    size_t diff = begin2 - begin;
+    assert(diff < 64);
+    mask1 = (1 << (64 - diff)) - 1;
+  } else {
+    test1 = false;
+  }
+  bool test2; 
+  size_t bit_index2;
+  uint64_t mask2;
+  if (end >= end2) {
+    test2 = true;
+    bit_index2 = end/64;
+    size_t diff = end - end2 + 1;
+    assert(diff < 64);
+    mask2 = ~((1 << diff) - 1);
+  } else {
+    test2 = false;
+  }
+  bitset_reset_range <<<blocks, threads>>>(field->is_updated.gpu_rd_ptr(), vec_begin, vec_end, test1, bit_index1, mask1, test2, bit_index2, mask2);
+}
+
 void get_offsets_from_bitset(index_type bitset_size, unsigned int * __restrict__ offsets, DynamicBitset * __restrict__ bitset, size_t * __restrict__ num_set_bits) {
   DynamicBitsetIterator flag_iterator(bitset);
   IdentityIterator offset_iterator;
@@ -249,7 +307,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   if (enforce_data_mode != onlyData) {
     //timer1.start();
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
-    ctx->is_updated.cpu_rd_ptr()->reset_all();
+    ctx->is_updated.cpu_rd_ptr()->reset();
     batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
     check_cuda_kernel;
     //timer1.stop();

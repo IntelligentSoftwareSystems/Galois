@@ -121,3 +121,22 @@ struct Reduce_min_dist_current {
   }
   typedef unsigned int ValTy;
 };
+
+struct Bitset_dist_current {
+  static bool is_valid() {
+    return true;
+  }
+  static Galois::DynamicBitSet& get() {
+    if (personality == GPU_CUDA) get_bitset_dist_current_cuda(cuda_ctx, (unsigned long long int *)bitset_dist_current.get_vec().data());
+    return bitset_dist_current;
+  }
+  // inclusive range
+  static void reset_range(size_t begin, size_t end) {
+    if (personality == GPU_CUDA) {
+      bitset_dist_current_reset_cuda(cuda_ctx, begin, end);
+    } else {
+      assert (personality == CPU);
+      bitset_dist_current.reset(begin, end);
+    }
+  }
+};

@@ -344,5 +344,17 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
   }
 
+  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+    if (syncType == base_hGraph::syncBroadcast) { // reset masters
+      if (numOwned_withEdges > 0) {
+        bitset_reset_range(0, numOwned_withEdges - 1);
+      }
+    } else { // reset mirrors
+      assert(syncType == base_hGraph::syncReduce);
+      if (numOwned_withEdges < numNodes) {
+        bitset_reset_range(numOwned_withEdges, numNodes - 1);
+      }
+    }
+  }
 };
 

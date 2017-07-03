@@ -592,5 +592,23 @@ public:
     return numNodes;
   }
 
+  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+    size_t first_owned = G2L(gid2host[base_hGraph::id].first);
+    size_t last_owned = G2L(gid2host[base_hGraph::id].second - 1);
+    assert(first_owned <= last_owned);
+    assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
+    if (syncType == base_hGraph::syncBroadcast) { // reset masters
+      bitset_reset_range(first_owned, last_owned);
+    } else { // reset mirrors
+      assert(syncType == base_hGraph::syncReduce);
+      if (first_owned > 0) {
+        bitset_reset_range(0, first_owned - 1);
+      }
+      if (last_owned < (numNodes - 1)) {
+        bitset_reset_range(last_owned + 1, numNodes - 1);
+      }
+    }
+  }
+
 };
 

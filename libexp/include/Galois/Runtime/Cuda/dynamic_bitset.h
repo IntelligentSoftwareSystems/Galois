@@ -32,9 +32,8 @@ public:
     assert(sizeof(unsigned long long int) * 8 == 64);
     num_bits_capacity = nbits;
     num_bits = nbits;
-    size_t bit_vector_size = ceil((float)num_bits/64);
-    CUDA_SAFE_CALL(cudaMalloc(&bit_vector, bit_vector_size * sizeof(unsigned long long int)));
-    reset_all();
+    CUDA_SAFE_CALL(cudaMalloc(&bit_vector, vec_size() * sizeof(unsigned long long int)));
+    reset();
   }
 
   void resize(size_t nbits) {
@@ -46,14 +45,17 @@ public:
     return num_bits;
   }
 
-  __device__ __host__ size_t alloc_size() const {
+  __device__ __host__ size_t vec_size() const {
     size_t bit_vector_size = ceil((float)num_bits/64);
-    return bit_vector_size * sizeof(unsigned long long int);
+    return bit_vector_size;
   }
 
-  void reset_all() {
-    size_t bit_vector_size = ceil((float)num_bits/64);
-    CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, bit_vector_size * sizeof(unsigned long long int)));
+  __device__ __host__ size_t alloc_size() const {
+    return vec_size() * sizeof(unsigned long long int);
+  }
+
+  void reset() {
+    CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, vec_size() * sizeof(unsigned long long int)));
   }
 
   // assumes bit_vector is not updated (set) in parallel
@@ -71,25 +73,25 @@ public:
     atomicOr(&bit_vector[bit_index], bit_offset);
   }
 
+  // different indices can be updated in parallel
   __device__ void batch_reset(const size_t bit_index) {
     bit_vector[bit_index] = 0;
   }
 
-  // assumes different indices are updated in parallel
+  // different indices can be updated in parallel
+  // but assumes same index is not updated in parallel
   __device__ void batch_bitwise_and(const size_t bit_index, const unsigned long long int mask) {
     bit_vector[bit_index] &= mask;
   }
 
   void copy_to_cpu(unsigned long long int *bit_vector_cpu_copy) {
     assert(bit_vector_cpu_copy != NULL);
-    size_t bit_vector_size = ceil((float)num_bits/64);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, bit_vector_size * sizeof(unsigned long long int), cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, vec_size() * sizeof(unsigned long long int), cudaMemcpyDeviceToHost));
   }
 
   void copy_to_gpu(unsigned long long int * cpu_bit_vector) {
     assert(cpu_bit_vector != NULL);
-    size_t bit_vector_size = ceil((float)num_bits/64);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, bit_vector_size * sizeof(unsigned long long int), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(unsigned long long int), cudaMemcpyHostToDevice));
   }
 };
 
