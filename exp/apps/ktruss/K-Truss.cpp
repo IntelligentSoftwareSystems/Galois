@@ -39,6 +39,7 @@
 #include <deque>
 #include <algorithm>
 #include <fstream>
+#include <memory>
 
 enum Algo {
   bspJacobi,
@@ -136,7 +137,7 @@ size_t countValidEdges(G& g) {
 }
 
 template<typename Graph>
-void reportKTruss(Graph& g, unsigned int k, std::string algoName) {
+void reportKTruss(Graph& g) {
   if (outName.empty()) {
     return;
   }
@@ -464,13 +465,21 @@ struct BSPCoreThenTrussAlgo {
   } // end operator()
 }; // end struct BSPCoreThenTrussAlgo
 
+template<typename T>
+using PerIterAlloc = typename Galois::PerIterAllocTy::rebind<T>::other;
+
 template<typename G>
-std::deque<typename G::GraphNode> getValidCommonNeighbors(G& g,
-  typename G::GraphNode src, typename G::GraphNode dst, Galois::MethodFlag flag = Galois::MethodFlag::WRITE)
+std::deque<typename G::GraphNode, PerIterAlloc<typename G::GraphNode> >
+getValidCommonNeighbors(
+  G& g,
+  typename G::GraphNode src, typename G::GraphNode dst, 
+  Galois::PerIterAllocTy& a, Galois::MethodFlag flag = Galois::MethodFlag::WRITE)
 {
+  using GNode = typename G::GraphNode;
+
   auto srcI = g.edge_begin(src, flag), srcE = g.edge_end(src, flag), 
     dstI = g.edge_begin(dst, flag), dstE = g.edge_end(dst, flag);
-  std::deque<typename G::GraphNode> commonNeighbors;
+  std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors(a);
 
   while (true) {
     // find the first valid edge
@@ -526,9 +535,10 @@ struct AsyncTrussAlgo {
     PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r)
       : g(g), j(j), r(r) {}
 
-    void operator()(Edge e) {
+    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
-      std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst, Galois::MethodFlag::UNPROTECTED);
+      std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors
+        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), Galois::MethodFlag::UNPROTECTED);
       auto numValidCommonNeighbors = commonNeighbors.size();
 
       g.getEdgeData(g.findEdgeSortedByDst(src, dst)) = (numValidCommonNeighbors << 1);
@@ -582,7 +592,8 @@ struct AsyncTrussAlgo {
       ieData = removed;
 
       // propagate edge removal
-      std::deque<GNode> commonNeighbors = getValidCommonNeighbors(g, src, dst);
+      std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors
+        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc());
       for (auto n: commonNeighbors) {
         removeUnsupportedEdge(((n < src) ? n : src), ((n < src) ? src: n), ctx);
         removeUnsupportedEdge(((n < dst) ? n : dst), ((n < dst) ? dst: n), ctx);
@@ -611,14 +622,18 @@ struct AsyncTrussAlgo {
       Galois::do_all_steal<true>()
     );
 
-    Galois::do_all_local(work, 
+    Galois::for_each_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
-      Galois::do_all_steal<true>()
+      Galois::loopname("PickUnsupportedEdges"),
+      Galois::does_not_need_aborts<>(),
+      Galois::does_not_need_push<>(),
+      Galois::needs_per_iter_alloc<>()
     );
 
     Galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
-      Galois::loopname("PropagateEdgeRemoval")
+      Galois::loopname("PropagateEdgeRemoval"),
+      Galois::needs_per_iter_alloc<>()
     );
   } // end operator()
 }; // end AsyncTrussAlgo
@@ -643,7 +658,7 @@ void run() {
   algo(g, trussNum);
   T.stop();
   Galois::reportPageAlloc("MeminfoPost");
-  reportKTruss(g, trussNum, algo.name());
+  reportKTruss(g);
 }
 
 int main(int argc, char **argv) {
