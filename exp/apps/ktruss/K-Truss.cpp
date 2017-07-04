@@ -549,27 +549,24 @@ struct AsyncTrussAlgo {
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
 
-      auto isRemoved = oeData & removed;
-      auto oldSupport = (oeData >> 1), newSupport = oldSupport - 1;
-
-      // decrement support and avoid underflow
-      if (oldSupport) {
-        oeData = (newSupport << 1) | isRemoved;
-        ieData = (newSupport << 1) | isRemoved;
-      }
-
-      // enqueue unsupported edge
-      if (!oldSupport || newSupport < j) {
+      auto newSupport = (oeData >> 1) - 1;
+      oeData = (newSupport << 1);
+      ieData = (newSupport << 1);
+      if (newSupport < j) {
         ctx.push(std::make_pair(src, dst));
       }
     }
 
     void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
+
+      // lock nodes within 2 hops from src
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       for (auto ei: g.edges(src)) {
         g.edges(g.getEdgeDst(ei));
       }
+
+      // lock nodes within 2 hops from dst
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
       for (auto ei: g.edges(dst)) {
         g.edges(g.getEdgeDst(ei));
@@ -613,21 +610,16 @@ struct AsyncTrussAlgo {
       },
       Galois::do_all_steal<true>()
     );
-    std::cout << "begin: " << countValidNodes(g) << " nodes, " << countValidEdges(g) << " edges" << std::endl;
 
     Galois::do_all_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
       Galois::do_all_steal<true>()
     );
-    std::cout << "pick out " << std::distance(unsupported.begin(), unsupported.end()) << " unsupported edges" << std::endl;
 
     Galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
       Galois::loopname("PropagateEdgeRemoval")
     );
-    std::cout << "end: " << countValidNodes(g) << " nodes, " << countValidEdges(g) << " edges" << std::endl;
-
-    //Galois::for_each();
   } // end operator()
 }; // end AsyncTrussAlgo
 
