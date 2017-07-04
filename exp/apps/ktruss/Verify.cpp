@@ -113,6 +113,7 @@ void readTruss(Graph& g) {
     nodes.insert(n2);
   }
   
+  std::cout << "read " << nodes.size() << " unique nodes" << std::endl;
   std::cout << "read " << edges << " unique edges" << std::endl;
   
   if(ktrussEdges && edges != ktrussEdges) {
