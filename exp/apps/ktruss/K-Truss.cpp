@@ -41,8 +41,8 @@
 #include <fstream>
 
 enum Algo {
+  bspJacobi,
   bsp,
-  bspIm,
   bspCoreThenTruss,
   async,
   asyncCoreThenTruss
@@ -60,12 +60,12 @@ static cll::opt<unsigned int> trussNum("trussNum", cll::desc("report trussNum-tr
 static cll::opt<std::string> outName("o", cll::desc("output file for the edgelist of resulting truss"));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), 
   cll::values(
-    clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel"), 
-    clEnumValN(Algo::bspIm, "bspIm", "Bulk-synchronous parallel improved (default)"),
-    clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss", "Compute k-1 core and then k-truss in bspIm way"),
+    clEnumValN(Algo::bspJacobi, "bspJacobi", "Bulk-synchronous parallel with separated edge removal"), 
+    clEnumValN(Algo::bsp, "bsp", "Bulk-synchronous parallel (default)"),
+    clEnumValN(Algo::bspCoreThenTruss, "bspCoreThenTruss", "Compute k-1 core and then k-truss"),
     clEnumValN(Algo::async, "async", "Asynchronous"), 
     clEnumValN(Algo::asyncCoreThenTruss, "asyncCoreThenTruss", "Compute k-1 core and then k-truss in async way"),
-    clEnumValEnd), cll::init(Algo::bspIm));
+    clEnumValEnd), cll::init(Algo::bsp));
 
 static const uint32_t valid = 0x0;
 static const uint32_t removed = 0x1;
@@ -210,12 +210,12 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode
   return numValidEqual >= j;
 }
 
-// BSPAlgo:
+// BSPTrussJacobiAlgo:
 // 1. Scan for unsupported edges.
 // 2. If no unsupported edges are found, done.
 // 3. Remove unsupported edges in a separated loop.
 // 4. Go back to 1.
-struct BSPAlgo {
+struct BSPTrussJacobiAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
@@ -264,13 +264,7 @@ struct BSPAlgo {
       Galois::do_all_steal<true>()
     );
 
-    size_t iter = 0;
-
     while (true) {
-//      std::cout << "Iteration " << iter << ": ";
-//      std::cout << countValidNodes(g) << " valid nodes, ";
-//      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
-
       Galois::do_all_local(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
         Galois::do_all_steal<true>()
@@ -292,18 +286,15 @@ struct BSPAlgo {
       unsupported.clear();
       cur->clear();
       std::swap(cur, next);
-      ++iter;
     } 
-
-//    std::cout << "Ends at iteration " << iter << std::endl;
   } // end operator()
-}; // end struct BSPAlgo
+}; // end struct BSPTrussJacobiAlgo
 
-// BSPImprovedAlgo:
+// BSPTrussAlgo:
 // 1. Keep supported edges and remove unsupported edges.
 // 2. If all edges are kept, done.
 // 3. Go back to 3.
-struct BSPImprovedAlgo {
+struct BSPTrussAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
@@ -357,14 +348,8 @@ struct BSPImprovedAlgo {
     );
     curSize = std::distance(cur->begin(), cur->end());
 
-    size_t iter = 0;
-
     // remove unsupported edges until no more edges can be removed
     while (true) {
-//      std::cout << "Iteration " << iter << ": ";
-//      std::cout << countValidNodes(g) << " valid nodes, ";
-//      std::cout << std::distance(cur->begin(), cur->end()) << " valid edges" << std::endl;
-
       Galois::do_all_local(*cur, 
         KeepSupportedEdges{g, k-2, *next},
         Galois::do_all_steal<true>()
@@ -379,34 +364,24 @@ struct BSPImprovedAlgo {
       cur->clear();
       curSize = nextSize;
       std::swap(cur, next);
-      ++iter;
     } 
-
-//    std::cout << "Ends at iteration " << iter << std::endl;
   } // end operator()
-}; // end struct BSPImprovedAlgo
+}; // end struct BSPTrussAlgo
 
-// BSPCoreThenTrussAlgo:
-// 1. Reduce the graph to k-1 core
-//    a. Keep nodes w/ degree >= k-1 and remove all edges for nodes whose degree < k-1.
-//    b. If all nodes are kept, done.
-//    c. Go back to a.
-// 2. Compute k-truss from k-1 core
-//    a. Keep supported edges and remove unsupported edges.
-//    b. If all edges are kept, done.
-//    c. Go back to a.
-struct BSPCoreThenTrussAlgo {
+// BSPCoreImprovedAlgo:
+// 1. Keep nodes w/ degree >= k and remove all edges for nodes whose degree < k.
+// 2. If all nodes are kept, done.
+// 3. Go back to 1.
+struct BSPCoreImprovedAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
   typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  typedef std::pair<GNode, GNode> Edge;
-  typedef Galois::InsertBag<Edge> EdgeVec;
   typedef Galois::InsertBag<GNode> NodeVec;
 
-  std::string name() { return "bspCoreThenTruss"; }
+  std::string name() { return "bspCoreIm"; }
 
   struct KeepValidNodes {
     Graph& g;
@@ -429,113 +404,62 @@ struct BSPCoreThenTrussAlgo {
     }
   };
 
-  struct KeepSupportedEdges {
-    Graph& g;
-    unsigned int j;
-    EdgeVec& s;
+  void operator()(Graph& g, unsigned int k) {
+    NodeVec work[2];
+    NodeVec *cur = &work[0], *next = &work[1];
+    size_t curSize = g.size(), nextSize;
 
-    KeepSupportedEdges(Graph& g, unsigned int j, EdgeVec& s)
-      : g(g), j(j), s(s) {}
+    Galois::do_all_local(g, 
+      KeepValidNodes{g, k, *next}, 
+      Galois::do_all_steal<true>()
+    );
+    nextSize = std::distance(next->begin(), next->end());
 
-    void operator()(Edge e) {
-      if (isSupportNoLessThanJ(g, e.first, e.second, j)) {
-        s.push_back(e);
-      } else {
-        g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
-        g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
-      }
+    while (curSize != nextSize) {
+      cur->clear();
+      curSize = nextSize;
+      std::swap(cur, next);
+
+      Galois::do_all_local(*cur, 
+        KeepValidNodes{g, k, *next}, 
+        Galois::do_all_steal<true>()
+      );
+      nextSize = std::distance(next->begin(), next->end());
     }
-  };
+  }
+};
+
+// BSPCoreThenTrussAlgo:
+// 1. Reduce the graph to k-1 core
+// 2. Compute k-truss from k-1 core
+struct BSPCoreThenTrussAlgo {
+  // set LSB of an edge weight to indicate the removal of the edge.
+  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+
+  std::string name() { return "bspCoreThenTruss"; }
 
   void operator()(Graph& g, unsigned int k) {
     if (0 == k-2) {
       return;
     }
 
-    size_t iter = 0;
-    NodeVec nWork[2];
-    NodeVec *nCur = &nWork[0], *nNext = &nWork[1];
-    size_t nCurSize = g.size(), nNextSize;
-
     Galois::StatTimer TCore("Reduce_to_k-1_core");
     TCore.start();
 
-//    std::cout << "Core iteration " << iter << ": ";
-//    std::cout << nCurSize << " valid nodes" << std::endl;
+    BSPCoreImprovedAlgo bspCoreIm;
+    bspCoreIm(g, k-1);
 
-    // reduce to k-1 core
-    Galois::do_all_local(g, 
-      KeepValidNodes{g, k-1, *nNext}, 
-      Galois::do_all_steal<true>()
-    );
-    nNextSize = std::distance(nNext->begin(), nNext->end());
-
-    while (nCurSize != nNextSize) {
-      nCur->clear();
-      nCurSize = nNextSize;
-      std::swap(nCur, nNext);
-      ++iter;
-
-//      std::cout << "Core iteration " << iter << ": ";
-//      std::cout << nCurSize << " valid nodes" << std::endl;
-
-      Galois::do_all_local(*nCur, 
-        KeepValidNodes{g, k-1, *nNext}, 
-        Galois::do_all_steal<true>()
-      );
-      nNextSize = std::distance(nNext->begin(), nNext->end());
-    }
-
-//    std::cout << "Ends core computation at iteration " << iter << std::endl;
     TCore.stop();
-
-    iter = 0;
-    EdgeVec eWork[2];
-    EdgeVec *eCur = &eWork[0], *eNext = &eWork[1];
-    size_t eCurSize, eNextSize;
-
-    // symmetry breaking: 
-    // consider only valid edges (i, j) where i < j
-    Galois::do_all_local(g, 
-      [&g, eCur] (GNode n) {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
-          auto dst = g.getEdgeDst(e);
-          if (dst > n && !(g.getEdgeData(e) & removed)) {
-            eCur->push_back(std::make_pair(n, dst));
-          }
-        }
-      },
-      Galois::do_all_steal<true>()
-    );
-    eCurSize = std::distance(eCur->begin(), eCur->end());
 
     Galois::StatTimer TTruss("Reduce_to_k_truss");
     TTruss.start();
 
-    // remove unsupported edges until no more edges can be removed
-    while (true) {
-//      std::cout << "Truss iteration " << iter << ": ";
-//      std::cout << countValidNodes(g) << " valid nodes, ";
-//      std::cout << eCurSize << " valid edges" << std::endl;
+    BSPTrussAlgo bspTrussIm;
+    bspTrussIm(g, k);
 
-      Galois::do_all_local(*eCur,
-        KeepSupportedEdges{g, k-2, *eNext},
-        Galois::do_all_steal<true>()
-      );
-      eNextSize = std::distance(eNext->begin(), eNext->end());
-
-      if (eCurSize == eNextSize) {
-        // every edge in *eCur is kept, done
-        break;
-      }
-
-      eCur->clear();
-      eCurSize = eNextSize;
-      std::swap(eCur, eNext);
-      ++iter;
-    }
-
-//    std::cout << "Ends truss computation at iteration " << iter << std::endl;
     TTruss.stop();
   } // end operator()
 }; // end struct BSPCoreThenTrussAlgo
@@ -576,11 +500,11 @@ std::deque<typename G::GraphNode> getValidCommonNeighbors(G& g,
   return commonNeighbors;
 }
 
-// AsyncAlgo:
+// AsyncTrussAlgo:
 // 1. Compute support for all edges and pick out unsupported ones.
 // 2. Remove unsupported edges, decrease the support for affected edges and pick out those becomeing unsupported.
 // 3. Repeat 2. until no more unsupported edges are found.
-struct AsyncAlgo {
+struct AsyncTrussAlgo {
   // edge weight: (# triangles supported << 1) | removal
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
@@ -705,7 +629,7 @@ struct AsyncAlgo {
 
     //Galois::for_each();
   } // end operator()
-}; // end AsyncAlgo
+}; // end AsyncTrussAlgo
 
 template<typename Algo>
 void run() {
@@ -742,17 +666,17 @@ int main(int argc, char **argv) {
   Galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-  case bsp: 
-    run<BSPAlgo>(); 
+  case bspJacobi: 
+    run<BSPTrussJacobiAlgo>(); 
     break;
-  case bspIm:
-    run<BSPImprovedAlgo>();
+  case bsp:
+    run<BSPTrussAlgo>();
     break;
   case bspCoreThenTruss:
     run<BSPCoreThenTrussAlgo>();
     break;
   case async: 
-    run<AsyncAlgo>(); 
+    run<AsyncTrussAlgo>(); 
     break;
   case asyncCoreThenTruss:
 //    run<AsyncCoreThenTrussAlgo>();
