@@ -643,7 +643,13 @@ struct AsyncAlgo {
     void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
+      for (auto ei: g.edges(src)) {
+        g.edges(g.getEdgeDst(ei));
+      }
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
+      for (auto ei: g.edges(dst)) {
+        g.edges(g.getEdgeDst(ei));
+      }
 
       // avoid repeated processing
       if (oeData & removed) {
