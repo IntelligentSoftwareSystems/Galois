@@ -264,13 +264,13 @@ public:
   }
 
   void loadStatistics(Galois::Graph::OfflineGraph& g, std::vector<uint64_t>& prefixSumOfEdges) {
-    auto columnBlockSize = numRowHosts * blockSize;
+    uint64_t columnBlockSize = numRowHosts * (uint64_t)blockSize;
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       hasIncomingEdge[i].resize(columnBlockSize);
     }
 
-    auto rowBlockSize = numColumnHosts * blockSize;
+    uint64_t rowBlockSize = numColumnHosts * (uint64_t)blockSize;
     std::vector<std::vector<uint64_t> > numOutgoingEdges(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       numOutgoingEdges[i].assign(blockSize, 0);
@@ -338,7 +338,7 @@ public:
           createNode = true;
         } else if ((gridColumnID() == getColumnHostID(src)) 
           && hasIncomingEdge[0].test(getColumnIndex(src))) {
-          assert(false);
+          assert(false); // should be owned
           fprintf(stderr, "WARNING: Partitioning of vertices resulted in some inconsistency");
           createNode = true;
           ++dummyOutgoingNodes;
@@ -353,8 +353,8 @@ public:
     }
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      auto dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
-      auto dst_end = dst + blockSize;
+      uint64_t dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
+      uint64_t dst_end = dst + blockSize;
       if (dst_end > base_hGraph::totalNodes) dst_end = base_hGraph::totalNodes;
       if ((dst_end <= rowOffset) || (dst >= (rowOffset + rowBlockSize))) {
         for (; dst < dst_end; ++dst) {
@@ -546,7 +546,7 @@ public:
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
-    auto rowBlockSize = numColumnHosts * blockSize;
+    uint64_t rowBlockSize = numColumnHosts * (uint64_t)blockSize;
     uint64_t rowOffset = gridRowID() * rowBlockSize;
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t src = rowOffset + (i * blockSize);
@@ -561,8 +561,8 @@ public:
       }
     }
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      auto dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
-      auto dst_end = dst + blockSize;
+      uint64_t dst = (i * rowBlockSize) + (gridColumnID() * blockSize);
+      uint64_t dst_end = dst + blockSize;
       if (dst_end > base_hGraph::totalNodes) dst_end = base_hGraph::totalNodes;
       if ((dst_end <= rowOffset) || (dst >= (rowOffset + rowBlockSize))) {
         auto h = getHostID(dst);
