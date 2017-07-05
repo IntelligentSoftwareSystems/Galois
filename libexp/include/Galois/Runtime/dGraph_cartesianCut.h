@@ -338,6 +338,8 @@ public:
           createNode = true;
         } else if ((gridColumnID() == getColumnHostID(src)) 
           && hasIncomingEdge[0].test(getColumnIndex(src))) {
+          assert(false);
+          fprintf(stderr, "WARNING: Partitioning of vertices resulted in some inconsistency");
           createNode = true;
           ++dummyOutgoingNodes;
         }
