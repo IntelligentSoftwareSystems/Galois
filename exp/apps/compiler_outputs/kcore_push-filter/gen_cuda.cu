@@ -12,7 +12,9 @@ unsigned int * P_TRIM;
 #include "gen_cuda.cuh"
 static const int __tb_KCoreStep1 = TB_SIZE;
 static const int __tb_InitializeGraph2 = TB_SIZE;
-__global__ void InitializeGraph2(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_degree)
+__global__ void InitializeGraph2(CSRGraph graph, 
+    DynamicBitset* is_updated,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_degree)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -119,6 +121,7 @@ __global__ void InitializeGraph2(CSRGraph graph, unsigned int __nowned, unsigned
           index_type dest_node;
           dest_node = graph.getAbsDestination(current_edge);
           atomicAdd(&p_current_degree[dest_node], (unsigned int)1);
+          is_updated->set(dest_node);
         }
       }
       // FP: "50 -> 51;
@@ -157,6 +160,8 @@ __global__ void InitializeGraph2(CSRGraph graph, unsigned int __nowned, unsigned
             index_type dest_node;
             dest_node = graph.getAbsDestination(current_edge);
             atomicAdd(&p_current_degree[dest_node], (unsigned int)1);
+            is_updated->set(dest_node);
+
           }
         }
       }
@@ -191,6 +196,7 @@ __global__ void InitializeGraph2(CSRGraph graph, unsigned int __nowned, unsigned
           index_type dest_node;
           dest_node = graph.getAbsDestination(current_edge);
           atomicAdd(&p_current_degree[dest_node], (unsigned int)1);
+          is_updated->set(dest_node);
         }
       }
       // FP: "89 -> 90;
@@ -203,7 +209,14 @@ __global__ void InitializeGraph2(CSRGraph graph, unsigned int __nowned, unsigned
   }
   // FP: "94 -> 95;
 }
-__global__ void InitializeGraph1(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_degree, bool * p_flag, unsigned int * p_trim)
+__global__ void InitializeGraph1(CSRGraph graph, 
+                                 DynamicBitset* is_updated,
+                                 unsigned int __nowned, 
+                                 unsigned int __begin, 
+                                 unsigned int __end, 
+                                 unsigned int * p_current_degree, 
+                                 bool * p_flag, 
+                                 unsigned int * p_trim)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -220,11 +233,13 @@ __global__ void InitializeGraph1(CSRGraph graph, unsigned int __nowned, unsigned
       p_flag[src] = true;
       p_trim[src] = 0;
       p_current_degree[src] = 0;
+      is_updated->set(src);
     }
   }
   // FP: "9 -> 10;
 }
-__global__ void KCoreStep2(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_degree, unsigned int * p_trim)
+__global__ void KCoreStep2(CSRGraph graph,
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_degree, unsigned int * p_trim)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -247,7 +262,8 @@ __global__ void KCoreStep2(CSRGraph graph, unsigned int __nowned, unsigned int _
   }
   // FP: "10 -> 11;
 }
-__global__ void KCoreStep1(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int local_k_core_num, unsigned int * p_current_degree, bool * p_flag, unsigned int * p_trim, Sum ret_val)
+__global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int local_k_core_num, unsigned int * p_current_degree, bool * p_flag, unsigned int * p_trim, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -350,6 +366,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __nowned, unsigned int _
           index_type dst;
           dst = graph.getAbsDestination(current_edge);
           atomicAdd(&p_trim[dst], (unsigned int)1);
+          is_updated->set(dst);
         }
       }
       __syncthreads();
@@ -383,6 +400,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __nowned, unsigned int _
             index_type dst;
             dst = graph.getAbsDestination(current_edge);
             atomicAdd(&p_trim[dst], (unsigned int)1);
+            is_updated->set(dst);
           }
         }
       }
@@ -407,6 +425,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __nowned, unsigned int _
           index_type dst;
           dst = graph.getAbsDestination(current_edge);
           atomicAdd(&p_trim[dst], (unsigned int)1);
+          is_updated->set(dst);
         }
       }
       _np.execute_round_done(ITSIZE);
@@ -425,7 +444,9 @@ void InitializeGraph2_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph2 <<<blocks, __tb_InitializeGraph2>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr());
+  InitializeGraph2 <<<blocks, __tb_InitializeGraph2>>>(ctx->gg, 
+  ctx->current_degree.is_updated.gpu_rd_ptr(),
+  ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -445,7 +466,10 @@ void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph1 <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  InitializeGraph1 <<<blocks, threads>>>(ctx->gg, 
+    ctx->current_degree.is_updated.gpu_rd_ptr(),
+    ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
+    ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -465,7 +489,9 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  KCoreStep2 <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  KCoreStep2 <<<blocks, threads>>>(ctx->gg, 
+    ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
+    ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -489,7 +515,9 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval,
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, ctx->nowned, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+  KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, 
+  ctx->trim.is_updated.gpu_rd_ptr(),
+  ctx->nowned, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

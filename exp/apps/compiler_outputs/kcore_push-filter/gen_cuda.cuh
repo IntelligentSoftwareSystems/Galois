@@ -42,8 +42,18 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->trim.data.zero_gpu();
 }
 
-void bitset_current_degree_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->current_degree.is_updated.cpu_rd_ptr()->reset_all();
+
+// Bitset functions
+void get_bitset_current_degree_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->current_degree.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_current_degree_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->current_degree.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_current_degree_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->current_degree, begin, end);
 }
 
 unsigned int get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -92,6 +102,10 @@ void batch_get_reset_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned
 }
 
 void batch_set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -101,10 +115,6 @@ void batch_add_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_
 
 void batch_min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
-}
-
-void bitset_flag_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->flag.is_updated.cpu_rd_ptr()->reset_all();
 }
 
 bool get_node_flag_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -153,6 +163,10 @@ void batch_get_reset_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, 
 }
 
 void batch_set_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, bool *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<bool, sharedMaster, setOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, bool *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<bool, sharedMirror, setOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -164,9 +178,19 @@ void batch_min_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 	batch_set_shared_field<bool, sharedMaster, minOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void bitset_trim_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->trim.is_updated.cpu_rd_ptr()->reset_all();
+// Bitset functions (manually added)
+void get_bitset_trim_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->trim.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
+
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->trim.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->trim, begin, end);
+}
+
 
 unsigned int get_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID) {
 	unsigned int *trim = ctx->trim.data.cpu_rd_ptr();
@@ -214,6 +238,10 @@ void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, 
 }
 
 void batch_set_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
