@@ -75,7 +75,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 }
 
 void bitset_betweeness_centrality_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->betweeness_centrality.is_updated.cpu_rd_ptr()->clear();
+	//ctx->betweeness_centrality.is_updated.cpu_rd_ptr()->clear();
 }
 
 float get_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -124,8 +124,13 @@ void batch_get_reset_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, u
 }
 
 void batch_set_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->betweeness_centrality, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->betweeness_centrality, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->betweeness_centrality, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -136,7 +141,7 @@ void batch_min_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigne
 }
 
 void bitset_current_length_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->current_length.is_updated.cpu_rd_ptr()->clear();
+	//ctx->current_length.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -188,6 +193,10 @@ void batch_get_reset_node_current_length_cuda(struct CUDA_Context *ctx, unsigned
 }
 
 void batch_set_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->current_length, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->current_length, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -200,7 +209,7 @@ void batch_min_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_
 }
 
 void bitset_dependency_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->dependency.is_updated.cpu_rd_ptr()->clear();
+	//ctx->dependency.is_updated.cpu_rd_ptr()->clear();
 }
 
 float get_node_dependency_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -249,8 +258,13 @@ void batch_get_reset_node_dependency_cuda(struct CUDA_Context *ctx, unsigned fro
 }
 
 void batch_set_node_dependency_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->dependency, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_dependency_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->dependency, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_dependency_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->dependency, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -261,7 +275,7 @@ void batch_min_node_dependency_cuda(struct CUDA_Context *ctx, unsigned from_id, 
 }
 
 void bitset_num_predecessors_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->num_predecessors.is_updated.cpu_rd_ptr()->clear();
+	//ctx->num_predecessors.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_num_predecessors_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -310,6 +324,10 @@ void batch_get_reset_node_num_predecessors_cuda(struct CUDA_Context *ctx, unsign
 }
 
 void batch_set_node_num_predecessors_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->num_predecessors, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_num_predecessors_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->num_predecessors, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -322,7 +340,7 @@ void batch_min_node_num_predecessors_cuda(struct CUDA_Context *ctx, unsigned fro
 }
 
 void bitset_num_shortest_paths_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->num_shortest_paths.is_updated.cpu_rd_ptr()->clear();
+	//ctx->num_shortest_paths.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -371,8 +389,13 @@ void batch_get_reset_node_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsi
 }
 
 void batch_set_node_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->num_shortest_paths, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->num_shortest_paths, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->num_shortest_paths, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -383,7 +406,7 @@ void batch_min_node_num_shortest_paths_cuda(struct CUDA_Context *ctx, unsigned f
 }
 
 void bitset_num_successors_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->num_successors.is_updated.cpu_rd_ptr()->clear();
+	//ctx->num_successors.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_num_successors_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -432,8 +455,13 @@ void batch_get_reset_node_num_successors_cuda(struct CUDA_Context *ctx, unsigned
 }
 
 void batch_set_node_num_successors_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->num_successors, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_num_successors_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->num_successors, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_num_successors_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->num_successors, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -444,7 +472,7 @@ void batch_min_node_num_successors_cuda(struct CUDA_Context *ctx, unsigned from_
 }
 
 void bitset_old_length_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->old_length.is_updated.cpu_rd_ptr()->clear();
+	//ctx->old_length.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_old_length_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -493,8 +521,13 @@ void batch_get_reset_node_old_length_cuda(struct CUDA_Context *ctx, unsigned fro
 }
 
 void batch_set_node_old_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->old_length, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_old_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->old_length, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_old_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->old_length, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -505,7 +538,7 @@ void batch_min_node_old_length_cuda(struct CUDA_Context *ctx, unsigned from_id, 
 }
 
 void bitset_propogation_flag_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->propogation_flag.is_updated.cpu_rd_ptr()->clear();
+	//ctx->propogation_flag.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned char get_node_propogation_flag_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -554,8 +587,13 @@ void batch_get_reset_node_propogation_flag_cuda(struct CUDA_Context *ctx, unsign
 }
 
 void batch_set_node_propogation_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned char *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned char, sharedMaster, setOp>(ctx, &ctx->propogation_flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_propogation_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned char *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned char, sharedMirror, setOp>(ctx, &ctx->propogation_flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_propogation_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned char *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned char, sharedMaster, addOp>(ctx, &ctx->propogation_flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -566,7 +604,7 @@ void batch_min_node_propogation_flag_cuda(struct CUDA_Context *ctx, unsigned fro
 }
 
 void bitset_to_add_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->to_add.is_updated.cpu_rd_ptr()->clear();
+	//ctx->to_add.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_to_add_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -615,8 +653,13 @@ void batch_get_reset_node_to_add_cuda(struct CUDA_Context *ctx, unsigned from_id
 }
 
 void batch_set_node_to_add_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->to_add, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_to_add_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->to_add, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_to_add_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->to_add, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -627,7 +670,7 @@ void batch_min_node_to_add_cuda(struct CUDA_Context *ctx, unsigned from_id, unsi
 }
 
 void bitset_to_add_float_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->to_add_float.is_updated.cpu_rd_ptr()->clear();
+	//ctx->to_add_float.is_updated.cpu_rd_ptr()->clear();
 }
 
 float get_node_to_add_float_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -676,8 +719,13 @@ void batch_get_reset_node_to_add_float_cuda(struct CUDA_Context *ctx, unsigned f
 }
 
 void batch_set_node_to_add_float_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<float, sharedMaster, setOp>(ctx, &ctx->to_add_float, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_to_add_float_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMirror, setOp>(ctx, &ctx->to_add_float, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
+
 
 void batch_add_node_to_add_float_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, addOp>(ctx, &ctx->to_add_float, from_id, bitset_comm, offsets, v, v_size, data_mode);
@@ -688,7 +736,7 @@ void batch_min_node_to_add_float_cuda(struct CUDA_Context *ctx, unsigned from_id
 }
 
 void bitset_trim_clear_cuda(struct CUDA_Context *ctx) {
-	ctx->trim.is_updated.cpu_rd_ptr()->clear();
+	//ctx->trim.is_updated.cpu_rd_ptr()->clear();
 }
 
 unsigned int get_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -737,6 +785,10 @@ void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, 
 }
 
 void batch_set_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_set_mirror_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 

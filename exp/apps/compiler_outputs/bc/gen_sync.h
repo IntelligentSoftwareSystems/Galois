@@ -202,7 +202,7 @@ struct Broadcast_to_add {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_to_add_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_to_add_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -416,7 +416,7 @@ struct Broadcast_to_add_float {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_to_add_float_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_to_add_float_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -639,7 +639,7 @@ struct Broadcast_num_shortest_paths {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
+      batch_set_mirror_num_shortest_paths_cuda(cuda_ctx, from_id, b, o, y, s,
                                data_mode);
       return true;
     }
@@ -870,7 +870,7 @@ struct Broadcast_num_successors {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_num_successors_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -1102,7 +1102,7 @@ struct Broadcast_num_predecessors {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_num_predecessors_cuda(cuda_ctx, from_id, b, o, y, s, 
                                            data_mode);
       return true;
     }
@@ -1324,7 +1324,7 @@ struct Broadcast_trim {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_trim_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -1533,7 +1533,7 @@ struct Broadcast_current_length {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_current_length_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -1675,7 +1675,7 @@ struct Broadcast_old_length {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_old_length_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_old_length_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }
@@ -1809,7 +1809,7 @@ struct Broadcast_propogation_flag {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_propogation_flag_cuda(cuda_ctx, from_id, b, o, y, s, 
                                            data_mode);
       return true;
     }
@@ -2043,7 +2043,7 @@ struct Broadcast_dependency {
                            DataCommMode data_mode) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      batch_set_node_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
+      batch_set_mirror_dependency_cuda(cuda_ctx, from_id, b, o, y, s, 
                                data_mode);
       return true;
     }

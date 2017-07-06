@@ -262,36 +262,25 @@ struct InitializeIteration {
                    Galois::loopname("InitializeIteration"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
-    printf("about to sync things in init iter\n");
-    printf("0thing\n");
     // broadcast ALL reset values (inefficient, but this is initialization)
     _graph.sync<writeSource, readDestination, ReduceSet_current_length, 
                 Broadcast_current_length>("InitializeIteration");
-    printf("1thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_propogation_flag, 
                 Broadcast_propogation_flag>("InitializeIteration");
-    printf("2thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_num_successors, 
                 Broadcast_num_successors>("InitializeIteration");
-    printf("3thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_old_length,
                 Broadcast_old_length>("InitializeIteration");
-    printf("4thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_num_predecessors, 
                 Broadcast_num_predecessors>("InitializeIteration");
-    printf("5thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_trim,
                 Broadcast_trim>("InitializeIteration");
-    printf("6thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_num_shortest_paths,
                 Broadcast_num_shortest_paths>("InitializeIteration");
-    printf("7thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_dependency,
                 Broadcast_dependency>("InitializeIteration");
-    printf("8thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_to_add,
                 Broadcast_to_add>("InitializeIteration");
-    printf("9thing\n");
     _graph.sync<writeSource, readDestination, ReduceSet_to_add_float,
                 Broadcast_to_add_float>("InitializeIteration");
 
@@ -1134,7 +1123,7 @@ struct DependencyPropogation {
       SuccessorDecrement::go(_graph);
 
       _graph.sync<writeSource, readSource, Reduce_to_add_float, 
-                  Broadcast_to_add_float>("NumShortestPaths");
+                  Broadcast_to_add_float>("DependencyPropogation");
       // with to_add_float sync'd, update dependency
       DependencyIncrement::go(_graph);
 
@@ -1398,7 +1387,7 @@ int main(int argc, char** argv) {
 
     // Verify, i.e. print out graph data for examination
     if (verify) {
-      char v_out[100];
+      char *v_out = (char*)malloc(35);
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
@@ -1418,9 +1407,11 @@ int main(int argc, char** argv) {
                     get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
 
             Galois::Runtime::printOutput(v_out);
+            memset(v_out, '\0', 35);
         }
       }
 #endif
+      free(v_out);
     }
     return 0;
   } catch(const char* c) {
