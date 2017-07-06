@@ -30,7 +30,7 @@ void bitset_current_length_clear_cuda(struct CUDA_Context *ctx);
 unsigned int get_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void add_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
-bool min_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
+unsigned int min_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void batch_get_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);
 void batch_get_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode);
 void batch_get_mirror_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v);

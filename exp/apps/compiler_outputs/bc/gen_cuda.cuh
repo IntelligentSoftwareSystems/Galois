@@ -159,13 +159,13 @@ void add_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsign
 	current_length[LID] += v;
 }
 
-bool min_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+unsigned int min_node_current_length_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
 	unsigned int *current_length = ctx->current_length.data.cpu_wr_ptr();
+  unsigned int old = current_length[LID];
 	if (current_length[LID] > v) {
 		current_length[LID] = v;
-    return true;
   }
-  return false;
+  return old;
 }
 
 void batch_get_node_current_length_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {

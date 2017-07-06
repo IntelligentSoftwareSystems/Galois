@@ -263,25 +263,25 @@ struct InitializeIteration {
                    Galois::numrun(_graph.get_run_identifier()));
 
     // broadcast ALL reset values (inefficient, but this is initialization)
-    _graph.sync<writeSource, readDestination, ReduceSet_current_length, 
+    _graph.sync<writeSource, readDestination, Reduce_set_current_length, 
                 Broadcast_current_length>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_propogation_flag, 
+    _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_num_successors, 
+    _graph.sync<writeSource, readDestination, Reduce_set_num_successors, 
                 Broadcast_num_successors>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_old_length,
+    _graph.sync<writeSource, readDestination, Reduce_set_old_length,
                 Broadcast_old_length>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_num_predecessors, 
+    _graph.sync<writeSource, readDestination, Reduce_set_num_predecessors, 
                 Broadcast_num_predecessors>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_trim,
+    _graph.sync<writeSource, readDestination, Reduce_set_trim,
                 Broadcast_trim>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_num_shortest_paths,
+    _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths,
                 Broadcast_num_shortest_paths>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_dependency,
+    _graph.sync<writeSource, readDestination, Reduce_set_dependency,
                 Broadcast_dependency>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_to_add,
+    _graph.sync<writeSource, readDestination, Reduce_set_to_add,
                 Broadcast_to_add>("InitializeIteration");
-    _graph.sync<writeSource, readDestination, ReduceSet_to_add_float,
+    _graph.sync<writeSource, readDestination, Reduce_set_to_add_float,
                 Broadcast_to_add_float>("InitializeIteration");
 
     //if (personality == GPU_CUDA) {
@@ -366,7 +366,7 @@ struct FirstIterationSSSP {
                    Galois::loopname("FirstIterationSSSP"));
 
     // Next op will read src, current length
-    _graph.sync<writeDestination, readSource, Reduce_current_length, 
+    _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
                 Broadcast_current_length>("FirstIterationSSSP");
 
     //if (personality == GPU_CUDA) {
@@ -456,16 +456,15 @@ struct SSSP {
 
       if (accum_result) {
         // sync on source
-        _graph.sync<writeDestination, readSource, Reduce_current_length, 
+        _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
                     Broadcast_current_length>("SSSP");
 
       } else {
         // sync both
-        _graph.sync<writeDestination, readAny, Reduce_current_length, 
+        _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
                     Broadcast_current_length>("SSSP");
       }
     } while (accum_result);
-    //} while (iterations < maxIterations);
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -544,11 +543,11 @@ struct PredAndSucc {
                    Galois::loopname("PredAndSucc"));
 
     // sync for use in NumShortPath calculation
-    _graph.sync<writeDestination, readSource, 
-                Reduce_num_predecessors, Broadcast_num_predecessors>("PredAndSucc");
+    _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors, 
+                Broadcast_num_predecessors>("PredAndSucc");
 
     // sync now for later DependencyPropogation use (read src/dst)
-    _graph.sync<writeSource, readAny, Reduce_num_successors, 
+    _graph.sync<writeSource, readAny, Reduce_add_num_successors, 
                 Broadcast_num_successors>("PredAndSucc");
 
     //if (personality == GPU_CUDA) {
@@ -748,7 +747,7 @@ struct NumShortestPaths {
                      Galois::loopname("NumShortestPaths"));
 
       _graph.sync<writeDestination, readSource, 
-                  Reduce_trim, Broadcast_trim>("NumShortestPaths");
+                  Reduce_add_trim, Broadcast_trim>("NumShortestPaths");
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -776,7 +775,7 @@ struct NumShortestPaths {
       PredecessorDecrement::go(_graph);
 
       // sync to_adds on source
-      _graph.sync<writeDestination, readSource, Reduce_to_add, 
+      _graph.sync<writeDestination, readSource, Reduce_add_to_add, 
                   Broadcast_to_add>("NumShortestPaths");
       // do num_shortest_paths incrementing using to_add 
       PathsIncrement::go(_graph);
@@ -788,7 +787,7 @@ struct NumShortestPaths {
       // sync num_short_paths on dest if necessary (will be sync'd on source
       // already, i.e. all sources should have the correct value)
       if (!accum_result) {
-        _graph.sync<writeSource, readDestination, ReduceSet_num_shortest_paths, 
+        _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths, 
                     Broadcast_num_shortest_paths>("NumShortestPaths");
       }
 
@@ -912,7 +911,7 @@ struct PropFlagReset {
                    Galois::numrun(_graph.get_run_identifier()));
 
     // flag read later on both source and dest
-    _graph.sync<writeSource, readAny, ReduceSet_propogation_flag, 
+    _graph.sync<writeSource, readAny, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag>("PropFlagReset");
 
     //if (personality == GPU_CUDA) {
@@ -966,9 +965,9 @@ struct SuccessorDecrement {
                    Galois::numrun(_graph.get_run_identifier()));
 
     // need reduce set for both flag and succ
-    _graph.sync<writeSource, readDestination, ReduceSet_propogation_flag, 
+    _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag>("SuccessorDecrement");
-    _graph.sync<writeSource, readDestination, ReduceSet_num_successors, 
+    _graph.sync<writeSource, readDestination, Reduce_set_num_successors, 
                 Broadcast_num_successors>("SuccessorDecrement");
   }
 
@@ -1094,7 +1093,7 @@ struct DependencyPropogation {
     //  }
     //}
 
-      _graph.sync<writeSource, readSource, Reduce_trim, 
+      _graph.sync<writeSource, readSource, Reduce_add_trim, 
                   Broadcast_trim>("DependencyPropogation");
 
     //if (personality == GPU_CUDA) {
@@ -1122,7 +1121,7 @@ struct DependencyPropogation {
       // do successor decrementing using sync'd trim
       SuccessorDecrement::go(_graph);
 
-      _graph.sync<writeSource, readSource, Reduce_to_add_float, 
+      _graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
                   Broadcast_to_add_float>("DependencyPropogation");
       // with to_add_float sync'd, update dependency
       DependencyIncrement::go(_graph);
@@ -1132,11 +1131,10 @@ struct DependencyPropogation {
 
       if (accum_result) {
         // sync dependency on dest; source should all have same dep
-        _graph.sync<writeSource, readDestination, ReduceSet_dependency,
+        _graph.sync<writeSource, readDestination, Reduce_set_dependency,
                     Broadcast_dependency>("DependencyPropogation");
       } 
     } while (accum_result);
-    //} while (iterations < maxIterations);
   }
 
   /* Summary:
