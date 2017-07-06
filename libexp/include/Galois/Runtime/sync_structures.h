@@ -44,6 +44,8 @@
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
+#ifndef SYNC_STRUCT_MACROS
+#define SYNC_STRUCT_MACROS
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Add
@@ -432,8 +434,8 @@ struct Broadcast_##fieldname {\
                            size_t s,\
                            DataCommMode data_mode) {\
     if (personality == GPU_CUDA) {\
-      batch_set_mirror_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
-                                         data_mode);\
+      batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                               data_mode);\
       return true;\
     }\
     assert (personality == CPU);\
@@ -527,3 +529,5 @@ struct Bitset_##fieldname {\
   }\
 }
 #endif
+
+#endif // header guard

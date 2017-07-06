@@ -180,7 +180,7 @@ struct NodeData {
 };
 
 // sync structures
-#include "gen_sync.h"
+#include "gen_sync.hh"
 
 // second type (unsigned int) is for edge weights
 typedef hGraph<NodeData, unsigned int> Graph;

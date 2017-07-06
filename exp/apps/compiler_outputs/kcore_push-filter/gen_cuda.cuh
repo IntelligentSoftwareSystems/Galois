@@ -105,7 +105,7 @@ void batch_set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_
 	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_set_mirror_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+void batch_set_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -166,7 +166,7 @@ void batch_set_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 	batch_set_shared_field<bool, sharedMaster, setOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_set_mirror_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, bool *v, size_t v_size, DataCommMode data_mode) {
+void batch_set_mirror_node_flag_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, bool *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<bool, sharedMirror, setOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
@@ -241,7 +241,7 @@ void batch_set_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_set_mirror_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
+void batch_set_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 

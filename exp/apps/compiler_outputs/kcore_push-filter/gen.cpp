@@ -176,7 +176,7 @@ Galois::DynamicBitSet bitset_current_degree;
 Galois::DynamicBitSet bitset_trim;
 
 // add all sync/bitset structs (needs above declarations)
-#include "gen_sync.h"
+#include "gen_sync.hh"
 
 /******************************************************************************/
 /* Functors for running the algorithm */
@@ -544,8 +544,13 @@ int main(int argc, char** argv) {
         Galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
 
-        //bitset_current_degree.reset();
-        //bitset_trim.reset();
+      #ifdef __GALOIS_HET_CUDA__
+        // TODO gpu bitset resets
+      #endif
+
+        bitset_current_degree.reset();
+        bitset_trim.reset();
+
         InitializeGraph1::go((*h_graph));
       }
     }
