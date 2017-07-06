@@ -1,4 +1,4 @@
-/**-*- C++ -*-
+/**KCore -*- C++ -*-
  * @file
  * @section License
  *
@@ -37,7 +37,6 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
-//#include "Galois/Runtime/dGraph_vertexCut.h"
 #include "Galois/Runtime/dGraph_cartesianCut.h"
 #include "Galois/Runtime/dGraph_hybridCut.h"
 
@@ -70,7 +69,6 @@ std::string personality_str(Personality p) {
 enum VertexCut {
   PL_VCUT, CART_VCUT
 };
-
 
 static const char* const name = "KCore - Distributed Heterogeneous "
                                 "with Worklist.";
@@ -207,10 +205,8 @@ struct InitializeGraph2 {
                    Galois::loopname("InitializeGraph2"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
-    _graph.sync<writeDestination, readSource, Reduce_current_degree, 
+    _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
-    //_graph.sync<writeDestination, readSource, Reduce_current_degree, 
-    //  Broadcast_current_degree>("InitializeGraph2");
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -258,10 +254,8 @@ struct InitializeGraph1 {
                    Galois::loopname("InitializeGraph1"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
-    _graph.sync<writeSource, readDestination, ReduceSet_current_degree, 
+    _graph.sync<writeSource, readDestination, Reduce_set_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph1");
-    //_graph.sync<writeSource, readDestination, Reduce_current_degree, 
-    //  Broadcast_current_degree>("InitializeGraph1");
 
     // make sure everything is initialized
     InitializeGraph2::go(_graph);
@@ -397,9 +391,9 @@ struct KCoreStep1 {
 
       
       // do the trim sync
-      _graph.sync<writeDestination, readSource, Reduce_trim, Broadcast_trim, 
+      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCoreStep1");
-      //_graph.sync<writeDestination, readSource, Reduce_trim, 
+      //_graph.sync<writeDestination, readSource, Reduce_add_trim, 
       //            Broadcast_trim>("KCoreStep1");
 
       // handle trimming (locally)
