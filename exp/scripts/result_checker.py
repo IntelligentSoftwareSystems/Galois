@@ -35,6 +35,11 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
         offset = offset + len(line1)
         split_line1 = line1.split(' ')
 
+
+      # forces failure if missings rows exist
+      #if mrows > 0:
+      #  return (-1, errors, mrows)
+
       if (split_line1[0] == split_line2[0]):
         # absolute value of difference in fields
         field_difference = abs(float(split_line1[1]) - float(split_line2[1]))
@@ -114,9 +119,11 @@ if __name__ == "__main__":
   allFiles_arr = parsed_arguments.files[1:]
 
   print masterFile  
-  print allFiles_arr
+  print allFiles_arr  
 
   tolerance = parsed_arguments.tolerance
+
+  print("Starting comparison...")
 
   # apparently if you pass in a tolerance argument it returns it as a list...
   # the default is just a float
