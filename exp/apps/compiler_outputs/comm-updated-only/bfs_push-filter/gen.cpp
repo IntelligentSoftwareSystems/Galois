@@ -307,7 +307,7 @@ int main(int argc, char** argv) {
 
 
     StatTimer_hg_init.start();
-    Graph* hg;
+    Graph* hg = nullptr;
     if (numPipelinedPhases > 1) {
       numPipelinedPhases = 1;
       if (net.ID == 0) {

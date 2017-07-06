@@ -103,7 +103,7 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 
 
 static const float alpha = (1.0 - 0.85);
-struct PR_NodeData {
+struct NodeData {
   float value;
   float delta;
   std::atomic<float> residual;
@@ -114,10 +114,10 @@ struct PR_NodeData {
 Galois::DynamicBitSet bitset_residual;
 Galois::DynamicBitSet bitset_nout;
 
-typedef hGraph<PR_NodeData, void> Graph;
-typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
-typedef hGraph_cartesianCut<PR_NodeData, void> Graph_cartesianCut;
+typedef hGraph<NodeData, void> Graph;
+typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -143,7 +143,7 @@ struct ResetGraph {
   }
 
   void operator()(GNode src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
     sdata.value = 0;
     sdata.nout = 0;
     sdata.residual = 0;
@@ -166,14 +166,14 @@ struct InitializeGraphNout {
       	} else if (personality == CPU)
       #endif
       {
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraphNout{ &_graph }, Galois::loopname("InitializeGraphNout"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "nout", "float" , "add",  "0"));
       }
       _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout, Bitset_nout>("InitializeGraphNout");
       
   }
 
   void operator()(GNode src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
     Galois::atomicAdd(sdata.nout, (unsigned int) std::distance(graph->edge_begin(src), graph->edge_end(src)));
     bitset_nout.set(src);
   }
@@ -195,21 +195,21 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       {
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       }
       _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("InitializeGraph");
       
   }
 
   void operator()(GNode src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
     sdata.value = local_alpha;
 
     if(sdata.nout > 0 ){
       float delta = sdata.value*(1-local_alpha)/sdata.nout;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
-        PR_NodeData& ddata = graph->getData(dst);
+        NodeData& ddata = graph->getData(dst);
         Galois::atomicAdd(ddata.residual, delta);
         bitset_residual.set(dst);
       }
@@ -239,7 +239,7 @@ cll::opt<float> & local_tolerance;
   }
 
   void operator()(WorkItem src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
     if (sdata.residual > this->local_tolerance){
       float residual_old = sdata.residual;
       sdata.residual = 0;
@@ -265,7 +265,7 @@ void static go(Graph& _graph) {
     } else if (personality == CPU)
 #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph}, Galois::loopname("PageRank"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
 _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
 
@@ -273,13 +273,13 @@ Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identi
 
 }
 void operator()(WorkItem src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
     if (sdata.delta > 0) {
       float delta = sdata.delta;
       sdata.delta = 0;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
-        PR_NodeData& ddata = graph->getData(dst);
+        NodeData& ddata = graph->getData(dst);
         Galois::atomicAdd(ddata.residual, delta);
         bitset_residual.set(dst);
       }
@@ -314,7 +314,7 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
         }
     _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
     
@@ -329,14 +329,14 @@ struct PageRank {
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(WorkItem src) const {
-    PR_NodeData& sdata = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
 
     if(sdata.delta > 0){
       float delta = sdata.delta;
       sdata.delta = 0;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
-        PR_NodeData& ddata = graph->getData(dst);
+        NodeData& ddata = graph->getData(dst);
         Galois::atomicAdd(ddata.residual, delta);
         bitset_residual.set(dst);
       }
@@ -401,7 +401,7 @@ int main(int argc, char** argv) {
 #endif
 
     StatTimer_hg_init.start();
-    Graph* hg;
+    Graph* hg = nullptr;
     if (numPipelinedPhases > 1) {
       numPipelinedPhases = 1;
       if (net.ID == 0) {
