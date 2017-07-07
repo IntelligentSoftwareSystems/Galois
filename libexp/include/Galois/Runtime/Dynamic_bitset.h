@@ -55,28 +55,61 @@ namespace Galois {
     void reset(size_t begin, size_t end){
       assert(begin <= (num_bits - 1));
       assert(end <= (num_bits - 1));
-      size_t vec_begin = (begin + bits_uint64 - 1)/bits_uint64;
+
+      // 100% safe implementation, but slow
+      //for (unsigned long i = begin; i <= end; i++) {
+      //  size_t bit_index = i / bits_uint64;
+      //  uint64_t bit_offset = 1;
+      //  bit_offset <<= (i % bits_uint64);
+      //  uint64_t mask = ~bit_offset;
+      //  bitvec[bit_index] &= mask;
+      //}
+
+      // block which you are safe to clear
+      size_t vec_begin = (begin + bits_uint64 - 1) / bits_uint64;
       size_t vec_end;
+
       if (end == (num_bits - 1)) vec_end = bitvec.size();
       else vec_end = (end+1)/bits_uint64; // floor
+
       if (vec_begin < vec_end) {
         std::fill(bitvec.begin() + vec_begin, bitvec.begin() + vec_end, 0);
       }
+
       vec_begin *= bits_uint64;
       vec_end *= bits_uint64;
-      if (begin < vec_begin) {
-        size_t diff = vec_begin - begin;
-        assert(diff < 64);
-        uint64_t mask = (1 << (64 - diff)) - 1;
-        size_t bit_index = begin/bits_uint64;
-        bitvec[bit_index] &= mask;
-      }
-      if (end >= vec_end) {
-        size_t diff = end - vec_end + 1;
-        assert(diff < 64);
-        uint64_t mask = (1 << diff) - 1;
-        size_t bit_index = end/bits_uint64;
-        bitvec[bit_index] &= ~mask;
+
+      // at this point vec_begin -> vec_end-1 has been reset
+
+      if (vec_begin > vec_end) {
+        // no fill happened
+        if (begin < vec_begin) {
+          size_t diff = vec_begin - begin;
+          assert(diff < 64);
+          uint64_t mask = ((uint64_t)1 << (64 - diff)) - 1;
+
+          size_t end_diff = end - vec_end + 1;
+          uint64_t or_mask = ((uint64_t)1 << end_diff) - 1;
+          mask |= ~or_mask;
+
+          size_t bit_index = begin / bits_uint64;
+          bitvec[bit_index] &= mask;
+        }
+      } else {
+        if (begin < vec_begin) {
+          size_t diff = vec_begin - begin;
+          assert(diff < 64);
+          uint64_t mask = ((uint64_t)1 << (64 - diff)) - 1;
+          size_t bit_index = begin/bits_uint64;
+          bitvec[bit_index] &= mask;
+        }
+        if (end >= vec_end) {
+          size_t diff = end - vec_end + 1;
+          assert(diff < 64);
+          uint64_t mask = ((uint64_t)1 << diff) - 1;
+          size_t bit_index = end/bits_uint64;
+          bitvec[bit_index] &= ~mask;
+        }
       }
     }
 
