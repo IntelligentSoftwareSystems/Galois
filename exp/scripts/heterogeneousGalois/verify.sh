@@ -13,16 +13,27 @@ inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-#outputdirname=/net/ohm/export/cdgc/dist-outputs
-outputdirname=/workspace/dist-outputs
+outputdirname=/net/ohm/export/cdgc/dist-outputs
+#outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
 problem=${EXECP[0]}
 OUTPUT=${outputdirname}/${inputname}.${problem}
+
 # kcore output files have a number at the end specifying kcore number
 if [[ $execname == *"kcore"* ]]; then
   OUTPUT=${outputdirname}/${inputname}.${problem}100
 fi
+
+# for bc, do single source outputs
+if [[ ($execname == *"bc"*) ]]; then
+  OUTPUT=${outputdirname}/${inputname}.ssbc
+fi
+
+# for bc, if using rmat15, then use all sources output
+#if [[ ($execname == *"kcore"*) && ($inputname == "rmat15") ]]; then
+#  OUTPUT=${outputdirname}/rmat15.bc
+#fi
 
 MPI=mpiexec
 LOG=.verify_log
@@ -56,6 +67,13 @@ elif [[ $execname == *"pull"* ]]; then
 #  extension=tgr
 #  FLAGS+=" -transpose"
 fi
+
+# bc: if rmat15 is not used, specify single source flags
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+  FLAGS+=" -singleSource"
+  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+fi
+
 grep "${inputname}.${extension}" ${source_file} >>$LOG
 INPUT=${inputdirname}/${inputname}.${extension}
 
@@ -63,6 +81,7 @@ if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/GaloisCpp
 fi
 checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
+#checker=./result_checker.py
 
 hostname=`hostname`
 
@@ -106,6 +125,8 @@ for partition in 1 2 3; do
       PFLAGS+=" -scalegpu=3"
     fi
     rm -f output_*.log
+
+
     echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG
     eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG 2>&1
     #outputs="output_${hostname}_0.log"
@@ -116,7 +137,15 @@ for partition in 1 2 3; do
     #done
     #eval "sort -nu ${outputs} -o output_${hostname}_*.log"
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
-    eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
+
+    # higher threshold for bc
+    if [[ ($execname == *"bc"*) ]]; then
+      eval "python $checker -t=0.2 $OUTPUT output_${hostname}_0.log &> .output_diff"
+    else
+      eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
+    fi
+
+
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
