@@ -42,6 +42,11 @@
  * GALOIS_SYNC_STRUCTURE_REDUCE_ADD(current_degree, unsigned int);
  * GALOIS_SYNC_STRUCTURE_BROADCAST(current_degree, unsigned int);
  *
+ * 
+ * WARNING: "bool" is NOT supported as a field type: the code uses the data
+ * operation on C vectors, and a vector<bool> has a specialized version of
+ * the data operation that causes problems. Use a uint8_t instead.
+ *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 #ifndef SYNC_STRUCT_MACROS
