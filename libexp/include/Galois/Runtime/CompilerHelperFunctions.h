@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_COMPILER_HELPER_FUNCTIONS_H
 #define GALOIS_RUNTIME_COMPILER_HELPER_FUNCTIONS_H
@@ -28,6 +29,36 @@
 #include <vector>
 
 namespace Galois {
+  /** Galois::atomicMax + non-atomic max calls **/
+
+  template<typename Ty>
+  const Ty atomicMax(std::atomic<Ty>& a, const Ty b){
+    Ty old_a = a;
+    // if old value is less than new value, atomically exchange
+    while (old_a < b && !a.compare_exchange_weak(old_a, b));
+    return old_a;
+  }
+
+  template<typename Ty>
+  const Ty max(std::atomic<Ty>& a, const Ty& b){
+    Ty old_a = a;
+
+    if(a < b){
+      a = b;
+    }
+    return old_a;
+  }
+
+  template<typename Ty>
+  const Ty max(Ty& a, const Ty& b){
+    Ty old_a = a;
+
+    if(a < b){
+      a = b;
+    }
+    return old_a;
+  }
+
   /** Galois::atomicMin **/
   template<typename Ty>
     const Ty atomicMin(std::atomic<Ty>& a, const Ty b){
