@@ -45,9 +45,9 @@ struct Cell;
 struct CellPin {
   std::string name;
   float capacitance;
-  TimingSense tSense;
   PinType pinType;
   Cell *cell;
+  std::unordered_map<std::string, TimingSense> tSense;
   std::unordered_map<std::string, LUT *> cellRise, cellFall, riseTransition, fallTransition;
   std::unordered_map<std::string, LUT *> risePower, fallPower;
 };

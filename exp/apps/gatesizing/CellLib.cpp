@@ -101,16 +101,19 @@ static void readLutForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, Cel
 
     else if (token == "timing_sense") {
       fRd.nextToken(); // get ":"
+
       token = fRd.nextToken();
-      auto inPin = cell->inPins.at(relatedPinName);
-      if (token == "positive_unate") {
-        inPin->tSense = TIMING_SENSE_POSITIVE_UNATE;
-      }
-      else if (token == "negative_unate") {
-        inPin->tSense = TIMING_SENSE_NEGATIVE_UNATE;
-      }
-      else {
-        inPin->tSense = TIMING_SENSE_NON_UNATE;
+      auto& mapping = cellPin->tSense;
+      if (!mapping.count(relatedPinName)) {
+        if (token == "positive_unate") {
+          mapping.insert({relatedPinName, TIMING_SENSE_POSITIVE_UNATE});
+        }
+        else if (token == "negative_unate") {
+          mapping.insert({relatedPinName, TIMING_SENSE_NEGATIVE_UNATE});
+        }
+        else {
+          mapping.insert({relatedPinName, TIMING_SENSE_NON_UNATE});
+        }
       }
       fRd.nextToken(); // get ";"
     }
@@ -198,7 +201,6 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
 
   CellPin *cellPin = new CellPin;
   cellPin->name = fRd.nextToken();
-  cellPin->tSense = TIMING_SENSE_UNDEFINED;
   cellPin->pinType = PIN_UNDEFINED;
   cellPin->cell = cell;
   cell->cellPins.insert({cellPin->name, cellPin});
@@ -433,11 +435,6 @@ static void printCell(Cell *c) {
     std::cout << "    pin (" << pin->name << ") {" << std::endl;
     std::cout << "      direction: input" << std::endl;
     std::cout << "      capacitance: " << pin->capacitance << std::endl;
-    std::cout << "      timing sense: ";
-    std::cout << ((pin->tSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
-                  (pin->tSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
-                  (pin->tSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
-                 ) << std::endl;
     std::cout << "    }" << std::endl;
   }
 
@@ -452,6 +449,16 @@ static void printCell(Cell *c) {
     auto pin = item.second;
     std::cout << "    pin (" << pin->name << ") {" << std::endl;
     std::cout << "      direction: output" << std::endl;
+
+    for (auto i: pin->tSense) {
+      auto inPinName = i.first;
+      auto inPinSense = i.second;
+      std::cout << "      timing sense for input pin " << inPinName << ": ";
+      std::cout << ((inPinSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
+                    (inPinSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
+                    (inPinSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
+                   ) << std::endl;
+    }
 
     for (auto i: pin->cellRise) {
       printLUT(i.second, "cell_rise", i.first);

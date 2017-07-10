@@ -89,7 +89,7 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
       // get pins and wire connections
       for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
         if (token[0] != '.') {
-          std::cerr << "Error: expecting .pinName(wrieName)" << std::endl;
+          std::cerr << "Error: expecting .pinName(wireName)" << std::endl;
           std::abort();
         }
         // .pinName (wireName)
