@@ -545,11 +545,13 @@ int main(int argc, char** argv) {
         (*h_graph).reset_num_iter(run+1);
 
       #ifdef __GALOIS_HET_CUDA__
-        // TODO gpu bitset resets
+        if (personality == GPU_CUDA) { 
+          bitset_current_degree_reset_cuda(cuda_ctx);
+          bitset_trim_reset_cuda(cuda_ctx);
+        } else
       #endif
-
-        bitset_current_degree.reset();
-        bitset_trim.reset();
+        { bitset_current_degree.reset();
+        bitset_trim.reset(); }
 
         InitializeGraph1::go((*h_graph));
       }

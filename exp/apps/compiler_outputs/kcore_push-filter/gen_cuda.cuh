@@ -42,7 +42,6 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->trim.data.zero_gpu();
 }
 
-
 // Bitset functions
 void get_bitset_current_degree_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
 	ctx->current_degree.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
