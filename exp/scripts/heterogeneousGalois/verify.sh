@@ -30,10 +30,10 @@ if [[ ($execname == *"bc"*) ]]; then
   OUTPUT=${outputdirname}/${inputname}.ssbc
 fi
 
-# for bc, if using rmat15, then use all sources output
-#if [[ ($execname == *"kcore"*) && ($inputname == "rmat15") ]]; then
-#  OUTPUT=${outputdirname}/rmat15.bc
-#fi
+# for bc, if using rmat15, then use all sources output (without ss)
+if [[ ($execname == *"bc"*) && ($inputname == "rmat15") ]]; then
+  OUTPUT=${outputdirname}/rmat15.bc
+fi
 
 MPI=mpiexec
 LOG=.verify_log
@@ -68,8 +68,9 @@ elif [[ $execname == *"pull"* ]]; then
 #  FLAGS+=" -transpose"
 fi
 
-# bc: if rmat15 is not used, specify single source flags
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+# bc: if rmat15 is not used, specify single source flags else do
+# all sources for rmat15
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat15") ]]; then
   FLAGS+=" -singleSource"
   FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
 fi
