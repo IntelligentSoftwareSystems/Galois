@@ -498,8 +498,9 @@ int main(int argc, char** argv) {
       } else
     #endif
       {
-        NumNodesVisited::go(*hg);
-        MaxDistance::go(*hg);
+      MaxDistance::current_max = 0;
+      NumNodesVisited::go(*hg);
+      MaxDistance::go(*hg);
       }
 
       if((run + 1) != numRuns){
