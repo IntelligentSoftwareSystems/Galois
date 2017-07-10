@@ -68,7 +68,8 @@ __global__ void InitializeIteration(CSRGraph graph, unsigned int __nowned, unsig
   }
   // FP: "15 -> 16;
 }
-__global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length)
+__global__ void FirstIterationSSSP(CSRGraph graph, DynamicBitset* is_updated,
+ unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -179,6 +180,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __nowned, unsign
           dst = graph.getAbsDestination(current_edge);
           new_dist = 1 + p_current_length[src];
           atomicMin(&p_current_length[dst], new_dist);
+          is_updated->set(dst);
         }
       }
       // FP: "52 -> 53;
@@ -220,6 +222,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __nowned, unsign
             dst = graph.getAbsDestination(current_edge);
             new_dist = 1 + p_current_length[src];
             atomicMin(&p_current_length[dst], new_dist);
+            is_updated->set(dst);
           }
         }
       }
@@ -257,6 +260,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __nowned, unsign
           dst = graph.getAbsDestination(current_edge);
           new_dist = 1 + p_current_length[src];
           atomicMin(&p_current_length[dst], new_dist);
+          is_updated->set(dst);
         }
       }
       // FP: "95 -> 96;
@@ -270,7 +274,8 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __nowned, unsign
   }
   // FP: "100 -> 101;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length, unsigned int * p_old_length, Sum ret_val)
+__global__ void SSSP(CSRGraph graph, DynamicBitset* is_updated,
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length, unsigned int * p_old_length, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -371,6 +376,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           old = atomicMin(&p_current_length[dst], new_dist);
           if (old > new_dist)
           {
+            is_updated->set(dst);
             ret_val.do_return( 1);
             //continue;
           }
@@ -413,6 +419,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
             old = atomicMin(&p_current_length[dst], new_dist);
             if (old > new_dist)
             {
+              is_updated->set(dst);
               ret_val.do_return( 1);
               //continue;
             }
@@ -446,6 +453,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           old = atomicMin(&p_current_length[dst], new_dist);
           if (old > new_dist)
           {
+            is_updated->set(dst);
             ret_val.do_return( 1);
             //continue;
           }
@@ -459,7 +467,11 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__global__ void PredAndSucc(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length, unsigned int * p_num_predecessors, unsigned int * p_num_successors)
+__global__ void PredAndSucc(CSRGraph graph, 
+    DynamicBitset* is_updated_pred, DynamicBitset* is_updated_succ,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, 
+    unsigned int * p_current_length, unsigned int * p_num_predecessors, 
+    unsigned int * p_num_successors)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -573,6 +585,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __nowned, unsigned int 
           {
             atomicAdd(&p_num_successors[src], (unsigned int)1);
             atomicAdd(&p_num_predecessors[dst], (unsigned int)1);
+            is_updated_succ->set(src);
+            is_updated_pred->set(dst);
           }
         }
       }
@@ -618,6 +632,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __nowned, unsigned int 
             {
               atomicAdd(&p_num_successors[src], (unsigned int)1);
               atomicAdd(&p_num_predecessors[dst], (unsigned int)1);
+              is_updated_succ->set(src);
+              is_updated_pred->set(dst);
             }
           }
         }
@@ -659,6 +675,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __nowned, unsigned int 
           {
             atomicAdd(&p_num_successors[src], (unsigned int)1);
             atomicAdd(&p_num_predecessors[dst], (unsigned int)1);
+            is_updated_succ->set(src);
+            is_updated_pred->set(dst);
           }
         }
       }
@@ -704,7 +722,10 @@ __global__ void PredecessorDecrement(CSRGraph graph, unsigned int __nowned, unsi
   }
   // FP: "16 -> 17;
 }
-__global__ void PathsIncrement(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_num_shortest_paths, unsigned int * p_to_add)
+__global__ void PathsIncrement(CSRGraph graph, 
+    DynamicBitset* is_updated_num_shortest_paths,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, 
+    unsigned int * p_num_shortest_paths, unsigned int * p_to_add)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -722,12 +743,18 @@ __global__ void PathsIncrement(CSRGraph graph, unsigned int __nowned, unsigned i
       {
         p_num_shortest_paths[src] += p_to_add[src];
         p_to_add[src] = 0;
+        is_updated_num_shortest_paths->set(src);
       }
     }
   }
   // FP: "10 -> 11;
 }
-__global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_current_length, unsigned int * p_num_predecessors, unsigned int * p_num_shortest_paths, unsigned char * p_propogation_flag, unsigned int * p_to_add, unsigned int * p_trim, Sum ret_val)
+__global__ void NumShortestPaths(CSRGraph graph, 
+    DynamicBitset* is_updated_to_add, DynamicBitset* is_updated_trim,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, 
+    unsigned int * p_current_length, unsigned int * p_num_predecessors, 
+    unsigned int * p_num_shortest_paths, unsigned char * p_propogation_flag, 
+    unsigned int * p_to_add, unsigned int * p_trim, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -829,6 +856,10 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
           {
             atomicAdd(&p_to_add[dst], paths_to_add);
             atomicAdd(&p_trim[dst], (unsigned int)1);
+
+            is_updated_to_add->set(dst);
+            is_updated_trim->set(dst);
+
             ret_val.do_return( 1);
             //continue;
           }
@@ -873,6 +904,10 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
             {
               atomicAdd(&p_to_add[dst], paths_to_add);
               atomicAdd(&p_trim[dst], (unsigned int)1);
+
+              is_updated_to_add->set(dst);
+              is_updated_trim->set(dst);
+
               ret_val.do_return( 1);
               //continue;
             }
@@ -908,6 +943,10 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
           {
             atomicAdd(&p_to_add[dst], paths_to_add);
             atomicAdd(&p_trim[dst], (unsigned int)1);
+
+            is_updated_to_add->set(dst);
+            is_updated_trim->set(dst);
+
             ret_val.do_return( 1);
             //continue;
           }
@@ -922,7 +961,10 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __nowned, unsigned
   }
   ret_val.thread_exit<_br>(_ts);
 }
-__global__ void PropFlagReset(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned char * p_propogation_flag)
+__global__ void PropFlagReset(CSRGraph graph, 
+    DynamicBitset* is_updated_propogation_flag,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, 
+    unsigned char * p_propogation_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -937,11 +979,17 @@ __global__ void PropFlagReset(CSRGraph graph, unsigned int __nowned, unsigned in
     if (pop)
     {
       p_propogation_flag[src] = false;
+      is_updated_propogation_flag->set(src);
     }
   }
   // FP: "7 -> 8;
 }
-__global__ void SuccessorDecrement(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_num_successors, unsigned char * p_propogation_flag, unsigned int * p_trim)
+__global__ void SuccessorDecrement(CSRGraph graph,
+    DynamicBitset* is_updated_propogation_flag, 
+    DynamicBitset* is_updated_num_successors,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end,
+    unsigned int * p_num_successors, unsigned char * p_propogation_flag,
+    unsigned int * p_trim)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -958,26 +1006,29 @@ __global__ void SuccessorDecrement(CSRGraph graph, unsigned int __nowned, unsign
       if (p_num_successors[src] == 0 && !p_propogation_flag[src])
       {
         p_propogation_flag[src] = true;
+        is_updated_propogation_flag->set(src);
         continue;
       }
       if (p_trim[src] > 0)
       {
-        if (p_trim[src] > p_num_successors[src])
-        {
-          //abort();
-        }
         p_num_successors[src] = p_num_successors[src] - p_trim[src];
+        is_updated_num_successors->set(src);
+
         p_trim[src] = 0;
+
         if (p_num_successors[src] == 0)
         {
           p_propogation_flag[src] = false;
+          is_updated_propogation_flag->set(src);
         }
       }
     }
   }
   // FP: "19 -> 20;
 }
-__global__ void DependencyIncrement(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_dependency, float * p_to_add_float)
+__global__ void DependencyIncrement(CSRGraph graph, 
+    DynamicBitset* is_updated_dependency,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_dependency, float * p_to_add_float)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -995,12 +1046,20 @@ __global__ void DependencyIncrement(CSRGraph graph, unsigned int __nowned, unsig
       {
         p_dependency[src] += p_to_add_float[src];
         p_to_add_float[src] = 0.0;
+
+        is_updated_dependency->set(src);
       }
     }
   }
   // FP: "10 -> 11;
 }
-__global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const unsigned int  local_current_src_node, unsigned int * p_current_length, float * p_dependency, unsigned int * p_num_shortest_paths, unsigned int * p_num_successors, unsigned char * p_propogation_flag, float * p_to_add_float, unsigned int * p_trim, Sum ret_val)
+__global__ void DependencyPropogation(CSRGraph graph, 
+    DynamicBitset* is_updated_trim, DynamicBitset* is_updated_to_add_float,
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, 
+    const unsigned int  local_current_src_node, unsigned int * p_current_length, 
+    float * p_dependency, unsigned int * p_num_shortest_paths, 
+    unsigned int * p_num_successors, unsigned char * p_propogation_flag, 
+    float * p_to_add_float, unsigned int * p_trim, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -1043,6 +1102,9 @@ __global__ void DependencyPropogation(CSRGraph graph, unsigned int __nowned, uns
         {
           atomicAdd(&p_trim[src], (unsigned int)1);
           atomicAdd(&p_to_add_float[src], (((float)p_num_shortest_paths[src] / (float)p_num_shortest_paths[dst]) * (float)(1.0 + p_dependency[dst])));
+
+          is_updated_trim->set(src);
+          is_updated_to_add_float->set(src);
           ret_val.do_return( 1);
           continue;
         }
@@ -1119,7 +1181,9 @@ void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct 
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr());
+  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, 
+    ctx->current_length.is_updated.gpu_rd_ptr(), // bitset for curlen
+    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1143,7 +1207,9 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), _rv);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, 
+    ctx->current_length.is_updated.gpu_rd_ptr(), // bitset for curlen
+    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1165,7 +1231,10 @@ void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Co
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr());
+  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, 
+    ctx->num_predecessors.is_updated.gpu_rd_ptr(),
+    ctx->num_successors.is_updated.gpu_rd_ptr(),
+    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1205,7 +1274,10 @@ void PathsIncrement_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PathsIncrement <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr());
+  PathsIncrement <<<blocks, threads>>>(ctx->gg, 
+    ctx->num_shortest_paths.is_updated.gpu_wr_ptr(), 
+    ctx->nowned, __begin, __end, ctx->num_shortest_paths.data.gpu_wr_ptr(), 
+    ctx->to_add.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1229,7 +1301,14 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, int & __r
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+  NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, 
+    ctx->to_add.is_updated.gpu_wr_ptr(),
+    ctx->trim.is_updated.gpu_wr_ptr(),
+    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), 
+    ctx->num_predecessors.data.gpu_wr_ptr(), 
+    ctx->num_shortest_paths.data.gpu_wr_ptr(), 
+    ctx->propogation_flag.data.gpu_wr_ptr(), 
+    ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1251,7 +1330,9 @@ void PropFlagReset_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PropFlagReset <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->propogation_flag.data.gpu_wr_ptr());
+  PropFlagReset <<<blocks, threads>>>(ctx->gg, 
+    ctx->propogation_flag.is_updated.gpu_wr_ptr(),
+    ctx->nowned, __begin, __end, ctx->propogation_flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1271,7 +1352,11 @@ void SuccessorDecrement_cuda(unsigned int  __begin, unsigned int  __end, struct 
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  SuccessorDecrement <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  SuccessorDecrement <<<blocks, threads>>>(ctx->gg, 
+    ctx->propogation_flag.is_updated.gpu_wr_ptr(),
+    ctx->num_successors.is_updated.gpu_wr_ptr(),
+    ctx->nowned, __begin, __end, ctx->num_successors.data.gpu_wr_ptr(), 
+    ctx->propogation_flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1291,7 +1376,10 @@ void DependencyIncrement_cuda(unsigned int  __begin, unsigned int  __end, struct
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  DependencyIncrement <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dependency.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr());
+  DependencyIncrement <<<blocks, threads>>>(ctx->gg, 
+    ctx->dependency.is_updated.gpu_wr_ptr(),
+    ctx->nowned, __begin, __end, ctx->dependency.data.gpu_wr_ptr(), 
+    ctx->to_add_float.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1315,7 +1403,18 @@ void DependencyPropogation_cuda(unsigned int  __begin, unsigned int  __end, int 
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  DependencyPropogation <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_current_src_node, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+  DependencyPropogation <<<blocks, threads>>>(ctx->gg, 
+    ctx->trim.is_updated.gpu_wr_ptr(), 
+    ctx->to_add_float.is_updated.gpu_wr_ptr(),
+    ctx->nowned, __begin, __end, local_current_src_node, 
+    ctx->current_length.data.gpu_wr_ptr(), 
+    ctx->dependency.data.gpu_wr_ptr(), 
+    ctx->num_shortest_paths.data.gpu_wr_ptr(), 
+    ctx->num_successors.data.gpu_wr_ptr(), 
+    ctx->propogation_flag.data.gpu_wr_ptr(), 
+    ctx->to_add_float.data.gpu_wr_ptr(), 
+    ctx->trim.data.gpu_wr_ptr(), 
+    _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

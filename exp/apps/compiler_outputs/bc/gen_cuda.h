@@ -212,3 +212,63 @@ void SSSP_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct 
 void SSSP_all_cuda(int & __retval, struct CUDA_Context *ctx);
 void SuccessorDecrement_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
 void SuccessorDecrement_all_cuda(struct CUDA_Context *ctx);
+
+
+// Bitset calls
+void get_bitset_to_add_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_to_add_reset_cuda(struct CUDA_Context *ctx);
+void bitset_to_add_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_to_add_float_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_to_add_float_reset_cuda(struct CUDA_Context *ctx);
+void bitset_to_add_float_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+void get_bitset_num_shortest_paths_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_num_shortest_paths_reset_cuda(struct CUDA_Context *ctx);
+void bitset_num_shortest_paths_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+void get_bitset_num_successors_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_num_successors_reset_cuda(struct CUDA_Context *ctx);
+void bitset_num_successors_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_num_predecessors_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_num_predecessors_reset_cuda(struct CUDA_Context *ctx);
+void bitset_num_predecessors_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_trim_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx);
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_current_length_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_current_length_reset_cuda(struct CUDA_Context *ctx);
+void bitset_current_length_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_old_length_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_old_length_reset_cuda(struct CUDA_Context *ctx);
+void bitset_old_length_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_propogation_flag_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_propogation_flag_reset_cuda(struct CUDA_Context *ctx);
+void bitset_propogation_flag_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);
+
+void get_bitset_dependency_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute);
+void bitset_dependency_reset_cuda(struct CUDA_Context *ctx);
+void bitset_dependency_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end);

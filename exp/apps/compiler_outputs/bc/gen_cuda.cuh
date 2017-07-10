@@ -800,3 +800,170 @@ void batch_min_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsign
 	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+
+// bitset calls
+
+void get_bitset_to_add_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->to_add.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_to_add_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->to_add.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_to_add_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->to_add, begin, end);
+}
+
+
+
+void get_bitset_to_add_float_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->to_add_float.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_to_add_float_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->to_add_float.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_to_add_float_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->to_add_float, begin, end);
+}
+
+
+
+void get_bitset_num_shortest_paths_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->num_shortest_paths.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_num_shortest_paths_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->num_shortest_paths.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_num_shortest_paths_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->num_shortest_paths, begin, end);
+}
+
+
+void get_bitset_num_successors_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->num_successors.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_num_successors_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->num_successors.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_num_successors_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->num_successors, begin, end);
+}
+
+
+
+
+void get_bitset_num_predecessors_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->num_predecessors.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_num_predecessors_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->num_predecessors.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_num_predecessors_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->num_predecessors, begin, end);
+}
+
+
+
+
+void get_bitset_trim_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->trim.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->trim.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_trim_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->trim, begin, end);
+}
+
+
+
+
+
+void get_bitset_current_length_cuda(struct CUDA_Context *ctx, 
+                              unsigned long long int *bitset_compute) {
+	ctx->current_length.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_current_length_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->current_length.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_current_length_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->current_length, begin, end);
+}
+
+
+
+
+void get_bitset_old_length_cuda(struct CUDA_Context *ctx, 
+                                unsigned long long int *bitset_compute) {
+	ctx->old_length.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_old_length_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->old_length.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_old_length_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->old_length, begin, end);
+}
+
+
+
+
+
+void get_bitset_propogation_flag_cuda(struct CUDA_Context *ctx, 
+                                      unsigned long long int *bitset_compute) {
+	ctx->propogation_flag.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_propogation_flag_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->propogation_flag.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_propogation_flag_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                size_t end) {
+  reset_bitset_field(&ctx->propogation_flag, begin, end);
+}
+
+
+
+
+void get_bitset_dependency_cuda(struct CUDA_Context *ctx, 
+                                unsigned long long int *bitset_compute) {
+	ctx->dependency.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_dependency_reset_cuda(struct CUDA_Context *ctx) {
+	ctx->dependency.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_dependency_reset_cuda(struct CUDA_Context *ctx, size_t begin, 
+                                  size_t end) {
+  reset_bitset_field(&ctx->dependency, begin, end);
+}
