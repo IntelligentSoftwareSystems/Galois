@@ -407,11 +407,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
       uint64_t globalOffset = gid2host[base_hGraph::id].first;
+      auto ee_end = g.edge_begin(gid2host[base_hGraph::id].first);
       for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
-        auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
+        auto ee = ee_end;
+        ee_end = g.edge_end(src);
+        auto num_edges = std::distance(ee, ee_end);
         if(num_edges > VCutTheshold){
           //Assign edges for high degree nodes to the destination
-          for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
+          for(; ee != ee_end; ++ee){
             auto gdst = g.getEdgeDst(ee);
             auto h = find_hostID(gdst);
             numOutgoingEdges[h][src - globalOffset]++;
@@ -420,7 +423,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         else{
           //keep all edges with the source node
-          for(auto ee = g.edge_begin(src), ee_end = g.edge_end(src); ee != ee_end; ++ee){
+          for(; ee != ee_end; ++ee){
             numOutgoingEdges[base_hGraph::id][src - globalOffset]++;
             num_assigned_edges_perhost[base_hGraph::id]++;
             auto gdst = g.getEdgeDst(ee);
@@ -525,10 +528,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(base_hGraph::numHosts);
         auto& net = Galois::Runtime::getSystemNetworkInterface();
 
+        auto ee_end = g.edge_begin(gid2host[base_hGraph::id].first);
         //Go over assigned nodes and distribute edges.
         for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
+          auto ee = ee_end;
+          ee_end = g.edge_end(src);
 
-          auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
+          auto num_edges = std::distance(ee, ee_end);
           for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
             gdst_vec[i].clear();
             gdata_vec[i].clear();
@@ -541,8 +547,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
           }
 
-          auto ee = g.edge_begin(src);
-          auto ee_end = g.edge_end(src);
           if(num_edges > VCutTheshold){
             //Assign edges for high degree nodes to the destination
             for(; ee != ee_end; ++ee){
@@ -597,10 +601,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
         auto& net = Galois::Runtime::getSystemNetworkInterface();
 
+        auto ee_end = g.edge_begin(gid2host[base_hGraph::id].first);
         //Go over assigned nodes and distribute edges.
         for(auto src = gid2host[base_hGraph::id].first; src != gid2host[base_hGraph::id].second; ++src){
+          auto ee = ee_end;
+          ee_end = g.edge_end(src);
 
-          auto num_edges = std::distance(g.edge_begin(src), g.edge_end(src));
+          auto num_edges = std::distance(ee, ee_end);
           for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
             gdst_vec[i].clear();
             //gdst_vec[i].reserve(std::distance(ii, ee));
@@ -608,8 +615,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           uint32_t lsrc = 0;
           uint64_t cur = 0;
 
-          auto ee = g.edge_begin(src);
-          auto ee_end = g.edge_end(src);
           if (isLocal(src)) {
               lsrc = G2L(src);
               cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
