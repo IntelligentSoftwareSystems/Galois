@@ -23,7 +23,7 @@
  * Compute BFS on distributed Galois using worklist.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
- * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operator)
+ * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
 #include <iostream>
@@ -290,15 +290,15 @@ struct BFS {
         if (old_dist > new_dist) bitset_dist_current.set(dst);
       }
 
-      DGAccumulator_accum+= 1;
+      DGAccumulator_accum += 1;
     }
   }
 };
 
-Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
+Galois::DGAccumulator<int> BFS::DGAccumulator_accum;
 
 /******************************************************************************/
-/* Sanity check operator */
+/* Sanity check operators */
 /******************************************************************************/
 
 /* Gets the total number of nodes visited (i.e. distance is less than 
@@ -337,6 +337,47 @@ struct NumNodesVisited {
   }
 };
 Galois::DGAccumulator<unsigned int> NumNodesVisited::DGAccumulator_accum;
+
+/* Gets max distance (not including infinity) */
+struct MaxDistance {
+  const unsigned int &local_infinity;
+  Graph* graph;
+
+  static unsigned int current_max;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+
+  MaxDistance(const unsigned int _infinity, Graph* _graph) : 
+    local_infinity(_infinity), graph(_graph){}
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), 
+                   MaxDistance(infinity, &_graph), 
+                   Galois::loopname("MaxDistance"));
+
+    DGAccumulator_accum = current_max;
+    unsigned int max_distance = DGAccumulator_accum.reduce_max();
+
+    // Only node 0 will print max distance
+    if (_graph.id == 0) {
+      printf("Max distance is %u\n", max_distance);
+    }
+  }
+  
+  /* Gets the max distance from all owned nodes (infinity is excluded) */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (graph->isOwned(graph->getGID(src)) && 
+        src_data.dist_current != local_infinity) {
+
+      if (current_max < src_data.dist_current) {
+        current_max = src_data.dist_current;
+      }
+    }
+  }
+};
+Galois::DGAccumulator<unsigned int> MaxDistance::DGAccumulator_accum;
+unsigned int MaxDistance::current_max = 0;
 
 /******************************************************************************/
 /* Main */
@@ -447,13 +488,15 @@ int main(int argc, char** argv) {
         BFS::go((*hg));
       StatTimer_main.stop();
 
-      #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) { 
-          // TODO currently no GPU support for sanity check operator
-        } else
-      #endif
-          NumNodesVisited::go(*hg);
-
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) { 
+        // TODO currently no GPU support for sanity check operators
+      } else
+    #endif
+      {
+        NumNodesVisited::go(*hg);
+        MaxDistance::go(*hg);
+      }
 
       if((run + 1) != numRuns){
         //Galois::Runtime::getHostBarrier().wait();
@@ -469,14 +512,14 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+        for (auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           if ((*hg).isOwned((*hg).getGID(*ii))) 
             Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                          (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+        for (auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           if ((*hg).isOwned((*hg).getGID(*ii))) 
             Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                      get_node_dist_current_cuda(cuda_ctx, *ii));
