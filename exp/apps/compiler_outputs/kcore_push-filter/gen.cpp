@@ -430,6 +430,42 @@ struct KCoreStep1 {
 };
 Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 
+
+/******************************************************************************/
+/* Sanity check operator */
+/******************************************************************************/
+
+/* Gets the total number of nodes that are still alive */
+struct GetNumberAlive {
+  Graph* graph;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+
+  GetNumberAlive(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), 
+                   GetNumberAlive(&_graph), 
+                   Galois::loopname("GetNumberAlive"));
+
+    unsigned int num_alive = DGAccumulator_accum.reduce();
+
+    // Only node 0 will print the number alive
+    if (_graph.id == 0) {
+      printf("Number of nodes alive is %u\n", num_alive);
+    }
+  }
+
+  /* Check if an owned node is alive: if yes, then increment an accumulator */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (graph->isOwned(graph->getGID(src)) && src_data.flag) {
+      DGAccumulator_accum += 1;
+    }
+  }
+};
+Galois::DGAccumulator<unsigned int> GetNumberAlive::DGAccumulator_accum;
+
 /******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
@@ -539,6 +575,13 @@ int main(int argc, char** argv) {
         KCoreStep1::go((*h_graph));
       StatTimer_main.stop();
 
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          // TODO currently no GPU support for sanity check operator
+        } else
+      #endif
+          GetNumberAlive::go(*h_graph);
+
       // re-init graph for next run
       if ((run + 1) != numRuns) {
         Galois::Runtime::getHostBarrier().wait();
@@ -571,6 +614,8 @@ int main(int argc, char** argv) {
                                          (*h_graph).getData(*ii).flag,
                                          (*h_graph).getData(*ii).current_degree);
 
+          // does a sanity check as well: degree should be less than k core
+          // if dead and higher than it if alive
           if (!((*h_graph).getData(*ii).flag)) {
             assert((*h_graph).getData(*ii).current_degree < k_core_num);
           } else {
