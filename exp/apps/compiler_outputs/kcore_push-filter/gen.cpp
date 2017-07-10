@@ -26,7 +26,7 @@
  */
 
 /******************************************************************************/
-/* This was manually genereted, not compiler generated */
+/* Sync code/calls was manually written, not compiler generated */
 /******************************************************************************/
 
 #include <iostream>
@@ -430,9 +430,8 @@ struct KCoreStep1 {
 };
 Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 
-
 /******************************************************************************/
-/* Sanity check operator */
+/* Sanity check operators */
 /******************************************************************************/
 
 /* Gets the total number of nodes that are still alive */
@@ -465,6 +464,36 @@ struct GetNumberAlive {
   }
 };
 Galois::DGAccumulator<unsigned int> GetNumberAlive::DGAccumulator_accum;
+
+/* Gets the total number of nodes that are dead */
+struct GetNumberDead {
+  Graph* graph;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+
+  GetNumberDead(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), GetNumberDead(&_graph),
+                   Galois::loopname("GetNumberDead"));
+
+    unsigned int num_dead = DGAccumulator_accum.reduce();
+
+    // Only node 0 will print the number dead
+    if (_graph.id == 0) {
+      printf("Number of nodes dead is %u\n", num_dead);
+    }
+  }
+
+  /* Check if an owned node is dead: if yes, then increment an accumulator */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (graph->isOwned(graph->getGID(src)) && !src_data.flag) {
+      DGAccumulator_accum += 1;
+    }
+  }
+};
+Galois::DGAccumulator<unsigned int> GetNumberDead::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Main method for running */
@@ -529,7 +558,6 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
 
-
     Graph* h_graph = nullptr;
 
     if (enableVCut) {
@@ -575,12 +603,15 @@ int main(int argc, char** argv) {
         KCoreStep1::go((*h_graph));
       StatTimer_main.stop();
 
-      #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) { 
-          // TODO currently no GPU support for sanity check operator
-        } else
-      #endif
-          GetNumberAlive::go(*h_graph);
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) { 
+        // TODO currently no GPU support for sanity check operator
+      } else
+    #endif
+      {
+        GetNumberAlive::go(*h_graph);
+        GetNumberDead::go(*h_graph);
+      }
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
