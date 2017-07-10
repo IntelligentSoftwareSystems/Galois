@@ -312,6 +312,8 @@ struct NumNodesVisited {
     local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
+    DGAccumulator_accum.reset();
+
     Galois::do_all(_graph.begin(), _graph.end(), 
                    NumNodesVisited(infinity, &_graph), 
                    Galois::loopname("NumNodesVisited"));
@@ -349,6 +351,8 @@ struct MaxDistance {
     local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
+    DGAccumulator_accum.reset();
+
     Galois::do_all(_graph.begin(), _graph.end(), 
                    MaxDistance(infinity, &_graph), 
                    Galois::loopname("MaxDistance"));
@@ -438,7 +442,6 @@ int main(int argc, char** argv) {
       }
     }
 #endif
-
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;

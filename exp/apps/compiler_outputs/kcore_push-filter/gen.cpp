@@ -442,6 +442,8 @@ struct GetNumberAlive {
   GetNumberAlive(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+    DGAccumulator_accum.reset();
+
     Galois::do_all(_graph.begin(), _graph.end(), 
                    GetNumberAlive(&_graph), 
                    Galois::loopname("GetNumberAlive"));
@@ -473,6 +475,8 @@ struct GetNumberDead {
   GetNumberDead(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+    DGAccumulator_accum.reset();
+
     Galois::do_all(_graph.begin(), _graph.end(), GetNumberDead(&_graph),
                    Galois::loopname("GetNumberDead"));
 
