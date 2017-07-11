@@ -38,6 +38,8 @@ struct LutTemplate {
 struct LUT {
   LutTemplate *lutTemplate;
   std::vector<std::vector<float> > index, value;
+
+  float lookup(std::vector<float>& param);
 };
 
 struct Cell;

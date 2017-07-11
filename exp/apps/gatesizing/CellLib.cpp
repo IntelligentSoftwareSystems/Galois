@@ -2,6 +2,37 @@
 #include "FileReader.h"
 
 #include <string>
+#include <algorithm>
+#include <utility>
+#include <cassert>
+
+static float linearInterpolate(float x1, float x2, float x3, float y1, float y3) {
+  return y1 + (y3 - y1) * (x2 - x1) / (x3 - x1);
+}
+
+static std::pair<size_t, size_t> findBound(float v, std::vector<float>& array) {
+  auto upper = std::upper_bound(array.begin(), array.end(), v);
+  auto upperIndex = std::distance(array.begin(), upper);
+  auto lowerIndex = upperIndex - 1;
+  return std::make_pair(lowerIndex, upperIndex);
+}
+
+float LUT::lookup(std::vector<float>& param) {
+  // dimensions should match
+  auto paramDim = param.size();
+  assert(paramDim == index.size());
+
+  auto b0 = findBound(param[0], index[0]);
+  if (1 == paramDim) {
+    return linearInterpolate(index[0][b0.first], param[0], index[0][b0.second], value[0][b0.first], value[0][b0.second]);
+  }
+  else {
+    auto b1 = findBound(param[1], index[1]);
+    auto y1 = linearInterpolate(index[1][b1.first], param[1], index[1][b1.second], value[b0.first][b1.first], value[b0.first][b1.second]);
+    auto y3 = linearInterpolate(index[1][b1.first], param[1], index[1][b1.second], value[b0.second][b1.first], value[b0.second][b1.second]);
+    return linearInterpolate(index[0][b0.first], param[0], index[0][b0.second], y1, y3);
+  }
+}
 
 static void readWireLoad(FileReader& fRd, CellLib *cellLib) {
   fRd.nextToken(); // get "("
