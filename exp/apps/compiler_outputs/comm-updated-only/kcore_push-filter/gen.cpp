@@ -322,7 +322,8 @@ struct KCoreStep2 {
     } else if (personality == CPU)
   #endif
     Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
-                   Galois::loopname("KCoreStep2"));
+                   Galois::loopname("KCoreStep2"),
+                   Galois::numrun(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
@@ -367,7 +368,8 @@ struct KCoreStep1 {
     #endif
       Galois::do_all(_graph.begin(), _graph.end(), 
                      KCoreStep1(k_core_num, &_graph), 
-                     Galois::loopname("KCoreStep1"));
+                     Galois::loopname("KCoreStep1"),
+                     Galois::numrun(_graph.get_run_identifier()));
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -447,15 +449,16 @@ struct GetAliveDead {
     DGAccumulator_accum2.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), GetAliveDead(&_graph), 
-                   Galois::loopname("GetAliveDead"));
+                   Galois::loopname("GetAliveDead"),
+                   Galois::numrun(_graph.get_run_identifier()));
 
     unsigned int num_alive = DGAccumulator_accum.reduce();
     unsigned int num_dead = DGAccumulator_accum2.reduce();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
-      printf("Number of nodes alive is %u\n", num_alive);
-      printf("Number of nodes dead is %u\n", num_dead);
+      printf("Number of nodes alive is %u, dead is %u\n", num_alive,
+             num_dead);
     }
   }
 
