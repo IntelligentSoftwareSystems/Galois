@@ -13,11 +13,11 @@ struct Node {
   float slew, totalNetC;
   float arrivalTime, requiredTime, slack;
   float internalPower, netPower;
+  bool isRise;
 };
 
 struct Edge {
   VerilogWire *wire;
-  bool isRise;
   float delay;
   float internalPower, netPower;
 };

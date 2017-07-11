@@ -96,10 +96,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     data.slack = sdc.targetDelay;
     data.internalPower = 0.0;
     data.netPower = 0.0;
+    data.isRise = false;
 
     for (auto e: g.edges(n)) {
       auto& eData = g.getEdgeData(e);
-      eData.isRise = false;
       eData.delay = 0.0;
       eData.internalPower = 0.0;
       eData.netPower = 0.0;
@@ -145,6 +145,7 @@ void printCircuitGraph(Graph& g) {
     std::cout << "  slack = " << data.slack << std::endl;
     std::cout << "  internalPower = " << data.internalPower << std::endl;
     std::cout << "  netPower = " << data.netPower << std::endl;
+    std::cout << "  isRise = " << ((data.isRise) ? "true" : "false") << std::endl;
 
     for (auto oe: g.edges(n)) {
       auto toPin = g.getData(g.getEdgeDst(oe), unprotected).pin;
@@ -166,7 +167,6 @@ void printCircuitGraph(Graph& g) {
         std::cout << "    wire: " << wire->name << std::endl;
       }
       else {
-        std::cout << "    isRise = " << ((eData.isRise) ? "true" : "false") << std::endl;
         std::cout << "    delay = " << eData.delay << std::endl;
         std::cout << "    internalPower = " << eData.internalPower << std::endl;
         std::cout << "    netPower = " << eData.netPower << std::endl;
@@ -193,7 +193,6 @@ void printCircuitGraph(Graph& g) {
         std::cout << "    wire: " << wire->name << std::endl;
       }
       else {
-        std::cout << "    isRise = " << ((eData.isRise) ? "true" : "false") << std::endl;
         std::cout << "    delay = " << eData.delay << std::endl;
         std::cout << "    internalPower = " << eData.internalPower << std::endl;
         std::cout << "    netPower = " << eData.netPower << std::endl;
