@@ -592,6 +592,15 @@ int main(int argc, char** argv) {
 
       if((run + 1) != numRuns){
         //Galois::Runtime::getHostBarrier().wait();
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) { 
+          bitset_residual_reset_cuda(cuda_ctx);
+          bitset_nout_reset_cuda(cuda_ctx);
+        } else
+      #endif
+        { bitset_residual.reset();
+        bitset_nout.reset(); }
+
         (*hg).reset_num_iter(run+1);
         ResetGraph::go((*hg));
         InitializeGraphNout::go((*hg));
