@@ -435,69 +435,45 @@ Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 /******************************************************************************/
 
 /* Gets the total number of nodes that are still alive */
-struct GetNumberAlive {
+struct GetAliveDead {
   Graph* graph;
   static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum2;
 
-  GetNumberAlive(Graph* _graph) : graph(_graph){}
+  GetAliveDead(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
     DGAccumulator_accum.reset();
+    DGAccumulator_accum2.reset();
 
-    Galois::do_all(_graph.begin(), _graph.end(), 
-                   GetNumberAlive(&_graph), 
-                   Galois::loopname("GetNumberAlive"));
+    Galois::do_all(_graph.begin(), _graph.end(), GetAliveDead(&_graph), 
+                   Galois::loopname("GetAliveDead"));
 
     unsigned int num_alive = DGAccumulator_accum.reduce();
+    unsigned int num_dead = DGAccumulator_accum2.reduce();
 
-    // Only node 0 will print the number alive
+    // Only node 0 will print data
     if (_graph.id == 0) {
       printf("Number of nodes alive is %u\n", num_alive);
-    }
-  }
-
-  /* Check if an owned node is alive: if yes, then increment an accumulator */
-  void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
-
-    if (graph->isOwned(graph->getGID(src)) && src_data.flag) {
-      DGAccumulator_accum += 1;
-    }
-  }
-};
-Galois::DGAccumulator<unsigned int> GetNumberAlive::DGAccumulator_accum;
-
-/* Gets the total number of nodes that are dead */
-struct GetNumberDead {
-  Graph* graph;
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-
-  GetNumberDead(Graph* _graph) : graph(_graph){}
-
-  void static go(Graph& _graph) {
-    DGAccumulator_accum.reset();
-
-    Galois::do_all(_graph.begin(), _graph.end(), GetNumberDead(&_graph),
-                   Galois::loopname("GetNumberDead"));
-
-    unsigned int num_dead = DGAccumulator_accum.reduce();
-
-    // Only node 0 will print the number dead
-    if (_graph.id == 0) {
       printf("Number of nodes dead is %u\n", num_dead);
     }
   }
 
-  /* Check if an owned node is dead: if yes, then increment an accumulator */
+  /* Check if an owned node is alive/dead: increment appropriate accumulator */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src)) && !src_data.flag) {
-      DGAccumulator_accum += 1;
+    if (graph->isOwned(graph->getGID(src))) {
+      if (src_data.flag) {
+        DGAccumulator_accum += 1;
+      } else {
+        DGAccumulator_accum2 += 1;
+      }
     }
   }
 };
-Galois::DGAccumulator<unsigned int> GetNumberDead::DGAccumulator_accum;
+Galois::DGAccumulator<unsigned int> GetAliveDead::DGAccumulator_accum;
+Galois::DGAccumulator<unsigned int> GetAliveDead::DGAccumulator_accum2;
 
 /******************************************************************************/
 /* Main method for running */
@@ -613,8 +589,7 @@ int main(int argc, char** argv) {
       } else
     #endif
       {
-        GetNumberAlive::go(*h_graph);
-        GetNumberDead::go(*h_graph);
+        GetAliveDead::go(*h_graph);
       }
 
       // re-init graph for next run

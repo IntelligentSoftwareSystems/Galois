@@ -301,87 +301,57 @@ Galois::DGAccumulator<int> BFS::DGAccumulator_accum;
 /* Sanity check operators */
 /******************************************************************************/
 
-/* Gets the total number of nodes visited (i.e. distance is less than 
- * infinity) */
-struct NumNodesVisited {
+/* Prints total number of nodes visited + max distance */
+struct BFSSanityCheck {
   const unsigned int &local_infinity;
   Graph* graph;
 
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  static unsigned int current_max;
 
-  NumNodesVisited(const unsigned int _infinity, Graph* _graph) : 
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_sum;
+  static Galois::DGAccumulator<unsigned int> DGAccumulator_max;
+
+  BFSSanityCheck(const unsigned int _infinity, Graph* _graph) : 
     local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    DGAccumulator_accum.reset();
+    DGAccumulator_sum.reset();
+    DGAccumulator_max.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   NumNodesVisited(infinity, &_graph), 
-                   Galois::loopname("NumNodesVisited"));
+                   BFSSanityCheck(infinity, &_graph), 
+                   Galois::loopname("BFSSanityCheck"));
 
-    unsigned int num_visited = DGAccumulator_accum.reduce();
 
-    // Only node 0 will print the number visited
+    unsigned int num_visited = DGAccumulator_sum.reduce();
+
+    DGAccumulator_max = current_max;
+    unsigned int max_distance = DGAccumulator_max.reduce_max();
+
+    // Only node 0 will print the info
     if (_graph.id == 0) {
       printf("Number of nodes visited is %u\n", num_visited);
+      printf("Max distance is %u\n", max_distance);
     }
   }
 
-  /* Check if an owned node's distance is less than infinity: 
-   * if yes, then increment an accumulator */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     if (graph->isOwned(graph->getGID(src)) && 
         src_data.dist_current < local_infinity) {
-      DGAccumulator_accum += 1;
-    }
-  }
-};
-Galois::DGAccumulator<unsigned int> NumNodesVisited::DGAccumulator_accum;
-
-/* Gets max distance (not including infinity) */
-struct MaxDistance {
-  const unsigned int &local_infinity;
-  Graph* graph;
-
-  static unsigned int current_max;
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-
-  MaxDistance(const unsigned int _infinity, Graph* _graph) : 
-    local_infinity(_infinity), graph(_graph){}
-
-  void static go(Graph& _graph) {
-    DGAccumulator_accum.reset();
-
-    Galois::do_all(_graph.begin(), _graph.end(), 
-                   MaxDistance(infinity, &_graph), 
-                   Galois::loopname("MaxDistance"));
-
-    DGAccumulator_accum = current_max;
-    unsigned int max_distance = DGAccumulator_accum.reduce_max();
-
-    // Only node 0 will print max distance
-    if (_graph.id == 0) {
-      printf("Max distance is %u\n", max_distance);
-    }
-  }
-  
-  /* Gets the max distance from all owned nodes (infinity is excluded) */
-  void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
-
-    if (graph->isOwned(graph->getGID(src)) && 
-        src_data.dist_current != local_infinity) {
+      DGAccumulator_sum += 1;
 
       if (current_max < src_data.dist_current) {
         current_max = src_data.dist_current;
       }
     }
   }
+
 };
-Galois::DGAccumulator<unsigned int> MaxDistance::DGAccumulator_accum;
-unsigned int MaxDistance::current_max = 0;
+Galois::DGAccumulator<unsigned int> BFSSanityCheck::DGAccumulator_sum;
+Galois::DGAccumulator<unsigned int> BFSSanityCheck::DGAccumulator_max;
+unsigned int BFSSanityCheck::current_max = 0;
 
 /******************************************************************************/
 /* Main */
@@ -498,9 +468,8 @@ int main(int argc, char** argv) {
       } else
     #endif
       {
-      MaxDistance::current_max = 0;
-      NumNodesVisited::go(*hg);
-      MaxDistance::go(*hg);
+      BFSSanityCheck::current_max = 0;
+      BFSSanityCheck::go(*hg);
       }
 
       if((run + 1) != numRuns){
