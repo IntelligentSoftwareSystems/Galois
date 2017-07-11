@@ -128,12 +128,12 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto& data = g.getData(n, unprotected);
     auto pin = data.pin;
     if (pin) {
-      if (pin->gate) {
-        auto cell = pin->gate->cell;
-        if (cell->inPins.count(pin->name)) {
+      auto gate = pin->gate;
+      if (gate) {
+        if (gate->inPins.count(pin)) {
           data.isGateInput = true;
         }
-        else if (cell->outPins.count(pin->name)) {
+        else if (gate->outPins.count(pin)) {
           data.isGateOutput = true;
         }
       }
