@@ -14,6 +14,7 @@ struct Node {
   float arrivalTime, requiredTime, slack;
   float internalPower, netPower;
   bool isRise;
+  bool isPrimaryInput, isPrimaryOutput, isGateInput, isGateOutput;
 };
 
 struct Edge {

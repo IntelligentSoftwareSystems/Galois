@@ -97,6 +97,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     data.internalPower = 0.0;
     data.netPower = 0.0;
     data.isRise = false;
+    data.isPrimaryInput = false;
+    data.isPrimaryOutput = false;
+    data.isGateInput = false;
+    data.isGateOutput = false;
 
     for (auto e: g.edges(n)) {
       auto& eData = g.getEdgeData(e);
@@ -108,12 +112,32 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
 
   for (auto oe: g.edges(dummySrc)) {
     auto pi = g.getEdgeDst(oe);
-    g.getData(pi, unprotected).slew = sdc.primaryInputSlew;
+    auto& data = g.getData(pi, unprotected);
+    data.slew = sdc.primaryInputSlew;
+    data.isPrimaryInput = true;
   }
 
   for (auto ie: g.in_edges(dummySink)) {
     auto po = g.getEdgeDst(ie);
-    g.getData(po, unprotected).totalNetC = sdc.primaryOutputTotalNetC;
+    auto& data = g.getData(po, unprotected);
+    data.totalNetC = sdc.primaryOutputTotalNetC;
+    data.isPrimaryOutput = true;
+  }
+
+  for (auto n: g) {
+    auto& data = g.getData(n, unprotected);
+    auto pin = data.pin;
+    if (pin) {
+      if (pin->gate) {
+        auto cell = pin->gate->cell;
+        if (cell->inPins.count(pin->name)) {
+          data.isGateInput = true;
+        }
+        else if (cell->outPins.count(pin->name)) {
+          data.isGateOutput = true;
+        }
+      }
+    }
   }
 }
 
@@ -146,6 +170,10 @@ void printCircuitGraph(Graph& g) {
     std::cout << "  internalPower = " << data.internalPower << std::endl;
     std::cout << "  netPower = " << data.netPower << std::endl;
     std::cout << "  isRise = " << ((data.isRise) ? "true" : "false") << std::endl;
+    std::cout << "  isPrimaryInput = " << ((data.isPrimaryInput) ? "true" : "false") << std::endl;
+    std::cout << "  isPrimaryOutput = " << ((data.isPrimaryOutput) ? "true" : "false") << std::endl;
+    std::cout << "  isGateInput = " << ((data.isGateInput) ? "true" : "false") << std::endl;
+    std::cout << "  isGateOutput = " << ((data.isGateOutput) ? "true" : "false") << std::endl;
 
     for (auto oe: g.edges(n)) {
       auto toPin = g.getData(g.getEdgeDst(oe), unprotected).pin;
