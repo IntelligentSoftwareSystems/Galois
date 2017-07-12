@@ -28,7 +28,7 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
       split_line1 = line1.split(' ')
       split_line2 = line2.split(' ')
 
-      while (split_line1[0] < split_line2[0]):
+      while (long(split_line1[0]) < long(split_line2[0])):
         print "MISSING ROW: ", split_line1[0]
         mrows = mrows + 1
         line1 = mfile.readline()
@@ -40,7 +40,7 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
       #if mrows > 0:
       #  return (-1, errors, mrows)
 
-      if (split_line1[0] == split_line2[0]):
+      if (long(split_line1[0]) == long(split_line2[0])):
         # absolute value of difference in fields
         field_difference = abs(float(split_line1[1]) - float(split_line2[1]))
 
