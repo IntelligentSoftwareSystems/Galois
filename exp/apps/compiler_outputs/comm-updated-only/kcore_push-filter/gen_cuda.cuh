@@ -7,9 +7,9 @@
 #include "Galois/Runtime/Cuda/cuda_helpers.h"
 
 struct CUDA_Context : public CUDA_Context_Common {
-	struct CUDA_Context_Field<unsigned int> current_degree;
+	struct CUDA_Context_Field<uint32_t> current_degree;
 	struct CUDA_Context_Field<bool> flag;
-	struct CUDA_Context_Field<unsigned int> trim;
+	struct CUDA_Context_Field<uint32_t> trim;
 };
 
 struct CUDA_Context *get_CUDA_context(int id) {
@@ -55,65 +55,65 @@ void bitset_current_degree_reset_cuda(struct CUDA_Context *ctx, size_t begin, si
   reset_bitset_field(&ctx->current_degree, begin, end);
 }
 
-unsigned int get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	unsigned int *current_degree = ctx->current_degree.data.cpu_rd_ptr();
+uint32_t get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	uint32_t *current_degree = ctx->current_degree.data.cpu_rd_ptr();
 	return current_degree[LID];
 }
 
-void set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *current_degree = ctx->current_degree.data.cpu_wr_ptr();
+void set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *current_degree = ctx->current_degree.data.cpu_wr_ptr();
 	current_degree[LID] = v;
 }
 
-void add_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *current_degree = ctx->current_degree.data.cpu_wr_ptr();
+void add_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *current_degree = ctx->current_degree.data.cpu_wr_ptr();
 	current_degree[LID] += v;
 }
 
-void min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *current_degree = ctx->current_degree.data.cpu_wr_ptr();
+void min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *current_degree = ctx->current_degree.data.cpu_wr_ptr();
 	if (current_degree[LID] > v)
 		current_degree[LID] = v;
 }
 
-void batch_get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->current_degree, from_id, v);
+void batch_get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v) {
+	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->current_degree, from_id, v);
 }
 
-void batch_get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_get_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	batch_get_shared_field<unsigned int, sharedMirror, false>(ctx, &ctx->current_degree, from_id, v);
+void batch_get_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v) {
+	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->current_degree, from_id, v);
 }
 
-void batch_get_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<unsigned int, sharedMirror, false>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_get_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
-	batch_get_shared_field<unsigned int, sharedMirror, true>(ctx, &ctx->current_degree, from_id, v, i);
+void batch_get_reset_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v, uint32_t i) {
+	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->current_degree, from_id, v, i);
 }
 
-void batch_get_reset_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode, unsigned int i) {
-	batch_get_shared_field<unsigned int, sharedMirror, true>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
+void batch_get_reset_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
 }
 
-void batch_set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_set_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_set_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_set_mirror_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_add_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_add_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_min_node_current_degree_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
 bool get_node_flag_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -191,64 +191,64 @@ void bitset_trim_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) 
 }
 
 
-unsigned int get_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	unsigned int *trim = ctx->trim.data.cpu_rd_ptr();
+uint32_t get_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	uint32_t *trim = ctx->trim.data.cpu_rd_ptr();
 	return trim[LID];
 }
 
-void set_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *trim = ctx->trim.data.cpu_wr_ptr();
+void set_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *trim = ctx->trim.data.cpu_wr_ptr();
 	trim[LID] = v;
 }
 
-void add_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *trim = ctx->trim.data.cpu_wr_ptr();
+void add_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *trim = ctx->trim.data.cpu_wr_ptr();
 	trim[LID] += v;
 }
 
-void min_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *trim = ctx->trim.data.cpu_wr_ptr();
+void min_node_trim_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v) {
+	uint32_t *trim = ctx->trim.data.cpu_wr_ptr();
 	if (trim[LID] > v)
 		trim[LID] = v;
 }
 
-void batch_get_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->trim, from_id, v);
+void batch_get_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v) {
+	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->trim, from_id, v);
 }
 
-void batch_get_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<unsigned int, sharedMaster, false>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_get_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<uint32_t, sharedMaster, false>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v) {
-	batch_get_shared_field<unsigned int, sharedMirror, false>(ctx, &ctx->trim, from_id, v);
+void batch_get_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v) {
+	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->trim, from_id, v);
 }
 
-void batch_get_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode) {
-	batch_get_shared_field<unsigned int, sharedMirror, false>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_get_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode) {
+	batch_get_shared_field<uint32_t, sharedMirror, false>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned int *v, unsigned int i) {
-	batch_get_shared_field<unsigned int, sharedMirror, true>(ctx, &ctx->trim, from_id, v, i);
+void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, uint32_t *v, uint32_t i) {
+	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->trim, from_id, v, i);
 }
 
-void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t *v_size, DataCommMode *data_mode, unsigned int i) {
-	batch_get_shared_field<unsigned int, sharedMirror, true>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
+void batch_get_reset_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+	batch_get_shared_field<uint32_t, sharedMirror, true>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
 }
 
-void batch_set_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_set_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_set_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMirror, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_set_mirror_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, setOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_add_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, addOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_add_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_min_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned int *v, size_t v_size, DataCommMode data_mode) {
-	batch_set_shared_field<unsigned int, sharedMaster, minOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+void batch_min_node_trim_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 

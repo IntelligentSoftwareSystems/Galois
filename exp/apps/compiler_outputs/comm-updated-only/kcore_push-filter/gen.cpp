@@ -159,8 +159,8 @@ static cll::opt<int> num_nodes("num_nodes",
 /******************************************************************************/
 
 struct NodeData {
-  std::atomic<unsigned int> current_degree;
-  std::atomic<unsigned int> trim;
+  std::atomic<uint32_t> current_degree;
+  std::atomic<uint32_t> trim;
   bool flag;
 };
 
@@ -224,7 +224,7 @@ struct InitializeGraph2 {
       //}
 
       NodeData& dest_data = graph->getData(dest_node);
-      Galois::atomicAdd(dest_data.current_degree, (unsigned int)1);
+      Galois::atomicAdd(dest_data.current_degree, (uint32_t)1);
 
       bitset_current_degree.set(dest_node);
     }
@@ -340,11 +340,11 @@ struct KCoreStep2 {
 /* Step that determines if a node is dead and updates its neighbors' trim
  * if it is */
 struct KCoreStep1 {
-  cll::opt<unsigned int>& local_k_core_num;
+  cll::opt<uint32_t>& local_k_core_num;
   static Galois::DGAccumulator<int> DGAccumulator_accum;
   Graph* graph;
 
-  KCoreStep1(cll::opt<unsigned int>& _kcore, Graph* _graph) : 
+  KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph) : 
     local_k_core_num(_kcore), graph(_graph){}
 
   void static go(Graph& _graph){
@@ -403,6 +403,7 @@ struct KCoreStep1 {
 
       iterations++;
     } while ((iterations < maxIterations) && DGAccumulator_accum.reduce());
+
   }
 
   void operator()(GNode src) const {
@@ -423,7 +424,7 @@ struct KCoreStep1 {
 
            auto& dst_data = graph->getData(dst);
 
-           Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+           Galois::atomicAdd(dst_data.trim, (uint32_t)1);
            bitset_trim.set(dst);
         }
       }
@@ -439,12 +440,20 @@ Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 /* Gets the total number of nodes that are still alive */
 struct GetAliveDead {
   Graph* graph;
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum2;
+  static Galois::DGAccumulator<uint32_t> DGAccumulator_accum;
+  static Galois::DGAccumulator<uint32_t> DGAccumulator_accum2;
 
   GetAliveDead(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      // TODO currently no GPU support for sanity check operator
+      printf("Warning: No GPU support for sanity check; might get "
+             "wrong results.\n");
+    }
+  #endif
+
     DGAccumulator_accum.reset();
     DGAccumulator_accum2.reset();
 
@@ -452,8 +461,8 @@ struct GetAliveDead {
                    Galois::loopname("GetAliveDead"),
                    Galois::numrun(_graph.get_run_identifier()));
 
-    unsigned int num_alive = DGAccumulator_accum.reduce();
-    unsigned int num_dead = DGAccumulator_accum2.reduce();
+    uint32_t num_alive = DGAccumulator_accum.reduce();
+    uint32_t num_dead = DGAccumulator_accum2.reduce();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
@@ -475,8 +484,8 @@ struct GetAliveDead {
     }
   }
 };
-Galois::DGAccumulator<unsigned int> GetAliveDead::DGAccumulator_accum;
-Galois::DGAccumulator<unsigned int> GetAliveDead::DGAccumulator_accum2;
+Galois::DGAccumulator<uint32_t> GetAliveDead::DGAccumulator_accum;
+Galois::DGAccumulator<uint32_t> GetAliveDead::DGAccumulator_accum2;
 
 /******************************************************************************/
 /* Main method for running */
@@ -586,14 +595,8 @@ int main(int argc, char** argv) {
         KCoreStep1::go((*h_graph));
       StatTimer_main.stop();
 
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) { 
-        // TODO currently no GPU support for sanity check operator
-      } else
-    #endif
-      {
-        GetAliveDead::go(*h_graph);
-      }
+      // sanity check
+      GetAliveDead::go(*h_graph);
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
