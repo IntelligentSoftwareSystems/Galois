@@ -5,13 +5,13 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
-unsigned int * P_DIST_CURRENT;
-unsigned int * P_DIST_OLD;
+uint32_t * P_DIST_CURRENT;
+uint32_t * P_DIST_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_FirstItr_SSSP = TB_SIZE;
 static const int __tb_SSSP = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current, unsigned int * p_dist_old)
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint64_t local_src_node, uint32_t * p_dist_current, uint32_t * p_dist_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -32,7 +32,7 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old)
+__global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -140,10 +140,10 @@ __global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigne
         jj = ns +_np_j;
         {
           index_type dst;
-          unsigned int new_dist;
+          uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -182,10 +182,10 @@ __global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigne
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            unsigned int new_dist;
+            uint32_t new_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-            unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
         }
@@ -220,10 +220,10 @@ __global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigne
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          unsigned int new_dist;
+          uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -238,7 +238,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigne
   }
   // FP: "101 -> 102;
 }
-__global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_dist_current, unsigned int * p_dist_old, Sum ret_val)
+__global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -357,10 +357,10 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
         jj = ns +_np_j;
         {
           index_type dst;
-          unsigned int new_dist;
+          uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -399,10 +399,10 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            unsigned int new_dist;
+            uint32_t new_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-            unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist) is_updated->set(dst);
           }
         }
@@ -437,10 +437,10 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          unsigned int new_dist;
+          uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
-          unsigned int old_dist = atomicMin(&p_dist_current[dst], new_dist);
+          uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist) is_updated->set(dst);
         }
       }
@@ -457,7 +457,7 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
   }
   ret_val.thread_exit<_br>(_ts);
 }
-void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -471,7 +471,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const unsi
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_all_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(0, ctx->nowned, local_infinity, local_src_node, ctx);

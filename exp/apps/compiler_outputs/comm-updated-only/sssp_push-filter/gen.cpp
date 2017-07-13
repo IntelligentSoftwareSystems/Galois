@@ -79,7 +79,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned long long> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
@@ -103,15 +103,15 @@ static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes wit
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for hosts on each physical node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init("c"));
 #endif
 
-const unsigned int infinity = std::numeric_limits<unsigned int>::max()/4;
+const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
 
 struct NodeData {
-  std::atomic<unsigned int> dist_current;
-  unsigned int dist_old;
+  std::atomic<uint32_t> dist_current;
+  uint32_t dist_old;
 };
 
 Galois::DynamicBitSet bitset_dist_current;
@@ -130,12 +130,12 @@ typedef typename Graph::GraphNode GNode;
 /******************************************************************************/
 
 struct InitializeGraph {
-  const unsigned int &local_infinity;
-  cll::opt<unsigned int> &local_src_node;
+  const uint32_t &local_infinity;
+  cll::opt<unsigned long long> &local_src_node;
   Graph *graph;
 
-  InitializeGraph(cll::opt<unsigned int> &_src_node, 
-                  const unsigned int &_infinity, Graph* _graph) : 
+  InitializeGraph(cll::opt<unsigned long long> &_src_node, 
+                  const uint32_t &_infinity, Graph* _graph) : 
                     local_infinity(_infinity), local_src_node(_src_node), 
                     graph(_graph){}
 
@@ -176,7 +176,7 @@ struct FirstItr_SSSP{
   FirstItr_SSSP(Graph * _graph):graph(_graph){}
 
   void static go(Graph& _graph) {
-    unsigned int __begin, __end;
+    uint32_t __begin, __end;
     if (_graph.isLocal(src_node)) {
       __begin = _graph.getLID(src_node);
       __end = __begin + 1;
@@ -217,8 +217,8 @@ struct FirstItr_SSSP{
          ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist = graph->getEdgeData(jj) + snode.dist_current;
-      unsigned int old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+      uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
+      uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
       if (old_dist > new_dist) bitset_dist_current.set(dst);
     }
   }
@@ -285,8 +285,8 @@ struct SSSP {
            ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        unsigned int new_dist = graph->getEdgeData(jj) + snode.dist_current;
-        unsigned int old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+        uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
+        uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
         if (old_dist > new_dist) bitset_dist_current.set(dst);
       }
 
@@ -302,18 +302,26 @@ Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 
 /* Prints total number of nodes visited + max distance */
 struct SSSPSanityCheck {
-  const unsigned int &local_infinity;
+  const uint32_t &local_infinity;
   Graph* graph;
 
-  static unsigned int current_max;
+  static uint32_t current_max;
 
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_sum;
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_max;
+  static Galois::DGAccumulator<uint64_t> DGAccumulator_sum;
+  static Galois::DGAccumulator<uint32_t> DGAccumulator_max;
 
-  SSSPSanityCheck(const unsigned int _infinity, Graph* _graph) : 
+  SSSPSanityCheck(const uint32_t _infinity, Graph* _graph) : 
     local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      // TODO currently no GPU support for sanity check operator
+      printf("Warning: No GPU support for sanity check; might get "
+             "wrong results.\n");
+    }
+  #endif
+
     DGAccumulator_sum.reset();
     DGAccumulator_max.reset();
 
@@ -322,14 +330,14 @@ struct SSSPSanityCheck {
                    Galois::loopname("SSSPSanityCheck"));
 
 
-    unsigned int num_visited = DGAccumulator_sum.reduce();
+    uint64_t num_visited = DGAccumulator_sum.reduce();
 
     DGAccumulator_max = current_max;
-    unsigned int max_distance = DGAccumulator_max.reduce_max();
+    uint32_t max_distance = DGAccumulator_max.reduce_max();
 
     // Only node 0 will print the info
     if (_graph.id == 0) {
-      printf("Number of nodes visited is %u\n", num_visited);
+      printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
     }
   }
@@ -348,9 +356,9 @@ struct SSSPSanityCheck {
   }
 
 };
-Galois::DGAccumulator<unsigned int> SSSPSanityCheck::DGAccumulator_sum;
-Galois::DGAccumulator<unsigned int> SSSPSanityCheck::DGAccumulator_max;
-unsigned int SSSPSanityCheck::current_max = 0;
+Galois::DGAccumulator<uint64_t> SSSPSanityCheck::DGAccumulator_sum;
+Galois::DGAccumulator<uint32_t> SSSPSanityCheck::DGAccumulator_max;
+uint32_t SSSPSanityCheck::current_max = 0;
 
 /******************************************************************************/
 /* Main */
@@ -461,15 +469,8 @@ int main(int argc, char** argv) {
         SSSP::go((*hg));
       StatTimer_main.stop();
 
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) { 
-        // TODO currently no GPU support for sanity check operators
-      } else
-    #endif
-      {
       SSSPSanityCheck::current_max = 0;
       SSSPSanityCheck::go(*hg);
-      }
 
       if ((run + 1) != numRuns) {
       #ifdef __GALOIS_HET_CUDA__
@@ -488,7 +489,7 @@ int main(int argc, char** argv) {
    StatTimer_total.stop();
 
     // Verify
-    if(verify){
+    if (verify) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
@@ -505,7 +506,7 @@ int main(int argc, char** argv) {
     }
 
     // Verify
-    if(verifyMax){
+    if (verifyMax) {
       uint32_t max_distance = 0;
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
