@@ -108,8 +108,10 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 /******************************************************************************/
 
 struct NodeData {
-  std::atomic<unsigned int> comp_current;
-  unsigned int comp_old;
+  // TODO should be uint64_t since component id is the lowest node id of the
+  // component
+  std::atomic<uint32_t> comp_current;
+  uint32_t comp_old;
 };
 
 Galois::DynamicBitSet bitset_comp_current;
@@ -201,8 +203,8 @@ struct FirstItr_ConnectedComp{
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist = snode.comp_current;
-      unsigned int old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
+      uint32_t new_dist = snode.comp_current;
+      uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
       if (old_dist > new_dist) bitset_comp_current.set(dst);
     }
   }
@@ -269,8 +271,8 @@ struct ConnectedComp {
            jj != ee; ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        unsigned int new_dist = snode.comp_current;
-        unsigned int old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
+        uint32_t new_dist = snode.comp_current;
+        uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
         if (old_dist > new_dist) bitset_comp_current.set(dst);
       }
 
@@ -286,22 +288,30 @@ Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 
 /* Get/print the number of members in node 0's component */
 struct Node0ComponentSize {
-  const unsigned int zero_component;
+  const uint64_t zero_component;
   Graph* graph;
 
-  static Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  static Galois::DGAccumulator<uint64_t> DGAccumulator_accum;
 
-  Node0ComponentSize(const unsigned int _zero_component, Graph* _graph) : 
+  Node0ComponentSize(const uint64_t _zero_component, Graph* _graph) : 
     zero_component(_zero_component), graph(_graph){}
 
   void static go(Graph& _graph) {
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      // TODO currently no GPU support for sanity check operator
+      printf("Warning: No GPU support for sanity check; might get "
+             "wrong results.\n");
+    }
+  #endif
+
     DGAccumulator_accum.reset();
 
     if (_graph.isOwned(0)) {
       DGAccumulator_accum += _graph.getData(_graph.getLID(0)).comp_current;
     }
 
-    unsigned int z_comp = DGAccumulator_accum.reduce();
+    uint64_t z_comp = DGAccumulator_accum.reduce();
 
     DGAccumulator_accum.reset();
 
@@ -309,11 +319,11 @@ struct Node0ComponentSize {
                    Node0ComponentSize(z_comp, &_graph), 
                    Galois::loopname("Node0ComponentSize"));
 
-    unsigned int num_in_component = DGAccumulator_accum.reduce();
+    uint64_t num_in_component = DGAccumulator_accum.reduce();
 
     // Only node 0 will print the number visited
     if (_graph.id == 0) {
-      printf("Number of nodes in node 0's component is %u\n", num_in_component);
+      printf("Number of nodes in node 0's component is %lu\n", num_in_component);
     }
   }
 
@@ -328,7 +338,7 @@ struct Node0ComponentSize {
     }
   }
 };
-Galois::DGAccumulator<unsigned int> Node0ComponentSize::DGAccumulator_accum;
+Galois::DGAccumulator<uint64_t> Node0ComponentSize::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Main */
@@ -435,14 +445,7 @@ int main(int argc, char** argv) {
         ConnectedComp::go((*hg));
       StatTimer_main.stop();
 
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) { 
-        // TODO currently no GPU support for sanity check operators
-      } else
-    #endif
-      {
-        Node0ComponentSize::go(*hg);
-      }
+      Node0ComponentSize::go(*hg);
 
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
