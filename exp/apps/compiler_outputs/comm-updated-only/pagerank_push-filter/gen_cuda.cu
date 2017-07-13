@@ -5,7 +5,7 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
-unsigned int * P_NOUT;
+uint32_t * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
 #include "kernels/reduce.cuh"
@@ -14,7 +14,7 @@ static const int __tb_FirstItr_PageRank = TB_SIZE;
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
 static const int __tb_InitializeGraphNout = TB_SIZE;
-__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -35,7 +35,7 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int _
   }
   // FP: "9 -> 10;
 }
-__global__ void InitializeGraphNout(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned int * p_nout)
+__global__ void InitializeGraphNout(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_nout)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -55,7 +55,7 @@ __global__ void InitializeGraphNout(CSRGraph graph, DynamicBitset *is_updated, u
   }
   // FP: "8 -> 9;
 }
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, uint32_t * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -265,7 +265,7 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
   }
   // FP: "101 -> 102;
 }
-__global__ void PageRankCopy(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_delta, float * p_value)
+__global__ void PageRankCopy(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, uint32_t * p_nout, float * p_residual, float * p_delta, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;

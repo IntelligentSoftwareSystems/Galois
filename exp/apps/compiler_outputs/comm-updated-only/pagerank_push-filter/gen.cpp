@@ -115,7 +115,7 @@ struct NodeData {
   float value;
   float delta;
   std::atomic<float> residual;
-  std::atomic<unsigned int> nout;
+  std::atomic<uint32_t> nout;
 };
 
 Galois::DynamicBitSet bitset_residual;
@@ -195,7 +195,7 @@ struct InitializeGraphNout {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     Galois::atomicAdd(sdata.nout, 
-      (unsigned int) std::distance(graph->edge_begin(src), 
+      (uint32_t) std::distance(graph->edge_begin(src), 
                                    graph->edge_end(src)));
     bitset_nout.set(src);
   }
@@ -419,6 +419,14 @@ struct PageRankSanity {
   PageRankSanity(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      // TODO currently no GPU support for sanity check operator
+      printf("Warning: No GPU support for sanity check; might get "
+             "wrong results.\n");
+    }
+  #endif
+
     DGAccumulator_max.reset();
     DGAccumulator_min.reset();
     DGAccumulator_sum.reset();
@@ -579,16 +587,10 @@ int main(int argc, char** argv) {
         PageRank::go((*hg));
       StatTimer_main.stop();
 
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) { 
-        // TODO currently no GPU support for sanity check operators
-      } else
-    #endif
-      {
+      // sanity check
       PageRankSanity::current_max = 0;
       PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
       PageRankSanity::go(*hg);
-      }
 
       if((run + 1) != numRuns){
         //Galois::Runtime::getHostBarrier().wait();
