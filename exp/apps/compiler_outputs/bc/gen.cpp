@@ -183,7 +183,7 @@ struct NodeData {
   std::atomic<uint32_t> trim;
   std::atomic<uint32_t> to_add;
 
-  std::atomic<float> to_add_float;
+  float to_add_float;
   float dependency;
 
   float betweeness_centrality;
@@ -222,7 +222,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
-  /* Initialize the entire graph node-by-node */
+  /* Initialize the graph */
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -234,11 +234,9 @@ struct InitializeGraph {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-
     //Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
     //               Galois::loopname("InitializeGraph"), 
     //               Galois::numrun(_graph.get_run_identifier()));
-
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun("0"));
@@ -246,29 +244,29 @@ struct InitializeGraph {
     // sync things that need to be sync'd on dest as well (this is init, it
     // doesn't matter too much how slow it is); some things will be sync'd later
     _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths,
-                Broadcast_num_shortest_paths>("InitializeGraph");
+                Broadcast_num_shortest_paths>("InitializeGraph_num_paths");
 
     _graph.sync<writeSource, readDestination, Reduce_set_num_successors, 
-                Broadcast_num_successors>("InitializeIteration");
+                Broadcast_num_successors>("InitializeIteration_num_succ");
 
     _graph.sync<writeSource, readDestination, Reduce_set_num_predecessors,
-                Broadcast_num_predecessors>("InitializeGraph");
+                Broadcast_num_predecessors>("InitializeGraph_num_pred");
 
     _graph.sync<writeSource, readDestination, Reduce_set_trim,
-                Broadcast_trim>("InitializeGraph");
+                Broadcast_trim>("InitializeGraph_trim");
 
     _graph.sync<writeSource, readDestination, Reduce_set_to_add,
-                Broadcast_to_add>("InitializeGraph");
+                Broadcast_to_add>("InitializeGraph_to_add");
 
     _graph.sync<writeSource, readDestination, Reduce_set_to_add_float,
-                Broadcast_to_add_float>("InitializeGraph");
+                Broadcast_to_add_float>("InitializeGraph_to_add_float");
 
     _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
-                Broadcast_propogation_flag>("InitializeIteration");
+                Broadcast_propogation_flag>("InitializeIteration_prop_flag");
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
-   * reset everything + sync */
+   * reset everything */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
@@ -298,12 +296,14 @@ struct InitializeIteration {
                        local_current_src_node(_local_current_src_node),
                        graph(_graph){}
 
-  /* Reset graph metadata node-by-node */
+  /* Reset graph metadata for next iteration of SSSP/BFS */
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeIteration_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_InitializeIteration_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeIteration_0");
+
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         InitializeIteration_all_cuda(infinity, current_src_node, cuda_ctx);
@@ -322,9 +322,9 @@ struct InitializeIteration {
     // The following are read from dest + haven't been sync'd yet, 
     // i.e. you need to sync
     _graph.sync<writeSource, readDestination, Reduce_set_dependency,
-                Broadcast_dependency>("InitializeIteration");
+                Broadcast_dependency>("InitializeIteration_dep");
     _graph.sync<writeSource, readDestination, Reduce_set_current_length, 
-                Broadcast_current_length>("InitializeIteration");
+                Broadcast_current_length>("InitializeIteration_cur_len");
     //_graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
     //            Broadcast_propogation_flag>("InitializeIteration");
   }
@@ -375,8 +375,10 @@ struct FirstIterationSSSP {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_FirstIterationSSSP_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_FirstIterationSSSP_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_FirstIterationSSSP_0");
+
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         FirstIterationSSSP_cuda(__begin, __end, cuda_ctx);
@@ -404,10 +406,9 @@ struct FirstIterationSSSP {
 
     _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
                 Broadcast_current_length, Bitset_current_length>(
-                "FirstIterationSSSP");
+                "FirstIterationSSSP_cur_len");
     // if this is a vertex cut then it would reset the flag for broadcast
     // dest
-
     //if (personality == GPU_CUDA) {
     // char test[100];
     //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
@@ -476,8 +477,10 @@ struct SSSP {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_0");
+        
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
@@ -510,7 +513,7 @@ struct SSSP {
         //         bitset_current_length.test(_graph.getLID(21848)));
         //}
         _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
-                    Broadcast_current_length, Bitset_current_length>("SSSP");
+                    Broadcast_current_length, Bitset_current_length>("SSSP_cur_len");
         //_graph.sync<writeDestination, readSource, Reduce_min_current_length, 
         //            Broadcast_current_length>("SSSP");
       } else {
@@ -528,12 +531,13 @@ struct SSSP {
           // will lead to incorrect results as it will not sync what is
           // necessary
           _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-                       Broadcast_current_length>("SSSP");
+                       Broadcast_current_length>("SSSP_cur_len_any_v");
           //_graph.sync<writeDestination, readAny, Reduce_min_current_length, 
           //            Broadcast_current_length, Bitset_current_length>("SSSP");
         } else {
           _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-                      Broadcast_current_length, Bitset_current_length>("SSSP");
+                      Broadcast_current_length, 
+                      Bitset_current_length>("SSSP_cur_len_any");
         }
       }
     } while (accum_result);
@@ -604,11 +608,13 @@ struct PredAndSucc {
     // Loop over all nodes in graph iteratively
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc_0");
+        
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        PredAndSucc_all_cuda(cuda_ctx);
+        PredAndSucc_all_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -622,12 +628,14 @@ struct PredAndSucc {
 
     // sync for use in NumShortPath calculation
     _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors, 
-                Broadcast_num_predecessors, Bitset_num_predecessors>("PredAndSucc");
+                Broadcast_num_predecessors, 
+                Bitset_num_predecessors>("PredAndSucc_pred");
 
     // sync now for later DependencyPropogation use (read src/dst) + use
     // for optimization in num shortest paths
     _graph.sync<writeSource, readAny, Reduce_add_num_successors, 
-                Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
+                Broadcast_num_successors, 
+                Bitset_num_successors>("PredAndSucc_succ");
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -693,8 +701,8 @@ struct PredAndSucc {
 
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
           // dest on shortest path with this node as predecessor
-          Galois::add(src_data.num_successors, (uint32_t)1);
-          Galois::atomicAdd(dst_data.num_predecessors, (uint32_t)1);
+          Galois::add(src_data.num_successors, (unsigned int)1);
+          Galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
 
           bitset_num_successors.set(src);
           bitset_num_predecessors.set(dst);
@@ -719,11 +727,12 @@ struct NumShortestPathsChanges {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_PredecessorDecrement_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPathsChanges_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPathsChanges_0");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        PredecessorDecrement_all_cuda(cuda_ctx);
+        NumShortestPathsChanges_all_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -804,12 +813,13 @@ struct NumShortestPaths {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths_0");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        NumShortestPaths_all_cuda(__retval, cuda_ctx);
+        NumShortestPaths_all_cuda(__retval, infinity, cuda_ctx);
         DGAccumulator_accum += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -824,7 +834,7 @@ struct NumShortestPaths {
       //               Galois::loopname("NumShortestPaths"));
 
       _graph.sync<writeDestination, readSource, Reduce_add_trim, 
-                  Broadcast_trim, Bitset_trim>("NumShortestPaths");
+                  Broadcast_trim, Bitset_trim>("NumShortestPaths_trim");
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -849,7 +859,7 @@ struct NumShortestPaths {
     //}
       // sync to_adds on source
       _graph.sync<writeDestination, readSource, Reduce_add_to_add, 
-                  Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
+                  Broadcast_to_add, Bitset_to_add>("NumShortestPaths_to_add");
 
       // do predecessor decrementing using trim + dependency changes with
       // to_add
@@ -865,14 +875,14 @@ struct NumShortestPaths {
       if (!accum_result) {
         _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths, 
                     Broadcast_num_shortest_paths, 
-                    Bitset_num_shortest_paths>("NumShortestPaths");
+                    Bitset_num_shortest_paths>("NumShortestPaths_num_paths");
 
         // note that only nodes with succ == 0 will have their flags sync'd
         // by way of bitset (it's only been set for those cases); the others
         // do not need to be sync'd as they will all be false already
         _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                     Broadcast_propogation_flag, 
-                    Bitset_propogation_flag>("NumShortestPaths");
+                    Bitset_propogation_flag>("NumShortestPaths_prop_flag");
       }
 
     //if (personality == GPU_CUDA) {
@@ -954,7 +964,7 @@ struct NumShortestPaths {
             // need to add my num_short_paths to dest
             Galois::atomicAdd(dst_data.to_add, paths_to_add);
             // increment dst trim so it can decrement predecessor
-            Galois::atomicAdd(dst_data.trim, (uint32_t)1);
+            Galois::atomicAdd(dst_data.trim, (unsigned int)1);
 
             bitset_to_add.set(dst);
             bitset_trim.set(dst);
@@ -984,11 +994,12 @@ struct DependencyPropChanges {
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_SuccessorDecrement_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropChanges_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropChanges_0");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        SuccessorDecrement_all_cuda(cuda_ctx);
+        DependencyPropChanges_all_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -1004,7 +1015,7 @@ struct DependencyPropChanges {
     // need reduce set for flag
     _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag,
-                Bitset_propogation_flag>("DependencyPropChanges");
+                Bitset_propogation_flag>("DependencyPropChanges_prop_flag");
 
     //_graph.sync<writeSource, readDestination, Reduce_set_num_successors, 
     //            Broadcast_num_successors,
@@ -1015,6 +1026,15 @@ struct DependencyPropChanges {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
+      // increment dependency using to_add_float then reset
+      if (src_data.to_add_float > 0.0) {
+        src_data.dependency += src_data.to_add_float;
+        src_data.to_add_float = 0.0;
+
+        // used in DependencyPropogation's go method
+        bitset_dependency.set(src);
+      }
+
       if (src_data.num_successors == 0 && src_data.propogation_flag) {
         // has had dependency back-propogated; reset the flag
         assert(src_data.trim == 0);
@@ -1035,15 +1055,6 @@ struct DependencyPropChanges {
           src_data.propogation_flag = true;
           bitset_propogation_flag.set(src);
         }
-      }
-
-      // increment dependency using to_add_float then reset
-      if (src_data.to_add_float > 0.0) {
-        src_data.dependency += src_data.to_add_float;
-        src_data.to_add_float = 0.0;
-
-        // used in DependencyPropogation's go method
-        bitset_dependency.set(src);
       }
     }
   }
@@ -1075,12 +1086,13 @@ struct DependencyPropogation {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation_0");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        DependencyPropogation_all_cuda(__retval, current_src_node, cuda_ctx);
+        DependencyPropogation_all_cuda(__retval, infinity, current_src_node, cuda_ctx);
         DGAccumulator_accum += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -1116,12 +1128,33 @@ struct DependencyPropogation {
     //    }
     //  }
     //}
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+    //      sprintf(test, "toadd%u %lu %f\n", iterations,
+    //              (_graph).getGID(*ii),
+    //              get_node_to_add_float_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //    }
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+    //      sprintf(test, "toadd%u %lu %f\n", iterations,
+    //              (_graph).getGID(*ii),
+    //              _graph.getData(*ii).to_add_float);
+    //      Galois::Runtime::printOutput(test);
+    //    }
+    //  }
+    //}
 
       _graph.sync<writeSource, readSource, Reduce_add_trim, 
-                  Broadcast_trim, Bitset_trim>("DependencyPropogation");
+                  Broadcast_trim, Bitset_trim>("DependencyPropogation_trim");
       _graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
                   Broadcast_to_add_float, 
-                  Bitset_to_add_float>("DependencyPropogation");
+                  Bitset_to_add_float>("DependencyPropogation_to_add_float");
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -1151,13 +1184,58 @@ struct DependencyPropogation {
       //_graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
       //            Broadcast_to_add_float>("DependencyPropogation");
 
+    //if (personality == GPU_CUDA) {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+    //      sprintf(test, "aftertoadd%u %lu %f\n", iterations,
+    //              (_graph).getGID(*ii),
+    //              get_node_to_add_float_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //    }
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+    //      sprintf(test, "aftertoadd%u %lu %f\n", iterations,
+    //              (_graph).getGID(*ii),
+    //              _graph.getData(*ii).to_add_float);
+    //      Galois::Runtime::printOutput(test);
+    //    }
+    //  }
+    //}
+
       iterations++;
       accum_result = DGAccumulator_accum.reduce();
+      //if (personality == GPU_CUDA) {
+      //  char test[100];
+      //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+      //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+      //      sprintf(test, "dp%u %lu %f\n", iterations,
+      //              (_graph).getGID(*ii),
+      //              get_node_dependency_cuda(cuda_ctx, *ii));
+      //      Galois::Runtime::printOutput(test);
+      //    }
+      //  }
+      //} else {
+      //  char test[100];
+      //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+      //    if ((_graph).isLocal((_graph).getGID(*ii))) {
+      //      sprintf(test, "dp%u %lu %f\n", iterations,
+      //              (_graph).getGID(*ii),
+      //              _graph.getData(*ii).dependency);
+      //      Galois::Runtime::printOutput(test);
+      //    }
+      //  }
+      //}
+
 
       if (accum_result) {
         // sync dependency on dest; source should all have same dep
         _graph.sync<writeSource, readDestination, Reduce_set_dependency,
-                    Broadcast_dependency, Bitset_dependency>("DependencyPropogation");
+                    Broadcast_dependency, 
+                    Bitset_dependency>("DependencyPropogation_dep");
       } 
     } while (accum_result);
   }
@@ -1196,16 +1274,14 @@ struct DependencyPropogation {
             // dep)
             if (dst_data.propogation_flag) {
               // dest on shortest path with this node as predecessor
-              if ((src_data.current_length + edge_weight) == 
-                   dst_data.current_length) {
+              if ((src_data.current_length + edge_weight) == dst_data.current_length) {
                 // increment my trim for later use to decrement successor
-                Galois::atomicAdd(src_data.trim, (uint32_t)1);
+                Galois::atomicAdd(src_data.trim, (unsigned int)1);
 
                 // update my to_add_float (which is later used to update dependency)
                 Galois::add(src_data.to_add_float, 
-                            (((float)src_data.num_shortest_paths / 
-                              (float)dst_data.num_shortest_paths) * 
-                              (float)(1.0 + dst_data.dependency)));
+                (((float)src_data.num_shortest_paths / 
+                (float)dst_data.num_shortest_paths) * (float)(1.0 + dst_data.dependency)));
 
                 bitset_trim.set(src);
                 bitset_to_add_float.set(src);
@@ -1279,8 +1355,9 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_BC_" + 
-                             (_graph.get_run_identifier()));
+        //std::string impl_str("CUDA_DO_ALL_IMPL_BC_" + 
+        //                     (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_BC_0");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         BC_all_cuda(cuda_ctx);
