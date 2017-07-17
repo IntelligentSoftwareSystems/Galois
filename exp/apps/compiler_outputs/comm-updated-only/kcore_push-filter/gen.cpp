@@ -218,6 +218,8 @@ struct InitializeGraph2 {
          current_edge++) {
       GNode dest_node = graph->getEdgeDst(current_edge);
 
+      //printf("edge is %lu to %lu\n", graph->getGID(src), graph->getGID(dest_node));
+
       //if (graph->getGID(dest_node) == 350208) {
       //  std::cout << "[" << graph->id << "]" <<
       //            "src is " << graph->getGID(src) << "\n";
@@ -561,7 +563,7 @@ int main(int argc, char** argv) {
                                       scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                             scalefactor);
+                             scalefactor, transpose);
     }
 
   #ifdef __GALOIS_HET_CUDA__
