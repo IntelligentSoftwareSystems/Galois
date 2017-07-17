@@ -119,9 +119,9 @@ static cll::opt<VertexCut> vertexcut("vertexcut",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned int> singleSourceNode("srcNodeId", 
-                                cll::desc("Source node used for single source "
-                                          "betweeness-centraility"),
+static cll::opt<unsigned int> startSource("srcNodeId", 
+                                cll::desc("Starting source node used for "
+                                          "betweeness-centrality"),
                                 cll::init(0));
 static cll::opt<unsigned int> numberOfSources("numOfSources", 
                                 cll::desc("Number of sources to use for "
@@ -390,12 +390,28 @@ struct FirstIterationSSSP {
                    FirstIterationSSSP(&_graph),
                    Galois::loopname("FirstIterationSSSP"),
                    Galois::numrun("0"));
+
                    //Galois::numrun(_graph.get_run_identifier()));
     //Galois::do_all(boost::make_counting_iterator(__begin), 
     //               boost::make_counting_iterator(__end), 
     //               FirstIterationSSSP(&_graph),
     //               Galois::loopname("FirstIterationSSSP"));
-    
+
+    //if (personality == GPU_CUDA) {
+    // char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //      sprintf(test, "[%u]bflen %lu %u\n", _graph.id, (_graph).getGID(*ii),
+    //              get_node_current_length_cuda(cuda_ctx, *ii));
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //} else {
+    //  char test[100];
+    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
+    //      sprintf(test, "[%u]bflen %lu %u\n", _graph.id, (_graph).getGID(*ii),
+    //              _graph.getData(*ii).current_length.load());
+    //      Galois::Runtime::printOutput(test);
+    //  }
+    //}
 
     //// Next op will read src, current length
     //if (_graph.isLocal(21848)) {
@@ -409,6 +425,7 @@ struct FirstIterationSSSP {
                 "FirstIterationSSSP_cur_len");
     // if this is a vertex cut then it would reset the flag for broadcast
     // dest
+
     //if (personality == GPU_CUDA) {
     // char test[100];
     //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
@@ -430,13 +447,19 @@ struct FirstIterationSSSP {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
+    //if (graph->isLocal(src)) {
+    //  if (graph->getGID(src) == 0) {
+    //    printf("[%u]0 found\n", graph->id);
+    //  }
+    //}
+
     for (auto current_edge = graph->edge_begin(src), 
               end_edge = graph->edge_end(src); 
          current_edge != end_edge; 
          ++current_edge) {
 
       //if (graph->isLocal(src)) {
-      //  if (graph->getGID(src) == 21848) {
+      //  if (graph->getGID(src) == 0) {
       //    printf("[%u]edges?\n", graph->id);
       //  }
       //}
@@ -444,12 +467,16 @@ struct FirstIterationSSSP {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
+      //printf("dest %lu, old length %u\n", graph->getGID(dst), 
+      //                                   dst_data.current_length.load());
+ 
       // For SSSP (uses the edge weight)
       //unsigned int new_dist = graph->getEdgeData(current_edge) + 
       //                        src_data.current_length;
       // BFS 
       uint32_t new_dist = 1 + src_data.current_length;
       Galois::atomicMin(dst_data.current_length, new_dist);
+      //printf("new length is %u from %u\n", dst_data.current_length.load(), new_dist);
 
       bitset_current_length.set(dst);
     }
@@ -1308,19 +1335,20 @@ struct BC {
   void static go(Graph& _graph){
     uint64_t start_i;
     uint64_t end_i;
+    start_i = startSource;
 
     if (singleSourceBC) {
-      start_i = singleSourceNode;
-      end_i = singleSourceNode + 1;
+      //start_i = startSource;
+      end_i = startSource + 1;
     } else {
-      start_i = 0;
+      //start_i = 0;
       if (numberOfSources != 0) {
-        end_i = numberOfSources;
+        end_i = start_i + numberOfSources;
       } else {
         end_i = _graph.totalNodes;
       }
     }
-
+    printf("start is %lu, end is %lu\n", start_i, end_i);
 
     for (uint64_t i = start_i; i < end_i; i++) {
       current_src_node = i;
@@ -1457,7 +1485,7 @@ int main(int argc, char** argv) {
                                       scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                             scalefactor);
+                                  scalefactor, transpose);
     }
 
   #ifdef __GALOIS_HET_CUDA__
