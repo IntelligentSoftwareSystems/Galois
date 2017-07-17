@@ -64,7 +64,10 @@ struct Cell {
 struct WireLoad {
   std::string name;
   float capacitance, resistance, slope;
-  std::map<size_t, float> fanoutLength;
+  std::vector<size_t> fanout;
+  std::vector<float> length;
+
+  float wireCapacitance(size_t deg);
 };
 
 struct CellLib {

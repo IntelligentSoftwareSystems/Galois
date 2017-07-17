@@ -5,16 +5,25 @@
 #include <algorithm>
 #include <utility>
 #include <cassert>
+#include <limits>
 
-static float linearInterpolate(float x1, float x2, float x3, float y1, float y3) {
+template<typename T>
+static T linearInterpolate(T x1, T x2, T x3, T y1, T y3) {
   return y1 + (y3 - y1) * (x2 - x1) / (x3 - x1);
 }
 
-static std::pair<size_t, size_t> findBound(float v, std::vector<float>& array) {
+template<typename T>
+static std::pair<size_t, size_t> findBound(T v, std::vector<T>& array) {
   auto upper = std::upper_bound(array.begin(), array.end(), v);
   auto upperIndex = std::distance(array.begin(), upper);
   auto lowerIndex = upperIndex - 1;
   return std::make_pair(lowerIndex, upperIndex);
+}
+
+float WireLoad::wireCapacitance(size_t deg) {
+  auto b = findBound(deg, fanout);
+  auto len = linearInterpolate((float)fanout[b.first], (float)deg, (float)fanout[b.second], length[b.first], length[b.second]);
+  return capacitance * len;
 }
 
 float LUT::lookup(std::vector<float>& param) {
@@ -62,8 +71,9 @@ static void readWireLoad(FileReader& fRd, CellLib *cellLib) {
     else if (token == "fanout_length") {
       fRd.nextToken(); // get "("
       size_t fanout = std::stoul(fRd.nextToken());
+      wireLoad->fanout.push_back(fanout);
       float length = std::stof(fRd.nextToken());
-      wireLoad->fanoutLength.insert({fanout, length});
+      wireLoad->length.push_back(length);
       fRd.nextToken(); // get ")"
       fRd.nextToken(); // get ";"
     }
@@ -409,8 +419,8 @@ static void printWireLoad(WireLoad *w) {
   std::cout << "  capacitance: " << w->capacitance << std::endl;
   std::cout << "  resistance: " << w->resistance << std::endl;
   std::cout << "  slope: " << w->slope << std::endl;
-  for (auto i: w->fanoutLength) {
-    std::cout << "  fanout_length(" << i.first << ", " << i.second << ")" << std::endl;
+  for (size_t i = 0; i < w->fanout.size(); i++) {
+    std::cout << "  fanout_length(" << w->fanout[i] << ", " << w->length[i] << ")" << std::endl;
   }
   std::cout << "}" << std::endl;
 }
