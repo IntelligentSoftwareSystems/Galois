@@ -71,7 +71,8 @@ class OfflineGraph {
   uint64_t sizeEdgeData;
   size_t length;
   bool v2;
-  uint64_t numSeeksEdgeDst, numSeeksIndex, numSeeksData;
+  uint64_t numSeeksEdgeDst, numSeeksIndex, numSeeksEdgeData;
+  uint64_t numBytesReadEdgeDst, numBytesReadIndex, numBytesReadEdgeData;
 
   Galois::Substrate::SimpleLock lock;
 
@@ -85,7 +86,9 @@ class OfflineGraph {
     }
     uint64_t retval;
     fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-    locEdgeDst += fileEdgeDst.gcount();
+    auto numBytesRead = fileEdgeDst.gcount();
+    locEdgeDst += numBytesRead;
+    numBytesReadEdgeDst += numBytesRead;
     return retval;
   }
 
@@ -100,12 +103,16 @@ class OfflineGraph {
     if (v2) {
       uint64_t retval;
       fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-      locIndex += fileIndex.gcount();
+      auto numBytesRead = fileIndex.gcount();
+      locIndex += numBytesRead;
+      numBytesReadIndex += numBytesRead;
       return retval;
     } else {
       uint32_t retval;
       fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
-      locIndex += fileIndex.gcount();
+      auto numBytesRead = fileIndex.gcount();
+      locIndex += numBytesRead;
+      numBytesReadIndex += numBytesRead;
       return retval;
     }
   }
@@ -119,13 +126,15 @@ class OfflineGraph {
     pos = (pos + 7) & ~7;
     pos += edge * sizeEdgeData;
     if (locEdgeData != pos){
-       numSeeksData++;
+       numSeeksEdgeData++;
        fileEdgeData.seekg(pos, fileEdgeDst.beg);
        locEdgeData = pos;
     }
     T retval;
     fileEdgeData.read(reinterpret_cast<char*>(&retval), sizeof(T));
-    locEdgeData += fileEdgeData.gcount();
+    auto numBytesRead = fileEdgeData.gcount();
+    locEdgeData += numBytesRead;
+    numBytesReadEdgeData += numBytesRead;
     /*fprintf(stderr, "READ:: %ld[", edge);
     for(int i=0; i<sizeof(T); ++i){
        fprintf(stderr, "%c", reinterpret_cast<char*>(&retval)[i]);
@@ -141,7 +150,9 @@ public:
 
   OfflineGraph(const std::string& name)
     :fileEdgeDst(name, std::ios_base::binary), fileIndex(name, std::ios_base::binary), fileEdgeData(name, std::ios_base::binary),
-     locEdgeDst(0), locIndex(0), locEdgeData(0),numSeeksEdgeDst(0), numSeeksIndex(0), numSeeksData(0)
+     locEdgeDst(0), locIndex(0), locEdgeData(0),
+     numSeeksEdgeDst(0), numSeeksIndex(0), numSeeksEdgeData(0),
+     numBytesReadEdgeDst(0), numBytesReadIndex(0), numBytesReadEdgeData(0)
 
   {
     if (!fileEdgeDst.is_open() || !fileEdgeDst.good()) throw "Bad filename";
@@ -164,11 +175,16 @@ public:
     fileIndex.seekg(0, std::ios_base::beg);
   }
   uint64_t num_seeks(){
-     std::cout << "Seeks :: " << numSeeksEdgeDst << " , " << numSeeksData << " , " << numSeeksIndex << " \n";
-     return numSeeksEdgeDst+numSeeksData+numSeeksIndex;
+     //std::cout << "Seeks :: " << numSeeksEdgeDst << " , " << numSeeksEdgeData << " , " << numSeeksIndex << " \n";
+     return numSeeksEdgeDst+numSeeksEdgeData+numSeeksIndex;
+  }
+  uint64_t num_bytes_read(){
+     //std::cout << "Bytes read :: " << numBytesReadEdgeDst << " , " << numBytesReadEdgeData << " , " << numBytesReadIndex << " \n";
+     return numBytesReadEdgeDst+numBytesReadEdgeData+numBytesReadIndex;
   }
   void reset_seek_counters(){
-     numSeeksEdgeDst=numSeeksData=numSeeksIndex=0;
+     numSeeksEdgeDst=numSeeksEdgeData=numSeeksIndex=0;
+     numBytesReadEdgeDst=numBytesReadEdgeData=numBytesReadIndex=0;
   }
 
   OfflineGraph(OfflineGraph&&) = default;

@@ -1773,6 +1773,7 @@ private:
            } else {
              set_subset<SyncFnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            }
+           // TODO: reduce could update the bitset, so it needs to be copied back to the device
          }
        }
      }

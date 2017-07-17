@@ -183,6 +183,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     std::vector<bool> ghosts(g.size());
 
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
       auto ii = ee;
@@ -191,6 +194,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         ghosts[g.getEdgeDst(ii)] = true;
       }
     }
+    timer.stop();
+    fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
     std::cerr << "[" << base_hGraph::id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
     for (uint64_t x = 0; x < g.size(); ++x)
@@ -280,7 +285,13 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-    fprintf(stderr, "Loading edge-data while creating edges.\n");
+    if (base_hGraph::id == 0) {
+      fprintf(stderr, "Loading edge-data while creating edges.\n");
+    }
+
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
 
     uint64_t cur = 0;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
@@ -299,11 +310,21 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
       graph.fixEndEdge(lid, cur);
     }
+
+    timer.stop();
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-    fprintf(stderr, "Loading void edge-data while creating edges.\n");
+    if (base_hGraph::id == 0) {
+      fprintf(stderr, "Loading void edge-data while creating edges.\n");
+    }
+
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
+
     uint64_t cur = 0;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
@@ -320,6 +341,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
       graph.fixEndEdge(lid, cur);
     }
+
+    timer.stop();
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
