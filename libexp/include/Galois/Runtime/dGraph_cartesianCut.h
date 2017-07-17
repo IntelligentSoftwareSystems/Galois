@@ -278,6 +278,9 @@ public:
     uint64_t rowOffset = gid2host[base_hGraph::id].first;
     assert(rowOffset == ((gridRowID() * rowBlockSize) + (gridColumnID() * blockSize)));
 
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
     base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
     for (auto src = gid2host[base_hGraph::id].first; src < gid2host[base_hGraph::id].second; ++src) {
@@ -290,6 +293,8 @@ public:
         numOutgoingEdges[h][src - rowOffset]++;
       }
     }
+    timer.stop();
+    fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -384,6 +389,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
+    g.reset_seek_counters();
 
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
@@ -395,7 +401,7 @@ public:
     ++Galois::Runtime::evilPhase;
 
     timer.stop();
-    std::cout << "[" << base_hGraph::id << "] Edge loading time : " << timer.get_usec()/1000000.0f << " seconds\n";
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
