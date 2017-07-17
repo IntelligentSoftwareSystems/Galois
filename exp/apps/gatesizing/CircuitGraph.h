@@ -10,7 +10,7 @@
 
 struct Node {
   VerilogPin *pin;
-  float slew, totalNetC;
+  float slew, totalNetC, totalPinC;
   float arrivalTime, requiredTime, slack;
   float internalPower, netPower;
   bool isRise;

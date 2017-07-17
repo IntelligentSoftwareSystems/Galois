@@ -91,9 +91,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto& data = g.getData(n, unprotected);
     data.slew = 0.0;
     data.totalNetC = 0.0;
-    data.arrivalTime = 0.0;
-    data.requiredTime = sdc.targetDelay;
-    data.slack = sdc.targetDelay;
+    data.totalPinC = 0.0;
+    data.arrivalTime = std::numeric_limits<float>::infinity();
+    data.requiredTime = std::numeric_limits<float>::infinity();
+    data.slack = std::numeric_limits<float>::infinity();
     data.internalPower = 0.0;
     data.netPower = 0.0;
     data.isRise = false;
@@ -113,15 +114,18 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
   for (auto oe: g.edges(dummySrc)) {
     auto pi = g.getEdgeDst(oe);
     auto& data = g.getData(pi, unprotected);
-    data.slew = sdc.primaryInputSlew;
     data.isPrimaryInput = true;
+    data.arrivalTime = 0.0;
+    data.slew = sdc.primaryInputSlew;
   }
 
   for (auto ie: g.in_edges(dummySink)) {
     auto po = g.getEdgeDst(ie);
     auto& data = g.getData(po, unprotected);
-    data.totalNetC = sdc.primaryOutputTotalNetC;
     data.isPrimaryOutput = true;
+    data.requiredTime = sdc.targetDelay;
+    data.totalPinC = sdc.primaryOutputTotalPinC;
+    data.totalNetC = sdc.primaryOutputTotalNetC;
   }
 
   for (auto n: g) {
@@ -135,6 +139,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
         }
         else if (gate->outPins.count(pin)) {
           data.isGateOutput = true;
+
+          // wires are not changing, so initialize here
+          auto wire = g.getEdgeData(g.edge_begin(n)).wire;
+          data.totalNetC = wire->wireLoad->wireCapacitance(wire->leaves.size());
         }
       }
     }
@@ -164,6 +172,7 @@ void printCircuitGraph(Graph& g) {
 
     std::cout << "  slew = " << data.slew << std::endl;
     std::cout << "  totalNetC = " << data.totalNetC << std::endl;
+    std::cout << "  totalPinC = " << data.totalPinC << std::endl;
     std::cout << "  arrivalTime = " << data.arrivalTime << std::endl;
     std::cout << "  requiredTime = " << data.requiredTime << std::endl;
     std::cout << "  slack = " << data.slack << std::endl;
