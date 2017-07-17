@@ -131,7 +131,8 @@ void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&.
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
-  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
+                      std::make_tuple(args...));
 }
 
 /**

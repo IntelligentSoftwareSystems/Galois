@@ -64,6 +64,7 @@ class DoAllExecutor {
     threads without work go in it.  When all threads are in the queue, stop
   */
 
+  /* Run jobs from begin (b) to end (e) and return the number of jobs run */
   unsigned exec(iterator b, iterator e) {
     unsigned n = 0;
     while (b != e) {
@@ -82,15 +83,16 @@ class DoAllExecutor {
   Substrate::PtrLock<msg> head;
   std::atomic<unsigned> waiting;
   
-  //return true to continue, false to exit
+  // return true to continue, false to exit
   bool wait(iterator& b, iterator& e) {
-    //else, add ourselves to the queue
+    // else, add ourselves to the queue
     msg self;
     self.b = b;
     self.e = e;
     self.exit = false;
     self.next = nullptr;
     self.ready = false;
+
     do {
       self.next = head.getValue();
     } while(!head.CAS(self.next, &self));
@@ -161,9 +163,13 @@ public:
   }
 };
 
+/* Runs the passed in function on a specified range using threads. Work
+ * stealing can be turned on depending on the argument */
 template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
+void do_all_impl(const RangeTy& range, const FunctionTy& f, 
+                 const char* loopname = 0, bool steal = false) {
   reportLoopInstance(loopname);
+
   if (steal) {
     DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
     Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
@@ -178,6 +184,8 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname
   }
 }
 
+/* Calls do_all_impl after parsing the args passed in (e.g. loopname, if you 
+ * should steal work, etc.) */
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
@@ -189,16 +197,19 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
         std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
         std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
+  // Creates a timer for this do_all loop
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
   std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-
   Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
+
   Timer_do_all_impl.start();
+
   do_all_impl(
       r, fn,
       get_by_supertype<loopname_tag>(dtpl).getValue(),
       get_by_supertype<do_all_steal_tag>(dtpl).getValue());
+
   Timer_do_all_impl.stop();
 }
 

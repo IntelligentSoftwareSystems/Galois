@@ -388,7 +388,7 @@ public:
     edgeIndData[n] = e;
   }
 
-  // perform an in-memory tranpose of the graph, replacing the original
+  // perform an in-memory transpose of the graph, replacing the original
   // CSR to CSC
   void transpose() {
     Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
@@ -398,6 +398,7 @@ public:
     EdgeData edgeData_new;
     EdgeIndData edgeIndData_old;
     EdgeIndData edgeIndData_temp;
+
     if (UseNumaAlloc) {
       edgeIndData_old.allocateLocal(numNodes);
       edgeIndData_temp.allocateLocal(numNodes);
@@ -409,28 +410,34 @@ public:
       edgeDst_old.allocateInterleaved(numEdges);
       edgeData_new.allocateInterleaved(numEdges);
     }
+
     Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
       [&](uint32_t n){
         edgeIndData_old[n] = edgeIndData[n];
         edgeIndData_temp[n] = 0;
       }, Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), Galois::numrun("0"));
+
     for (uint64_t e = 0; e < numEdges; ++e) { // parallelization makes this slower
         auto dst = edgeDst[e];
         edgeDst_old[e] = dst;
         ++edgeIndData_temp[dst];
     }
+
     for (uint32_t n = 1; n < numNodes; ++n) {
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
     }
+
     Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
       [&](uint32_t n){
         edgeIndData[n] = edgeIndData_temp[n];
       }, Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), Galois::numrun("0"));
+
     edgeIndData_temp[0] = 0;
     Galois::do_all(boost::counting_iterator<uint32_t>(1), boost::counting_iterator<uint32_t>(numNodes),
       [&](uint32_t n){
         edgeIndData_temp[n] = edgeIndData[n-1];
       }, Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), Galois::numrun("0"));
+
     for (uint32_t src = 0; src < numNodes; ++src) { // parallelization makes this slower
       uint64_t e;
       if (src == 0) e = 0;
@@ -443,6 +450,7 @@ public:
         e++;
       }
     }
+
     if (EdgeData::has_value) {
       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
         [&](uint32_t e){

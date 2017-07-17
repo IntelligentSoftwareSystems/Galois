@@ -36,25 +36,31 @@
 
 using namespace Galois::Substrate;
 
-static void pageIn(void* _ptr, size_t len, size_t pageSize, unsigned numThreads, bool finegrained) {
+/* Access pages on each thread so each thread has local pages 
+ * already loaded */
+static void pageIn(void* _ptr, size_t len, size_t pageSize, 
+                   unsigned numThreads, bool finegrained) {
   char* ptr = static_cast<char*>(_ptr);
+
   if (numThreads == 1) {
     for (size_t x = 0; x < len; x += pageSize / 2)
       ptr[x] = 0;
   } else {
     ThreadPool::getThreadPool().run(numThreads, 
-                        [ptr, len, pageSize, numThreads, finegrained] () 
-                        {
-                          auto myID = ThreadPool::getTID();
-                          if (finegrained) {
-                            for (size_t x  = pageSize * myID; x < len; x += pageSize * numThreads)
-                              ptr[x] = 0;
-                          } else {
-                            for (size_t x = myID * len / numThreads; x < len && x < (myID + 1) * len / numThreads; x+= pageSize)
-                              ptr[x] = 0;
-                          }
-                        }
-                        );
+      [ptr, len, pageSize, numThreads, finegrained] () 
+      {
+        auto myID = ThreadPool::getTID();
+        if (finegrained) {
+          for (size_t x  = pageSize * myID; x < len; x += pageSize * numThreads)
+          ptr[x] = 0;
+        } else {
+          for (size_t x = myID * len / numThreads; 
+               x < len && x < (myID + 1) * len / numThreads; 
+               x += pageSize)
+            ptr[x] = 0;
+        }
+      }
+    );
   }
 }
 
@@ -75,14 +81,16 @@ static size_t roundup (size_t data, size_t mult) {
 }
 
 LAptr Galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThreads) {
-  //round up to hugePageSize
+  // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
 
 #ifdef GALOIS_USE_NUMA
-  //We don't use numa_alloc_interleaved_subset because we really want huge pages
-  //yes this is a comment in a ifdef, but if libnuma improves, this is where the alloc would go
+  // We don't use numa_alloc_interleaved_subset because we really want huge 
+  // pages
+  // yes this is a comment in a ifdef, but if libnuma improves, this is where 
+  // the alloc would go
 #endif
-  //Get a non-prefaulted allocation
+  // Get a non-prefaulted allocation
   void* data = allocPages(bytes/allocSize(), false);
   if (data)
     pageIn(data, bytes, allocSize(), numThreads, true);
@@ -90,9 +98,9 @@ LAptr Galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
 }
 
 LAptr Galois::Substrate::largeMallocLocal(size_t bytes) {
-  //round up to hugePageSize
+  // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
-  //Get a prefaulted allocation
+  // Get a prefaulted allocation
   return LAptr{allocPages(bytes/allocSize(), true), detail::largeFreer{bytes}};
 }
 
@@ -104,9 +112,9 @@ LAptr Galois::Substrate::largeMallocFloating(size_t bytes) {
 }
 
 LAptr Galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
-  //round up to hugePageSize
+  // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
-  //Get a non-prefaulted allocation
+  // Get a non-prefaulted allocation
   void* data = allocPages(bytes/allocSize(), false);
   if (data)
     pageIn(data, bytes, allocSize(), numThreads, false);
