@@ -92,7 +92,7 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     data.slew = 0.0;
     data.totalNetC = 0.0;
     data.totalPinC = 0.0;
-    data.arrivalTime = std::numeric_limits<float>::infinity();
+    data.arrivalTime = 0.0;
     data.requiredTime = std::numeric_limits<float>::infinity();
     data.slack = std::numeric_limits<float>::infinity();
     data.internalPower = 0.0;
@@ -115,7 +115,6 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto pi = g.getEdgeDst(oe);
     auto& data = g.getData(pi, unprotected);
     data.isPrimaryInput = true;
-    data.arrivalTime = 0.0;
     data.slew = sdc.primaryInputSlew;
   }
 
