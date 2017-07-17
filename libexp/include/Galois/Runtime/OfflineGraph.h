@@ -63,30 +63,29 @@ namespace Graph {
 
 
 class OfflineGraph {
-  std::ifstream file1;
-  std::ifstream fileIndex, fileEdgeDst, fileEdgeData;
-  std::streamoff loc1, locIndex, locEdgeData;
+  std::ifstream fileEdgeDst, fileIndex, fileEdgeData;
+  std::streamoff locEdgeDst, locIndex, locEdgeData;
 
   uint64_t numNodes;
   uint64_t numEdges;
   uint64_t sizeEdgeData;
   size_t length;
   bool v2;
-  uint64_t numSeeks1, numSeeksDst, numSeeksData;
+  uint64_t numSeeksEdgeDst, numSeeksIndex, numSeeksData;
 
   Galois::Substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + node)*sizeof(uint64_t);
-    if (loc1 != pos){
-       numSeeks1++;
-      file1.seekg(pos, file1.beg);
-      loc1 = pos;
+    if (locEdgeDst != pos){
+      numSeeksEdgeDst++;
+      fileEdgeDst.seekg(pos, fileEdgeDst.beg);
+      locEdgeDst = pos;
     }
     uint64_t retval;
-    file1.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-    loc1 += file1.gcount();
+    fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+    locEdgeDst += fileEdgeDst.gcount();
     return retval;
   }
 
@@ -94,8 +93,8 @@ class OfflineGraph {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
     if (locIndex != pos){
-       numSeeksDst++;
-       fileIndex.seekg(pos, file1.beg);
+       numSeeksIndex++;
+       fileIndex.seekg(pos, fileEdgeDst.beg);
        locIndex = pos;
     }
     if (v2) {
@@ -121,7 +120,7 @@ class OfflineGraph {
     pos += edge * sizeEdgeData;
     if (locEdgeData != pos){
        numSeeksData++;
-       fileEdgeData.seekg(pos, file1.beg);
+       fileEdgeData.seekg(pos, fileEdgeDst.beg);
        locEdgeData = pos;
     }
     T retval;
@@ -141,36 +140,35 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file1(name, std::ios_base::binary), fileIndex(name, std::ios_base::binary),fileEdgeDst(name, std::ios_base::binary), fileEdgeData(name, std::ios_base::binary),
-     loc1(0), locIndex(0), locEdgeData(0),numSeeks1(0), numSeeksDst(0), numSeeksData(0)
+    :fileEdgeDst(name, std::ios_base::binary), fileIndex(name, std::ios_base::binary), fileEdgeData(name, std::ios_base::binary),
+     locEdgeDst(0), locIndex(0), locEdgeData(0),numSeeksEdgeDst(0), numSeeksIndex(0), numSeeksData(0)
 
   {
-    if (!file1.is_open() || !file1.good()) throw "Bad filename";
+    if (!fileEdgeDst.is_open() || !fileEdgeDst.good()) throw "Bad filename";
     uint64_t ver = 0;
-    file1.read(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
-    file1.read(reinterpret_cast<char*>(&sizeEdgeData), sizeof(uint64_t));
-    file1.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
-    file1.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
+    fileEdgeDst.read(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
+    fileEdgeDst.read(reinterpret_cast<char*>(&sizeEdgeData), sizeof(uint64_t));
+    fileEdgeDst.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
+    fileEdgeDst.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
     if (ver == 0 || ver > 2) throw "Bad Version";
     v2 = ver == 2;
-    if (!file1) throw "Out of data";
+    if (!fileEdgeDst) throw "Out of data";
     //File length
-    file1.seekg(0, file1.end);
-    length = file1.tellg();
+    fileEdgeDst.seekg(0, fileEdgeDst.end);
+    length = fileEdgeDst.tellg();
     if (length < sizeof(uint64_t)*(4+numNodes) + (v2 ? sizeof(uint64_t) : sizeof(uint32_t))*numEdges)
       throw "File too small";
     
-    file1.seekg(0, std::ios_base::beg);
     fileEdgeDst.seekg(0, std::ios_base::beg);
     fileEdgeData.seekg(0, std::ios_base::beg);
     fileIndex.seekg(0, std::ios_base::beg);
   }
   uint64_t num_seeks(){
-     std::cout << "Seeks :: " << numSeeks1 << " , " << numSeeksData << " , " << numSeeksDst << " \n";
-     return numSeeks1+numSeeksData+numSeeksDst;
+     std::cout << "Seeks :: " << numSeeksEdgeDst << " , " << numSeeksData << " , " << numSeeksIndex << " \n";
+     return numSeeksEdgeDst+numSeeksData+numSeeksIndex;
   }
   void reset_seek_counters(){
-     numSeeks1=numSeeksData=numSeeksDst=0;
+     numSeeksEdgeDst=numSeeksData=numSeeksIndex=0;
   }
 
   OfflineGraph(OfflineGraph&&) = default;
