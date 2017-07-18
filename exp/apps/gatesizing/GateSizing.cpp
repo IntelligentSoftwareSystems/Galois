@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
   T.start();
 
   cellLib.read(lib);
-  cellLib.printCellLibDebug();
+//  cellLib.printCellLibDebug();
   std::cout << "parsed cell library" << std::endl;
 
   vModule.read(inputCircuit, &cellLib);
@@ -104,6 +104,8 @@ int main(int argc, char** argv) {
   vModule.writeVerilogModule(outputCircuit);
   std::cout << "wrote modified verilog module" << std::endl;
 
+  auto gStat = getCircuitGraphStatistics(graph);
+  std::cout << gStat.first << " nodes, " << gStat.second << " edges" << std::endl;
   return 0;
 }
 

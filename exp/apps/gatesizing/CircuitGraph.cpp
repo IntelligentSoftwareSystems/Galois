@@ -231,3 +231,11 @@ void printCircuitGraph(Graph& g) {
   } // end for ie
 } // end printCircuitGraph()
 
+std::pair<size_t, size_t> getCircuitGraphStatistics(Graph& g) {
+  size_t numNodes = std::distance(g.begin(), g.end());
+  size_t numEdges = 0;
+  for (auto n: g) {
+    numEdges += std::distance(g.edge_begin(n), g.edge_end(n));
+  }
+  return std::make_pair(numNodes, numEdges);
+}

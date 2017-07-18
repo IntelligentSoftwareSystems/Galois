@@ -1,4 +1,5 @@
 #include <unordered_map>
+#include <utility>
 
 #include "Galois/Graphs/Graph.h"
 
@@ -32,6 +33,7 @@ extern GNode dummySrc, dummySink;
 void constructCircuitGraph(Graph& g, VerilogModule& vModule);
 void initializeCircuitGraph(Graph& g, SDC& sdc);
 void printCircuitGraph(Graph& g);
+std::pair<size_t, size_t> getCircuitGraphStatistics(Graph& g);
 
 #endif // GALOIS_CIRCUIT_GRAPH_H
 
