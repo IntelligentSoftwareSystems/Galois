@@ -84,6 +84,8 @@ void constructCircuitGraph(Graph& g, VerilogModule& vModule) {
       g.getEdgeData(e).wire = wire;
     }
   }
+
+  nodeMap.clear();
 } // end constructCircuitGraph()
 
 void initializeCircuitGraph(Graph& g, SDC& sdc) {
@@ -104,10 +106,7 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     data.isGateOutput = false;
 
     for (auto e: g.edges(n)) {
-      auto& eData = g.getEdgeData(e);
-      eData.delay = 0.0;
-      eData.internalPower = 0.0;
-      eData.netPower = 0.0;
+      g.getEdgeData(e).delay = 0.0;
     }
   }
 
@@ -160,28 +159,27 @@ void printCircuitGraph(Graph& g) {
       std::cout << pin->name;
     }
     else {
-      if (!std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected))) {
-        std::cout << "dummySink";
-      }
-      else if (!std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected))) {
-        std::cout << "dummySrc";
-      }
+      std::cout << ((n == dummySink) ? "dummySink" : "dummySrc");
     }
     std::cout << std::endl;
 
-    std::cout << "  slew = " << data.slew << std::endl;
-    std::cout << "  totalNetC = " << data.totalNetC << std::endl;
-    std::cout << "  totalPinC = " << data.totalPinC << std::endl;
-    std::cout << "  arrivalTime = " << data.arrivalTime << std::endl;
-    std::cout << "  requiredTime = " << data.requiredTime << std::endl;
-    std::cout << "  slack = " << data.slack << std::endl;
-    std::cout << "  internalPower = " << data.internalPower << std::endl;
-    std::cout << "  netPower = " << data.netPower << std::endl;
-    std::cout << "  isRise = " << ((data.isRise) ? "true" : "false") << std::endl;
-    std::cout << "  isPrimaryInput = " << ((data.isPrimaryInput) ? "true" : "false") << std::endl;
-    std::cout << "  isPrimaryOutput = " << ((data.isPrimaryOutput) ? "true" : "false") << std::endl;
-    std::cout << "  isGateInput = " << ((data.isGateInput) ? "true" : "false") << std::endl;
-    std::cout << "  isGateOutput = " << ((data.isGateOutput) ? "true" : "false") << std::endl;
+    if (data.isPrimaryInput || data.isGateInput) {
+      std::cout << "  type = " << ((data.isPrimaryInput) ? "primary" : "gate") << " input" << std::endl;
+      std::cout << "  slew = " << data.slew << std::endl;
+    }
+    if (data.isGateOutput || data.isPrimaryOutput) {
+      std::cout << "  type = " << ((data.isPrimaryOutput) ? "primary" : "gate") << " output" << std::endl;
+      std::cout << "  totalNetC = " << data.totalNetC << std::endl;
+      std::cout << "  totalPinC = " << data.totalPinC << std::endl;
+      std::cout << "  internalPower = " << data.internalPower << std::endl;
+      std::cout << "  netPower = " << data.netPower << std::endl;
+    }
+    if (n != dummySrc && n != dummySink) {
+      std::cout << "  arrivalTime = " << data.arrivalTime << std::endl;
+      std::cout << "  requiredTime = " << data.requiredTime << std::endl;
+      std::cout << "  slack = " << data.slack << std::endl;
+      std::cout << "  isRise = " << ((data.isRise) ? "true" : "false") << std::endl;
+    }
 
     for (auto oe: g.edges(n)) {
       auto toPin = g.getData(g.getEdgeDst(oe), unprotected).pin;
@@ -204,8 +202,6 @@ void printCircuitGraph(Graph& g) {
       }
       else {
         std::cout << "    delay = " << eData.delay << std::endl;
-        std::cout << "    internalPower = " << eData.internalPower << std::endl;
-        std::cout << "    netPower = " << eData.netPower << std::endl;
       }
    } // end for oe
 
@@ -230,8 +226,6 @@ void printCircuitGraph(Graph& g) {
       }
       else {
         std::cout << "    delay = " << eData.delay << std::endl;
-        std::cout << "    internalPower = " << eData.internalPower << std::endl;
-        std::cout << "    netPower = " << eData.netPower << std::endl;
       }
     }
   } // end for ie

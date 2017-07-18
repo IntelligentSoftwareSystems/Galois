@@ -20,7 +20,6 @@ struct Node {
 struct Edge {
   VerilogWire *wire;
   float delay;
-  float internalPower, netPower;
 };
 
 typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
