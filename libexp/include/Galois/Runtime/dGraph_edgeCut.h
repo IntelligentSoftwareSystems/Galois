@@ -35,7 +35,8 @@
 //class hGraph;
 
 
-template<typename NodeTy, typename EdgeTy, bool isBipartite = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool isBipartite = false, 
+         bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   public:
@@ -91,7 +92,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     // Return if gid is Owned by local host.
     bool isOwned(uint64_t gid) const {
       return gid >= globalOffset && gid < globalOffset + numOwned_withEdges;
-      if(isBipartite){
+      if (isBipartite) {
         if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
           return true;
       }
@@ -104,12 +105,16 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
 
+    /**
+     * Constructor for hGraph_edgeCut
+     */
     hGraph_edgeCut(const std::string& filename, 
                    const std::string& partitionFolder, 
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned> scalefactor, 
-                   bool transpose = false) : 
+                   bool transpose = false,
+                   bool find_thread_ranges = false) : 
                     base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
 
       Galois::Statistic statGhostNodes("TotalGhostNodes");
@@ -249,6 +254,17 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
+
+    if (!find_thread_ranges) {
+      base_hGraph::thread_ranges = nullptr;
+    } else {
+      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+
+      StatTimer_thread_ranges.start();
+      base_hGraph::determine_thread_ranges();
+      StatTimer_thread_ranges.stop();
+    }
+
     StatTimer_graph_construct.stop();
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
@@ -366,6 +382,16 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   uint64_t get_local_total_nodes() const {
     return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
+  }
+
+  /**
+   * Gets the thread ranges object that specifies division of labor for threads
+   *
+   * @returns An array of iterators specifying where a thread should begin
+   * work.
+   */
+  typename base_hGraph::const_iterator* get_thread_ranges() const {
+    return base_hGraph::get_thread_ranges();
   }
 
   void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {

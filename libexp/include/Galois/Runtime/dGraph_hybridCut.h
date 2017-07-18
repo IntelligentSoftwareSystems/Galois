@@ -199,8 +199,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
 
-    hGraph_vertexCut(const std::string& filename, const std::string& partitionFolder,unsigned host, unsigned _numHosts, std::vector<unsigned> scalefactor, bool transpose = false, uint32_t VCutTheshold = 100, bool bipartite = false) :  base_hGraph(host, _numHosts) {
-
+    /**
+     * Constructor for Vertex Cut
+     */
+    hGraph_vertexCut(const std::string& filename, 
+               const std::string& partitionFolder,
+               unsigned host, unsigned _numHosts, 
+               std::vector<unsigned> scalefactor, 
+               bool transpose = false, 
+               uint32_t VCutTheshold = 100, 
+               bool bipartite = false,
+               bool find_thread_ranges = false) : base_hGraph(host, _numHosts) {
       if (!scalefactor.empty()) {
         if (base_hGraph::id == 0) {
           std::cerr << "WARNING: scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n";
@@ -342,6 +351,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       }
 
+      if (!find_thread_ranges) {
+        base_hGraph::thread_ranges = nullptr;
+      } else {
+        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+  
+        StatTimer_thread_ranges.start();
+        base_hGraph::determine_thread_ranges();
+        StatTimer_thread_ranges.stop();
+      }
 
       /*****************************************
        * Communication PreProcessing:
@@ -859,6 +877,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint64_t get_local_total_nodes() const {
       return (base_hGraph::numOwned);
     }
+
+    /**
+     * Gets the thread ranges object that specifies division of labor for threads
+     *
+     * @returns An array of iterators specifying where a thread should begin
+     * work.
+     */
+    typename base_hGraph::const_iterator* get_thread_ranges() const {
+      return base_hGraph::get_thread_ranges();
+    }
+
 
     void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
       size_t first_owned = G2L(gid2host[base_hGraph::id].first);

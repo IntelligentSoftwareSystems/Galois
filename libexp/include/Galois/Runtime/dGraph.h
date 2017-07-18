@@ -79,28 +79,29 @@ enum ReadLocation { readSource, readDestination, readAny };
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
 
-  public:
-   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
-   typedef typename std::conditional<BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
+ public:
+  typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
+  typedef typename std::conditional<BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
+  typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
 
-   enum SyncType { syncReduce, syncBroadcast };
+  enum SyncType { syncReduce, syncBroadcast };
 
-   GraphTy graph;
-   bool transposed;
-   bool round;
-   uint64_t totalNodes; // Total nodes in the complete graph.
-   uint64_t totalEdges;
-   uint64_t totalMirrorNodes; // Total mirror nodes from others.
-   uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
-   uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-   uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-   uint32_t total_isolatedNodes; // Calculate the total isolated nodes
-   uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
-   const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
-   const uint32_t numHosts;
-   //ghost cell ID translation
+  GraphTy graph;
+  bool transposed;
+  bool round;
+  uint64_t totalNodes; // Total nodes in the complete graph.
+  uint64_t totalEdges;
+  uint64_t totalMirrorNodes; // Total mirror nodes from others.
+  uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
+  uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint32_t total_isolatedNodes; // Calculate the total isolated nodes
+  uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
+  const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
+  const uint32_t numHosts;
+  //ghost cell ID translation
+
 
   //memoization optimization
   std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
@@ -267,6 +268,8 @@ public:
    typedef typename GraphTy::const_local_iterator const_local_iterator;
    typedef typename GraphTy::edge_iterator edge_iterator;
 
+   // used to track division of labor for threads in this partition
+   iterator* thread_ranges;
 
    //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
    hGraph(unsigned host, unsigned numHosts) :
@@ -435,70 +438,227 @@ public:
 
 #endif
 
-   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = getDataImpl<BSPNode>(N, mflag);
-//    auto i =Galois::Runtime::NetworkInterface::ID;
-      //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
-      return r;
-   }
+  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//  auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
 
-   const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
-      auto& r = getDataImpl<BSPNode>(N, mflag);
-//    auto i =Galois::Runtime::NetworkInterface::ID;
-      //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
-      return r;
-   }
-   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      return getEdgeDataImpl<BSPEdge>(ni, mflag);
-   }
+  const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//  auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
+  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+    return getEdgeDataImpl<BSPEdge>(ni, mflag);
+  }
 
-   GraphNode getEdgeDst(edge_iterator ni) {
-      return graph.getEdgeDst(ni);
-   }
+  GraphNode getEdgeDst(edge_iterator ni) {
+    return graph.getEdgeDst(ni);
+  }
 
-   edge_iterator edge_begin(GraphNode N) {
-      return graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED);
-   }
+  edge_iterator edge_begin(GraphNode N) {
+    return graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED);
+  }
 
-   edge_iterator edge_end(GraphNode N) {
-      return graph.edge_end(N);
-   }
+  edge_iterator edge_end(GraphNode N) {
+    return graph.edge_end(N);
+  }
 
-   size_t size() const {
-      return graph.size();
-   }
-   size_t sizeEdges() const {
-      return graph.sizeEdges();
-   }
+  size_t size() const {
+    return graph.size();
+  }
 
-   const_iterator begin() const {
-      return graph.begin();
-   }
-   iterator begin() {
-      return graph.begin();
-   }
+  size_t sizeEdges() const {
+    return graph.sizeEdges();
+  }
 
-   const_iterator end() const {
-      if (transposed) return graph.end();
-      return graph.begin() + numOwned;
-   }
-   iterator end() {
-      if (transposed) return graph.end();
-      return graph.begin() + numOwned;
-   }
+  const_iterator begin() const {
+    return graph.begin();
+  }
 
-   const_iterator ghost_begin() const {
-      return end();
-   }
-   iterator ghost_begin() {
-      return end();
-   }
-   const_iterator ghost_end() const {
-      return graph.end();
-   }
-   iterator ghost_end() {
-      return graph.end();
-   }
+  iterator begin() {
+    return graph.begin();
+  }
+
+  const_iterator end() const {
+    if (transposed) return graph.end();
+    return graph.begin() + numOwned;
+  }
+
+  iterator end() {
+    if (transposed) return graph.end();
+    return graph.begin() + numOwned;
+  }
+
+  const_iterator ghost_begin() const {
+    return end();
+  }
+
+  iterator ghost_begin() {
+    return end();
+  }
+
+  const_iterator ghost_end() const {
+    return graph.end();
+  }
+
+  iterator ghost_end() {
+    return graph.end();
+  }
+
+
+  /** 
+   * Call after graph is completely constructed. Attempts to more evenly 
+   * distribute nodes among threads by checking the number of edges per
+   * node and determining where each thread should start. 
+   * This should only be done once after graph construction to prevent
+   * too much overhead.
+   **/
+  void determine_thread_ranges() {
+    uint32_t num_threads = Galois::Runtime::activeThreads;
+
+    thread_ranges = (iterator*)malloc(sizeof(iterator) * (num_threads + 1));
+    assert(thread_ranges != nullptr);
+
+    printf("[%u] num owned edges is %lu\n", id, graph.sizeEdges());
+
+    // theoretically how many edges we want to distributed to each thread
+    uint64_t edges_per_thread = graph.sizeEdges() / num_threads;
+
+    printf("[%u] want %lu edges per thread\n", id, edges_per_thread);
+
+    // Case where there are less nodes than threads
+    if (num_threads > graph.end() - graph.begin()) {
+      iterator current_node = graph.begin();
+      uint64_t num_nodes = graph.end() - current_node;
+      
+      // assign one node per thread (note not all nodes will get a thread in
+      // this case
+      thread_ranges[0] = current_node;
+      for (uint32_t i = 0; i < num_nodes; i++) {
+        thread_ranges[i+1] = ++current_node;
+      }
+
+      // deal with remainder threads
+      for (uint32_t i = num_nodes; i < num_threads; i++) {
+        thread_ranges[i+1] = graph.end();
+      }
+
+      return;
+    }
+
+    // Single node case
+    if (num_threads == 1) {
+      thread_ranges[0] = graph.begin();
+      thread_ranges[1] = graph.end();
+      return;
+    }
+
+
+    uint32_t current_thread = 0;
+    uint64_t current_edge_count = 0;
+    iterator current_local_node = graph.begin();
+
+    thread_ranges[current_thread] = graph.begin();
+
+    printf("[%u] going to determine thread ranges\n", id);
+
+    while (current_local_node != graph.end() && current_thread != num_threads) {
+      uint32_t nodes_remaining = graph.end() - current_local_node;
+      uint32_t threads_remaining = num_threads - current_thread;
+     
+      assert(nodes_remaining >= threads_remaining);
+
+      if (threads_remaining == 1) {
+        // give the rest of the nodes to this thread and get out
+        // TODO
+        printf("[%u] Thread %u has %lu edges and %ld nodes (only 1 thread)\n",
+               id, current_thread, 
+               graph.edge_end(*(graph.end() - 1)) -
+               graph.edge_begin(*(thread_ranges[current_thread])),
+               graph.end() - thread_ranges[current_thread]);
+
+        thread_ranges[current_thread + 1] = graph.end();
+
+        break;
+      } else if ((graph.end() - current_local_node) == threads_remaining) {
+        // Out of nodes to assign: finish up assignments (at this point,
+        // each remaining thread gets 1 node) and break
+
+        printf("Out of nodes: assigning the rest of the nodes to remaining "
+               "threads\n");
+        for (uint32_t i = 0; i < threads_remaining; i++) {
+          printf("[%u] Thread %u has %lu edges and %ld nodes (oon)\n",
+                 id, current_thread, 
+                 graph.edge_end(*current_local_node) -
+                 graph.edge_begin(*(thread_ranges[current_thread])),
+                 current_local_node + 1 - thread_ranges[current_thread]);
+
+          thread_ranges[++current_thread] = ++current_local_node;
+        }
+
+        assert(current_local_node == graph.end());
+        assert(current_thread == num_threads);
+        break;
+      }
+
+      uint64_t num_edges = std::distance(graph.edge_begin(*current_local_node), 
+                                         graph.edge_end(*current_local_node));
+
+      current_edge_count += num_edges;
+      //printf("[%u] node %u has %lu edges\n", id, *current_local_node, num_edges);
+      //printf("[%u] cur edge count is %lu\n", id, current_edge_count);
+
+      // TODO clean this code up to make it simpler
+      // TODO determine better thresholds
+      if (num_edges > (3 * edges_per_thread / 4)) {
+        if (current_edge_count - num_edges <= (edges_per_thread / 4)) {
+          // if this thread currently doesn't have too many edges, then
+          // go ahead and assign to this thread (i.e. do nothing and let
+          // execution continue normally)
+
+          //printf("[%u] big one to thread %u\n", id, current_thread);
+        } else {
+          printf("[%u] Thread %u has %lu edges and %ld nodes (big)\n",
+                 id, current_thread, current_edge_count - num_edges,
+                 current_local_node - thread_ranges[current_thread]);
+
+          // else, assign to the NEXT thread (i.e. end this thread and move
+          // on to the next)
+          // beginning of next thread is current local node (the big one)
+          thread_ranges[current_thread + 1] = current_local_node;
+          current_thread++;
+
+          current_edge_count = 0;
+          // go back to beginning of loop without incrementing
+          // current_local_node so the loop can handle this next node
+          continue;
+        }
+      }
+
+      if (current_edge_count >= edges_per_thread) {
+        printf("[%u] Thread %u has %lu edges and %ld nodes (over)\n",
+               id, current_thread, current_edge_count,
+               current_local_node + 1 - thread_ranges[current_thread]);
+
+        // This thread has enough edges; save end of this node and move on
+        // mark beginning of next thread as the next node
+        thread_ranges[current_thread + 1] = current_local_node + 1;
+        current_edge_count = 0;
+        current_thread++;
+      } 
+      
+      current_local_node++;
+    }
+
+    // sanity checks
+    assert(thread_ranges[0] == graph.begin());
+    assert(thread_ranges[num_threads] == graph.end());
+    printf("[%u] ranges found\n", id);
+  }
 
   void exchange_info_init(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -2709,26 +2869,37 @@ public:
 #endif
 
 
-   uint64_t get_totalEdges() const {
-	   return totalEdges;
-   }
-   void reset_num_iter(uint32_t runNum){
-      num_run = runNum;
-   }
-   uint32_t get_run_num() {
-     return num_run;
-   }
-   void set_num_iter(uint32_t iteration){
+  uint64_t get_totalEdges() const {
+    return totalEdges;
+  }
+  void reset_num_iter(uint32_t runNum){
+     num_run = runNum;
+  }
+  uint32_t get_run_num() {
+    return num_run;
+  }
+  void set_num_iter(uint32_t iteration){
     num_iteration = iteration;
-   }
+  }
 
-   std::string get_run_identifier(){
+  std::string get_run_identifier(){
     return std::string(std::to_string(num_run) + "_" + std::to_string(num_iteration));
-   }
-   /** Report stats to be printed.**/
-   void reportStats(){
+  }
+  /** Report stats to be printed.**/
+  void reportStats(){
     statGhostNodes.report();
-   }
+  }
+
+  /**
+   * Gets the thread ranges object that specifies division of labor for threads
+   *
+   * @returns An array of iterators specifying where a thread should begin
+   * work; const version.
+   */
+  const_iterator* get_thread_ranges() const {
+    assert(thread_ranges != nullptr);
+    return thread_ranges;
+  }
 
   void save_local_graph(std::string folder_name, std::string local_file_name){
 
