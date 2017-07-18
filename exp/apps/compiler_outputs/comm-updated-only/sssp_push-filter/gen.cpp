@@ -84,9 +84,6 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
-static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
-static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
-
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
@@ -422,12 +419,6 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
-    if (numPipelinedPhases > 1) {
-      numPipelinedPhases = 1;
-      if (net.ID == 0) {
-        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
-      }
-    }
     if (enableVCut){
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
