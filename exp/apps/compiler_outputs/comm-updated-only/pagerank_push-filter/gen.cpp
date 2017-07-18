@@ -415,6 +415,7 @@ struct PageRankSanity {
   static Galois::DGAccumulator<float> DGAccumulator_max;
   static Galois::DGAccumulator<float> DGAccumulator_min;
   static Galois::DGAccumulator<float> DGAccumulator_sum;
+  static Galois::DGAccumulator<float> DGAccumulator_sum_residual;
 
   PageRankSanity(Graph* _graph) : graph(_graph){}
 
@@ -430,6 +431,7 @@ struct PageRankSanity {
     DGAccumulator_max.reset();
     DGAccumulator_min.reset();
     DGAccumulator_sum.reset();
+    DGAccumulator_sum_residual.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
                    PageRankSanity(&_graph), 
@@ -441,12 +443,14 @@ struct PageRankSanity {
     float max_rank = DGAccumulator_max.reduce_max();
     float min_rank = DGAccumulator_min.reduce_min();
     float rank_sum = DGAccumulator_sum.reduce();
+    float residual_sum = DGAccumulator_sum_residual.reduce();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
       printf("Max rank is %f\n", max_rank);
       printf("Min rank is %f\n", min_rank);
       printf("Rank sum is %f\n", rank_sum);
+      printf("Residual sum is %f\n", residual_sum);
     }
   }
   
@@ -465,12 +469,14 @@ struct PageRankSanity {
       }
 
       DGAccumulator_sum += src_data.value;
+      DGAccumulator_sum_residual += src_data.residual;
     }
   }
 };
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum;
+Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum_residual;
 float PageRankSanity::current_max = 0;
 float PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
 
