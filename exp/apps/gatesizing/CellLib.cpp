@@ -15,6 +15,12 @@ static T linearInterpolate(T x1, T x2, T x3, T y1, T y3) {
 template<typename T>
 static std::pair<size_t, size_t> findBound(T v, std::vector<T>& array) {
   auto upper = std::upper_bound(array.begin(), array.end(), v);
+  if (upper == array.end()) {
+    return std::make_pair(array.size()-1, array.size()-1);
+  }
+  if (upper == array.begin()) {
+    return std::make_pair(0,0);
+  }
   auto upperIndex = std::distance(array.begin(), upper);
   auto lowerIndex = upperIndex - 1;
   return std::make_pair(lowerIndex, upperIndex);
@@ -22,7 +28,18 @@ static std::pair<size_t, size_t> findBound(T v, std::vector<T>& array) {
 
 float WireLoad::wireCapacitance(size_t deg) {
   auto b = findBound(deg, fanout);
-  auto len = linearInterpolate((float)fanout[b.first], (float)deg, (float)fanout[b.second], length[b.first], length[b.second]);
+  float len;
+  if (b.first != b.second) {
+    len = linearInterpolate((float)fanout[b.first], (float)deg, (float)fanout[b.second], length[b.first], length[b.second]);
+  }
+  // out of lower bound
+  else if (0 == b.second) {
+    len = 0.0;
+  }
+  // out of upper bound
+  else {
+    len = length[b.second] + (deg - fanout[b.second]) * slope;
+  }
   return capacitance * len;
 }
 
