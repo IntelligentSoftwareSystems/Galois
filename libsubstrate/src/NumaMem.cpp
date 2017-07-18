@@ -36,8 +36,8 @@
 
 using namespace Galois::Substrate;
 
-/* Access pages on each thread so each thread has local pages 
- * already loaded */
+/* Access pages on each thread so each thread has some pages already loaded 
+ * (preferably ones it will use) */
 static void pageIn(void* _ptr, size_t len, size_t pageSize, 
                    unsigned numThreads, bool finegrained) {
   char* ptr = static_cast<char*>(_ptr);
@@ -47,13 +47,19 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize,
       ptr[x] = 0;
   } else {
     ThreadPool::getThreadPool().run(numThreads, 
-      [ptr, len, pageSize, numThreads, finegrained] () 
+     [ptr, len, pageSize, numThreads, finegrained] () 
       {
         auto myID = ThreadPool::getTID();
+
         if (finegrained) {
+          // round robin page distribution among threads (e.g. thread 0 gets
+          // a page, then thread 1, then thread n, then back to thread 0 and 
+          // so on until the end of the region)
           for (size_t x  = pageSize * myID; x < len; x += pageSize * numThreads)
-          ptr[x] = 0;
+            ptr[x] = 0;
         } else {
+          // sectioned page distribution (e.g. thread 0 gets first chunk, thread
+          // 1 gets next chunk, ... last thread gets last chunk)
           for (size_t x = myID * len / numThreads; 
                x < len && x < (myID + 1) * len / numThreads; 
                x += pageSize)
@@ -72,7 +78,7 @@ void Galois::Substrate::detail::largeFreer::operator()(void* ptr) const {
   largeFree(ptr, bytes);
 }
 
-//round data to a multiple of mult
+// round data to a multiple of mult
 static size_t roundup (size_t data, size_t mult) {
   auto rem = data % mult;
   if (!rem)
@@ -92,8 +98,16 @@ LAptr Galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
 #endif
   // Get a non-prefaulted allocation
   void* data = allocPages(bytes/allocSize(), false);
+
+  // Then page in based on thread number
   if (data)
+    // false = chunked paging
+    // true = round robin paging
+    // (see comments above for details)
+
+    //pageIn(data, bytes, allocSize(), numThreads, false);
     pageIn(data, bytes, allocSize(), numThreads, true);
+
   return LAptr{data, detail::largeFreer{bytes}};
 }
 
@@ -105,9 +119,9 @@ LAptr Galois::Substrate::largeMallocLocal(size_t bytes) {
 }
 
 LAptr Galois::Substrate::largeMallocFloating(size_t bytes) {
-  //round up to hugePageSize
+  // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
-  //Get a non-prefaulted allocation
+  // Get a non-prefaulted allocation
   return LAptr{allocPages(bytes/allocSize(), false), detail::largeFreer{bytes}};
 }
 
