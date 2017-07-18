@@ -366,12 +366,22 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, 
+                         Galois::loopname("PageRank"), 
+                         Galois::write_set("reduce", "this->graph", 
+                                           "struct NodeData &", 
+                                           "struct PR_NodeData &" , "residual", 
+                                           "float" , "add",  "0"), 
+                         Galois::numrun(_graph.get_run_identifier()));
         }
-    _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
-    
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
-    ++_num_iterations;
+      _graph.sync<writeDestination, readSource, Reduce_add_residual, 
+                  Broadcast_residual, Bitset_residual>("PageRank");
+      
+      Galois::Runtime::reportStat("(NULL)", 
+          "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+          (unsigned long)DGAccumulator_accum.read_local(), 0);
+
+      ++_num_iterations;
     } while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
@@ -407,6 +417,7 @@ Galois::DGAccumulator<int> PageRank::DGAccumulator_accum;
 
 // gets rank max, min and sum across all nodes
 struct PageRankSanity {
+  cll::opt<float>& local_tolerance;
   Graph* graph;
 
   static float current_max;
@@ -416,8 +427,10 @@ struct PageRankSanity {
   static Galois::DGAccumulator<float> DGAccumulator_min;
   static Galois::DGAccumulator<float> DGAccumulator_sum;
   static Galois::DGAccumulator<float> DGAccumulator_sum_residual;
+  static Galois::DGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance;
 
-  PageRankSanity(Graph* _graph) : graph(_graph){}
+  PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph) : 
+    local_tolerance(_local_tolerance), graph(_graph) {}
 
   void static go(Graph& _graph) {
   #ifdef __GALOIS_HET_CUDA__
@@ -432,9 +445,10 @@ struct PageRankSanity {
     DGAccumulator_min.reset();
     DGAccumulator_sum.reset();
     DGAccumulator_sum_residual.reset();
+    DGAccumulator_residual_over_tolerance.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   PageRankSanity(&_graph), 
+                   PageRankSanity(tolerance, &_graph), 
                    Galois::loopname("PageRankSanity"));
 
     DGAccumulator_max = current_max;
@@ -444,6 +458,7 @@ struct PageRankSanity {
     float min_rank = DGAccumulator_min.reduce_min();
     float rank_sum = DGAccumulator_sum.reduce();
     float residual_sum = DGAccumulator_sum_residual.reduce();
+    uint64_t over_tolerance = DGAccumulator_residual_over_tolerance.reduce();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
@@ -451,6 +466,7 @@ struct PageRankSanity {
       printf("Min rank is %f\n", min_rank);
       printf("Rank sum is %f\n", rank_sum);
       printf("Residual sum is %f\n", residual_sum);
+      printf("# nodes with residual over tolerance is %lu\n", over_tolerance);
     }
   }
   
@@ -468,15 +484,21 @@ struct PageRankSanity {
         current_min = src_data.value;
       }
 
+      if (src_data.residual > local_tolerance) {
+        DGAccumulator_residual_over_tolerance += 1;
+      }
+
       DGAccumulator_sum += src_data.value;
       DGAccumulator_sum_residual += src_data.residual;
     }
   }
 };
+
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum_residual;
+Galois::DGAccumulator<uint64_t> PageRankSanity::DGAccumulator_residual_over_tolerance;
 float PageRankSanity::current_max = 0;
 float PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
 
