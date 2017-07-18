@@ -92,6 +92,12 @@ static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut.
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
 
+static cll::opt<bool> doAllEdge("doAllEdge", 
+                                cll::desc("Specify if you want certain do-alls "
+                                "to divide work using edges as a metric"),
+                                cll::init(false));
+
+
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -251,13 +257,21 @@ struct BFS {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
+    {
+      if (!doAllEdge) {
       Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
         Galois::loopname("BFS"), 
         Galois::write_set("reduce", "this->graph", "struct NodeData &", 
           "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""),
         Galois::numrun(_graph.get_run_identifier()));
+      } else {
+        Galois::do_all_range(_graph.begin(), _graph.end(), _graph.get_thread_ranges(),
+          BFS (&_graph), Galois::loopname("BFS"), 
+          Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+            "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""),
+          Galois::numrun(_graph.get_run_identifier()));
       }
+    }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
@@ -431,14 +445,16 @@ int main(int argc, char** argv) {
     if (enableVCut) {
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, doAllEdge);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold);
+                                 scalefactor, transpose, VCutThreshold,
+                                 false, // bipartite argument
+                                 doAllEdge);
     }
     else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scalefactor, transpose);
+                             scalefactor, transpose, doAllEdge);
     }
 
 #ifdef __GALOIS_HET_CUDA__

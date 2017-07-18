@@ -20,7 +20,8 @@
  *
  * @section Description
  *
- * Compute Betweeness-Centrality on distributed Galois 
+ * Compute Betweeness-Centrality on distributed Galois using, at the moment,
+ * BFS (NOT SSSP) for distances
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -128,6 +129,11 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                           "betweeness-centraility"),
                                 cll::init(0));
 
+static cll::opt<bool> doAllEdge("doAllEdge", 
+                                cll::desc("Specify if you want certain do-alls "
+                                "to divide work using edges as a metric"),
+                                cll::init(false));
+
 
 #ifdef __GALOIS_HET_CUDA__
 // If running on both CPUs and GPUs, below is included
@@ -193,10 +199,17 @@ struct NodeData {
 };
 
 // second type (unsigned int) is for edge weights
-typedef hGraph<NodeData, unsigned int> Graph;
-typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
+// activate if you want to use sssp
+//typedef hGraph<NodeData, unsigned int> Graph;
+//typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
+//typedef hGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
+//typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
+
+// no edge data = bfs not sssp
+typedef hGraph<NodeData, void> Graph;
+typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
 
@@ -470,7 +483,8 @@ struct FirstIterationSSSP {
       //printf("dest %lu, old length %u\n", graph->getGID(dst), 
       //                                   dst_data.current_length.load());
  
-      // For SSSP (uses the edge weight)
+      // For SSSP (uses the edge weight; you need to change the graph edge
+      // type as well in the declaration above)
       //unsigned int new_dist = graph->getEdgeData(current_edge) + 
       //                        src_data.current_length;
       // BFS 
@@ -517,18 +531,25 @@ struct SSSP {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
+      {
       //if (_graph.isLocal(21848)) {
       //  printf("[%u]is 21848 set; before operator? %d, owned %d\n", _graph.id, 
       //         bitset_current_length.test(_graph.getLID(21848)),
       //         _graph.isOwned(21848));
       //}
-      Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
-                     Galois::loopname("SSSP"),
-                     Galois::numrun("0"));
-                     //Galois::numrun(_graph.get_run_identifier()));
-      //Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
-      //               Galois::loopname("SSSP"));
-      
+      if (!doAllEdge) {
+        Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
+                       Galois::loopname("SSSP"),
+                       Galois::numrun("0"));
+                       //Galois::numrun(_graph.get_run_identifier()));
+      } else {
+        Galois::do_all_range(_graph.begin(), _graph.end(), 
+                       _graph.get_thread_ranges(),
+                       SSSP(&_graph), 
+                       Galois::loopname("SSSP"),
+                       Galois::numrun("0"));
+      }
+      }
 
       iterations++;
 
@@ -645,13 +666,22 @@ struct PredAndSucc {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(infinity, &_graph), 
-                   Galois::loopname("PredAndSucc"),
-                   Galois::numrun("0"));
-                   //Galois::numrun(_graph.get_run_identifier()));
     //Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(&_graph), 
     //               Galois::loopname("PredAndSucc"));
-    
+    {
+    if (!doAllEdge) {
+      Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(infinity, &_graph), 
+                     Galois::loopname("PredAndSucc"),
+                     Galois::numrun("0"));
+                     //Galois::numrun(_graph.get_run_identifier()));
+    } else {
+      Galois::do_all_range(_graph.begin(), _graph.end(), 
+                     _graph.get_thread_ranges(),
+                     PredAndSucc(infinity, &_graph), 
+                     Galois::loopname("PredAndSucc"),
+                     Galois::numrun("0"));
+    }
+    }
 
     // sync for use in NumShortPath calculation
     _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors, 
@@ -851,6 +881,8 @@ struct NumShortestPaths {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
+    {  
+      if (!doAllEdge) {
       Galois::do_all(_graph.begin(), _graph.end(), 
                      NumShortestPaths(infinity, &_graph), 
                      Galois::loopname("NumShortestPaths"),
@@ -859,7 +891,14 @@ struct NumShortestPaths {
       //Galois::do_all(_graph.begin(), _graph.end(), 
       //               NumShortestPaths(&_graph), 
       //               Galois::loopname("NumShortestPaths"));
-
+      } else {
+        Galois::do_all_range(_graph.begin(), _graph.end(), 
+                       _graph.get_thread_ranges(),
+                       NumShortestPaths(infinity, &_graph), 
+                       Galois::loopname("NumShortestPaths"),
+                       Galois::numrun("0"));
+      }
+    }
       _graph.sync<writeDestination, readSource, Reduce_add_trim, 
                   Broadcast_trim, Bitset_trim>("NumShortestPaths_trim");
 
@@ -1124,15 +1163,24 @@ struct DependencyPropogation {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      Galois::do_all(_graph.begin(), _graph.end(), 
-                     DependencyPropogation(infinity, current_src_node, &_graph), 
-                     Galois::loopname("DependencyPropogation"),
-                     Galois::numrun("0"));
-                     //Galois::numrun(_graph.get_run_identifier()));
+    {
+      if (!doAllEdge) {
+        Galois::do_all(_graph.begin(), _graph.end(), 
+                       DependencyPropogation(infinity, current_src_node, &_graph), 
+                       Galois::loopname("DependencyPropogation"),
+                       Galois::numrun("0"));
+                       //Galois::numrun(_graph.get_run_identifier()));
       //Galois::do_all(_graph.begin(), _graph.end(), 
       //               DependencyPropogation(current_src_node, &_graph), 
       //               Galois::loopname("DependencyPropogation"));
-                     
+      } else {
+        Galois::do_all_range(_graph.begin(), _graph.end(), _graph.get_thread_ranges(),
+                       DependencyPropogation(infinity, current_src_node, &_graph), 
+                       Galois::loopname("DependencyPropogation"),
+                       Galois::numrun("0"));
+      }
+    }
+                    
 
     //if (personality == GPU_CUDA) {
     //  char test[100];
@@ -1350,14 +1398,18 @@ struct BC {
     }
     printf("start is %lu, end is %lu\n", start_i, end_i);
 
+    Galois::StatTimer StatTimerProgress("PRINT_PROGRESS");
+
     for (uint64_t i = start_i; i < end_i; i++) {
       current_src_node = i;
 
+      StatTimerProgress.start();
       if (_graph.id == 0) {
         if (i % 5000 == 0) {
           std::cout << "SSSP source node " << i << "\n";
         }
       }
+      StatTimerProgress.stop();
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -1479,13 +1531,15 @@ int main(int argc, char** argv) {
     if (enableVCut) {
       if (vertexcut == CART_VCUT)
         h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                         scalefactor, transpose);
+                                         scalefactor, transpose, doAllEdge);
       else if (vertexcut == PL_VCUT)
         h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                      scalefactor, transpose, VCutThreshold);
+                                      scalefactor, transpose, VCutThreshold, 
+                                      false, // argument for bipartite...
+                                      doAllEdge);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                                  scalefactor, transpose);
+                                  scalefactor, transpose, doAllEdge);
     }
 
   #ifdef __GALOIS_HET_CUDA__
