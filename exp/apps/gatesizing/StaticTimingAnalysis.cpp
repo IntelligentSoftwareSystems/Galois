@@ -3,6 +3,7 @@
 #include "CellLib.h"
 
 #include "Galois/Bag.h"
+#include "Galois/Statistic.h"
 
 #include <iostream>
 #include <string>
@@ -68,6 +69,9 @@ struct ComputeRequiredTime {
 }; // end struct ComputeRequiredTime
 
 static void computeRequiredTime(Graph& g) {
+  Galois::StatTimer TRequiredTime("RequiredTime");
+  TRequiredTime.start();
+
   // enqueue all primary outputs
   Galois::InsertBag<GNode> work;
   for (auto ie: g.in_edges(dummySink)) {
@@ -75,6 +79,7 @@ static void computeRequiredTime(Graph& g) {
   }
 
   Galois::for_each_local(work, ComputeRequiredTime{g}, Galois::loopname("ComputeRequiredTime"));
+  TRequiredTime.stop();
 }
 
 struct ComputeArrivalTimeAndPower {
@@ -175,6 +180,9 @@ struct ComputeArrivalTimeAndPower {
 }; // end struct ComputeArrivalTimeAndPower
 
 static void computeArrivalTimeAndPower(Graph& g) {
+  Galois::StatTimer TArrivalTimeAndPower("ArrivalTimeAndPower");
+  TArrivalTimeAndPower.start();
+
   // enqueue all primary inputs
   Galois::InsertBag<GNode> work;
   for (auto e: g.edges(dummySrc)) {
@@ -182,6 +190,7 @@ static void computeArrivalTimeAndPower(Graph& g) {
   }
 
   Galois::for_each_local(work, ComputeArrivalTimeAndPower{g}, Galois::loopname("ComputeArrivalTimeAndPower"));
+  TArrivalTimeAndPower.stop();
 }
 
 void doStaticTimingAnalysis(Graph& graph) {
