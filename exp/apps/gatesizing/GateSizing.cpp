@@ -39,6 +39,7 @@
 #include "CellLib.h"
 #include "Verilog.h"
 #include "Sdc.h"
+#include "StaticTimingAnalysis.h"
 
 #include <utility>
 #include <vector>
@@ -62,10 +63,6 @@ static CellLib cellLib;
 static VerilogModule vModule;
 static SDC sdc;
 
-void doStaticTimingAnalysis() {
-
-}
-
 void doGateSizing() {
 
 }
@@ -78,7 +75,7 @@ int main(int argc, char** argv) {
   T.start();
 
   cellLib.read(lib);
-//  cellLib.printCellLibDebug();
+  cellLib.printCellLibDebug();
   std::cout << "parsed cell library" << std::endl;
 
   vModule.read(inputCircuit, &cellLib);
@@ -94,10 +91,14 @@ int main(int argc, char** argv) {
   printCircuitGraph(graph);
   std::cout << "constructed circuit graph" << std::endl;
 
-  doStaticTimingAnalysis();
+  doStaticTimingAnalysis(graph);
+  printCircuitGraph(graph);
+  std::cout << "finished static timinig analysis" << std::endl;
+
   doGateSizing();
 //  vModule.printVerilogModuleDebug();
 //  printCircuitGraph(graph);
+  std::cout << "finished gate sizing" << std::endl;
 
   T.stop();
   vModule.writeVerilogModule(outputCircuit);
