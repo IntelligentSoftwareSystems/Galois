@@ -544,6 +544,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           mirrorNodes[h].push_back(x);
         }
       }
+      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_hGraph::id, numNodes, numEdges);
 
 #if 0
       if(base_hGraph::id == 0){
