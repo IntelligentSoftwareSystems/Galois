@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <vector>
 #include "Galois/Galois.h"
+#include "Galois/DoAllWrap.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/gstl.h"
 
@@ -268,7 +269,7 @@ struct PageRankCopy {
     } else if (personality == CPU)
   #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), 
+      Galois::do_all_choice(_graph.begin(), _graph.end(), 
                      PageRankCopy{ alpha, tolerance, &_graph }, 
                      Galois::loopname("PageRank"), 
                      Galois::numrun(_graph.get_run_identifier()));
@@ -303,7 +304,7 @@ struct FirstItr_PageRank{
     } else if (personality == CPU)
 #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph},
+      Galois::do_all_choice(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph},
                      Galois::loopname("PageRank"), 
                      Galois::numrun(_graph.get_run_identifier()), 
                      Galois::write_set("reduce", "this->graph", 
@@ -363,7 +364,7 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, 
+          Galois::do_all_choice(_graph.begin(), _graph.end(), PageRank{ &_graph }, 
                          Galois::loopname("PageRank"), 
                          Galois::write_set("reduce", "this->graph", 
                                            "struct NodeData &", 
