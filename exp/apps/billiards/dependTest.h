@@ -30,19 +30,29 @@
 #ifndef _ORDER_DEP_TEST_H_
 #define _ORDER_DEP_TEST_H_
 
-#include <cassert>
-
 #include "Event.h"
 #include "Ball.h"
 #include "Cushion.h"
 #include "FPutils.h"
+#include "DefaultValues.h"
+
+#include "llvm/Support/CommandLine.h"
+
+#include <cassert>
+
+namespace cll = llvm::cl;
+extern cll::opt<unsigned> vmaxFactor;
 
 class OrderDepTest {
 
-  static const FP V_MAX;
+  const FP V_MAX;
 
 public:
-  static bool dependsOn(const Event& later, const Event& earlier) {
+
+  OrderDepTest (void): V_MAX (DefaultValues::MAX_SPEED * FP(unsigned(vmaxFactor))) {
+  }
+
+  bool dependsOn(const Event& later, const Event& earlier) const {
 
     assert (earlier < later);
 
@@ -51,18 +61,18 @@ public:
 
 private:
 
-  static bool dependsOnInternal (const Event& e2, const Event& e1) {
+  bool dependsOnInternal (const Event& e2, const Event& e1) const {
     assert (e1 < e2);
 
-    assert (e1.getBall ()->vel ().mag () < V_MAX);
-    assert (e2.getBall ()->vel ().mag () < V_MAX);
+    GALOIS_ASSERT (e1.getBall ()->vel ().mag () < V_MAX);
+    GALOIS_ASSERT (e2.getBall ()->vel ().mag () < V_MAX);
 
     if (e1.getKind () == Event::BALL_COLLISION) {
-      assert (e1.getOtherBall ()->vel ().mag () < V_MAX);
+      GALOIS_ASSERT (e1.getOtherBall ()->vel ().mag () < V_MAX);
     }
 
     if (e2.getKind () == Event::BALL_COLLISION) {
-      assert (e2.getOtherBall ()->vel ().mag () < V_MAX);
+      GALOIS_ASSERT (e2.getOtherBall ()->vel ().mag () < V_MAX);
     }
 
     bool haveSameBall = checkCommonBall (e1, e2);
@@ -71,7 +81,10 @@ private:
 
     FP minDist = computeMinDist (e1, e2);
 
+    assert (V_MAX > FP(0.0));
     FP vmaxTime = minDist / V_MAX;
+
+    // std::cout << "V_MAX = " << V_MAX << std::endl;
 
     FP tdiff = e2.getTime () - e1.getTime ();
 

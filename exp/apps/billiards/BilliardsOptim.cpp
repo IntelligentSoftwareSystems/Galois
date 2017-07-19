@@ -141,7 +141,7 @@ public:
         VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
         ExecSourcesOptim {table, enablePrints, logEvents},
         AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints),
-        std::make_tuple (Galois::enable_parameter<false> {}, Galois::loopname ("billiards-optimistic")));
+        std::make_tuple (Galois::loopname ("billiards-optimistic")));
 
 
     for (unsigned i = 0; i < table.getNumBalls (); ++i) {

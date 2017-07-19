@@ -35,6 +35,7 @@
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
 #include "Galois/gtuple.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Traits.h"
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Context.h"
@@ -50,19 +51,26 @@
 #include <deque>
 #include <vector>
 
+#include "llvm/Support/CommandLine.h"
+
 namespace Galois {
 namespace Runtime {
+
+  extern llvm::cl::opt<bool> useParaMeterOpt;
+
 namespace ParaMeter {
 
 struct StepStats {
 
-  size_t step;
-  size_t parallelism = 0;
-  size_t workListSize;
+  const size_t step;
+  GAccumulator<size_t> parallelism;
+  const size_t workListSize;
 
-  explicit StepStats (size_t _step, size_t _wlsz): step (_step), workListSize (_wlsz) {}
+  explicit StepStats (size_t _step, size_t _wlsz): step (_step), parallelism (),  workListSize (_wlsz) {}
 
-  explicit StepStats (size_t _step, size_t par, size_t _wlsz): step (_step), parallelism (par), workListSize (_wlsz) {}
+  explicit StepStats (size_t _step, size_t par, size_t _wlsz): step (_step), parallelism (), workListSize (_wlsz) {
+    parallelism += par;
+  }
 
   static void printHeader(FILE* out) {
     fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
@@ -70,7 +78,7 @@ struct StepStats {
 
   void dump(FILE* out, const char* loopname) const {
     if (out) {
-      fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism, workListSize);
+      fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism.reduceRO (), workListSize);
     }
   }
 };
@@ -246,7 +254,7 @@ class ParaMeterExecutor {
       // switch worklists
       // dump stats
       StepStats stat {currStep, numIter};
-      stat.parallelism = numActivities;
+      stat.parallelism += numActivities;
 
       finishStep(stat);
       ++currStep;
@@ -341,8 +349,28 @@ private:
   std::vector<StepStats> allSteps;
 };
 
+
+template<typename R, typename F, typename ArgsTuple>
+void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) {
+
+  using T = typename R::values_type;
+
+  auto tpl = Galois::get_default_trait_values(argsTuple,
+      std::make_tuple (loopname_tag {}),
+      std::make_tuple (default_loopname {}));
+
+  using Tpl_ty = decltype (tpl);
+
+  using Exec = ParaMeterExecutor<T, F, Tpl_ty>;
+  Exec exec (func, tpl);
+
+  exec.init (range);
+
 }
-}
+
+
+} // end namespace ParaMeter
+} // end namespace Runtime
 
 namespace WorkList {
 
@@ -358,7 +386,7 @@ public:
   typedef T value_type;
 };
 
-}
+} // end WorkList
 
 namespace Runtime {
 
@@ -370,7 +398,38 @@ class ForEachExecutor<Galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
 };
 
+
+
+
+
+} // end Runtime;
+
+template <typename I, typename F, typename... Args> 
+void for_each_exp (const I& beg, const I& end, const F& func, const Args&... args) {
+
+  auto range = Runtime::makeStandardRange (beg, end);
+  auto tpl = std::make_tuple (args...);
+
+  if (Runtime::useParaMeterOpt) {
+    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  } else {
+    Runtime::for_each_gen (range, func, tpl);
+  }
 }
 
+
+template <typename C, typename F, typename... Args> 
+void for_each_local_exp (C& cont, const F& func, const Args&... args) {
+
+  auto range = Runtime::makeLocalRange(cont);
+  auto tpl = std::make_tuple (args...);
+
+  if (Runtime::useParaMeterOpt) {
+    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  } else {
+    Runtime::for_each_gen (range, func, tpl);
+  }
 }
+
+} // end Galois
 #endif

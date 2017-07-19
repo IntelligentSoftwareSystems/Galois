@@ -62,8 +62,8 @@ enable_testing()
 ###### Configure compiler ######
 
 #Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -fno-use-cxa-atexit")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -fno-use-cxa-atexit")
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
@@ -157,12 +157,19 @@ add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
+find_package(OpenMP)
+if(OPENMP_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+endif()
+
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
 
+<<<<<<< HEAD
   if (USE_LWCI)
     add_definitions(-DGALOIS_USE_LWCI)
     #include_directories("$ENV{LWCI_ROOT}/include")
@@ -180,6 +187,8 @@ if(USE_EXP)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   endif()
 
+=======
+>>>>>>> master
   find_package(TBB)
   if(TBB_FOUND)
     include_directories(${TBB_INCLUDE_DIRS})
@@ -296,6 +305,7 @@ include(CheckEndian)
 ###### Build Hacks ######
 
 add_definitions(-D__STDC_LIMIT_MACROS)
+add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
 if (GRAPH_LOCATION)

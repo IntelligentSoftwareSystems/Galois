@@ -1,0 +1,10 @@
+K-CUTS TAO ANALYSIS:
+	- Topology:
+		- Unstructured
+	- Active Nodes:
+		- Location:
+			- Data-driven
+		- Ordering:
+			- Unordered
+	- Operator:
+		- Local Computation

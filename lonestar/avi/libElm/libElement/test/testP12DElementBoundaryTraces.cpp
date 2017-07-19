@@ -34,7 +34,7 @@
 int main()
 { 
   double Vertices[] = {1,0,0,1,0,0};
-  std::vector<double> Vertices0(Vertices, Vertices+6);
+  VecDouble Vertices0(Vertices, Vertices+6);
 
   Triangle<2>::SetGlobalCoordinatesArray(Vertices0);
   Segment<2>::SetGlobalCoordinatesArray(Vertices0);

@@ -29,3 +29,14 @@ if (VTune_FOUND)
   target_link_libraries(galois_runtime dl)
 endif()
 
+add_library(galois_runtime_obj OBJECT ${sources})
+target_include_directories(galois_runtime_obj PUBLIC 
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_SOURCE_DIR}/libsubstrate/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+set_target_properties (galois_runtime_obj PROPERTIES 
+  INTERFACE_POSITION_INDEPENDENT_CODE On 
+  POSITION_INDEPENDENT_CODE On
+)
+

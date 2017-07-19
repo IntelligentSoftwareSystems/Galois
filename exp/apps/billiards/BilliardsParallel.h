@@ -13,6 +13,8 @@ using AddListTy = Galois::PerThreadVector<Event>;
 struct VisitNhoodSafetyTest {
   static const unsigned CHUNK_SIZE = 1;
 
+  OrderDepTest dt;
+
   template <typename C, typename I>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& event, const C& c, const I beg, const I end) {
 
@@ -20,7 +22,7 @@ struct VisitNhoodSafetyTest {
 
     for (I i = beg; i != end; ++i) {
       if (event > *i) {
-        if (OrderDepTest::dependsOn (event, *i)) {
+        if (dt.dependsOn (event, *i)) {
           indep = false;
           break;
         }

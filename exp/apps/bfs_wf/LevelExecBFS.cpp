@@ -25,7 +25,59 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "LevelExecBFS.h"
+
+#include <vector>
+#include <functional>
+
+#include "Galois/Runtime/LevelExecutor.h"
+#include "Galois/WorkList/WorkList.h"
+
+#include "bfs.h"
+#include "bfsParallel.h"
+
+class LevelExecBFS: public BFS {
+
+public:
+
+  virtual const std::string getVersion () const { return "using Level-by-Level executor"; }
+
+  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+
+    ParCounter numIter;
+
+
+    // update request for root
+    Update first (startNode, 0);
+
+    std::vector<Update> wl;
+    wl.push_back (first);
+
+    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
+    typedef Galois::WorkList::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
+
+    Galois::Runtime::for_each_ordered_level (
+        Galois::Runtime::makeStandardRange (wl.begin (), wl.end ()), 
+        GetLevel (), 
+        std::less<unsigned> (),
+        VisitNhood (graph),
+        OpFunc (graph, numIter));
+
+    // Galois::for_each (first,
+        // OpFunc (graph, numIter),
+        // Galois::loopname ("bfs-level-exec"),
+        // Galois::wl<WL_ty> ());
+
+
+    std::cout << "number of iterations: " << numIter.reduce () << std::endl;
+
+
+    return numIter.reduce ();
+  }
+
+
+};
+
+
 
 int main (int argc, char* argv[]) {
   LevelExecBFS b;

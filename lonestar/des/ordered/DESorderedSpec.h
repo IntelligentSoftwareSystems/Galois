@@ -56,14 +56,14 @@ namespace des_ord {
 
 typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
-typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
+typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 
 
 class DESorderedSpec: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   using VecGNode = std::vector<GNode>;
 
@@ -114,33 +114,35 @@ class DESorderedSpec:
       GNode n = nodes[recvObj->getID ()];
 
       size_t stateSize = recvObj->getStateSize ();
-      auto alloc = ctx.getPerIterAlloc ();
 
-      char* const p = alloc.allocate (stateSize);
+      Galois::Runtime::FixedSizeHeap heap (stateSize);
+      void* const p = heap.allocate (stateSize);
 
       recvObj->copyState (p, stateSize);
 
-      auto f = [recvObj, p, stateSize] (void) {
+      auto f = [recvObj, p, stateSize, heap] (void) mutable {
         recvObj->restoreState (p, stateSize);
+        heap.deallocate (p);
       };
 
       ctx.addUndoAction (f);
 
-      using AddList_ty = std::vector<Event_ty, Galois::PerIterAllocTy::rebind<Event_ty>::other>;
-
-      AddList_ty newEvents (alloc);
+      auto addNewFunc = [&ctx] (const Event_ty& e) {
+        ctx.push (e);
+      };
 
       // FIXME: newEvents needs to be iteration local
-      recvObj->execEvent (event, graph, n, newEvents);
+      recvObj->execEvent (event, graph, n, addNewFunc);
 
-      for (auto a = newEvents.begin ()
-          , enda = newEvents.end (); a != enda; ++a) {
-        ctx.push (*a);
-        // std::cout << "### Adding: " << a->detailedString () << std::endl;
-      }
+      // for (auto a = newEvents.begin ()
+          // , enda = newEvents.end (); a != enda; ++a) {
+        // ctx.push (*a);
+        // // std::cout << "### Adding: " << a->detailedString () << std::endl;
+      // }
 
-      auto inc = [this] (void) {
+      auto inc = [this, p, heap] (void) mutable {
         nevents += 1;
+        heap.deallocate (p);
       };
 
       ctx.addCommitAction (inc);
@@ -168,13 +170,14 @@ protected:
     Accumulator_ty nevents;
 
     // Galois::for_each_ordered (
-    // Galois::Runtime::for_each_ordered_rob (
-    Galois::Runtime::for_each_ordered_optim (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, nodes),
-        OpFunc (graph, nodes, nevents));
+        OpFunc (graph, nodes, nevents),
+        std::make_tuple (
+          Galois::loopname("des_ordered_spec")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

@@ -101,7 +101,7 @@ class Residue
   //! getFields()[i] returns the field number beginning from zero.\n
   //! The variable \f$u^f_a\f$ is then computed with field getFields()[f]
   //! in the element.
-  virtual const std::vector<size_t> & getFields() const = 0;
+  virtual const VecSize_t& getFields() const = 0;
 
 
   //! Returns the number of degrees of freedom per field used
@@ -187,10 +187,10 @@ class BaseResidue: public Residue {
 protected:
   const Element& element;
   const SimpleMaterial& material;
-  const std::vector<size_t>& fieldsUsed;
+  const VecSize_t& fieldsUsed;
 
 
-  BaseResidue (const Element& element, const SimpleMaterial& material, const std::vector<size_t>& fieldsUsed)
+  BaseResidue (const Element& element, const SimpleMaterial& material, const VecSize_t& fieldsUsed)
   : element (element), material (material), fieldsUsed (fieldsUsed) {
   }
 
@@ -204,7 +204,7 @@ public:
     return element;
   }
 
-  virtual const std::vector<size_t>& getFields () const {
+  virtual const VecSize_t& getFields () const {
     return fieldsUsed;
   }
 
@@ -233,7 +233,7 @@ public:
 
 class DResidue: public BaseResidue {
  public: 
-  DResidue (const Element& element, const SimpleMaterial& material, const std::vector<size_t>& fieldsUsed)
+  DResidue (const Element& element, const SimpleMaterial& material, const VecSize_t& fieldsUsed)
   : BaseResidue(element, material, fieldsUsed) {}
 
   DResidue(const DResidue &NewEl): BaseResidue(NewEl) {}
@@ -265,7 +265,7 @@ class DResidue: public BaseResidue {
   
   //! Consistency test for DResidues. 
   static bool consistencyTest(const DResidue & DRes,  
-			      const std::vector<size_t> & DofPerField,
+			      const VecSize_t& DofPerField,
 			      const MatDouble &argval);
 
   //! \brief assemble Residual Vector and it Derivative

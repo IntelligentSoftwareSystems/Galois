@@ -67,7 +67,7 @@ class BasisFunctions
   //!  gives the value of shape function a at quadrature point q
   //!  
   //!  getShapes returns an empty vector if no shape functions are available
-  virtual const std::vector<double> & getShapes() const = 0; 
+  virtual const VecDouble& getShapes() const = 0; 
   
   //! Derivatives of shape functions at quadrature points 
   //! getDShapes()[q*getBasisDimension()*getNumberOfDerivativesPerFunction()+
@@ -76,16 +76,16 @@ class BasisFunctions
   //!
   //! getDShapes returns an empty vector if no derivatives are
   //! available
-  virtual const std::vector<double> & getDShapes() const = 0; 
+  virtual const VecDouble& getDShapes() const = 0; 
   
   //! @return vector of integration weights
-  virtual const std::vector<double> & getIntegrationWeights() const = 0;  //!< Integration weights 
+  virtual const VecDouble& getIntegrationWeights() const = 0;  //!< Integration weights 
 
   //! Coordinates of quadrature points in the real configuration
   //! getQuadraturePointCoordinates()
   //! q*ElementGeometry::getEmbeddingDimension()+i]
   //! returns the i-th coordinate in real space of quadrature point q 
-  virtual const std::vector<double> & getQuadraturePointCoordinates() const = 0; 
+  virtual const VecDouble& getQuadraturePointCoordinates() const = 0; 
 
   //! returns the number of shape functions provided
   virtual size_t getBasisDimension() const = 0;
@@ -121,16 +121,16 @@ class EmptyBasisFunctions: public BasisFunctions
   inline EmptyBasisFunctions(const EmptyBasisFunctions &) {}
   virtual EmptyBasisFunctions *  clone() const { return new EmptyBasisFunctions(*this); }
   
-  const std::vector<double> & getShapes() const { return ZeroSizeVector; }
-  const std::vector<double> & getDShapes() const { return ZeroSizeVector; }
-  const std::vector<double> & getIntegrationWeights() const { return ZeroSizeVector; }
-  const std::vector<double> & getQuadraturePointCoordinates() const { return ZeroSizeVector; }
+  const VecDouble& getShapes() const { return ZeroSizeVector; }
+  const VecDouble& getDShapes() const { return ZeroSizeVector; }
+  const VecDouble& getIntegrationWeights() const { return ZeroSizeVector; }
+  const VecDouble& getQuadraturePointCoordinates() const { return ZeroSizeVector; }
   size_t getBasisDimension() const { return 0; }
   size_t getNumberOfDerivativesPerFunction() const { return 0; } 
   size_t getSpatialDimensions() const { return 0; }
    
  private:
-  static std::vector<double> ZeroSizeVector;
+  static VecDouble ZeroSizeVector;
 };
 
 #endif

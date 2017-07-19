@@ -41,10 +41,11 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
+#include "llvm/Support/CommandLine.h"
+
 #include "CilkInit.h"
 #include <unistd.h>
 
-#include "llvm/Support/CommandLine.h"
 
 namespace Galois {
 

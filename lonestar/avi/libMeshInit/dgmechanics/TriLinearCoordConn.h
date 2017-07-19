@@ -51,7 +51,7 @@ class TriLinearCoordConn
      */
 
     virtual Element* makeElem (const size_t elemIndex) const {
-      std::vector<GlobalNodalIndex> conn;
+      VecSize_t conn;
 
       genElemConnectivity (elemIndex, conn);
 
@@ -73,7 +73,7 @@ class TriLinearCoordConn
       size_t iNodes = getNumNodes(); // Assume 2D triangles.
 
       for (size_t e = 0; e < iElements; e++) {
-        // std::vector<GlobalNodalIndex> conn;
+        // VecSize_t conn;
         GlobalNodalIndex node0;
         GlobalNodalIndex node1;
 
@@ -93,7 +93,7 @@ class TriLinearCoordConn
 
       std::sort (faces.begin (), faces.end ());
 
-      std::vector<size_t> NodeInfo (faces.size () * 2, 0);
+      VecSize_t NodeInfo (faces.size () * 2, 0);
       size_t middlenodenum = iNodes;
 
       // Create middle nodes
@@ -127,7 +127,7 @@ class TriLinearCoordConn
       }
 
       // Create connectivity
-      std::vector<GlobalNodalIndex> copyconn (connectivity);
+      VecSize_t copyconn (connectivity);
       connectivity.resize (iElements * 3 * 4);
 
       for (size_t e = 0; e < iElements; e++) {

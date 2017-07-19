@@ -98,16 +98,16 @@ class Element
   virtual size_t getNumDerivatives(size_t field) const = 0;  
 
   //!  Shape functions at quadrature points of one of the fields
-  virtual const std::vector <double> &getShapes(size_t field) const = 0;  
+  virtual const VecDouble &getShapes(size_t field) const = 0;  
 
   //!  Shape function derivatives at quadrature points of one of the fields
-  virtual const std::vector <double> &getDShapes(size_t field) const = 0;  
+  virtual const VecDouble &getDShapes(size_t field) const = 0;  
 
   //! Integration weights of a given field 
-  virtual const std::vector <double> &getIntegrationWeights(size_t field) const = 0; 
+  virtual const VecDouble &getIntegrationWeights(size_t field) const = 0; 
 
   //! Integration point coordinates of a given field 
-  virtual const std::vector <double> &getIntegrationPtCoords(size_t field) const = 0;  
+  virtual const VecDouble &getIntegrationPtCoords(size_t field) const = 0;  
 
   //! Value of shape function "shapenumber" of field "field" 
   //! at quadrature point "quad"
@@ -193,16 +193,16 @@ public:
   inline size_t getNumDerivatives (size_t field) const {
     return LocalShapes[getFieldShapes (field)]-> getNumberOfDerivativesPerFunction ();
   }
-  inline const std::vector<double> &getShapes (size_t field) const {
+  inline const VecDouble& getShapes (size_t field) const {
     return LocalShapes[getFieldShapes (field)]->getShapes ();
   }
-  inline const std::vector<double> &getDShapes (size_t field) const {
+  inline const VecDouble& getDShapes (size_t field) const {
     return LocalShapes[getFieldShapes (field)]->getDShapes ();
   }
-  inline const std::vector<double> &getIntegrationWeights (size_t field) const {
+  inline const VecDouble& getIntegrationWeights (size_t field) const {
     return LocalShapes[getFieldShapes (field)]->getIntegrationWeights ();
   }
-  inline const std::vector<double> &getIntegrationPtCoords (size_t field) const {
+  inline const VecDouble& getIntegrationPtCoords (size_t field) const {
     return LocalShapes[getFieldShapes (field)]->getQuadraturePointCoordinates ();
   }
 

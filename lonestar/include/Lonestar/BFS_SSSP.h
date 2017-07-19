@@ -43,10 +43,9 @@ struct not_consistent {
       Dist ddist = g.getData(g.getEdgeDst(ii));
       Dist w = getEdgeWeight<useOne>(ii);
       if (ddist > dist + w) {
-        // std::cout << ddist << " " << dist + w << " " << n << " " <<
-        // g.getEdgeDst(ii) << "\n"; // XXX
+        std::cout << ddist << " " << dist + w << " " << n << " " << g.getEdgeDst(ii) << "\n"; // XXX
         refb = true;
-        return;
+        // return;
       }
     }
   }
@@ -78,9 +77,9 @@ bool verify(Graph& graph, GNode source) {
   if (notVisited)
     std::cerr << notVisited << " unvisited nodes; this is an error if the graph is strongly connected\n";
 
-  std::atomic<bool> consistent;
-  Galois::do_all_local(graph, not_consistent<useOne>(graph, consistent));
-  if (!consistent) {
+  std::atomic<bool> not_c;
+  Galois::do_all_local(graph, not_consistent<useOne>(graph, not_c));
+  if (not_c) {
     std::cerr << "node found with incorrect distance\n";
     return false;
   }

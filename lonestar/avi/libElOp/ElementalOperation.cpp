@@ -33,7 +33,7 @@
 #include "util.h"
 #include "ElementalOperation.h"
 
-bool DResidue::consistencyTest(const DResidue & DRes, const std::vector<size_t> & DofPerField, const MatDouble &argval) {
+bool DResidue::consistencyTest(const DResidue & DRes, const VecSize_t& DofPerField, const MatDouble &argval) {
   size_t NFields = DRes.getFields().size();
 
   MatDouble largval(argval);
@@ -122,7 +122,7 @@ enum AssembleMode {
 };
 
 template<typename T> 
-static bool _Assemble(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G
+static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
     , const VecDouble & Dofs, VecDouble&  ResVec, MatDouble& DResMat, const AssembleMode& mode) {
 
   // VecZeroEntries(*ResVec);
@@ -144,7 +144,7 @@ static bool _Assemble(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G
   const VecDouble& GDofs = Dofs;
 
   for (size_t e = 0; e < DResArray.size(); e++) {
-    const std::vector<size_t> & DPF = DResArray[e]->getFields();
+    const VecSize_t& DPF = DResArray[e]->getFields();
     size_t localsize = 0;
 
     if (argval.size() < DPF.size()) {
@@ -193,7 +193,7 @@ static bool _Assemble(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G
 
     double * resvals = new double[localsize];
     size_t * indices = new size_t[localsize];
-    double * dresvals;
+    double * dresvals = nullptr;
 
     if (mode == DRESIDUE) {
       dresvals = new double[localsize * localsize];
@@ -245,12 +245,12 @@ static bool _Assemble(std::vector<T *> &DResArray, const LocalToGlobalMap & L2G
 
   return true;
 }
-bool Residue::assemble(std::vector<Residue *> &ResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble&  ResVec) {
+bool Residue::assemble(std::vector<Residue*> &ResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble&  ResVec) {
   MatDouble d;
   return _Assemble<Residue> (ResArray, L2G, Dofs, ResVec, d, RESIDUE);
 }
 
-bool DResidue::assemble(std::vector<DResidue *> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble& ResVec, MatDouble& DResMat) {
+bool DResidue::assemble(std::vector<DResidue*> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble& ResVec, MatDouble& DResMat) {
   return _Assemble<DResidue> (DResArray, L2G, Dofs, ResVec, DResMat, DRESIDUE);
 }
 

@@ -169,7 +169,13 @@ void on_each(const FunctionTy& fn, const Args&... args) {
  * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
-  Runtime::preAlloc_impl(num);
+  static const bool DISABLE_PREALLOC = false;
+  if (DISABLE_PREALLOC) {
+    Galois::Substrate::gWarn("preAlloc disabled");
+
+  } else {
+    Runtime::preAlloc_impl(num);
+  }
 }
 
 /**

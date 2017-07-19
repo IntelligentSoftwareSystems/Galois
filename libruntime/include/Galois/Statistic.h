@@ -60,7 +60,7 @@ public:
 
   //! Adds stat to stat pool, usually deconsructor or StatManager calls this for you.
   void report() {
-    for (auto x = 0U; x < vals.size(); ++x)  {
+    for (unsigned x = 0; x < vals.size(); ++x)  {
       auto* ptr = vals.getRemote(x);
       if (ptr->first)
         Galois::Runtime::reportStat(loopname, statname, ptr->second, x);

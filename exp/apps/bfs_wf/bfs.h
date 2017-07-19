@@ -34,9 +34,10 @@
 #include <limits>
 #include <iostream>
 #include <set>
+#include "Galois/Graphs/LC_InlineEdge_Graph.h"
 
-#define GALOIS_USE_MIC_CSR_IMPL
-// #undef GALOIS_USE_MIC_CSR_IMPL
+// #define GALOIS_USE_MIC_CSR_IMPL
+#undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
   #include "Galois/Graphs/LC_CSR_MIC_Graph.h"
@@ -98,21 +99,17 @@ struct NodeDataCacheLine: public Galois::Runtime::LL::CacheLineStorage<unsigned>
 
 typedef Galois::GAccumulator<unsigned> ParCounter;
 
-template <typename ND>
-class BFS {
+
+template <typename G, bool IS_BFS=true> 
+class BFS_SSSP_Base {
 
 public:
-#ifdef GALOIS_USE_MIC_CSR_IMPL
-  typedef typename Galois::Graph::LC_CSR_MIC_Graph<ND, void>
-#else
-  typedef typename Galois::Graph::LC_CSR_Graph<ND, void>
-#endif
-    ::template with_numa_alloc<true>::type
-    ::template with_no_lockable<true>::type Graph;
-  typedef typename Graph::GraphNode GNode;
-  typedef ND NodeData_ty;
 
-protected:
+  using Graph = G;
+  using GNode = typename Graph::GraphNode;
+  using ND = typename Graph::node_data_type;
+
+  // TODO: change to a generic name
   virtual size_t runBFS (Graph& graph, GNode& startNode) = 0;
 
   virtual const std::string getVersion () const = 0;
@@ -137,7 +134,7 @@ protected:
     Galois::do_all_choice (Galois::Runtime::makeLocalRange(graph),
         [&numEdges,&graph] (GNode n) {
           graph.getData (n, Galois::MethodFlag::UNPROTECTED) = ND (BFS_LEVEL_INFINITY);
-          numEdges += graph.edge_end (n, Galois::MethodFlag::UNPROTECTED) - graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED);
+          numEdges += std::distance (graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED),  graph.edge_end (n, Galois::MethodFlag::UNPROTECTED));
           // std::cout << "Degree: " << graph.edge_end (n, Galois::MethodFlag::UNPROTECTED) - graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED) << std::endl;
         },
         std::make_tuple (
@@ -148,12 +145,12 @@ protected:
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
   }
 
-  virtual GNode getStartNode (const Graph& graph, unsigned startId) const {
+  virtual GNode getStartNode (Graph& graph, unsigned startId) const {
     assert (startId < graph.size ());
 
     unsigned id = 0;
     GNode startNode = 0;
-    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
+    for (auto i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 
       if (id == startId) {
@@ -166,7 +163,17 @@ protected:
     return startNode;
   }
 
-  virtual bool verify (Graph& graph, GNode& startNode) const {
+  template<bool useOneL, typename I>
+  static ND getEdgeWeight(Graph& graph, I ii, typename std::enable_if<useOneL>::type* = nullptr) {
+    return 1;
+  }
+
+  template<bool useOneL, typename I>
+  static ND getEdgeWeight(Graph& graph, I ii, typename std::enable_if<!useOneL>::type* = nullptr) {
+    return graph.getEdgeData(ii);
+  }
+
+  bool verify (Graph& graph, GNode& startNode) const {
 
     Galois::StatTimer t_verify ("Verification time: ");
 
@@ -181,7 +188,7 @@ protected:
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange(graph),
         [&graph, &numUnreachable, &result, &startNode] (GNode n) {
-          const unsigned srcLevel = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+          const ND srcLevel = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
           if (srcLevel >= BFS_LEVEL_INFINITY) { 
             numUnreachable += 1;
             // std::cerr << "BAD Level value >= INFINITY at node " << (*i) << std::endl;
@@ -189,12 +196,14 @@ protected:
           }
 
 
-          for (typename Graph::edge_iterator e = graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED)
+          for (auto e = graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED)
             , ende = graph.edge_end (n, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
             
             GNode dst = graph.getEdgeDst (e);
-            const unsigned dstLevel = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-            if (dstLevel > (srcLevel + 1) || (dst != startNode && dstLevel == 0)) {
+            const ND dstLevel = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            const ND edgeWeight = getEdgeWeight<IS_BFS> (graph, e);
+
+            if (dstLevel > (srcLevel + edgeWeight) || (dst != startNode && dstLevel == 0)) {
               *result.getLocal () = false;
               std::cerr << "BAD Level value=" << dstLevel << " at neighbor " << dst << " of node " 
                 << n << std::endl; 
@@ -243,9 +252,7 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::pagePoolSize();
-    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::pagePoolSize());
-    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
+    Galois::preAlloc ((Galois::getActiveThreads () * 10 * graph.sizeEdges ())/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();
@@ -269,6 +276,178 @@ public:
 
   }
 
+  struct Update {
+    GNode node;
+    ND level;
+
+    Update (const GNode& node, const ND& level)
+      : node (node), level (level) 
+    {}
+
+    friend std::ostream& operator << (std::ostream& out, const Update& up) {
+      out << "(node:" << up.node << ",level:" << up.level << ")";
+      return out;
+    }
+  };
+
+  struct GetLevel {
+
+    ND operator () (const Update& up) const {
+      return up.level;
+    }
+  };
+
+  struct Comparator {
+    bool operator () (const Update& left, const Update& right) const {
+      int d = left.level - right.level;
+
+      if (d == 0) {
+        // FIXME: assuming nodes are actually integer like
+        d = left.node - right.node;
+      }
+
+      return (d < 0);
+    }
+  };
+
+  struct VisitNhood {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
+    Graph& graph;
+
+    explicit VisitNhood (Graph& graph): graph (graph) {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) {
+
+      // just like DES, we only lock the node being updated, but not its
+      // outgoing neighbors
+      graph.getData (up.node, Galois::MethodFlag::WRITE);
+    }
+  };
+
+  struct OpFunc {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
+    typedef int tt_does_not_need_aborts; // used by LevelExecBFS
+
+    Graph& graph;
+    ParCounter& numIter;
+
+    OpFunc (Graph& graph, ParCounter& numIter): graph (graph), numIter (numIter) {}
+
+    template <typename C>
+      void operator () (const Update& up, C& ctx) const {
+
+        if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+
+          graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
+
+
+          for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+              , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+            GNode dst = graph.getEdgeDst (ni);
+
+            if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+              ctx.push (Update (dst, up.level + 1));
+            }
+          }
+
+        }
+
+        numIter += 1;
+      }
+
+  };
+
+  struct OpFuncSpec: public OpFunc {
+
+    OpFuncSpec (Graph& graph, ParCounter& numIter): OpFunc (graph, numIter) {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) const {
+      auto& graph = OpFunc::graph;
+      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
+
+
+      if (ndata == BFS_LEVEL_INFINITY) {
+
+        ndata = up.level;
+
+        auto undo = [this, &graph, up] (void) {
+          graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = BFS_LEVEL_INFINITY;
+        };
+
+        ctx.addUndoAction (undo);
+
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+          GNode dst = graph.getEdgeDst (ni);
+          auto w = getEdgeWeight<IS_BFS> (graph, ni);
+
+          ctx.push (Update (dst, up.level + w));
+        }
+
+      }
+
+      auto inc = [this] (void) {
+        OpFunc::numIter += 1;
+      };
+
+      ctx.addCommitAction (inc);
+    }
+  };
+
+  // relies on round based execution of IKDG executor
+  struct OpFuncLocalMin: public OpFunc {
+
+    OpFuncLocalMin (Graph& graph, ParCounter& numIter): OpFunc (graph, numIter) {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) {
+      auto& graph = OpFunc::graph;
+      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
+      if (ndata > up.level) {
+
+        ndata = up.level;
+
+
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+          GNode dst = graph.getEdgeDst (ni);
+          auto w = getEdgeWeight<IS_BFS> (graph, ni);
+
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) > (up.level + w)) {
+            ctx.push (Update (dst, up.level + w));
+          }
+        }
+
+      }
+
+      OpFunc::numIter += 1;
+    }
+
+  };
+
+};
+
+#ifdef GALOIS_USE_MIC_CSR_IMPL
+  typedef typename Galois::Graph::LC_CSR_MIC_Graph<unsigned, void>
+#else
+  typedef typename Galois::Graph::LC_CSR_Graph<unsigned, void>
+#endif
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<false>::type BFSgraph; // TODO: make lockable a template parameter for different BFS implementations
+
+class BFS: public BFS_SSSP_Base<BFSgraph> {
+
+public:
+  typedef typename Graph::GraphNode GNode;
 
   template <typename WL, typename T>
   GALOIS_ATTRIBUTE_PROF_NOINLINE static void addToWL (
@@ -292,7 +471,7 @@ public:
     // putting a loop to acquire locks. For now, edge_begin does not acquire locks on neighbors,
     // which it should
     if (doLock) {
-      for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::MethodFlag::WRITE)
+      for (auto ni = graph.edge_begin (src, Galois::MethodFlag::WRITE)
           , eni = graph.edge_end (src, Galois::MethodFlag::WRITE); ni != eni; ++ni) {
 
         GNode dst = graph.getEdgeDst (ni);
@@ -301,7 +480,7 @@ public:
     }
 
 
-    for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED), eni = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED);
+    for (auto ni = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED), eni = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED);
         ni != eni; ++ni) {
 
       GNode dst = graph.getEdgeDst (ni);
@@ -323,5 +502,12 @@ public:
 
 };
 
+using SsspGraph =  typename Galois::Graph::LC_InlineEdge_Graph<unsigned int, uint32_t>
+    ::with_no_lockable<false>::type
+    ::with_numa_alloc<true>::type;
+
+struct SSSP: public BFS_SSSP_Base<SsspGraph, false> {
+
+};
 
 #endif // _BFS_H_

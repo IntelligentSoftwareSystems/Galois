@@ -55,6 +55,17 @@ void Galois::Runtime::signalConflict(Lockable* lockable) {
   throw Galois::Runtime::CONFLICT; // Conflict
 }
 
+#ifdef GALOIS_USE_EXP
+bool Galois::Runtime::owns(Lockable* lockable, MethodFlag m) {
+  SimpleRuntimeContext* ctx = getThreadContext();
+  if (ctx) {
+    return ctx->owns(lockable, m);
+  } 
+  return false;
+}
+#endif
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // LockManagerBase & SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,3 +137,8 @@ void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable
   GALOIS_DIE("Shouldn't get here");
 }
 
+#ifdef GALOIS_USE_EXP
+bool Galois::Runtime::SimpleRuntimeContext::owns(Galois::Runtime::Lockable* lockable, Galois::MethodFlag) const {
+  GALOIS_DIE("SimpleRuntimeContext::owns Not Implemented");
+}
+#endif

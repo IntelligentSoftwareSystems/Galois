@@ -30,7 +30,7 @@
 #define GALOIS_FLAT_SET_H
 
 
-#include "Galois/STLcontainers.h"
+#include "Galois/gstl.h"
 
 #include <algorithm>
 

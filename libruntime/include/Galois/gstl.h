@@ -1,4 +1,4 @@
-/** Simple STL style algorithms -*- C++ -*-
+/** Simple STL style algorithms, STL data structures with Galois allocators -*- C++ -*-
  * @file
  * @section License
  *
@@ -23,13 +23,64 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
+#include "PriorityQueue.h"
+
 #include <algorithm>
 #include <iterator>
 #include <utility>
 
+#include <vector>
+#include <set>
+#include <deque>
+#include <list>
+
 namespace Galois {
 
-// TODO: move to namespace gstl?
+namespace gstl {
+
+  template<typename T>
+  using Pow2Alloc = typename Runtime::Pow_2_BlockAllocator<T>; 
+
+  template<typename T>
+  using FixedSizeAlloc = typename Runtime::FixedSizeAllocator<T>; 
+
+  template<typename T>
+  using Vector = std::vector<T, Pow2Alloc<T> >; 
+
+  template<typename T>
+  using Deque = std::deque<T, Pow2Alloc<T> >; 
+
+  template<typename T>
+  using List = std::list<T, FixedSizeAlloc<T> >; 
+
+  template<typename T, typename C=std::less<T> >
+  using Set = std::set<T, C, FixedSizeAlloc<T> >; 
+
+  template<typename T, typename C=std::less<T> >
+  using PQ = MinHeap<T, C, Vector<T> >; 
+
+  // template<typename T>
+  // struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
+// 
+  // template<typename T>
+  // struct FixedSizeAlloc { typedef typename Runtime::MM::FixedSizeAllocator<T> type; };
+// 
+  // template<typename T>
+  // struct Vector { typedef typename std::vector<T, typename Pow2Alloc<T>::type > type; };
+// 
+  // template<typename T>
+  // struct Deque { typedef typename std::deque<T, typename Pow2Alloc<T>::type > type; };
+// 
+  // template<typename T>
+  // struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
+// 
+  // template<typename T, typename C>
+  // struct Set { typedef typename std::set<T, C, typename FixedSizeAlloc<T>::type > type; };
+// 
+  // template<typename T, typename C>
+  // struct PQ { typedef MinHeap<T, C, typename Vector<T>::type > type; };
+} // end namespace gstl
+
 
 template<typename IterTy, class Distance>
 IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {

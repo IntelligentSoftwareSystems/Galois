@@ -24,6 +24,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */ 
 
+#include "AuxDefs.h"
+
 struct femapMaterial {
   size_t    id;
   size_t    type;
@@ -41,7 +43,7 @@ struct femapProperty {
   std::string         title;
   int            flag[4];
   int            num_val;
-  std::vector<double> value;
+  VecDouble value;
 };
 
 struct femapNode {
@@ -58,7 +60,7 @@ struct femapElement {
   size_t topology;
   size_t geomId;
   int formulation;  // int is a guess--documentation doesn't give type
-  std::vector<size_t> node;
+  VecSize_t node;
 };
 
 struct constraint {
@@ -104,7 +106,7 @@ struct groupRule {
 
 struct groupList {
   size_t type;
-  std::vector<size_t> entityID;
+  VecSize_t entityID;
 };
 
 struct femapGroup {

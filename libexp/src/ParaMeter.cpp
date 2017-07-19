@@ -29,6 +29,14 @@
 #include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Substrate/gio.h"
 
+namespace Galois {
+  namespace Runtime {
+
+namespace cll = llvm::cl;
+cll::opt<std::string> paraMeterOutFileOpt ("ParaMeterOut", cll::desc ("output csv stats file for ParaMeter"), cll::init("ParaMeter_Stats.csv"));
+cll::opt<bool> useParaMeterOpt ("useParaMeter", cll::desc ("enable ParaMeter to measure available parallelism"), cll::init(false));
+  } 
+}
 
 struct StatsFileManager {
   static const unsigned FNAME_SIZE = 256;
@@ -36,7 +44,8 @@ struct StatsFileManager {
   bool init = false;
   bool isOpen = false;
   FILE* statsFH = nullptr;
-  char statsFileName[FNAME_SIZE];
+  // char statsFileName[FNAME_SIZE];
+  std::string statsFileName;
 
 
   ~StatsFileManager (void) {
@@ -47,15 +56,16 @@ struct StatsFileManager {
     if (!init) {
       init = true;
 
-      time_t rawtime;
-      struct tm* timeinfo;
+      statsFileName = Galois::Runtime::paraMeterOutFileOpt;
+      // time_t rawtime;
+      // struct tm* timeinfo;
+// 
+      // time(&rawtime);
+      // timeinfo = localtime(&rawtime);
+// 
+      // strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
 
-      time(&rawtime);
-      timeinfo = localtime(&rawtime);
-
-      strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
-
-      statsFH = fopen(statsFileName, "w");
+      statsFH = fopen(statsFileName.c_str(), "w");
       GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
 
       Galois::Runtime::ParaMeter::StepStats::printHeader(statsFH);
@@ -65,7 +75,7 @@ struct StatsFileManager {
     }
 
     if (!isOpen) {
-      statsFH = fopen (statsFileName, "a"); // open in append mode
+      statsFH = fopen (statsFileName.c_str(), "a"); // open in append mode
       GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
 
       isOpen = true;

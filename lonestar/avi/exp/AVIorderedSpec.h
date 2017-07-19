@@ -106,7 +106,7 @@ protected:
 
     template <typename C>
     void operator()(const Update& item, C&) {
-      typedef std::vector<GlobalNodalIndex> V;
+      typedef VecSize_t V;
 
       const V& conn = item.avi->getGeometry().getConnectivity();
 
@@ -221,7 +221,7 @@ public:
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         Comparator(), nhVisitor, p,
-        std::make_tuple (Galois::loopname ("avi-optim"), Galois::enable_parameter<false> {}));
+        std::make_tuple (Galois::loopname ("avi-optim")));
 
 
     printf("iterations = %lu\n", niter.reduce());

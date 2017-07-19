@@ -53,15 +53,15 @@ namespace des_ord {
 
 typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
-typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
+typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 typedef Galois::GAtomicPadded<bool> AtomicBool_ty;
 
 static const bool DEBUG = false;
 
-struct SimObjInfo: public TypeHelper {
+struct SimObjInfo: public TypeHelper<> {
   
 
   struct MarkedEvent {
@@ -257,7 +257,7 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 }
 
 class DESorderedHandSet: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct OpFuncSet {
 
@@ -299,7 +299,11 @@ class DESorderedHandSet:
         nevents += 1;
         newEvents.get ().clear ();
 
-        recvObj->execEvent (event, graph, srcInfo.node, newEvents.get ());
+        auto addNewEvents = [this] (const Event_ty& e) {
+          newEvents.get().push_back(e);
+        };
+
+        recvObj->execEvent (event, graph, srcInfo.node, addNewEvents);
 
         for (AddList_ty::local_iterator a = newEvents.get ().begin ()
             , enda = newEvents.get ().end (); a != enda; ++a) {

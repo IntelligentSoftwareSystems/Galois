@@ -43,10 +43,10 @@
 #include <iostream>
 #include <set>
 
-class AbstractWavefrontBFS: public BFS<unsigned> {
+class AbstractWavefrontBFS: public BFS {
 
 protected:
-  typedef BFS<unsigned> Super_ty;
+  typedef BFS Super_ty;
 
   //! @return number of iterations
   template <typename WL, typename WFInnerLoop> 
@@ -100,7 +100,7 @@ protected:
 class BFSserialWavefront: public AbstractWavefrontBFS {
 
 protected:
-  typedef std::vector<GNode> WL_ty;
+  typedef Galois::SerialBag<GNode> WL_ty;
   typedef AbstractWavefrontBFS::Super_ty Super_ty;
 
 
@@ -132,9 +132,9 @@ public:
 };
 
 
-template <typename WL, typename ND> 
+template <typename WL> 
 struct DoAllFunctor {
-  typedef BFS<ND> BaseBFS;
+  typedef BFS BaseBFS;
 
   typename BaseBFS::Graph& graph;
   WL& nextWL;
@@ -151,7 +151,7 @@ struct DoAllFunctor {
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (typename BaseBFS::GNode& src) {
-    numAdds += BFS<ND>::template bfsOperator<false, WL> (graph, src, nextWL);
+    numAdds += BFS::bfsOperator<false, WL> (graph, src, nextWL);
   }
 
 };
@@ -170,11 +170,11 @@ struct LoopFlags<false> { // more when no locking
 };
 
 
-template <bool doLock, typename WL, typename ND>
-struct ForEachFunctor: public DoAllFunctor<WL, ND>, public LoopFlags<doLock> {
+template <bool doLock, typename WL>
+struct ForEachFunctor: public DoAllFunctor<WL>, public LoopFlags<doLock> {
 
-  typedef DoAllFunctor<WL, ND> Super_ty;
-  typedef BFS<ND> BaseBFS;
+  typedef DoAllFunctor<WL> Super_ty;
+  typedef BFS BaseBFS;
 
   ForEachFunctor (
       typename BaseBFS::Graph& graph,
@@ -221,7 +221,7 @@ private:
 
       ParCounter numAdds;
 
-      ForEachFunctor<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
+      ForEachFunctor<doLock, GaloisWL> l (graph, nextWL, numAdds);
       Galois::for_each(it, it, l, Galois::wl<WL>(std::ref(currWL)));
 
       return numAdds.reduce ();

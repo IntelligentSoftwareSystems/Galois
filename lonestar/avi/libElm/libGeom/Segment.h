@@ -61,7 +61,7 @@ template<size_t SPD>
 class Segment:public AbstractGeom<SPD>
 {
  public:
-  Segment (const std::vector<double> globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
+  Segment (const VecDouble& globalCoordVec, const VecSize_t& connectivity)
     :AbstractGeom<SPD> (globalCoordVec, connectivity) {
       assert (connectivity.size () == 2);
   }
@@ -113,7 +113,7 @@ class Segment:public AbstractGeom<SPD>
     return(getInRadius());
   }
 
-  virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
+  virtual void computeNormal (size_t e, VecDouble& vNormal) const {
     std::cerr << "Segment::computeNormal not implemented yet" << std::endl;
     abort ();
   }

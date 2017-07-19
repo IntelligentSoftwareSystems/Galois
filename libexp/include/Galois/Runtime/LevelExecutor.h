@@ -32,14 +32,16 @@
 #if 0
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
 #include "Galois/optional.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListWrapper.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Substrate/ThreadPool.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 
 #include <map>
 #include <vector>
@@ -59,19 +61,19 @@ template <typename Key, typename KeyCmp, typename WL_ty>
 class LevelMap {
 public:
   using value_type = typename WL_ty::value_type;
-  using MapAlloc = MM::FixedSizeAllocator<std::pair<const Key, WL_ty*> >;
-  using WLalloc = MM::FixedSizeAllocator<WL_ty>;
+  using MapAlloc = FixedSizeAllocator<std::pair<const Key, WL_ty*> >;
+  using WLalloc = FixedSizeAllocator<WL_ty>;
   using InternalMap = std::map<Key, WL_ty*, KeyCmp, MapAlloc>;
   using GarbageVec = Galois::gdeque<WL_ty*>;
   using Level = std::pair<Key, WL_ty*>;
   using CachedLevel = Galois::optional<Level>;
 
 private:
-  LL::ThreadRWlock rwmutex;
+  ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;
-  PerThreadStorage<CachedLevel> cachedLevels;
+  Substrate::PerThreadStorage<CachedLevel> cachedLevels;
 
 public:
   LevelMap (const KeyCmp& kcmp): 
@@ -153,18 +155,18 @@ template <typename WL_ty>
 class LevelMap<unsigned, std::less<unsigned>, WL_ty> {
 public:
   using value_type = typename WL_ty::value_type;
-  using WLalloc = MM::FixedSizeAllocator<WL_ty>;
+  using WLalloc = FixedSizeAllocator<WL_ty>;
   using GarbageVec = Galois::gdeque<WL_ty*>;
   using Level = std::pair<unsigned, WL_ty*>;
   using InternalMap = std::deque<Level>;
   using CachedLevel = Galois::optional<Level>;
 
 private:
-  LL::ThreadRWlock rwmutex;
+  ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;
-  PerThreadStorage<CachedLevel> cachedLevels;
+  Substrate::PerThreadStorage<CachedLevel> cachedLevels;
 
   unsigned begLevel = 0;
 
@@ -289,7 +291,7 @@ class LevelExecutor {
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
   struct BodyWrapper;
   using ForEachExec_ty = Galois::Runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
@@ -327,7 +329,7 @@ class LevelExecutor {
       nhVisit (x, uhand);
       opFunc (x, uhand);
 
-      if (ForEachTraits<OpFunc>::NeedsPush) { // TODO: change to check for noadd trait
+      if (ForEachTraits<OpFunc>::NeedsPush) { 
         for (auto i = uhand.getPushBuffer ().begin ()
             , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
@@ -397,7 +399,7 @@ public:
   }
 
   static bool isMasterThread (void) {
-    return LL::getTID () == 0;
+    return Substrate::ThreadPool::getTID () == 0;
   }
 
   // parallel
@@ -438,7 +440,7 @@ public:
     }
 
     if (isMasterThread ()) {
-      LL::gPrint("Level-by-Level, critical path length: ", steps, ", avg. parallelism: ", totalWork/(double) steps, "\n");
+      Substrate::gPrint("Level-by-Level, critical path length: ", steps, ", avg. parallelism: ", totalWork/(double) steps, "\n");
     }
 
   }
@@ -495,7 +497,7 @@ auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, c
 }
 
 template<typename R, typename KeyFn, typename KeyCmp, typename NhoodFn, typename OpFn>
-void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& keyCmp, const NhoodFn& nhoodFn, const OpFn& opFn, const char* ln=0) {
+void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& keyCmp, NhoodFn nhoodFn, OpFn opFn, const char* ln=0) {
   typedef typename R::value_type value_type;
   typedef typename std::result_of<KeyFn(value_type)>::type key_type;
   constexpr bool is_less = std::is_same<KeyCmp, std::less<key_type>>::value;

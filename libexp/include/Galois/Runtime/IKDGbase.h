@@ -3,12 +3,17 @@
 
 
 #include "Galois/AltBag.h"
+#include "Galois/Accumulator.h"
 #include "Galois/OrderedTraits.h"
+#include "Galois/DoAllWrap.h"
 
 #include "Galois/Runtime/OrderedLockable.h"
+#include "Galois/Runtime/WindowWorkList.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+
+#include "llvm/Support/CommandLine.h"
 
 #include <utility>
 #include <functional>
@@ -73,8 +78,9 @@ public:
             c->disableSrc ();
           }
         },
-        "safety_test_loop",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple(
+          Galois::loopname("safety_test_loop"),
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
   }
 };
 
@@ -89,70 +95,43 @@ struct SafetyTestLoop<Ctxt, int> {
 };
 
 
-template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
-void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
-  Galois::Runtime::setThreadContext (c);
-
-  int result = 0;
-
-#ifdef GALOIS_USE_LONGJMP
-  if ((result = setjmp(hackjmp)) == 0) {
-#else
-    try {
-#endif
-      func (c->getActive (), uhand, std::forward<Args> (args)...);
-
-#ifdef GALOIS_USE_LONGJMP
-    } else {
-      // TODO
-    }
-#else 
-  } catch (ConflictFlag f) {
-    result = f;
-  }
-#endif
-
-  switch (result) {
-    case 0:
-      break;
-    case CONFLICT: 
-      c->disableSrc ();
-      break;
-    default:
-      GALOIS_DIE ("can't handle conflict flag type");
-      break;
-  }
-
-
-  Galois::Runtime::setThreadContext (NULL);
-}
-
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
-class IKDGbase {
+class IKDGbase: public OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt> {
 
 protected:
-  using CtxtCmp = typename Ctxt::CtxtCmp;
-  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadBag<Ctxt*>;
 
-  using UserCtxt = UserContextAccess<T>;
-  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
+  using Base = OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+  using CtxtWL = typename Base::CtxtWL;
 
-  static const bool OPERATOR_CAN_ABORT = exists_by_supertype<operator_can_abort_tag, ArgsTuple>::value;
-  static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value 
-    || !std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value;
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, SetWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
 
-  static const bool ENABLE_PARAMETER = get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
-  static const bool NEEDS_PUSH = !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;
+  template <typename Outer>
+  struct WindowWLwrapper: public WindowWL {
+    Outer& outer;
 
+    WindowWLwrapper (Outer& outer, const Cmp& cmp):
+      WindowWL (cmp), outer (outer) {}
 
-  Cmp cmp;
-  NhFunc nhFunc;
-  ExFunc exFunc;
-  OpFunc opFunc;
-  const char* loopname;
+    void push (const T& x) {
+      WindowWL::push (x);
+    }
 
-  CtxtCmp ctxtCmp;
+    // TODO: complete this class
+    void push (Ctxt* c) {
+      assert (c);
+
+      WindowWL::push (c->getActive ());
+
+      // destroy and deallocate c
+      outer.ctxtAlloc.destroy (c);
+      outer.ctxtAlloc.deallocate (c, 1);
+    }
+
+    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
+      WindowWL::poll (wl, newSize, origSize, outer.getCtxtMaker());
+    }
+  };
+
   std::unique_ptr<CtxtWL> currWL;
   std::unique_ptr<CtxtWL> nextWL;
 
@@ -163,19 +142,22 @@ protected:
   size_t totalCommits;
   double targetCommitRatio;
 
-  CtxtAlloc ctxtAlloc;
-  PerThreadUserCtxt userHandles;
   GAccumulator<size_t> roundTasks;;
   GAccumulator<size_t> roundCommits;
 
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_expandNhood;
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
+  TimeAccumulator t_reclaimMemory;
+
+
+
   IKDGbase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
-      cmp (cmp), 
-      nhFunc (nhFunc), 
-      exFunc (exFunc),
-      opFunc (opFunc), 
-      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
-      ctxtCmp (cmp),
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
       currWL (new CtxtWL),
       nextWL (new CtxtWL),
       windowSize (0),
@@ -184,7 +166,6 @@ protected:
       totalCommits (0),
       targetCommitRatio (commitRatioArg)
   {
-    if (!loopname) { loopname = "NULL"; }
 
     if (targetCommitRatio < 0.0) {
       targetCommitRatio = 0.0;
@@ -193,7 +174,7 @@ protected:
       targetCommitRatio = 1.0;
     }
 
-    if (ENABLE_PARAMETER) {
+    if (Base::ENABLE_PARAMETER) {
       assert (targetCommitRatio == 0.0);
     }
 
@@ -203,9 +184,6 @@ protected:
     dumpStats ();
   }
 
-  const Cmp& getItemCmp () const { return cmp; }
-
-  const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
 
   CtxtWL& getCurrWL (void) { 
     assert (currWL);
@@ -218,16 +196,24 @@ protected:
   }
 
   void dumpStats (void) {
-    reportStat (loopname, "rounds", rounds,0);
-    reportStat (loopname, "committed", totalCommits,0);
-    reportStat (loopname, "total", totalTasks,0);
+    reportStat (Base::loopname, "rounds", rounds,0);
+    reportStat (Base::loopname, "committed", totalCommits,0);
+    reportStat (Base::loopname, "total", totalTasks,0);
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 
+    reportStat ("(NULL)", "t_expandNhood",    t_expandNhood.get(),0);
+    reportStat ("(NULL)", "t_beginRound",     t_beginRound.get(),0);
+    reportStat ("(NULL)", "t_executeSources", t_executeSources.get(),0);
+    reportStat ("(NULL)", "t_applyOperator",  t_applyOperator.get(),0);
+    reportStat ("(NULL)", "t_serviceAborts",  t_serviceAborts.get(),0);
+    reportStat ("(NULL)", "t_performCommits", t_performCommits.get(),0);
+    reportStat ("(NULL)", "t_reclaimMemory",  t_reclaimMemory.get(),0);
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, CtxtWL& wl) {
+  //  TODO: spill range 
+  template <typename WinWL, typename WL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, WL& wl) {
 
     //    dbg::print("Spilling to winWL");
 
@@ -236,7 +222,7 @@ protected:
     on_each(
         [this, &wl, &winWL] (const unsigned tid, const unsigned numT) {
           while (!wl.get ().empty ()) {
-            Ctxt* c = wl.get ().back ();
+            auto e  = wl.get ().back ();
             wl.get ().pop_back ();
 
             //            dbg::print("Spilling: ", c, " with active: ", c->getActive ());
@@ -249,8 +235,8 @@ protected:
     assert (!winWL.empty ());
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (WinWL& winWL, CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
+  template <typename WinWL, typename WL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (WinWL& winWL, WL& wl, size_t currCommits, size_t prevWindowSize) {
 
     assert (targetCommitRatio != 0.0);
 
@@ -265,7 +251,7 @@ protected:
       assert (currCommits == 0);
 
       // initial settings
-      if (NEEDS_PUSH) {
+      if (Base::NEEDS_PUSH) {
         windowSize = std::min (
             (winWL.initSize ()),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
@@ -305,7 +291,7 @@ protected:
     assert (windowSize > 0);
 
 
-    if (NEEDS_PUSH) {
+    if (Base::NEEDS_PUSH) {
       if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
@@ -325,27 +311,39 @@ protected:
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound (WinWL& winWL) {
-    std::swap (currWL, nextWL);
+  template <typename WinWL, typename WL>
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void refillRound (WinWL& winWL, WL& wl) {
+
 
     if (targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
-
       size_t prevWindowSize = roundTasks.reduceRO ();
-      refill (winWL, *currWL, currCommits, prevWindowSize);
+      refill (winWL, wl, currCommits, prevWindowSize);
     }
-
 
     roundCommits.reset ();
     roundTasks.reset ();
+  }
+
+  template <typename WinWL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound (WinWL& winWL) {
+    std::swap (currWL, nextWL);
     nextWL->clear_all_parallel ();
+
+    refillRound (winWL, *currWL);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
     ++rounds;
     totalCommits += roundCommits.reduceRO ();
     totalTasks += roundTasks.reduceRO ();
+
+    if (roundTasks.reduceRO () > 0) {
+      assert (roundCommits.reduceRO() > 0 && "No commits this round, No progress");
+    }
+
+    // std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
+        // rounds, roundTasks.reduceRO (), roundCommits.reduceRO ());
   }
 
   // TODO: for debugging only
@@ -359,12 +357,12 @@ protected:
         [this, &perThrdMin] (const Ctxt* c) {
           Galois::optional<const Ctxt*>& m = *(perThrdMin.getLocal ());
 
-          if (!m || ctxtCmp (c, *m)) { // c < *m
+          if (!m || Base::ctxtCmp (c, *m)) { // c < *m
             m = c;
           }
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMinCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
@@ -373,7 +371,7 @@ protected:
       const Galois::optional<const Ctxt*>& m = *(perThrdMin.getRemote (i));
 
       if (m) {
-        if (!ret || ctxtCmp (*m, ret)) { // ret < *m
+        if (!ret || Base::ctxtCmp (*m, ret)) { // ret < *m
           ret = *m;
         }
       }
@@ -391,12 +389,12 @@ protected:
         [this, &perThrdMax] (const Ctxt* c) {
           Galois::optional<const Ctxt*>& m = *(perThrdMax.getLocal ());
 
-          if (!m || ctxtCmp (*m, c)) { // *m < c
+          if (!m || Base::ctxtCmp (*m, c)) { // *m < c
             m = c;
           } 
         },
         std::make_tuple (
-            Galois::loopname ("safety_test_loop"),
+            Galois::loopname ("getMaxCurrWL"),
             Galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
@@ -405,7 +403,7 @@ protected:
       const Galois::optional<const Ctxt*>& m = *(perThrdMax.getRemote (i));
 
       if (m) {
-        if (!ret || ctxtCmp (ret, *m)) { // ret < *m
+        if (!ret || Base::ctxtCmp (ret, *m)) { // ret < *m
           ret = *m;
         }
       }

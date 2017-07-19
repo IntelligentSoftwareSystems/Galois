@@ -120,9 +120,9 @@ public:
 
   virtual size_t getStateSize () const = 0;
 
-  virtual void copyState (char* const buf, const size_t bufSize) const = 0;
+  virtual void copyState (void* const buf, const size_t bufSize) const = 0;
 
-  virtual void restoreState (char* const buf, const size_t bufSize) = 0;
+  virtual void restoreState (void* const buf, const size_t bufSize) = 0;
 };
 
 

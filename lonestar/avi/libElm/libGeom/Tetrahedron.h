@@ -70,7 +70,7 @@ public:
 
 public:
   
-  Tetrahedron (const std::vector<double>& globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
+  Tetrahedron (const VecDouble& globalCoordVec, const VecSize_t& connectivity)
     :AbstractGeom<TET_SPD> (globalCoordVec, connectivity) {
       assert (connectivity.size () == 4);
   }
@@ -146,7 +146,7 @@ public:
   //! Prompts an error if an invalid face is requested.
   Triangle<3> * getFaceGeometry(size_t e) const {
     if(e<=3) {
-      std::vector<GlobalNodalIndex> conn(FaceNodes + 3*e, FaceNodes + 3*e + 2);
+      VecSize_t conn(FaceNodes + 3*e, FaceNodes + 3*e + 2);
 
       return new Triangle<TET_SPD> (AbstractGeom<TET_SPD>::getGlobalCoordVec (), conn);
 
@@ -227,7 +227,7 @@ public:
   //!
   //! @param e: face number for which the normal is desired
   //! @param vNormal: output of the three Cartesian components of the normal vector
-  virtual void computeNormal (size_t e, std::vector<double>& vNormal) const {
+  virtual void computeNormal (size_t e, VecDouble& vNormal) const {
     const size_t sd = AbstractGeom<TET_SPD>::SP_DIM;
 
     size_t n0, n1, n2;   // Local node numbers of face 'e'

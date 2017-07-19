@@ -63,9 +63,9 @@ public:
   //!
   //! If not derivatives of shape functions are available, just provide and empty vector as 
   //! DShapesInput
-  inline BasisFunctionsProvidedExternalQuad (const std::vector<double> &ShapesInput,
-      const std::vector<double> &DShapesInput, const std::vector<double> &QuadratureWeights,
-      const std::vector<double> &QuadratureCoords) :
+  inline BasisFunctionsProvidedExternalQuad (const VecDouble& ShapesInput,
+      const VecDouble& DShapesInput, const VecDouble& QuadratureWeights,
+      const VecDouble& QuadratureCoords) :
     LocalShapes (ShapesInput), LocalDShapes (DShapesInput),
     LocalWeights (QuadratureWeights), LocalCoordinates (QuadratureCoords) {
 
@@ -98,8 +98,8 @@ public:
   //! @param QuadratureCoords: QuadratureCoords[q*spd+i] contains the i-th coordinate of the position of quadrature
   //! point "q"
   inline BasisFunctionsProvidedExternalQuad (size_t NShapes,
-      const std::vector<double> &DShapesInput, const std::vector<double> &QuadratureWeights,
-      const std::vector<double> &QuadratureCoords) :
+      const VecDouble& DShapesInput, const VecDouble& QuadratureWeights,
+      const VecDouble& QuadratureCoords) :
     LocalShapes (ZeroSizeVector), LocalDShapes (DShapesInput), NumberOfShapes (NShapes),
     LocalWeights (QuadratureWeights), LocalCoordinates (QuadratureCoords) {
 
@@ -115,7 +115,7 @@ public:
   inline virtual ~BasisFunctionsProvidedExternalQuad () {
   }
 
-  inline BasisFunctionsProvidedExternalQuad (const BasisFunctionsProvidedExternalQuad &NewBas) :
+  inline BasisFunctionsProvidedExternalQuad (const BasisFunctionsProvidedExternalQuad& NewBas) :
     LocalShapes (NewBas.LocalShapes), LocalDShapes (NewBas.LocalDShapes),
         NumberOfShapes (NewBas.NumberOfShapes) , LocalWeights (NewBas.LocalWeights), LocalCoordinates (NewBas.LocalCoordinates) {
   }
@@ -127,7 +127,7 @@ public:
   //!  Shape functions at quadrature points
   //!  getShapes()[q*Shape::getNumFunctions()+a]
   //!  gives the value of shape function a at quadrature point q
-  inline const std::vector<double> & getShapes () const {
+  inline const VecDouble& getShapes () const {
     return LocalShapes;
   }
 
@@ -135,12 +135,12 @@ public:
   //! getDShapes()[q*Shape::getNumFunctions()*ElementGeometry::getEmbeddingDimensions()+a*ElementGeometry::getEmbeddingDimensions()+i] 
   //! gives the
   //! derivative in the i-th direction of degree of freedom a at quadrature point q
-  inline const std::vector<double> & getDShapes () const {
+  inline const VecDouble& getDShapes () const {
     return LocalDShapes;
   }
 
   //!< Integration weights 
-  inline const std::vector<double> & getIntegrationWeights () const {
+  inline const VecDouble& getIntegrationWeights () const {
     return LocalWeights;
   }
 
@@ -148,7 +148,7 @@ public:
   //! getQuadraturePointCoordinates()
   //! [q*ElementGeometry::getEmbeddingDimension()+i]
   //! returns the i-th coordinate in real space of quadrature point q 
-  inline const std::vector<double> & getQuadraturePointCoordinates () const {
+  inline const VecDouble& getQuadraturePointCoordinates () const {
     return LocalCoordinates;
   }
 
@@ -168,14 +168,14 @@ public:
   }
 
 private:
-  const std::vector<double>& LocalShapes;
-  const std::vector<double>& LocalDShapes;
+  const VecDouble& LocalShapes;
+  const VecDouble& LocalDShapes;
   size_t NumberOfShapes;
 
 protected:
-  const std::vector<double>& LocalWeights;
-  const std::vector<double>& LocalCoordinates;
-  static const std::vector<double> ZeroSizeVector;
+  const VecDouble& LocalWeights;
+  const VecDouble& LocalCoordinates;
+  static const VecDouble ZeroSizeVector;
 };
 
 /**
@@ -203,9 +203,9 @@ public:
   //! @param QuadratureWeights: QuadratureWeights[q] contains the value of the quadrature weight at quad point "q"
   //! @param QuadratureCoords: QuadratureCoords[q*spd+i] contains the i-th coordinate of the position of quadrature
   //! point "q"
-  inline BasisFunctionsProvided (const std::vector<double> &ShapesInput,
-      const std::vector<double> &DShapesInput, const std::vector<double> &QuadratureWeights,
-      const std::vector<double> &QuadratureCoords) :
+  inline BasisFunctionsProvided (const VecDouble &ShapesInput,
+      const VecDouble &DShapesInput, const VecDouble &QuadratureWeights,
+      const VecDouble &QuadratureCoords) :
         BasisFunctionsProvidedExternalQuad (ShapesInput, DShapesInput, QuadratureWeights, QuadratureCoords) {
   }
 

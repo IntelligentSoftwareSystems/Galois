@@ -32,6 +32,7 @@
 #define GALOIS_GRAPH_LC_INOUT_GRAPH_H
 
 #include "Galois/Graphs/Details.h"
+#include "Galois/Galois.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>
@@ -230,6 +231,29 @@ public:
     } else {
       std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)), comp);
     }
+  }
+
+  /**
+   * Sorts incoming edges of a node. Comparison is by getInEdgeDst(e).
+   */
+  void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    this->acquireNode(N, mflag);
+    if(!asymmetric) {
+      typedef EdgeSortValue<GraphNode, edge_data_type> EdgeSortVal;
+      std::sort(this->edge_sort_begin(N), this->edge_sort_end(N), 
+        [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
+    } else {
+      typedef EdgeSortValue<typename InGraph::GraphNode, typename InGraph::edge_data_type> InEdgeSortVal;
+      std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)), 
+        [=] (const InEdgeSortVal& e1, const InEdgeSortVal& e2) { return e1.dst < e2.dst; });
+    }
+  }
+
+  /**
+   * Sorts incoming edges of all nodes. Comparison is by getInEdgeDst(e).
+   */
+  void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
+    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
   }
 
   size_t idFromNode(GraphNode N) {

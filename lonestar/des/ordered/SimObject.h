@@ -40,14 +40,14 @@ class SimObject: public des::BaseSimObject<Event_tp> {
   typedef des::BaseSimObject<Event_tp> Base;
   typedef Event_tp Event_ty;
 
-  template <typename Cont> 
+  template <typename AddNewFunc> 
   struct SendAddList: public Base::SendWrapper {
-    Cont& container;
+    AddNewFunc& addNewFunc;
 
-    SendAddList (Cont& _container): Base::SendWrapper (), container (_container) {}
+    SendAddList (AddNewFunc& _container): Base::SendWrapper (), addNewFunc (_container) {}
 
     virtual void send (Base* dstObj, const Event_ty& event) {
-      container.push_back (event);
+      addNewFunc (event);
     }
   };
 
@@ -58,27 +58,27 @@ public:
     : Base (id) 
   {}
 
-  template <typename G, typename C>
+  template <typename G, typename AddNewFunc>
   void execEvent (
       const Event_ty& event, 
       G& graph, 
       typename G::GraphNode& mynode, 
-      C& newEvents) {
+      AddNewFunc& newEvents) {
 
     assert (event.getRecvObj () == this);
 
     typename Base::template OutDegIterator<G> beg = this->make_begin (graph, mynode);
     typename Base::template OutDegIterator<G> end = this->make_end (graph, mynode);
 
-    SendAddList<C> addListWrap (newEvents);
+    SendAddList<AddNewFunc> addListWrap (newEvents);
     this->execEventIntern (event, addListWrap, beg, end);
   }
 
   virtual size_t getStateSize () const = 0;
   
-  virtual void copyState (char* const buf, const size_t bufSize) const = 0; 
+  virtual void copyState (void* const buf, const size_t bufSize) const = 0; 
 
-  virtual void restoreState (char* const buf, const size_t bufSize) = 0;
+  virtual void restoreState (void* const buf, const size_t bufSize) = 0;
 };
 
 } // end namespace des_ord

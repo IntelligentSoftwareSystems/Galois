@@ -108,14 +108,14 @@ class ShapesEvaluated: public BasisFunctions
   
  public:
   // Accessors/Mutators:
-  inline const std::vector<double> & getShapes() const { return LocalShapes; }
+  inline const VecDouble& getShapes() const { return LocalShapes; }
 
-  inline const std::vector<double> & getDShapes() const { return LocalDShapes; }
+  inline const VecDouble& getDShapes() const { return LocalDShapes; }
 
-  inline const std::vector<double> & getIntegrationWeights() const 
+  inline const VecDouble& getIntegrationWeights() const 
     { return LocalWeights;}
 
-  inline const std::vector<double> & getQuadraturePointCoordinates() const 
+  inline const VecDouble& getQuadraturePointCoordinates() const 
     { return LocalCoordinates; }
 
   //! returns the number of shape functions provided
@@ -145,10 +145,10 @@ class ShapesEvaluated: public BasisFunctions
 
 
  private:
-  std::vector<double> LocalShapes;
-  std::vector<double> LocalDShapes;
-  std::vector<double> LocalWeights;
-  std::vector<double> LocalCoordinates;
+  VecDouble LocalShapes;
+  VecDouble LocalDShapes;
+  VecDouble LocalWeights;
+  VecDouble LocalCoordinates;
 };
 
 

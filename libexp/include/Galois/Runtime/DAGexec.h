@@ -346,7 +346,9 @@ public:
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
-       "free_ctx", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("free_ctx"), 
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -399,7 +401,10 @@ public:
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
 
-        }, "create_ctxt", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        }, 
+        std::make_tuple (
+          Galois::loopname ("create_ctxt"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     // virtual call implemented by derived classes
     createAllEdges ();
@@ -412,7 +417,10 @@ public:
           if (ctxt->isSrc ()) {
             initSources.get ().push_back (ctxt);
           }
-        }, "finalize", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        }, 
+        std::make_tuple (
+          Galois::loopname ("finalize"), 
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
 
@@ -445,7 +453,9 @@ public:
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
-        "resetDAG", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("resetDAG"), 
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
     t_reset.stop ();
   }
 
@@ -460,7 +470,9 @@ public:
           numNodes += 1;
           numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
         },
-        "dag_stats", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("dag_stats"), 
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     printf ("DAG created with %zd nodes, %zd edges\n", 
         numNodes.reduceRO (), numEdges.reduceRO ());
@@ -497,7 +509,10 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
               Base::createEdge (*i, *j);
             }
           }
-        }, "create_ctxt_edges", Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
+        }, 
+        std::make_tuple (
+          Galois::loopname ("create_ctxt_edges"), 
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 };
 
@@ -536,7 +551,10 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
               Base::createEdge (*w, *r);
             }
           }
-        }, "create_ctxt_edges", Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
+        }, 
+        std::make_tuple (
+          Galois::loopname ("create_ctxt_edges"), 
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 
 };

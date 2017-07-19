@@ -1,0 +1,10 @@
+############## AIG TEST ##############
+Using 4 threads.
+Connecting edges ...
+Design Name: top
+|Nodes|: 16217004
+I: 117
+L: 0
+O: 50
+A: 16216836
+Parser time: 2052383 milliseconds

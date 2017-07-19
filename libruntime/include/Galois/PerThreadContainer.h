@@ -47,7 +47,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 
 #include "Galois/gdeque.h"
-#include "Galois/STLcontainers.h"
+#include "Galois/gstl.h"
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
@@ -318,6 +318,7 @@ protected:
   }
 
   ~PerThreadContainer() { 
+    clear_all_parallel ();
     destroy();
   }
 
@@ -432,24 +433,34 @@ public:
     return sz;
   }
 
-  void clear_all() {
-    for (unsigned i = 0; i < perThrdCont.size(); ++i) {
-      get(i).clear();
-    }
-  }
+  // XXX: disabling because of per thread memory allocators 
+  // void clear_all() {
+    // for (unsigned i = 0; i < perThrdCont.size(); ++i) {
+      // get(i).clear();
+    // }
+  // }
 
   void clear_all_parallel (void) {
-    auto r = Galois::Runtime::makeStandardRange (
-        boost::counting_iterator<unsigned> (0),
-        boost::counting_iterator<unsigned> (perThrdCont.size ()));
 
-    Galois::Runtime:: do_all_impl (
-        r, 
-        [this] (unsigned i) {
-          get (i).clear ();
-        },
-        "clear_all", 
-        false);
+    Runtime::on_each_impl(
+        [this] (const unsigned tid, const unsigned numT) {
+          get ().clear ();
+        });
+
+
+    // XXX: following implementation causes problems with allocators
+    // that allocate per thread separately
+    // auto r = Galois::Runtime::makeStandardRange (
+        // boost::counting_iterator<unsigned> (0),
+        // boost::counting_iterator<unsigned> (perThrdCont.size ()));
+// 
+    // Galois::Runtime:: do_all_impl (
+        // r, 
+        // [this] (unsigned i) {
+          // get (i).clear ();
+        // },
+        // "clear_all", 
+        // false);
     
   }
 

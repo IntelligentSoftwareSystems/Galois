@@ -72,7 +72,7 @@ template<size_t SPD>
 class Triangle: public AbstractGeom<SPD> {
  public:
   //! Connectivity in Triangle<SPD> GlobalCoordinatesArray
-  Triangle (const std::vector<double>& globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
+  Triangle (const VecDouble& globalCoordVec, const VecSize_t& connectivity)
     :AbstractGeom<SPD> (globalCoordVec, connectivity) {
       assert (connectivity.size () == 3);
   }
@@ -108,9 +108,9 @@ class Triangle: public AbstractGeom<SPD> {
 
   virtual Segment<SPD> * getFaceGeometry(size_t e) const; 
 
-  virtual void computeNormal (size_t e, std::vector<double>& vNormal) const;
+  virtual void computeNormal (size_t e, VecDouble& vNormal) const;
 
-  virtual void computeCenter (std::vector<double>& center) const;
+  virtual void computeCenter (VecDouble& center) const;
 
 private:
   static size_t    SegmentNodes[];
@@ -171,7 +171,7 @@ void Triangle<SPD>::dMap(const double * X, double *DY, double &Jac) const
 template<size_t SPD>   
 Segment<SPD> * Triangle<SPD>::getFaceGeometry(size_t e) const
 {
-  std::vector<GlobalNodalIndex> conn(2);
+  VecSize_t conn(2);
   switch(e)
   {
     case 0:
@@ -235,7 +235,7 @@ double Triangle<SPD>:: getOutRadius(void) const {
 }
 
 template <size_t SPD>
-void Triangle<SPD>::computeNormal(size_t e, std::vector<double> &VNormal) const {
+void Triangle<SPD>::computeNormal(size_t e, VecDouble& VNormal) const {
   double NodalCoord[4];
 
   size_t    n[2];
@@ -267,7 +267,7 @@ void Triangle<SPD>::computeNormal(size_t e, std::vector<double> &VNormal) const 
  * sides, which are perpendicular to the sides
  */
 template <size_t SPD>
-void Triangle<SPD>::computeCenter (std::vector<double>& center) const {
+void Triangle<SPD>::computeCenter (VecDouble& center) const {
 
   double x1 = AbstractGeom<SPD>::getCoordinate (0, 0); // node 0, x coord
   double y1 = AbstractGeom<SPD>::getCoordinate (0, 1); // node 0, y coord

@@ -82,11 +82,11 @@ private:
   std::vector<AVI*> aviVec;
 
 
-  std::vector<size_t> fieldsUsed;
+  VecSize_t fieldsUsed;
 
   double writeInc;
   int writeInterval;
-  std::vector<size_t> aviWriteInterval;
+  VecSize_t aviWriteInterval;
   FILE* syncFileWriter;
 
 private:

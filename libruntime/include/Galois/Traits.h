@@ -328,5 +328,17 @@ struct has_deterministic_local_state: public trait_has_type<T>, has_deterministi
 
 /** For distributed Galois **/
 struct op_tag {};
+
 }
+/**
+ * Stats of multiple instance of a loop will be combined 
+ * if this tag is passed
+ */
+struct combine_stats_by_name_tag {};
+template <typename T=bool>
+struct combine_stats_by_name: public trait_has_type<T>, combine_stats_by_name_tag {}; 
+
+} // close namespace Galois
+
+
 #endif

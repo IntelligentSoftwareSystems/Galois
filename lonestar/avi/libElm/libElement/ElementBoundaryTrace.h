@@ -79,7 +79,7 @@ class ElementBoundaryTraces
   //! face element accesses with getTrace(FaceIndex).
   //!
   //! The value returned starts at 0 for the first face and so on.
-  virtual const std::vector<size_t> & getTraceFaceIds() const = 0;
+  virtual const VecSize_t& getTraceFaceIds() const = 0;
 
 
   //! Returns the Trace number where the trace for face FaceIndex is stored.
@@ -104,7 +104,7 @@ class ElementBoundaryTraces
   //! Returns the outward normal to face getTraceFaceIds(FaceIndex)
   //! FaceIndex ranges from 0
   //! to the getNumTraceFaces()-1. 
-  virtual const std::vector<double> & getNormal(size_t FaceIndex) const = 0;
+  virtual const VecDouble& getNormal(size_t FaceIndex) const = 0;
 
   //! map between the degrees of freedom of field in a trace 
   //! and those in the original element
@@ -181,7 +181,7 @@ public:
     return FaceElements.size ();
   }
 
-  const std::vector<size_t> & getTraceFaceIds () const {
+  const VecSize_t& getTraceFaceIds () const {
     return FaceNumbers;
   }
 
@@ -206,7 +206,7 @@ protected:
 
 private:
   std::vector<const Element *> FaceElements;
-  std::vector<size_t> FaceNumbers;
+  VecSize_t FaceNumbers;
 };
 
 #endif

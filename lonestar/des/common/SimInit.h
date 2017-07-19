@@ -55,7 +55,7 @@
 
 namespace des {
 
-template <typename SimGate_tp, typename Input_tp, typename Output_tp>
+template <NullEventOpt NULL_EVENT_OPT, typename SimGate_tp, typename Input_tp, typename Output_tp>
 class SimInit {
 
 public:
@@ -161,7 +161,7 @@ protected:
         initEvents.push_back(e);
       }
 
-      if (createNullEvents) {
+      if (NULL_EVENT_OPT == NEEDS_NULL_EVENTS) {
         // final NULL_EVENT scheduled at INFINITY_SIM_TIME to signal that no more
         // non-null events will be received on an input
 

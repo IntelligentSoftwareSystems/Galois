@@ -29,5 +29,5 @@
 #include "BasisFunctions.h"
 #include "BasisFunctionsProvided.h"
 
-std::vector<double> EmptyBasisFunctions::ZeroSizeVector;
-const std::vector<double> BasisFunctionsProvidedExternalQuad::ZeroSizeVector;
+VecDouble EmptyBasisFunctions::ZeroSizeVector;
+const VecDouble BasisFunctionsProvidedExternalQuad::ZeroSizeVector;

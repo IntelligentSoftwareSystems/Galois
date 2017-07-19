@@ -192,7 +192,7 @@ public:
     return operation.getFieldDof (fieldnumber);
   }
 
-  const std::vector<size_t>& getFields () const {
+  const VecSize_t& getFields () const {
     return operation.getFields ();
   }
 

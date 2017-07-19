@@ -178,7 +178,7 @@ void initResidual(Graph& graph) {
       //contribute residual
       auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
       for (auto ii : graph.edges(src)) {
-        auto dst = graph.getEdgeDst(src);
+        auto dst = graph.getEdgeDst(ii);
         auto& ddata = graph.getData(dst);
         atomicAdd(ddata.residual, 1.0/nout);
       }

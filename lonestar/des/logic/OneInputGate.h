@@ -170,12 +170,12 @@ protected:
 public:
   virtual size_t getStateSize () const { return sizeof (State); }
 
-  virtual void copyState (char* const buf, const size_t bufSize) const {
+  virtual void copyState (void* const buf, const size_t bufSize) const {
     assert (bufSize >= getStateSize () && "insufficient buffer for state");
     new (buf) State (*this);
   }
 
-  virtual void restoreState (char* const buf, const size_t bufSize) {
+  virtual void restoreState (void* const buf, const size_t bufSize) {
     assert (bufSize >= getStateSize () && "insufficient buffer for state");
 
     State* s = reinterpret_cast<State*> (buf);

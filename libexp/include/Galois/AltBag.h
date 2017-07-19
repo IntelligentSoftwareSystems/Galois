@@ -35,6 +35,9 @@
 
 #include "Galois/Runtime/Mem.h"
 
+#include "Galois/Substrate/gio.h"
+
+
 #include <boost/iterator/iterator_facade.hpp>
 
 #include <list>
@@ -50,7 +53,9 @@ namespace Galois {
 template <typename T, const size_t SZ=0>
 class SerialBag {
 
-  using PageHeap = Runtime::SystemHeap;
+  using dbg = Substrate::debug<0>;
+
+  using PageHeap = Runtime::PageHeap;
   using FSheap = Runtime::FixedSizeHeap;
 
   struct Block {
@@ -68,10 +73,22 @@ class SerialBag {
 
 
 
-  PageHeap pageHeap;
+  PageHeap* pageHeap;
   FSheap fsHeap;
   Block sentinel; // sentinel
   Block* tail;
+
+  void init (void) {
+    tail = &sentinel;
+    sentinel.next = tail;
+    sentinel.prev = tail;
+  }
+
+  //! sentinel is a dummy empty block that must be after tail
+  void checkInvariants (void) const {
+    assert (tail->next == &sentinel);
+    assert (sentinel.prev == tail);
+  }
 
   Block* getHead (void) const {
     return sentinel.next;
@@ -161,13 +178,15 @@ class SerialBag {
     void* p = nullptr;
 
     if (SZ == 0) { 
-      p = pageHeap.allocate (ALLOC_SIZE);
+      assert (pageHeap);
+      p = pageHeap->allocate (ALLOC_SIZE);
 
     } else {
       p = fsHeap.allocate (ALLOC_SIZE);
     }
 
     assert (p != nullptr);
+    dbg::print (this, " allocating a new block: ", p);
 
 
     size_t offset = 1;
@@ -188,7 +207,9 @@ class SerialBag {
     b->~Block ();
 
     if (SZ == 0) {
-      pageHeap.deallocate (b);
+      assert (pageHeap);
+      pageHeap->deallocate (b);
+      dbg::print (this, " deallocating block: ", b);
     } else {
       fsHeap.deallocate (b);
     }
@@ -196,14 +217,17 @@ class SerialBag {
 
   void pushBackBlock (void) {
 
+    checkInvariants ();
+
     Block* b = newBlock ();
 
     b->next = &sentinel;
-    b->prev = tail->prev;
-    tail->next = b;
     sentinel.prev = b;
+    b->prev = tail;
+    tail->next = b;
     tail = b;
 
+    checkInvariants ();
     // b->next = head;
     // head->prev = b;
     // head = b;
@@ -214,36 +238,40 @@ class SerialBag {
     assert (tail != nullptr && tail != &sentinel && !tail->chunk.empty ());
     assert (tail->next == &sentinel);
 
-    Block* t = tail;
+    Block* old_t = tail;
 
-    Block* b = tail->prev;
-    b->next = &sentinel;
-    sentinel.prev = b;
+    Block* new_t = tail->prev;
+    new_t->next = &sentinel;
+    sentinel.prev = new_t;
 
-    tail = b;
+    tail = new_t;
 
-    deleteBlock (t);
+    deleteBlock (old_t);
+    checkInvariants ();
   }
 
   void pushFrontBlock (void) {
+    checkInvariants ();
 
     Block* b = newBlock ();
 
 
     Block* head = getHead ();
     b->next = head;
+    head->prev = b;
     b->prev = &sentinel;
+    sentinel.next = b;
 
     if (tail == &sentinel) {
       tail = b;
     }
-    sentinel.next = b;
-    head->prev = b;
 
+    checkInvariants ();
   }
 
 
   void popFrontBlock (void) {
+    checkInvariants ();
 
     Block* head = getHead ();
 
@@ -253,14 +281,13 @@ class SerialBag {
     sentinel.next = head->next;
     head->next->prev = &sentinel;
 
-    head->next = nullptr;
-    head->prev = nullptr;
-
     if (tail == head) {
       tail = &sentinel;
+      init ();
     }
 
     deleteBlock (head);
+    checkInvariants ();
   }
 
   void printBlocks (void) {
@@ -272,13 +299,6 @@ class SerialBag {
     }
     std::printf ("\n");
   }
-
-  void init (void) {
-    tail = &sentinel;
-    sentinel.next = tail;
-    sentinel.prev = tail;
-  }
-
 
 public:
   using value_type = T;
@@ -298,7 +318,7 @@ public:
 
   SerialBag (void)
     : 
-      pageHeap (),
+      pageHeap (PageHeap::getInstance ()),
       fsHeap (ALLOC_SIZE),
       sentinel (),
       tail (&sentinel)
@@ -372,6 +392,8 @@ public:
   }
 
   void splice (SerialBag& that) {
+    this->checkInvariants ();
+    that.checkInvariants ();
 
     if (!that.empty ()) {
       this->tail->next = that.getHead ();
@@ -385,6 +407,8 @@ public:
     }
 
     assert (that.empty ());
+    this->checkInvariants ();
+    that.checkInvariants ();
   }
 
   iterator begin () {
@@ -767,16 +791,6 @@ public:
 
   void push (const T& x) {
     push_back (x);
-  }
-
-  void push_back (const T& x, unsigned owner) {
-    assert (owner < Galois::getActiveThreads ());
-    Super_ty::get (owner).push_back (x);
-  }
-
-  void push (const T& x, unsigned owner) {
-    assert (owner < Galois::getActiveThreads ());
-    Super_ty::get (owner).push_back (x);
   }
 
   void splice_all (PerThreadBag& that) {
