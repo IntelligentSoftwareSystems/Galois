@@ -49,12 +49,14 @@
 namespace Galois {
 
 enum DoAllTypes { 
-  DOALL_GALOIS, DOALL_GALOIS_STEAL, DOALL_GALOIS_FOREACH, DOALL_COUPLED, DOALL_CILK, DOALL_OPENMP 
+  DOALL_GALOIS, DOALL_GALOIS_STEAL, DOALL_GALOIS_FOREACH, DOALL_COUPLED, 
+  DOALL_CILK, DOALL_OPENMP, DOALL_RANGE
 };
 
 namespace cll = llvm::cl;
 //extern cll::opt<DoAllTypes> doAllKind;
 cll::opt<DoAllTypes> doAllKind (
+    "doAllKind",
     cll::desc ("DoAll Implementation"),
     cll::values (
       clEnumVal (DOALL_GALOIS, "DOALL_GALOIS"),
@@ -63,6 +65,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (DOALL_COUPLED, "DOALL_COUPLED"),
       clEnumVal (DOALL_CILK, "DOALL_CILK"),
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
+      clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
       clEnumValEnd),
     cll::init (DOALL_COUPLED));
 
@@ -71,30 +74,32 @@ void setDoAllImpl (const DoAllTypes& type);
 
 DoAllTypes getDoAllImpl (void);
 
-
 template <DoAllTypes TYPE> 
 struct DoAllImpl {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    std::abort ();
+  static inline void go(const R& range, const F& func, 
+                        const ArgsTuple& argsTuple) {
+    std::abort();
   }
 };
 
 template <>
 struct DoAllImpl<DOALL_GALOIS> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen (range, func, 
-        std::tuple_cat (std::make_tuple (do_all_steal<false> ()), argsTuple));
+  static inline void go (const R& range, const F& func, 
+                         const ArgsTuple& argsTuple) {
+    Galois::Runtime::do_all_gen(range, func, 
+        std::tuple_cat(std::make_tuple(do_all_steal<false> ()), argsTuple));
   }
 };
 
 template <>
 struct DoAllImpl<DOALL_GALOIS_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
+  static inline void go(const R& range, const F& func, 
+                        const ArgsTuple& argsTuple) {
     Galois::Runtime::do_all_gen (range, func, 
-        std::tuple_cat (std::make_tuple (do_all_steal<true> ()), argsTuple));
+        std::tuple_cat(std::make_tuple(do_all_steal<true>()), argsTuple));
   }
 };
 
@@ -134,7 +139,7 @@ template <>
 struct DoAllImpl<DOALL_COUPLED> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_coupled (range, func, argsTuple);
+    Galois::Runtime::do_all_coupled(range, func, argsTuple);
   }
 };
 
@@ -171,28 +176,63 @@ struct DoAllImpl<DOALL_OPENMP> {
   }
 };
 
+/**
+ * Not a standard do-all loop as the work distribution among threads is 
+ * specified by an iterator array. All iterations should be independent.
+ * Operator should conform to <code>fn(item)</code> where item is i
+ *
+ * @param range Begin/end of range of do-all
+ * @param func operator
+ * @param argsTuple optional arguments to loop; 
+ * TODO currently should have a non-optional iterator array that tells you
+ * where each thread starts/stops work; make this optional in the future
+ */
+template <>
+struct DoAllImpl<DOALL_RANGE> {
+  // TODO make it so the work splitting happens within this function instead
+  // of at graph initialization (then it would work with all ranges
+  // and not just an all vertices range)
+  template <typename R, typename F, typename ArgsTuple>
+  static inline void go(const R& range, const F& func, 
+                        const ArgsTuple& argsTuple) {
+
+    // iterator array should be first argument in args Tuple
+    Galois::Runtime::do_all_gen(
+      Runtime::makeSpecificRange(range.begin(), range.end(),
+                                 std::get<0>(argsTuple)),
+                                 func, 
+      std::tuple_cat(std::make_tuple(do_all_steal<false>()), argsTuple)
+    );
+  }
+};
+
+
 template <typename R, typename F, typename ArgsTuple>
-void do_all_choice (const R& range, const F& func, const DoAllTypes& type, const ArgsTuple& argsTuple) {
+void do_all_choice(const R& range, const F& func, const DoAllTypes& type, 
+                   const ArgsTuple& argsTuple) {
 
   switch (type) {
     case DOALL_GALOIS_STEAL:
-      DoAllImpl<DOALL_GALOIS_STEAL>::go (range, func, argsTuple);
+      DoAllImpl<DOALL_GALOIS_STEAL>::go(range, func, argsTuple);
       break;
     case DOALL_GALOIS_FOREACH:
-      DoAllImpl<DOALL_GALOIS_FOREACH>::go (range, func, argsTuple);
+      DoAllImpl<DOALL_GALOIS_FOREACH>::go(range, func, argsTuple);
       break;
     case DOALL_GALOIS:
-      DoAllImpl<DOALL_GALOIS>::go (range, func, argsTuple);
+      DoAllImpl<DOALL_GALOIS>::go(range, func, argsTuple);
       break;
     case DOALL_COUPLED:
-      DoAllImpl<DOALL_COUPLED>::go (range, func, argsTuple);
+      DoAllImpl<DOALL_COUPLED>::go(range, func, argsTuple);
       break;
     case DOALL_CILK:
-      DoAllImpl<DOALL_CILK>::go (range, func, argsTuple);
+      DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
       break;
     case DOALL_OPENMP:
-      // DoAllImpl<DOALL_OPENMP>::go (range, func, argsTuple);
+      // DoAllImpl<DOALL_OPENMP>::go(range, func, argsTuple);
       std::abort ();
+      break;
+    case DOALL_RANGE:
+      DoAllImpl<DOALL_RANGE>::go(range, func, argsTuple);
       break;
     default:
       abort ();
