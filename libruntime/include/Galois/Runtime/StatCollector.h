@@ -30,6 +30,7 @@
 #ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
 #define GALOIS_RUNTIME_STATCOLLECTOR_H
 
+//TODO: remove dist stuff 
 #include "Galois/gdeque.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Runtime/Serialize.h"

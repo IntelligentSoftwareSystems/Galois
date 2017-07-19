@@ -70,6 +70,7 @@ namespace Galois {
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
 void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
+  // TODO: remove
   Runtime::for_each_gen_dist(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
 }
 
@@ -148,6 +149,34 @@ template<typename ConTy,typename FunctionTy, typename... Args>
 void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
   Runtime::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
+
+
+/** Do_alls with Galois::StatTimer
+ * To measure do_all time.
+ *
+ */
+
+template<typename ConTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename... Args>
+void for_each_local(ConTy& c, const FunctionTy& fn, GTimerTy& statTimer, const Args&... args) {
+  Runtime::for_each_gen(Runtime::makeLocalRange(c), fn, statTimer, std::make_tuple(args...));
+}
+
+template<typename IterTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename... Args>
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, GTimerTy& statTimer, const Args&... args) {
+  Runtime::do_all_gen(Runtime::makeStandardRange(b, e), fn, statTimer, std::make_tuple(args...));
+}
+
+template<typename ItemTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename... Args>
+void do_all(const ItemTy& i, const FunctionTy& fn, GTimerTy& statTimer, const Args&... args) {
+  ItemTy iwl[1] = {i};
+  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, statTimer, std::make_tuple(args...));
+}
+
+template<typename ConTy,typename FunctionTy, Galois::StatTimer GTimerTy, typename... Args>
+void do_all_local(ConTy& c, const FunctionTy& fn, GTimerTy& statTimer, const Args&... args) {
+  Runtime::do_all_gen(Runtime::makeLocalRange(c), fn, statTimer, std::make_tuple(args...));
+}
+
 
 /**
  * Low-level parallel loop. Operator is applied for each running thread.
@@ -231,6 +260,7 @@ void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, cons
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
+//TODO: remove these
 template<typename... Args>
 int read_set(Args... args) {
   // Nothing for now.

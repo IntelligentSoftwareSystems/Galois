@@ -72,6 +72,8 @@ class DESorderedSpec:
   struct NhoodVisitor {
     typedef int tt_has_fixed_neighborhood;
 
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
     Graph& graph;
     VecGNode& nodes;
 
@@ -88,6 +90,9 @@ class DESorderedSpec:
 
 
   struct OpFunc {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
     Graph& graph;
     VecGNode& nodes;
     Accumulator_ty& nevents;

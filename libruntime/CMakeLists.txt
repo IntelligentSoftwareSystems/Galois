@@ -18,12 +18,14 @@ set(sources
 add_library(galois_runtime STATIC ${sources})
 target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+#TODO: move this linking to distirbuted only
 target_link_libraries(galois_runtime galois_net)
 target_link_libraries(galois_runtime galois_substrate)
 target_link_libraries(galois_runtime gllvm)
 if (NUMA_FOUND)
   target_link_libraries(galois_runtime ${NUMA_LIBRARY})
 endif()
+#TODO: move this to toplevel CMakeLists
 if (VTune_FOUND)
   target_link_libraries(galois_runtime ${VTune_LIBRARY})
   target_link_libraries(galois_runtime dl)

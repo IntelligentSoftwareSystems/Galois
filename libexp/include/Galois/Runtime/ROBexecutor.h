@@ -86,9 +86,9 @@ namespace Runtime {
   // TODO: memory management: other threads may refer to an iteration context that has
   // been deallocated after commit or abort
 template <typename T, typename Cmp, typename Exec>
-class ROBcontext: public SimpleRuntimeContext {
+class ROBcontext: public OrderedContextBase<T> {
 
-  using Base = SimpleRuntimeContext;
+  using Base = OrderedContextBase<T>;
   using NhoodList =  Galois::gdeque<Lockable*, 4>; // 2nd arg is chunk size
 
 public:
@@ -109,7 +109,6 @@ public:
 public:
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<State> state;
-  T active;
   Exec& executor;
 
   bool lostConflict;
@@ -129,9 +128,8 @@ public:
 
   explicit ROBcontext (const T& x, Exec& e)
     : 
-      Base (true), 
+      Base (x), 
       state (State::UNSCHEDULED), 
-      active (x), 
       executor (e), 
       lostConflict (false),
       executed (false),
@@ -156,7 +154,7 @@ public:
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
     for (bool succ = false; !succ; ) {
-      Base::AcquireStatus acq = Base::tryAcquire (l);
+      typename Base::AcquireStatus acq = Base::tryAcquire (l);
 
       switch (acq) {
         case Base::FAIL: {
@@ -221,7 +219,7 @@ public:
 
     userHandle.rollback ();
     releaseLocks ();
-    executor.push_abort (active, owner);
+    executor.push_abort (Base::getActive (), owner);
     userHandle.reset ();
 
     Substrate::compilerBarrier ();
@@ -229,19 +227,6 @@ public:
     setState (State::ABORT_DONE);
 
   }
-
-  struct PtrComparator {
-    const Cmp& cmp;
-
-    explicit PtrComparator (const Cmp& cmp): cmp (cmp) {}
-
-    inline bool operator () (const ROBcontext* left, const ROBcontext* right) const {
-      assert (left != nullptr);
-      assert (right != nullptr);
-
-      return cmp (left->active, right->active);
-    }
-  };
 
 private:
 
@@ -324,13 +309,13 @@ class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename Ctxt::PtrComparator;
+  using CtxtCmp = ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = PerThreadDeque<Ctxt*>;
   using CtxtVec = PerThreadVector<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
+  using ROB = Galois::MinHeap<Ctxt*, CtxtCmp>;
 
   using Lock_ty = Galois::Substrate::SimpleLock;
   // using Lock_ty = Galois::Runtime::LL::PthreadLock<true>;
@@ -471,7 +456,7 @@ public:
 
           didWork = true;
 
-          dbg::debug (ctx, " scheduled with item ", ctx->active,
+          dbg::debug (ctx, " scheduled with item ", ctx->getActive (),
               " remaining contexts: ", freeList.get ().size ());
 
           applyOperator (ctx);
@@ -559,10 +544,10 @@ private:
     assert (ctx != nullptr);
 
     Galois::Runtime::setThreadContext (ctx);
-    nhFunc (ctx->active, ctx->userHandle);
+    nhFunc (ctx->getActive (), ctx->userHandle);
 
     if (ctx->hasState (Ctxt::State::SCHEDULED)) {
-      opFunc (ctx->active, ctx->userHandle);
+      opFunc (ctx->getActive (), ctx->userHandle);
     }
     Galois::Runtime::setThreadContext (nullptr);
 
@@ -709,7 +694,7 @@ private:
 
         }  else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
 
-          if (isEarliest (head->active)) {
+          if (isEarliest (head->getActive ())) {
 
             head->setState (Ctxt::State::COMMITTING);
             head->doCommit ();
@@ -721,7 +706,7 @@ private:
             reclaim (t);
             didWork = true;
             numCommitted += 1;
-            dbg::debug (__ctxt, " committed: ", head, ", with active: ", head->active);
+            dbg::debug (__ctxt, " committed: ", head, ", with active: ", head->getActive ());
 
           } else {
             break;
@@ -885,7 +870,7 @@ class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename Ctxt::PtrComparator;
+  using CtxtCmp = ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
@@ -974,15 +959,15 @@ public:
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 
-        dbg::debug (ctx, " scheduled with item ", ctx->active);
+        dbg::debug (ctx, " scheduled with item ", ctx->getActive ());
 
         ++totalIter;
 
         Galois::Runtime::setThreadContext (ctx);
-        nhFunc (ctx->active, ctx->userHandle);
+        nhFunc (ctx->getActive (), ctx->userHandle);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
-          opFunc (ctx->active, ctx->userHandle);
+          opFunc (ctx->getActive (), ctx->userHandle);
         }
         Galois::Runtime::setThreadContext (nullptr);
 
@@ -1078,7 +1063,7 @@ private:
       dbg::debug ("head of rob ready to commit : ", head);
       bool earliest = false;
       if (!nextPending->empty ()) {
-        earliest = !itemCmp (nextPending->top (), head->active);
+        earliest = !itemCmp (nextPending->top (), head->getActive ());
 
       } else {
         earliest = true;
@@ -1125,7 +1110,7 @@ private:
 
         bool earliest = false;
         if (!nextPending->empty ()) {
-          earliest = !itemCmp (nextPending->top (), head->active);
+          earliest = !itemCmp (nextPending->top (), head->getActive ());
 
         } else {
           earliest = true;
@@ -1196,4 +1181,5 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 } // end namespace Galois
 
 #endif //  GALOIS_RUNTIME_ROB_EXECUTOR_H
+
 

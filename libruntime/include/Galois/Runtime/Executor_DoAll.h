@@ -156,23 +156,6 @@ public:
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
     iterator end = range.local_end();
-<<<<<<< HEAD
-        
-    unsigned long stat_iterations = 0;
-    unsigned long stat_donations = 0;
-
-    do {
-      do {
-        auto mid = split_range(begin,end);
-        stat_iterations += exec(begin, mid);
-        begin = mid;
-        stat_donations += tryDonate(begin,end);
-      } while (begin != end);
-    } while (wait(begin, end));
-    
-    reportStat(loopname, "Iterations", stat_iterations, Substrate::ThreadPool::getTID());
-    reportStat(loopname, "Donations", stat_donations, Substrate::ThreadPool::getTID());
-=======
 
     if (!STEAL) {
       while (begin != end) {
@@ -189,33 +172,37 @@ public:
         }
       } while (trySteal(tld, begin, end, minSteal));
     }
->>>>>>> master
   }
 
-};
+  //New operator
+  void operator_NEW() {
+    //Assume the copy constructor on the functor is readonly
+    iterator begin = range.local_begin();
+    iterator end = range.local_end();
+    //TODO: Make a separate donation function.
 
-<<<<<<< HEAD
-template<typename RangeTy, typename FunctionTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  reportLoopInstance(loopname);
-  if (steal) {
-    DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
-  } else {
-    FunctionTy f_cpy (f);
-    Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
-        auto begin = range.local_begin();
-        auto end = range.local_end();
-        while (begin != end)
-          f_cpy(*begin++);
-      });
+    unsigned long stat_iterations = 0;
+    unsigned long stat_donations = 0;
+
+    do {
+      do {
+        auto mid = split_range(begin,end);
+        stat_iterations += exec(begin, mid);
+        begin = mid;
+        stat_donations += tryDonate(begin,end);
+      } while (begin != end);
+    } while (wait(begin, end));
+
+    reportStat(loopname, "Iterations", stat_iterations, Substrate::ThreadPool::getTID());
+    reportStat(loopname, "Donations", stat_donations, Substrate::ThreadPool::getTID());
   }
-}
-=======
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
-  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+
+
+  template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+    void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+      DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+      Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    }
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
@@ -237,7 +224,6 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) 
       // });
   // }
 // }
->>>>>>> master
 
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
@@ -250,23 +236,36 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
         std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
         std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
+  do_all_impl( r, fn, dtpl);
+}
+
+template<typename RangeTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename TupleTy>
+void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, const TupleTy& tpl) {
+  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
+
+  auto dtpl = std::tuple_cat(tpl,
+      get_default_trait_values(tpl,
+        std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
+
+#if 0
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
   std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-
-<<<<<<< HEAD
   Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
   Timer_do_all_impl.start();
+#endif
+
+  statTimer.start();
   do_all_impl(
       r, fn,
       get_by_supertype<loopname_tag>(dtpl).getValue(),
       get_by_supertype<do_all_steal_tag>(dtpl).getValue());
-  Timer_do_all_impl.stop();
-=======
-  do_all_impl( r, fn, dtpl);
->>>>>>> master
+  statTimer.stop();
+  }
 }
-
 
 } // end namespace Runtime
 } // end namespace Galois

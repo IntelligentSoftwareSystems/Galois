@@ -1,6 +1,7 @@
 #include "Galois/Bag.h"
 #include<iostream>
 
+//TODO: move to libdist or delete
 namespace Galois {
 namespace WorkList {
 

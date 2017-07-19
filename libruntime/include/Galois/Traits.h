@@ -326,6 +326,7 @@ template<typename T>
 struct has_deterministic_local_state: public trait_has_type<T>, has_deterministic_local_state_tag {};
 
 
+// TODO: separate to libdist
 /** For distributed Galois **/
 struct op_tag {};
 

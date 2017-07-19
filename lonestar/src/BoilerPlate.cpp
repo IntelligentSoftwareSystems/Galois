@@ -62,38 +62,33 @@ static void LonestarPrintVersion() {
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, 
-                   const char* app, const char* desc, const char* url) {
-  
+    const char* app, const char* desc, const char* url) {
+
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
   assert(enforce_metadata <= 3);
   enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
-  
-  if (net.ID == 0) {
-    LonestarPrintVersion();
-    std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
-    std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-    std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
-    if (desc)
-      std::cout << desc << "\n";
-    if (url)
-      std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" << url << "\n";
-    std::cout << "\n";
+  LonestarPrintVersion();
+  std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
+  std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
+  std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
+  if (desc)
+    std::cout << desc << "\n";
+  if (url)
+    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" << url << "\n";
+  std::cout << "\n";
 
-    std::ostringstream cmdout;
-    for (int i = 0; i < argc; ++i) {
-      cmdout << argv[i];
-      if (i != argc - 1)
-        cmdout << " ";
-    }
-    Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
-    Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
-    Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)net.Num, 0);
-    Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
+  std::ostringstream cmdout;
+  for (int i = 0; i < argc; ++i) {
+    cmdout << argv[i];
+    if (i != argc - 1)
+      cmdout << " ";
   }
+  Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
+  Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
+  Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
 
   char name[256];
   gethostname(name, 256);

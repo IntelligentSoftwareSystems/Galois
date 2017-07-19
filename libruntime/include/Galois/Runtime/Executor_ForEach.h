@@ -34,6 +34,7 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+// TODO: remove dist stuff
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 

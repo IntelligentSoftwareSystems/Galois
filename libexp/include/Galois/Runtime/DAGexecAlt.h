@@ -167,7 +167,7 @@ struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt, SharerWrapper>, Ctxt, 
 };
 
 template <typename T>
-struct DAGcontext: public SimpleRuntimeContext {
+struct DAGcontext: public OrderedContextBase<T> {
 
   // typedef DAGnhoodItem<DAGcontext> NItem;
   using NItem = DAGnhoodItem<DAGcontext, SharerVec<DAGcontext> >;
@@ -177,15 +177,13 @@ struct DAGcontext: public SimpleRuntimeContext {
 
 
   AtomicBool onWL;
-  T elem;
   NhoodMgr& nhmgr;
   NhoodSet nhood;
 
 
   explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
-    SimpleRuntimeContext {true},
+    OrderedContextBase<T> {t},
     onWL {false},
-    elem {t}, 
     nhmgr {nhmgr}
   {}
 
@@ -250,15 +248,6 @@ struct DAGcontext: public SimpleRuntimeContext {
   }
 
   void reset (void) {}
-
-  template <typename Cmp>
-  struct Comparator {
-    Cmp cmp;
-
-    bool operator () (const DAGcontext* left, const DAGcontext* right) const {
-      return cmp (left->elem, right->elem);
-    }
-  };
 
 };
 
@@ -552,3 +541,4 @@ void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& 
 
 
 #endif // GALOIS_RUNTIME_DAGEXEC_ALT_H
+

@@ -53,7 +53,7 @@ namespace Runtime {
  */
 Substrate::Barrier& getBarrier(unsigned activeThreads);
 
-//FIXME: move to network?
+//TODO: move to network?
 Substrate::Barrier& getHostBarrier();
 
 } // end namespace Runtime

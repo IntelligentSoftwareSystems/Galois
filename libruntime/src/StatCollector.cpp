@@ -27,6 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+// TODO: separeate out distributed code to libdist
+
 #include "Galois/Runtime/StatCollector.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Network.h"
