@@ -383,9 +383,11 @@ private:
 
     Iter steal_beg;
     Iter steal_end;
-    Diff_ty steal_size;
 
-    bool succ = rich.stealWork (steal_beg, steal_end, steal_size, amount, chunk_size);
+    // stealWork should initialize to a more appropriate value
+    Diff_ty steal_size = 0;
+
+    bool succ = rich.stealWork(steal_beg, steal_end, steal_size, amount, chunk_size);
 
     if (succ) {
       assert (steal_beg != steal_end);
@@ -712,7 +714,6 @@ public:
 
 template <typename R, typename F, typename _ArgsTuple>
 void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple) {
-
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
         std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
