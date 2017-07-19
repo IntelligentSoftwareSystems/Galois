@@ -881,10 +881,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     /**
      * Gets the thread ranges object that specifies division of labor for threads
      *
-     * @returns An array of iterators specifying where a thread should begin
+     * @returns An array of uint32_t specifying where a thread should begin
      * work.
      */
-    typename base_hGraph::const_iterator* get_thread_ranges() const {
+    uint32_t* get_thread_ranges() const {
       return base_hGraph::get_thread_ranges();
     }
 

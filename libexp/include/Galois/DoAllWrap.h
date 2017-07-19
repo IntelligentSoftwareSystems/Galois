@@ -23,7 +23,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  */
@@ -191,16 +191,27 @@ template <>
 struct DoAllImpl<DOALL_RANGE> {
   // TODO make it so the work splitting happens within this function instead
   // of at graph initialization (then it would work with all ranges
-  // and not just an all vertices range)
+  // and not just an all vertices range as is being assumed currently)
   template <typename R, typename F, typename ArgsTuple>
   static inline void go(const R& range, const F& func, 
                         const ArgsTuple& argsTuple) {
 
-    // iterator array should be first argument in args Tuple
+    auto defaultArgsTuple = std::tuple_cat(
+      argsTuple,
+      get_default_trait_values(
+        argsTuple, 
+        std::make_tuple(thread_range_tag{}),
+        std::make_tuple(thread_range{})
+      )
+    );
+
+    const uint32_t *thread_ranges = 
+      get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
+    assert(thread_ranges != nullptr);
+
     Galois::Runtime::do_all_gen(
-      Runtime::makeSpecificRange(range.begin(), range.end(),
-                                 std::get<0>(argsTuple)),
-                                 func, 
+      Runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
+      func, 
       std::tuple_cat(std::make_tuple(do_all_steal<false>()), argsTuple)
     );
   }
@@ -210,7 +221,6 @@ struct DoAllImpl<DOALL_RANGE> {
 template <typename R, typename F, typename ArgsTuple>
 void do_all_choice(const R& range, const F& func, const DoAllTypes& type, 
                    const ArgsTuple& argsTuple) {
-
   switch (type) {
     case DOALL_GALOIS_STEAL:
       DoAllImpl<DOALL_GALOIS_STEAL>::go(range, func, argsTuple);

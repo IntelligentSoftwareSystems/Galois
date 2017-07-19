@@ -113,13 +113,13 @@ inline StandardRange<IterTy> makeStandardRange(IterTy begin, IterTy end) {
 
 /** 
  * SpecificRange is a range type where a threads range is specified by
- * an iterator array that tells you where each thread should begin its
+ * an an int array that tells you where each thread should begin its
  * iteration 
  */
 template<typename IterTy>
 class SpecificRange {
   IterTy global_begin, global_end;
-  const IterTy* thread_beginnings;
+  const uint32_t* thread_beginnings;
 
 public:
   typedef IterTy iterator;
@@ -128,7 +128,7 @@ public:
 
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
 
-  SpecificRange(IterTy b, IterTy e, const IterTy* thread_ranges): 
+  SpecificRange(IterTy b, IterTy e, const uint32_t* thread_ranges): 
     global_begin(b), global_end(e), thread_beginnings(thread_ranges) { }
 
   iterator begin() const { return global_begin; }
@@ -144,8 +144,12 @@ public:
   std::pair<block_iterator, block_iterator> block_pair() const {
     uint32_t my_thread_id = Substrate::ThreadPool::getTID();
 
-    iterator local_start = thread_beginnings[my_thread_id];
-    iterator local_end = thread_beginnings[my_thread_id + 1];
+    iterator local_start = global_begin + thread_beginnings[my_thread_id];
+    iterator local_end = global_begin + thread_beginnings[my_thread_id + 1];
+
+    if (local_end >= global_end) {
+      local_end = global_end;
+    }
 
     return std::make_pair(local_start, local_end);
   }
@@ -174,7 +178,7 @@ public:
 template<typename IterTy>
 inline SpecificRange<IterTy> makeSpecificRange(IterTy begin, 
                                                IterTy end,
-                                               const IterTy* thread_ranges) {
+                                               const uint32_t* thread_ranges) {
   return SpecificRange<IterTy>(begin, end, thread_ranges);
 }
 

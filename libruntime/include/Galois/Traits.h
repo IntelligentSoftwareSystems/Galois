@@ -168,6 +168,8 @@ struct function_traits<T, typename std::enable_if<has_function_traits<T>(0)>::ty
 
 //! @section Traits
 
+
+
 /**
  * Indicate name to appear in statistics. Optional argument to {@link do_all()}
  * and {@link for_each()} loops.
@@ -328,5 +330,20 @@ struct has_deterministic_local_state: public trait_has_type<T>, has_deterministi
 
 /** For distributed Galois **/
 struct op_tag {};
+
+/**
+ * Array of uint32_t. Could be used for various things, but main use case now
+ * is to pass in information for thread work splitting.
+ */
+struct thread_range_tag {};
+
+struct thread_range: public trait_has_value<const uint32_t*>, thread_range_tag {
+  thread_range(const uint32_t* t = nullptr) : 
+    trait_has_value<const uint32_t*>(t) {}
+};
+
 }
+
+
+
 #endif

@@ -105,25 +105,6 @@ void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
 }
 
 /**
- * Not a standard do-all loop as the work distribution among threads is 
- * specified by an iterator array. All iterations should be independent.
- * Operator should conform to <code>fn(item)</code> where item is i
- *
- * @param b beginning of range of items
- * @param e end of range of items
- * @param thread_ranges Array of iterators that specifies where each thead
- * is to begin its range
- * @param fn operator
- * @param args optional arguments to loop
- */
-template<typename IterTy, typename FunctionTy, typename... Args>
-void do_all_range(const IterTy& b, const IterTy& e, const IterTy *thread_ranges,
-                  const FunctionTy& fn, const Args&... args) {
-  Runtime::do_all_gen(Runtime::makeSpecificRange(b, e, thread_ranges), fn, 
-                      std::make_tuple(args...));
-}
-
-/**
  * Standard do-all loop. All iterations should be independent.
  * Operator should conform to <code>fn(item)</code> where item is a value from the iteration range.
  *
