@@ -116,7 +116,8 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 
     using T = typename R::value_type;
 
-    const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
+    const unsigned CHUNK_SIZE = 128;
+    //const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
 
     using WL_ty =  Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
 
