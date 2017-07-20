@@ -102,6 +102,10 @@ class hGraph: public GlobalObject {
   const uint32_t numHosts;
   //ghost cell ID translation
 
+  uint32_t numNodes; // Total nodes created on a host (Master + slaves)
+  uint32_t numNodesWithEdges; // Total nodes that need to be executed in an operator.
+  uint32_t beginMaster; // local id of the beginning of master nodes.
+  uint32_t endMaster; // local id of the end of master nodes.
 
   //memoization optimization
   std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
@@ -119,6 +123,7 @@ class hGraph: public GlobalObject {
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
   virtual uint64_t get_local_total_nodes() const = 0;
+
 #if 0
   virtual void save_meta_file(std::string name) const {
     std::cout << "Base implementation doesn't do anything\n";
@@ -507,6 +512,22 @@ public:
 
   iterator ghost_end() {
     return graph.end();
+  }
+
+  //return type is Galois::Runtime::StandardRange<boost::counting_iterator<size_t>>
+  auto allNodesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+                boost::counting_iterator<size_t> (numNodes));
+  }
+
+  auto masterNodesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (beginMaster),
+                boost::counting_iterator<size_t> (endMaster));
+  }
+
+  auto allNodesWithEdgesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+                boost::counting_iterator<size_t> (numNodesWithEdges));
   }
 
 

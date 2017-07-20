@@ -166,6 +166,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       numOwned_withEdges = base_hGraph::totalOwnedNodes = base_hGraph::numOwned = (gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first);
+
       if(isBipartite){
     	  uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
     	  for (unsigned i = 0; i < base_hGraph::numHosts; ++i){
@@ -237,8 +238,17 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       assert(found);
     }
 
-    numNodes = _numNodes = base_hGraph::numOwned + ghostMap.size();
+    base_hGraph::numNodes = numNodes = _numNodes = base_hGraph::numOwned + ghostMap.size();
     assert((uint64_t )base_hGraph::numOwned + (uint64_t )ghostMap.size() == (uint64_t )numNodes);
+
+    if(transpose){
+      base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+    } else {
+      base_hGraph::numNodesWithEdges = base_hGraph::numOwned;
+    }
+
+    base_hGraph::beginMaster = 0;
+    base_hGraph::endMaster = base_hGraph::numOwned;
 
     base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
     //std::cerr << "Allocate done\n";
@@ -380,6 +390,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return false;
   }
 
+  /*
+   * Returns the total nodes : master + slaves created on the local host.
+   */
   uint64_t get_local_total_nodes() const {
     return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
   }
