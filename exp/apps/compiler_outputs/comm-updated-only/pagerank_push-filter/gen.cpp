@@ -568,13 +568,13 @@ int main(int argc, char** argv) {
     if (enableVCut){
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold);
+                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
     } else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, scalefactor,
-                             transpose);
+                             transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
 
 
