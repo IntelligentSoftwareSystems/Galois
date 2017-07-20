@@ -238,6 +238,10 @@ public:
     std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << base_hGraph::numOwned << "\n";
     std::cerr << "[" << base_hGraph::id << "] Total edges : " << numEdges << "\n";
 
+    base_hGraph::numNodes = numNodes;
+    base_hGraph::numNodesWithEdges = G2L(gid2host[base_hGraph::id].second - 1) + 1;
+    base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
+    base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
     if (numNodes > 0) {
       assert(numEdges > 0);
       base_hGraph::graph.allocateFrom(numNodes, numEdges);
@@ -615,6 +619,9 @@ public:
     return true;
   }
 
+  /**
+     * Returns the start and end of master nodes in local graph.
+     */
   uint64_t get_local_total_nodes() const {
     return numNodes;
   }

@@ -311,6 +311,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       
       base_hGraph::numOwned = numNodes;
+      base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
+      base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+      base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
+      base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
       //ss_cout << base_hGraph::id << " : numNodes : " << numNodes << " , numEdges : " << numEdges << "\n";
 
       /******************************************
@@ -875,6 +879,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return true;
     }
 
+    /*
+   * Returns the total nodes : master + slaves created on the local host.
+   */
     uint64_t get_local_total_nodes() const {
       return (base_hGraph::numOwned);
     }
