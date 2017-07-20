@@ -27,20 +27,25 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+// TODO: separeate out distributed code to libdist
+
 #include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Substrate.h"
+#include "Galois/Substrate/StaticInstance.h"
 
 #include <cmath>
+#include <new>
 #include <map>
 #include <mutex>
 #include <numeric>
 #include <set>
 #include <string>
 #include <vector>
-
-namespace Galois {
-namespace Runtime {
-extern unsigned activeThreads;
-} } //end namespaces
+#include <sstream>
+#include <iostream>
+#include <fstream>
 
 using namespace Galois;
 using namespace Galois::Runtime;
@@ -94,9 +99,9 @@ Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.m
   switch(mode) {
   case 0: valueInt    = r.valueInt;    break;
   case 1: valueDouble = r.valueDouble; break;
-  case 2: valueStr    = r.valueStr;    break;
+  case 2: new (&valueStr) std::string(r.valueStr);    break;
   }
-}      
+}
 
 void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
   switch(mode) {
@@ -136,18 +141,33 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
   }
 }
 
+boost::uuids::uuid Galois::Runtime::StatCollector::UUID;
+boost::uuids::uuid Galois::Runtime::StatCollector::getUUID(){
+  if(UUID.is_nil()){
+    boost::uuids::random_generator generator;
+    UUID = generator();
+    return UUID;
+  }
+  else {
+    return UUID;
+  }
+}
 //assumne called serially
 void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
-  if (json)
-    out << "[\n";
-  else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
+
+  //Print header only on HOST 0
+  if(getHostID() == 0){
+    if (json)
+      out << "[\n";
+    else
+      out << "LOOP,INSTANCE,CATEGORY,HOST,THREAD,VAL\n";
+  }
   MAKE_LOCK_GUARD(StatsLock);
   for (auto& p : Stats) {
     if (json)
-      out << "{ \"LOOP\" : " << *std::get<2>(p.first) << " , \"INSTANCE\" : " << std::get<4>(p.first) << " , \"CATEGORY\" : " << *std::get<3>(p.first) << " , \"HOST\" : " << std::get<0>(p.first) << " , \"THREAD\" : " << std::get<1>(p.first) << " , \"VALUE\" : ";
+      out << "{\"UUID\" : " <<  getUUID() << ", \"LOOP\" : " << *std::get<2>(p.first) << " , \"INSTANCE\" : " << std::get<4>(p.first) << " , \"CATEGORY\" : " << *std::get<3>(p.first) << " , \"HOST\" : " << std::get<0>(p.first) << " , \"THREAD\" : " << std::get<1>(p.first) << " , \"VALUE\" : ";
     else
-      out << *std::get<2>(p.first) << "," << std::get<4>(p.first) << " , " << *std::get<3>(p.first) << "," << std::get<0>(p.first) << "," << std::get<1>(p.first) << ",";
+      out <<getUUID() <<"," << *std::get<2>(p.first) << "," << std::get<4>(p.first) << " , " << *std::get<3>(p.first) << "," << std::get<0>(p.first) << "," << std::get<1>(p.first) << ",";
     p.second.print(out);
     out << (json ? "}\n" : "\n");
   }
@@ -171,6 +191,8 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
       v.resize(tid+1);
     v[tid] += p.second.valueInt;
   }
+
+  //  auto& net = Galois::Runtime::getSystemNetworkInterface();
   //print header
   out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
   for (unsigned x = 0; x <= maxThreadID; ++x)
@@ -178,7 +200,7 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   out << "\n";
   //print all values
   for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
-    std::vector<unsigned long>& Values = ii->second;
+    auto& Values = ii->second;
     out << "STAT,"
         << std::get<0>(ii->first)->c_str() << ","
         << std::get<1>(ii->first) << ","
@@ -195,4 +217,82 @@ void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);
 }
 
+//Implementation
 
+static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
+
+void Galois::Runtime::reportLoopInstance(const char* loopname) {
+  SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
+}
+
+static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, unsigned long value, unsigned TID) {
+  if (getHostID())
+    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
+  else 
+    SM.get()->addToStat(loopname, category, value, TID, HostID);
+}
+
+static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, const std::string value, unsigned TID) {
+  if (getHostID())
+    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
+  else 
+    SM.get()->addToStat(loopname, category, value, TID, HostID);
+}
+
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
+  reportStatImpl(getHostID(), loopname, category, value, TID);
+}
+
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string &value, unsigned TID) {
+  reportStatImpl(getHostID(), loopname, category, value, TID);
+  //out << loopname <<  ","  << 0 << ","<< category << "," << getHostID() << "," << TID << "," << value<<"\n";
+}
+
+void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
+  reportStatImpl(getHostID(),
+                 std::string(loopname ? loopname : "(NULL)"), 
+                 std::string(category ? category : "(NULL)"),
+                 value, TID);
+}
+
+void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string &value, unsigned TID) {
+  reportStatImpl(getHostID(),
+                 std::string(loopname ? loopname : "(NULL)"), 
+                 std::string(category ? category : "(NULL)"),
+                 value, TID);
+}
+
+static std::ofstream& openIfNot_output(std::string fname) {
+  static std::ofstream output_file;
+  if(!output_file.is_open()){
+    output_file.open(fname, std::ios_base::app);
+  }
+  assert(output_file.is_open());
+  return output_file;
+}
+
+void Galois::Runtime::printStats() {
+  //getSystemNetworkInterface().reportStats();
+  Galois::Runtime::getHostBarrier().wait();
+  //SM.get()->printDistStats(std::cout);
+  //SM.get()->printStats(std::cout);
+  SM.get()->printStatsForR(std::cout, false);
+}
+
+void Galois::Runtime::printStats(std::string fname) {
+  //getSystemNetworkInterface().reportStats();
+  Galois::Runtime::getHostBarrier().wait();
+  //SM.get()->printDistStats(std::cout);
+  //SM.get()->printStats(std::cout);
+  if(fname == "")
+    SM.get()->printStatsForR(std::cout, false);
+  else{
+    auto& out = openIfNot_output(fname);
+    SM.get()->printStatsForR(out, false);
+    out.close();
+  }
+  if (getHostID() == 0) {
+    std::cerr << "STAT FILENAME : " << fname << "\n";
+  }
+  Galois::Runtime::getHostBarrier().wait();
+}

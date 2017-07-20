@@ -53,6 +53,9 @@ namespace Runtime {
  */
 Substrate::Barrier& getBarrier(unsigned activeThreads);
 
+//TODO: move to network?
+Substrate::Barrier& getHostBarrier();
+
 } // end namespace Runtime
 } // end namespace Galois
 

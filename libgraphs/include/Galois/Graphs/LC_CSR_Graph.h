@@ -36,6 +36,7 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
+#include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Galois.h"
 
 #include <type_traits>
@@ -187,6 +188,65 @@ protected:
   }
 
 public:
+
+  LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
+  LC_CSR_Graph() = default;
+
+  LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
+
+  template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
+    LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
+                 EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
+    :numNodes(_numNodes), numEdges(_numEdges)
+  {
+//    std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+//    std::cerr << "Done Alloc\n";
+    for (size_t n = 0; n < numNodes; ++n) {
+      nodeData.constructAt(n);
+    }
+//    std::cerr << "Done Node Construct\n";
+    uint64_t cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      cur += edgeNum(n);
+      edgeIndData[n] = cur;
+    }
+//    std::cerr << "Done Edge Reserve\n";
+    cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+//      if (n % (1024*128) == 0)
+//        std::cout << n << " " << cur << "\n";
+      for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
+        if (EdgeData::has_value)
+          edgeData.set(cur, _edgeData(n, e));
+        edgeDst[cur] = _edgeDst(n, e);
+        ++cur;
+      }
+    }
+//    std::cerr << "Done Construct\n";
+  }
+
+  friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
+    swap(lhs.nodeData, rhs.nodeData);
+    swap(lhs.edgeIndData, rhs.edgeIndData);
+    swap(lhs.edgeDst, rhs.edgeDst);
+    swap(lhs.edgeData, rhs.edgeData);
+    std::swap(lhs.numNodes, rhs.numNodes);
+    std::swap(lhs.numEdges, rhs.numEdges);
+  }
+  
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
@@ -305,6 +365,126 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
+  }
+
+  void allocateFrom(uint32_t nNodes, uint64_t nEdges) {
+    numNodes = nNodes;
+    numEdges = nEdges;
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+  }
+
+  void constructNodes() {
+#ifndef GALOIS_GRAPH_CONSTRUCT_SERIAL
+    for (uint32_t x = 0; x < numNodes; ++x) {
+      nodeData.constructAt(x);
+      this->outOfLineConstructAt(x);
+    }
+#else
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t x){
+        nodeData.constructAt(x);
+        this->outOfLineConstructAt(x);
+      }, Galois::loopname("CONSTRUCT_NODES"), Galois::numrun("0"));
+#endif
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst, const typename EdgeData::value_type& val) {
+    edgeData.set(e, val);
+    edgeDst[e] = dst;
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst) {
+    edgeDst[e] = dst;
+  }
+
+  void fixEndEdge(uint32_t n, uint64_t e) {
+    edgeIndData[n] = e;
+  }
+
+  // perform an in-memory tranpose of the graph, replacing the original
+  // CSR to CSC
+  void transpose() {
+    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
+    timer.start();
+
+    EdgeDst edgeDst_old;
+    EdgeData edgeData_new;
+    EdgeIndData edgeIndData_old;
+    EdgeIndData edgeIndData_temp;
+    if (UseNumaAlloc) {
+      edgeIndData_old.allocateLocal(numNodes);
+      edgeIndData_temp.allocateLocal(numNodes);
+      edgeDst_old.allocateLocal(numEdges);
+      edgeData_new.allocateLocal(numEdges);
+    } else {
+      edgeIndData_old.allocateInterleaved(numNodes);
+      edgeIndData_temp.allocateLocal(numNodes);
+      edgeDst_old.allocateInterleaved(numEdges);
+      edgeData_new.allocateInterleaved(numEdges);
+    }
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData_old[n] = edgeIndData[n];
+        edgeIndData_temp[n] = 0;
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), Galois::numrun("0"));
+    for (uint64_t e = 0; e < numEdges; ++e) { // parallelization makes this slower
+        auto dst = edgeDst[e];
+        edgeDst_old[e] = dst;
+        ++edgeIndData_temp[dst];
+    }
+    for (uint32_t n = 1; n < numNodes; ++n) {
+      edgeIndData_temp[n] += edgeIndData_temp[n-1];
+    }
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData[n] = edgeIndData_temp[n];
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), Galois::numrun("0"));
+    edgeIndData_temp[0] = 0;
+    Galois::do_all(boost::counting_iterator<uint32_t>(1), boost::counting_iterator<uint32_t>(numNodes),
+      [&](uint32_t n){
+        edgeIndData_temp[n] = edgeIndData[n-1];
+      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), Galois::numrun("0"));
+    for (uint32_t src = 0; src < numNodes; ++src) { // parallelization makes this slower
+      uint64_t e;
+      if (src == 0) e = 0;
+      else e = edgeIndData_old[src-1];
+      while (e < edgeIndData_old[src]) {
+        auto dst = edgeDst_old[e];
+        auto e_new = edgeIndData_temp[dst]++;
+        edgeDst[e_new] = src;
+        edgeDataCopy(edgeData_new, edgeData, e_new, e);
+        e++;
+      }
+    }
+    if (EdgeData::has_value) {
+      Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
+        [&](uint32_t e){
+          edgeDataCopy(edgeData, edgeData_new, e, e);
+        }, Galois::loopname("TRANSPOSE_EDGEDATA_SET"), Galois::numrun("0"));
+    }
+
+    timer.stop();
+  }
+
+  template<bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<is_non_void>::type* = 0) {
+    edgeData_new[e_new] = edgeData[e];
+  }
+
+  template<bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<!is_non_void>::type* = 0) {
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {

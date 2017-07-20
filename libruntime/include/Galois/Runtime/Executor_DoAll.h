@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2016, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -32,6 +32,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
 #define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
@@ -63,76 +64,83 @@ class DoAllExecutor {
   RangeTy range;
   const char* loopname;
 
-  struct state {
-    iterator stealBegin;
-    iterator stealEnd;
-    Substrate::SimpleLock stealLock;
-    std::atomic<bool> avail;
+  /*
+    starving queue
+    threads without work go in it.  When all threads are in the queue, stop
+  */
 
-    state(): avail(false) { stealLock.lock(); }
-
-    void populateSteal(iterator& begin, iterator& end) {
-      if (std::distance(begin, end) > 1) {
-        avail = true;
-        stealEnd = end;
-        stealBegin = end = Galois::split_range(begin, end);
-      }
-      stealLock.unlock();
+  unsigned exec(iterator b, iterator e) {
+    unsigned n = 0;
+    while (b != e) {
+      ++n;
+      F(*b++);
     }
-
-    bool doSteal(iterator& begin, iterator& end, int minSteal) {
-      if (avail) {
-        std::lock_guard<Substrate::SimpleLock> lg(stealLock);
-        if (!avail)
-          return false;
-
-        if (stealBegin != stealEnd) {
-          begin = stealBegin;
-          if (std::distance(stealBegin, stealEnd) < 2*minSteal)
-            end = stealBegin = stealEnd;
-          else
-            end = stealBegin = Galois::split_range(stealBegin, stealEnd);
-          if (stealBegin == stealEnd)
-            avail = false;
-          return begin != end;
-        }
-      }
-      return false;
-    }
-  };
-
-  Substrate::PerThreadStorage<state> TLDS;
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool trySteal(state& local, iterator& begin, iterator& end, int minSteal) {
-    //First try stealing from self
-    if (local.doSteal(begin, end, minSteal))
-      return true;
-    //Then try stealing from neighbors
-    unsigned myID = Substrate::ThreadPool::getTID();
-    unsigned myPkg = Substrate::ThreadPool::getPackage();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
-    //try package neighbors
-    for (unsigned x = 0; x < activeThreads; ++x) {
-      if (x != myID && tp.getPackage(x) == myPkg) {
-        if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
-          if (std::distance(begin, end) > minSteal) {
-            local.stealLock.lock();
-            local.populateSteal(begin, end);
-          }
-          return true;
-        }
-      }
-    }
-    //try some random
-    // auto num = (activeThreads + 7) / 8;
-    // for (unsigned x = 0; x < num; ++x)
-    //   if (TLDS.getRemote()->doSteal(begin, end))
-    //     return true;
-    return false;
+    return n;
   }
 
+  struct msg {
+    std::atomic<bool> ready;
+    bool exit;
+    iterator b, e;
+    msg* next;
+  };
+  Substrate::PtrLock<msg> head;
+  std::atomic<unsigned> waiting;
+  
+  //return true to continue, false to exit
+  bool wait(iterator& b, iterator& e) {
+    //else, add ourselves to the queue
+    msg self;
+    self.b = b;
+    self.e = e;
+    self.exit = false;
+    self.next = nullptr;
+    self.ready = false;
+    do {
+      self.next = head.getValue();
+    } while(!head.CAS(self.next, &self));
+    ++waiting;
+
+    //wait for signal
+    while(!self.ready) {
+      //      std::cerr << waiting << "\n";
+      Substrate::asmPause();
+      if(waiting == activeThreads)
+        return false;
+      Substrate::asmPause();
+    }
+
+    b = self.b;
+    e = self.e;
+    return true;
+  }
+
+  unsigned tryDonate(iterator& b, iterator& e) {
+    if (std::distance(b,e) < 2)
+      return 0;
+    if (!head.getValue())
+      return 0;
+    if (head.try_lock()) {
+      msg* other = head.getValue();
+      if (other) {
+        head.unlock_and_set(other->next);
+        --waiting;
+        other->next = nullptr;
+        auto mid = split_range(b,e);
+        auto retval = std::distance(mid, e);
+        other->b = mid;
+        other->e = e;
+        e = mid;
+        other->ready = true;
+        return retval;
+      }
+      head.unlock();
+    }
+    return 0;
+  }
+  
 public:
+
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const ArgsTy& args)
     :
       F(_F), 
@@ -166,12 +174,35 @@ public:
     }
   }
 
-};
+  //New operator
+  void operator_NEW() {
+    //Assume the copy constructor on the functor is readonly
+    iterator begin = range.local_begin();
+    iterator end = range.local_end();
+    //TODO: Make a separate donation function.
 
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
-  DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    unsigned long stat_iterations = 0;
+    unsigned long stat_donations = 0;
+
+    do {
+      do {
+        auto mid = split_range(begin,end);
+        stat_iterations += exec(begin, mid);
+        begin = mid;
+        stat_donations += tryDonate(begin,end);
+      } while (begin != end);
+    } while (wait(begin, end));
+
+    reportStat(loopname, "Iterations", stat_iterations, Substrate::ThreadPool::getTID());
+    reportStat(loopname, "Donations", stat_donations, Substrate::ThreadPool::getTID());
+  }
+
+
+  template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+    void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+      DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+      Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    }
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
@@ -202,12 +233,39 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, do_all_steal<>{})));
+        std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
 
   do_all_impl( r, fn, dtpl);
 }
 
+template<typename RangeTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename TupleTy>
+void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, const TupleTy& tpl) {
+  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
+
+  auto dtpl = std::tuple_cat(tpl,
+      get_default_trait_values(tpl,
+        std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
+        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
+
+#if 0
+  std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
+  std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
+  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
+  Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
+  Timer_do_all_impl.start();
+#endif
+
+  statTimer.start();
+  do_all_impl(
+      r, fn,
+      get_by_supertype<loopname_tag>(dtpl).getValue(),
+      get_by_supertype<do_all_steal_tag>(dtpl).getValue());
+  statTimer.stop();
+  }
+}
 
 } // end namespace Runtime
 } // end namespace Galois

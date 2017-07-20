@@ -39,11 +39,15 @@ namespace Runtime {
 
 //! Begin a new loop instance
 void reportLoopInstance(const char* loopname);
+inline void reportLoopInstance(const std::string& loopname) {
+  reportLoopInstance(loopname.c_str());
+}
 
 //! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
-//! Reports stats for a given thread
+void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
+void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
@@ -56,6 +60,9 @@ void reportStatGlobal(const std::string& category, unsigned long val);
 
 //! Prints all stats
 void printStats();
+void printStats(std::string);
+// TODO: separate to dist
+void printDistStats();
 
 }
 } // end namespace Galois

@@ -34,12 +34,18 @@
 
 namespace Galois {
 
+//! Flag type for {@link StatTimer}
+struct start_now_t {};
+constexpr start_now_t start_now = start_now_t();
+
 //! A simple timer
 class Timer {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;
   std::chrono::time_point<clockTy> startT, stopT;
 public:
+  Timer() = default;
+  Timer(const start_now_t) { start(); }
   void start();
   void stop();
   unsigned long get() const;

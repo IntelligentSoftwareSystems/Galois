@@ -1,0 +1,10 @@
+*.orig
+*.patch
+
+# no temp files
+*~
+*.swp
+
+# no cscope/ctags files
+cscope.out
+tags

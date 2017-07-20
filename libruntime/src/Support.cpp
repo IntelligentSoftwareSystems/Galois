@@ -27,21 +27,11 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Statistic.h"
-#include "Galois/Runtime/StatCollector.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Substrate/gio.h"
-#include "Galois/Substrate/StaticInstance.h"
 #include "Galois/Runtime/Mem.h"
 #include <iostream>
 
-#include <cmath>
-#include <map>
-#include <mutex>
-#include <numeric>
-#include <set>
 #include <string>
-#include <vector>
 
 namespace Galois {
 namespace Runtime {
@@ -51,39 +41,15 @@ extern unsigned activeThreads;
 using namespace Galois;
 using namespace Galois::Runtime;
 
-static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
-
-void Galois::Runtime::reportLoopInstance(const char* loopname) {
-  SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
-}
-
-//FIXME: fix on Networked
-void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
-  SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
-		      std::string(category ? category : "(NULL)"),
-		      value, TID, 0);
-}
-
-//FIXME: fix on Networked
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
-  SM.get()->addToStat(loopname, category, value, TID, 0);
-}
-
 void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
 }
 void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
 }
 
-void Galois::Runtime::printStats() {
-  //  SM.get()->printStats(std::cout);
-  SM.get()->printStatsForR(std::cout, false);
-  //  SM.get()->printStatsForR(std::cout, true);
-}
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
-  auto* sm = SM.get();
   for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
-    sm->addToStat("(NULL)", category, static_cast<unsigned long>(numPagePoolAllocForThread(x)), x, 0);
+    reportStat("(NULL)", category, static_cast<unsigned long>(numPagePoolAllocForThread(x)), x);
 }
 
 void Galois::Runtime::reportNumaAlloc(const char* category) {
