@@ -23,6 +23,7 @@
  * Offline graph for loading large files
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Loc Hoang <l_hoang@utexas.edu> (prefix range at the bottom)
  */
 
 #ifndef _GALOIS_DIST_OFFLINE_GRAPH_
@@ -339,6 +340,281 @@ OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::i
 
 
 } // namespace Graph
+
+
+// In namespace Galois
+/**
+ * Given an offline graph, find a division of nodes based on edges.
+ *
+ * @param graph OfflineGraph representation
+ * @param begin Beginning of iterator to graph
+ * @param division_id The division that you want the range for
+ * @param num_divisions The total number of divisions you are working with
+ * @returns A pair of 2 iterators that correspond to the beginning and the
+ * end of the range for the division_id (end not inclusive)
+ */
+template<typename IterTy>
+std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
+                                       IterTy begin,
+                                       uint32_t division_id, 
+                                       uint32_t num_divisions) {
+  uint32_t total_nodes = graph.size();
+  assert(division_id < num_divisions);
+
+  // Single division case
+  if (num_divisions == 1) {
+    //printf("For division %u/%u we have begin %u and end %lu with %lu edges\n", 
+    //       division_id, num_divisions - 1, 
+    //       0, total_nodes, edge_prefix_sum.back());
+    return std::make_pair(begin, graph.end());
+  }
+
+  // Case where we have more divisions than nodes
+  if (num_divisions > total_nodes) {
+    // assign one element per division, i.e. division id n gets assigned to
+    // element n (if element n exists, else range is nothing)
+    if (division_id < total_nodes) {
+      IterTy node_to_get = begin + division_id;
+      //// this division gets a element
+      //if (division_id == 0) {
+      //  printf("For division %u/%u we have begin %u and end %u with %lu edges\n", 
+      //         division_id, num_divisions - 1, division_id, division_id + 1,
+      //         edge_prefix_sum[0]);
+      //} else {
+      //  printf("For division %u/%u we have begin %u and end %u with %lu edges\n", 
+      //         division_id, num_divisions - 1, division_id, division_id + 1,
+      //         edge_prefix_sum[division_id] - edge_prefix_sum[division_id - 1]);
+
+      //}
+      return std::make_pair(node_to_get, node_to_get + 1);
+    } else {
+      // this division gets no element
+      //printf("For division %u/%u we have begin %lu and end %lu with 0 edges\n", 
+      //       division_id, num_divisions - 1, total_nodes, total_nodes);
+      return std::make_pair(graph.end(), graph.end());
+    }
+  }
+
+  // To determine range for some element n, you have to determine
+  // range for elements 1 through n-1...
+  uint32_t current_division = 0;
+  uint64_t begin_element = 0;
+
+  uint64_t accounted_edges = 0;
+  uint64_t current_element = 0;
+
+  // theoretically how many edges we want to distributed to each division
+  uint64_t edges_per_division = graph.sizeEdges() / num_divisions;
+
+  //printf("Optimally want %lu edges per division\n", edges_per_division);
+  // TODO also could keep track of begin's prefix sum for debug printing, but
+  // would require more seeks
+  uint64_t current_prefix_sum = -1;
+  uint64_t last_prefix_sum = -1;
+  uint64_t current_processed = 0;
+
+  while (current_element < total_nodes && current_division < num_divisions) {
+    uint64_t elements_remaining = total_nodes - current_element;
+    uint32_t divisions_remaining = num_divisions - current_division;
+
+    assert(elements_remaining >= divisions_remaining);
+
+    if (divisions_remaining == 1) {
+      // assign remaining elements to last division
+      assert(current_division == num_divisions - 1); 
+      printf("For division %u/%u we have begin %lu and end as the end "
+             "getting the rest of the graph",
+              division_id, num_divisions - 1, begin_element);
+      //if (current_element != 0) {
+      //  printf("For division %u/%u we have begin %lu and end %lu with "
+      //         "%lu edges\n", 
+      //         division_id, num_divisions - 1, begin_element, 
+      //         current_element + 1, 
+      //         edge_prefix_sum[current_element] - 
+      //           edge_prefix_sum[begin_element - 1]);
+      //} else {
+      //  printf("For division %u/%u we have begin %lu and end %lu with "
+      //         "%lu edges\n", 
+      //         division_id, num_divisions - 1, begin_element, 
+      //         current_element + 1, edge_prefix_sum.back());
+      //}
+
+      return std::make_pair(begin + current_element, graph.end());
+    } else if ((total_nodes - current_element) == divisions_remaining) {
+      // Out of elements to assign: finish up assignments (at this point,
+      // each remaining division gets 1 element except for the current
+      // division which may have some already)
+
+      for (uint32_t i = 0; i < divisions_remaining; i++) {
+        if (current_division == division_id) {
+          // TODO get these prints working, but would require more disk seeks
+          //if (begin_element != 0) {
+          //  printf("For division %u/%u we have begin %lu and end %lu with "
+          //         "%lu edges\n", 
+          //         division_id, num_divisions - 1, begin_element, 
+          //         current_element + 1, 
+          //         edge_prefix_sum[current_element] - 
+          //           edge_prefix_sum[begin_element - 1]);
+          //} else {
+          //  printf("For division %u/%u we have begin %lu and end %lu with "
+          //         "%lu edges\n", 
+          //         division_id, num_divisions - 1, begin_element, 
+          //         current_element + 1, edge_prefix_sum[current_element]);
+          //}
+
+          return std::make_pair(begin + begin_element, 
+                                begin + current_element + 1);
+        } else {
+          current_division++;
+          begin_element = current_element + 1;
+          current_element++;
+        }
+      }
+
+      // shouldn't get out here...
+      assert(false);
+    }
+
+    // Determine various edge count numbers
+    uint64_t element_edges;
+
+    if (current_element > 0) {
+      // update last_prefix_sum once only
+      if (current_processed != current_element) {
+        last_prefix_sum = current_prefix_sum;
+        current_prefix_sum = *(graph.edge_end(current_element));
+        current_processed = current_element;
+      }
+
+      element_edges = current_prefix_sum - last_prefix_sum;
+      //element_edges = edge_prefix_sum[current_element] - 
+      //                edge_prefix_sum[current_element - 1];
+    } else {
+      current_prefix_sum = *(graph.edge_end(0));
+      element_edges = current_prefix_sum;
+    }
+
+    uint64_t edge_count_without_current;
+    if (current_element > 0) {
+      edge_count_without_current = current_prefix_sum - accounted_edges - 
+                                   element_edges;
+      //edge_count_without_current = edge_prefix_sum[current_element] -
+      //                             accounted_edges - element_edges;
+    } else {
+      edge_count_without_current = 0;
+    }
+ 
+    // if this element has a lot of edges, determine if it should go to
+    // this division or the next (don't want to cause this division to get
+    // too much)
+    if (element_edges > (3 * edges_per_division / 4)) {
+      // if this current division + edges of this element is too much,
+      // then do not add to this division but rather the next one
+      if (edge_count_without_current > (edges_per_division / 2)) {
+
+        // finish up this division; its last element is the one before this
+        // one
+        if (current_division == division_id) {
+          printf("For division %u/%u we have begin %lu and end %lu with "
+                 "%lu edges\n", division_id, num_divisions - 1, begin_element, 
+                 current_element, edge_count_without_current);
+  
+          return std::make_pair(begin + begin_element, 
+                                begin + current_element);
+        } else {
+          assert(current_division < division_id);
+
+          // this is safe (i.e. won't access -1) as you should never enter this 
+          // conditional if current element is still 0
+          accounted_edges = last_prefix_sum;
+          //accounted_edges = edge_prefix_sum[current_element - 1];
+          begin_element = current_element;
+          current_division++;
+
+          continue;
+        }
+      }
+    }
+
+    // handle this element by adding edges to running sums
+    uint64_t edge_count_with_current = edge_count_without_current + 
+                                       element_edges;
+
+    if (edge_count_with_current >= edges_per_division) {
+      // this division has enough edges after including the current
+      // node; finish up
+
+      if (current_division == division_id) {
+        printf("For division %u/%u we have begin %lu and end %lu with %lu edges\n", 
+               division_id, num_divisions - 1, begin_element, 
+               current_element + 1, edge_count_with_current);
+
+        return std::make_pair(begin + begin_element, 
+                              begin + current_element + 1);
+      } else {
+        //accounted_edges = edge_prefix_sum[current_element];
+        accounted_edges = current_prefix_sum;
+        // beginning element of next division
+        begin_element = current_element + 1;
+        current_division++;
+      }
+    }
+
+    current_element++;
+  }
+
+  // You shouldn't get out here.... (something should be returned before
+  // this....)
+  assert(false);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // TODO
+}
+
 } // namespace Galois
 
 #endif//_GALOIS_DIST_OFFLINE_GRAPH_
