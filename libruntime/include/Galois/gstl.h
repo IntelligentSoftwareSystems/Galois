@@ -29,6 +29,7 @@
 #include <utility>
 #include <cassert>
 
+
 namespace Galois {
 
 // TODO: move to namespace gstl?
@@ -102,7 +103,6 @@ std::pair<IntTy, IntTy> block_range(IntTy b, IntTy e, unsigned id, unsigned num)
   return std::make_pair(b,e);
 }
 
-
 /**
  * Given a prefix sum corresponding to the iterators, divide the iterators
  * up based on the prefix sum.
@@ -123,6 +123,7 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
   // TODO changed vector uint64_t? 64 bit overkill by any chance?
   // TODO change edge references to something else (since this can be used in
   // a more general sense as well)
+  // TODO make accesses to vector more efficient
 
   assert(division_id < num_divisions);
 
@@ -186,21 +187,22 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
       // assign remaining elements to last division
       assert(current_division == num_divisions - 1);
 
-      if (current_element != 0) {
-        printf("For division %u/%u we have begin %lu and end %lu with "
-               "%lu edges\n", 
-               division_id, num_divisions - 1, begin_element, 
-               current_element + 1, 
-               edge_prefix_sum[current_element] - 
-                 edge_prefix_sum[begin_element - 1]);
+      // TODO these prints are off
+      //if (current_element != 0) {
+      //  printf("For division %u/%u we have begin %lu and end %lu with "
+      //         "%lu edges\n", 
+      //         division_id, num_divisions - 1, begin_element, 
+      //         current_element + 1, 
+      //         edge_prefix_sum[current_element] - 
+      //           edge_prefix_sum[begin_element - 1]);
 
 
-      } else {
-        printf("For division %u/%u we have begin %lu and end %lu with "
-               "%lu edges\n", 
-               division_id, num_divisions - 1, begin_element, 
-               current_element + 1, edge_prefix_sum.back());
-      }
+      //} else {
+      //  printf("For division %u/%u we have begin %lu and end %lu with "
+      //         "%lu edges\n", 
+      //         division_id, num_divisions - 1, begin_element, 
+      //         current_element + 1, edge_prefix_sum.back());
+      //}
 
       return std::make_pair(begin + current_element, end);
     } else if ((num_elements - current_element) == divisions_remaining) {
