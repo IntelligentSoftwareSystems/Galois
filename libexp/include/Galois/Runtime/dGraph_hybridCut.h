@@ -35,6 +35,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include <sstream>
 
+#include "Galois/DoAllWrap.h"
 
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
@@ -355,15 +356,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       }
 
-      if (!find_thread_ranges) {
-        base_hGraph::thread_ranges = nullptr;
-      } else {
-        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-  
-        StatTimer_thread_ranges.start();
-        base_hGraph::determine_thread_ranges();
-        StatTimer_thread_ranges.stop();
-      }
+      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+      StatTimer_thread_ranges.start();
+      base_hGraph::determine_thread_ranges();
+      StatTimer_thread_ranges.stop();
 
       /*****************************************
        * Communication PreProcessing:
@@ -887,15 +883,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     /**
-     * Gets the thread ranges object that specifies division of labor for threads
+     * Gets the thread ranges container that specifies division of labor for 
+     * threads
      *
-     * @returns An array of uint32_t specifying where a thread should begin
-     * work.
+     * @returns ThreadRangeContainer that specifies how to split labor among
+     * threads
      */
-    uint32_t* get_thread_ranges() const {
+    typename base_hGraph::ThreadRangeContainer& get_thread_ranges() const {
       return base_hGraph::get_thread_ranges();
     }
-
 
     void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
       size_t first_owned = G2L(gid2host[base_hGraph::id].first);

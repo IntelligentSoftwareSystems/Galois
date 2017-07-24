@@ -31,6 +31,7 @@
 #include "Galois/Runtime/OfflineGraph.h"
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/Tracer.h"
+#include "Galois/DoAllWrap.h"
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
@@ -267,16 +268,10 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-    if (!find_thread_ranges) {
-      base_hGraph::thread_ranges = nullptr;
-    } else {
-      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-
-      StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges();
-      StatTimer_thread_ranges.stop();
-    }
-
+    Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+    StatTimer_thread_ranges.start();
+    base_hGraph::determine_thread_ranges();
+    StatTimer_thread_ranges.stop();
 
     StatTimer_graph_construct.stop();
 
@@ -627,12 +622,13 @@ public:
   }
 
   /**
-   * Gets the thread ranges object that specifies division of labor for threads
+   * Gets the thread ranges container that specifies division of labor for 
+   * threads
    *
-   * @returns An array of uint32_t specifying where a thread should begin
-   * work.
+   * @returns ThreadRangeContainer that specifies how to split labor among
+   * threads
    */
-  uint32_t* get_thread_ranges() const {
+  typename base_hGraph::ThreadRangeContainer& get_thread_ranges() const {
     return base_hGraph::get_thread_ranges();
   }
 

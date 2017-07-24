@@ -46,6 +46,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+
+// for thread container stuff
+#include "Galois/Substrate/ThreadPool.h"
+
 //#include "Galois/Runtime/dGraph_vertexCut.h"
 //#include "Galois/Runtime/dGraph_edgeCut.h"
 
@@ -266,110 +270,159 @@ public:
    }
 
 public:
-   typedef typename GraphTy::GraphNode GraphNode;
-   typedef typename GraphTy::iterator iterator;
-   typedef typename GraphTy::const_iterator const_iterator;
-   typedef typename GraphTy::local_iterator local_iterator;
-   typedef typename GraphTy::const_local_iterator const_local_iterator;
-   typedef typename GraphTy::edge_iterator edge_iterator;
+  typedef typename GraphTy::GraphNode GraphNode;
+  typedef typename GraphTy::iterator iterator;
+  typedef typename GraphTy::const_iterator const_iterator;
+  typedef typename GraphTy::local_iterator local_iterator;
+  typedef typename GraphTy::const_local_iterator const_local_iterator;
+  typedef typename GraphTy::edge_iterator edge_iterator;
 
-   // used to track division of labor for threads in this partition
-   uint32_t* thread_ranges;
+  struct ThreadRangeContainer {
+    typedef typename GraphTy::iterator iterator;
+    typedef typename GraphTy::local_iterator local_iterator;
 
-   //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
-   hGraph(unsigned host, unsigned numHosts) :
-       GlobalObject(this), transposed(false), round(false), id(host), numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
+    uint32_t* thread_ranges;
 
-      if (useGidMetadata) {
-        if (enforce_data_mode != offsetsData) {
-          useGidMetadata = false;
-        }
+    iterator global_begin;
+    iterator global_end;
+    iterator begin() const { return global_begin; }
+    iterator end() const { return global_end; }
+
+    local_iterator local_begin() const {
+      if (thread_ranges) {
+        uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+        return global_begin + thread_ranges[my_thread_id];
+      } else {
+        printf("begin is %p, end is %p\n", *global_begin, *global_end);
+        return Galois::block_range(begin(), end(), 
+                                   Galois::Substrate::ThreadPool::getTID(),
+                                   Galois::Runtime::activeThreads).first;
       }
+    }
+
+    local_iterator local_end() const {
+      if (thread_ranges) {
+        uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+        local_iterator to_return = global_begin + 
+                                   thread_ranges[my_thread_id + 1];
+        
+        if (to_return > global_end) {
+          to_return = global_end;
+        }
+        return to_return;
+      } else {
+        return Galois::block_range(begin(), end(), 
+                                   Galois::Substrate::ThreadPool::getTID(),
+                                   Galois::Runtime::activeThreads).second;
+      }
+    }
+  };
+  ThreadRangeContainer thread_range_container;
+
+  // used to track division of labor for threads in this partition
+  //uint32_t* thread_ranges;
+
+  //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
+  hGraph(unsigned host, unsigned numHosts) :
+      GlobalObject(this), transposed(false), round(false), id(host), 
+      numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
+    if (useGidMetadata) {
+      if (enforce_data_mode != offsetsData) {
+        useGidMetadata = false;
+      }
+    }
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      comm_mode = 0;
+    comm_mode = 0;
 #endif
 #endif
-      total_isolatedNodes = 0;
-      masterNodes.resize(numHosts);
-      mirrorNodes.resize(numHosts);
-      //masterNodes_bitvec.resize(numHosts);
-      numPipelinedPhases = 0;
-      num_recv_expected = 0;
-      num_run = 0;
-      num_iteration = 0;
-      totalEdges = 0;
+    total_isolatedNodes = 0;
+    masterNodes.resize(numHosts);
+    mirrorNodes.resize(numHosts);
+    //masterNodes_bitvec.resize(numHosts);
+    numPipelinedPhases = 0;
+    num_recv_expected = 0;
+    num_run = 0;
+    num_iteration = 0;
+    totalEdges = 0;
 
-      //uint32_t numNodes;
-      //uint64_t numEdges;
+    //uint32_t numNodes;
+    //uint64_t numEdges;
 #if 0
-      std::string part_fileName = getPartitionFileName(filename,partitionFolder,id,numHosts);
-      //OfflineGraph g(part_fileName);
-      hGraph(filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
-      graph.allocateFrom(numNodes, numEdges);
-      //std::cerr << "Allocate done\n";
+    std::string part_fileName = getPartitionFileName(filename,partitionFolder,id,numHosts);
+    //OfflineGraph g(part_fileName);
+    hGraph(filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
+    graph.allocateFrom(numNodes, numEdges);
+    //std::cerr << "Allocate done\n";
 
-      graph.constructNodes();
-      //std::cerr << "Construct nodes done\n";
-      loadEdges(graph, g);
-      std::cerr << "Edges loaded \n";
-      //testPart<PartitionTy>(g);
+    graph.constructNodes();
+    //std::cerr << "Construct nodes done\n";
+    loadEdges(graph, g);
+    std::cerr << "Edges loaded \n";
+    //testPart<PartitionTy>(g);
 
 #ifdef __GALOIS_HET_OPENCL__
-      clGraph.load_from_hgraph(*this);
+    clGraph.load_from_hgraph(*this);
 #endif
-
-      setup_communication();
+    setup_communication();
 
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      simulate_communication();
+    simulate_communication();
 #endif
 #endif
 #endif
-   }
-   void setup_communication() {
-      Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
-      Galois::Runtime::getHostBarrier().wait(); // so that all hosts start the timer together
-      StatTimer_comm_setup.start();
+  }
+  void setup_communication() {
+    Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
 
-      //Exchange information for memoization optimization.
-      exchange_info_init();
+    // so that all hosts start the timer together
+    Galois::Runtime::getHostBarrier().wait(); 
+    StatTimer_comm_setup.start();
 
-      for(uint32_t h = 0; h < masterNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
-             [&](uint32_t n){
-             masterNodes[h][n] = G2L(masterNodes[h][n]);
-             }, Galois::loopname("MASTER_NODES"), Galois::numrun(get_run_identifier()));
-      }
+    // Exchange information for memoization optimization.
+    exchange_info_init();
 
-      for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
-             [&](uint32_t n){
-             mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
-             }, Galois::loopname("MIRROR_NODES"), Galois::numrun(get_run_identifier()));
-      }
-      StatTimer_comm_setup.stop();
+    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                      boost::counting_iterator<uint32_t>(masterNodes[h].size()),
+                      [&](uint32_t n){
+                        masterNodes[h][n] = G2L(masterNodes[h][n]);
+                      }, 
+                      Galois::loopname("MASTER_NODES"), 
+                      Galois::numrun(get_run_identifier()));
+    }
 
-      for(auto x = 0U; x < masterNodes.size(); ++x){
-        std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
-        Galois::Statistic StatMasterNodes(master_nodes_str);
-        StatMasterNodes += masterNodes[x].size();
-      }
+    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                      boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
+                      [&](uint32_t n){
+                        mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
+                      }, 
+                      Galois::loopname("MIRROR_NODES"), 
+                      Galois::numrun(get_run_identifier()));
+    }
+    StatTimer_comm_setup.stop();
 
-      totalMirrorNodes = 0;
-      for(auto x = 0U; x < mirrorNodes.size(); ++x){
-        std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
-        if(x == id)
-          continue;
-        Galois::Statistic StatMirrorNodes(mirror_nodes_str);
-        StatMirrorNodes += mirrorNodes[x].size();
-        totalMirrorNodes += mirrorNodes[x].size();
-      }
+    for (auto x = 0U; x < masterNodes.size(); ++x) {
+      std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
+      Galois::Statistic StatMasterNodes(master_nodes_str);
+      StatMasterNodes += masterNodes[x].size();
+    }
 
-      send_info_to_host();
-   }
+    totalMirrorNodes = 0;
+    for (auto x = 0U; x < mirrorNodes.size(); ++x) {
+      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
+      if(x == id)
+        continue;
+      Galois::Statistic StatMirrorNodes(mirror_nodes_str);
+      StatMirrorNodes += mirrorNodes[x].size();
+      totalMirrorNodes += mirrorNodes[x].size();
+    }
+
+    send_info_to_host();
+  }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
    void simulate_communication() {
@@ -543,7 +596,8 @@ public:
 
     uint32_t total_nodes = graph.end() - graph.begin();
 
-    thread_ranges = (uint32_t*)malloc(sizeof(uint32_t) * (num_threads + 1));
+    uint32_t* thread_ranges = (uint32_t*)malloc(sizeof(uint32_t) * 
+                                                (num_threads + 1));
     assert(thread_ranges != nullptr);
 
     printf("[%u] num owned edges is %lu\n", id, graph.sizeEdges());
@@ -570,6 +624,13 @@ public:
         thread_ranges[i+1] = total_nodes;
       }
 
+      // save to container
+      thread_range_container.thread_ranges = thread_ranges;
+
+      // also, graph should be constructed at this point; save global begin/end
+      thread_range_container.global_begin = graph.begin();
+      thread_range_container.global_end = graph.end();
+
       return;
     }
 
@@ -577,6 +638,14 @@ public:
     if (num_threads == 1) {
       thread_ranges[0] = *(graph.begin());
       thread_ranges[1] = total_nodes;
+
+      // save to container
+      thread_range_container.thread_ranges = thread_ranges;
+
+      // also, graph should be constructed at this point; save global begin/end
+      thread_range_container.global_begin = graph.begin();
+      thread_range_container.global_end = graph.end();
+
       return;
     }
 
@@ -681,6 +750,13 @@ public:
     assert(thread_ranges[0] == 0);
     assert(thread_ranges[num_threads] == total_nodes);
     printf("[%u] ranges found\n", id);
+
+    // save to container
+    thread_range_container.thread_ranges = thread_ranges;
+
+    // also, graph should be constructed at this point; save global begin/end
+    thread_range_container.global_begin = graph.begin();
+    thread_range_container.global_end = graph.end();
   }
 
   void exchange_info_init(){
@@ -2914,13 +2990,13 @@ public:
   }
 
   /**
-   * Gets the thread ranges object that specifies division of labor for threads
+   * Gets the thread ranges container that specifies division of labor for threads
    *
-   * @returns An array of uint32_t specifying where a thread should begin
-   * work.
+   * @returns ThreadRangeContainer that specifies how to split labor among
+   * threads
    */
-  uint32_t* get_thread_ranges() const {
-    return thread_ranges;
+  ThreadRangeContainer& get_thread_ranges() {
+    return thread_range_container;
   }
 
   void save_local_graph(std::string folder_name, std::string local_file_name){
