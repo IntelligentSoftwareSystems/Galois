@@ -23,6 +23,24 @@ VerilogModule::~VerilogModule() {
   clear();
 }
 
+static void allocateConstants(VerilogModule *vModule) {
+  for (size_t i = 0; i < 2; i++) {
+    std::string name = "1'b" + std::to_string(i);
+
+    VerilogWire *wireConst = new VerilogWire;
+    wireConst->name = name;
+    wireConst->root = nullptr;
+    wireConst->wireLoad = vModule->cellLib->defaultWireLoad;
+    vModule->wires.insert({name, wireConst});
+
+    VerilogPin *pinConst = new VerilogPin;
+    pinConst->name = name;
+    pinConst->gate = nullptr;
+    pinConst->wire = nullptr;
+    vModule->inputs.insert({name, pinConst});
+  }
+}
+
 void VerilogModule::read(std::string inName, CellLib *lib) {
   char delimiters[] = {
     '(', ')',
@@ -41,6 +59,8 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
 
   FileReader fRd(inName, delimiters, sizeof(delimiters), separators, sizeof(separators));
   cellLib = lib;
+
+  allocateConstants(this);
 
   for (std::string token = fRd.nextToken(); token != ""; token = fRd.nextToken()) {
     // module moduleName(port1, port2, ...);
@@ -76,6 +96,16 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
 
     else if (token == "endmodule") {
       break;
+    }
+
+    // connect lhs wire->root to rhs node
+    else if (token == "assign" ) {
+      auto wire = wires.at(fRd.nextToken());
+      fRd.nextToken(); // get "="
+      auto pinName = fRd.nextToken();
+      auto pin = (inputs.count(pinName)) ? inputs.at(pinName) : outputs.at(pinName);
+      wire->root = pin;
+      fRd.nextToken(); // get ";"
     }
 
     // logic gates: gateType gateName ( .port1 (wire1), .port2 (wire2), ... .portN (wireN) );
