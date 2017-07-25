@@ -396,7 +396,7 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
-    if(enableVCut){
+    if (enableVCut) {
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
                                     scalefactor, transpose);

@@ -341,7 +341,6 @@ OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::i
 
 } // namespace Graph
 
-
 // In namespace Galois
 /**
  * Given an offline graph, find a division of nodes based on edges.
@@ -575,53 +574,6 @@ std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
   // You shouldn't get out here.... (something should be returned before
   // this....)
   assert(false);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // TODO
 }
 
 } // namespace Galois

@@ -256,7 +256,6 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
     } else {
       edge_count_without_current = 0;
     }
-
  
     // if this element has a lot of edges, determine if it should go to
     // this division or the next (don't want to cause this division to get

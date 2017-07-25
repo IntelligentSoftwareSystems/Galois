@@ -101,11 +101,7 @@ LAptr Galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
 
   // Then page in based on thread number
   if (data)
-    // false = chunked paging
     // true = round robin paging
-    // (see comments above for details)
-
-    //pageIn(data, bytes, allocSize(), numThreads, false);
     pageIn(data, bytes, allocSize(), numThreads, true);
 
   return LAptr{data, detail::largeFreer{bytes}};
@@ -131,6 +127,7 @@ LAptr Galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
   // Get a non-prefaulted allocation
   void* data = allocPages(bytes/allocSize(), false);
   if (data)
+    // false = blocked paging
     pageIn(data, bytes, allocSize(), numThreads, false);
   return LAptr{data, detail::largeFreer{bytes}};
 }
