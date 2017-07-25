@@ -214,8 +214,7 @@ struct ComputeArrivalTimeAndPower {
           // power follows critical path
           std::vector<float> vPinC = {inSlew, data.totalPinC};
           data.internalPower = powerLUT->lookup(vPinC);
-          std::vector<float> vNetC = {inSlew, data.totalNetC};
-          data.netPower = powerLUT->lookup(vNetC);
+          data.netPower = powerLUT->lookup(v) - data.internalPower; // avoid nan due to out-of-bound table lookup
         }
       } // end for ie
 
