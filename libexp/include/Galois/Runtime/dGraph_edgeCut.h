@@ -35,11 +35,9 @@
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
 
-
 template<typename NodeTy, typename EdgeTy, bool isBipartite = false, 
          bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
-
   public:
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     // GID = ghostMap[LID - numOwned]
@@ -71,7 +69,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
     std::pair<uint64_t, uint64_t> nodes_by_host_bipartite_G(uint32_t host) const {
           return gid2host_withoutEdges[host];
-     }
+    }
 
 
     // Return the ID to which gid belongs after patition.
@@ -223,9 +221,15 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       timer.start();
       g.reset_seek_counters();
 
+      // vector to hold a prefix sum for use in thread work distribution
+      std::vector<uint64_t> edge_prefix_sum(base_hGraph::numOwned);
+      uint32_t current_edge_sum = 0;
+      uint32_t current_node = 0;
+
       // loop through all nodes we own and determine ghosts (note a node
       // we own can also be marked a ghost here if there's an outgoing edge to 
       // it)
+      // Also determine prefix sums
       auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
       for (auto n = gid2host[base_hGraph::id].first;
            n < gid2host[base_hGraph::id].second;
@@ -234,9 +238,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         ee = g.edge_end(n);
         for (; ii < ee; ++ii) {
           ghosts[g.getEdgeDst(ii)] = true;
+          current_edge_sum++;
         }
+
+        edge_prefix_sum[current_node++] = current_edge_sum;
       }
-      // i can get a prefix sum here if I loop through all of them... TODO
+
       timer.stop();
 
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes " 
@@ -255,6 +262,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
 
+      // determine on which hosts each ghost nodes resides
       GlobalToLocalGhostMap.reserve(ghostMap.size());
       for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
         unsigned lid = ln + base_hGraph::numOwned;
@@ -286,9 +294,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                               _numNodes = 
                               base_hGraph::numOwned + ghostMap.size();
 
-      assert((uint64_t )base_hGraph::numOwned + (uint64_t )ghostMap.size() == 
-             (uint64_t )numNodes);
-
+      assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
+             (uint64_t)numNodes);
+      
+      // transpose is usually used for incoming edge cuts: this makes it
+      // so you consider ghosts as having edges as well (since in IEC ghosts
+      // have outgoing edges
       if (transpose) {
         base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
       } else {
@@ -298,7 +309,23 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::beginMaster = 0;
       base_hGraph::endMaster = base_hGraph::numOwned;
 
-      base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+      if (!edgeNuma) {
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+      } else {
+        // determine division of nodes among threads and allocate based on that
+        printf("Edge based NUMA division on\n");
+
+        edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
+
+        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        StatTimer_thread_ranges.start();
+        base_hGraph::determine_thread_ranges(_numNodes, edge_prefix_sum);
+        // TODO thread range finding here
+        StatTimer_thread_ranges.stop();
+
+        // TODO
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+      }
       //std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
@@ -313,10 +340,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-      StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges();
-      StatTimer_thread_ranges.stop();
+      if (!edgeNuma) {
+        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        StatTimer_thread_ranges.start();
+        base_hGraph::determine_thread_ranges();
+        StatTimer_thread_ranges.stop();
+      }
 
       StatTimer_graph_construct.stop();
       StatTimer_graph_construct_comm.start();
