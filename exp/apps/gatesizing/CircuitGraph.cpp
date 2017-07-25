@@ -100,27 +100,31 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     data.internalPower = 0.0;
     data.netPower = 0.0;
     data.isRise = false;
-    data.isPrimaryInput = false;
-    data.isPrimaryOutput = false;
-    data.isGateInput = false;
-    data.isGateOutput = false;
+    data.isDummy = false;
+    data.isPrimary = false;
+    data.isOutput = false;
+    data.precondition = 0;
 
     for (auto e: g.edges(n)) {
       g.getEdgeData(e).delay = 0.0;
     }
   }
 
+  g.getData(dummySrc, unprotected).isDummy = true;
   for (auto oe: g.edges(dummySrc)) {
     auto pi = g.getEdgeDst(oe);
     auto& data = g.getData(pi, unprotected);
-    data.isPrimaryInput = true;
+    data.isPrimary = true;
     data.slew = sdc.primaryInputSlew;
   }
 
+  g.getData(dummySink, unprotected).isDummy = true;
+  g.getData(dummySink, unprotected).isOutput = true;
   for (auto ie: g.in_edges(dummySink)) {
     auto po = g.getEdgeDst(ie);
     auto& data = g.getData(po, unprotected);
-    data.isPrimaryOutput = true;
+    data.isPrimary = true;
+    data.isOutput = true;
     data.requiredTime = sdc.targetDelay;
     data.totalPinC = sdc.primaryOutputTotalPinC;
     data.totalNetC = sdc.primaryOutputTotalNetC;
@@ -132,11 +136,8 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     if (pin) {
       auto gate = pin->gate;
       if (gate) {
-        if (gate->inPins.count(pin)) {
-          data.isGateInput = true;
-        }
-        else if (gate->outPins.count(pin)) {
-          data.isGateOutput = true;
+        if (gate->outPins.count(pin)) {
+          data.isOutput = true;
 
           // wires are not changing, so initialize here
           auto wire = g.getEdgeData(g.edge_begin(n)).wire;
@@ -163,18 +164,19 @@ void printCircuitGraph(Graph& g) {
     }
     std::cout << std::endl;
 
-    if (data.isPrimaryInput || data.isGateInput) {
-      std::cout << "  type = " << ((data.isPrimaryInput) ? "primary" : "gate") << " input" << std::endl;
-      std::cout << "  slew = " << data.slew << std::endl;
-    }
-    if (data.isGateOutput || data.isPrimaryOutput) {
-      std::cout << "  type = " << ((data.isPrimaryOutput) ? "primary" : "gate") << " output" << std::endl;
+    std::cout << "  type = ";
+    std::cout << ((data.isDummy) ? "dummy" : 
+                  (data.isPrimary) ? "primary" : "gate");
+    std::cout << ((data.isOutput) ? " output" : " input") << std::endl;
+
+    if (data.isOutput && !data.isDummy) {
       std::cout << "  totalNetC = " << data.totalNetC << std::endl;
       std::cout << "  totalPinC = " << data.totalPinC << std::endl;
       std::cout << "  internalPower = " << data.internalPower << std::endl;
       std::cout << "  netPower = " << data.netPower << std::endl;
     }
-    if (n != dummySrc && n != dummySink) {
+    if (!data.isDummy) {
+      std::cout << "  slew = " << data.slew << std::endl;
       std::cout << "  arrivalTime = " << data.arrivalTime << std::endl;
       std::cout << "  requiredTime = " << data.requiredTime << std::endl;
       std::cout << "  slack = " << data.slack << std::endl;
