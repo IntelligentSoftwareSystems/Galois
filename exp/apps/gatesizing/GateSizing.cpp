@@ -55,7 +55,7 @@ const char* url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputCircuit(cll::Positional, cll::desc("<input .v>"), cll::Required);
 static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"), cll::Required);
-static cll::opt<std::string> outputCircuit("out", cll::desc("path to the gate-sized .v"), cll::Required);
+static cll::opt<std::string> outputCircuit("o", cll::desc("output file for gate-sized .v"), cll::Required);
 static cll::opt<std::string> sdcFile("sdc", cll::desc("path to the sdc file"));
 
 // do not call clear() unless you are constructing new instances
