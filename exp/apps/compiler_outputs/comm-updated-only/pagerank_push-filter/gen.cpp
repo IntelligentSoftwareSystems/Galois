@@ -269,15 +269,16 @@ struct PageRankCopy {
     } else if (personality == CPU)
   #endif
     {
-      //Galois::do_all_choice(Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        PageRankCopy{ alpha, tolerance, &_graph }, 
+        std::make_tuple(Galois::loopname("PageRank"), 
+        Galois::thread_range(_graph.get_thread_ranges()),
+        Galois::numrun(_graph.get_run_identifier())));
+      //Galois::do_all_local(_graph,
       //               PageRankCopy{ alpha, tolerance, &_graph }, 
-      //               std::make_tuple(Galois::loopname("PageRank"), 
-      //               Galois::thread_range(_graph.get_thread_ranges()),
-      //               Galois::numrun(_graph.get_run_identifier())));
-      Galois::do_all_local(_graph,
-                     PageRankCopy{ alpha, tolerance, &_graph }, 
-                     Galois::loopname("PageRank"), 
-                     Galois::numrun(_graph.get_run_identifier()));
+      //               Galois::loopname("PageRank"), 
+      //               Galois::numrun(_graph.get_run_identifier()));
     }
   }
 
@@ -309,21 +310,22 @@ struct FirstItr_PageRank{
     } else if (personality == CPU)
 #endif
     {
-      //Galois::do_all_choice(Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        FirstItr_PageRank{&_graph},
+        std::make_tuple(Galois::loopname("PageRank"), 
+        Galois::thread_range(_graph.get_thread_ranges()),
+        Galois::numrun(_graph.get_run_identifier()), 
+        Galois::write_set("reduce", "this->graph", 
+          "struct NodeData &", "struct PR_NodeData &" , "residual", 
+          "float" , "add",  "0")));
+      //Galois::do_all_local(_graph,
       //               FirstItr_PageRank{&_graph},
-      //               std::make_tuple(Galois::loopname("PageRank"), 
-      //               Galois::thread_range(_graph.get_thread_ranges()),
+      //               Galois::loopname("PageRank"), 
       //               Galois::numrun(_graph.get_run_identifier()), 
       //               Galois::write_set("reduce", "this->graph", 
       //                 "struct NodeData &", "struct PR_NodeData &" , "residual", 
-      //                 "float" , "add",  "0")));
-      Galois::do_all_local(_graph,
-                     FirstItr_PageRank{&_graph},
-                     Galois::loopname("PageRank"), 
-                     Galois::numrun(_graph.get_run_identifier()), 
-                     Galois::write_set("reduce", "this->graph", 
-                       "struct NodeData &", "struct PR_NodeData &" , "residual", 
-                       "float" , "add",  "0"));
+      //                 "float" , "add",  "0"));
     }
   _graph.sync<writeDestination, readSource, Reduce_add_residual, 
               Broadcast_residual, Bitset_residual>("PageRank");
@@ -378,24 +380,25 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          //Galois::do_all_choice(Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+          Galois::do_all_choice(
+              Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+              PageRank{ &_graph }, 
+              std::make_tuple(Galois::loopname("PageRank"), 
+              Galois::thread_range(_graph.get_thread_ranges()),
+              Galois::write_set("reduce", "this->graph", 
+                                "struct NodeData &", 
+                                "struct PR_NodeData &" , "residual", 
+                                "float" , "add",  "0"), 
+              Galois::numrun(_graph.get_run_identifier())));
+
+          //Galois::do_all_local(_graph,
           //               PageRank{ &_graph }, 
-          //               std::make_tuple(Galois::loopname("PageRank"), 
-          //               Galois::thread_range(_graph.get_thread_ranges()),
+          //               Galois::loopname("PageRank"), 
           //               Galois::write_set("reduce", "this->graph", 
           //                                 "struct NodeData &", 
           //                                 "struct PR_NodeData &" , "residual", 
           //                                 "float" , "add",  "0"), 
-          //               Galois::numrun(_graph.get_run_identifier())));
-
-          Galois::do_all_local(_graph,
-                         PageRank{ &_graph }, 
-                         Galois::loopname("PageRank"), 
-                         Galois::write_set("reduce", "this->graph", 
-                                           "struct NodeData &", 
-                                           "struct PR_NodeData &" , "residual", 
-                                           "float" , "add",  "0"), 
-                         Galois::numrun(_graph.get_run_identifier()));
+          //               Galois::numrun(_graph.get_run_identifier()));
 
         }
       _graph.sync<writeDestination, readSource, Reduce_add_residual, 
