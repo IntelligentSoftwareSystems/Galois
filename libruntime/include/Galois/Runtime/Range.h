@@ -147,10 +147,6 @@ public:
     iterator local_start = global_begin + thread_beginnings[my_thread_id];
     iterator local_end = global_begin + thread_beginnings[my_thread_id + 1];
 
-    //if (local_end >= global_end) {
-    //  local_end = global_end;
-    //}
-
     //printf("thread %u gets start %u and end %u\n", my_thread_id, *local_start, 
     //       *local_end);
 
