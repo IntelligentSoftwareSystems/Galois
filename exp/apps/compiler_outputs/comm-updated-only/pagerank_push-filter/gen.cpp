@@ -432,7 +432,7 @@ struct PageRank {
         Galois::atomicAdd(ddata.residual, delta);
         bitset_residual.set(dst);
       }
-      DGAccumulator_accum+= 1;
+      DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
     }
   }
 };
