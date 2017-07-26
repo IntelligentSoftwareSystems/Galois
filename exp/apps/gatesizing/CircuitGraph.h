@@ -9,14 +9,18 @@
 #ifndef GALOIS_CIRCUIT_GRAPH_H
 #define GALOIS_CIRCUIT_GRAPH_H
 
-struct Node {
-  VerilogPin *pin;
-  float riseSlew, fallSlew;
-  float totalNetC, totalPinC;
+struct TimingPowerInfo {
+  float slew;
   float arrivalTime, requiredTime, slack;
   float internalPower, netPower;
-  bool isDummy, isPrimary, isOutput;
+};
+
+struct Node {
+  VerilogPin *pin;
   size_t precondition;
+  bool isDummy, isPrimary, isOutput;
+  float totalNetC, totalPinC;
+  TimingPowerInfo rise, fall;
 };
 
 struct Edge {

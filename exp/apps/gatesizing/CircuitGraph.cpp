@@ -91,19 +91,24 @@ void constructCircuitGraph(Graph& g, VerilogModule& vModule) {
 void initializeCircuitGraph(Graph& g, SDC& sdc) {
   for (auto n: g) {
     auto& data = g.getData(n, unprotected);
-    data.riseSlew = 0.0;
-    data.fallSlew = 0.0;
-    data.totalNetC = 0.0;
-    data.totalPinC = 0.0;
-    data.arrivalTime = 0.0;
-    data.requiredTime = std::numeric_limits<float>::infinity();
-    data.slack = std::numeric_limits<float>::infinity();
-    data.internalPower = 0.0;
-    data.netPower = 0.0;
+    data.precondition = 0;
     data.isDummy = false;
     data.isPrimary = false;
     data.isOutput = false;
-    data.precondition = 0;
+    data.totalNetC = 0.0;
+    data.totalPinC = 0.0;
+    data.rise.slew = 0.0;
+    data.rise.arrivalTime = -std::numeric_limits<float>::infinity();
+    data.rise.requiredTime = std::numeric_limits<float>::infinity();
+    data.rise.slack = std::numeric_limits<float>::infinity();
+    data.rise.internalPower = 0.0;
+    data.rise.netPower = 0.0;
+    data.fall.slew = 0.0;
+    data.fall.arrivalTime = -std::numeric_limits<float>::infinity();
+    data.fall.requiredTime = std::numeric_limits<float>::infinity();
+    data.fall.slack = std::numeric_limits<float>::infinity();
+    data.fall.internalPower = 0.0;
+    data.fall.netPower = 0.0;
 
     for (auto e: g.edges(n)) {
       auto& eData = g.getEdgeData(e);
@@ -117,8 +122,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto pi = g.getEdgeDst(oe);
     auto& data = g.getData(pi, unprotected);
     data.isPrimary = true;
-    data.riseSlew = sdc.primaryInputRiseSlew;
-    data.fallSlew = sdc.primaryInputFallSlew;
+    data.rise.slew = sdc.primaryInputRiseSlew;
+    data.rise.arrivalTime = 0.0;
+    data.fall.slew = sdc.primaryInputFallSlew;
+    data.fall.arrivalTime = 0.0;
   }
 
   g.getData(dummySink, unprotected).isDummy = true;
@@ -128,9 +135,10 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto& data = g.getData(po, unprotected);
     data.isPrimary = true;
     data.isOutput = true;
-    data.requiredTime = sdc.targetDelay;
     data.totalPinC = sdc.primaryOutputTotalPinC;
     data.totalNetC = sdc.primaryOutputTotalNetC;
+    data.rise.requiredTime = sdc.targetDelay;
+    data.fall.requiredTime = sdc.targetDelay;
   }
 
   for (auto n: g) {
@@ -194,15 +202,20 @@ void printCircuitGraph(Graph& g) {
     if (data.isOutput && !data.isDummy) {
       std::cout << "  totalNetC = " << data.totalNetC << std::endl;
       std::cout << "  totalPinC = " << data.totalPinC << std::endl;
-      std::cout << "  internalPower = " << data.internalPower << std::endl;
-      std::cout << "  netPower = " << data.netPower << std::endl;
+      std::cout << "  rise.internalPower = " << data.rise.internalPower << std::endl;
+      std::cout << "  rise.netPower = " << data.rise.netPower << std::endl;
+      std::cout << "  fall.internalPower = " << data.fall.internalPower << std::endl;
+      std::cout << "  fall.netPower = " << data.fall.netPower << std::endl;
     }
     if (!data.isDummy) {
-      std::cout << "  riseSlew = " << data.riseSlew << std::endl;
-      std::cout << "  fallSlew = " << data.fallSlew << std::endl;
-      std::cout << "  arrivalTime = " << data.arrivalTime << std::endl;
-      std::cout << "  requiredTime = " << data.requiredTime << std::endl;
-      std::cout << "  slack = " << data.slack << std::endl;
+      std::cout << "  rise.slew = " << data.rise.slew << std::endl;
+      std::cout << "  rise.arrivalTime = " << data.rise.arrivalTime << std::endl;
+      std::cout << "  rise.requiredTime = " << data.rise.requiredTime << std::endl;
+      std::cout << "  rise.slack = " << data.rise.slack << std::endl;
+      std::cout << "  fall.slew = " << data.fall.slew << std::endl;
+      std::cout << "  fall.arrivalTime = " << data.fall.arrivalTime << std::endl;
+      std::cout << "  fall.requiredTime = " << data.fall.requiredTime << std::endl;
+      std::cout << "  fall.slack = " << data.fall.slack << std::endl;
     }
 
     for (auto oe: g.edges(n)) {
