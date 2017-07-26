@@ -1619,7 +1619,7 @@ class alias : public Option {
       error("cl::alias must have argument name specified!");
     if (AliasFor == 0)
       error("cl::alias must have an cl::aliasopt(option) specified!");
-      addArgument();
+    addArgument();
   }
 public:
   void setAliasFor(Option &O) {

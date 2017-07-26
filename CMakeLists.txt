@@ -169,7 +169,6 @@ if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
 
-<<<<<<< HEAD
   if (USE_LWCI)
     add_definitions(-DGALOIS_USE_LWCI)
     #include_directories("$ENV{LWCI_ROOT}/include")
@@ -187,8 +186,6 @@ if(USE_EXP)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   endif()
 
-=======
->>>>>>> master
   find_package(TBB)
   if(TBB_FOUND)
     include_directories(${TBB_INCLUDE_DIRS})

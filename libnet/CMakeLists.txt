@@ -10,6 +10,7 @@ set(sources
 
 add_library(galois_net STATIC ${sources})
 target_include_directories(galois_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(galois_net PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
 if (USE_LWCI)
   target_include_directories(galois_net PUBLIC $ENV{LWCI_ROOT}/include)
 endif()

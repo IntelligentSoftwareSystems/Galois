@@ -30,15 +30,24 @@
 #ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
 #define GALOIS_RUNTIME_STATCOLLECTOR_H
 
+//TODO: remove dist stuff 
 #include "Galois/gdeque.h"
 #include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/Network.h"
 
 #include <string>
 #include <set>
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace Galois {
 namespace Runtime {
+
+
+// TODO: Rename to DistStatCollector and inherit from Galois::Runtime::StatCollector
+// TODO: remove duplicated code copied over form StatCollector
 
 class StatCollector {
 
@@ -86,14 +95,19 @@ class StatCollector {
 
 public:
 
+  static boost::uuids::uuid UUID;
+  static boost::uuids::uuid getUUID();
+
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
 
   void printStatsForR(std::ostream& out, bool json);
+  static void printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf);
 
   //still assumes int values
   void printStats(std::ostream& out);
+  void printDistStats(std::ostream& out);
 
   void beginLoopInstance(const std::string& str);
 };
