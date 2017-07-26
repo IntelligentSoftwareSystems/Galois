@@ -145,10 +145,17 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::block_range(
-                               0U, (unsigned)numNodes_to_divide, i, 
-                               base_hGraph::numHosts));
+        if (balanceEdges) {
+          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+            gid2host.push_back(Galois::prefix_range(g,
+                                 (uint64_t)0U, i, 
+                                 base_hGraph::numHosts));
+        } else {
+          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+            gid2host.push_back(Galois::block_range(
+                                 0U, (unsigned)numNodes_to_divide, i, 
+                                 base_hGraph::numHosts));
+        }
       } else {
         assert(scalefactor.size() == base_hGraph::numHosts);
 

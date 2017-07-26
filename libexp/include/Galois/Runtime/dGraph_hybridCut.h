@@ -257,8 +257,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << " , Total edges : " << base_hGraph::totalEdges << "\n";
       //compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::block_range(0U, (unsigned)numNodes_to_divide, i, base_hGraph::numHosts));
+        if (balanceEdges) {
+          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+            gid2host.push_back(Galois::prefix_range(g,
+                                 (uint64_t)0U, i, 
+                                 base_hGraph::numHosts));
+        } else {
+          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+            gid2host.push_back(Galois::block_range(
+                                 0U, (unsigned)numNodes_to_divide, i, 
+                                 base_hGraph::numHosts));
+        }
       }
 #if 0
       else {

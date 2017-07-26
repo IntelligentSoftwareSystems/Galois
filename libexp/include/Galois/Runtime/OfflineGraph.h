@@ -364,7 +364,7 @@ std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
   if (num_divisions == 1) {
     printf("For division %u/%u we have begin %u and end %lu with all edges\n", 
            division_id, num_divisions - 1, 0, total_nodes);
-    return std::make_pair(begin, graph.end());
+    return std::make_pair(begin, *graph.end());
   }
 
   // Case where we have more divisions than nodes
@@ -386,7 +386,7 @@ std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
       // this division gets no element
       printf("For division %u/%u we have begin %lu and end %lu with 0 edges\n", 
              division_id, num_divisions - 1, total_nodes, total_nodes);
-      return std::make_pair(graph.end(), graph.end());
+      return std::make_pair(*graph.end(), *graph.end());
     }
   }
 
@@ -417,7 +417,7 @@ std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
     if (divisions_remaining == 1) {
       // assign remaining elements to last division
       assert(current_division == num_divisions - 1); 
-      IterTy the_end = graph.end();
+      IterTy the_end = *graph.end();
 
       printf("For division %u/%u we have begin %lu and end as the end of the "
              "graph %lu\n", division_id, num_divisions - 1, begin_element, 

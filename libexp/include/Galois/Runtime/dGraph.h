@@ -90,6 +90,11 @@ static llvm::cl::opt<bool> edgeNuma("edgeNuma",
                              "numa allocation for threads"),
                              llvm::cl::init(false));
 
+static llvm::cl::opt<bool> balanceEdges("balanceEdges", 
+                             llvm::cl::desc("Partitioner assigns masters to hosts "
+                             "such that the edges of those masters are balanced"),
+                             llvm::cl::init(false));
+
 
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
