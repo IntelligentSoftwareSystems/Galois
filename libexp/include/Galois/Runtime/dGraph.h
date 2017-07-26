@@ -578,6 +578,17 @@ public:
   void determine_thread_ranges(uint32_t total_nodes, 
                                std::vector<uint64_t> edge_prefix_sum) {
     graph.determineThreadRanges(total_nodes, edge_prefix_sum);
+    graph.determineThreadRangesEdge(edge_prefix_sum);
+  }
+  
+  /**
+   * Determine the ranges for the edges of a graph for each thread given the
+   * prefix sum of edges. threadRanges must already be calculated.
+   *
+   * @param edge_prefix_sum Prefix sum of edges 
+   */
+  void determine_thread_ranges_edge(std::vector<uint64_t> edge_prefix_sum) {
+    graph.determineThreadRangesEdge(edge_prefix_sum);
   }
 
   void exchange_info_init(){

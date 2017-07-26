@@ -141,7 +141,7 @@ protected:
   // used to track division of nodes among threads
   uint32_t* threadRanges;
   // used to track division of edges among threads
-  uint64_t* threadRangesEdges;
+  uint64_t* threadRangesEdge;
 
   typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
 
@@ -243,7 +243,7 @@ public:
     }
 
     threadRanges = nullptr;
-    threadRangesEdges = nullptr;
+    threadRangesEdge = nullptr;
     //std::cerr << "Done Construct\n";
   }
 
@@ -662,8 +662,34 @@ public:
    */
   void determineThreadRangesEdge(std::vector<uint64_t> edgePrefixSum) {
     if (threadRanges) {
-      // TODO
+      uint32_t totalThreads = Galois::Runtime::activeThreads;
 
+      threadRangesEdge = (uint64_t*)malloc(sizeof(uint64_t) * 
+                                             (totalThreads + 1));
+      threadRangesEdge[0] = 0;
+
+      // determine edge range for each active thread
+      for (uint32_t i = 0; i < totalThreads; i++) {
+        uint32_t beginNode = threadRanges[i];
+        uint32_t endNode = threadRanges[i + 1];
+
+        uint64_t beginEdge;
+        if (beginNode > 0) {
+          beginEdge = edgePrefixSum[beginNode - 1];
+        } else {
+          beginEdge = 0;
+        }
+
+        uint64_t endEdge = edgePrefixSum[endNode - 1];
+
+        assert(beginEdge <= endEdge);
+        assert(endEdge <= numEdges);
+
+        assert(threadRangesEdge[i] == beginEdge);
+        printf("[%u] begin edge is %u, end edge is %u\n", i, beginEdge, 
+               endEdge);
+        threadRangesEdge[i + 1] = endEdge;
+      }
     } else {
       printf("WARNING: threadRangesEdge not calculated because threadRanges "
              "isn't calculated.\n");
@@ -715,31 +741,34 @@ public:
     }
   }
 
-  ///**
-  // * A version of allocateFrom that takes into account edge distribution across
-  // * nodes.
-  // *
-  // * @param nNodes Number to allocate for node data
-  // * @param nEdges Number to allocate for edge data
-  // * @param threadRanges Array that specifies how nodes are to be split up 
-  // * among threads.
-  // */
-  //void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
-  //                  const uint32_t* threadRanges, 
-  //                  std::vector<uint64_t> edgePrefixSum) {
-  //  // update graph values
-  //  numNodes = nNodes;
-  //  numEdges = nEdges;
+  /**
+   * A version of allocateFrom that takes into account edge distribution across
+   * nodes.
+   *
+   * @param nNodes Number to allocate for node data
+   * @param nEdges Number to allocate for edge data
+   * @param edgePrefixSum Vector with prefix sum of edges.
+   */
+  void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
+                    std::vector<uint64_t> edgePrefixSum) {
 
-  //  nodeData.allocateSpecifiedNode(numNodes, threadRanges);
-  //  edgeIndData.allocateSpecifiedNode(numNodes, threadRanges);
+    // update graph values
+    numNodes = nNodes;
+    numEdges = nEdges;
 
-  //  // determine how 
-  //  edgeDst.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
-  //  edgeData.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
+    // calculate thread ranges for nodes and edges
+    determineThreadRanges(numNodes, edgePrefixSum);
+    determineThreadRangesEdge(numNodes, edgePrefixSum);
 
-  //  this->outOfLineAllocateSpecifiedNode(numNodes, threadRanges);
-  //}
+    //nodeData.allocateSpecifiedNode(numNodes, threadRanges);
+    //edgeIndData.allocateSpecifiedNode(numNodes, threadRanges);
+
+    //// determine how 
+    //edgeDst.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
+    //edgeData.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
+
+    //this->outOfLineAllocateSpecifiedNode(numNodes, threadRanges);
+  }
 
   void constructNodes() {
 #ifndef GALOIS_GRAPH_CONSTRUCT_SERIAL
