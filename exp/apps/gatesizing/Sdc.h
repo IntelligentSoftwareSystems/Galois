@@ -7,7 +7,7 @@
 
 struct SDC {
   float targetDelay;
-  float primaryInputSlew;
+  float primaryInputRiseSlew, primaryInputFallSlew;
   float primaryOutputTotalPinC, primaryOutputTotalNetC;
 
   CellLib *cellLib;

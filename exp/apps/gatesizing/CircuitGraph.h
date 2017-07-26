@@ -11,17 +11,17 @@
 
 struct Node {
   VerilogPin *pin;
-  float slew, totalNetC, totalPinC;
+  float riseSlew, fallSlew;
+  float totalNetC, totalPinC;
   float arrivalTime, requiredTime, slack;
   float internalPower, netPower;
-  bool isRise;
   bool isDummy, isPrimary, isOutput;
   size_t precondition;
 };
 
 struct Edge {
   VerilogWire *wire;
-  float delay;
+  float riseDelay, fallDelay;
 };
 
 typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
