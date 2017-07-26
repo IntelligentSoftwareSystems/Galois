@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -29,12 +29,14 @@
  * Numa interleaved large allocations
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Loc Hoang <l_hoang@utexas.edu> (largeMalloc Node and Edge)
  */
 #ifndef GALOIS_SUBSTRATE_NUMAMEM
 #define GALOIS_SUBSTRATE_NUMAMEM
 
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 namespace Galois {
 namespace Substrate {
@@ -52,6 +54,15 @@ LAptr largeMallocLocal(size_t bytes); // fault in locally
 LAptr largeMallocFloating(size_t bytes); // leave numa mapping undefined
 LAptr largeMallocInterleaved(size_t bytes, unsigned numThreads); // fault in interleaved mapping
 LAptr largeMallocBlocked(size_t bytes, unsigned numThreads); // fault in block interleaved mapping
+
+// TODO clean this up into 1 function
+LAptr largeMallocSpecifiedNode(size_t bytes, uint32_t numThreads, 
+  const uint32_t* threadRanges, size_t elementSize);
+
+LAptr largeMallocSpecifiedEdge(size_t bytes, 
+          uint32_t numThreads, const uint32_t* threadRanges, 
+          std::vector<uint64_t> edgePrefixSum, size_t elementSize);
+
 
 } // namespace Substrate
 } // namespace Galois

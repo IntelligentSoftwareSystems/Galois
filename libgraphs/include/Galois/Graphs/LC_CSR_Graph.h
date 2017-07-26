@@ -78,10 +78,14 @@ public:
   struct with_id { typedef LC_CSR_Graph type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
+  struct with_node_data { 
+    typedef LC_CSR_Graph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type;
+  };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
+  struct with_edge_data { 
+    typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; 
+  };
 
   template<typename _file_edge_data>
   struct with_file_edge_data { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_file_edge_data> type; };
@@ -276,10 +280,21 @@ public:
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }
 
-  const_local_iterator local_begin() const { return const_local_iterator(this->localBegin(numNodes)); }
-  const_local_iterator local_end() const { return const_local_iterator(this->localEnd(numNodes)); }
-  local_iterator local_begin() { return local_iterator(this->localBegin(numNodes)); }
-  local_iterator local_end() { return local_iterator(this->localEnd(numNodes)); }
+  const_local_iterator local_begin() const { 
+    return const_local_iterator(this->localBegin(numNodes));
+  }
+
+  const_local_iterator local_end() const { 
+    return const_local_iterator(this->localEnd(numNodes));
+  }
+
+  local_iterator local_begin() { 
+    return local_iterator(this->localBegin(numNodes));
+  }
+
+  local_iterator local_end() { 
+    return local_iterator(this->localEnd(numNodes)); 
+  }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
@@ -296,11 +311,13 @@ public:
     return raw_end(N);
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, 
+      MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, 
+      MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
@@ -308,16 +325,21 @@ public:
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
   template<typename CompTy>
-  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE) {
+  void sortEdgesByEdgeData(GraphNode N, 
+                           const CompTy& comp = std::less<EdgeTy>(), 
+                           MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), 
+              detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   * Sorts outgoing edges of a node. 
+   * Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE) {
+  void sortEdges(GraphNode N, const CompTy& comp, 
+                 MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }
@@ -631,6 +653,23 @@ public:
     assert(threadRanges[0] == 0);
     assert(threadRanges[num_threads] == totalNodes);
   }
+
+  /**
+   * Determine the ranges for the edges of a graph for each thread given the
+   * prefix sum. threadRanges must already be calculated.
+   *
+   * @param edgePrefixSum Prefix sum of edges 
+   */
+  void determineThreadRangesEdge(std::vector<uint64_t> edgePrefixSum) {
+    if (threadRanges) {
+      // TODO
+
+    } else {
+      printf("WARNING: threadRangesEdge not calculated because threadRanges "
+             "isn't calculated.\n");
+    }
+  }
+
 
   template <typename F>
   ptrdiff_t partition_neighbors (GraphNode N, const F& func) {
