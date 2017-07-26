@@ -281,10 +281,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 #endif
 
-      if(isBipartite){
+      if (isBipartite) {
     	  uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
-    	  for (unsigned i = 0; i < base_hGraph::numHosts; ++i){
-    	    auto p = Galois::block_range(0U, (unsigned)numNodes_without_edges, i, base_hGraph::numHosts);
+    	  for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
+    	    auto p = Galois::block_range(0U, 
+                     (unsigned)numNodes_without_edges, 
+                     i, base_hGraph::numHosts);
     	    //std::cout << " last node : " << last_nodeID_withEdges_bipartite << ", " << p.first << " , " << p.second << "\n";
     	    gid2host_withoutEdges.push_back(std::make_pair(last_nodeID_withEdges_bipartite + p.first + 1, last_nodeID_withEdges_bipartite + p.second + 1));
           }
@@ -341,7 +343,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       loadEdges(base_hGraph::graph, g, numEdges_distribute, VCutThreshold);
       StatTimer_exchange_edges.stop();
 
-      StatTimer_graph_construct.stop();
       //print_string(" : loadEdges : done");
       }
 
@@ -356,10 +357,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       }
 
+      // TODO revise how this works to make it consistent across cuts
       Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
       StatTimer_thread_ranges.start();
       base_hGraph::determine_thread_ranges();
       StatTimer_thread_ranges.stop();
+
+      StatTimer_graph_construct.stop();
 
       /*****************************************
        * Communication PreProcessing:
@@ -880,17 +884,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
    */
     uint64_t get_local_total_nodes() const {
       return (base_hGraph::numOwned);
-    }
-
-    /**
-     * Gets the thread ranges container that specifies division of labor for 
-     * threads
-     *
-     * @returns ThreadRangeContainer that specifies how to split labor among
-     * threads
-     */
-    typename base_hGraph::ThreadRangeContainer& get_thread_ranges() const {
-      return base_hGraph::get_thread_ranges();
     }
 
     void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {

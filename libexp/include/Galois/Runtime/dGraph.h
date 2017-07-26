@@ -293,47 +293,6 @@ public:
   typedef typename GraphTy::const_local_iterator const_local_iterator;
   typedef typename GraphTy::edge_iterator edge_iterator;
 
-  struct ThreadRangeContainer {
-    typedef typename GraphTy::iterator iterator;
-    typedef typename GraphTy::local_iterator local_iterator;
-
-    uint32_t* thread_ranges;
-
-    iterator global_begin;
-    iterator global_end;
-    iterator begin() const { return global_begin; }
-    iterator end() const { return global_end; }
-
-    local_iterator local_begin() const {
-      if (thread_ranges) {
-        uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
-        return global_begin + thread_ranges[my_thread_id];
-      } else {
-        printf("begin is %p, end is %p\n", *global_begin, *global_end);
-        return Galois::block_range(begin(), end(), 
-                                   Galois::Substrate::ThreadPool::getTID(),
-                                   Galois::Runtime::activeThreads).first;
-      }
-    }
-
-    local_iterator local_end() const {
-      if (thread_ranges) {
-        uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
-        local_iterator to_return = global_begin + 
-                                   thread_ranges[my_thread_id + 1];
-        
-        if (to_return > global_end) {
-          to_return = global_end;
-        }
-        return to_return;
-      } else {
-        return Galois::block_range(begin(), end(), 
-                                   Galois::Substrate::ThreadPool::getTID(),
-                                   Galois::Runtime::activeThreads).second;
-      }
-    }
-  };
-  ThreadRangeContainer thread_range_container;
 
   //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
   hGraph(unsigned host, unsigned numHosts) :
@@ -596,6 +555,7 @@ public:
                 boost::counting_iterator<size_t> (numNodesWithEdges));
   }
 
+
   /** 
    * Call after graph is completely constructed. Attempts to more evenly 
    * distribute nodes among threads by checking the number of edges per
@@ -604,173 +564,7 @@ public:
    * too much overhead.
    **/
   void determine_thread_ranges() {
-    if (thread_range_container.thread_ranges) {
-      // other version already called or this is a second call to this;
-      // return 
-      printf("attempting to find thread ranges again\n");
-      return;
-    }
-
-    uint32_t num_threads = Galois::Runtime::activeThreads;
-
-    uint32_t total_nodes = graph.end() - graph.begin();
-
-    uint32_t* thread_ranges = (uint32_t*)malloc(sizeof(uint32_t) * 
-                                                (num_threads + 1));
-    assert(thread_ranges != nullptr);
-
-    printf("[%u] num owned edges is %lu\n", id, graph.sizeEdges());
-
-    // theoretically how many edges we want to distributed to each thread
-    uint64_t edges_per_thread = graph.sizeEdges() / num_threads;
-
-    printf("[%u] want %lu edges per thread\n", id, edges_per_thread);
-
-    // Case where there are less nodes than threads
-    if (num_threads > graph.end() - graph.begin()) {
-      iterator current_node = graph.begin();
-      uint64_t num_nodes = graph.end() - current_node;
-      
-      // assign one node per thread (note not all nodes will get a thread in
-      // this case
-      thread_ranges[0] = *current_node;
-      for (uint32_t i = 0; i < num_nodes; i++) {
-        thread_ranges[i+1] = *(++current_node);
-      }
-
-      // deal with remainder threads
-      for (uint32_t i = num_nodes; i < num_threads; i++) {
-        thread_ranges[i+1] = total_nodes;
-      }
-
-      // save to container
-      thread_range_container.thread_ranges = thread_ranges;
-
-      // also, graph should be constructed at this point; save global begin/end
-      thread_range_container.global_begin = graph.begin();
-      thread_range_container.global_end = graph.end();
-
-      return;
-    }
-
-    // Single node case
-    if (num_threads == 1) {
-      thread_ranges[0] = *(graph.begin());
-      thread_ranges[1] = total_nodes;
-
-      // save to container
-      thread_range_container.thread_ranges = thread_ranges;
-
-      // also, graph should be constructed at this point; save global begin/end
-      thread_range_container.global_begin = graph.begin();
-      thread_range_container.global_end = graph.end();
-
-      return;
-    }
-
-
-    uint32_t current_thread = 0;
-    uint64_t current_edge_count = 0;
-    iterator current_local_node = graph.begin();
-
-    thread_ranges[current_thread] = *(graph.begin());
-
-    printf("[%u] going to determine thread ranges\n", id);
-
-    while (current_local_node != graph.end() && current_thread != num_threads) {
-      uint32_t nodes_remaining = graph.end() - current_local_node;
-      uint32_t threads_remaining = num_threads - current_thread;
-     
-      assert(nodes_remaining >= threads_remaining);
-
-      if (threads_remaining == 1) {
-        // give the rest of the nodes to this thread and get out
-        // TODO
-        printf("[%u] Thread %u has %lu edges and %u nodes (only 1 thread)\n",
-               id, current_thread, 
-               graph.edge_end(*(graph.end() - 1)) -
-               graph.edge_begin(thread_ranges[current_thread]),
-               total_nodes - thread_ranges[current_thread]);
-
-        thread_ranges[current_thread + 1] = total_nodes;
-
-        break;
-      } else if ((graph.end() - current_local_node) == threads_remaining) {
-        // Out of nodes to assign: finish up assignments (at this point,
-        // each remaining thread gets 1 node) and break
-
-        printf("Out of nodes: assigning the rest of the nodes to remaining "
-               "threads\n");
-        for (uint32_t i = 0; i < threads_remaining; i++) {
-          printf("[%u] Thread %u has %lu edges and %u nodes (oon)\n",
-                 id, current_thread, 
-                 graph.edge_end(*current_local_node) -
-                 graph.edge_begin(thread_ranges[current_thread]),
-                 (*current_local_node) + 1 - thread_ranges[current_thread]);
-
-          thread_ranges[++current_thread] = *(++current_local_node);
-        }
-
-        assert(current_local_node == graph.end());
-        assert(current_thread == num_threads);
-        break;
-      }
-
-      uint64_t num_edges = std::distance(graph.edge_begin(*current_local_node), 
-                                         graph.edge_end(*current_local_node));
-
-
-      current_edge_count += num_edges;
-      //printf("%u has %lu\n", *current_local_node, num_edges);
-      //printf("[%u] cur edge count is %lu\n", id, current_edge_count);
-
-      // TODO clean this code up to make it simpler
-      // TODO determine better thresholds
-      if (num_edges > (3 * edges_per_thread / 4)) {
-        if (current_edge_count - num_edges > (edges_per_thread / 2)) {
-          printf("[%u] Thread %u has %lu edges and %u nodes (big)\n",
-                 id, current_thread, current_edge_count - num_edges,
-                 (*current_local_node) - thread_ranges[current_thread]);
-
-          // else, assign to the NEXT thread (i.e. end this thread and move
-          // on to the next)
-          // beginning of next thread is current local node (the big one)
-          thread_ranges[current_thread + 1] = *current_local_node;
-          current_thread++;
-
-          current_edge_count = 0;
-          // go back to beginning of loop without incrementing
-          // current_local_node so the loop can handle this next node
-          continue;
-        }
-      }
-
-      if (current_edge_count >= edges_per_thread) {
-        printf("[%u] Thread %u has %lu edges and %u nodes (over)\n",
-               id, current_thread, current_edge_count,
-               (*current_local_node) + 1 - thread_ranges[current_thread]);
-
-        // This thread has enough edges; save end of this node and move on
-        // mark beginning of next thread as the next node
-        thread_ranges[current_thread + 1] = (*current_local_node) + 1;
-        current_edge_count = 0;
-        current_thread++;
-      } 
-      
-      current_local_node++;
-    }
-
-    // sanity checks
-    assert(thread_ranges[0] == 0);
-    assert(thread_ranges[num_threads] == total_nodes);
-    printf("[%u] ranges found\n", id);
-
-    // save to container
-    thread_range_container.thread_ranges = thread_ranges;
-
-    // also, graph should be constructed at this point; save global begin/end
-    thread_range_container.global_begin = graph.begin();
-    thread_range_container.global_end = graph.end();
+    graph.determineThreadRanges();
   }
 
   /**
@@ -783,163 +577,8 @@ public:
    */
   void determine_thread_ranges(uint32_t total_nodes, 
                                std::vector<uint64_t> edge_prefix_sum) {
-    assert(edge_prefix_sum.size() == total_nodes);
-    uint32_t num_threads = Galois::Runtime::activeThreads;
-    uint32_t* thread_ranges = (uint32_t*)malloc(sizeof(uint32_t) * 
-                                                (num_threads + 1));
-
-    // Single thread case
-    if (num_threads == 1) {
-      thread_ranges[0] = 0;
-      thread_ranges[1] = total_nodes;
-
-      // save to container
-      thread_range_container.thread_ranges = thread_ranges;
-
-      thread_range_container.global_begin = graph.begin();
-      thread_range_container.global_end = 
-        boost::counting_iterator<uint32_t>(total_nodes);
-
-      return;
-    } else if (num_threads > total_nodes) {
-      // more threads than nodes
-      uint32_t current_node = 0;
-
-      thread_ranges[0] = current_node;
-      for (uint32_t i = 0; i < total_nodes; i++) {
-        thread_ranges[i+1] = ++current_node;
-      }
-
-      // deal with remainder threads
-      for (uint32_t i = total_nodes; i < num_threads; i++) {
-        thread_ranges[i+1] = total_nodes;
-      }
-
-      // save to container
-      thread_range_container.thread_ranges = thread_ranges;
-
-      // also, graph should be constructed at this point; save global begin/end
-      thread_range_container.global_begin = graph.begin();
-      thread_range_container.global_end = 
-        boost::counting_iterator<uint32_t>(total_nodes);
-
-      return;
-    }
-
-    uint32_t current_thread = 0;
-    uint64_t accounted_edges = 0;
-    uint32_t current_element = 0;
-
-    // theoretically how many edges we want to distributed to each thread
-    uint64_t edges_per_thread = edge_prefix_sum.back() / num_threads;
-
-    thread_ranges[0] = 0;
-
-    printf("Optimally want %lu edges per thread\n", edges_per_thread);
-
-    while (current_element < total_nodes && current_thread < num_threads) {
-      uint64_t elements_remaining = total_nodes - current_element;
-      uint32_t threads_remaining = num_threads - current_thread;
-
-      assert(elements_remaining >= threads_remaining);
-
-      if (threads_remaining == 1) {
-        // assign remaining elements to last thread
-        assert(current_thread == num_threads - 1); 
-        thread_ranges[current_thread + 1] = total_nodes;
-        printf("[%u] Thread %u begin %u end %u (1 thread)\n", id, current_thread,
-               thread_ranges[current_thread], thread_ranges[current_thread+1]);
-
-        break;
-      } else if ((total_nodes - current_element) == threads_remaining) {
-        // Out of elements to assign: finish up assignments (at this point,
-        // each remaining thread gets 1 element except for the current
-        // thread which may have some already)
-        for (uint32_t i = 0; i < threads_remaining; i++) {
-          thread_ranges[++current_thread] = (++current_element);
-          printf("[%u] Thread %u begin %u end %u (out of element)\n", id, 
-                 current_thread-1, thread_ranges[current_thread-1], 
-                 thread_ranges[current_thread]);
-        }
-
-        assert(current_element == total_nodes);
-        assert(current_thread == num_threads);
-        break;
-      }
-
-      // Determine various edge count numbers from prefix sum
-      uint64_t element_edges;
-      if (current_element > 0) {
-        element_edges = edge_prefix_sum[current_element] - 
-                        edge_prefix_sum[current_element - 1];
-      } else {
-        element_edges = edge_prefix_sum[0];
-      }
-  
-      uint64_t edge_count_without_current;
-      if (current_element > 0) {
-        edge_count_without_current = edge_prefix_sum[current_element] -
-                                     accounted_edges - element_edges;
-      } else {
-        edge_count_without_current = 0;
-      }
-
-      //printf("%u has %lu\n", current_element, element_edges);
-
-      // this thread or the next (don't want to cause this thread to get
-      // too much)
-      if (element_edges > (3 * edges_per_thread / 4)) {
-        // if this current thread + edges of this element is too much,
-        // then do not add to this thread but rather the next one
-        if (edge_count_without_current > (edges_per_thread / 2)) {
-          // assign to the NEXT thread (i.e. end this thread and move on to the 
-          // next)
-          // beginning of next thread is current local node (the big one)
-
-          thread_ranges[current_thread + 1] = current_element;
-          printf("[%u] Thread %u begin %u end %u (big)\n", id, 
-                 current_thread, thread_ranges[current_thread], 
-                 thread_ranges[current_thread+1]);
-
-          current_thread++;
-          accounted_edges = edge_prefix_sum[current_element - 1];
-
-          // go back to beginning of loop 
-          continue;
-        }
-      }
-
-      // handle this element by adding edges to running sums
-      uint64_t edge_count_with_current = edge_count_without_current + 
-                                         element_edges;
-
-      if (edge_count_with_current >= edges_per_thread) {
-        thread_ranges[++current_thread] = current_element + 1;
-        printf("[%u] Thread %u begin %u end %u (over)\n", id, current_thread-1,
-               thread_ranges[current_thread-1], 
-               thread_ranges[current_thread]);
-        //printf("sum is %lu\n", edge_prefix_sum[current_thread-1]);
-
-        accounted_edges = edge_prefix_sum[current_element];
-      }
-
-      current_element++;
-    }
-
-    // sanity checks
-    assert(thread_ranges[0] == 0);
-    assert(thread_ranges[num_threads] == total_nodes);
-
-    // save to container
-    thread_range_container.thread_ranges = thread_ranges;
-
-    thread_range_container.global_begin = graph.begin();
-    thread_range_container.global_end = 
-      boost::counting_iterator<uint32_t>(total_nodes);
-
+    graph.determineThreadRanges(total_nodes, edge_prefix_sum);
   }
-
-
 
   void exchange_info_init(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -3172,14 +2811,72 @@ public:
   }
 
   /**
-   * Gets the thread ranges container that specifies division of labor for threads
-   *
-   * @returns ThreadRangeContainer that specifies how to split labor among
+   * Returns the thread ranges array that specifies division of nodes among
    * threads
+   *
+   * @returns An array of unsigned ints which spcifies which thread gets which
+   * nodes.
    */
-  ThreadRangeContainer& get_thread_ranges() {
-    return thread_range_container;
+  const uint32_t* get_thread_ranges() {
+    return graph.getThreadRanges();
   }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Calls for the container object for do_all_local + other things that need
+  // this container interface
+  //////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Returns an iterator to the first node assigned to the thread that calls
+   * this function
+   *
+   * @returns An iterator to the first node that a thread is to do work on.
+   */
+  local_iterator local_begin() const {
+    const uint32_t* thread_ranges = graph.getThreadRanges();
+
+    if (thread_ranges) {
+      uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+      return begin() + thread_ranges[my_thread_id];
+    } else {
+      return Galois::block_range(begin(), end(), 
+                                 Galois::Substrate::ThreadPool::getTID(),
+                                 Galois::Runtime::activeThreads).first;
+    }
+  }
+
+  /**
+   * Returns an iterator to the node after the last node that the thread
+   * that calls this function is assigned to work on.
+   *
+   * @returns An iterator to the node after the last node the thread is
+   * to work on.
+   */
+  local_iterator local_end() const {
+    const uint32_t* thread_ranges = graph.getThreadRanges();
+
+    if (thread_ranges) {
+      uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+      local_iterator to_return = begin() + 
+                                 thread_ranges[my_thread_id + 1];
+       
+      // quick safety check to make sure it doesn't go past the end of the
+      // graph
+      if (to_return > end()) {
+        printf("WARNING: local end iterator goes past the end of the graph\n");
+        to_return = end();
+      }
+
+      return to_return;
+    } else {
+      return Galois::block_range(begin(), end(), 
+                                 Galois::Substrate::ThreadPool::getTID(),
+                                 Galois::Runtime::activeThreads).second;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+
 
   void save_local_graph(std::string folder_name, std::string local_file_name){
 

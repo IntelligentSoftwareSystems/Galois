@@ -268,12 +268,14 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
+    // TODO revise how this works to make it consistent across cuts
     Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
     StatTimer_thread_ranges.start();
     base_hGraph::determine_thread_ranges();
     StatTimer_thread_ranges.stop();
 
     StatTimer_graph_construct.stop();
+
 
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
@@ -615,23 +617,11 @@ public:
   }
 
   /**
-     * Returns the start and end of master nodes in local graph.
-     */
+   * Returns the start and end of master nodes in local graph.
+   */
   uint64_t get_local_total_nodes() const {
     return numNodes;
   }
-
-  /**
-   * Gets the thread ranges container that specifies division of labor for 
-   * threads
-   *
-   * @returns ThreadRangeContainer that specifies how to split labor among
-   * threads
-   */
-  typename base_hGraph::ThreadRangeContainer& get_thread_ranges() const {
-    return base_hGraph::get_thread_ranges();
-  }
-
 
   void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
     size_t first_owned = G2L(gid2host[base_hGraph::id].first);

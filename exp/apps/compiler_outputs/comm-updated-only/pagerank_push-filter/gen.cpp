@@ -274,7 +274,7 @@ struct PageRankCopy {
       //               std::make_tuple(Galois::loopname("PageRank"), 
       //               Galois::thread_range(_graph.get_thread_ranges()),
       //               Galois::numrun(_graph.get_run_identifier())));
-      Galois::do_all_local(_graph.get_thread_ranges(),
+      Galois::do_all_local(_graph,
                      PageRankCopy{ alpha, tolerance, &_graph }, 
                      Galois::loopname("PageRank"), 
                      Galois::numrun(_graph.get_run_identifier()));
@@ -317,7 +317,7 @@ struct FirstItr_PageRank{
       //               Galois::write_set("reduce", "this->graph", 
       //                 "struct NodeData &", "struct PR_NodeData &" , "residual", 
       //                 "float" , "add",  "0")));
-      Galois::do_all_local(_graph.get_thread_ranges(),
+      Galois::do_all_local(_graph,
                      FirstItr_PageRank{&_graph},
                      Galois::loopname("PageRank"), 
                      Galois::numrun(_graph.get_run_identifier()), 
@@ -388,7 +388,7 @@ struct PageRank {
           //                                 "float" , "add",  "0"), 
           //               Galois::numrun(_graph.get_run_identifier())));
 
-          Galois::do_all_local(_graph.get_thread_ranges(),
+          Galois::do_all_local(_graph,
                          PageRank{ &_graph }, 
                          Galois::loopname("PageRank"), 
                          Galois::write_set("reduce", "this->graph", 

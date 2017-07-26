@@ -312,19 +312,24 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (!edgeNuma) {
         base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
       } else {
-        // determine division of nodes among threads and allocate based on that
-        printf("Edge based NUMA division on\n");
+        //// determine division of nodes among threads and allocate based on that
+        //printf("Edge based NUMA division on\n");
 
-        edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
+        //edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
 
-        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-        StatTimer_thread_ranges.start();
-        base_hGraph::determine_thread_ranges(_numNodes, edge_prefix_sum);
-        // TODO thread range finding here
-        StatTimer_thread_ranges.stop();
+        //// TODO determine thread ranges in  allocate from call
+        //Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        //StatTimer_thread_ranges.start();
+        //base_hGraph::determine_thread_ranges(_numNodes, edge_prefix_sum);
+        //StatTimer_thread_ranges.stop();
 
-        // TODO
-        base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+        //const uint32_t* thread_ranges = 
+        //  base_hGraph::get_thread_ranges();
+        //assert(thread_ranges != nullptr);
+
+        //// TODO
+        //base_hGraph::graph.allocateFrom(_numNodes, _numEdges, thread_ranges, 
+        //                                edge_prefix_sum);
       }
       //std::cerr << "Allocate done\n";
 
@@ -348,6 +353,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       StatTimer_graph_construct.stop();
+
       StatTimer_graph_construct_comm.start();
       base_hGraph::setup_communication();
       StatTimer_graph_construct_comm.stop();
@@ -469,17 +475,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
   }
 
-  /**
-   * Gets the thread ranges container that specifies division of labor for 
-   * threads
-   *
-   * @returns ThreadRangeContainer that specifies how to split labor among
-   * threads
-   */
-  typename base_hGraph::ThreadRangeContainer& get_thread_ranges() const {
-    return base_hGraph::get_thread_ranges();
-  }
-
   void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
     if (syncType == base_hGraph::syncBroadcast) { // reset masters
       if (numOwned_withEdges > 0) {
@@ -493,4 +488,3 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 };
-
