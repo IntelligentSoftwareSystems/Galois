@@ -228,10 +228,18 @@ struct PageRank_delta {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-        PageRank_delta { alpha, tolerance, &_graph }, 
-        Galois::loopname("PageRank"), 
-        Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+    //    PageRank_delta { alpha, tolerance, &_graph }, 
+    //    Galois::loopname("PageRank"), 
+    //    Galois::numrun(_graph.get_run_identifier()));
+    Galois::do_all_choice(
+      Galois::Runtime::makeStandardRange(_graph.begin(), _graph.ghost_end()), 
+      PageRank_delta{ alpha, tolerance, &_graph }, 
+      std::make_tuple(Galois::loopname("PageRank"), 
+        Galois::thread_range(_graph.get_thread_ranges()),
+        Galois::numrun(_graph.get_run_identifier())
+      ));
+
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -271,10 +279,17 @@ struct PageRank {
           StatTimer_cuda.stop();
         } else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), 
-          PageRank { &_graph }, 
-          Galois::loopname("PageRank"), 
-          Galois::numrun(_graph.get_run_identifier()));
+      //Galois::do_all(_graph.begin(), _graph.end(), 
+      //    PageRank { &_graph }, 
+      //    Galois::loopname("PageRank"), 
+      //    Galois::numrun(_graph.get_run_identifier()));
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.ghost_end()), 
+        PageRank{ &_graph }, 
+        std::make_tuple(Galois::loopname("PageRank"), 
+          Galois::thread_range(_graph.get_thread_ranges()),
+          Galois::numrun(_graph.get_run_identifier())
+        ));
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
@@ -310,7 +325,6 @@ struct PageRank {
 /* Sanity check operators */
 /******************************************************************************/
 
-// gets rank max, min and sum across all nodes
 struct PageRankSanity {
   cll::opt<float>& local_tolerance;
   Graph* graph;
