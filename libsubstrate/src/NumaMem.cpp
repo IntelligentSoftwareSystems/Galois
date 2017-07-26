@@ -25,7 +25,7 @@
  * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
- * @author Loc Hoang <l_hoang@utexas.edu> (largeMalloc Node and Edge + helpers)
+ * @author Loc Hoang <l_hoang@utexas.edu> (largeMallocSpecified + helpers)
  */
 
 #include "Galois/Substrate/NumaMem.h"
@@ -68,6 +68,80 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize,
         }
       }
     );
+  }
+}
+
+/**
+ * Causes each thread to page in a specified region of the provided memory
+ * based on some distribution of elements as specified by a provided array.
+ *
+ * @tparam RangeArrayTy Type of threadRanges array: should either be uint32_t*
+ * or uint64_t*
+ * @param _ptr Pointer to the memory to page in
+ * @param len Length of the memory passed in
+ * @param pageSize Size of a page
+ * @param numThreads Number of threads to split work amongst
+ * @param threadRanges Array that specifies distribution of elements among 
+ * threads
+ * @param elementSize Size of an element that is to be distributed among 
+ * threads
+ */
+template<typename RangeArrayTy>
+static void pageInSpecified(void* _ptr, size_t len, size_t pageSize, 
+                   unsigned numThreads, RangeArrayTy threadRanges,
+                   size_t elementSize) {
+  assert(numThreads > 0);
+  assert(elementSize > 0);
+
+  char* ptr = static_cast<char*>(_ptr);
+
+  if (numThreads > 1) {
+    ThreadPool::getThreadPool().run(numThreads, 
+      [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
+        auto myID = ThreadPool::getTID();
+
+        uint32_t beginLocation = threadRanges[myID];
+        uint32_t endLocation = threadRanges[myID + 1];
+
+        assert(beginLocation <= endLocation);
+
+        printf("[%u] begin location %u and end location %u\n", myID,
+               beginLocation, endLocation);
+
+        // if equal, then no memory needed to allocate in first place
+        if (beginLocation != endLocation) {
+          size_t beginByte = beginLocation * elementSize;
+          size_t endByte;
+
+          if (endLocation != 0) {
+            // -1 since end * element will result in the first byte of the
+            // next node
+            endByte = (endLocation * elementSize) - 1;
+          } else {
+            endByte = 0;
+          }
+
+          assert(beginByte <= endByte);
+
+          uint32_t beginPage = beginByte / pageSize;
+          uint32_t endPage = endByte / pageSize;
+
+          assert(beginPage <= endPage);
+
+          printf("thread %u gets begin page %u and end page %u\n", myID,
+                  beginPage, endPage);
+
+          // write a byte to every page this thread occupies
+          for (uint32_t i = beginPage; i <= endPage; i++) {
+            ptr[i * pageSize] = 0;
+          }
+        }
+      }
+    );
+  } else {
+    // 1 thread case
+    for (size_t x = 0; x < len; x += pageSize / 2)
+      ptr[x] = 0;
   }
 }
 
@@ -134,176 +208,41 @@ LAptr Galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
 }
 
 /** 
- * TODO good description here
+ * Allocates pages for some specified number of bytes, then does NUMA page
+ * faulting based on a specified distribution of elements among threads.
+ *
+ * @tparam RangeArrayTy Type of threadRanges array: should either be uint32_t*
+ * or uint64_t*
+ * @param bytes Number of bytes to allocate
+ * @param numThreads Number of threads to page in regions for
+ * @param threadRanges Array specifying distribution of elements among threads
+ * @param elementSize Size of a data element that will be stored in the 
+ * allocated memory
+ * @returns The allocated memory along with a freer object
  */
-static void pageInSpecifiedNode(void* _ptr, size_t len, size_t pageSize, 
-                   unsigned numThreads, const uint32_t* threadRanges,
-                   size_t elementSize) {
-  assert(numThreads > 0);
-
-  char* ptr = static_cast<char*>(_ptr);
-
-  if (numThreads > 1) {
-    ThreadPool::getThreadPool().run(numThreads, 
-      [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
-        auto myID = ThreadPool::getTID();
-
-        uint32_t beginNode = threadRanges[myID];
-        uint32_t endNode = threadRanges[myID + 1];
-
-        assert(beginNode <= endNode);
-
-        printf("[%u] begin node %u and end node %u, nodes\n", myID, beginNode,
-               endNode);
-
-        // if equal, then no nodes in first place
-        if (beginNode != endNode) {
-          size_t beginByte = beginNode * elementSize;
-          size_t endByte;
-
-          if ((endNode * elementSize) != 0) {
-            // -1 since end * element will result in the first byte of the
-            // next node
-            endByte = (endNode * elementSize) - 1;
-          } else {
-            endByte = 0;
-          }
-
-          assert(beginByte <= endByte);
-
-          if (beginByte != endByte) {
-            uint32_t beginPage = beginByte / pageSize;
-            uint32_t endPage = endByte / pageSize;
-
-            assert(beginPage <= endPage);
-
-            printf("thread %u gets begin page %u and end page %u\n", myID,
-                    beginPage, endPage);
-
-            // write a byte to every page this thread occupies
-            for (uint32_t i = beginPage; i <= endPage; i++) {
-              ptr[i * pageSize] = 0;
-            }
-          }
-        }
-
-      });
-  } else {
-    // thread num = 1 case
-    for (size_t x = 0; x < len; x += pageSize / 2)
-      ptr[x] = 0;
-  }
-}
-
-
-LAptr Galois::Substrate::largeMallocSpecifiedNode(size_t bytes, 
-          uint32_t numThreads, const uint32_t* threadRanges, 
+template<typename RangeArrayTy>
+LAptr Galois::Substrate::largeMallocSpecified(size_t bytes, 
+          uint32_t numThreads, RangeArrayTy threadRanges, 
           size_t elementSize) {
   // ceiling to nearest page
   bytes = roundup(bytes, allocSize());
 
   void* data = allocPages(bytes / allocSize(), false);
 
-  // NUMA aware page in based on distribution of nodes to threads specified
-  // in threadRanges
+  // NUMA aware page in based on element distribution specified in threadRanges
   if (data) 
-    pageInSpecifiedNode(data, bytes, allocSize(), numThreads, threadRanges, 
-                        elementSize);
+    pageInSpecified(data, bytes, allocSize(), numThreads, threadRanges, 
+                    elementSize);
 
   return LAptr{data, detail::largeFreer{bytes}};
 }
-
-/** 
- * TODO good description here
- */
-static void pageInSpecifiedEdge(void* _ptr, size_t len, size_t pageSize, 
-                   unsigned numThreads, const uint32_t* threadRanges,
-                   std::vector<uint64_t> edgePrefixSum, size_t elementSize) {
-  assert(numThreads > 0);
-
-  char* ptr = static_cast<char*>(_ptr);
-
-  if (numThreads > 1) {
-    ThreadPool::getThreadPool().run(numThreads, 
-      [ptr, len, pageSize, numThreads, threadRanges, edgePrefixSum, elementSize] () {
-        auto myID = ThreadPool::getTID();
-
-        uint32_t beginNode = threadRanges[myID];
-        uint32_t endNode = threadRanges[myID + 1];
-        printf("[%u] begin node is %u, end node is %u\n", myID, beginNode, 
-               endNode);
-
-
-        uint64_t beginEdge;
-        if (beginNode > 0) {
-          beginEdge = edgePrefixSum[beginNode - 1];
-        } else {
-          beginEdge = 0;
-        }
-
-        uint64_t endEdge = edgePrefixSum[endNode - 1];
-
-        assert(beginEdge <= endEdge);
-
-        printf("[%u] begin edge is %u, end edge is %u\n", myID, beginEdge, 
-               endEdge);
-
-        // if equal, then no edges in first place
-        if (beginEdge != endEdge) {
-          size_t beginByte = beginEdge * elementSize;
-          size_t endByte;
-
-          if ((endEdge * elementSize) != 0) {
-            // -1 since end * element will result in the first byte of the
-            // next edge
-            endByte = (endEdge * elementSize) - 1;
-          } else {
-            endByte = 0;
-          }
-
-          assert(beginByte <= endByte);
-
-          if (beginByte != endByte) {
-            uint32_t beginPage = beginByte / pageSize;
-            uint32_t endPage = endByte / pageSize;
-
-            assert(beginPage <= endPage);
-
-            printf("thread %u gets begin page %u and end page %u; edges\n", myID,
-                    beginPage, endPage);
-
-            // write a byte to every page this thread occupies
-            for (uint32_t i = beginPage; i <= endPage; i++) {
-              ptr[i * pageSize] = 0;
-            }
-          }
-        }
-      });
-  } else {
-    // thread num = 1 case
-    for (size_t x = 0; x < len; x += pageSize / 2)
-      ptr[x] = 0;
-  }
-}
-
-LAptr Galois::Substrate::largeMallocSpecifiedEdge(size_t bytes, 
-          uint32_t numThreads, const uint32_t* threadRanges, 
-          std::vector<uint64_t> edgePrefixSum, size_t elementSize) {
-  // ceiling to nearest page
-  bytes = roundup(bytes, allocSize());
-
-  void* data = allocPages(bytes / allocSize(), false);
-
-  // NUMA aware page in based on distribution of nodes to threads specified
-  // in threadRanges
-  if (data) 
-    pageInSpecifiedEdge(data, bytes, allocSize(), numThreads, threadRanges, 
-                        edgePrefixSum, elementSize);
-
-  return LAptr{data, detail::largeFreer{bytes}};
-}
-
-
-//LAptr Galois::Substrate::largeMallocSpecifiedEdge() {
-//
-//}
+// Explicit template declarations since the template is defined in the .h
+// file
+template
+LAptr Galois::Substrate::largeMallocSpecified<uint32_t*>(size_t bytes, 
+          uint32_t numThreads, uint32_t* threadRanges, 
+          size_t elementSize);
+template
+LAptr Galois::Substrate::largeMallocSpecified<uint64_t*>(size_t bytes, 
+          uint32_t numThreads, uint64_t* threadRanges, 
+          size_t elementSize);

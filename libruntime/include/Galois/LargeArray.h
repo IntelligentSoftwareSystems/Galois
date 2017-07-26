@@ -160,38 +160,29 @@ public:
    */
   void allocateLocal(size_type n) { allocate(n, Local); }
 
-  ///** 
-  // * Allocate specific
-  // * TODO description
-  // */
-  //void allocateSpecifiedNode(size_type number_of_elements, 
-  //                           const uint32_t* threadRanges) {
-  //  assert(!m_data);
-  //  m_realdata = Substrate::largeMallocSpecifiedNode(
-  //                 number_of_elements * sizeof(T),
-  //                 Runtime::activeThreads, threadRanges,
-  //                 sizeof(T));
-  //  m_size = number_of_elements;
-  //  m_data = reinterpret_cast<T*>(m_realdata.get());
+  /** 
+   * Allocate memory to threads based on a provided array specifying which
+   * threads receive which elements of data.
+   *
+   * @tparam RangeArrayTy The type of the threadRanges array; should either
+   * be uint32_t* or uint64_t*
+   * @param numberOfElements Number of elements to allocate space for
+   * @param threadRanges An array specifying how elements should be split
+   * among threads
+   */
+  template<typename RangeArrayTy>
+  void allocateSpecified(size_type numberOfElements, 
+                         RangeArrayTy threadRanges) {
+    assert(!m_data);
 
-  //}
+    m_realdata = Substrate::largeMallocSpecified(
+                   numberOfElements * sizeof(T),
+                   Runtime::activeThreads, threadRanges,
+                   sizeof(T));
 
-  ///** 
-  // * Allocate specific
-  // * TODO description
-  // */
-  //void allocateSpecifiedEdge(size_type number_of_elements, 
-  //                           const uint32_t* threadRanges,
-  //                           std::vector<uint64_t> edgePrefixSum) {
-  //  assert(!m_data);
-  //  m_realdata = Substrate::largeMallocSpecifiedEdge(
-  //                 number_of_elements * sizeof(T),
-  //                 Runtime::activeThreads, threadRanges,
-  //                 edgePrefixSum, sizeof(T));
-  //  m_size = number_of_elements;
-  //  m_data = reinterpret_cast<T*>(m_realdata.get());
-  //}
-
+    m_size = numberOfElements;
+    m_data = reinterpret_cast<T*>(m_realdata.get());
+  }
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -271,9 +262,9 @@ public:
   void allocateInterleaved(size_type n) { }
   void allocateBlocked(size_type n) { }
   void allocateLocal(size_type n, bool prefault = true) { }
-  void allocateSpecifiedEdge(size_type number_of_elements, 
-                             const uint32_t* threadRanges,
-                             std::vector<uint64_t> edgePrefixSum) { }
+  template<typename RangeArrayTy>
+  void allocateSpecified(size_type number_of_elements, 
+                         RangeArrayTy threadRanges) { }
 
 
   template<typename... Args> void construct(Args&&... args) { }

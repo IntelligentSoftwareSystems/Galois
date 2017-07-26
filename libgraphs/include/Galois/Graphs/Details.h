@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -29,6 +29,7 @@
  * Implementation details for various graphs.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu> (only added allocatespecified things)
  */
 
 #ifndef GALOIS_GRAPH_DETAILS_H
@@ -283,13 +284,16 @@ public:
   void outOfLineAllocateBlocked(size_t numNodes) {
     outOfLineLocks.allocateBlocked(numNodes);
   }
+
+  template <typename RangeArrayType>
+  void outOfLineAllocateSpecified(size_t n, RangeArrayType threadRanges) {
+    outOfLineLocks.allocateSpecified(n, threadRanges);
+  }
+
   void outOfLineConstructAt(size_t n) {
     outOfLineLocks.constructAt(n);
   }
 
-  //void outOfLineAllocateSpecifiedNode(size_t n, const uint32_t* threadRanges) {
-  //  outOfLineLocks.allocateSpecifiedNode(n, threadRanges);
-  //}
 };
 
 template<>
@@ -303,7 +307,8 @@ public:
   void outOfLineAllocateInterleaved(size_t numNodes) { }
   void outOfLineAllocateBlocked(size_t) {}
   void outOfLineConstructAt(size_t n) { }
-  void outOfLineAllocateSpecifiedNode(size_t n, const uint32_t* threadRanges) {}
+  template <typename RangeArrayType>
+  void outOfLineAllocateSpecified(size_t n, RangeArrayType threadRanges) {}
 };
 
 //! Edge specialization for void edge data

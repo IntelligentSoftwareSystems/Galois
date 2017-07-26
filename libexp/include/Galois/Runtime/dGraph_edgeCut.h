@@ -57,7 +57,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint32_t numNodes;
     uint32_t numOwned_withEdges;
 
-
     // Return the local offsets for the nodes to host.
     std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
       return hostNodes[host];
@@ -296,7 +295,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
-      
+      edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
+
       // transpose is usually used for incoming edge cuts: this makes it
       // so you consider ghosts as having edges as well (since in IEC ghosts
       // have outgoing edges
@@ -312,24 +312,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (!edgeNuma) {
         base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
       } else {
-        //// determine division of nodes among threads and allocate based on that
-        //printf("Edge based NUMA division on\n");
-
-        //edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
-
-        //// TODO determine thread ranges in  allocate from call
-        //Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-        //StatTimer_thread_ranges.start();
-        //base_hGraph::determine_thread_ranges(_numNodes, edge_prefix_sum);
-        //StatTimer_thread_ranges.stop();
-
-        //const uint32_t* thread_ranges = 
-        //  base_hGraph::get_thread_ranges();
-        //assert(thread_ranges != nullptr);
-
-        //// TODO
-        //base_hGraph::graph.allocateFrom(_numNodes, _numEdges, thread_ranges, 
-        //                                edge_prefix_sum);
+        // determine division of nodes among threads and allocate based on that
+        printf("Edge based NUMA division on\n");
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges, edge_prefix_sum);
       }
       //std::cerr << "Allocate done\n";
 
@@ -349,6 +334,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
         StatTimer_thread_ranges.start();
         base_hGraph::determine_thread_ranges();
+        //base_hGraph::determine_thread_ranges_edge(edge_prefix_sum);
         StatTimer_thread_ranges.stop();
       }
 

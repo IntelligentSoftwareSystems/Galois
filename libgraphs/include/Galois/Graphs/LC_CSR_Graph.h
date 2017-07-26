@@ -427,7 +427,6 @@ public:
 
       if (threads_remaining == 1) {
         // give the rest of the nodes to this thread and get out
-        // TODO
         printf("Thread %u has %lu edges and %u nodes (only 1 thread)\n",
                current_thread, 
                edge_end(*(end() - 1)) -
@@ -440,7 +439,6 @@ public:
       } else if ((end() - current_local_node) == threads_remaining) {
         // Out of nodes to assign: finish up assignments (at this point,
         // each remaining thread gets 1 node) and break
-
         printf("Out of nodes: assigning the rest of the nodes to remaining "
                "threads\n");
         for (uint32_t i = 0; i < threads_remaining; i++) {
@@ -686,7 +684,7 @@ public:
         assert(endEdge <= numEdges);
 
         assert(threadRangesEdge[i] == beginEdge);
-        printf("[%u] begin edge is %u, end edge is %u\n", i, beginEdge, 
+        printf("[%u] begin edge is %lu, end edge is %lu\n", i, beginEdge, 
                endEdge);
         threadRangesEdge[i + 1] = endEdge;
       }
@@ -751,23 +749,23 @@ public:
    */
   void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
                     std::vector<uint64_t> edgePrefixSum) {
-
     // update graph values
     numNodes = nNodes;
     numEdges = nEdges;
 
     // calculate thread ranges for nodes and edges
     determineThreadRanges(numNodes, edgePrefixSum);
-    determineThreadRangesEdge(numNodes, edgePrefixSum);
+    determineThreadRangesEdge(edgePrefixSum);
 
-    //nodeData.allocateSpecifiedNode(numNodes, threadRanges);
-    //edgeIndData.allocateSpecifiedNode(numNodes, threadRanges);
+    // node based alloc
+    nodeData.allocateSpecified(numNodes, threadRanges);
+    edgeIndData.allocateSpecified(numNodes, threadRanges);
 
-    //// determine how 
-    //edgeDst.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
-    //edgeData.allocateSpecifiedEdge(numEdges, threadRanges, edgePrefixSum);
+    // edge based alloc
+    edgeDst.allocateSpecified(numEdges, threadRangesEdge);
+    edgeData.allocateSpecified(numEdges, threadRangesEdge);
 
-    //this->outOfLineAllocateSpecifiedNode(numNodes, threadRanges);
+    this->outOfLineAllocateSpecified(numNodes, threadRanges);
   }
 
   void constructNodes() {
