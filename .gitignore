@@ -1,5 +1,6 @@
 *.orig
 *.patch
+.*.swo
 
 # no temp files
 *~
