@@ -371,16 +371,17 @@ public:
 
     uint32_t num_threads = Galois::Runtime::activeThreads;
     uint32_t total_nodes = end() - begin();
+    //printf("nodes is %u\n", total_nodes);
 
     threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (num_threads + 1));
     assert(threadRanges != nullptr);
 
-    printf("num owned edges is %lu\n", sizeEdges());
+    //printf("num owned edges is %lu\n", sizeEdges());
 
     // theoretically how many edges we want to distributed to each thread
     uint64_t edges_per_thread = sizeEdges() / num_threads;
 
-    printf("want %lu edges per thread\n", edges_per_thread);
+    //printf("want %lu edges per thread\n", edges_per_thread);
 
     // Case where there are less nodes than threads
     if (num_threads > end() - begin()) {
@@ -417,7 +418,7 @@ public:
 
     threadRanges[current_thread] = *(begin());
 
-    printf("going to determine thread ranges\n");
+    //printf("going to determine thread ranges\n");
 
     while (current_local_node != end() && current_thread != num_threads) {
       uint32_t nodes_remaining = end() - current_local_node;
@@ -684,8 +685,8 @@ public:
         assert(endEdge <= numEdges);
 
         assert(threadRangesEdge[i] == beginEdge);
-        printf("[%u] begin edge is %lu, end edge is %lu\n", i, beginEdge, 
-               endEdge);
+        //printf("[%u] begin edge is %lu, end edge is %lu\n", i, beginEdge, 
+        //       endEdge);
         threadRangesEdge[i + 1] = endEdge;
       }
     } else {

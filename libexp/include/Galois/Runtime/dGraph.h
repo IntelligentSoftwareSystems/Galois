@@ -2875,7 +2875,6 @@ public:
       // graph
       if (to_return > end()) {
         printf("WARNING: local end iterator goes past the end of the graph\n");
-        to_return = end();
       }
 
       return to_return;

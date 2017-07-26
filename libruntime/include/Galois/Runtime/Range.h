@@ -147,9 +147,12 @@ public:
     iterator local_start = global_begin + thread_beginnings[my_thread_id];
     iterator local_end = global_begin + thread_beginnings[my_thread_id + 1];
 
-    if (local_end >= global_end) {
-      local_end = global_end;
-    }
+    //if (local_end >= global_end) {
+    //  local_end = global_end;
+    //}
+
+    //printf("thread %u gets start %u and end %u\n", my_thread_id, *local_start, 
+    //       *local_end);
 
     return std::make_pair(local_start, local_end);
   }
@@ -165,8 +168,7 @@ public:
   block_iterator block_end() const { return block_pair().second; }
 };
 
-/**
- * Creates a SpecificRange object.
+/** * Creates a SpecificRange object.
  *
  * @tparam IterTy The iterator type used by the range object
  * @param begin The global beginning of the range
