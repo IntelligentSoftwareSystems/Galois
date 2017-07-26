@@ -286,6 +286,10 @@ public:
   void outOfLineConstructAt(size_t n) {
     outOfLineLocks.constructAt(n);
   }
+
+  //void outOfLineAllocateSpecifiedNode(size_t n, const uint32_t* threadRanges) {
+  //  outOfLineLocks.allocateSpecifiedNode(n, threadRanges);
+  //}
 };
 
 template<>
@@ -299,6 +303,7 @@ public:
   void outOfLineAllocateInterleaved(size_t numNodes) { }
   void outOfLineAllocateBlocked(size_t) {}
   void outOfLineConstructAt(size_t n) { }
+  void outOfLineAllocateSpecifiedNode(size_t n, const uint32_t* threadRanges) {}
 };
 
 //! Edge specialization for void edge data

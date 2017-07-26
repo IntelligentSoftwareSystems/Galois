@@ -86,6 +86,7 @@ protected:
       break;
     case Interleaved:
       m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), Runtime::activeThreads);
+      break;
     case Local:
       m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
     };
@@ -158,6 +159,39 @@ public:
    * @param  n         number of elements to allocate 
    */
   void allocateLocal(size_type n) { allocate(n, Local); }
+
+  ///** 
+  // * Allocate specific
+  // * TODO description
+  // */
+  //void allocateSpecifiedNode(size_type number_of_elements, 
+  //                           const uint32_t* threadRanges) {
+  //  assert(!m_data);
+  //  m_realdata = Substrate::largeMallocSpecifiedNode(
+  //                 number_of_elements * sizeof(T),
+  //                 Runtime::activeThreads, threadRanges,
+  //                 sizeof(T));
+  //  m_size = number_of_elements;
+  //  m_data = reinterpret_cast<T*>(m_realdata.get());
+
+  //}
+
+  ///** 
+  // * Allocate specific
+  // * TODO description
+  // */
+  //void allocateSpecifiedEdge(size_type number_of_elements, 
+  //                           const uint32_t* threadRanges,
+  //                           std::vector<uint64_t> edgePrefixSum) {
+  //  assert(!m_data);
+  //  m_realdata = Substrate::largeMallocSpecifiedEdge(
+  //                 number_of_elements * sizeof(T),
+  //                 Runtime::activeThreads, threadRanges,
+  //                 edgePrefixSum, sizeof(T));
+  //  m_size = number_of_elements;
+  //  m_data = reinterpret_cast<T*>(m_realdata.get());
+  //}
+
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -237,6 +271,11 @@ public:
   void allocateInterleaved(size_type n) { }
   void allocateBlocked(size_type n) { }
   void allocateLocal(size_type n, bool prefault = true) { }
+  void allocateSpecifiedEdge(size_type number_of_elements, 
+                             const uint32_t* threadRanges,
+                             std::vector<uint64_t> edgePrefixSum) { }
+
+
   template<typename... Args> void construct(Args&&... args) { }
   template<typename... Args> void constructAt(size_type n, Args&&... args) { }
   template<typename... Args> void create(size_type n, Args&&... args) { }
