@@ -156,6 +156,7 @@ void Galois::Substrate::detail::largeFreer::operator()(void* ptr) const {
 // round data to a multiple of mult
 static size_t roundup (size_t data, size_t mult) {
   auto rem = data % mult;
+
   if (!rem)
     return data;
   return data + (mult - rem);
