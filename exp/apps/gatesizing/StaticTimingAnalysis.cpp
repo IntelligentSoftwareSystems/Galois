@@ -28,7 +28,8 @@ struct ComputeRequiredTime {
     else if (data.isPrimary) {
       // primary output
       if (data.isOutput) {
-        data.slack = data.requiredTime - data.arrivalTime;
+        data.rise.slack = data.rise.requiredTime - data.rise.arrivalTime;
+        data.fall.slack = data.fall.requiredTime - data.fall.arrivalTime;
         for (auto ie: g.in_edges(n)) {
           ctx.push(g.getEdgeDst(ie));
         }
@@ -36,10 +37,18 @@ struct ComputeRequiredTime {
       // primary input
       else {
         for (auto oe: g.edges(n)) {
-          auto requiredTime = g.getData(g.getEdgeDst(oe)).requiredTime;
-          if (requiredTime < data.requiredTime) {
-            data.requiredTime = requiredTime;
-            data.slack = requiredTime - data.arrivalTime;
+          auto& outData = g.getData(g.getEdgeDst(oe));
+
+          auto riseRequiredTime = outData.rise.requiredTime;
+          if (data.rise.requiredTime > riseRequiredTime) {
+            data.rise.requiredTime = riseRequiredTime;
+            data.rise.slack = riseRequiredTime - data.rise.arrivalTime;
+          }
+
+          auto fallRequiredTime = outData.fall.requiredTime;
+          if (data.fall.requiredTime > fallRequiredTime) {
+            data.fall.requiredTime = fallRequiredTime;
+            data.fall.slack = fallRequiredTime - data.fall.arrivalTime;
           }
         }
       }
@@ -52,10 +61,19 @@ struct ComputeRequiredTime {
 
       bool changed = false;
       for (auto oe: g.edges(n)) {
-        auto requiredTime = g.getData(g.getEdgeDst(oe)).requiredTime;
-        if (requiredTime < data.requiredTime) {
-          data.requiredTime = requiredTime;
-          data.slack = requiredTime - data.arrivalTime;
+        auto& outData = g.getData(g.getEdgeDst(oe));
+
+        auto riseRequiredTime = outData.rise.requiredTime;
+        if (data.rise.requiredTime > riseRequiredTime) {
+          data.rise.requiredTime = riseRequiredTime;
+          data.rise.slack = riseRequiredTime - data.rise.arrivalTime;
+          changed = true;
+        }
+
+        auto fallRequiredTime = outData.fall.requiredTime;
+        if (data.fall.requiredTime > fallRequiredTime) {
+          data.fall.requiredTime = fallRequiredTime;
+          data.fall.slack = fallRequiredTime - data.fall.arrivalTime;
           changed = true;
         }
       }
@@ -73,11 +91,25 @@ struct ComputeRequiredTime {
       g.in_edges(n);
 
       bool changed = false;
-      for (auto e: g.edges(n)) {
-        float requiredTime = g.getData(g.getEdgeDst(e)).requiredTime - g.getEdgeData(e).delay;
-        if (requiredTime < data.requiredTime) {
-          data.requiredTime = requiredTime;
-          data.slack = requiredTime - data.arrivalTime;
+      for (auto oe: g.edges(n)) {
+        auto& outData = g.getData(g.getEdgeDst(oe));
+        auto& oeData= g.getEdgeData(oe);
+
+        auto outRiseRequiredTime = outData.rise.requiredTime - oeData.riseDelay;
+        auto outFallRequiredTime = outData.fall.requiredTime - oeData.fallDelay;
+        auto tSense = outData.pin->gate->cell->outPins.at(outData.pin->name)->tSense.at(data.pin->name);
+
+        auto riseRequiredTime = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? outRiseRequiredTime : outFallRequiredTime;
+        if (data.rise.requiredTime > riseRequiredTime) {
+          data.rise.requiredTime = riseRequiredTime;
+          data.rise.slack = riseRequiredTime - data.rise.arrivalTime;
+          changed = true;
+        }
+
+        auto fallRequiredTime = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? outFallRequiredTime : outRiseRequiredTime;
+        if (data.fall.requiredTime > fallRequiredTime) {
+          data.fall.requiredTime = fallRequiredTime;
+          data.fall.slack = fallRequiredTime - data.fall.arrivalTime;
           changed = true;
         }
       }
@@ -122,9 +154,10 @@ struct ComputeArrivalTimeAndPower {
       if (data.isOutput) {
         for (auto ie: g.in_edges(n)) {
           auto& inData = g.getData(g.getEdgeDst(ie));
-          data.slew = inData.slew;
-          data.isRise = inData.isRise;
-          data.arrivalTime = inData.arrivalTime;
+          data.rise.slew = inData.rise.slew;
+          data.rise.arrivalTime = inData.rise.arrivalTime;
+          data.fall.slew = inData.fall.slew;
+          data.fall.arrivalTime = inData.fall.arrivalTime;
         }     
       }
       // primary input
@@ -142,9 +175,10 @@ struct ComputeArrivalTimeAndPower {
 
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
-        data.slew = inData.slew;
-        data.isRise = inData.isRise;
-        data.arrivalTime = inData.arrivalTime;
+        data.rise.slew = inData.rise.slew;
+        data.rise.arrivalTime = inData.rise.arrivalTime;
+        data.fall.slew = inData.fall.slew;
+        data.fall.arrivalTime = inData.fall.arrivalTime;
       }
 
       for (auto oe: g.edges(n)) {
@@ -166,9 +200,9 @@ struct ComputeArrivalTimeAndPower {
       data.totalPinC = 0.0;
       for (auto oe: g.edges(n)) {
         auto& outData = g.getData(g.getEdgeDst(oe));
-        auto pin = outData.pin;
-        if (pin->gate) {
-          data.totalPinC += pin->gate->cell->cellPins.at(pin->name)->capacitance;
+        auto outPin = outData.pin;
+        if (outPin->gate) {
+          data.totalPinC += outPin->gate->cell->inPins.at(outPin->name)->capacitance;
         }
         else {
           // primary output, already recorded
@@ -176,45 +210,50 @@ struct ComputeArrivalTimeAndPower {
         }
       }
 
-      auto outCellPin = data.pin->gate->cell->outPins.at(data.pin->name);
-      data.arrivalTime = -std::numeric_limits<float>::infinity();
+      auto cellOutPin = data.pin->gate->cell->outPins.at(data.pin->name);
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
-        auto pin = inData.pin;
-        auto isInRise = inData.isRise;
-        LUT *cellLUT = nullptr, *transitionLUT = nullptr, *powerLUT = nullptr; 
-        auto tSense = outCellPin->tSense.at(pin->name);
-
-        if ((TIMING_SENSE_POSITIVE_UNATE == tSense && isInRise) ||
-            (TIMING_SENSE_NEGATIVE_UNATE == tSense && !isInRise)) {
-          cellLUT = outCellPin->cellRise.at(pin->name);
-          transitionLUT = outCellPin->riseTransition.at(pin->name);
-          powerLUT = outCellPin->risePower.at(pin->name);
-        }
-        else if ((TIMING_SENSE_POSITIVE_UNATE == tSense && !isInRise) ||
-                 (TIMING_SENSE_NEGATIVE_UNATE == tSense && isInRise)) {
-          cellLUT = outCellPin->cellFall.at(pin->name);
-          transitionLUT = outCellPin->fallTransition.at(pin->name);
-          powerLUT = outCellPin->fallPower.at(pin->name);
-        }
-
-        float totalC = data.totalPinC + data.totalNetC;
-        auto inSlew = inData.slew;
-        std::vector<float> v = {inSlew, totalC};
         auto& ieData = g.getEdgeData(ie);
-        ieData.delay = cellLUT->lookup(v);
-        auto newArrivalTime = inData.arrivalTime + ieData.delay;
+        auto tSense = cellOutPin->tSense.at(inData.pin->name);
 
-        if (data.arrivalTime < newArrivalTime) {
+        // rising edge
+        auto cellRise = cellOutPin->cellRise.at(inData.pin->name);
+        TimingPowerInfo *infoForRise = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? &(inData.rise) : &(inData.fall);
+        std::vector<float> riseVTotalC = {infoForRise->slew, data.totalPinC + data.totalNetC};
+        ieData.riseDelay = cellRise->lookup(riseVTotalC);
+
+        auto newRiseArrivalTime = infoForRise->arrivalTime + ieData.riseDelay;
+        if (data.rise.arrivalTime < newRiseArrivalTime) {
           // update critical path
-          data.arrivalTime = newArrivalTime;
-          data.isRise = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? isInRise : !isInRise;
-          data.slew = transitionLUT->lookup(v);
+          data.rise.arrivalTime = newRiseArrivalTime;
+          auto riseTransition = cellOutPin->riseTransition.at(inData.pin->name);
+          data.rise.slew = riseTransition->lookup(riseVTotalC);
 
           // power follows critical path
-          std::vector<float> vPinC = {inSlew, data.totalPinC};
-          data.internalPower = powerLUT->lookup(vPinC);
-          data.netPower = powerLUT->lookup(v) - data.internalPower; // avoid nan due to out-of-bound table lookup
+          auto risePower = cellOutPin->risePower.at(inData.pin->name);
+          std::vector<float> riseVPinC = {infoForRise->slew, data.totalPinC};
+          data.rise.internalPower = risePower->lookup(riseVPinC);
+          data.rise.netPower = risePower->lookup(riseVTotalC) - data.rise.internalPower;
+        }
+
+        // falling edge
+        auto cellFall = cellOutPin->cellFall.at(inData.pin->name);
+        TimingPowerInfo *infoForFall = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? &(inData.fall) : &(inData.rise);
+        std::vector<float> fallVTotalC = {infoForFall->slew, data.totalPinC + data.totalNetC};
+        ieData.fallDelay = cellFall->lookup(fallVTotalC);
+
+        auto newFallArrivalTime = infoForFall->arrivalTime + ieData.fallDelay;
+        if (data.fall.arrivalTime < newFallArrivalTime) {
+          // update critical path
+          data.fall.arrivalTime = newFallArrivalTime;
+          auto fallTransition = cellOutPin->fallTransition.at(inData.pin->name);
+          data.fall.slew = fallTransition->lookup(fallVTotalC);
+
+          // power follows critical path
+          auto fallPower = cellOutPin->fallPower.at(inData.pin->name);
+          std::vector<float> fallVPinC = {infoForFall->slew, data.totalPinC};
+          data.fall.internalPower = fallPower->lookup(fallVPinC);
+          data.fall.netPower = fallPower->lookup(fallVTotalC) - data.fall.internalPower;
         }
       } // end for ie
 
