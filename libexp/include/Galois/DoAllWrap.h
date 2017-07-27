@@ -67,7 +67,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
       clEnumValEnd),
-    cll::init (DOALL_COUPLED));
+    cll::init (DOALL_GALOIS)); // default is regular DOALL
 
 
 void setDoAllImpl (const DoAllTypes& type);
