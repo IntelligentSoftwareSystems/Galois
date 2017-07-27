@@ -323,6 +323,8 @@ public:
     num_iteration = 0;
     totalEdges = 0;
 
+    graph.initRanges();
+
     //uint32_t numNodes;
     //uint64_t numEdges;
 #if 0

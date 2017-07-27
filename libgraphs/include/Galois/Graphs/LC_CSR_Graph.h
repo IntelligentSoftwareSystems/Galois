@@ -201,6 +201,16 @@ public:
   LC_CSR_Graph() = default;
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
 
+  /**
+   * Initialize the thread ranges pointers to null pointer. This is EXTREMELY
+   * important for correctness and should be called if the initializer below
+   * isn't used.
+   */
+  void initRanges() {
+    threadRanges = nullptr;
+    threadRangesEdge = nullptr;
+  }
+
   template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
   LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
                EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)

@@ -30,7 +30,6 @@
 #include <unordered_map>
 #include "Galois/Runtime/dGraph.h"
 #include "Galois/Runtime/OfflineGraph.h"
-#include "Galois/DoAllWrap.h"
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
