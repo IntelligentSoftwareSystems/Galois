@@ -590,8 +590,8 @@ public:
       dst->first()->acquire(mflag);
       EdgeTy* e = dst->second();
       edgesF.delEdge(e);
-      dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
       src->erase(dst.base());
+      dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
     }
   }
 
