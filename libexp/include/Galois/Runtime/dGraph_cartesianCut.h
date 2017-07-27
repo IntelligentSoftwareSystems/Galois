@@ -183,13 +183,15 @@ public:
               bool find_thread_ranges = false) : base_hGraph(host, _numHosts) {
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
-        std::cerr << "WARNING: scalefactor not supported for cartesian vertex-cuts\n";
+        std::cerr << "WARNING: scalefactor not supported for cartesian "
+                     " vertex-cuts\n";
       }
       scalefactor.clear();
     }
     if (transpose) {
       if (base_hGraph::id == 0) {
-        std::cerr << "ERROR: transpose not supported for cartesian vertex-cuts\n";
+        std::cerr << "ERROR: transpose not supported for cartesian "
+                     "vertex-cuts\n";
       }
       assert(false);
     }
@@ -243,18 +245,35 @@ public:
     std::vector<uint64_t> prefixSumOfEdges;
     loadStatistics(g, prefixSumOfEdges); // first pass of the graph file
 
-    std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::totalOwnedNodes << "\n";
-    std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << numNodes - base_hGraph::totalOwnedNodes << "\n";
-    std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << base_hGraph::numOwned << "\n";
-    std::cerr << "[" << base_hGraph::id << "] Total edges : " << numEdges << "\n";
+    std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
+                 base_hGraph::totalOwnedNodes << "\n";
+
+    std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
+                 numNodes - base_hGraph::totalOwnedNodes << "\n";
+
+    std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << 
+                 base_hGraph::numOwned << "\n";
+
+    std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
+                 numEdges << "\n";
 
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = G2L(gid2host[base_hGraph::id].second - 1) + 1;
     base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
     base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
+
     if (numNodes > 0) {
       assert(numEdges > 0);
-      base_hGraph::graph.allocateFrom(numNodes, numEdges);
+
+      assert(prefixSumOfEdges.size() == numNodes);
+
+      if (!edgeNuma) {
+        base_hGraph::graph.allocateFrom(numNodes, numEdges);
+      } else {
+        printf("Edge based NUMA division on\n");
+        base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+      }
+
       //std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
@@ -277,11 +296,13 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-    // TODO revise how this works to make it consistent across cuts
-    Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-    StatTimer_thread_ranges.start();
-    base_hGraph::determine_thread_ranges();
-    StatTimer_thread_ranges.stop();
+    // TODO revise how this works and make it consistent across cuts
+    if (!edgeNuma) {
+      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+      StatTimer_thread_ranges.start();
+      base_hGraph::determine_thread_ranges();
+      StatTimer_thread_ranges.stop();
+    }
 
     StatTimer_graph_construct.stop();
 
@@ -291,7 +312,8 @@ public:
     StatTimer_graph_construct_comm.stop();
   }
 
-  void loadStatistics(Galois::Graph::OfflineGraph& g, std::vector<uint64_t>& prefixSumOfEdges) {
+  void loadStatistics(Galois::Graph::OfflineGraph& g, 
+                      std::vector<uint64_t>& prefixSumOfEdges) {
     uint64_t columnBlockSize = numRowHosts * (uint64_t)blockSize;
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {

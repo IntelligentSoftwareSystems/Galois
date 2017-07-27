@@ -340,6 +340,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       fill_mirrorNodes(base_hGraph::mirrorNodes);
 
+      // TODO revise how this works and make it consistent across cuts
       if (!edgeNuma) {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
         StatTimer_thread_ranges.start();

@@ -313,7 +313,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_exchange_edges.start();
 
       std::vector<uint64_t> prefixSumOfEdges;
-      assign_edges_phase1(g, numEdges_distribute, VCutThreshold, prefixSumOfEdges, base_hGraph::mirrorNodes);
+      assign_edges_phase1(g, numEdges_distribute, VCutThreshold, 
+                          prefixSumOfEdges, base_hGraph::mirrorNodes);
 
 #if 0
       if(base_hGraph::id == 0)
@@ -336,7 +337,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_allocate_local_DS.start();
 
-      base_hGraph::graph.allocateFrom(numNodes, numEdges);
+      if (!edgeNuma) {
+        base_hGraph::graph.allocateFrom(numNodes, numEdges);
+      } else {
+        printf("Edge based NUMA division on\n");
+        base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+      }
+
       base_hGraph::graph.constructNodes();
 
       for (uint32_t n = 0; n < numNodes; ++n) {
@@ -366,11 +373,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       }
 
-      // TODO revise how this works to make it consistent across cuts
-      Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-      StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges();
-      StatTimer_thread_ranges.stop();
+      // TODO revise how this works and make it consistent across cuts
+      if (!edgeNuma) {
+        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        StatTimer_thread_ranges.start();
+        base_hGraph::determine_thread_ranges();
+        StatTimer_thread_ranges.stop();
+      }
 
       StatTimer_graph_construct.stop();
 
