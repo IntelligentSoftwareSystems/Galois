@@ -179,11 +179,22 @@ struct FirstItr_ConnectedComp{
     } else if (personality == CPU)
 #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), 
-        FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
-        Galois::numrun(_graph.get_run_identifier()), 
-        Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-          "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+      //Galois::do_all(_graph.begin(), _graph.end(), 
+      //  FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
+      //  Galois::numrun(_graph.get_run_identifier()), 
+      //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+      //    "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        FirstItr_ConnectedComp{&_graph}, 
+        std::make_tuple(
+          Galois::thread_range(_graph.get_thread_ranges()),
+          Galois::loopname("ConnectedComp"), 
+          Galois::numrun(_graph.get_run_identifier()), 
+          Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+            "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
+      );
     }
     _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                 Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
@@ -235,12 +246,23 @@ struct ConnectedComp {
       } else if (personality == CPU)
     #endif
       {
-        Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
-                       Galois::loopname("ConnectedComp"), 
-                       Galois::write_set("reduce", "this->graph", 
-                         "struct NodeData &", "struct NodeData &" , 
-                         "comp_current", "unsigned int" , "min",  ""), 
-                       Galois::numrun(_graph.get_run_identifier()));
+        //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
+        //               Galois::loopname("ConnectedComp"), 
+        //               Galois::write_set("reduce", "this->graph", 
+        //                 "struct NodeData &", "struct NodeData &" , 
+        //                 "comp_current", "unsigned int" , "min",  ""), 
+        //               Galois::numrun(_graph.get_run_identifier()));
+        Galois::do_all_choice(
+          Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+          ConnectedComp{&_graph}, 
+          std::make_tuple(
+            Galois::thread_range(_graph.get_thread_ranges()),
+            Galois::loopname("ConnectedComp"), 
+            Galois::numrun(_graph.get_run_identifier()), 
+            Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+              "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
+        );
+
       }
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
