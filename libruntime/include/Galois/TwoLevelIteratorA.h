@@ -168,7 +168,7 @@ private:
     InnerIter end;
 
     for (end = m_inner_end_fn(*m_outer); m_inner_begin_fn(*m_outer) == end; ) {
-      bool too_far = safe_decrement(m_outer, m_outer_begin);
+      bool too_far __attribute__((unused)) = safe_decrement(m_outer, m_outer_begin);
       assert(!too_far);
       end = m_inner_end_fn(*m_outer);
     }
@@ -183,7 +183,7 @@ private:
 
   void decrement() {
     if (m_outer == m_outer_end) {
-      bool too_far = safe_decrement(m_outer, m_outer_begin);
+      bool too_far __attribute__((unused)) = safe_decrement(m_outer, m_outer_begin);
       assert(!too_far);
       seek_backward();
     } else if (!safe_decrement(this->base_reference(), m_inner_begin_fn(*m_outer))) {
@@ -191,12 +191,12 @@ private:
       return;
     } else {
       // Reached end of inner range
-      bool too_far = safe_decrement(m_outer, m_outer_begin);
+      bool too_far __attribute__((unused)) = safe_decrement(m_outer, m_outer_begin);
       assert(!too_far);
       seek_backward();
     }
 
-    bool too_far = safe_decrement(this->base_reference(), m_inner_begin_fn(*m_outer));
+    bool too_far __attribute__((unused)) = safe_decrement(this->base_reference(), m_inner_begin_fn(*m_outer));
     assert(!too_far);
   }
 

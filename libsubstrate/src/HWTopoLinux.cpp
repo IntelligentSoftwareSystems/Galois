@@ -227,7 +227,7 @@ static unsigned countNumaNodes(const std::vector<cpuinfo>& info) {
 }
 
 static void markSMT(std::vector<cpuinfo>& info) {
-  for (int i = 1 ; i < info.size(); ++i)
+  for (unsigned int i = 1 ; i < info.size(); ++i)
     if (info[i - 1].physid == info[i].physid &&
         info[i - 1].coreid == info[i].coreid)
       info[i].smt = true;

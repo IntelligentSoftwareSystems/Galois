@@ -36,7 +36,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include <iostream>
-#include <deque>
+#include <unordered_set>
 #include <algorithm>
 #include <fstream>
 
@@ -47,8 +47,10 @@ static const char* desc = "Verify for maximal k-truss";
 static const char* url = nullptr;
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string> trussFile("trussFile", cll::desc("edgelist to for the trusses"), cll::Required);
+static cll::opt<std::string> trussFile("trussFile", cll::desc("edgelist for the trusses"), cll::Required);
 static cll::opt<unsigned int> trussNum("trussNum", cll::desc("verify for maximal trussNum-trusses"), cll::Required);
+static cll::opt<unsigned int> ktrussNodes("trussNodes", cll::desc("truss nodes for verification"), cll::init(0));
+static cll::opt<unsigned int> ktrussEdges("trussEdges", cll::desc("truss edges for verification"), cll::init(0)); // must be undirected edge count, i.e. counting (n1, n2) and (n2, n1) as 1 edge
 
 static const uint32_t valid = 0x0;
 static const uint32_t removed = 0x1;
@@ -72,7 +74,7 @@ void initialize(Graph& g) {
   Galois::do_all_local(
     g, 
     [&g] (typename Graph::GraphNode N) { 
-      for (auto e: g.edges(N)) {
+      for (auto e: g.edges(N, Galois::MethodFlag::UNPROTECTED)) {
         g.getEdgeData(e) = removed;
       }
     },
@@ -89,16 +91,46 @@ void readTruss(Graph& g) {
   }
 
   unsigned int n1, n2;
+  unsigned int edges = 0;
+  std::unordered_set<unsigned int> nodes;
   while (edgelist >> n1 >> n2) {
-    g.getEdgeData(g.findEdgeSortedByDst(n1, n2)) = valid;
-    g.getEdgeData(g.findEdgeSortedByDst(n2, n1)) = valid;
+    auto e = g.findEdgeSortedByDst(n1, n2);
+    if(valid == g.getEdgeData(e)) {
+      std::cout << "ignoring duplicate edge" << n1 << ", " << n2 << std::endl;
+      continue;
+    }
+    g.getEdgeData(e) = valid;
+
+    e = g.findEdgeSortedByDst(n2, n1);
+    if(valid == g.getEdgeData(e)) {
+      std::cout << "duplicate edge (rev) " << n2 << ", " << n1 << std::endl;
+      continue;
+    }
+    g.getEdgeData(e) = valid;
+    
+    edges++;
+    nodes.insert(n1);
+    nodes.insert(n2);
+  }
+  
+  std::cout << "read " << nodes.size() << " unique nodes" << std::endl;
+  std::cout << "read " << edges << " unique edges" << std::endl;
+  
+  if(ktrussEdges && edges != ktrussEdges) {
+    std::cerr << "edges read not equal to -trussEdges=" << ktrussEdges << std::endl;
+    GALOIS_DIE("Verification error");
+  }
+
+  if(ktrussNodes && nodes.size() != ktrussNodes) {
+    std::cerr << "nodes read not equal to -trussNodes=" << ktrussNodes << std::endl;
+    GALOIS_DIE("Verification error");
   }
 }
 
 void printGraph(Graph& g) {
   for (auto n: g) {
     std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n)) {
+    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n) continue;
       std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
@@ -112,7 +144,7 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
   Galois::do_all_local(g, 
     [&g, &numNodes, &numEdges] (GNode n) {
       size_t numN = 0;
-      for (auto e: g.edges(n)) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
           if (g.getEdgeDst(e) > n) {
             numEdges += 1;
@@ -200,7 +232,7 @@ int main(int argc, char **argv) {
   // consider only edges (i, j) where i < j
   Galois::do_all_local(g, 
     [&g, &work] (GNode n) {
-      for (auto e: g.edges(n)) {
+      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         auto dst = g.getEdgeDst(e);
         if (dst > n) {
           work.push_back(std::make_pair(n, dst));

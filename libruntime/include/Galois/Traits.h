@@ -136,6 +136,16 @@ get_default_trait_values(S source, T tags, D defaults)
   return get_by_indices(defaults, ResSeq {});
 }
 
+template<typename T, typename Tuple, 
+  typename Seq = typename make_int_seq<std::tuple_size<Tuple>::value - 1>::type>
+typename tuple_elements<Tuple, Seq>::type  
+get_tuple_without(T rm_type, Tuple tpl)
+{
+  typedef typename make_int_seq<subtype_index_nodup<T, Tuple>::value>::type Seq_pre;
+  typedef typename make_int_seq<std::tuple_size<Tuple>::value - subtype_index_nodup<T, Tuple>::value - 1>::type Seq_post;
+  return std::tuple_cat(get_by_offset<0>(tpl, Seq_pre{}), get_by_offset<subtype_index_nodup<T, Tuple>::value + 1>(tpl, Seq_post{})); 
+}
+
 template<typename T>
 constexpr auto has_function_traits(int) -> decltype(std::declval<typename T::function_traits>(), bool()) {
   return true;
@@ -169,6 +179,14 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
 
 struct default_loopname: public loopname {
   default_loopname (void): loopname ("loopname") {}
+};
+
+/**
+ * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}
+ */
+struct numrun_tag {};
+struct numrun: public trait_has_value<const std::string>, numrun_tag {
+  numrun(const std::string p = ""): trait_has_value<const std::string>(p) { }
 };
 
 /**
@@ -307,6 +325,12 @@ struct has_deterministic_local_state_tag {};
 template<typename T>
 struct has_deterministic_local_state: public trait_has_type<T>, has_deterministic_local_state_tag {};
 
+
+// TODO: separate to libdist
+/** For distributed Galois **/
+struct op_tag {};
+
+}
 /**
  * Stats of multiple instance of a loop will be combined 
  * if this tag is passed
@@ -316,7 +340,6 @@ template <typename T=bool>
 struct combine_stats_by_name: public trait_has_type<T>, combine_stats_by_name_tag {}; 
 
 } // close namespace Galois
-
 
 
 #endif

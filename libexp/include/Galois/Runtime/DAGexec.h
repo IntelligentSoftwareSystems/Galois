@@ -591,3 +591,4 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 
 
 #endif // GALOIS_RUNTIME_DAG_H
+

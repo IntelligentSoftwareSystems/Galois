@@ -103,7 +103,7 @@ private:
   uint32_t* raw_neighbor_end(GraphNode N) const;
 
   //! Initializes a graph from block of memory
-  void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
+  void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset, uint64_t);
 
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 

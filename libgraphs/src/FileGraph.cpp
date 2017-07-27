@@ -72,12 +72,12 @@ namespace Galois {
 namespace Graph {
 
 //File format V1:
-//version (1) {uint64_t LE}
+//version (1 or 2) {uint64_t LE}
 //EdgeType size {uint64_t LE}
 //numNodes {uint64_t LE}
 //numEdges {uint64_t LE}
 //outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint32_t LE}
+//outedges[numEdges] {uint32_t LE or uint64_t LE for ver == 2}
 //potential padding (32bit max) to Re-Align to 64bits
 //EdgeType[numEdges] {EdgeType size}
 
@@ -133,7 +133,7 @@ void FileGraph::move_assign(FileGraph&& o) {
   std::swap(edgeOffset, o.edgeOffset);
 }
 
-void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset) {
+void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset, uint64_t lenlimit) {
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = convert_le64toh(*fptr++);
   if (version != 1)
@@ -146,11 +146,12 @@ void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset) {
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
-  outs = fptr32; 
-  fptr32 += numEdges;
-  if (numEdges % 2)
-    fptr32 += 1;
-  edgeData = (char*)fptr32;
+  outs = fptr32;
+  fptr32 += numEdges + numEdges % 2;
+  if (!lenlimit || lenlimit > numEdges + ((char*)fptr32 - (char*)m))
+    edgeData = (char*)fptr32;
+  else
+    edgeData = 0;
 }
 
 static size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeData) {
@@ -210,7 +211,7 @@ void* FileGraph::fromArrays(
   if (edge_data)
     memcpy(fptr0, edge_data, sizeof_edge_data * num_edges);
 
-  fromMem(base, node_offset, edge_offset);
+  fromMem(base, node_offset, edge_offset, 0);
   return edgeData;
 }
 
@@ -224,12 +225,12 @@ void FileGraph::fromFile(const std::string& filename) {
   if (fstat(fd, &buf) == -1)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
 
-  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
 
-  fromMem(base, 0, 0);
+  fromMem(base, 0, 0, buf.st_size);
 }
 
 template<typename Mappings>
@@ -258,7 +259,7 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, Edge
   mappings.push_back({base, headerSize});
 
   // Read metadata of whole graph
-  fromMem(base, *nrange.first, *erange.first);
+  fromMem(base, *nrange.first, *erange.first, 0);
 
   // Adjust metadata to correspond to part
   uint64_t partNumNodes = std::distance(nrange.first, nrange.second);

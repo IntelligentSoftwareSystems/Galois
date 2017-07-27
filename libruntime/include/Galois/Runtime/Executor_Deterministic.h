@@ -609,7 +609,8 @@ public:
       while ((p = sourceList.pop())) {
         ctx = *p;
         assert(ctx->preds == 0);
-        bool commit = e.executeTask(etld, ctx);
+        bool commit;
+        commit = e.executeTask(etld, ctx);
         local.incrementCommitted();
         assert(commit);
         committed += 1;

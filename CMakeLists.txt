@@ -7,6 +7,13 @@ set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 set(GALOIS_COPYRIGHT_YEAR "2015") # Also in COPYRIGHT
 
+#adding additional compiler flags for mpip profiling
+#set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
+#set(MPIP_DIR "/net/ohm/export/cdgc/gill/modules/mpip/lib")
+#set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
+#link_directories(LIBUNWIND_DIR MPIP_DIR)
+
+
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release")
   # cmake default flags with relwithdebinfo is -O2 -g
@@ -40,10 +47,13 @@ endforeach()
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
+set(USE_LWCI OFF CACHE BOOL "Use LWCI communication runtime")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
+set(USE_HETERO ON CACHE BOOL "Use Heterogeneous features")
+set(USE_GGC OFF CACHE BOOL "Use IrGL Compiler (CUDA)")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -78,7 +88,6 @@ endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set(USE_GOLD_LINKER "ON")
   if(CXX_TOOLCHAIN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()
@@ -107,11 +116,23 @@ if(CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 # Enable architecture-specific optimizations
-find_package(ArchFlags)
-if(ARCH_FLAGS_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
+if(NOT USE_HETERO)
+  find_package(ArchFlags)
+  if(ARCH_FLAGS_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
+  endif()
+endif()
+
+# More warnings
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
+  endif()
 endif()
 
 # GNU profiling
@@ -125,7 +146,7 @@ if(USE_SANATIZER)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ###### Configure features ######
@@ -148,6 +169,26 @@ if(USE_EXP)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
 
+<<<<<<< HEAD
+  if (USE_LWCI)
+    add_definitions(-DGALOIS_USE_LWCI)
+    #include_directories("$ENV{LWCI_ROOT}/include")
+    set(LWCI_LIBRARY "$ENV{LWCI_ROOT}/lib/liblwci.a")
+  endif()
+
+  find_package(MPI REQUIRED) # for distributed
+  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+  include_directories(${MPI_INCLUDE_PATH})
+
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  endif()
+
+=======
+>>>>>>> master
   find_package(TBB)
   if(TBB_FOUND)
     include_directories(${TBB_INCLUDE_DIRS})
@@ -175,6 +216,38 @@ if(USE_EXP)
       set(GALOIS_USE_LONGJMP on)
     else()
       message(FATAL_ERROR "Hardware transactional memory not supported")
+    endif()
+  endif()
+  if(USE_HETERO)
+    find_package(CUDA REQUIRED)
+    #find_package(OpenCL REQUIRED)
+    if(CUDA_FOUND)
+      set(CUDA_PROPAGATE_HOST_FLAGS off)
+      set(CUDA_SEPARABLE_COMPILATION on)
+      set(CUDA_HOST_COMPILER g++)
+
+      if(USE_GGC)
+        message("INSIDE GCC")
+        if(NOT "$ENV{GGC_PATH}" STREQUAL "")
+          set(GGC_PATH $ENV{GGC_PATH})
+          message(STATUS "GGC_PATH set to ${GGC_PATH}")
+        else()
+          set(GGC_PATH "/net/velocity/workspace/SourceCode/ggc")
+        endif()
+        if (EXISTS ${GGC_PATH})
+        else()
+          message(FATAL_ERROR "GGC_PATH=${GGC_PATH} does not exist; set environment variable GGC_PATH to override")
+        endif()
+
+        set(GGC_INCLUDE_PATH "${GGC_PATH}/rt/include")
+        set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
+
+        cuda_include_directories( ${GGC_INCLUDE_PATH} ${MGPU_PATH})
+        set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61)
+        link_directories(${GGC_PATH}/rt/lib)
+      endif()
+    else()
+      message(FATAL_ERROR "Need CUDA for heterogenous code")
     endif()
   endif()
 endif()
@@ -248,9 +321,9 @@ elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
-  MESSAGE(STATUS "Tests cannot run without inputs.  \"make inputs\" to download inputs")
+  MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
-#set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
+set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
 
@@ -266,7 +339,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
-#    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
+    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
@@ -299,6 +372,7 @@ function(app name)
   endif()
   target_link_libraries(${name} ${APP_EXTLIBS})
   target_link_libraries(${name} lonestar)
+  target_link_libraries(${name} galois_net)
   target_link_libraries(${name} galois_graphs)
   target_link_libraries(${name} galois_runtime)
   target_link_libraries(${name} galois_substrate)
@@ -343,6 +417,7 @@ function(makeTest)
       target_link_libraries(test-${name} galois_exp)
     endif()
     target_link_libraries(test-${name} lonestar)
+    target_link_libraries(test-${name} galois_net)
     target_link_libraries(test-${name} galois_graphs)
     target_link_libraries(test-${name} galois_runtime)
     target_link_libraries(test-${name} galois_substrate)
@@ -380,6 +455,7 @@ add_subdirectory(libllvm)
 add_subdirectory(libsubstrate)
 add_subdirectory(libruntime)
 add_subdirectory(libgraphs)
+add_subdirectory(libnet)
 add_subdirectory(libexp)
 
 add_subdirectory(tools)
@@ -390,13 +466,11 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(examples)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
-  if(USE_EXP)
-   add_subdirectory(exp)
-  endif()
+  add_subdirectory(exp)
 endif()
 
 ###### Documentation ######
-find_package(Doxygen 1.8)
+find_package(Doxygen)
 if(DOXYGEN_FOUND)
 set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
@@ -423,9 +497,10 @@ include(CPack)
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
 set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
-if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include")
-endif()
+#if(USE_EXP)
+#  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include" "${PROJECT_SOURCE_DIR}/libgaloiscl/include")
+#endif()
+
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
 set(GALOIS_INCLUDE_DIR)  # Galois include provides

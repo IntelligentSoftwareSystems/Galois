@@ -73,6 +73,11 @@ public:
     ptr->second += v;
     return *this;
   }
+
+  Ty getVal() const {
+    return vals.getLocal()->second;
+  }
+
 };
 
 using Statistic = StatisticBase<unsigned long>;
@@ -83,32 +88,47 @@ using Statistic = StatisticBase<unsigned long>;
  */
 class StatManager: private boost::noncopyable {
   std::deque<Statistic*> stats;
+  std::string statOutputFile_name;
+  bool stat_printed;
 
 public:
+  StatManager(){
+   statOutputFile_name = "";
+   stat_printed = false;
+  }
+  StatManager(std::string name){
+   statOutputFile_name = name;
+   stat_printed = false;
+  }
   ~StatManager() {
-    for(auto* s : stats)
-      s->report();
-    Galois::Runtime::printStats();
+    if(!stat_printed){
+      for(auto* s : stats)
+        s->report();
+      Galois::Runtime::printStats(statOutputFile_name);
+    }
   }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
     stats.push_back(&s);
   }
-};
 
-//! Flag type for {@link StatTimer}
-struct start_now_t {};
-constexpr start_now_t start_now = start_now_t();
+  void reportStat(){
+    for(auto* s : stats)
+      s->report();
+    Galois::Runtime::printStats(statOutputFile_name);
+    stat_printed = true;
+  }
+};
 
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
-  const char* name;
-  const char* loopname;
+  std::string name;
+  std::string loopname;
   bool main;
   bool valid;
 
 protected:
-  void init(const char* n, const char* l, bool m, bool s) {
+  void init(const std::string& n, const std::string& l, bool m, bool s) {
     name = n;
     loopname = l;
     main = m;
@@ -118,14 +138,14 @@ protected:
   }
 
 public:
-  StatTimer(const char* n) { init(n, 0, false, false); }
-  StatTimer(const char* n, start_now_t t) { init(n, 0, false, true); }
+  StatTimer(const std::string& n) { init(n, "(NULL)", false, false); }
+  StatTimer(const std::string& n, start_now_t t) { init(n, "(NULL)", false, true); }
 
-  StatTimer(const char* n, const char* l) { init(n, l, false, false); }
-  StatTimer(const char* n, const char* l, start_now_t t) { init(n, l, false, true); }
+  StatTimer(const std::string& n, const std::string& l) { init(n, l, false, false); }
+  StatTimer(const std::string& n, const std::string& l, start_now_t t) { init(n, l, false, true); }
 
-  StatTimer() { init("Time", 0, true, false); }
-  StatTimer(start_now_t t) { init("Time", 0, true, true); }
+  StatTimer() { init("Time", "(NULL)", true, false); }
+  StatTimer(start_now_t t) { init("Time", "(NULL)", true, true); }
 
   ~StatTimer() {
     if (valid)
