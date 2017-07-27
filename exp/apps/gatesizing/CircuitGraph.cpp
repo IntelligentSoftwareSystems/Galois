@@ -123,9 +123,13 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
     auto& data = g.getData(pi, unprotected);
     data.isPrimary = true;
     data.rise.slew = sdc.primaryInputRiseSlew;
-    data.rise.arrivalTime = 0.0;
     data.fall.slew = sdc.primaryInputFallSlew;
-    data.fall.arrivalTime = 0.0;
+    if (data.pin->name != "1'b0") {
+      data.rise.arrivalTime = 0.0;
+    }
+    if (data.pin->name != "1'b1") {
+      data.fall.arrivalTime = 0.0;
+    }
   }
 
   g.getData(dummySink, unprotected).isDummy = true;
