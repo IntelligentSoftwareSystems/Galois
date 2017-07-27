@@ -8,8 +8,8 @@
 
 #define nOUTPUTS 10			// Number of outputs of the window (not used yet)
 #define nINPUTS 10			// Number of inputs of the window
-#define nFANOUT 8			// Maximum number of outgoing edges accepted to a node become and active node
-#define nLEVELS 5			// Number of level sweeped to build the TFO (Transitive Fanout) of the reference node
+#define nFANOUT 5			// Maximum number of outgoing edges accepted to a node become and active node
+#define nLEVELS 6			// Number of level sweeped to build the TFO (Transitive Fanout) of the reference node
 #define CUT_SIZE_LIMIT 8		// Maximum size of reconvergence-driven cuts
 
 std::string getFileName( std::string path );

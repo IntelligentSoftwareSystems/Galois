@@ -284,6 +284,10 @@ void optimize( aig::Aig & aig, GNodeSet & window, GNodeSet & leaves, GNodeSet & 
 
 	SubjectGraph::Mixer mixer( nVarsW, poolSizeW, varSetW );
 	
+	// DEBUG
+	//SubjectGraph::Mixer mixerDebug( nVarsW, poolSizeW, varSetW );
+	// DEBUG
+
 	for ( auto root : roots ) {
 		aig::NodeData & rootData = graph.getData( root, Galois::MethodFlag::WRITE );
 		std::string outputName = ("o"+std::to_string(rootData.id));
@@ -295,6 +299,10 @@ void optimize( aig::Aig & aig, GNodeSet & window, GNodeSet & leaves, GNodeSet & 
 
 		std::cout << std::endl << "Original Solution for root " << rootData.id << ":\n\t" << expression << std::endl;
 		mixer.mix( expression, outputName );
+	
+		// DEBUG	
+		//mixerDebug.mix( expression, outputName );		
+		// DEBUG
 	
 		if ( !expSupInfo.needsOpt ) {
 			continue;
@@ -359,12 +367,36 @@ void optimize( aig::Aig & aig, GNodeSet & window, GNodeSet & leaves, GNodeSet & 
 	
 	}
 	std::cout << "############################################ " << std::endl;
-
+*/
 	std::string fileName = "/workspace/vnpossani/GALOIS_DUMPS/dots/graph_" + std::to_string( nodeID ) + "_mixed_" + std::to_string( window.size() );
 	std::ofstream dotFileMixer( fileName+".dot" );
 	dotFileMixer << cmxaig->toDot();
-*/
+/*
+	// DEBUG
+	SubjectGraph::Cmxaig * cmxaigDebug = mixerDebug.getCmxaig();
+	dotFileMixer.close();
+
+	std::cout << "################# ORIGINAL ################# " << std::endl;
+	for ( auto output : cmxaigDebug->getOutputs() ) {	
+		SubjectGraph::ChoiceNode * choiceNode = (SubjectGraph::ChoiceNode*) output->getInNodes()[0];
+		bool polarity = output->getInEdges()[0];
+		word * f = choiceNode->getFunctionPtr();
+		std::cout << "polarity: " << polarity << std::endl;
+		std::cout << "Fout = " << Functional::toHex( f, nWordsW ) << std::endl;
+		word * fNeg = new word[ nWordsW ];
+		Functional::NOT( fNeg, f, nWordsW );
+		std::cout << "Fout = " << Functional::toHex( fNeg, nWordsW ) << std::endl;
 	
+	}
+	std::cout << "############################################ " << std::endl;
+
+	std::string debugName = "/workspace/vnpossani/GALOIS_DUMPS/dots/graph_" + std::to_string( nodeID ) + "_debug_" + std::to_string( window.size() );
+	std::ofstream dotDebug( debugName+".dot" );
+	dotDebug << cmxaigDebug->toDot();
+	dotDebug.close();
+	delete cmxaigDebug;
+	// DEBUG
+*/
 	Covering::coveringMananger coveringMananger;
 	Covering::setCoveringMananger( cmxaig->getAndCounter(), cmxaig->getXorCounter(), cmxaig->getMuxCounter(), coveringMananger );
 	Covering::CoveringVector_2D outputCoverings;
@@ -416,7 +448,6 @@ void optimize( aig::Aig & aig, GNodeSet & window, GNodeSet & leaves, GNodeSet & 
 		replace( graph, window, leaves, roots, leafMap, rootMap, cmxaig );
 	}
 
-/*
 	std::ofstream dotFileCovering( fileName+"_covered.dot" );
 	dotFileCovering << cmxaig->toDot();
 	dotFileCovering.close();
@@ -425,7 +456,6 @@ void optimize( aig::Aig & aig, GNodeSet & window, GNodeSet & leaves, GNodeSet & 
 
 	AigWriter aigWriter( "node_" + std::to_string( nodeID ) +  "_" + std::to_string( window.size() ) +"_rewrited.aig" );
 	aigWriter.writeAig( aig );
-*/
 
 	delete cmxaig;
 	
@@ -618,35 +648,21 @@ void replace( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSet
 			graph.removeNode( node, Galois::MethodFlag::WRITE );
 		}
 	}
-	
-	// Ensure that all in_coming edges or roots were removed
-	for ( auto root : roots ) {
-		
-		std::vector< aig::GNode > toRemoveEdge;
 
+	for ( auto root : roots ) {
+		aig::NodeData & rootData = graph.getData( root, Galois::MethodFlag::WRITE );
 		for ( auto inEdge : graph.in_edges( root ) ) {
 			aig::GNode inNode = graph.getEdgeDst( inEdge );
-			toRemoveEdge.push_back( inNode );
-		}
-
-		//aig::NodeData & rootData = graph.getData( root, Galois::MethodFlag::WRITE );
-
-		for ( auto inNode : toRemoveEdge ) {
-			
-			//aig::NodeData & inNodeData = graph.getData( inNode, Galois::MethodFlag::WRITE ); 
-			//std::cout << std::endl << "Removing edge between " << inNodeData.id << " -> " << rootData.id << std::endl;
-			
+			aig::NodeData & inNodeData = graph.getData( inNode, Galois::MethodFlag::WRITE ); 
+			std::cout << std::endl << "Removing edge between " << inNodeData.id << " -> " << rootData.id << std::endl;
 			auto edgeIt = graph.findEdge( inNode, root );
 
-			/*
 			if ( edgeIt == graph.edge_end( inNode ) ) {
 				std::cout << "Edge not Found!" << std::endl;
 			}
-			*/
-
+	
 			graph.removeEdge( inNode, edgeIt, Galois::MethodFlag::WRITE );
-
-			/*
+			
 			edgeIt = graph.findEdge( inNode, root );
 			if ( edgeIt == graph.edge_end( inNode ) ) {
 				std::cout << "The edge was removed!" << std::endl;
@@ -654,18 +670,9 @@ void replace( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSet
 			else { 
 				std::cout << "The edge was NOT removed!" << std::endl;
 			}
-			*/
 		}
-
-		/*	
-		for ( auto inEdge : graph.in_edges( root ) ) {	
-			aig::GNode inNode = graph.getEdgeDst( inEdge );
-			aig::NodeData & inNodeData = graph.getData( inNode, Galois::MethodFlag::WRITE ); 
-			std::cout << std::endl << "Edge between " << inNodeData.id << " -> " << rootData.id << " is still reachable!" << std::endl;
-		}
-		*/
 	}
-
+/*
 	std::unordered_map< int, aig::GNode > visited;
 	std::vector< SubjectGraph::Node* > topAnds;
 	
@@ -742,6 +749,7 @@ void replace( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSet
 			rootData.andBehavior = !rootData.andBehavior;
 		}
 	}
+*/
 }
 
 aig::GNode createNodes( SubjectGraph::Node* currentNode, aig::Graph & graph, std::unordered_map< std::string, aig::GNode > & leaveMap, std::unordered_map< std::string, aig::GNode > & rootMap, std::unordered_map< int, aig::GNode > & visited, std::vector< int > & availableIDs ) {
