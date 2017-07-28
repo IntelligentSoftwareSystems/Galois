@@ -195,6 +195,13 @@ public:
       }
       assert(false);
     }
+    if (balanceEdges) {
+      if (base_hGraph::id == 0) {
+        std::cerr << "WARNING: balanceEdges not supported for cartesian "
+                     " vertex-cuts\n";
+      }
+      balanceEdges = false;
+    }
 
     Galois::Statistic statGhostNodes("TotalGhostNodes");
     Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
@@ -210,17 +217,10 @@ public:
 
     // compute readers for all nodes
     // if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-      if (balanceEdges) {
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::prefix_range(g,
-                               (uint64_t)0U, i, 
-                               base_hGraph::numHosts));
-      } else {
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::block_range(
-                               0U, (unsigned)g.size(), i, 
-                               base_hGraph::numHosts));
-      }
+      for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+        gid2host.push_back(Galois::block_range(
+                             0U, (unsigned)g.size(), i, 
+                             base_hGraph::numHosts));
 #if 0
     } else {
       assert(scalefactor.size() == base_hGraph::numHosts);

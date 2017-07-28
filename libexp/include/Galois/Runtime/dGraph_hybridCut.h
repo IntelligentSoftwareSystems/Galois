@@ -217,6 +217,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         scalefactor.clear();
       }
+      if (balanceEdges) {
+        if (base_hGraph::id == 0) {
+          std::cerr << "WARNING: balanceEdges not supported for cartesian "
+                       " vertex-cuts\n";
+        }
+        balanceEdges = false;
+      }
 
       Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT PL", 0, 0);
 
@@ -257,17 +264,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << " , Total edges : " << base_hGraph::totalEdges << "\n";
       //compute owners for all nodes
       if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-        if (balanceEdges) {
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-            gid2host.push_back(Galois::prefix_range(g,
-                                 (uint64_t)0U, i, 
-                                 base_hGraph::numHosts));
-        } else {
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-            gid2host.push_back(Galois::block_range(
-                                 0U, (unsigned)numNodes_to_divide, i, 
-                                 base_hGraph::numHosts));
-        }
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+          gid2host.push_back(Galois::block_range(
+                               0U, (unsigned)numNodes_to_divide, i, 
+                               base_hGraph::numHosts));
       }
 #if 0
       else {
