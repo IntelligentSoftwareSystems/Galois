@@ -11,7 +11,6 @@ set(sources
         src/Substrate.cpp
         src/Version.cpp
         src/PagePool.cpp
-        src/Tracer.cpp
         src/StatCollector.cpp
 )
 

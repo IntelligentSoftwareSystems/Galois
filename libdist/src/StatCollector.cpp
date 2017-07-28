@@ -243,6 +243,7 @@ static void reportStatImpl(uint32_t HostID, const std::string loopname, const st
     SM.get()->addToStat(loopname, category, value, TID, HostID);
 }
 
+// TODO: following 4 variants are duplicated from libruntime/src/Support.cpp
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
   reportStatImpl(getHostID(), loopname, category, value, TID);
 }
@@ -283,6 +284,7 @@ void Galois::Runtime::printStats() {
   SM.get()->printStatsForR(std::cout, false);
 }
 
+// TODO: duplicated in libruntime/src/Support.cpp. Use that
 void Galois::Runtime::printStats(std::string fname) {
   //getSystemNetworkInterface().reportStats();
   Galois::Runtime::getHostBarrier().wait();
