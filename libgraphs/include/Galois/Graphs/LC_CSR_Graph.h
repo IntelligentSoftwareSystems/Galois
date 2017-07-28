@@ -714,16 +714,95 @@ public:
     return (mid - beg);
   }
 
+  // swiped from FileGraph.cpp
+  size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
+                   size_t lb, size_t ub, std::vector<uint64_t>edgePrefixSum) {
+    while (lb < ub) {
+      size_t mid = lb + (ub - lb) / 2;
+      size_t num_edges;
+
+      if (mid != 0) {
+        num_edges = edgePrefixSum[mid - 1];
+      } else {
+        num_edges = 0;
+      }
+      //size_t num_edges = *edge_begin(mid);
+
+      size_t size = num_edges * edgeSize + (mid) * nodeSize;
+
+      if (size < targetSize)
+        lb = mid + 1;
+      else
+        ub = mid;
+    }
+    return lb;
+  }
+
+  typedef std::pair<iterator, iterator> NodeRange;
+  typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
+  typedef std::pair<NodeRange, EdgeRange> GraphRange;
+
+  auto divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total,
+                    std::vector<uint64_t>edgePrefixSum)
+      -> GraphRange {
+    // size of all data
+    size_t size = numNodes * nodeSize + numEdges * edgeSize;
+    // size of a block (one block for each division)
+    size_t block = (size + total - 1) / total;
+  
+    size_t aa = numEdges;
+    size_t ea = numEdges;
+  
+    size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes, 
+                          edgePrefixSum);
+    size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes, 
+                          edgePrefixSum);
+  
+    if (bb != eb) {
+      if (bb != 0) {
+        aa = edgePrefixSum[bb - 1];
+      } else {
+        aa = 0;
+      }
+      ea = edgePrefixSum[eb - 1];
+    }
+    return GraphRange(NodeRange(iterator(bb), iterator(eb)), 
+                      EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+  }
+
   void allocateFrom(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
+      ////fprintf(stderr, "LADSFOASDFKAS\n");
+      //nodeData.allocateInterleaved(numNodes);
+      //edgeIndData.allocateInterleaved(numNodes);
+      //edgeDst.allocateInterleaved(numEdges);
+      //edgeData.allocateInterleaved(numEdges);
+      //this->outOfLineAllocateInterleaved(numNodes);
+
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
       edgeData.allocateBlocked(numEdges);
       this->outOfLineAllocateBlocked(numNodes);
+
+      //nodeData.allocateLocal(numNodes);
+      //edgeIndData.allocateLocal(numNodes);
+      //edgeDst.allocateLocal(numEdges);
+      //edgeData.allocateLocal(numEdges);
+      //this->outOfLineAllocateLocal(numNodes);
     } else {
+      //nodeData.allocateLocal(numNodes);
+      //edgeIndData.allocateLocal(numNodes);
+      //edgeDst.allocateLocal(numEdges);
+      //edgeData.allocateLocal(numEdges);
+      //this->outOfLineAllocateLocal(numNodes);
+      //nodeData.allocateBlocked(numNodes);
+      //edgeIndData.allocateBlocked(numNodes);
+      //edgeDst.allocateBlocked(numEdges);
+      //edgeData.allocateBlocked(numEdges);
+      //this->outOfLineAllocateBlocked(numNodes);
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
       edgeDst.allocateInterleaved(numEdges);
@@ -747,6 +826,11 @@ public:
       edgeDst.allocateInterleaved(numEdges);
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
+      //nodeData.allocateBlocked(numNodes);
+      //edgeIndData.allocateBlocked(numNodes);
+      //edgeDst.allocateBlocked(numEdges);
+      //edgeData.allocateBlocked(numEdges);
+      //this->outOfLineAllocateBlocked(numNodes);
     }
   }
 
@@ -771,12 +855,100 @@ public:
     // node based alloc
     nodeData.allocateSpecified(numNodes, threadRanges);
     edgeIndData.allocateSpecified(numNodes, threadRanges);
+    //nodeData.allocateLocal(numNodes);
+    //edgeIndData.allocateLocal(numNodes);
 
     // edge based alloc
     edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     edgeData.allocateSpecified(numEdges, threadRangesEdge);
+    //edgeDst.allocateLocal(numEdges);
+    //edgeData.allocateLocal(numEdges);
 
     this->outOfLineAllocateSpecified(numNodes, threadRanges);
+    //this->outOfLineAllocateLocal(numNodes);
+  }
+
+  /** 
+   * TODO description
+   */
+  void allocateFromByNode(uint32_t nNodes, uint64_t nEdges, 
+                          std::vector<uint64_t> edgePrefixSum) {
+    numNodes = nNodes;
+    numEdges = nEdges;
+
+    uint32_t numThreads = Galois::Runtime::activeThreads;
+    assert(numThreads > 0);
+
+    threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (numThreads + 1));
+    threadRangesEdge = (uint64_t*)malloc(sizeof(uint64_t) * (numThreads + 1));
+
+    threadRanges[0] = 0;
+    threadRangesEdge[0] = 0;
+
+    for (uint32_t i = 0; i < numThreads; i++) {
+      auto nodeEdgeSplits = divideByNode(
+          NodeData::size_of::value + EdgeIndData::size_of::value + 
+          LC_CSR_Graph::size_of_out_of_line::value,
+          EdgeDst::size_of::value + EdgeData::size_of::value,
+          i, numThreads, edgePrefixSum);
+
+      auto nodeSplits = nodeEdgeSplits.first;
+      auto edgeSplits = nodeEdgeSplits.second;
+
+      if (nodeSplits.first != nodeSplits.second) {
+        if (i != 0) {
+          //printf("thread ranges edge i is %lu\n", threadRangesEdge[i]);
+          //printf("edgeSplits first is %lu\n", *edgeSplits.first);
+          assert(threadRanges[i] == *(nodeSplits.first));
+          assert(threadRangesEdge[i] == *(edgeSplits.first));
+        } else {
+          // = 0
+          assert(threadRanges[i] == 0);
+          assert(threadRangesEdge[i] == 0);
+        }
+
+        threadRanges[i + 1] = *(nodeSplits.second);
+        threadRangesEdge[i + 1] = *(edgeSplits.second);
+      } else {
+        // thread assinged no nodes
+        assert(edgeSplits.first == edgeSplits.second);
+
+        threadRanges[i + 1] = threadRanges[i];
+        threadRangesEdge[i + 1] = threadRangesEdge[i];
+      }
+      printf("thread %u gets nodes %u to %u\n", i, threadRanges[i], 
+              threadRanges[i+1]);
+      printf("thread %u gets edges %lu to %lu\n", i, threadRangesEdge[i], 
+              threadRangesEdge[i+1]);
+    }
+
+    // node based alloc
+    nodeData.allocateSpecified(numNodes, threadRanges);
+    edgeIndData.allocateSpecified(numNodes, threadRanges);
+    //nodeData.allocateLocal(numNodes);
+    //edgeIndData.allocateLocal(numNodes);
+
+    // edge based alloc
+    edgeDst.allocateSpecified(numEdges, threadRangesEdge);
+    edgeData.allocateSpecified(numEdges, threadRangesEdge);
+    //edgeDst.allocateLocal(numEdges);
+    //edgeData.allocateLocal(numEdges);
+
+    this->outOfLineAllocateSpecified(numNodes, threadRanges);
+
+    //if (UseNumaAlloc) {
+    //  nodeData.allocateLocal(numNodes);
+    //  edgeIndData.allocateLocal(numNodes);
+    //  edgeDst.allocateLocal(numEdges);
+    //  edgeData.allocateLocal(numEdges);
+    //  this->outOfLineAllocateLocal(numNodes);
+    //} else {
+    //  nodeData.allocateInterleaved(numNodes);
+    //  edgeIndData.allocateInterleaved(numNodes);
+    //  edgeDst.allocateInterleaved(numEdges);
+    //  edgeData.allocateInterleaved(numEdges);
+    //  this->outOfLineAllocateInterleaved(numNodes);
+    //}
   }
 
   void constructNodes() {
@@ -892,12 +1064,25 @@ public:
   void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<!is_non_void>::type* = 0) {
   }
 
+
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
+    // at this point memory is already allocated
+    //auto both = graph.divideByNode(
+    //    NodeData::size_of::value + EdgeIndData::size_of::value + 
+    //    LC_CSR_Graph::size_of_out_of_line::value,
+    //    EdgeDst::size_of::value + EdgeData::size_of::value,
+    //    tid, total);
+    //auto r = both.first;
+    //auto edgeSplit = both.second;
+
     auto r = graph.divideByNode(
-        NodeData::size_of::value + EdgeIndData::size_of::value + LC_CSR_Graph::size_of_out_of_line::value,
+        NodeData::size_of::value + EdgeIndData::size_of::value + 
+        LC_CSR_Graph::size_of_out_of_line::value,
         EdgeDst::size_of::value + EdgeData::size_of::value,
         tid, total).first;
+
     this->setLocalRange(*r.first, *r.second);
+
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       nodeData.constructAt(*ii);
       edgeIndData[*ii] = *graph.edge_end(*ii);
