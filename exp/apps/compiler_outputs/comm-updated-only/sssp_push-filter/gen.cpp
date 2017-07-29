@@ -23,6 +23,7 @@
  * Compute Single Source Shortest Path on distributed Galois using worklist.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
@@ -67,7 +68,7 @@ std::string personality_str(Personality p) {
 #endif
 
 static const char* const name = "SSSP - Distributed Heterogeneous with worklist.";
-static const char* const desc = "Bellman-Ford SSSP on Distributed Galois.";
+static const char* const desc = "Variant of Chaoitic relaxation SSSP on Distributed Galois.";
 static const char* const url = 0;
 
 /******************************************************************************/
@@ -84,6 +85,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
@@ -452,13 +454,13 @@ int main(int argc, char** argv) {
     if (enableVCut){
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose);
+                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
     } else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, 
-                             scalefactor, transpose);
+                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
 
 
@@ -524,27 +526,6 @@ int main(int argc, char** argv) {
         }
       }
 #endif
-    }
-
-    // Verify
-    if (verifyMax) {
-      uint32_t max_distance = 0;
-#ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-#endif
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if(max_distance < (*hg).getData(*ii).dist_current && ((*hg).getData(*ii).dist_current != 1073741823))
-            max_distance = (*hg).getData(*ii).dist_current;
-        }
-#ifdef __GALOIS_HET_CUDA__
-      } else if(personality == GPU_CUDA)  {
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if(max_distance < get_node_dist_current_cuda(cuda_ctx, *ii) && (get_node_dist_current_cuda(cuda_ctx, *ii) != 1073741823))
-            max_distance = get_node_dist_current_cuda(cuda_ctx, *ii);
-        }
-      }
-#endif
-      Galois::Runtime::reportStat("(NULL)", "MAX DISTANCE ", (unsigned long)max_distance, 0);
     }
 
     }

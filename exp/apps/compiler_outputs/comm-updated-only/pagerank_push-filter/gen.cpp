@@ -89,7 +89,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(100));
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
