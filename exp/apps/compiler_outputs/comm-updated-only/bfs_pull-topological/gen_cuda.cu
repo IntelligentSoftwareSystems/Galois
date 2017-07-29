@@ -115,15 +115,17 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
         jj = ns +_np_j;
         {
           index_type dst;
-          unsigned int new_dist;
-          unsigned int old_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_dist_current[dst] + 1;
-          old_dist = atomicMin(&p_dist_current[src], new_dist);
-          if (old_dist > new_dist)
-          {
-            ret_val.do_return( 1);
-            is_updated->set(src);
+          if (p_dist_current[src] > new_dist) {
+            old_dist = atomicMin(&p_dist_current[src], new_dist);
+            if (old_dist > new_dist)
+            {
+              is_updated->set(src);
+              ret_val.do_return( 1);
+            }
           }
         }
       }
@@ -157,15 +159,17 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            unsigned int new_dist;
-            unsigned int old_dist;
+            uint32_t new_dist;
+            uint32_t old_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = p_dist_current[dst] + 1;
-            old_dist = atomicMin(&p_dist_current[src], new_dist);
-            if (old_dist > new_dist)
-            {
-              ret_val.do_return( 1);
-              is_updated->set(src);
+            if (p_dist_current[src] > new_dist) {
+              old_dist = atomicMin(&p_dist_current[src], new_dist);
+              if (old_dist > new_dist)
+              {
+                is_updated->set(src);
+                ret_val.do_return( 1);
+              }
             }
           }
         }
@@ -190,15 +194,17 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          unsigned int new_dist;
-          unsigned int old_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_dist_current[dst] + 1;
-          old_dist = atomicMin(&p_dist_current[src], new_dist);
-          if (old_dist > new_dist)
-          {
-            ret_val.do_return( 1);
-            is_updated->set(src);
+          if (p_dist_current[src] > new_dist) {
+            old_dist = atomicMin(&p_dist_current[src], new_dist);
+            if (old_dist > new_dist)
+            {
+              is_updated->set(src);
+              ret_val.do_return( 1);
+            }
           }
         }
       }

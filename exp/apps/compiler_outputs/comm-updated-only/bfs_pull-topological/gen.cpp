@@ -181,18 +181,6 @@ struct BFS {
       _graph.set_num_iter(_num_iterations);
       DGAccumulator_accum.reset();
       #ifdef __GALOIS_HET_CUDA__
-      	if (personality == GPU_CUDA) {
-      		std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
-      		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-      		StatTimer_cuda.start();
-      		int __retval = 0;
-      		BFS_all_cuda(__retval, cuda_ctx);
-      		DGAccumulator_accum += __retval;
-      		StatTimer_cuda.stop();
-      	} else if (personality == CPU)
-      #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::numrun(_graph.get_run_identifier()), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int" , "min",  ""));
-      #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
           Galois::StatTimer StatTimer_cuda(impl_str.c_str());
@@ -232,9 +220,8 @@ struct BFS {
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist;
-      new_dist = dnode.dist_current + 1;
-      auto old_dist = Galois::min(snode.dist_current, new_dist);
+      uint32_t new_dist = dnode.dist_current + 1;
+      uint32_t old_dist = Galois::min(snode.dist_current, new_dist);
       if (old_dist > new_dist){
         bitset_dist_current.set(src);
         DGAccumulator_accum += 1;

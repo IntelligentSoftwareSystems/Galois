@@ -23,6 +23,7 @@
  * Compute ConnectedComp on distributed Galois using worklist.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
