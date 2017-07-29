@@ -192,11 +192,24 @@ struct BFS {
         } else if (personality == CPU)
       #endif
       {
-        Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
-          Galois::loopname("BFS"), 
-          Galois::numrun(_graph.get_run_identifier()),
-          Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-            "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+        //Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
+        //  Galois::loopname("BFS"), 
+        //  Galois::numrun(_graph.get_run_identifier()),
+        //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+        //    "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+        Galois::do_all_choice(
+          Galois::Runtime::makeStandardRange(
+            _graph.begin(), 
+            _graph.end()
+          ), 
+          BFS{ &_graph }, 
+          std::make_tuple(Galois::loopname("BFS"), 
+            Galois::thread_range(_graph.get_thread_ranges()),
+            Galois::numrun(_graph.get_run_identifier()),
+            Galois::write_set("reduce", "this->graph", 
+                         "struct NodeData &", "struct NodeData &" , 
+                         "dist_current", "unsigned int" , "min",  "")
+          ));
       }
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
