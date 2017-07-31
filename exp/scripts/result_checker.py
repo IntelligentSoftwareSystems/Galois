@@ -28,6 +28,10 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
       split_line1 = line1.split(' ')
       split_line2 = line2.split(' ')
 
+      if (split_line1[0] == ''):
+        print("ERROR: output longer than input")
+        return (0, errors, mrows)
+
       while (long(split_line1[0]) < long(split_line2[0])):
         print "MISSING ROW: ", split_line1[0]
         mrows = mrows + 1
