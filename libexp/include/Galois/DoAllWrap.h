@@ -189,7 +189,7 @@ struct DoAllImpl<DOALL_OPENMP> {
  */
 template <>
 struct DoAllImpl<DOALL_RANGE> {
-  // TODO make it so the work splitting happens within this function instead
+  // TODO make it so the work splitting happens within this function(?) instead
   // of at graph initialization (then it would work with all ranges
   // and not just an all vertices range as is being assumed currently)
   template <typename R, typename F, typename ArgsTuple>

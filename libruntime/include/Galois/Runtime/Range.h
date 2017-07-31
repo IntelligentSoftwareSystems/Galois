@@ -136,21 +136,47 @@ public:
 
   /* Using the thread_beginnings array which tells you which node each thread
    * should begin at, we can get the local block range for a particular 
-   * thread 
+   * thread. If the local range falls outside of 
    *
    * @returns A pair of iterators that specifies the beginning and end
    * of the range for this particular thread.
    */
   std::pair<block_iterator, block_iterator> block_pair() const {
     uint32_t my_thread_id = Substrate::ThreadPool::getTID();
+    uint32_t total_threads = Runtime::activeThreads;
 
-    iterator local_start = global_begin + thread_beginnings[my_thread_id];
-    iterator local_end = global_begin + thread_beginnings[my_thread_id + 1];
+    iterator local_begin = thread_beginnings[my_thread_id];
+    iterator local_end = thread_beginnings[my_thread_id + 1];
 
-    //printf("thread %u gets start %u and end %u\n", my_thread_id, *local_start, 
-    //       *local_end);
+    assert(local_begin <= local_end);
 
-    return std::make_pair(local_start, local_end);
+    if (thread_beginnings[total_threads] == *global_end && *global_begin == 0) {
+      //printf("thread %u gets start %u and end %u\n", my_thread_id, *local_begin, 
+      //       *local_end);
+
+      return std::make_pair(local_begin, local_end);
+    } else {
+      // This path assumes that we were passed in thread_beginnings for the range
+      // 0 to last node, but the passed in range to execute is NOT the entire 
+      // 0 to thread end range; therefore, work under the assumption that only
+      // some threads will execute things only if they "own" nodes in the range
+
+      // determine if our range is in range of what needs to be executed
+      if (local_begin >= global_begin && local_end <= global_end) {
+        return std::make_pair(local_begin, local_end);
+      } else if (local_end <= global_end && local_end > global_begin) {
+        // local_begin < global_begin, but this thread still has some things
+        // it can execute
+        return std::make_pair(global_begin, local_end);
+      } else if (local_begin >= global_begin && local_begin < global_end) {
+        // local_end > global_end, but still 
+        return std::make_pair(local_begin, global_end);
+      } else {
+        // we don't fall in range
+        //printf("thread %u does nothing\n", my_thread_id);
+        return std::make_pair(global_end, global_end);
+      }
+    }
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
