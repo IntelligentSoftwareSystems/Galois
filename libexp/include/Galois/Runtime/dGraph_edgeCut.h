@@ -228,7 +228,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // vector to hold a prefix sum for use in thread work distribution
       std::vector<uint64_t> edge_prefix_sum(base_hGraph::numOwned);
-      uint32_t current_edge_sum = 0;
+      uint64_t current_edge_sum = 0;
       uint32_t current_node = 0;
 
       // loop through all nodes we own and determine ghosts (note a node
