@@ -324,6 +324,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         // determine division of nodes among threads and allocate based on that
         printf("Edge based NUMA division on\n");
         base_hGraph::graph.allocateFrom(_numNodes, _numEdges, edge_prefix_sum);
+        //base_hGraph::graph.allocateFromByNode(_numNodes, _numEdges, 
+        //                                      edge_prefix_sum);
       }
       //std::cerr << "[" << base_hGraph::id << "] Allocate done" << "\n";
 
