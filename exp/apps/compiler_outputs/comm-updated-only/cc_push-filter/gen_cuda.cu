@@ -143,8 +143,10 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, DynamicBitset *is_updated
           uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          if (old_dist > new_dist) is_updated->set(dst);
+          if (p_comp_current[dst] > new_dist) {
+            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
+          }
         }
       }
       // FP: "53 -> 54;
@@ -185,8 +187,10 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, DynamicBitset *is_updated
             uint32_t new_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = p_comp_current[src];
-            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-            if (old_dist > new_dist) is_updated->set(dst);
+            if (p_comp_current[dst] > new_dist) {
+              uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+              if (old_dist > new_dist) is_updated->set(dst);
+            }
           }
         }
       }
@@ -223,8 +227,10 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, DynamicBitset *is_updated
           uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          if (old_dist > new_dist) is_updated->set(dst);
+          if (p_comp_current[dst] > new_dist) {
+            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
+          }
         }
       }
       // FP: "96 -> 97;
@@ -360,8 +366,10 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
           uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          if (old_dist > new_dist) is_updated->set(dst);
+          if (p_comp_current[dst] > new_dist) {
+            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
+          }
         }
       }
       // FP: "55 -> 56;
@@ -402,8 +410,10 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
             uint32_t new_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = p_comp_current[src];
-            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-            if (old_dist > new_dist) is_updated->set(dst);
+            if (p_comp_current[dst] > new_dist) {
+              uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+              if (old_dist > new_dist) is_updated->set(dst);
+            }
           }
         }
       }
@@ -440,8 +450,10 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
           uint32_t new_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          if (old_dist > new_dist) is_updated->set(dst);
+          if (p_comp_current[dst] > new_dist) {
+            uint32_t old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
+          }
         }
       }
       // FP: "98 -> 99;
