@@ -100,13 +100,13 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
       [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
         auto myID = ThreadPool::getTID();
 
-        uint32_t beginLocation = threadRanges[myID];
-        uint32_t endLocation = threadRanges[myID + 1];
+        uint64_t beginLocation = threadRanges[myID];
+        uint64_t endLocation = threadRanges[myID + 1];
 
         assert(beginLocation <= endLocation);
 
-        printf("[%u] begin location %u and end location %u\n", myID,
-               beginLocation, endLocation);
+        //printf("[%u] begin location %u and end location %u\n", myID,
+        //       beginLocation, endLocation);
 
         // if equal, then no memory needed to allocate in first place
         if (beginLocation != endLocation) {
@@ -115,7 +115,7 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
 
           if (endLocation != 0) {
             // -1 since end * element will result in the first byte of the
-            // next node
+            // next element
             endByte = (endLocation * elementSize) - 1;
           } else {
             endByte = 0;
@@ -123,13 +123,15 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
 
           assert(beginByte <= endByte);
 
+          //memset(ptr + beginByte, 0, (endByte - beginByte + 1));
+
           uint32_t beginPage = beginByte / pageSize;
           uint32_t endPage = endByte / pageSize;
 
           assert(beginPage <= endPage);
 
-          printf("thread %u gets begin page %u and end page %u\n", myID,
-                  beginPage, endPage);
+          //printf("thread %u gets begin page %u and end page %u\n", myID,
+          //        beginPage, endPage);
 
           // write a byte to every page this thread occupies
           for (uint32_t i = beginPage; i <= endPage; i++) {
