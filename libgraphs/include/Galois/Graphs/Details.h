@@ -284,6 +284,9 @@ public:
   void outOfLineAllocateBlocked(size_t numNodes) {
     outOfLineLocks.allocateBlocked(numNodes);
   }
+  void outOfLineAllocateFloating(size_t numNodes) {
+    outOfLineLocks.allocateFloating(numNodes);
+  }
 
   template <typename RangeArrayType>
   void outOfLineAllocateSpecified(size_t n, RangeArrayType threadRanges) {
@@ -306,6 +309,7 @@ public:
   void outOfLineAllocateLocal(size_t numNodes) { }
   void outOfLineAllocateInterleaved(size_t numNodes) { }
   void outOfLineAllocateBlocked(size_t) {}
+  void outOfLineAllocateFloating(size_t) {}
   void outOfLineConstructAt(size_t n) { }
   template <typename RangeArrayType>
   void outOfLineAllocateSpecified(size_t n, RangeArrayType threadRanges) {}

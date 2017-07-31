@@ -76,19 +76,27 @@ public:
   };
 
 protected:
-  enum AllocType {Blocked, Local, Interleaved};
+  enum AllocType {Blocked, Local, Interleaved, Floating};
   void allocate(size_type n, AllocType t) {
     assert(!m_data);
     m_size = n;
     switch(t) {
     case Blocked:
+      printf("Block-alloc'd\n");
       m_realdata = Substrate::largeMallocBlocked(n*sizeof(T), Runtime::activeThreads);
       break;
     case Interleaved:
+      printf("Interleave-alloc'd\n");
       m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), Runtime::activeThreads);
       break;
     case Local:
+      printf("Local-allocd\n");
       m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
+      break;
+    case Floating:
+      printf("Floating-alloc'd\n");
+      m_realdata = Substrate::largeMallocFloating(n*sizeof(T));
+      break;
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
@@ -159,6 +167,14 @@ public:
    * @param  n         number of elements to allocate 
    */
   void allocateLocal(size_type n) { allocate(n, Local); }
+
+  /**
+   * Allocates using no memory policy (no pre alloc)
+   *
+   * @param  n         number of elements to allocate 
+   */
+  void allocateFloating(size_type n) { allocate(n, Floating); }
+
 
   /** 
    * Allocate memory to threads based on a provided array specifying which
@@ -262,6 +278,7 @@ public:
   void allocateInterleaved(size_type n) { }
   void allocateBlocked(size_type n) { }
   void allocateLocal(size_type n, bool prefault = true) { }
+  void allocateFloating(size_type n) { }
   template<typename RangeArrayTy>
   void allocateSpecified(size_type number_of_elements, 
                          RangeArrayTy threadRanges) { }
