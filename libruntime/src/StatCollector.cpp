@@ -94,7 +94,7 @@ Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.m
   switch(mode) {
   case 0: valueInt    = r.valueInt;    break;
   case 1: valueDouble = r.valueDouble; break;
-  case 2: valueStr    = r.valueStr;    break;
+  case 2: new (&valueStr) std::string(r.valueStr);    break;
   }
 }
 
