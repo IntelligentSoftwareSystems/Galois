@@ -41,6 +41,28 @@ static void allocateConstants(VerilogModule *vModule) {
   }
 }
 
+static std::string getWireName(FileReader& fRd) {
+  std::string result = fRd.nextToken(), token = fRd.nextToken();
+
+  // wire name
+  if ("\\" == result) {
+    result = token; // get rid of "\\"
+    token = fRd.nextToken();
+  }
+
+  // wire name is an array element
+  if ("[" == token) {
+    result += token; // consume "["
+    result += fRd.nextToken(); // get index
+    result += fRd.nextToken(); // consume "]"
+  }
+  else {
+    fRd.pushToken(token);
+  }
+
+  return result;
+}
+
 void VerilogModule::read(std::string inName, CellLib *lib) {
   char delimiters[] = {
     '(', ')',
@@ -75,22 +97,24 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
     else if (token == "input" || token == "output") {
       auto& primary = (token == "input") ? inputs : outputs;
       for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
+        fRd.pushToken(token);
         VerilogPin *pin = new VerilogPin;
-        pin->name = token;
+        pin->name = getWireName(fRd);
         pin->gate = nullptr;
         pin->wire = nullptr;
-        primary.insert({token, pin});
+        primary.insert({pin->name, pin});
       }
     }
 
     // wire wire1, wire2, ..., wireN;
     else if (token == "wire") {
       for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
+        fRd.pushToken(token);
         VerilogWire *wire = new VerilogWire;
-        wire->name = token;
+        wire->name = getWireName(fRd);
         wire->root = nullptr;
         wire->wireLoad = cellLib->defaultWireLoad;
-        wires.insert({token, wire});
+        wires.insert({wire->name, wire});
       }
     }
 
@@ -128,7 +152,7 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
         pin->gate = gate;
 
         fRd.nextToken(); // get "("
-        pin->wire = wires.at(fRd.nextToken());
+        pin->wire = wires.at(getWireName(fRd));
         fRd.nextToken(); // get ")"
 
         auto cellPin = gate->cell->cellPins.at(pin->name);
