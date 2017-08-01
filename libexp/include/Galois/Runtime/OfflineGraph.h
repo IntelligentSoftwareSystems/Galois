@@ -581,21 +581,25 @@ std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
  * divisions and save the results in a passed in vector.
  *
  * @param graph OfflineGraph representation
- * @param begin Beginning of iterator to graph
+ * @param begin Beginning of graph
+ * @param end End of graph
  * @param num_divisions The total number of divisions you are working with
  * @param division_vector Vector to hold distribution of nodes among divisions
+ * @param scale_factor Optional scale factor that weights division of nodes
+ * among partitions
  */
 template<typename IterTy>
-void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin, 
-                  uint32_t num_divisions, 
-                  std::vector<std::pair<IterTy, IterTy>>& division_vector) {
+void prefix_range(Galois::Graph::OfflineGraph& graph, 
+                  IterTy begin, IterTy end, uint32_t num_divisions, 
+                  std::vector<std::pair<IterTy, IterTy>>& division_vector,
+                  std::vector<unsigned> scale_factor = std::vector<unsigned>()) {
   uint64_t total_nodes = graph.size();
 
   // Single division case
   if (num_divisions == 1) {
     printf("all elements to 1 division\n");
 
-    division_vector.push_back(std::make_pair(begin, *graph.end()));
+    division_vector.push_back(std::make_pair(begin, end));
     assert(division_vector.size() == num_divisions);
     return;
   }
@@ -613,12 +617,31 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
 
     // divisions with no elements
     for (uint64_t i = total_nodes; i < num_divisions; i++) {
-      division_vector.push_back(std::make_pair(*graph.end(), *graph.end()));
+      division_vector.push_back(std::make_pair(end, end));
     }
 
     assert(division_vector.size() == num_divisions);
     return;
   }
+
+  uint32_t num_blocks = 0;
+
+  if (scale_factor.empty()) {
+    num_blocks = num_divisions;
+    for (uint32_t i = 0; i < num_divisions; i++) {
+      scale_factor.push_back(1);
+    }
+  } else {
+    assert(scale_factor.size() == num_divisions);
+    assert(num_divisions >= 1);
+
+    for (uint32_t i = 0; i < num_divisions; i++) {
+      num_blocks += scale_factor[i];
+    }
+  }
+
+  uint64_t edges_per_block = graph.sizeEdges() / num_blocks;
+  printf("Want %lu edges per block (unit of division)\n", edges_per_block);
 
   uint32_t current_division = 0;
   uint64_t begin_element = 0;
@@ -627,9 +650,10 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
   uint64_t current_element = 0;
 
   // theoretically how many edges we want to distributed to each division
-  uint64_t edges_per_division = graph.sizeEdges() / num_divisions;
+  uint64_t edges_this_division = scale_factor[current_division] * 
+                                 edges_per_block;
 
-  printf("Optimally want %lu edges per division\n", edges_per_division);
+  printf("Optimally want %lu edges this division\n", edges_this_division);
 
   uint64_t current_prefix_sum = -1;
   uint64_t last_prefix_sum = -1;
@@ -643,28 +667,12 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
 
     if (divisions_remaining == 1) {
       // assign remaining elements to last division
-      IterTy the_end = *graph.end();
-
       printf("For division %u/%u we have begin %lu and end as the end of the "
              "graph %lu\n", current_division, num_divisions - 1, begin_element, 
              total_nodes);
 
-      //if (current_element != 0) {
-      //  printf("For division %u/%u we have begin %lu and end %lu with "
-      //         "%lu edges\n", 
-      //         division_id, num_divisions - 1, begin_element, 
-      //         current_element + 1, 
-      //         edge_prefix_sum[current_element] - 
-      //           edge_prefix_sum[begin_element - 1]);
-      //} else {
-      //  printf("For division %u/%u we have begin %lu and end %lu with "
-      //         "%lu edges\n", 
-      //         division_id, num_divisions - 1, begin_element, 
-      //         current_element + 1, edge_prefix_sum.back());
-      //}
-
       division_vector.push_back(std::make_pair(begin + current_element, 
-                                               the_end));
+                                               end));
       assert(division_vector.size() == num_divisions);
       return;
     } else if ((total_nodes - current_element) == divisions_remaining) {
@@ -688,7 +696,6 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
         current_division++;
         begin_element = current_element + 1;
         current_element++;
-
       }
 
       assert(division_vector.size() == num_divisions);
@@ -707,8 +714,6 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
       }
 
       element_edges = current_prefix_sum - last_prefix_sum;
-      //element_edges = edge_prefix_sum[current_element] - 
-      //                edge_prefix_sum[current_element - 1];
     } else {
       current_prefix_sum = *(graph.edge_end(0));
       element_edges = current_prefix_sum;
@@ -718,8 +723,6 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
     if (current_element > 0) {
       edge_count_without_current = current_prefix_sum - accounted_edges - 
                                    element_edges;
-      //edge_count_without_current = edge_prefix_sum[current_element] -
-      //                             accounted_edges - element_edges;
     } else {
       edge_count_without_current = 0;
     }
@@ -727,10 +730,10 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
     // if this element has a lot of edges, determine if it should go to
     // this division or the next (don't want to cause this division to get
     // too much)
-    if (element_edges > (3 * edges_per_division / 4)) {
+    if (element_edges > (3 * edges_this_division / 4)) {
       // if this current division + edges of this element is too much,
       // then do not add to this division but rather the next one
-      if (edge_count_without_current > (edges_per_division / 2)) {
+      if (edge_count_without_current > (edges_this_division / 2)) {
         // finish up this division; its last element is the one before this
         // one
         printf("For division %u/%u we have begin %lu and end %lu with "
@@ -743,9 +746,9 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
         // this is safe (i.e. won't access -1) as you should never enter this 
         // conditional if current element is still 0
         accounted_edges = last_prefix_sum;
-        //accounted_edges = edge_prefix_sum[current_element - 1];
         begin_element = current_element;
         current_division++;
+        edges_this_division = scale_factor[current_division] * edges_per_block;
 
         continue;
       }
@@ -755,7 +758,7 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
     uint64_t edge_count_with_current = edge_count_without_current + 
                                        element_edges;
 
-    if (edge_count_with_current >= edges_per_division) {
+    if (edge_count_with_current >= edges_this_division) {
       // this division has enough edges after including the current
       // node; finish up
       printf("For division %u/%u we have begin %lu and end %lu with %lu edges\n", 
@@ -766,9 +769,11 @@ void prefix_range(Galois::Graph::OfflineGraph& graph, IterTy begin,
                                                begin + current_element + 1));
 
       accounted_edges = current_prefix_sum;
+
       // beginning element of next division
       begin_element = current_element + 1;
       current_division++;
+      edges_this_division = scale_factor[current_division] * edges_per_block;
     }
 
     current_element++;
