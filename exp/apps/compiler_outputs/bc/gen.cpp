@@ -129,12 +129,6 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                           "betweeness-centraility"),
                                 cll::init(0));
 
-static cll::opt<bool> doAllEdge("doAllEdge", 
-                                cll::desc("Specify if you want certain do-alls "
-                                "to divide work using edges as a metric"),
-                                cll::init(false));
-
-
 #ifdef __GALOIS_HET_CUDA__
 // If running on both CPUs and GPUs, below is included
 static cll::opt<int> gpudevice("gpu", 
@@ -537,18 +531,20 @@ struct SSSP {
       //         bitset_current_length.test(_graph.getLID(21848)),
       //         _graph.isOwned(21848));
       //}
-      if (!doAllEdge) {
-        Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
-                       Galois::loopname("SSSP"),
-                       Galois::numrun("0"));
-                       //Galois::numrun(_graph.get_run_identifier()));
-      } else {
-        Galois::do_all_range(_graph.begin(), _graph.end(), 
-                       _graph.get_thread_ranges(),
-                       SSSP(&_graph), 
-                       Galois::loopname("SSSP"),
-                       Galois::numrun("0"));
-      }
+      //Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
+      //               Galois::loopname("SSSP"),
+      //               Galois::numrun("0"));
+      //               //Galois::numrun(_graph.get_run_identifier()));
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()),
+        SSSP(&_graph), 
+        std::make_tuple(
+          Galois::loopname("DependencyPropogation"), 
+          Galois::thread_range(_graph.get_thread_ranges()),
+          Galois::numrun("0")
+          //Galois::numrun(_graph.get_run_identifier())
+        )
+      );
       }
 
       iterations++;
@@ -669,18 +665,18 @@ struct PredAndSucc {
     //Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(&_graph), 
     //               Galois::loopname("PredAndSucc"));
     {
-    if (!doAllEdge) {
-      Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(infinity, &_graph), 
-                     Galois::loopname("PredAndSucc"),
-                     Galois::numrun("0"));
-                     //Galois::numrun(_graph.get_run_identifier()));
-    } else {
-      Galois::do_all_range(_graph.begin(), _graph.end(), 
-                     _graph.get_thread_ranges(),
-                     PredAndSucc(infinity, &_graph), 
-                     Galois::loopname("PredAndSucc"),
-                     Galois::numrun("0"));
-    }
+    //Galois::do_all(_graph.begin(), _graph.end(), PredAndSucc(infinity, &_graph), 
+    //               Galois::loopname("PredAndSucc"),
+    //               Galois::numrun("0"));
+    //               //Galois::numrun(_graph.get_run_identifier()));
+    Galois::do_all_choice(
+      Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()),
+      PredAndSucc(infinity, &_graph), 
+      std::make_tuple(Galois::loopname("PredAndSucc"),
+                      Galois::thread_range(_graph.get_thread_ranges()),
+                      Galois::numrun("0")
+      )
+    );
     }
 
     // sync for use in NumShortPath calculation
@@ -882,22 +878,23 @@ struct NumShortestPaths {
       } else if (personality == CPU)
     #endif
     {  
-      if (!doAllEdge) {
-      Galois::do_all(_graph.begin(), _graph.end(), 
-                     NumShortestPaths(infinity, &_graph), 
-                     Galois::loopname("NumShortestPaths"),
-                     Galois::numrun("0"));
-                     //Galois::numrun(_graph.get_run_identifier()));
+      //Galois::do_all(_graph.begin(), _graph.end(), 
+      //               NumShortestPaths(infinity, &_graph), 
+      //               Galois::loopname("NumShortestPaths"),
+      //               Galois::numrun("0"));
+      //               //Galois::numrun(_graph.get_run_identifier()));
       //Galois::do_all(_graph.begin(), _graph.end(), 
       //               NumShortestPaths(&_graph), 
       //               Galois::loopname("NumShortestPaths"));
-      } else {
-        Galois::do_all_range(_graph.begin(), _graph.end(), 
-                       _graph.get_thread_ranges(),
-                       NumShortestPaths(infinity, &_graph), 
-                       Galois::loopname("NumShortestPaths"),
-                       Galois::numrun("0"));
-      }
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()),
+        NumShortestPaths(infinity, &_graph), 
+        std::make_tuple(Galois::loopname("NumShortestPaths"),
+                        Galois::thread_range(_graph.get_thread_ranges()),
+                        Galois::numrun("0")
+        )
+      );
+
     }
       _graph.sync<writeDestination, readSource, Reduce_add_trim, 
                   Broadcast_trim, Bitset_trim>("NumShortestPaths_trim");
@@ -1164,21 +1161,19 @@ struct DependencyPropogation {
       } else if (personality == CPU)
     #endif
     {
-      if (!doAllEdge) {
-        Galois::do_all(_graph.begin(), _graph.end(), 
-                       DependencyPropogation(infinity, current_src_node, &_graph), 
-                       Galois::loopname("DependencyPropogation"),
-                       Galois::numrun("0"));
-                       //Galois::numrun(_graph.get_run_identifier()));
-      //Galois::do_all(_graph.begin(), _graph.end(), 
-      //               DependencyPropogation(current_src_node, &_graph), 
-      //               Galois::loopname("DependencyPropogation"));
-      } else {
-        Galois::do_all_range(_graph.begin(), _graph.end(), _graph.get_thread_ranges(),
-                       DependencyPropogation(infinity, current_src_node, &_graph), 
-                       Galois::loopname("DependencyPropogation"),
-                       Galois::numrun("0"));
-      }
+        //Galois::do_all(_graph.begin(), _graph.end(), 
+        //               DependencyPropogation(infinity, current_src_node, &_graph), 
+        //               Galois::loopname("DependencyPropogation"),
+        //               Galois::numrun("0"));
+        //               //Galois::numrun(_graph.get_run_identifier()));
+        Galois::do_all_choice(
+          Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()),
+          DependencyPropogation(infinity, current_src_node, &_graph), 
+          std::make_tuple(Galois::loopname("DependencyPropogation"),
+                          Galois::thread_range(_graph.get_thread_ranges()),
+                          Galois::numrun("0")
+          )
+        );
     }
                     
 
@@ -1531,15 +1526,13 @@ int main(int argc, char** argv) {
     if (enableVCut) {
       if (vertexcut == CART_VCUT)
         h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                         scalefactor, transpose, doAllEdge);
+                                         scalefactor, transpose);
       else if (vertexcut == PL_VCUT)
         h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                      scalefactor, transpose, VCutThreshold, 
-                                      false, // argument for bipartite...
-                                      doAllEdge);
+                                      scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                                  scalefactor, transpose, doAllEdge);
+                                  scalefactor, transpose);
     }
 
   #ifdef __GALOIS_HET_CUDA__
