@@ -101,6 +101,67 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return (GlobalToLocalGhostMap.find(gid) != GlobalToLocalGhostMap.end());
     }
 
+    // compute owners by blocking Nodes
+    void computeOwnersBlockedNodes(Galois::Graph::OfflineGraph& g, 
+        uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+          gid2host.push_back(Galois::block_range(
+                               0U, (unsigned)numNodes_to_divide, i, 
+                               base_hGraph::numHosts));
+      } else {
+        assert(scalefactor.size() == base_hGraph::numHosts);
+
+        unsigned numBlocks = 0;
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+          numBlocks += scalefactor[i];
+
+        std::vector<std::pair<uint64_t, uint64_t>> blocks;
+        for (unsigned i = 0; i < numBlocks; ++i)
+          blocks.push_back(Galois::block_range(
+                             0U, (unsigned)numNodes_to_divide, i, numBlocks));
+
+        std::vector<unsigned> prefixSums;
+        prefixSums.push_back(0);
+        for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
+          prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
+          unsigned firstBlock = prefixSums[i];
+          unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
+          gid2host.push_back(std::make_pair(blocks[firstBlock].first, 
+                                            blocks[lastBlock].second));
+        }
+      }
+    }
+
+    // compute owners while trying to balance edges
+    void computeOwnersBalancedEdges(Galois::Graph::OfflineGraph& g,
+        uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      if (base_hGraph::id == 0) {
+        // compute owners for all hosts and send that info to all hosts
+        Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
+                             base_hGraph::numHosts,
+                             gid2host, scalefactor);
+        for (unsigned h = 1; h < base_hGraph::numHosts; ++h) {
+          Galois::Runtime::SendBuffer b;
+          Galois::Runtime::gSerialize(b, gid2host);
+          net.sendTagged(h, Galois::Runtime::evilPhase, b);
+        }
+        net.flush();
+      } else {
+        // receive computed owners from host 0
+        decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+        do {
+          net.handleReceives();
+          p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        } while (!p);
+        assert(p->first == 0);
+        auto& b = p->second;
+        Galois::Runtime::gDeserialize(b, gid2host);
+      }
+      ++Galois::Runtime::evilPhase;
+    }
 
     /**
      * Constructor for hGraph_edgeCut
@@ -143,40 +204,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    base_hGraph::totalNodes << "\n";
 
       // compute owners for all nodes
-      if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-        if (balanceEdges && (base_hGraph::numHosts != 1)) {
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-            gid2host.push_back(Galois::prefix_range(g,
-                                 (uint64_t)0U, i, 
-                                 base_hGraph::numHosts));
-        } else {
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-            gid2host.push_back(Galois::block_range(
-                                 0U, (unsigned)numNodes_to_divide, i, 
-                                 base_hGraph::numHosts));
-        }
+      if (balanceEdges) {
+        computeOwnersBalancedEdges(g, numNodes_to_divide, scalefactor);
       } else {
-        assert(scalefactor.size() == base_hGraph::numHosts);
-
-        unsigned numBlocks = 0;
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          numBlocks += scalefactor[i];
-
-        std::vector<std::pair<uint64_t, uint64_t>> blocks;
-        for (unsigned i = 0; i < numBlocks; ++i)
-          blocks.push_back(Galois::block_range(
-                             0U, (unsigned)numNodes_to_divide, i, numBlocks));
-
-        std::vector<unsigned> prefixSums;
-        prefixSums.push_back(0);
-        for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
-          prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-          unsigned firstBlock = prefixSums[i];
-          unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
-          gid2host.push_back(std::make_pair(blocks[firstBlock].first, 
-                                            blocks[lastBlock].second));
-        }
+        computeOwnersBlockedNodes(g, numNodes_to_divide, scalefactor);
       }
 
       // at this point gid2Host has pairs for how to split nodes among
