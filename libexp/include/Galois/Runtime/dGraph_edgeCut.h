@@ -258,7 +258,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       g.reset_seek_counters();
 
       // vector to hold a prefix sum for use in thread work distribution
-      std::vector<uint64_t> edge_prefix_sum(base_hGraph::numOwned);
+      std::vector<uint64_t> prefixSumOfOutEdges(base_hGraph::numOwned);
       uint64_t current_edge_sum = 0;
       uint32_t current_node = 0;
 
@@ -277,7 +277,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           current_edge_sum++;
         }
 
-        edge_prefix_sum[current_node++] = current_edge_sum;
+        prefixSumOfOutEdges[current_node++] = current_edge_sum;
       }
 
       timer.stop();
@@ -332,7 +332,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
-      edge_prefix_sum.resize(_numNodes, edge_prefix_sum.back());
+      prefixSumOfOutEdges.resize(_numNodes, prefixSumOfOutEdges.back());
 
       // transpose is usually used for incoming edge cuts: this makes it
       // so you consider ghosts as having edges as well (since in IEC ghosts
@@ -354,9 +354,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       } else {
         // determine division of nodes among threads and allocate based on that
         printf("Edge based NUMA division on\n");
-        base_hGraph::graph.allocateFrom(_numNodes, _numEdges, edge_prefix_sum);
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges, prefixSumOfOutEdges);
         //base_hGraph::graph.allocateFromByNode(_numNodes, _numEdges, 
-        //                                      edge_prefix_sum);
+        //                                      prefixSumOfOutEdges);
       }
       //std::cerr << "[" << base_hGraph::id << "] Allocate done" << "\n";
 
@@ -378,7 +378,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
         StatTimer_thread_ranges.start();
         base_hGraph::determine_thread_ranges();
-        //base_hGraph::determine_thread_ranges_edge(edge_prefix_sum);
+        //base_hGraph::determine_thread_ranges_edge(prefixSumOfOutEdges);
         StatTimer_thread_ranges.stop();
       }
 
