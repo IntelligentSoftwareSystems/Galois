@@ -23,6 +23,7 @@
  * Compute pageRank using residual on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
@@ -31,6 +32,7 @@
 #include <algorithm>
 #include <vector>
 #include "Galois/Galois.h"
+#include "Galois/DoAllWrap.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/gstl.h"
 
@@ -87,10 +89,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
-static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
-static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
-
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(100));
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
@@ -165,42 +164,6 @@ struct ResetGraph {
   }
 };
 
-struct InitializeGraphNout {
-  Graph* graph;
-
-  InitializeGraphNout(Graph* _graph) : graph(_graph){}
-  void static go(Graph& _graph) {
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraphNout_" + (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		InitializeGraphNout_all_cuda(cuda_ctx);
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
-    {
-    Galois::do_all(_graph.begin(), _graph.end(), 
-                   InitializeGraphNout{ &_graph }, 
-                   Galois::loopname("InitializeGraphNout"), 
-                   Galois::numrun(_graph.get_run_identifier()), 
-                   Galois::write_set("reduce", "this->graph", 
-                     "struct NodeData &", "struct PR_NodeData &" , "nout", 
-                     "float" , "add",  "0"));
-    }
-    _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
-                Bitset_nout>("InitializeGraphNout");
-  }
-
-  void operator()(GNode src) const {
-    NodeData& sdata = graph->getData(src);
-    Galois::atomicAdd(sdata.nout, 
-      (uint32_t) std::distance(graph->edge_begin(src), 
-                                   graph->edge_end(src)));
-    bitset_nout.set(src);
-  }
-};
-
 struct InitializeGraph {
   const float &local_alpha;
   Graph* graph;
@@ -227,34 +190,31 @@ struct InitializeGraph {
         "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
 
-    _graph.sync<writeDestination, readSource, Reduce_add_residual, 
+    _graph.sync<writeSource, readSource, Reduce_set_residual, 
                 Broadcast_residual, Bitset_residual>("InitializeGraph");
+    _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
+                Bitset_nout>("InitializeGraphNout");
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.value = local_alpha;
-
-    if (sdata.nout > 0) {
-      float delta = sdata.value * (1 - local_alpha) / sdata.nout;
-      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
-          nbr != ee; 
-          ++nbr){
-        GNode dst = graph->getEdgeDst(nbr);
-        NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
-        bitset_residual.set(dst);
-      }
-    }
+    sdata.value = 0;
+    sdata.residual = local_alpha;
+    bitset_residual.set(src);
+    sdata.delta = 0;
+    Galois::atomicAdd(sdata.nout, 
+      (uint32_t) std::distance(graph->edge_begin(src), 
+                                   graph->edge_end(src)));
+    bitset_nout.set(src);
   }
 };
 
-struct PageRankCopy {
+struct PageRank_delta {
   const float & local_alpha;
   cll::opt<float> & local_tolerance;
   Graph* graph;
 
-  PageRankCopy(const float & _local_alpha, cll::opt<float> & _local_tolerance,
+  PageRank_delta(const float & _local_alpha, cll::opt<float> & _local_tolerance,
                Graph * _graph) : 
                  local_alpha(_local_alpha),
                  local_tolerance(_local_tolerance),
@@ -266,15 +226,21 @@ struct PageRankCopy {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      PageRankCopy_all_cuda(alpha, tolerance, cuda_ctx);
+      PageRank_delta_all_cuda(alpha, tolerance, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), 
-                     PageRankCopy{ alpha, tolerance, &_graph }, 
-                     Galois::loopname("PageRank"), 
-                     Galois::numrun(_graph.get_run_identifier()));
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        PageRank_delta{ alpha, tolerance, &_graph }, 
+        std::make_tuple(Galois::loopname("PageRank"), 
+        Galois::thread_range(_graph.get_thread_ranges()),
+        Galois::numrun(_graph.get_run_identifier())));
+      //Galois::do_all_local(_graph,
+      //               PageRank_delta{ alpha, tolerance, &_graph }, 
+      //               Galois::loopname("PageRank"), 
+      //               Galois::numrun(_graph.get_run_identifier()));
     }
   }
 
@@ -291,53 +257,6 @@ struct PageRankCopy {
   }
 };
 
-struct FirstItr_PageRank{
-  Graph * graph;
-  FirstItr_PageRank(Graph * _graph):graph(_graph){}
-
-  void static go(Graph& _graph) {
-#ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
-      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-      StatTimer_cuda.start();
-      FirstItr_PageRank_all_cuda(cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-#endif
-    {
-      Galois::do_all(_graph.begin(), _graph.end(), FirstItr_PageRank{&_graph},
-                     Galois::loopname("PageRank"), 
-                     Galois::numrun(_graph.get_run_identifier()), 
-                     Galois::write_set("reduce", "this->graph", 
-                       "struct NodeData &", "struct PR_NodeData &" , "residual", 
-                       "float" , "add",  "0"));
-    }
-  _graph.sync<writeDestination, readSource, Reduce_add_residual, 
-              Broadcast_residual, Bitset_residual>("PageRank");
-  Galois::Runtime::reportStat("(NULL)", 
-    "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-    _graph.end() - _graph.begin(), 0);
-  }
-
-  void operator()(WorkItem src) const {
-    NodeData& sdata = graph->getData(src);
-
-    if (sdata.delta > 0) {
-      float delta = sdata.delta;
-      sdata.delta = 0;
-      for (auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
-           nbr != ee; 
-           ++nbr){
-        GNode dst = graph->getEdgeDst(nbr);
-        NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
-        bitset_residual.set(dst);
-      }
-    }
-  }
-};
-
 struct PageRank {
   Graph* graph;
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -345,14 +264,11 @@ struct PageRank {
   PageRank(Graph* _g): graph(_g){}
 
   void static go(Graph& _graph) {
-    PageRankCopy::go(_graph);
-    FirstItr_PageRank::go(_graph);
-    
-    unsigned _num_iterations = 1;
+    unsigned _num_iterations = 0;
     
     do { 
       _graph.set_num_iter(_num_iterations);
-      PageRankCopy::go(_graph);
+      PageRank_delta::go(_graph);
       DGAccumulator_accum.reset();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
@@ -366,12 +282,35 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::numrun(_graph.get_run_identifier()));
+          Galois::do_all_choice(
+              Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+              PageRank{ &_graph }, 
+              std::make_tuple(Galois::loopname("PageRank"), 
+              Galois::thread_range(_graph.get_thread_ranges()),
+              Galois::write_set("reduce", "this->graph", 
+                                "struct NodeData &", 
+                                "struct PR_NodeData &" , "residual", 
+                                "float" , "add",  "0"), 
+              Galois::numrun(_graph.get_run_identifier())));
+
+          //Galois::do_all_local(_graph,
+          //               PageRank{ &_graph }, 
+          //               Galois::loopname("PageRank"), 
+          //               Galois::write_set("reduce", "this->graph", 
+          //                                 "struct NodeData &", 
+          //                                 "struct PR_NodeData &" , "residual", 
+          //                                 "float" , "add",  "0"), 
+          //               Galois::numrun(_graph.get_run_identifier()));
+
         }
-    _graph.sync<writeDestination, readSource, Reduce_add_residual, Broadcast_residual, Bitset_residual>("PageRank");
-    
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), (unsigned long)DGAccumulator_accum.read_local(), 0);
-    ++_num_iterations;
+      _graph.sync<writeDestination, readSource, Reduce_add_residual, 
+                  Broadcast_residual, Bitset_residual>("PageRank");
+      
+      Galois::Runtime::reportStat("(NULL)", 
+          "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+          (unsigned long)DGAccumulator_accum.read_local(), 0);
+
+      ++_num_iterations;
     } while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
@@ -383,11 +322,9 @@ struct PageRank {
 
   void operator()(WorkItem src) const {
     NodeData& sdata = graph->getData(src);
-
     if (sdata.delta > 0) {
       float delta = sdata.delta;
       sdata.delta = 0;
-
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
           nbr != ee; ++nbr) {
         GNode dst = graph->getEdgeDst(nbr);
@@ -395,7 +332,7 @@ struct PageRank {
         Galois::atomicAdd(ddata.residual, delta);
         bitset_residual.set(dst);
       }
-      DGAccumulator_accum+= 1;
+      DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
     }
   }
 };
@@ -407,16 +344,24 @@ Galois::DGAccumulator<int> PageRank::DGAccumulator_accum;
 
 // gets rank max, min and sum across all nodes
 struct PageRankSanity {
+  cll::opt<float>& local_tolerance;
   Graph* graph;
 
   static float current_max;
   static float current_min;
+  static float current_max_residual;
+  static float current_min_residual;
 
   static Galois::DGAccumulator<float> DGAccumulator_max;
   static Galois::DGAccumulator<float> DGAccumulator_min;
   static Galois::DGAccumulator<float> DGAccumulator_sum;
+  static Galois::DGAccumulator<float> DGAccumulator_sum_residual;
+  static Galois::DGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance;
+  static Galois::DGAccumulator<float> DGAccumulator_max_residual;
+  static Galois::DGAccumulator<float> DGAccumulator_min_residual;
 
-  PageRankSanity(Graph* _graph) : graph(_graph){}
+  PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph) : 
+    local_tolerance(_local_tolerance), graph(_graph) {}
 
   void static go(Graph& _graph) {
   #ifdef __GALOIS_HET_CUDA__
@@ -430,23 +375,37 @@ struct PageRankSanity {
     DGAccumulator_max.reset();
     DGAccumulator_min.reset();
     DGAccumulator_sum.reset();
+    DGAccumulator_sum_residual.reset();
+    DGAccumulator_residual_over_tolerance.reset();
+    DGAccumulator_max_residual.reset();
+    DGAccumulator_min_residual.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   PageRankSanity(&_graph), 
+                   PageRankSanity(tolerance, &_graph), 
                    Galois::loopname("PageRankSanity"));
 
     DGAccumulator_max = current_max;
     DGAccumulator_min = current_min;
+    DGAccumulator_max_residual = current_max_residual;
+    DGAccumulator_min_residual = current_min_residual;
 
     float max_rank = DGAccumulator_max.reduce_max();
     float min_rank = DGAccumulator_min.reduce_min();
     float rank_sum = DGAccumulator_sum.reduce();
+    float residual_sum = DGAccumulator_sum_residual.reduce();
+    uint64_t over_tolerance = DGAccumulator_residual_over_tolerance.reduce();
+    float max_residual = DGAccumulator_max_residual.reduce_max();
+    float min_residual = DGAccumulator_min_residual.reduce_min();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
       printf("Max rank is %f\n", max_rank);
       printf("Min rank is %f\n", min_rank);
       printf("Rank sum is %f\n", rank_sum);
+      printf("Residual sum is %f\n", residual_sum);
+      printf("# nodes with residual over tolerance is %lu\n", over_tolerance);
+      printf("Max residual is %f\n", max_residual);
+      printf("Min residual is %f\n", min_residual);
     }
   }
   
@@ -464,15 +423,37 @@ struct PageRankSanity {
         current_min = src_data.value;
       }
 
+      if (current_max_residual < src_data.residual) {
+        current_max_residual = src_data.residual;
+      }
+
+      if (current_min_residual > src_data.residual) {
+        current_min_residual = src_data.residual;
+      }
+
+      if (src_data.residual > local_tolerance) {
+        DGAccumulator_residual_over_tolerance += 1;
+      }
+
       DGAccumulator_sum += src_data.value;
+      DGAccumulator_sum_residual += src_data.residual;
     }
   }
 };
+
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min;
 Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum;
+Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum_residual;
+Galois::DGAccumulator<uint64_t> PageRankSanity::DGAccumulator_residual_over_tolerance;
+Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max_residual;
+Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min_residual;
+
 float PageRankSanity::current_max = 0;
 float PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
+
+float PageRankSanity::current_max_residual = 0;
+float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
 
 
 /******************************************************************************/
@@ -537,22 +518,16 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
 
-    if (numPipelinedPhases > 1) {
-      numPipelinedPhases = 1;
-      if (net.ID == 0) {
-        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
-      }
-    }
     if (enableVCut){
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold);
+                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
     } else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, scalefactor,
-                             transpose);
+                             transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
 
 
@@ -573,7 +548,6 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-      InitializeGraphNout::go((*hg));
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
@@ -590,6 +564,10 @@ int main(int argc, char** argv) {
       // sanity check
       PageRankSanity::current_max = 0;
       PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
+
+      PageRankSanity::current_max_residual = 0;
+      PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
+
       PageRankSanity::go(*hg);
 
       if((run + 1) != numRuns){
@@ -605,7 +583,6 @@ int main(int argc, char** argv) {
 
         (*hg).reset_num_iter(run+1);
         ResetGraph::go((*hg));
-        InitializeGraphNout::go((*hg));
         InitializeGraph::go((*hg));
       }
     }

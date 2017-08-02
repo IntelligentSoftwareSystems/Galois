@@ -168,6 +168,8 @@ struct function_traits<T, typename std::enable_if<has_function_traits<T>(0)>::ty
 
 //! @section Traits
 
+
+
 /**
  * Indicate name to appear in statistics. Optional argument to {@link do_all()}
  * and {@link for_each()} loops.
@@ -337,6 +339,17 @@ struct op_tag {};
 struct combine_stats_by_name_tag {};
 template <typename T=bool>
 struct combine_stats_by_name: public trait_has_type<T>, combine_stats_by_name_tag {}; 
+
+/**
+ * Array of uint32_t. Could be used for various things, but main use case now
+ * is to pass in information for thread work splitting.
+ */
+struct thread_range_tag {};
+
+struct thread_range: public trait_has_value<const uint32_t*>, thread_range_tag {
+  thread_range(const uint32_t* t = nullptr) : 
+    trait_has_value<const uint32_t*>(t) {}
+};
 
 } // close namespace Galois
 

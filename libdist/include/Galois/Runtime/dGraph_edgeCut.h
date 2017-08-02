@@ -34,10 +34,9 @@
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
 
-
-template<typename NodeTy, typename EdgeTy, bool isBipartite = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool isBipartite = false, 
+         bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
-
   public:
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     // GID = ghostMap[LID - numOwned]
@@ -45,7 +44,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     // LID = GlobalToLocalGhostMap[GID]
     std::unordered_map<uint64_t, uint32_t> GlobalToLocalGhostMap;
     //LID Node owned by host i. Stores ghost nodes from each host.
-    std::vector<std::pair<uint32_t, uint32_t> > hostNodes;
+    std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
     std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
     std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
@@ -56,7 +55,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint64_t globalOffset;
     uint32_t numNodes;
     uint32_t numOwned_withEdges;
-
 
     // Return the local offsets for the nodes to host.
     std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -69,7 +67,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
     std::pair<uint64_t, uint64_t> nodes_by_host_bipartite_G(uint32_t host) const {
           return gid2host_withoutEdges[host];
-     }
+    }
 
 
     // Return the ID to which gid belongs after patition.
@@ -82,7 +80,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         if(isBipartite){
           if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
-		    return i;
+        return i;
         }
       }
       return -1;
@@ -91,7 +89,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     // Return if gid is Owned by local host.
     bool isOwned(uint64_t gid) const {
       return gid >= globalOffset && gid < globalOffset + numOwned_withEdges;
-      if(isBipartite){
+      if (isBipartite) {
         if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
           return true;
       }
@@ -103,15 +101,81 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return (GlobalToLocalGhostMap.find(gid) != GlobalToLocalGhostMap.end());
     }
 
+    // compute owners by blocking Nodes
+    void computeOwnersBlockedNodes(Galois::Graph::OfflineGraph& g, 
+        uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+          gid2host.push_back(Galois::block_range(
+                               0U, (unsigned)numNodes_to_divide, i, 
+                               base_hGraph::numHosts));
+      } else {
+        assert(scalefactor.size() == base_hGraph::numHosts);
 
+        unsigned numBlocks = 0;
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
+          numBlocks += scalefactor[i];
+
+        std::vector<std::pair<uint64_t, uint64_t>> blocks;
+        for (unsigned i = 0; i < numBlocks; ++i)
+          blocks.push_back(Galois::block_range(
+                             0U, (unsigned)numNodes_to_divide, i, numBlocks));
+
+        std::vector<unsigned> prefixSums;
+        prefixSums.push_back(0);
+        for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
+          prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+        for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
+          unsigned firstBlock = prefixSums[i];
+          unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
+          gid2host.push_back(std::make_pair(blocks[firstBlock].first, 
+                                            blocks[lastBlock].second));
+        }
+      }
+    }
+
+    // compute owners while trying to balance edges
+    void computeOwnersBalancedEdges(Galois::Graph::OfflineGraph& g,
+        uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+      if (base_hGraph::id == 0) {
+        // compute owners for all hosts and send that info to all hosts
+        Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
+                             base_hGraph::numHosts,
+                             gid2host, scalefactor);
+        for (unsigned h = 1; h < base_hGraph::numHosts; ++h) {
+          Galois::Runtime::SendBuffer b;
+          Galois::Runtime::gSerialize(b, gid2host);
+          net.sendTagged(h, Galois::Runtime::evilPhase, b);
+        }
+        net.flush();
+      } else {
+        // receive computed owners from host 0
+        decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+        do {
+          net.handleReceives();
+          p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        } while (!p);
+        assert(p->first == 0);
+        auto& b = p->second;
+        Galois::Runtime::gDeserialize(b, gid2host);
+      }
+      ++Galois::Runtime::evilPhase;
+    }
+
+    /**
+     * Constructor for hGraph_edgeCut
+     */
     hGraph_edgeCut(const std::string& filename, 
                    const std::string& partitionFolder, 
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned> scalefactor, 
-                   bool transpose = false) : 
-                    base_hGraph(host, _numHosts) /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, uint64_t& _totalNodes, unsigned _id )*/{
-
+                   bool transpose = false,
+                   bool find_thread_ranges = false) : 
+                    base_hGraph(host, _numHosts) {
+      /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
+       *  uint64_t& _totalNodes, unsigned _id )*/
       Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       StatTimer_graph_construct.start();
@@ -121,142 +185,217 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Graph::OfflineGraph g(filename);
 
       uint64_t numNodes_to_divide = 0;
+
       if (isBipartite) {
-    	  for (uint64_t n = 0; n < g.size(); ++n){
-    		  if(std::distance(g.edge_begin(n), g.edge_end(n))){
+        for (uint64_t n = 0; n < g.size(); ++n){
+          if(std::distance(g.edge_begin(n), g.edge_end(n))){
                   ++numNodes_to_divide;
                   last_nodeID_withEdges_bipartite = n;
-    		  }
-    	  }
-      }
-      else {
-    	  numNodes_to_divide = g.size();
+          }
+        }
+      } else {
+        numNodes_to_divide = g.size();
       }
 
 
       base_hGraph::totalNodes = g.size();
       base_hGraph::totalEdges = g.sizeEdges();
-      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << base_hGraph::totalNodes << "\n";
-      //compute owners for all nodes
-      if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          gid2host.push_back(Galois::block_range(0U, (unsigned) numNodes_to_divide, i, base_hGraph::numHosts));
+      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
+                   base_hGraph::totalNodes << "\n";
+
+      // compute owners for all nodes
+      if (balanceEdges) {
+        computeOwnersBalancedEdges(g, numNodes_to_divide, scalefactor);
       } else {
-        assert(scalefactor.size() == base_hGraph::numHosts);
-        unsigned numBlocks = 0;
-        for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-          numBlocks += scalefactor[i];
-        std::vector<std::pair<uint64_t, uint64_t>> blocks;
-        for (unsigned i = 0; i < numBlocks; ++i)
-          blocks.push_back(Galois::block_range(0U, (unsigned) numNodes_to_divide, i, numBlocks));
-        std::vector<unsigned> prefixSums;
-        prefixSums.push_back(0);
-        for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
-          prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+        computeOwnersBlockedNodes(g, numNodes_to_divide, scalefactor);
+      }
+
+      // at this point gid2Host has pairs for how to split nodes among
+      // hosts; pair has begin and end
+      numOwned_withEdges = base_hGraph::totalOwnedNodes = 
+                           base_hGraph::numOwned = 
+                           (gid2host[base_hGraph::id].second - 
+                             gid2host[base_hGraph::id].first);
+
+      if (isBipartite) {
+        uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-          unsigned firstBlock = prefixSums[i];
-          unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
-          gid2host.push_back(std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
+          auto p = Galois::block_range(
+                     0U, (unsigned)numNodes_without_edges, i, 
+                     base_hGraph::numHosts);
+
+          std::cout << " last node : " << last_nodeID_withEdges_bipartite << 
+                       ", " << p.first << " , " << p.second << "\n";
+
+          gid2host_withoutEdges.push_back(std::make_pair(last_nodeID_withEdges_bipartite + p.first + 1, last_nodeID_withEdges_bipartite + p.second + 1));
+          globalOffset_bipartite = gid2host_withoutEdges[base_hGraph::id].first;
         }
+
+        numOwned_withoutEdges = (gid2host_withoutEdges[base_hGraph::id].second - 
+                                 gid2host_withoutEdges[base_hGraph::id].first);
+        base_hGraph::totalOwnedNodes = base_hGraph::numOwned = 
+                                   (gid2host[base_hGraph::id].second - 
+                                    gid2host[base_hGraph::id].first) + 
+                                   (gid2host_withoutEdges[base_hGraph::id].second - 
+                                    gid2host_withoutEdges[base_hGraph::id].first);
       }
-
-      numOwned_withEdges = base_hGraph::totalOwnedNodes = base_hGraph::numOwned = (gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first);
-      if(isBipartite){
-    	  uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
-    	  for (unsigned i = 0; i < base_hGraph::numHosts; ++i){
-    	    auto p = Galois::block_range(0U, (unsigned)numNodes_without_edges, i, base_hGraph::numHosts);
-    	    std::cout << " last node : " << last_nodeID_withEdges_bipartite << ", " << p.first << " , " << p.second << "\n";
-    	    gid2host_withoutEdges.push_back(std::make_pair(last_nodeID_withEdges_bipartite + p.first + 1, last_nodeID_withEdges_bipartite + p.second + 1));
-    	    globalOffset_bipartite = gid2host_withoutEdges[base_hGraph::id].first;
-          }
-    	  numOwned_withoutEdges = (gid2host_withoutEdges[base_hGraph::id].second - gid2host_withoutEdges[base_hGraph::id].first);
-    	  base_hGraph::totalOwnedNodes = base_hGraph::numOwned = (gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first) + (gid2host_withoutEdges[base_hGraph::id].second - gid2host_withoutEdges[base_hGraph::id].first);
-      }
-
-
 
       globalOffset = gid2host[base_hGraph::id].first;
-    std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << base_hGraph::numOwned << "\n";
 
-    _numEdges = g.edge_begin(gid2host[base_hGraph::id].second) - g.edge_begin(gid2host[base_hGraph::id].first); // depends on Offline graph impl
-    std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
+      std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
+                   base_hGraph::numOwned << "\n";
 
-    std::vector<bool> ghosts(g.size());
+      // depends on Offline graph impl
+      _numEdges = g.edge_begin(gid2host[base_hGraph::id].second) - 
+                    g.edge_begin(gid2host[base_hGraph::id].first); 
+      std::cerr << "[" << base_hGraph::id << "] Total edges : " << _numEdges << "\n";
 
-    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
-    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
-      auto ii = ee;
-      ee = g.edge_end(n);
-      for (; ii < ee; ++ii) {
-        ghosts[g.getEdgeDst(ii)] = true;
-      }
-    }
-    std::cerr << "[" << base_hGraph::id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
-    for (uint64_t x = 0; x < g.size(); ++x)
-      if (ghosts[x] && !isOwned(x))
-        ghostMap.push_back(x);
-    std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << ghostMap.size() << "\n";
+      std::vector<bool> ghosts(g.size());
 
-    hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
-    GlobalToLocalGhostMap.reserve(ghostMap.size());
-    for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
-      unsigned lid = ln + base_hGraph::numOwned;
-      auto gid = ghostMap[ln];
-      GlobalToLocalGhostMap[gid] = lid;
-      bool found = false;
-      for (auto h = 0U; h < gid2host.size(); ++h) {
-        auto& p = gid2host[h];
-        if (gid >= p.first && gid < p.second) {
-          hostNodes[h].first = std::min(hostNodes[h].first, lid);
-          hostNodes[h].second = lid + 1;
-          found = true;
-          break;
-        }
-        else if(isBipartite){
-        	auto& p2 = gid2host_withoutEdges[h];
-          if(gid >= p2.first && gid < p2.second) {
-        	  hostNodes[h].first = std::min(hostNodes[h].first, lid);
-         	  hostNodes[h].second = lid + 1;
-        	  found = true;
-        	  break;
-           }
+      Galois::Timer timer;
+      timer.start();
+      g.reset_seek_counters();
+
+      // vector to hold a prefix sum for use in thread work distribution
+      std::vector<uint64_t> prefixSumOfOutEdges(base_hGraph::numOwned);
+      uint64_t current_edge_sum = 0;
+      uint32_t current_node = 0;
+
+      // loop through all nodes we own and determine ghosts (note a node
+      // we own can also be marked a ghost here if there's an outgoing edge to 
+      // it)
+      // Also determine prefix sums
+      auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+      for (auto n = gid2host[base_hGraph::id].first;
+           n < gid2host[base_hGraph::id].second;
+           ++n) {
+        auto ii = ee;
+        ee = g.edge_end(n);
+        for (; ii < ee; ++ii) {
+          ghosts[g.getEdgeDst(ii)] = true;
+          current_edge_sum++;
         }
 
+        prefixSumOfOutEdges[current_node++] = current_edge_sum;
       }
-      assert(found);
+
+      timer.stop();
+
+      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes " 
+              "in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, 
+                                g.num_bytes_read(), g.num_seeks());
+      std::cerr << "[" << base_hGraph::id << "] Ghost Finding Done " << 
+                   std::count(ghosts.begin(), ghosts.end(), true) << "\n";
+
+      // only nodes we do not own are actual ghosts (i.e. filter the "ghosts"
+      // found above)
+      for (uint64_t x = 0; x < g.size(); ++x)
+        if (ghosts[x] && !isOwned(x))
+          ghostMap.push_back(x);
+      std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
+                   ghostMap.size() << "\n";
+
+      hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
+
+      // determine on which hosts each ghost nodes resides
+      GlobalToLocalGhostMap.reserve(ghostMap.size());
+      for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
+        unsigned lid = ln + base_hGraph::numOwned;
+        auto gid = ghostMap[ln];
+        GlobalToLocalGhostMap[gid] = lid;
+        bool found = false;
+
+        for (auto h = 0U; h < gid2host.size(); ++h) {
+          auto& p = gid2host[h];
+          if (gid >= p.first && gid < p.second) {
+            hostNodes[h].first = std::min(hostNodes[h].first, lid);
+            hostNodes[h].second = lid + 1;
+            found = true;
+            break;
+          } else if (isBipartite) {
+            auto& p2 = gid2host_withoutEdges[h];
+            if(gid >= p2.first && gid < p2.second) {
+              hostNodes[h].first = std::min(hostNodes[h].first, lid);
+              hostNodes[h].second = lid + 1;
+              found = true;
+              break;
+             }
+          }
+        }
+        assert(found);
+      }
+
+      base_hGraph::numNodes = numNodes = 
+                              _numNodes = 
+                              base_hGraph::numOwned + ghostMap.size();
+
+      assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
+             (uint64_t)numNodes);
+      prefixSumOfOutEdges.resize(_numNodes, prefixSumOfOutEdges.back());
+
+      // transpose is usually used for incoming edge cuts: this makes it
+      // so you consider ghosts as having edges as well (since in IEC ghosts
+      // have outgoing edges
+      if (transpose) {
+        base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+      } else {
+        base_hGraph::numNodesWithEdges = base_hGraph::numOwned;
+      }
+
+      base_hGraph::beginMaster = 0;
+      base_hGraph::endMaster = base_hGraph::numOwned;
+
+      //std::cerr << "[" << base_hGraph::id << "] Beginning memory allocation" <<
+      //             "\n";
+
+      if (!edgeNuma) {
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
+      } else {
+        // determine division of nodes among threads and allocate based on that
+        printf("Edge based NUMA division on\n");
+        base_hGraph::graph.allocateFrom(_numNodes, _numEdges, prefixSumOfOutEdges);
+        //base_hGraph::graph.allocateFromByNode(_numNodes, _numEdges, 
+        //                                      prefixSumOfOutEdges);
+      }
+      //std::cerr << "[" << base_hGraph::id << "] Allocate done" << "\n";
+
+      base_hGraph::graph.constructNodes();
+      //std::cerr << "[" << base_hGraph::id << "] Construct nodes done" << "\n";
+
+      loadEdges(base_hGraph::graph, g);
+      std::cerr << "[" << base_hGraph::id << "] Edges loaded" << "\n";
+
+      if (transpose) {
+        base_hGraph::graph.transpose(edgeNuma);
+        base_hGraph::transposed = true;
+      }
+
+      fill_mirrorNodes(base_hGraph::mirrorNodes);
+
+      // TODO revise how this works and make it consistent across cuts
+      if (!edgeNuma) {
+        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        StatTimer_thread_ranges.start();
+        base_hGraph::determine_thread_ranges();
+        //base_hGraph::determine_thread_ranges_edge(prefixSumOfOutEdges);
+        StatTimer_thread_ranges.stop();
+      }
+
+      StatTimer_graph_construct.stop();
+
+      StatTimer_graph_construct_comm.start();
+      base_hGraph::setup_communication();
+      StatTimer_graph_construct_comm.stop();
     }
-
-    numNodes = _numNodes = base_hGraph::numOwned + ghostMap.size();
-    assert((uint64_t )base_hGraph::numOwned + (uint64_t )ghostMap.size() == (uint64_t )numNodes);
-
-    base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
-    //std::cerr << "Allocate done\n";
-
-    base_hGraph::graph.constructNodes();
-    //std::cerr << "Construct nodes done\n";
-    loadEdges(base_hGraph::graph, g);
-    std::cerr << "Edges loaded \n";
-
-    if (transpose) {
-      base_hGraph::graph.transpose();
-      base_hGraph::transposed = true;
-    }
-
-    fill_mirrorNodes(base_hGraph::mirrorNodes);
-    StatTimer_graph_construct.stop();
-    StatTimer_graph_construct_comm.start();
-    base_hGraph::setup_communication();
-    StatTimer_graph_construct_comm.stop();
-  }
 
   uint32_t G2L(uint64_t gid) const {
     if (gid >= globalOffset && gid < globalOffset + numOwned_withEdges)
       return gid - globalOffset;
 
     if(isBipartite){
-    	if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
-    	      return gid - globalOffset_bipartite + numOwned_withEdges;
+      if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
+            return gid - globalOffset_bipartite + numOwned_withEdges;
     }
 
     return GlobalToLocalGhostMap.at(gid);
@@ -280,7 +419,13 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-    fprintf(stderr, "Loading edge-data while creating edges.\n");
+    if (base_hGraph::id == 0) {
+      fprintf(stderr, "Loading edge-data while creating edges.\n");
+    }
+
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
 
     uint64_t cur = 0;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
@@ -299,11 +444,21 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
       graph.fixEndEdge(lid, cur);
     }
+
+    timer.stop();
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
-    fprintf(stderr, "Loading void edge-data while creating edges.\n");
+    if (base_hGraph::id == 0) {
+      fprintf(stderr, "Loading void edge-data while creating edges.\n");
+    }
+
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
+
     uint64_t cur = 0;
     auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
@@ -320,6 +475,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     for (uint32_t lid = base_hGraph::numOwned; lid < numNodes; ++lid) {
       graph.fixEndEdge(lid, cur);
     }
+
+    timer.stop();
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
@@ -340,6 +498,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return false;
   }
 
+  /*
+   * Returns the total nodes : master + slaves created on the local host.
+   */
   uint64_t get_local_total_nodes() const {
     return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
   }
@@ -357,4 +518,3 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 };
-

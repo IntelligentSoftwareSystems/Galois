@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Compute ConnectedComp on distributed Galois using worklist.
+ * Compute ConnectedComp Pull on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
@@ -67,8 +67,8 @@ std::string personality_str(Personality p) {
 }
 #endif
 
-static const char* const name = "ConnectedComp - Distributed Heterogeneous with worklist.";
-static const char* const desc = "ConnectedComp on Distributed Galois.";
+static const char* const name = "ConnectedComp Pull - Distributed Heterogeneous";
+static const char* const desc = "ConnectedComp pull on Distributed Galois.";
 static const char* const url = 0;
 
 /******************************************************************************/
@@ -76,7 +76,7 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (Transpose graph)>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
@@ -108,8 +108,7 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 struct NodeData {
   // TODO should be uint64_t since component id is the lowest node id of the
   // component
-  std::atomic<uint32_t> comp_current;
-  uint32_t comp_old;
+  uint32_t comp_current;
 };
 
 Galois::DynamicBitSet bitset_comp_current;
@@ -152,72 +151,15 @@ struct InitializeGraph {
                      "unsigned int" , "set",  ""));
     }
 
-    _graph.sync<writeSource, readDestination, Reduce_set_comp_current, 
+    _graph.sync<writeSource, readAny, Reduce_set_comp_current, 
                 Broadcast_comp_current, Bitset_comp_current>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
-    sdata.comp_old = graph->getGID(src);
     bitset_comp_current.set(src);
   }
-};
-
-struct FirstItr_ConnectedComp{
-  Graph * graph;
-  FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
-
-  void static go(Graph& _graph) {
-#ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
-                             (_graph.get_run_identifier()));
-      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-      StatTimer_cuda.start();
-      FirstItr_ConnectedComp_all_cuda(cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-#endif
-    {
-      //Galois::do_all(_graph.begin(), _graph.end(), 
-      //  FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
-      //  Galois::numrun(_graph.get_run_identifier()), 
-      //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-      //    "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
-
-      Galois::do_all_choice(
-        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-        FirstItr_ConnectedComp{&_graph}, 
-        std::make_tuple(
-          Galois::thread_range(_graph.get_thread_ranges()),
-          Galois::loopname("ConnectedComp"), 
-          Galois::numrun(_graph.get_run_identifier()), 
-          Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-            "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
-      );
-    }
-    _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
-                Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
-  
-    Galois::Runtime::reportStat("(NULL)", 
-      "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-      _graph.end() - _graph.begin(), 0);
-  }
-
-  void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
-    snode.comp_old = snode.comp_current;
-
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
-      GNode dst = graph->getEdgeDst(jj);
-      auto& dnode = graph->getData(dst);
-      uint32_t new_dist = snode.comp_current;
-      uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
-      if (old_dist > new_dist) bitset_comp_current.set(dst);
-    }
-  }
-
 };
 
 struct ConnectedComp {
@@ -227,9 +169,6 @@ struct ConnectedComp {
   ConnectedComp(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    using namespace Galois::WorkList;
-    FirstItr_ConnectedComp::go(_graph);
-    
     unsigned _num_iterations = 1;
     
     do { 
@@ -246,7 +185,6 @@ struct ConnectedComp {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
         //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
         //               Galois::loopname("ConnectedComp"), 
         //               Galois::write_set("reduce", "this->graph", 
@@ -263,10 +201,8 @@ struct ConnectedComp {
             Galois::write_set("reduce", "this->graph", "struct NodeData &", 
               "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
         );
-
-      }
-      _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+      _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
+                  Broadcast_comp_current, Bitset_comp_current>("BFS");
       
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
@@ -284,19 +220,15 @@ struct ConnectedComp {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    if (snode.comp_old > snode.comp_current) {
-      snode.comp_old = snode.comp_current;
-
-      for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-           jj != ee; ++jj) {
-        GNode dst = graph->getEdgeDst(jj);
-        auto& dnode = graph->getData(dst);
-        uint32_t new_dist = snode.comp_current;
-        uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
-        if (old_dist > new_dist) bitset_comp_current.set(dst);
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
+      GNode dst = graph->getEdgeDst(jj);
+      auto& dnode = graph->getData(dst);
+      uint32_t new_comp = dnode.comp_current;
+      uint32_t old_comp = Galois::min(snode.comp_current, new_comp);
+      if (old_comp > new_comp){
+        bitset_comp_current.set(src);
+        DGAccumulator_accum += 1;
       }
-
-      DGAccumulator_accum+= 1;
     }
   }
 };

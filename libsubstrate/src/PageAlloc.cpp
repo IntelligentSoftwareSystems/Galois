@@ -87,17 +87,25 @@ size_t Galois::Substrate::allocSize() {
 }
 
 void* Galois::Substrate::allocPages(unsigned num, bool preFault) {
-  void* ptr = trymmap(num*hugePageSize, preFault ? _MAP_HUGE_POP : _MAP_HUGE);
-  if (!ptr) {
-    gWarn("Huge page alloc failed, falling back");
-    ptr = trymmap(num*hugePageSize, preFault ? _MAP_POP : _MAP);
+  if (num > 0) {
+    void* ptr = trymmap(num * hugePageSize, 
+                        preFault ? _MAP_HUGE_POP : _MAP_HUGE);
+    if (!ptr) {
+      gWarn("Huge page alloc failed, falling back");
+      ptr = trymmap(num*hugePageSize, preFault ? _MAP_POP : _MAP);
+    }
+
+    if (!ptr)
+      GALOIS_SYS_DIE("Out of Memory");
+
+    if (preFault && doHandMap)
+      for (size_t x = 0; x < num*hugePageSize; x += 4096)
+        static_cast<char*>(ptr)[x] = 0;
+
+    return ptr;
+  } else {
+    return nullptr;
   }
-  if (!ptr)
-    GALOIS_SYS_DIE("Out of Memory");
-  if (preFault && doHandMap)
-    for (size_t x = 0; x < num*hugePageSize; x += 4096)
-      static_cast<char*>(ptr)[x] = 0;
-  return ptr;
 }
 
 void Galois::Substrate::freePages(void* ptr, unsigned num) {

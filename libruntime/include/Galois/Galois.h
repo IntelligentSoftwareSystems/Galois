@@ -23,7 +23,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  */
@@ -117,6 +117,22 @@ void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
 template<typename IterTy,typename FunctionTy, typename... Args>
 void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
   Runtime::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
+}
+
+/**
+ * Standard do-all loop. All iterations should be independent.
+ * Operator should conform to <code>fn(item)</code> where item is i
+ *
+ * @param i item
+ * @param fn operator
+ * @param args optional arguments to loop
+ * @returns fn
+ */
+template<typename ItemTy, typename FunctionTy, typename... Args>
+void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
+  ItemTy iwl[1] = {i};
+  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
+                      std::make_tuple(args...));
 }
 
 /**

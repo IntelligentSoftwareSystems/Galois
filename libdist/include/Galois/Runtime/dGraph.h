@@ -23,6 +23,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu> (Thread Range stuff)
  */
 
 #include "Galois/gstl.h"
@@ -46,6 +47,9 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+// for thread container stuff
+#include "Galois/Substrate/ThreadPool.h"
+
 //#include "Galois/Runtime/dGraph_vertexCut.h"
 //#include "Galois/Runtime/dGraph_edgeCut.h"
 
@@ -68,10 +72,29 @@
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
 namespace cll = llvm::cl;
-static cll::opt<unsigned> buffSize("sendBuffSize", cll::desc("max size for send buffers in element count"), cll::init(4096));
+static cll::opt<unsigned> buffSize("sendBuffSize", 
+                       cll::desc("max size for send buffers in element count"), 
+                       cll::init(4096));
 #endif
 
-llvm::cl::opt<bool> useGidMetadata("useGidMetadata", llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), llvm::cl::init(false));
+llvm::cl::opt<bool> useGidMetadata("useGidMetadata", 
+  llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), 
+  llvm::cl::init(false));
+
+static llvm::cl::opt<bool> useNumaAlloc("useNumaAlloc", 
+                             llvm::cl::desc("Setting to use numa allocation"),
+                             llvm::cl::init(false));
+
+static llvm::cl::opt<bool> edgeNuma("edgeNuma", 
+                             llvm::cl::desc("Flag to use exp. edge-centric "
+                             "numa allocation for threads"),
+                             llvm::cl::init(false));
+
+static llvm::cl::opt<bool> balanceEdges("balanceEdges", 
+                             llvm::cl::desc("Partitioner assigns masters to hosts "
+                             "such that the edges of those masters are balanced"),
+                             llvm::cl::init(false));
+
 
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
@@ -79,28 +102,35 @@ enum ReadLocation { readSource, readDestination, readAny };
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph: public GlobalObject {
 
-  public:
-   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
-   typedef typename std::conditional<BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
+ public:
+  typedef typename std::conditional<
+    BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
+  typedef typename std::conditional<
+    BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy; // no lockable
+  typedef typename Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true> GraphTy;
 
-   enum SyncType { syncReduce, syncBroadcast };
+  enum SyncType { syncReduce, syncBroadcast };
 
-   GraphTy graph;
-   bool transposed;
-   bool round;
-   uint64_t totalNodes; // Total nodes in the complete graph.
-   uint64_t totalEdges;
-   uint64_t totalMirrorNodes; // Total mirror nodes from others.
-   uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
-   uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-   uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-   uint32_t total_isolatedNodes; // Calculate the total isolated nodes
-   uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
-   const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
-   const uint32_t numHosts;
-   //ghost cell ID translation
+  GraphTy graph;
+  bool transposed;
+  bool round;
+  uint64_t totalNodes; // Total nodes in the complete graph.
+  uint64_t totalEdges;
+  uint64_t totalMirrorNodes; // Total mirror nodes from others.
+  uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
+  uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint32_t total_isolatedNodes; // Calculate the total isolated nodes
+  uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
+  const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
+  const uint32_t numHosts;
+  //ghost cell ID translation
+
+  uint32_t numNodes; // Total nodes created on a host (Master + slaves)
+  uint32_t numNodesWithEdges; // Total nodes that need to be executed in an operator.
+  uint32_t beginMaster; // local id of the beginning of master nodes.
+  uint32_t endMaster; // local id of the end of master nodes.
 
   //memoization optimization
   std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
@@ -118,6 +148,7 @@ class hGraph: public GlobalObject {
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
   virtual uint64_t get_local_total_nodes() const = 0;
+
 #if 0
   virtual void save_meta_file(std::string name) const {
     std::cout << "Base implementation doesn't do anything\n";
@@ -260,108 +291,115 @@ public:
    }
 
 public:
-   typedef typename GraphTy::GraphNode GraphNode;
-   typedef typename GraphTy::iterator iterator;
-   typedef typename GraphTy::const_iterator const_iterator;
-   typedef typename GraphTy::local_iterator local_iterator;
-   typedef typename GraphTy::const_local_iterator const_local_iterator;
-   typedef typename GraphTy::edge_iterator edge_iterator;
+  typedef typename GraphTy::GraphNode GraphNode;
+  typedef typename GraphTy::iterator iterator;
+  typedef typename GraphTy::const_iterator const_iterator;
+  typedef typename GraphTy::local_iterator local_iterator;
+  typedef typename GraphTy::const_local_iterator const_local_iterator;
+  typedef typename GraphTy::edge_iterator edge_iterator;
 
 
-   //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
-   hGraph(unsigned host, unsigned numHosts) :
-       GlobalObject(this), transposed(false), round(false), id(host), numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
-
-      if (useGidMetadata) {
-        if (enforce_data_mode != offsetsData) {
-          useGidMetadata = false;
-        }
+  //hGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
+  hGraph(unsigned host, unsigned numHosts) :
+      GlobalObject(this), transposed(false), round(false), id(host), 
+      numHosts(numHosts), statGhostNodes("TotalGhostNodes") {
+    if (useGidMetadata) {
+      if (enforce_data_mode != offsetsData) {
+        useGidMetadata = false;
       }
+    }
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      comm_mode = 0;
+    comm_mode = 0;
 #endif
 #endif
-      total_isolatedNodes = 0;
-      masterNodes.resize(numHosts);
-      mirrorNodes.resize(numHosts);
-      //masterNodes_bitvec.resize(numHosts);
-      numPipelinedPhases = 0;
-      num_recv_expected = 0;
-      num_run = 0;
-      num_iteration = 0;
-      totalEdges = 0;
+    total_isolatedNodes = 0;
+    masterNodes.resize(numHosts);
+    mirrorNodes.resize(numHosts);
+    //masterNodes_bitvec.resize(numHosts);
+    numPipelinedPhases = 0;
+    num_recv_expected = 0;
+    num_run = 0;
+    num_iteration = 0;
+    totalEdges = 0;
 
-      //uint32_t numNodes;
-      //uint64_t numEdges;
+    //uint32_t numNodes;
+    //uint64_t numEdges;
 #if 0
-      std::string part_fileName = getPartitionFileName(filename,partitionFolder,id,numHosts);
-      //OfflineGraph g(part_fileName);
-      hGraph(filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
-      graph.allocateFrom(numNodes, numEdges);
-      //std::cerr << "Allocate done\n";
+    std::string part_fileName = getPartitionFileName(filename,partitionFolder,id,numHosts);
+    //OfflineGraph g(part_fileName);
+    hGraph(filename, partitionFolder, host, numHosts, scalefactor, numNodes, numOwned, numEdges, totalNodes, id);
+    graph.allocateFrom(numNodes, numEdges);
+    //std::cerr << "Allocate done\n";
 
-      graph.constructNodes();
-      //std::cerr << "Construct nodes done\n";
-      loadEdges(graph, g);
-      std::cerr << "Edges loaded \n";
-      //testPart<PartitionTy>(g);
+    graph.constructNodes();
+    //std::cerr << "Construct nodes done\n";
+    loadEdges(graph, g);
+    std::cerr << "Edges loaded \n";
+    //testPart<PartitionTy>(g);
 
 #ifdef __GALOIS_HET_OPENCL__
-      clGraph.load_from_hgraph(*this);
+    clGraph.load_from_hgraph(*this);
 #endif
-
-      setup_communication();
+    setup_communication();
 
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-      simulate_communication();
+    simulate_communication();
 #endif
 #endif
 #endif
-   }
-   void setup_communication() {
-      Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
-      Galois::Runtime::getHostBarrier().wait(); // so that all hosts start the timer together
-      StatTimer_comm_setup.start();
+  }
+  void setup_communication() {
+    Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
 
-      //Exchange information for memoization optimization.
-      exchange_info_init();
+    // so that all hosts start the timer together
+    Galois::Runtime::getHostBarrier().wait(); 
+    StatTimer_comm_setup.start();
 
-      for(uint32_t h = 0; h < masterNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
-             [&](uint32_t n){
-             masterNodes[h][n] = G2L(masterNodes[h][n]);
-             }, Galois::loopname("MASTER_NODES"), Galois::numrun(get_run_identifier()));
-      }
+    // Exchange information for memoization optimization.
+    exchange_info_init();
 
-      for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
-             [&](uint32_t n){
-             mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
-             }, Galois::loopname("MIRROR_NODES"), Galois::numrun(get_run_identifier()));
-      }
-      StatTimer_comm_setup.stop();
+    for (uint32_t h = 0; h < masterNodes.size(); ++h) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                      boost::counting_iterator<uint32_t>(masterNodes[h].size()),
+                      [&](uint32_t n){
+                        masterNodes[h][n] = G2L(masterNodes[h][n]);
+                      }, 
+                      Galois::loopname("MASTER_NODES"), 
+                      Galois::numrun(get_run_identifier()));
+    }
 
-      for(auto x = 0U; x < masterNodes.size(); ++x){
-        std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
-        Galois::Statistic StatMasterNodes(master_nodes_str);
-        StatMasterNodes += masterNodes[x].size();
-      }
+    for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                      boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
+                      [&](uint32_t n){
+                        mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
+                      }, 
+                      Galois::loopname("MIRROR_NODES"), 
+                      Galois::numrun(get_run_identifier()));
+    }
+    StatTimer_comm_setup.stop();
 
-      totalMirrorNodes = 0;
-      for(auto x = 0U; x < mirrorNodes.size(); ++x){
-        std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
-        if(x == id)
-          continue;
-        Galois::Statistic StatMirrorNodes(mirror_nodes_str);
-        StatMirrorNodes += mirrorNodes[x].size();
-        totalMirrorNodes += mirrorNodes[x].size();
-      }
+    for (auto x = 0U; x < masterNodes.size(); ++x) {
+      std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
+      Galois::Statistic StatMasterNodes(master_nodes_str);
+      StatMasterNodes += masterNodes[x].size();
+    }
 
-      send_info_to_host();
-   }
+    totalMirrorNodes = 0;
+    for (auto x = 0U; x < mirrorNodes.size(); ++x) {
+      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
+      if(x == id)
+        continue;
+      Galois::Statistic StatMirrorNodes(mirror_nodes_str);
+      StatMirrorNodes += mirrorNodes[x].size();
+      totalMirrorNodes += mirrorNodes[x].size();
+    }
+
+    send_info_to_host();
+  }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
    void simulate_communication() {
@@ -435,70 +473,128 @@ public:
 
 #endif
 
-   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = getDataImpl<BSPNode>(N, mflag);
-//    auto i =Galois::Runtime::NetworkInterface::ID;
-      //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
-      return r;
-   }
+  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//  auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
 
-   const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
-      auto& r = getDataImpl<BSPNode>(N, mflag);
-//    auto i =Galois::Runtime::NetworkInterface::ID;
-      //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
-      return r;
-   }
-   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      return getEdgeDataImpl<BSPEdge>(ni, mflag);
-   }
+  const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//  auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
+  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+    return getEdgeDataImpl<BSPEdge>(ni, mflag);
+  }
 
-   GraphNode getEdgeDst(edge_iterator ni) {
-      return graph.getEdgeDst(ni);
-   }
+  GraphNode getEdgeDst(edge_iterator ni) {
+    return graph.getEdgeDst(ni);
+  }
 
-   edge_iterator edge_begin(GraphNode N) {
-      return graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED);
-   }
+  edge_iterator edge_begin(GraphNode N) {
+    return graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED);
+  }
 
-   edge_iterator edge_end(GraphNode N) {
-      return graph.edge_end(N);
-   }
+  edge_iterator edge_end(GraphNode N) {
+    return graph.edge_end(N);
+  }
 
-   size_t size() const {
-      return graph.size();
-   }
-   size_t sizeEdges() const {
-      return graph.sizeEdges();
-   }
+  size_t size() const {
+    return graph.size();
+  }
 
-   const_iterator begin() const {
-      return graph.begin();
-   }
-   iterator begin() {
-      return graph.begin();
-   }
+  size_t sizeEdges() const {
+    return graph.sizeEdges();
+  }
 
-   const_iterator end() const {
-      if (transposed) return graph.end();
-      return graph.begin() + numOwned;
-   }
-   iterator end() {
-      if (transposed) return graph.end();
-      return graph.begin() + numOwned;
-   }
+  const_iterator begin() const {
+    return graph.begin();
+  }
 
-   const_iterator ghost_begin() const {
-      return end();
-   }
-   iterator ghost_begin() {
-      return end();
-   }
-   const_iterator ghost_end() const {
-      return graph.end();
-   }
-   iterator ghost_end() {
-      return graph.end();
-   }
+  iterator begin() {
+    return graph.begin();
+  }
+
+  const_iterator end() const {
+    if (transposed) return graph.end();
+    return graph.begin() + numOwned;
+  }
+
+  iterator end() {
+    if (transposed) return graph.end();
+    return graph.begin() + numOwned;
+  }
+
+  const_iterator ghost_begin() const {
+    return end();
+  }
+
+  iterator ghost_begin() {
+    return end();
+  }
+
+  const_iterator ghost_end() const {
+    return graph.end();
+  }
+
+  iterator ghost_end() {
+    return graph.end();
+  }
+
+  //return type is Galois::Runtime::StandardRange<boost::counting_iterator<size_t>>
+  auto allNodesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+                boost::counting_iterator<size_t> (numNodes));
+  }
+
+  auto masterNodesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (beginMaster),
+                boost::counting_iterator<size_t> (endMaster));
+  }
+
+  auto allNodesWithEdgesRange() {
+    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+                boost::counting_iterator<size_t> (numNodesWithEdges));
+  }
+
+
+  /** 
+   * Call after graph is completely constructed. Attempts to more evenly 
+   * distribute nodes among threads by checking the number of edges per
+   * node and determining where each thread should start. 
+   * This should only be done once after graph construction to prevent
+   * too much overhead.
+   **/
+  void determine_thread_ranges() {
+    graph.determineThreadRanges();
+  }
+
+  /**
+   * A version of determine_thread_ranges that uses a pre-computed prefix sum
+   * to determine division of nodes among threads.
+   *
+   * @param total_nodes The total number of nodes (masters + mirrors) on this
+   * partition.
+   * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
+   */
+  void determine_thread_ranges(uint32_t total_nodes, 
+                               std::vector<uint64_t> edge_prefix_sum) {
+    graph.determineThreadRanges(total_nodes, edge_prefix_sum);
+    graph.determineThreadRangesEdge(edge_prefix_sum);
+  }
+  
+  /**
+   * Determine the ranges for the edges of a graph for each thread given the
+   * prefix sum of edges. threadRanges must already be calculated.
+   *
+   * @param edge_prefix_sum Prefix sum of edges 
+   */
+  void determine_thread_ranges_edge(std::vector<uint64_t> edge_prefix_sum) {
+    graph.determineThreadRangesEdge(edge_prefix_sum);
+  }
 
   void exchange_info_init(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -1773,6 +1869,7 @@ private:
            } else {
              set_subset<SyncFnTy, syncType, false, true>(loopName, sharedNodes[from_id], bit_set_count, offsets, val_vec, bit_set_compute);
            }
+           // TODO: reduce could update the bitset, so it needs to be copied back to the device
          }
        }
      }
@@ -2708,26 +2805,93 @@ public:
 #endif
 
 
-   uint64_t get_totalEdges() const {
-	   return totalEdges;
-   }
-   void reset_num_iter(uint32_t runNum){
-      num_run = runNum;
-   }
-   uint32_t get_run_num() {
-     return num_run;
-   }
-   void set_num_iter(uint32_t iteration){
+  uint64_t get_totalEdges() const {
+    return totalEdges;
+  }
+  void reset_num_iter(uint32_t runNum){
+     num_run = runNum;
+  }
+  uint32_t get_run_num() {
+    return num_run;
+  }
+  void set_num_iter(uint32_t iteration){
     num_iteration = iteration;
-   }
+  }
 
-   std::string get_run_identifier(){
+  std::string get_run_identifier(){
     return std::string(std::to_string(num_run) + "_" + std::to_string(num_iteration));
-   }
-   /** Report stats to be printed.**/
-   void reportStats(){
+  }
+  /** Report stats to be printed.**/
+  void reportStats(){
     statGhostNodes.report();
-   }
+  }
+
+  /**
+   * Returns the thread ranges array that specifies division of nodes among
+   * threads
+   *
+   * @returns An array of unsigned ints which spcifies which thread gets which
+   * nodes.
+   */
+  const uint32_t* get_thread_ranges() {
+    return graph.getThreadRanges();
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Calls for the container object for do_all_local + other things that need
+  // this container interface
+  //////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Returns an iterator to the first node assigned to the thread that calls
+   * this function
+   *
+   * @returns An iterator to the first node that a thread is to do work on.
+   */
+  local_iterator local_begin() const {
+    const uint32_t* thread_ranges = graph.getThreadRanges();
+
+    if (thread_ranges) {
+      uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+      return begin() + thread_ranges[my_thread_id];
+    } else {
+      return Galois::block_range(begin(), end(), 
+                                 Galois::Substrate::ThreadPool::getTID(),
+                                 Galois::Runtime::activeThreads).first;
+    }
+  }
+
+  /**
+   * Returns an iterator to the node after the last node that the thread
+   * that calls this function is assigned to work on.
+   *
+   * @returns An iterator to the node after the last node the thread is
+   * to work on.
+   */
+  local_iterator local_end() const {
+    const uint32_t* thread_ranges = graph.getThreadRanges();
+
+    if (thread_ranges) {
+      uint32_t my_thread_id = Galois::Substrate::ThreadPool::getTID();
+      local_iterator to_return = begin() + 
+                                 thread_ranges[my_thread_id + 1];
+       
+      // quick safety check to make sure it doesn't go past the end of the
+      // graph
+      if (to_return > end()) {
+        printf("WARNING: local end iterator goes past the end of the graph\n");
+      }
+
+      return to_return;
+    } else {
+      return Galois::block_range(begin(), end(), 
+                                 Galois::Substrate::ThreadPool::getTID(),
+                                 Galois::Runtime::activeThreads).second;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+
 
   void save_local_graph(std::string folder_name, std::string local_file_name){
 

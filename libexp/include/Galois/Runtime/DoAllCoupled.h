@@ -383,9 +383,11 @@ private:
 
     Iter steal_beg;
     Iter steal_end;
-    Diff_ty steal_size;
 
-    bool succ = rich.stealWork (steal_beg, steal_end, steal_size, amount, chunk_size);
+    // stealWork should initialize to a more appropriate value
+    Diff_ty steal_size = 0;
+
+    bool succ = rich.stealWork(steal_beg, steal_end, steal_size, amount, chunk_size);
 
     if (succ) {
       assert (steal_beg != steal_end);
@@ -714,11 +716,19 @@ public:
 
 template <typename R, typename F, typename _ArgsTuple>
 void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple) {
-
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
         std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
         std::make_tuple (default_loopname {}, default_chunk_size {})));
+
+  // Creates a timer for this do_all loop
+  std::string loopName(get_by_supertype<loopname_tag>(argsT).value);
+  std::string num_run_identifier = get_by_supertype<numrun_tag>(argsT).value;
+  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
+  Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
+
+  Timer_do_all_impl.start();
+
   using ArgsT = decltype (argsT);
   details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
@@ -728,6 +738,8 @@ void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple)
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));
+
+  Timer_do_all_impl.stop();
 }
 
 template <typename R, typename F, typename _ArgsTuple>

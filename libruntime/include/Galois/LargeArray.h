@@ -76,18 +76,27 @@ public:
   };
 
 protected:
-  enum AllocType {Blocked, Local, Interleaved};
+  enum AllocType {Blocked, Local, Interleaved, Floating};
   void allocate(size_type n, AllocType t) {
     assert(!m_data);
     m_size = n;
     switch(t) {
     case Blocked:
+      printf("Block-alloc'd\n");
       m_realdata = Substrate::largeMallocBlocked(n*sizeof(T), Runtime::activeThreads);
       break;
     case Interleaved:
+      printf("Interleave-alloc'd\n");
       m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), Runtime::activeThreads);
+      break;
     case Local:
+      printf("Local-allocd\n");
       m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
+      break;
+    case Floating:
+      printf("Floating-alloc'd\n");
+      m_realdata = Substrate::largeMallocFloating(n*sizeof(T));
+      break;
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
@@ -158,6 +167,38 @@ public:
    * @param  n         number of elements to allocate 
    */
   void allocateLocal(size_type n) { allocate(n, Local); }
+
+  /**
+   * Allocates using no memory policy (no pre alloc)
+   *
+   * @param  n         number of elements to allocate 
+   */
+  void allocateFloating(size_type n) { allocate(n, Floating); }
+
+
+  /** 
+   * Allocate memory to threads based on a provided array specifying which
+   * threads receive which elements of data.
+   *
+   * @tparam RangeArrayTy The type of the threadRanges array; should either
+   * be uint32_t* or uint64_t*
+   * @param numberOfElements Number of elements to allocate space for
+   * @param threadRanges An array specifying how elements should be split
+   * among threads
+   */
+  template<typename RangeArrayTy>
+  void allocateSpecified(size_type numberOfElements, 
+                         RangeArrayTy& threadRanges) {
+    assert(!m_data);
+
+    m_realdata = Substrate::largeMallocSpecified(
+                   numberOfElements * sizeof(T),
+                   Runtime::activeThreads, threadRanges,
+                   sizeof(T));
+
+    m_size = numberOfElements;
+    m_data = reinterpret_cast<T*>(m_realdata.get());
+  }
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -237,6 +278,12 @@ public:
   void allocateInterleaved(size_type n) { }
   void allocateBlocked(size_type n) { }
   void allocateLocal(size_type n, bool prefault = true) { }
+  void allocateFloating(size_type n) { }
+  template<typename RangeArrayTy>
+  void allocateSpecified(size_type number_of_elements, 
+                         RangeArrayTy threadRanges) { }
+
+
   template<typename... Args> void construct(Args&&... args) { }
   template<typename... Args> void constructAt(size_type n, Args&&... args) { }
   template<typename... Args> void create(size_type n, Args&&... args) { }
