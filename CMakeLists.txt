@@ -168,6 +168,7 @@ if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libexp/include")
+  include_directories("libdist/include")
 
   if (USE_LWCI)
     add_definitions(-DGALOIS_USE_LWCI)
