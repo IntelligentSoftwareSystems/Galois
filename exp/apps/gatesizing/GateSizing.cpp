@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
 
   constructCircuitGraph(graph, vModule);
   initializeCircuitGraph(graph, sdc);
-  printCircuitGraph(graph);
+//  printCircuitGraph(graph);
   std::cout << "constructed circuit graph" << std::endl;
 
   doStaticTimingAnalysis(graph);
