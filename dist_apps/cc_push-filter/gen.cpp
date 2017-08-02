@@ -23,6 +23,7 @@
  * Compute ConnectedComp on distributed Galois using worklist.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
@@ -83,10 +84,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
-static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
-static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
-
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(100));
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
@@ -182,11 +180,22 @@ struct FirstItr_ConnectedComp{
     } else if (personality == CPU)
 #endif
     {
-      Galois::do_all(_graph.begin(), _graph.end(), 
-        FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
-        Galois::numrun(_graph.get_run_identifier()), 
-        Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-          "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+      //Galois::do_all(_graph.begin(), _graph.end(), 
+      //  FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
+      //  Galois::numrun(_graph.get_run_identifier()), 
+      //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+      //    "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+
+      Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        FirstItr_ConnectedComp{&_graph}, 
+        std::make_tuple(
+          Galois::thread_range(_graph.get_thread_ranges()),
+          Galois::loopname("ConnectedComp"), 
+          Galois::numrun(_graph.get_run_identifier()), 
+          Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+            "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
+      );
     }
     _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                 Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
@@ -238,12 +247,23 @@ struct ConnectedComp {
       } else if (personality == CPU)
     #endif
       {
-        Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
-                       Galois::loopname("ConnectedComp"), 
-                       Galois::write_set("reduce", "this->graph", 
-                         "struct NodeData &", "struct NodeData &" , 
-                         "comp_current", "unsigned int" , "min",  ""), 
-                       Galois::numrun(_graph.get_run_identifier()));
+        //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
+        //               Galois::loopname("ConnectedComp"), 
+        //               Galois::write_set("reduce", "this->graph", 
+        //                 "struct NodeData &", "struct NodeData &" , 
+        //                 "comp_current", "unsigned int" , "min",  ""), 
+        //               Galois::numrun(_graph.get_run_identifier()));
+        Galois::do_all_choice(
+          Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+          ConnectedComp{&_graph}, 
+          std::make_tuple(
+            Galois::thread_range(_graph.get_thread_ranges()),
+            Galois::loopname("ConnectedComp"), 
+            Galois::numrun(_graph.get_run_identifier()), 
+            Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+              "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
+        );
+
       }
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
@@ -399,22 +419,16 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
-    if (numPipelinedPhases > 1) {
-      numPipelinedPhases = 1;
-      if (net.ID == 0) {
-        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
-      }
-    }
-    if(enableVCut){
+    if (enableVCut) {
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
       else if(vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold);
+                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
     } else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scalefactor, transpose);
+                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
 
 #ifdef __GALOIS_HET_CUDA__

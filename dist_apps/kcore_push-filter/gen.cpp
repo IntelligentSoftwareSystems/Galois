@@ -218,6 +218,8 @@ struct InitializeGraph2 {
          current_edge++) {
       GNode dest_node = graph->getEdgeDst(current_edge);
 
+      //printf("edge is %lu to %lu\n", graph->getGID(src), graph->getGID(dest_node));
+
       //if (graph->getGID(dest_node) == 350208) {
       //  std::cout << "[" << graph->id << "]" <<
       //            "src is " << graph->getGID(src) << "\n";
@@ -328,10 +330,13 @@ struct KCoreStep2 {
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    // note even dead nodes can have trim updated
-    if (src_data.trim > 0) {
-      src_data.current_degree = src_data.current_degree - src_data.trim;
-      src_data.trim = 0;
+
+    // we currently do not care about degree for dead nodes
+    if (src_data.flag) {
+      if (src_data.trim > 0) {
+        src_data.current_degree = src_data.current_degree - src_data.trim;
+        src_data.trim = 0;
+      }
     }
   }
 };
@@ -561,7 +566,7 @@ int main(int argc, char** argv) {
                                       scalefactor, transpose, VCutThreshold);
     } else {
       h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                             scalefactor);
+                             scalefactor, transpose);
     }
 
   #ifdef __GALOIS_HET_CUDA__
@@ -625,26 +630,24 @@ int main(int argc, char** argv) {
     #endif
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            // prints the flag (alive/dead) and current (out) degree of a node
-            Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
-                                         (*h_graph).getData(*ii).flag,
-                                         (*h_graph).getData(*ii).current_degree);
+            // prints the flag (alive/dead)
+            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                         (*h_graph).getData(*ii).flag);
 
-          // does a sanity check as well: degree should be less than k core
-          // if dead and higher than it if alive
+
+          // does a sanity check as well: 
+          // degree higher than kcore if node is alive
           if (!((*h_graph).getData(*ii).flag)) {
             assert((*h_graph).getData(*ii).current_degree < k_core_num);
-          } else {
-            assert((*h_graph).getData(*ii).current_degree >= k_core_num);
-          }
+          } 
         }
     #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA) {
         for(auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            Galois::Runtime::printOutput("% % %\n", (*h_graph).getGID(*ii), 
-                                     get_node_flag_cuda(cuda_ctx, *ii),
-                                     (get_node_current_degree_cuda(cuda_ctx, *ii)));
+            Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                     get_node_flag_cuda(cuda_ctx, *ii));
+                                     
         }
       }
     #endif

@@ -461,10 +461,12 @@ add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(lonestar)
   add_subdirectory(apps)
+  add_subdirectory(dist_apps)
   add_subdirectory(examples)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
   add_subdirectory(exp)
+  add_subdirectory(dist_exp)
 endif()
 
 ###### Documentation ######

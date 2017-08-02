@@ -62,15 +62,11 @@ void batch_set_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsig
 void batch_add_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode);
 
-void FirstItr_PageRank_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
-void FirstItr_PageRank_all_cuda(struct CUDA_Context *ctx);
-void InitializeGraphNout_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
-void InitializeGraphNout_all_cuda(struct CUDA_Context *ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const float & local_alpha, struct CUDA_Context *ctx);
 void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context *ctx);
 void PageRank_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
 void PageRank_all_cuda(int & __retval, struct CUDA_Context *ctx);
-void PageRankCopy_cuda(unsigned int __begin, unsigned int __end, const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
-void PageRankCopy_all_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
+void PageRank_delta_cuda(unsigned int __begin, unsigned int __end, const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
+void PageRank_delta_all_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
 void ResetGraph_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
 void ResetGraph_all_cuda(struct CUDA_Context *ctx);

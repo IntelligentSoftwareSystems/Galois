@@ -23,6 +23,7 @@
  * Compute Single Source Shortest Path on distributed Galois using worklist.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
@@ -67,7 +68,7 @@ std::string personality_str(Personality p) {
 #endif
 
 static const char* const name = "SSSP - Distributed Heterogeneous with worklist.";
-static const char* const desc = "Bellman-Ford SSSP on Distributed Galois.";
+static const char* const desc = "Variant of Chaoitic relaxation SSSP on Distributed Galois.";
 static const char* const url = 0;
 
 /******************************************************************************/
@@ -84,9 +85,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
 
-static cll::opt<unsigned int> numPipelinedPhases("numPipelinedPhases", cll::desc("num of pipelined phases to overlap computation and communication"), cll::init(1));
-static cll::opt<unsigned int> numComputeSubsteps("numComputeSubsteps", cll::desc("num of sub steps of computations within a BSP phase"), cll::init(1));
-
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
 static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
        cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
        cll::init(PL_VCUT));
@@ -194,12 +193,27 @@ struct FirstItr_SSSP{
     } else if (personality == CPU)
 #endif
     {
-    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, 
-                   FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), 
-                   Galois::numrun(_graph.get_run_identifier()), 
-                   Galois::write_set("reduce", "this->graph", 
-                     "struct NodeData &", "struct NodeData &", 
-                     "dist_current", "unsigned int" , "min",  ""));
+    //Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, 
+    //               FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), 
+    //               Galois::numrun(_graph.get_run_identifier()), 
+    //               Galois::write_set("reduce", "this->graph", 
+    //                 "struct NodeData &", "struct NodeData &", 
+    //                 "dist_current", "unsigned int" , "min",  ""));
+    Galois::do_all_choice(
+        Galois::Runtime::makeStandardRange(
+          _graph.begin() + __begin, 
+          _graph.begin() + __end
+        ), 
+        FirstItr_SSSP{ &_graph }, 
+        std::make_tuple(Galois::loopname("SSSP"), 
+          Galois::thread_range(_graph.get_thread_ranges()),
+          Galois::numrun(_graph.get_run_identifier()),
+          Galois::write_set("reduce", "this->graph", 
+                       "struct NodeData &", "struct NodeData &" , 
+                       "dist_current", "unsigned int" , "min",  "")
+        )
+    );
+
     }
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("SSSP");
@@ -252,11 +266,26 @@ struct SSSP {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
-            Galois::loopname("SSSP"), 
-            Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-              "struct NodeData &", "dist_current", "unsigned int", "min",  ""), 
-            Galois::numrun(_graph.get_run_identifier()));
+          //Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
+          //  Galois::loopname("SSSP"), 
+          //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+          //    "struct NodeData &", "dist_current", "unsigned int", "min",  ""), 
+          //  Galois::numrun(_graph.get_run_identifier()));
+
+          Galois::do_all_choice(
+            Galois::Runtime::makeStandardRange(
+              _graph.begin(), 
+              _graph.end()
+            ), 
+            SSSP{ &_graph }, 
+            std::make_tuple(Galois::loopname("SSSP"), 
+              Galois::thread_range(_graph.get_thread_ranges()),
+              Galois::numrun(_graph.get_run_identifier()),
+              Galois::write_set("reduce", "this->graph", 
+                           "struct NodeData &", "struct NodeData &" , 
+                           "dist_current", "unsigned int" , "min",  "")
+          ));
+
         }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
@@ -422,22 +451,16 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
-    if (numPipelinedPhases > 1) {
-      numPipelinedPhases = 1;
-      if (net.ID == 0) {
-        std::cerr << "WARNING: numPipelinedPhases is not supported\n";
-      }
-    }
     if (enableVCut){
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose);
+                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose);
+                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
     } else {
       hg = new Graph_edgeCut(inputFile,partFolder, net.ID, net.Num, 
-                             scalefactor, transpose);
+                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
 
 
@@ -503,27 +526,6 @@ int main(int argc, char** argv) {
         }
       }
 #endif
-    }
-
-    // Verify
-    if (verifyMax) {
-      uint32_t max_distance = 0;
-#ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-#endif
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if(max_distance < (*hg).getData(*ii).dist_current && ((*hg).getData(*ii).dist_current != 1073741823))
-            max_distance = (*hg).getData(*ii).dist_current;
-        }
-#ifdef __GALOIS_HET_CUDA__
-      } else if(personality == GPU_CUDA)  {
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if(max_distance < get_node_dist_current_cuda(cuda_ctx, *ii) && (get_node_dist_current_cuda(cuda_ctx, *ii) != 1073741823))
-            max_distance = get_node_dist_current_cuda(cuda_ctx, *ii);
-        }
-      }
-#endif
-      Galois::Runtime::reportStat("(NULL)", "MAX DISTANCE ", (unsigned long)max_distance, 0);
     }
 
     }
