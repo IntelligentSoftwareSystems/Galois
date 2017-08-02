@@ -188,7 +188,7 @@ public:
    */
   template<typename RangeArrayTy>
   void allocateSpecified(size_type numberOfElements, 
-                         RangeArrayTy threadRanges) {
+                         RangeArrayTy& threadRanges) {
     assert(!m_data);
 
     m_realdata = Substrate::largeMallocSpecified(

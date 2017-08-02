@@ -367,7 +367,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Edges loaded" << "\n";
 
       if (transpose) {
-        base_hGraph::graph.transpose();
+        base_hGraph::graph.transpose(edgeNuma);
         base_hGraph::transposed = true;
       }
 

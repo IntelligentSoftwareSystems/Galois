@@ -289,7 +289,7 @@ public:
 
 #if 0
     if (transpose && (numNodes > 0)) {
-      base_hGraph::graph.transpose();
+      base_hGraph::graph.transpose(edgeNuma);
       base_hGraph::transposed = true;
     }
 #endif

@@ -139,9 +139,9 @@ protected:
   uint64_t numEdges;
 
   // used to track division of nodes among threads
-  uint32_t* threadRanges;
+  std::vector<uint32_t> threadRanges;
   // used to track division of edges among threads
-  uint64_t* threadRangesEdge;
+  std::vector<uint64_t> threadRangesEdge;
 
   typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
 
@@ -206,9 +206,9 @@ public:
    * important for correctness and should be called if the initializer below
    * isn't used.
    */
-  void initRanges() {
-    threadRanges = nullptr;
-    threadRangesEdge = nullptr;
+  void clearRanges() {
+    threadRanges.clear();
+    threadRangesEdge.clear();
   }
 
   template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
@@ -252,8 +252,6 @@ public:
       }
     }
 
-    threadRanges = nullptr;
-    threadRangesEdge = nullptr;
     //std::cerr << "Done Construct\n";
   }
 
@@ -433,7 +431,8 @@ public:
    * @returns An array of uint32_t that specifies which thread gets which nodes.
    */
   const uint32_t* getThreadRanges() const {
-    return threadRanges;
+    if (threadRanges.size() == 0) return nullptr;
+    return threadRanges.data();
   }
 
   /** 
@@ -444,7 +443,7 @@ public:
    * too much overhead.
    **/
   void determineThreadRanges() {
-    if (threadRanges) {
+    if (threadRanges.size() != 0) {
       // other version already called or this is a second call to this;
       // return 
       return;
@@ -454,8 +453,7 @@ public:
     uint32_t total_nodes = end() - begin();
     //printf("nodes is %u\n", total_nodes);
 
-    threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (num_threads + 1));
-    assert(threadRanges != nullptr);
+    threadRanges.resize(num_threads + 1);
 
     //printf("num owned edges is %lu\n", sizeEdges());
 
@@ -595,17 +593,18 @@ public:
    * partition.
    * @param edgePrefixSum The edge prefix sum of the nodes on this partition.
    */
+  template <typename VectorTy>
   void determineThreadRanges(uint32_t totalNodes, 
-                             std::vector<uint64_t> edgePrefixSum) {
+                             VectorTy& edgePrefixSum) {
     // if we already have thread ranges calculated, do nothing and return
-    if (threadRanges) {
+    if (threadRanges.size() != 0) {
       return;
     }
 
     assert(edgePrefixSum.size() == totalNodes);
     uint32_t num_threads = Galois::Runtime::activeThreads;
 
-    threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (num_threads + 1));
+    threadRanges.resize(num_threads + 1);
 
     // Single thread case
     if (num_threads == 1) {
@@ -635,7 +634,7 @@ public:
     uint32_t current_element = 0;
 
     // theoretically how many edges we want to distributed to each thread
-    uint64_t edges_per_thread = edgePrefixSum.back() / num_threads;
+    uint64_t edges_per_thread = edgePrefixSum[totalNodes - 1] / num_threads;
 
     threadRanges[0] = 0;
 
@@ -740,20 +739,21 @@ public:
    *
    * @param edgePrefixSum A prefix sum of edges
    */
-  void determineThreadRangesByNode(std::vector<uint64_t> edgePrefixSum) {
+  void determineThreadRangesByNode(std::vector<uint64_t>& edgePrefixSum) {
     uint32_t numThreads = Galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
-    if (threadRanges) {
+    if (threadRanges.size() != 0) {
       printf("Warning: Thread ranges already specified\n");
     }
 
-    if (threadRangesEdge) {
+    if (threadRangesEdge.size() != 0) {
       printf("Warning: Thread ranges edge already specified\n");
     }
 
-    threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (numThreads + 1));
-    threadRangesEdge = (uint64_t*)malloc(sizeof(uint64_t) * (numThreads + 1));
+    clearRanges();
+    threadRanges.resize(numThreads + 1);
+    threadRangesEdge.resize(numThreads + 1);
 
     threadRanges[0] = 0;
     threadRangesEdge[0] = 0;
@@ -802,12 +802,12 @@ public:
    *
    * @param edgePrefixSum Prefix sum of edges 
    */
-  void determineThreadRangesEdge(std::vector<uint64_t> edgePrefixSum) {
-    if (threadRanges) {
+  template <typename VectorTy>
+  void determineThreadRangesEdge(VectorTy& edgePrefixSum) {
+    if (threadRanges.size() > 0) {
       uint32_t totalThreads = Galois::Runtime::activeThreads;
 
-      threadRangesEdge = (uint64_t*)malloc(sizeof(uint64_t) * 
-                                             (totalThreads + 1));
+      threadRangesEdge.resize(totalThreads + 1);
       threadRangesEdge[0] = 0;
 
       // determine edge range for each active thread
@@ -980,10 +980,8 @@ public:
     uint32_t numThreads = Galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
-    threadRanges = (uint32_t*)malloc(sizeof(uint32_t) * (numThreads + 1));
-    threadRangesEdge = (uint64_t*)malloc(sizeof(uint64_t) * (numThreads + 1));
-    assert(threadRanges);
-    assert(threadRangesEdge);
+    threadRanges.resize(numThreads + 1);
+    threadRangesEdge.resize(numThreads + 1);
 
     threadRanges[0] = 0;
     threadRangesEdge[0] = 0;
@@ -1110,7 +1108,7 @@ public:
    * Perform an in-memory transpose of the graph, replacing the original
    * CSR to CSC
    */
-  void transpose() {
+  void transpose(bool reallocate = false) {
     Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
     timer.start();
 
@@ -1119,17 +1117,10 @@ public:
     EdgeIndData edgeIndData_old;
     EdgeIndData edgeIndData_temp;
 
-    if (UseNumaAlloc) {
-      edgeIndData_old.allocateLocal(numNodes);
-      edgeIndData_temp.allocateLocal(numNodes);
-      edgeDst_old.allocateLocal(numEdges);
-      edgeData_new.allocateLocal(numEdges);
-    } else {
-      edgeIndData_old.allocateInterleaved(numNodes);
-      edgeIndData_temp.allocateLocal(numNodes);
-      edgeDst_old.allocateInterleaved(numEdges);
-      edgeData_new.allocateInterleaved(numEdges);
-    }
+    edgeIndData_old.allocateInterleaved(numNodes);
+    edgeIndData_temp.allocateInterleaved(numNodes);
+    edgeDst_old.allocateInterleaved(numEdges);
+    edgeData_new.allocateInterleaved(numEdges);
 
     // Copy old node->index location + initialize the temp array
     Galois::do_all(boost::counting_iterator<uint32_t>(0), 
@@ -1146,14 +1137,31 @@ public:
     for (uint64_t e = 0; e < numEdges; ++e) { 
         auto dst = edgeDst[e];
         edgeDst_old[e] = dst;
-        // counting outgoing edges in tranpose graph by counting
-        // incoming edges
+        // counting outgoing edges in the tranpose graph by
+        // counting incoming edges in the original graph
         ++edgeIndData_temp[dst];
     }
 
     // prefix sum calculation of the edge index array
     for (uint32_t n = 1; n < numNodes; ++n) {
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
+    }
+
+    // recalculate thread ranges for nodes and edges
+    clearRanges();
+    determineThreadRanges(numNodes, edgeIndData_temp);
+    determineThreadRangesEdge(edgeIndData_temp);
+
+    // reallocate nodeData
+    if (reallocate) {
+      nodeData.deallocate();
+      nodeData.allocateSpecified(numNodes, threadRanges);
+    }
+
+    // reallocate edgeIndData
+    if (reallocate) {
+      edgeIndData.deallocate();
+      edgeIndData.allocateSpecified(numNodes, threadRanges);
     }
 
     // copy over the new tranposed edge index data
@@ -1175,6 +1183,12 @@ public:
                    }, 
                    Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
                    Galois::numrun("0"));
+
+    // reallocate edgeDst
+    if (reallocate) {
+      edgeDst.deallocate();
+      edgeDst.allocateSpecified(numEdges, threadRangesEdge);
+    }
 
     // parallelization makes this slower
     for (uint32_t src = 0; src < numNodes; ++src) { 
@@ -1198,6 +1212,12 @@ public:
         edgeDataCopy(edgeData_new, edgeData, e_new, e);
         e++;
       }
+    }
+
+    // reallocate edgeData
+    if (reallocate) {
+      edgeData.deallocate();
+      edgeData.allocateSpecified(numEdges, threadRangesEdge);
     }
 
     // if edge weights, then overwrite edgeData with new edge data

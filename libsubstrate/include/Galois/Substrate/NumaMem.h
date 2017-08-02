@@ -60,7 +60,7 @@ LAptr largeMallocBlocked(size_t bytes, unsigned numThreads);
 // fault in specified regions for each thread (threadRanges)
 template<typename RangeArrayTy>
 LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads, 
-                           RangeArrayTy threadRanges, size_t elementSize);
+                           RangeArrayTy& threadRanges, size_t elementSize);
 
 
 } // namespace Substrate

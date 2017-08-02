@@ -225,7 +225,7 @@ LAptr Galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
  */
 template<typename RangeArrayTy>
 LAptr Galois::Substrate::largeMallocSpecified(size_t bytes, 
-          uint32_t numThreads, RangeArrayTy threadRanges, 
+          uint32_t numThreads, RangeArrayTy& threadRanges, 
           size_t elementSize) {
   // ceiling to nearest page
   bytes = roundup(bytes, allocSize());
@@ -242,10 +242,10 @@ LAptr Galois::Substrate::largeMallocSpecified(size_t bytes,
 // Explicit template declarations since the template is defined in the .h
 // file
 template
-LAptr Galois::Substrate::largeMallocSpecified<uint32_t*>(size_t bytes, 
-          uint32_t numThreads, uint32_t* threadRanges, 
+LAptr Galois::Substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes, 
+          uint32_t numThreads, std::vector<uint32_t>& threadRanges, 
           size_t elementSize);
 template
-LAptr Galois::Substrate::largeMallocSpecified<uint64_t*>(size_t bytes, 
-          uint32_t numThreads, uint64_t* threadRanges, 
+LAptr Galois::Substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes, 
+          uint32_t numThreads, std::vector<uint64_t>& threadRanges, 
           size_t elementSize);

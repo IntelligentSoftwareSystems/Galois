@@ -369,7 +369,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::Runtime::getHostBarrier().wait();
 
       if (transpose && (numNodes > 0)) {
-        base_hGraph::graph.transpose();
+        base_hGraph::graph.transpose(edgeNuma);
         base_hGraph::transposed = true;
       }
 
