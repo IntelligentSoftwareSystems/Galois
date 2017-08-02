@@ -442,7 +442,6 @@ public:
    * node and determining where each thread should start. 
    * This should only be done once after graph construction to prevent
    * too much overhead.
-   *
    **/
   void determineThreadRanges() {
     if (threadRanges) {
@@ -736,7 +735,7 @@ public:
   }
 
   /**
-   * Uses the divideByNode function stolen from FileGraph to do partitioning
+   * Uses the divideByNode function from FileGraph to do partitioning
    * of nodes/edges among threads.
    *
    * @param edgePrefixSum A prefix sum of edges
@@ -839,10 +838,8 @@ public:
     }
   }
 
-
-
   template <typename F>
-  ptrdiff_t partition_neighbors (GraphNode N, const F& func) {
+  ptrdiff_t partition_neighbors(GraphNode N, const F& func) {
     auto beg = &edgeDst[*raw_begin (N)];
     auto end = &edgeDst[*raw_end (N)];
     auto mid = std::partition (beg, end, func);
@@ -854,7 +851,6 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
-      ////fprintf(stderr, "LADSFOASDFKAS\n");
       //nodeData.allocateInterleaved(numNodes);
       //edgeIndData.allocateInterleaved(numNodes);
       //edgeDst.allocateInterleaved(numEdges);
@@ -872,6 +868,12 @@ public:
       //edgeDst.allocateLocal(numEdges);
       //edgeData.allocateLocal(numEdges);
       //this->outOfLineAllocateLocal(numNodes);
+
+      //nodeData.allocateFloating(numNodes);
+      //edgeIndData.allocateFloating(numNodes);
+      //edgeDst.allocateFloating(numEdges);
+      //edgeData.allocateFloating(numEdges);
+      //this->outOfLineAllocateFloating(numNodes);
     } else {
       //nodeData.allocateLocal(numNodes);
       //edgeIndData.allocateLocal(numNodes);
@@ -901,7 +903,6 @@ public:
       edgeData.allocateLocal(numEdges);
       this->outOfLineAllocateLocal(numNodes);
     } else {
-      //printf("thisfrom\n");
       //nodeData.allocateInterleaved(numNodes);
       //edgeIndData.allocateInterleaved(numNodes);
       //edgeDst.allocateInterleaved(numEdges);
@@ -938,6 +939,7 @@ public:
    */
   void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
                     std::vector<uint64_t> edgePrefixSum) {
+    //printf("My split\n");
     // update graph values
     numNodes = nNodes;
     numEdges = nEdges;
@@ -971,6 +973,7 @@ public:
    * @param graph A graph in the FileGraph class.
    */
   void allocateFromByNode(FileGraph& graph) {
+    //printf("alloc by node\n");
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
@@ -1103,8 +1106,10 @@ public:
     edgeIndData[n] = e;
   }
 
-  // perform an in-memory transpose of the graph, replacing the original
-  // CSR to CSC
+  /** 
+   * Perform an in-memory transpose of the graph, replacing the original
+   * CSR to CSC
+   */
   void transpose() {
     Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
     timer.start();
@@ -1126,51 +1131,84 @@ public:
       edgeData_new.allocateInterleaved(numEdges);
     }
 
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
-      [&](uint32_t n){
-        edgeIndData_old[n] = edgeIndData[n];
-        edgeIndData_temp[n] = 0;
-      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), Galois::numrun("0"));
+    // Copy old node->index location + initialize the temp array
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                   boost::counting_iterator<uint32_t>(numNodes),
+                   [&](uint32_t n) {
+                     edgeIndData_old[n] = edgeIndData[n];
+                     edgeIndData_temp[n] = 0;
+                   }, 
+                   Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
+                   Galois::numrun("0"));
 
-    for (uint64_t e = 0; e < numEdges; ++e) { // parallelization makes this slower
+    // parallelization makes this slower
+    // get destination of edge, copy to array, and  
+    for (uint64_t e = 0; e < numEdges; ++e) { 
         auto dst = edgeDst[e];
         edgeDst_old[e] = dst;
+        // counting outgoing edges in tranpose graph by counting
+        // incoming edges
         ++edgeIndData_temp[dst];
     }
 
+    // prefix sum calculation of the edge index array
     for (uint32_t n = 1; n < numNodes; ++n) {
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
     }
 
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numNodes),
-      [&](uint32_t n){
-        edgeIndData[n] = edgeIndData_temp[n];
-      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), Galois::numrun("0"));
+    // copy over the new tranposed edge index data
+    Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                   boost::counting_iterator<uint32_t>(numNodes),
+                   [&](uint32_t n) {
+                     edgeIndData[n] = edgeIndData_temp[n];
+                   }, 
+                   Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
+                   Galois::numrun("0"));
 
+    // edgeIndData_temp[i] will now hold number of edges that all nodes
+    // before the ith node have
     edgeIndData_temp[0] = 0;
-    Galois::do_all(boost::counting_iterator<uint32_t>(1), boost::counting_iterator<uint32_t>(numNodes),
-      [&](uint32_t n){
-        edgeIndData_temp[n] = edgeIndData[n-1];
-      }, Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), Galois::numrun("0"));
+    Galois::do_all(boost::counting_iterator<uint32_t>(1), 
+                   boost::counting_iterator<uint32_t>(numNodes),
+                   [&](uint32_t n){
+                     edgeIndData_temp[n] = edgeIndData[n-1];
+                   }, 
+                   Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
+                   Galois::numrun("0"));
 
-    for (uint32_t src = 0; src < numNodes; ++src) { // parallelization makes this slower
+    // parallelization makes this slower
+    for (uint32_t src = 0; src < numNodes; ++src) { 
+      // e = start index into edge array for a particular node
       uint64_t e;
-      if (src == 0) e = 0;
-      else e = edgeIndData_old[src-1];
+      if (src == 0) 
+        e = 0;
+      else 
+        e = edgeIndData_old[src - 1];
+
+      // get all outgoing edges of a particular node in the non-tranpose and
+      // convert to incoming
       while (e < edgeIndData_old[src]) {
+        // destination nodde
         auto dst = edgeDst_old[e];
+        // location to save edge
         auto e_new = edgeIndData_temp[dst]++;
+        // save src as destination
         edgeDst[e_new] = src;
+        // copy edge data to "new" array
         edgeDataCopy(edgeData_new, edgeData, e_new, e);
         e++;
       }
     }
 
+    // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
-      Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(numEdges),
-        [&](uint32_t e){
-          edgeDataCopy(edgeData, edgeData_new, e, e);
-        }, Galois::loopname("TRANSPOSE_EDGEDATA_SET"), Galois::numrun("0"));
+      Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+                     boost::counting_iterator<uint32_t>(numEdges),
+                     [&](uint32_t e){
+                       edgeDataCopy(edgeData, edgeData_new, e, e);
+                     }, 
+                     Galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
+                     Galois::numrun("0"));
     }
 
     timer.stop();
