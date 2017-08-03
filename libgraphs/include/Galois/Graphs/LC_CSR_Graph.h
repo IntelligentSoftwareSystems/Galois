@@ -461,154 +461,155 @@ public:
     return threadRanges.data();
   }
 
-  /** 
-   * Call ONLY after graph is completely constructed. Attempts to more evenly 
-   * distribute nodes among threads by checking the number of edges per
-   * node and determining where each thread should start. 
-   * This should only be done once after graph construction to prevent
-   * too much overhead.
-   **/
-  void determineThreadRanges() {
-    if (threadRanges.size() != 0) {
-      // other version already called or this is a second call to this;
-      // return 
-      return;
-    }
+  // DEPRECATED: do not use, only use 1 that takes prefix sum + nodes
+  ///** 
+  // * Call ONLY after graph is completely constructed. Attempts to more evenly 
+  // * distribute nodes among threads by checking the number of edges per
+  // * node and determining where each thread should start. 
+  // * This should only be done once after graph construction to prevent
+  // * too much overhead.
+  // **/
+  //void determineThreadRanges() {
+  //  if (threadRanges.size() != 0) {
+  //    // other version already called or this is a second call to this;
+  //    // return 
+  //    return;
+  //  }
 
-    uint32_t num_threads = Galois::Runtime::activeThreads;
-    uint32_t total_nodes = end() - begin();
-    //printf("nodes is %u\n", total_nodes);
+  //  uint32_t num_threads = Galois::Runtime::activeThreads;
+  //  uint32_t total_nodes = end() - begin();
+  //  //printf("nodes is %u\n", total_nodes);
 
-    threadRanges.resize(num_threads + 1);
+  //  threadRanges.resize(num_threads + 1);
 
-    //printf("num owned edges is %lu\n", sizeEdges());
+  //  //printf("num owned edges is %lu\n", sizeEdges());
 
-    // theoretically how many edges we want to distributed to each thread
-    uint64_t edges_per_thread = sizeEdges() / num_threads;
+  //  // theoretically how many edges we want to distributed to each thread
+  //  uint64_t edges_per_thread = sizeEdges() / num_threads;
 
-    //printf("want %lu edges per thread\n", edges_per_thread);
+  //  //printf("want %lu edges per thread\n", edges_per_thread);
 
-    // Case where there are less nodes than threads
-    if (num_threads > end() - begin()) {
-      iterator current_node = begin();
-      uint64_t num_nodes = end() - current_node;
-      
-      // assign one node per thread (note not all nodes will get a thread in
-      // this case
-      threadRanges[0] = *current_node;
-      for (uint32_t i = 0; i < num_nodes; i++) {
-        threadRanges[i+1] = *(++current_node);
-      }
+  //  // Case where there are less nodes than threads
+  //  if (num_threads > end() - begin()) {
+  //    iterator current_node = begin();
+  //    uint64_t num_nodes = end() - current_node;
+  //    
+  //    // assign one node per thread (note not all nodes will get a thread in
+  //    // this case
+  //    threadRanges[0] = *current_node;
+  //    for (uint32_t i = 0; i < num_nodes; i++) {
+  //      threadRanges[i+1] = *(++current_node);
+  //    }
 
-      // deal with remainder threads
-      for (uint32_t i = num_nodes; i < num_threads; i++) {
-        threadRanges[i+1] = total_nodes;
-      }
+  //    // deal with remainder threads
+  //    for (uint32_t i = num_nodes; i < num_threads; i++) {
+  //      threadRanges[i+1] = total_nodes;
+  //    }
 
-      return;
-    }
+  //    return;
+  //  }
 
-    // Single node case
-    if (num_threads == 1) {
-      threadRanges[0] = *(begin());
-      threadRanges[1] = total_nodes;
+  //  // Single node case
+  //  if (num_threads == 1) {
+  //    threadRanges[0] = *(begin());
+  //    threadRanges[1] = total_nodes;
 
-      return;
-    }
-
-
-    uint32_t current_thread = 0;
-    uint64_t current_edge_count = 0;
-    iterator current_local_node = begin();
-
-    threadRanges[current_thread] = *(begin());
-
-    //printf("going to determine thread ranges\n");
-
-    while (current_local_node != end() && current_thread != num_threads) {
-      uint32_t nodes_remaining = end() - current_local_node;
-      uint32_t threads_remaining = num_threads - current_thread;
-     
-      assert(nodes_remaining >= threads_remaining);
-
-      if (threads_remaining == 1) {
-        // give the rest of the nodes to this thread and get out
-        printf("Thread %u has %lu edges and %u nodes (only 1 thread)\n",
-               current_thread, 
-               edge_end(*(end() - 1)) -
-               edge_begin(threadRanges[current_thread]),
-               total_nodes - threadRanges[current_thread]);
-
-        threadRanges[current_thread + 1] = total_nodes;
-
-        break;
-      } else if ((end() - current_local_node) == threads_remaining) {
-        // Out of nodes to assign: finish up assignments (at this point,
-        // each remaining thread gets 1 node) and break
-        printf("Out of nodes: assigning the rest of the nodes to remaining "
-               "threads\n");
-        for (uint32_t i = 0; i < threads_remaining; i++) {
-          printf("Thread %u has %lu edges and %u nodes (oon)\n",
-                 current_thread, 
-                 edge_end(*current_local_node) -
-                 edge_begin(threadRanges[current_thread]),
-                 (*current_local_node) + 1 - threadRanges[current_thread]);
-
-          threadRanges[++current_thread] = *(++current_local_node);
-        }
-
-        assert(current_local_node == end());
-        assert(current_thread == num_threads);
-        break;
-      }
-
-      uint64_t num_edges = std::distance(edge_begin(*current_local_node), 
-                                         edge_end(*current_local_node));
+  //    return;
+  //  }
 
 
-      current_edge_count += num_edges;
-      //printf("%u has %lu\n", *current_local_node, num_edges);
-      //printf("[%u] cur edge count is %lu\n", id, current_edge_count);
+  //  uint32_t current_thread = 0;
+  //  uint64_t current_edge_count = 0;
+  //  iterator current_local_node = begin();
 
-      if (num_edges > (3 * edges_per_thread / 4)) {
-        if (current_edge_count - num_edges > (edges_per_thread / 2)) {
-          printf("Thread %u has %lu edges and %u nodes (big)\n",
-                 current_thread, current_edge_count - num_edges,
-                 (*current_local_node) - threadRanges[current_thread]);
+  //  threadRanges[current_thread] = *(begin());
 
-          // else, assign to the NEXT thread (i.e. end this thread and move
-          // on to the next)
-          // beginning of next thread is current local node (the big one)
-          threadRanges[current_thread + 1] = *current_local_node;
-          current_thread++;
+  //  //printf("going to determine thread ranges\n");
 
-          current_edge_count = 0;
-          // go back to beginning of loop without incrementing
-          // current_local_node so the loop can handle this next node
-          continue;
-        }
-      }
+  //  while (current_local_node != end() && current_thread != num_threads) {
+  //    uint32_t nodes_remaining = end() - current_local_node;
+  //    uint32_t threads_remaining = num_threads - current_thread;
+  //   
+  //    assert(nodes_remaining >= threads_remaining);
 
-      if (current_edge_count >= edges_per_thread) {
-        printf("Thread %u has %lu edges and %u nodes (over)\n",
-               current_thread, current_edge_count,
-               (*current_local_node) + 1 - threadRanges[current_thread]);
+  //    if (threads_remaining == 1) {
+  //      // give the rest of the nodes to this thread and get out
+  //      printf("Thread %u has %lu edges and %u nodes (only 1 thread)\n",
+  //             current_thread, 
+  //             edge_end(*(end() - 1)) -
+  //             edge_begin(threadRanges[current_thread]),
+  //             total_nodes - threadRanges[current_thread]);
 
-        // This thread has enough edges; save end of this node and move on
-        // mark beginning of next thread as the next node
-        threadRanges[current_thread + 1] = (*current_local_node) + 1;
-        current_edge_count = 0;
-        current_thread++;
-      } 
-      
-      current_local_node++;
-    }
+  //      threadRanges[current_thread + 1] = total_nodes;
 
-    // sanity checks
-    assert(threadRanges[0] == 0);
-    assert(threadRanges[num_threads] == total_nodes);
-    printf("ranges found\n");
-  }
+  //      break;
+  //    } else if ((end() - current_local_node) == threads_remaining) {
+  //      // Out of nodes to assign: finish up assignments (at this point,
+  //      // each remaining thread gets 1 node) and break
+  //      printf("Out of nodes: assigning the rest of the nodes to remaining "
+  //             "threads\n");
+  //      for (uint32_t i = 0; i < threads_remaining; i++) {
+  //        printf("Thread %u has %lu edges and %u nodes (oon)\n",
+  //               current_thread, 
+  //               edge_end(*current_local_node) -
+  //               edge_begin(threadRanges[current_thread]),
+  //               (*current_local_node) + 1 - threadRanges[current_thread]);
+
+  //        threadRanges[++current_thread] = *(++current_local_node);
+  //      }
+
+  //      assert(current_local_node == end());
+  //      assert(current_thread == num_threads);
+  //      break;
+  //    }
+
+  //    uint64_t num_edges = std::distance(edge_begin(*current_local_node), 
+  //                                       edge_end(*current_local_node));
+
+
+  //    current_edge_count += num_edges;
+  //    //printf("%u has %lu\n", *current_local_node, num_edges);
+  //    //printf("[%u] cur edge count is %lu\n", id, current_edge_count);
+
+  //    if (num_edges > (3 * edges_per_thread / 4)) {
+  //      if (current_edge_count - num_edges > (edges_per_thread / 2)) {
+  //        printf("Thread %u has %lu edges and %u nodes (big)\n",
+  //               current_thread, current_edge_count - num_edges,
+  //               (*current_local_node) - threadRanges[current_thread]);
+
+  //        // else, assign to the NEXT thread (i.e. end this thread and move
+  //        // on to the next)
+  //        // beginning of next thread is current local node (the big one)
+  //        threadRanges[current_thread + 1] = *current_local_node;
+  //        current_thread++;
+
+  //        current_edge_count = 0;
+  //        // go back to beginning of loop without incrementing
+  //        // current_local_node so the loop can handle this next node
+  //        continue;
+  //      }
+  //    }
+
+  //    if (current_edge_count >= edges_per_thread) {
+  //      printf("Thread %u has %lu edges and %u nodes (over)\n",
+  //             current_thread, current_edge_count,
+  //             (*current_local_node) + 1 - threadRanges[current_thread]);
+
+  //      // This thread has enough edges; save end of this node and move on
+  //      // mark beginning of next thread as the next node
+  //      threadRanges[current_thread + 1] = (*current_local_node) + 1;
+  //      current_edge_count = 0;
+  //      current_thread++;
+  //    } 
+  //    
+  //    current_local_node++;
+  //  }
+
+  //  // sanity checks
+  //  assert(threadRanges[0] == 0);
+  //  assert(threadRanges[num_threads] == total_nodes);
+  //  printf("ranges found\n");
+  //}
 
 
   /**

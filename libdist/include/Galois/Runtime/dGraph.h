@@ -561,16 +561,17 @@ public:
   }
 
 
-  /** 
-   * Call after graph is completely constructed. Attempts to more evenly 
-   * distribute nodes among threads by checking the number of edges per
-   * node and determining where each thread should start. 
-   * This should only be done once after graph construction to prevent
-   * too much overhead.
-   **/
-  void determine_thread_ranges() {
-    graph.determineThreadRanges();
-  }
+  // DEPRECATED: do not use, only use 1 that takes prefix sum + nodes
+  ///** 
+  // * Call after graph is completely constructed. Attempts to more evenly 
+  // * distribute nodes among threads by checking the number of edges per
+  // * node and determining where each thread should start. 
+  // * This should only be done once after graph construction to prevent
+  // * too much overhead.
+  // **/
+  //void determine_thread_ranges() {
+  //  graph.determineThreadRanges();
+  //}
 
   /**
    * A version of determine_thread_ranges that uses a pre-computed prefix sum

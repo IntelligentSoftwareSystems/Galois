@@ -376,9 +376,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // TODO revise how this works and make it consistent across cuts
       if (!edgeNuma) {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+
         StatTimer_thread_ranges.start();
-        base_hGraph::determine_thread_ranges();
-        //base_hGraph::determine_thread_ranges_edge(prefixSumOfOutEdges);
+        base_hGraph::determine_thread_ranges(_numNodes, prefixSumOfOutEdges);
         StatTimer_thread_ranges.stop();
       }
 
