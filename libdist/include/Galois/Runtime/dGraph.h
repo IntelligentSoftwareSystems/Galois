@@ -95,6 +95,15 @@ static llvm::cl::opt<bool> balanceEdges("balanceEdges",
                              "such that the edges of those masters are balanced"),
                              llvm::cl::init(false));
 
+static llvm::cl::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges", 
+                             llvm::cl::desc("Determines weight of nodes when "
+                             "partitioning among threads"),
+                             llvm::cl::init(0));
+
+static llvm::cl::opt<uint32_t> nodeAlphaBalance("nodeAlphaBalance", 
+                             llvm::cl::desc("Determines weight of nodes when "
+                             "partitioning among hosts"),
+                             llvm::cl::init(0));
 
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
@@ -583,7 +592,7 @@ public:
    */
   void determine_thread_ranges(uint32_t total_nodes, 
                                std::vector<uint64_t> edge_prefix_sum) {
-    graph.determineThreadRanges(total_nodes, edge_prefix_sum);
+    graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
     graph.determineThreadRangesEdge(edge_prefix_sum);
   }
   

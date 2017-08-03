@@ -142,7 +142,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         // compute owners for all hosts and send that info to all hosts
         Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
                              base_hGraph::numHosts,
-                             gid2host, scalefactor);
+                             gid2host, nodeAlphaBalance, scalefactor);
         for (unsigned h = 1; h < base_hGraph::numHosts; ++h) {
           Galois::Runtime::SendBuffer b;
           Galois::Runtime::gSerialize(b, gid2host);

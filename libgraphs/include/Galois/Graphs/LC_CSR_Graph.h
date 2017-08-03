@@ -619,10 +619,12 @@ public:
    * @param totalNodes The total number of nodes (masters + mirrors) on this
    * partition.
    * @param edgePrefixSum The edge prefix sum of the nodes on this partition.
+   * @param nodeAlpha The higher the number, the more weight nodes have in
+   * determining division of nodes.
    */
   template <typename VectorTy>
-  void determineThreadRanges(uint32_t totalNodes, 
-                             VectorTy& edgePrefixSum) {
+  void determineThreadRanges(uint32_t totalNodes, VectorTy& edgePrefixSum,
+                             uint32_t nodeAlpha=0) {
     // if we already have thread ranges calculated, do nothing and return
     if (threadRanges.size() != 0) {
       return;
@@ -656,16 +658,21 @@ public:
       return;
     }
 
+    uint64_t node_weight = (uint64_t)totalNodes * (uint64_t)nodeAlpha;
+
+    // theoretically how many units we want to distributed to each thread
+    uint64_t units_per_thread = edgePrefixSum[totalNodes - 1] / num_threads +
+                                node_weight;
+
+    printf("Optimally want %lu units per thread\n", units_per_thread);
+
     uint32_t current_thread = 0;
-    uint64_t accounted_edges = 0;
     uint32_t current_element = 0;
 
-    // theoretically how many edges we want to distributed to each thread
-    uint64_t edges_per_thread = edgePrefixSum[totalNodes - 1] / num_threads;
+    uint64_t accounted_edges = 0;
+    uint32_t accounted_elements = 0;
 
     threadRanges[0] = 0;
-
-    printf("Optimally want %lu edges per thread\n", edges_per_thread);
 
     while (current_element < totalNodes && current_thread < num_threads) {
       uint64_t elements_remaining = totalNodes - current_element;
@@ -697,8 +704,12 @@ public:
         break;
       }
 
-      // Determine various edge count numbers from prefix sum
-      uint64_t element_edges;
+      //
+      // Determine various count numbers from prefix sum
+      //
+
+      // num edges this element has
+      uint64_t element_edges; 
       if (current_element > 0) {
         element_edges = edgePrefixSum[current_element] - 
                         edgePrefixSum[current_element - 1];
@@ -706,6 +717,8 @@ public:
         element_edges = edgePrefixSum[0];
       }
   
+      // num edges this division currently has not taking into account 
+      // this element we are currently on
       uint64_t edge_count_without_current;
       if (current_element > 0) {
         edge_count_without_current = edgePrefixSum[current_element] -
@@ -714,25 +727,34 @@ public:
         edge_count_without_current = 0;
       }
 
-      //printf("%u has %lu\n", current_element, element_edges);
+      // determine current unit count by taking into account nodes already 
+      // handled
+      uint64_t unit_count_without_current = 
+         edge_count_without_current + 
+         ((current_element - accounted_elements) * nodeAlpha); 
 
-      // this thread or the next (don't want to cause this thread to get
-      // too much)
-      if (element_edges > (3 * edges_per_thread / 4)) {
-        // if this current thread + edges of this element is too much,
+      // include node into weight of this element
+      uint64_t element_units = element_edges + nodeAlpha;
+
+      if (element_units > (3 * units_per_thread / 4)) {
+        // if this current thread + units of this element is too much,
         // then do not add to this thread but rather the next one
-        if (edge_count_without_current > (edges_per_thread / 2)) {
+        if (unit_count_without_current > (units_per_thread / 2)) {
+          assert(current_element != 0);
+
           // assign to the NEXT thread (i.e. end this thread and move on to the 
           // next)
-          // beginning of next thread is current local node (the big one)
-
+          // beginning of next thread is current local element (i.e. the big 
+          // one we are giving up to the next)
           threadRanges[current_thread + 1] = current_element;
           printf("Thread %u begin %u end %u (big)\n", 
                  current_thread, threadRanges[current_thread], 
                  threadRanges[current_thread+1]);
 
-          current_thread++;
           accounted_edges = edgePrefixSum[current_element - 1];
+          accounted_elements = current_element;
+
+          current_thread++;
 
           // go back to beginning of loop 
           continue;
@@ -740,10 +762,10 @@ public:
       }
 
       // handle this element by adding edges to running sums
-      uint64_t edge_count_with_current = edge_count_without_current + 
-                                         element_edges;
+      uint64_t unit_count_with_current = unit_count_without_current + 
+                                         element_units;
 
-      if (edge_count_with_current >= edges_per_thread) {
+      if (unit_count_with_current >= units_per_thread) {
         threadRanges[++current_thread] = current_element + 1;
         printf("Thread %u begin %u end %u (over)\n", current_thread-1,
                threadRanges[current_thread - 1], 
@@ -751,6 +773,7 @@ public:
         //printf("sum is %lu\n", edgePrefixSum[current_thread-1]);
 
         accounted_edges = edgePrefixSum[current_element];
+        accounted_elements = current_element + 1;
       }
 
       current_element++;
