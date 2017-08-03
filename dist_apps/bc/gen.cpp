@@ -246,7 +246,7 @@ struct InitializeGraph {
     //               Galois::numrun(_graph.get_run_identifier()));
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, 
                    Galois::loopname("InitializeGraph"), 
-                   Galois::numrun("0"));
+                   Galois::numrun(_graph.get_run_identifier()));
 
     // sync things that need to be sync'd on dest as well (this is init, it
     // doesn't matter too much how slow it is); some things will be sync'd later
@@ -320,8 +320,8 @@ struct InitializeIteration {
     Galois::do_all(_graph.begin(), _graph.end(), 
                    InitializeIteration{infinity, current_src_node, &_graph},
                    Galois::loopname("InitializeIteration"), 
-                   Galois::numrun("0"));
-    //               Galois::numrun(_graph.get_run_identifier()));
+                   Galois::numrun(_graph.get_run_identifier()));
+                   //Galois::numrun("0"));
     //Galois::do_all(_graph.begin(), _graph.end(), 
     //               InitializeIteration{infinity, current_src_node, &_graph},
     //               Galois::loopname("InitializeIteration"));
@@ -396,7 +396,7 @@ struct FirstIterationSSSP {
                    boost::make_counting_iterator(__end), 
                    FirstIterationSSSP(&_graph),
                    Galois::loopname("FirstIterationSSSP"),
-                   Galois::numrun("0"));
+                   Galois::numrun(_graph.get_run_identifier()));
 
                    //Galois::numrun(_graph.get_run_identifier()));
     //Galois::do_all(boost::make_counting_iterator(__begin), 
@@ -539,10 +539,10 @@ struct SSSP {
         Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()),
         SSSP(&_graph), 
         std::make_tuple(
-          Galois::loopname("DependencyPropogation"), 
+          Galois::loopname("SSSP"), 
           Galois::thread_range(_graph.get_thread_ranges()),
-          Galois::numrun("0")
-          //Galois::numrun(_graph.get_run_identifier())
+          //Galois::numrun("0")
+          Galois::numrun(_graph.get_run_identifier())
         )
       );
       }
@@ -674,7 +674,8 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       std::make_tuple(Galois::loopname("PredAndSucc"),
                       Galois::thread_range(_graph.get_thread_ranges()),
-                      Galois::numrun("0")
+                      //Galois::numrun("0")
+                      Galois::numrun(_graph.get_run_identifier())
       )
     );
     }
@@ -791,8 +792,8 @@ struct NumShortestPathsChanges {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), NumShortestPathsChanges{&_graph}, 
                    Galois::loopname("NumShortestPathsChanges"), 
-                   Galois::numrun("0"));
-                   //Galois::numrun(_graph.get_run_identifier()));
+                   //Galois::numrun("0"));
+                   Galois::numrun(_graph.get_run_identifier()));
     //Galois::do_all(_graph.begin(), _graph.end(), NumShortestPathsChanges{&_graph}, 
     //               Galois::loopname("NumShortestPathsChanges"));
     
@@ -891,7 +892,7 @@ struct NumShortestPaths {
         NumShortestPaths(infinity, &_graph), 
         std::make_tuple(Galois::loopname("NumShortestPaths"),
                         Galois::thread_range(_graph.get_thread_ranges()),
-                        Galois::numrun("0")
+                        Galois::numrun(_graph.get_run_identifier())
         )
       );
 
@@ -1069,8 +1070,8 @@ struct DependencyPropChanges {
     Galois::do_all(_graph.begin(), _graph.end(), 
                    DependencyPropChanges{infinity, &_graph}, 
                    Galois::loopname("DependencyPropChanges"), 
-                   Galois::numrun("0"));
-                   //Galois::numrun(_graph.get_run_identifier()));
+                   //Galois::numrun("0"));
+                   Galois::numrun(_graph.get_run_identifier()));
     //Galois::do_all(_graph.begin(), _graph.end(), DependencyPropChanges{&_graph}, 
     //               Galois::loopname("DependencyPropChanges"));
     
@@ -1171,7 +1172,7 @@ struct DependencyPropogation {
           DependencyPropogation(infinity, current_src_node, &_graph), 
           std::make_tuple(Galois::loopname("DependencyPropogation"),
                           Galois::thread_range(_graph.get_thread_ranges()),
-                          Galois::numrun("0")
+                          Galois::numrun(_graph.get_run_identifier())
           )
         );
     }
@@ -1393,18 +1394,20 @@ struct BC {
     }
     printf("start is %lu, end is %lu\n", start_i, end_i);
 
-    Galois::StatTimer StatTimerProgress("PRINT_PROGRESS");
+    //Galois::StatTimer StatTimerProgress("PRINT_PROGRESS");
 
     for (uint64_t i = start_i; i < end_i; i++) {
       current_src_node = i;
 
-      StatTimerProgress.start();
+      //StatTimerProgress.start();
       if (_graph.id == 0) {
         if (i % 5000 == 0) {
           std::cout << "SSSP source node " << i << "\n";
         }
       }
-      StatTimerProgress.stop();
+      //StatTimerProgress.stop();
+
+      _graph.set_num_iter(0);
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -1413,6 +1416,8 @@ struct BC {
       // get SSSP on the current graph
       SSSP::go(_graph);
       //std::cout << "SSSP done\n";
+
+      _graph.set_num_iter(0);
 
       // calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
@@ -1425,6 +1430,8 @@ struct BC {
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph);
       //std::cout << "DepProp done\n";
+
+      _graph.set_num_iter(0);
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
@@ -1440,7 +1447,8 @@ struct BC {
       } else if (personality == CPU)
     #endif
       Galois::do_all(_graph.begin(), _graph.end(), BC(&_graph), 
-                     Galois::loopname("BC"));
+                     Galois::loopname("BC"),
+                     Galois::numrun(_graph.get_run_identifier()));
       
       // all sources should have dependency value, meaning all sources will
       // update the BC value correctly; no sync required here 
