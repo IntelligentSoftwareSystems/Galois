@@ -421,7 +421,7 @@ struct InitializeGraph {
     	_graph.sync<writeDestination, readSource, Reduce_1, Broadcast_1>("InitializeGraph");
     	_graph.sync<writeDestination, readSource, Reduce_2, Broadcast_2>("InitializeGraph");
 
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "updates" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "edge_offset" , "unsigned long" , "set",  ""), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "set",  ""));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
@@ -610,7 +610,7 @@ struct SGD {
       	_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
 
 
-      Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("reduce", "this->graph", "struct NodeData &", "std::vector<std::array<double, LATENT_VECTOR_SIZE>>" , "latent_vector", "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "latent_vector" , "std::array<double, LATENT_VECTOR_SIZE>" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"));
+      Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"));
       ++iteration;
       rms_normalized = std::sqrt(DGAccumulator_accum.reduce()/_graph.get_totalEdges());
       std::cout << " RMS Normalized  : " << rms_normalized << "\n";

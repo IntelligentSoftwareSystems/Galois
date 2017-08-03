@@ -185,9 +185,7 @@ struct InitializeGraph {
     {
     Galois::do_all(_graph.begin(), _graph.end(), 
       InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), 
-      Galois::numrun(_graph.get_run_identifier()), 
-      Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-        "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      Galois::numrun(_graph.get_run_identifier()));
     }
 
     _graph.sync<writeSource, readSource, Reduce_set_residual, 
@@ -287,19 +285,11 @@ struct PageRank {
               PageRank{ &_graph }, 
               std::make_tuple(Galois::loopname("PageRank"), 
               Galois::thread_range(_graph.get_thread_ranges()),
-              Galois::write_set("reduce", "this->graph", 
-                                "struct NodeData &", 
-                                "struct PR_NodeData &" , "residual", 
-                                "float" , "add",  "0"), 
               Galois::numrun(_graph.get_run_identifier())));
 
           //Galois::do_all_local(_graph,
           //               PageRank{ &_graph }, 
           //               Galois::loopname("PageRank"), 
-          //               Galois::write_set("reduce", "this->graph", 
-          //                                 "struct NodeData &", 
-          //                                 "struct PR_NodeData &" , "residual", 
-          //                                 "float" , "add",  "0"), 
           //               Galois::numrun(_graph.get_run_identifier()));
 
         }

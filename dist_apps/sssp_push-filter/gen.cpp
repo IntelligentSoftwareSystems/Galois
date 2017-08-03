@@ -153,10 +153,7 @@ struct InitializeGraph {
     Galois::do_all(_graph.begin(), _graph.end(), 
       InitializeGraph {src_node, infinity, &_graph}, 
       Galois::loopname("InitializeGraph"), 
-      Galois::numrun(_graph.get_run_identifier()), 
-      Galois::write_set("broadcast", "this->graph", "struct NodeData &", 
-                        "struct NodeData &", "dist_current" , "unsigned int", 
-                        "set",  ""));
+      Galois::numrun(_graph.get_run_identifier()));
     }
     _graph.sync<writeSource, readDestination, Reduce_set_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("InitializeGraph");
@@ -195,10 +192,7 @@ struct FirstItr_SSSP{
     {
     //Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, 
     //               FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), 
-    //               Galois::numrun(_graph.get_run_identifier()), 
-    //               Galois::write_set("reduce", "this->graph", 
-    //                 "struct NodeData &", "struct NodeData &", 
-    //                 "dist_current", "unsigned int" , "min",  ""));
+    //               Galois::numrun(_graph.get_run_identifier()));
     Galois::do_all_choice(
         Galois::Runtime::makeStandardRange(
           _graph.begin() + __begin, 
@@ -207,10 +201,7 @@ struct FirstItr_SSSP{
         FirstItr_SSSP{ &_graph }, 
         std::make_tuple(Galois::loopname("SSSP"), 
           Galois::thread_range(_graph.get_thread_ranges()),
-          Galois::numrun(_graph.get_run_identifier()),
-          Galois::write_set("reduce", "this->graph", 
-                       "struct NodeData &", "struct NodeData &" , 
-                       "dist_current", "unsigned int" , "min",  "")
+          Galois::numrun(_graph.get_run_identifier())
         )
     );
 
@@ -268,8 +259,6 @@ struct SSSP {
         {
           //Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
           //  Galois::loopname("SSSP"), 
-          //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-          //    "struct NodeData &", "dist_current", "unsigned int", "min",  ""), 
           //  Galois::numrun(_graph.get_run_identifier()));
 
           Galois::do_all_choice(
@@ -280,10 +269,7 @@ struct SSSP {
             SSSP{ &_graph }, 
             std::make_tuple(Galois::loopname("SSSP"), 
               Galois::thread_range(_graph.get_thread_ranges()),
-              Galois::numrun(_graph.get_run_identifier()),
-              Galois::write_set("reduce", "this->graph", 
-                           "struct NodeData &", "struct NodeData &" , 
-                           "dist_current", "unsigned int" , "min",  "")
+              Galois::numrun(_graph.get_run_identifier())
           ));
 
         }

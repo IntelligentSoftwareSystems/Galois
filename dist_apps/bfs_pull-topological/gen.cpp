@@ -151,10 +151,7 @@ struct InitializeGraph {
     Galois::do_all(_graph.begin(), _graph.end(), 
                    InitializeGraph {src_node, infinity, &_graph}, 
                    Galois::loopname("InitializeGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()), 
-                   Galois::write_set("broadcast", "this->graph", 
-                     "struct NodeData &", "struct NodeData &", "dist_current",
-                     "unsigned int" , "set",  ""));
+                   Galois::numrun(_graph.get_run_identifier()));
     }
     _graph.sync<writeSource, readAny, Reduce_set_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("InitializeGraph");
@@ -194,9 +191,7 @@ struct BFS {
       {
         //Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
         //  Galois::loopname("BFS"), 
-        //  Galois::numrun(_graph.get_run_identifier()),
-        //  Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-        //    "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""));
+        //  Galois::numrun(_graph.get_run_identifier()));
         Galois::do_all_choice(
           Galois::Runtime::makeStandardRange(
             _graph.begin(), 
@@ -205,10 +200,7 @@ struct BFS {
           BFS{ &_graph }, 
           std::make_tuple(Galois::loopname("BFS"), 
             Galois::thread_range(_graph.get_thread_ranges()),
-            Galois::numrun(_graph.get_run_identifier()),
-            Galois::write_set("reduce", "this->graph", 
-                         "struct NodeData &", "struct NodeData &" , 
-                         "dist_current", "unsigned int" , "min",  "")
+            Galois::numrun(_graph.get_run_identifier())
           ));
       }
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 

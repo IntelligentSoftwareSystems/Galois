@@ -145,10 +145,7 @@ struct InitializeGraph {
     {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, 
                    Galois::loopname("InitializeGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()), 
-                   Galois::write_set("broadcast", "this->graph", 
-                     "struct NodeData &", "struct NodeData &", "comp_current" ,
-                     "unsigned int" , "set",  ""));
+                   Galois::numrun(_graph.get_run_identifier()));
     }
 
     _graph.sync<writeSource, readAny, Reduce_set_comp_current, 
@@ -187,9 +184,6 @@ struct ConnectedComp {
     #endif
         //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
         //               Galois::loopname("ConnectedComp"), 
-        //               Galois::write_set("reduce", "this->graph", 
-        //                 "struct NodeData &", "struct NodeData &" , 
-        //                 "comp_current", "unsigned int" , "min",  ""), 
         //               Galois::numrun(_graph.get_run_identifier()));
         Galois::do_all_choice(
           Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
@@ -197,9 +191,7 @@ struct ConnectedComp {
           std::make_tuple(
             Galois::thread_range(_graph.get_thread_ranges()),
             Galois::loopname("ConnectedComp"), 
-            Galois::numrun(_graph.get_run_identifier()), 
-            Galois::write_set("reduce", "this->graph", "struct NodeData &", 
-              "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""))
+            Galois::numrun(_graph.get_run_identifier()))
         );
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("BFS");
