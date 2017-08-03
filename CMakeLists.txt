@@ -455,6 +455,7 @@ add_subdirectory(libruntime)
 add_subdirectory(libgraphs)
 add_subdirectory(libnet)
 add_subdirectory(libexp)
+add_subdirectory(libdist)
 
 add_subdirectory(tools)
 add_subdirectory(scripts)
