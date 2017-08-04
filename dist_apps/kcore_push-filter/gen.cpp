@@ -20,7 +20,8 @@
  *
  * @section Description
  *
- * Compute KCore on distributed Galois using top-filter.
+ * Compute KCore on distributed Galois using top-filter. The degree used is
+ * the in-degree.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -70,8 +71,7 @@ enum VertexCut {
   PL_VCUT, CART_VCUT
 };
 
-static const char* const name = "KCore - Distributed Heterogeneous "
-                                "with Worklist.";
+static const char* const name = "KCore - Distributed Heterogeneous Push Filter."
 static const char* const desc = "KCore on Distributed Galois.";
 static const char* const url = 0;
 
@@ -218,13 +218,6 @@ struct InitializeGraph2 {
          current_edge++) {
       GNode dest_node = graph->getEdgeDst(current_edge);
 
-      //printf("edge is %lu to %lu\n", graph->getGID(src), graph->getGID(dest_node));
-
-      //if (graph->getGID(dest_node) == 350208) {
-      //  std::cout << "[" << graph->id << "]" <<
-      //            "src is " << graph->getGID(src) << "\n";
-      //}
-
       NodeData& dest_data = graph->getData(dest_node);
       Galois::atomicAdd(dest_data.current_degree, (uint32_t)1);
 
@@ -259,7 +252,7 @@ struct InitializeGraph1 {
     _graph.sync<writeSource, readDestination, Reduce_set_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph1");
 
-    // make sure everything is initialized
+    // degree calculation
     InitializeGraph2::go(_graph);
   }
 
@@ -284,39 +277,11 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    //if (personality == GPU_CUDA) {
-    //  char test[100];
-    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
-    //    if ((_graph).isOwned((_graph).getGID(*ii))) {
-    //      sprintf(test, "%utrim %lu %u\n", _graph.id, (_graph).getGID(*ii),
-    //              get_node_trim_cuda(cuda_ctx, *ii));
-    //      Galois::Runtime::printOutput(test);
-    //    }
-    //  }
-    //} else {
-    //  char test[100];
-    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
-    //    if ((_graph).isOwned((_graph).getGID(*ii))) {
-    //      sprintf(test, "%utrim %lu %u\n", _graph.id, (_graph).getGID(*ii),
-    //              _graph.getData(*ii).trim.load());
-    //      Galois::Runtime::printOutput(test);
-    //    }
-    //  }
-    //}
-
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-
-      //for (auto ii = (_graph).begin(); ii != (_graph).end(); ++ii) {
-      //  if ((_graph).isOwned((_graph).getGID(*ii))) 
-      //    Galois::Runtime::printOutput("% % t: % %\n", (_graph).getGID(*ii), 
-      //                             get_node_flag_cuda(cuda_ctx, *ii),
-      //                             get_node_trim_cuda(cuda_ctx, *ii),
-      //                             (get_node_current_degree_cuda(cuda_ctx, *ii)));
-      //}
 
       StatTimer_cuda.start();
       KCoreStep2_all_cuda(cuda_ctx);
@@ -331,7 +296,8 @@ struct KCoreStep2 {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // we currently do not care about degree for dead nodes
+    // we currently do not care about degree for dead nodes, so updates to
+    // it are ignored
     if (src_data.flag) {
       if (src_data.trim > 0) {
         src_data.current_degree = src_data.current_degree - src_data.trim;
@@ -376,32 +342,9 @@ struct KCoreStep1 {
                      Galois::loopname("KCoreStep1"),
                      Galois::numrun(_graph.get_run_identifier()));
 
-    //if (personality == GPU_CUDA) {
-    //  char test[100];
-    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
-    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
-    //      sprintf(test, "%ubeforesynctrim %lu %u\n", _graph.id, (_graph).getGID(*ii),
-    //              get_node_trim_cuda(cuda_ctx, *ii));
-    //      Galois::Runtime::printOutput(test);
-    //    }
-    //  }
-    //} else {
-    //  char test[100];
-    //  for (auto ii = (_graph).begin(); ii != (_graph).ghost_end(); ++ii) {
-    //    if ((_graph).isLocal((_graph).getGID(*ii))) {
-    //      sprintf(test, "%ubeforesynctrim %lu %u\n", _graph.id, (_graph).getGID(*ii),
-    //              _graph.getData(*ii).trim.load());
-    //      Galois::Runtime::printOutput(test);
-    //    }
-    //  }
-    //}
-
-      
       // do the trim sync
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCoreStep1");
-      //_graph.sync<writeDestination, readSource, Reduce_add_trim, 
-      //            Broadcast_trim>("KCoreStep1");
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);
