@@ -1,5 +1,5 @@
 /** DoAll wrapper -*- C++ -*-
- * @file
+ * @File
  * This is the only file to include for basic Galois functionality.
  *
  * @section License
@@ -64,7 +64,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (DOALL_GALOIS_STEAL, "DOALL_GALOIS_STEAL"),
       clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
       clEnumVal (DOALL_COUPLED, "DOALL_COUPLED"),
-      clEnumVal (DOALL_COUPLED, "DOALL_COUPLED_RANGE"),
+      clEnumVal (DOALL_COUPLED_RANGE, "DOALL_COUPLED_RANGE"),
       clEnumVal (DOALL_CILK, "DOALL_CILK"),
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
