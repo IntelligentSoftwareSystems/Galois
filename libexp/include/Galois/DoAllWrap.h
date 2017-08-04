@@ -41,16 +41,16 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
-#include "llvm/Support/CommandLine.h"
-
 #include "CilkInit.h"
 #include <unistd.h>
 
+#include "llvm/Support/CommandLine.h"
 
 namespace Galois {
 
 enum DoAllTypes { 
   DOALL_GALOIS, DOALL_GALOIS_STEAL, DOALL_GALOIS_FOREACH, DOALL_COUPLED, 
+  DOALL_COUPLED_RANGE,
   DOALL_CILK, DOALL_OPENMP, DOALL_RANGE
 };
 
@@ -64,6 +64,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (DOALL_GALOIS_STEAL, "DOALL_GALOIS_STEAL"),
       clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
       clEnumVal (DOALL_COUPLED, "DOALL_COUPLED"),
+      clEnumVal (DOALL_COUPLED, "DOALL_COUPLED_RANGE"),
       clEnumVal (DOALL_CILK, "DOALL_CILK"),
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
@@ -141,6 +142,35 @@ struct DoAllImpl<DOALL_COUPLED> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
     Galois::Runtime::do_all_coupled(range, func, argsTuple);
+  }
+};
+
+/* Better do all coupled that takes into account even distribution of edges 
+ * among threads
+ */
+template <>
+struct DoAllImpl<DOALL_COUPLED_RANGE> {
+  template <typename R, typename F, typename ArgsTuple>
+  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
+    Galois::Runtime::do_all_coupled(range, func, argsTuple);
+
+    auto defaultArgsTuple = std::tuple_cat(
+      argsTuple,
+      get_default_trait_values(
+        argsTuple, 
+        std::make_tuple(thread_range_tag{}),
+        std::make_tuple(thread_range{})
+      )
+    );
+
+    const uint32_t *thread_ranges = 
+      get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
+
+    assert(thread_ranges != nullptr);
+
+    Galois::Runtime::do_all_coupled(Runtime::makeSpecificRange(range.begin(),
+                                    range.end(), thread_ranges),
+                                    func, argsTuple);
   }
 };
 
@@ -234,6 +264,9 @@ void do_all_choice(const R& range, const F& func, const DoAllTypes& type,
       break;
     case DOALL_COUPLED:
       DoAllImpl<DOALL_COUPLED>::go(range, func, argsTuple);
+      break;
+    case DOALL_COUPLED_RANGE:
+      DoAllImpl<DOALL_COUPLED_RANGE>::go(range, func, argsTuple);
       break;
     case DOALL_CILK:
       DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
