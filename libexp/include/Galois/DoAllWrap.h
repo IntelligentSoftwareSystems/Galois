@@ -152,8 +152,6 @@ template <>
 struct DoAllImpl<DOALL_COUPLED_RANGE> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_coupled(range, func, argsTuple);
-
     auto defaultArgsTuple = std::tuple_cat(
       argsTuple,
       get_default_trait_values(
