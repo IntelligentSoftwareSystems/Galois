@@ -23,7 +23,7 @@
  * Offline graph for loading large files
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
- * @author Loc Hoang <l_hoang@utexas.edu> (prefix range at the bottom)
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #ifndef _GALOIS_DIST_OFFLINE_GRAPH_
@@ -232,7 +232,6 @@ public:
 
   OfflineGraph(OfflineGraph&&) = default;
 
-
   size_t size() const { return numNodes; }
   size_t sizeEdges() const { return numEdges; }
   size_t edgeSize() const { return sizeEdgeData; }
@@ -259,12 +258,133 @@ public:
     return detail::make_no_deref_range(edge_begin(N), edge_end(N));
   }
 
-
   template<typename T>
   T getEdgeData(edge_iterator ni) {
     return edgeData<T>(*ni);
   }
 
+  /**
+   * Return a suitable index between an upper bound and a lower bound that
+   * attempts to get close to the target size (i.e. find a good chunk that
+   * corresponds to some size). 
+   *
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param targetWeight The amount of weight we want from the returned index
+   * @param lb lower bound to start search from
+   * @param ub upper bound to start search from
+   */
+  size_t findIndex(size_t nodeWeight, size_t edgeWeight, size_t targetWeight, 
+                   size_t lb, size_t ub) {
+    while (lb < ub) {
+      size_t mid = lb + (ub - lb) / 2;
+      size_t num_edges;
+  
+      if (mid != 0) {
+        num_edges = *edge_end(mid - 1);
+      } else {
+        num_edges = 0;
+      }
+  
+      size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
+  
+      if (weight < targetWeight)
+        lb = mid + 1;
+      else
+        ub = mid;
+    }
+    return lb;
+  }
+  
+  // typedefs used by divide by node below
+  typedef std::pair<iterator, iterator> NodeRange;
+  typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
+  typedef std::pair<NodeRange, EdgeRange> GraphRange;
+  
+  /** 
+   * Returns 2 ranges (one for nodes, one for edges) for a particular division.
+   * The ranges specify the nodes/edges that a division is responsible for. The
+   * function attempts to split them evenly among threads given some kind of
+   * weighting
+   *
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param id Division number you want the ranges for
+   * @param total Total number of divisions
+   * @param scaleFactor Vector specifying if certain divisions should get more 
+   * than other divisions
+   */
+  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
+                    std::vector<unsigned> scaleFactor = std::vector<unsigned>())
+      -> GraphRange {
+    assert(total >= 1);
+    assert(id >= 0 && id < total);
+
+    // weight of all data
+    uint64_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
+  
+    // determine number of blocks to divide among total divisions
+    uint32_t numBlocks = 0;
+    if (scaleFactor.empty()) {
+      numBlocks = total;
+
+      // scale factor holds a prefix sum of the scale factor
+      for (uint32_t i = 0; i < total; i++) {
+        scaleFactor.push_back(i + 1);
+      }
+    } else {
+      assert(scaleFactor.size() == total);
+      assert(total >= 1);
+
+      // get total number of blocks we need + save a prefix sum of the scale
+      // factor vector
+      for (uint32_t i = 0; i < total; i++) {
+        numBlocks += scaleFactor[i];
+        scaleFactor[i] = numBlocks;
+      }
+    }
+
+    // weight of a block (one block for each division by default; if scale
+    // factor specifies something different, then use that instead)
+    uint64_t blockWeight = (weight + numBlocks - 1) / numBlocks;
+
+    // lower and upper blocks that this division should get using the prefix
+    // sum of scaleFactor calculated above
+    uint32_t blockLower;
+    if (id != 0) {
+      blockLower = scaleFactor[id - 1];
+    } else {
+      blockLower = 0;
+    }
+    uint32_t blockUpper = scaleFactor[id];
+
+    assert(blockLower <= blockUpper);
+
+    // find allocation of nodes for this division
+    uint32_t nodesLower = findIndex(nodeWeight, edgeWeight, 
+                                    blockWeight * blockLower, 0, numNodes);
+    uint32_t nodesUpper = findIndex(nodeWeight, edgeWeight,
+                                    blockWeight * blockUpper, nodesLower,
+                                    numNodes);
+
+    uint64_t edgesLower = numEdges;
+    uint64_t edgesUpper = numEdges;
+    // correct number of edges based on nodes allocated to division if
+    // necessary
+    if (nodesLower != nodesUpper) {
+      if (nodesLower != 0) {
+        edgesLower = *(edge_end(nodesLower - 1));
+      } else {
+        edgesLower = 0;
+      }
+      edgesUpper = *(edge_end(nodesUpper - 1));
+    }
+  
+    return GraphRange(NodeRange(iterator(nodesLower), 
+                                iterator(nodesUpper)), 
+                      EdgeRange(edge_iterator(edgesLower), 
+                                edge_iterator(edgesUpper)));
+  }
 };
 
 
