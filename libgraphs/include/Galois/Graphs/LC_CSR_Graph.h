@@ -962,16 +962,16 @@ public:
     numNodes = nNodes;
     numEdges = nEdges;
     if (UseNumaAlloc) {
-      //nodeData.allocateLocal(numNodes);
-      //edgeIndData.allocateLocal(numNodes);
-      //edgeDst.allocateLocal(numEdges);
-      //edgeData.allocateLocal(numEdges);
-      //this->outOfLineAllocateLocal(numNodes);
-      nodeData.allocateInterleaved(numNodes);
-      edgeIndData.allocateInterleaved(numNodes);
-      edgeDst.allocateInterleaved(numEdges);
-      edgeData.allocateInterleaved(numEdges);
-      this->outOfLineAllocateInterleaved(numNodes);
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes);
+      //nodeData.allocateInterleaved(numNodes);
+      //edgeIndData.allocateInterleaved(numNodes);
+      //edgeDst.allocateInterleaved(numEdges);
+      //edgeData.allocateInterleaved(numEdges);
+      //this->outOfLineAllocateInterleaved(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
