@@ -383,12 +383,17 @@ public:
   /**
    * Return a suitable index between an upper bound and a lower bound that
    * attempts to get close to the target size (i.e. find a good chunk that
-   * corresponds to some size).
+   * corresponds to some size). 
    *
-   * @param TODO
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param targetWeight The amount of weight we want from the returned index
+   * @param lb lower bound to start search from
+   * @param ub upper bound to start search from
+   * @param edgePrefixSum prefix sum of edges
    */
-  size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
-                   size_t lb, size_t ub, std::vector<uint64_t>edgePrefixSum) {
+  size_t findIndex(size_t nodeWeight, size_t edgeWeight, size_t targetWeight, 
+                   size_t lb, size_t ub, std::vector<uint64_t> edgePrefixSum) {
     while (lb < ub) {
       size_t mid = lb + (ub - lb) / 2;
       size_t num_edges;
@@ -400,9 +405,9 @@ public:
       }
       //size_t num_edges = *edge_begin(mid);
 
-      size_t size = num_edges * edgeSize + (mid) * nodeSize;
+      size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
 
-      if (size < targetSize)
+      if (weight < targetWeight)
         lb = mid + 1;
       else
         ub = mid;
@@ -416,37 +421,47 @@ public:
 
   /** 
    * Returns 2 ranges (one for nodes, one for edges) for a particular division.
-   * The ranges specify the memory that a division is responsible for. The
-   * function attempts to split memory evenly among threads.
+   * The ranges specify the nodes/edges that a division is responsible for. The
+   * function attempts to split them evenly among threads given some kind of
+   * weighting
    *
-   * @param TODO
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param id Division number you want the ranges for
+   * @param total Total number of divisions
+   * @param edgePrefixSum a prefix sum of edges of the graph
    */
-  auto divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total,
-                    std::vector<uint64_t>edgePrefixSum)
+  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
+                    size_t total, std::vector<uint64_t> edgePrefixSum)
       -> GraphRange {
-    // size of all data
-    size_t size = numNodes * nodeSize + numEdges * edgeSize;
-    // size of a block (one block for each division)
-    size_t block = (size + total - 1) / total;
+    // weight of all data
+    size_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
+
+    // weight of a block (one block for each division)
+    size_t block = (weight + total - 1) / total;
   
-    size_t aa = numEdges;
-    size_t ea = numEdges;
+    size_t edgesLower = numEdges;
+    size_t edgesUpper = numEdges;
   
-    size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes, 
-                          edgePrefixSum);
-    size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes, 
-                          edgePrefixSum);
+    size_t nodesLower = findIndex(nodeWeight, edgeWeight, block * id, 0, 
+                                  numNodes, edgePrefixSum);
+    size_t nodesUpper = findIndex(nodeWeight, edgeWeight, block * (id + 1), 
+                                  nodesLower, numNodes, edgePrefixSum);
   
-    if (bb != eb) {
-      if (bb != 0) {
-        aa = edgePrefixSum[bb - 1];
+    // correct number of edges
+    if (nodesLower != nodesUpper) {
+      if (nodesLower != 0) {
+        edgesLower = edgePrefixSum[nodesLower - 1];
       } else {
-        aa = 0;
+        edgesLower = 0;
       }
-      ea = edgePrefixSum[eb - 1];
+      edgesUpper = edgePrefixSum[nodesUpper - 1];
     }
-    return GraphRange(NodeRange(iterator(bb), iterator(eb)), 
-                      EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+
+    return GraphRange(NodeRange(iterator(nodesLower), 
+                                iterator(nodesUpper)), 
+                      EdgeRange(edge_iterator(edgesLower), 
+                                edge_iterator(edgesUpper)));
   }
 
 
