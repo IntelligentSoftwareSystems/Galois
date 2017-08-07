@@ -630,12 +630,11 @@ public:
 
   // parallel call
   void initThread (void) {
-    term.initializeThread ();
+    term.initializeThread();
 
-    unsigned id = Substrate::ThreadPool::getTID ();
+    unsigned id = Substrate::ThreadPool::getTID();
 
-    *workers.getLocal (id) = ThreadContext (id, range.local_begin (), range.local_end ());
-
+    *workers.getLocal(id) = ThreadContext(id, range.local_begin(), range.local_end());
   }
 
 

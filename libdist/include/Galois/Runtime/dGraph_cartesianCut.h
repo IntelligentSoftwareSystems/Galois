@@ -300,7 +300,7 @@ public:
     if (!edgeNuma) {
       Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
       StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges();
+      base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
       StatTimer_thread_ranges.stop();
     }
 

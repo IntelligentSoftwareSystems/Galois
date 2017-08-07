@@ -241,7 +241,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_graph_construct.start();
       //std::stringstream ss_cout;
-      {
+
       Galois::Graph::OfflineGraph g(filename);
       isBipartite = bipartite;
 
@@ -360,7 +360,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_exchange_edges.stop();
 
       //print_string(" : loadEdges : done");
-      }
 
       //ss_cout << base_hGraph::id << " : assign_send_receive_edges done\n";
 
@@ -376,8 +375,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // TODO revise how this works and make it consistent across cuts
       if (!edgeNuma) {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+
         StatTimer_thread_ranges.start();
-        base_hGraph::determine_thread_ranges();
+        base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
         StatTimer_thread_ranges.stop();
       }
 
