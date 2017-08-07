@@ -71,7 +71,7 @@ enum VertexCut {
   PL_VCUT, CART_VCUT
 };
 
-static const char* const name = "KCore - Distributed Heterogeneous Push Filter."
+static const char* const name = "KCore - Distributed Heterogeneous Push Filter.";
 static const char* const desc = "KCore on Distributed Galois.";
 static const char* const url = 0;
 
