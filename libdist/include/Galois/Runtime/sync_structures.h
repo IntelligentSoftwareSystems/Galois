@@ -167,6 +167,117 @@ struct Reduce_add_##fieldname {\
 }
 #endif
 
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_REDUCE_ADD_ARRAY(fieldname, fieldtype) \
+struct Reduce_add_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                              data_mode, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, y, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      add_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    { Galois::add(fieldname[node_id], y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_add_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                         data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+    if (personality == GPU_CUDA) {\
+      set_node_##fieldname##_cuda(cuda_ctx, node_id, (ValTy)0);\
+    }\
+    else if (personality == CPU)\
+    Galois::set(fieldname[node_id], (ValTy)0);\
+  }\
+}
+#else
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_ADD_ARRAY(fieldname, fieldtype) \
+struct Reduce_add_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { Galois::add(fieldname[node_id], y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+    Galois::set(fieldname[node_id], (ValTy)0);\
+  }\
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Set
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,6 +371,111 @@ struct Reduce_set_##fieldname {\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { Galois::set(node.fieldname, y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#endif
+
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_REDUCE_SET_ARRAY(fieldname, fieldtype) \
+struct Reduce_set_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                              data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    { Galois::set(fieldname[node_id], y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                         data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#else
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_SET_ARRAY(fieldname, fieldtype) \
+struct Reduce_set_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { Galois::set(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -384,6 +600,110 @@ struct Reduce_min_##fieldname {\
 }
 #endif
 
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype) \
+struct Reduce_min_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                              data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+    }\
+    assert(personality == CPU);\
+    { return y < Galois::min(fieldname[node_id], y); }\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_min_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                        data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#else
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype) \
+struct Reduce_min_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { return y < Galois::min(fieldname[node_id], y); }\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 // Broadcast
 ////////////////////////////////////////////////////////////////////////////////
@@ -471,6 +791,102 @@ struct Broadcast_##fieldname {\
 \
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
     node.fieldname = y;\
+  }\
+\
+  static bool setVal_batch(unsigned from_id, \
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+}
+#endif
+
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_BROADCAST_ARRAY(fieldname, fieldtype)\
+struct Broadcast_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_batch(unsigned from_id,\
+                            unsigned long long int *b,\
+                            unsigned int *o,\
+                            ValTy *y,\
+                            size_t *s,\
+                            DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                         data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
+    if (personality == GPU_CUDA)\
+      set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+    else if (personality == CPU)\
+    fieldname[node_id] = y;\
+  }\
+\
+  static bool setVal_batch(unsigned from_id, \
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                               data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+}
+#else
+#define GALOIS_SYNC_STRUCTURE_BROADCAST_ARRAY(fieldname, fieldtype)\
+struct Broadcast_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {\
+    return fieldname[node_id];\
+  }\
+\
+  static bool extract_batch(unsigned from_id,\
+                            unsigned long long int *b,\
+                            unsigned int *o,\
+                            ValTy *y,\
+                            size_t *s,\
+                            DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
+    fieldname[node_id] = y;\
   }\
 \
   static bool setVal_batch(unsigned from_id, \

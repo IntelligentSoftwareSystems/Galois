@@ -112,8 +112,6 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 static const float alpha = (1.0 - 0.85);
 struct NodeData {
   float value;
-  float delta;
-  std::atomic<float> residual;
   std::atomic<uint32_t> nout;
 };
 
@@ -126,6 +124,9 @@ typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
+
+Galois::LargeArray<float> delta;
+Galois::LargeArray<std::atomic<float> > residual;
 
 typedef GNode WorkItem;
 
@@ -159,8 +160,8 @@ struct ResetGraph {
     NodeData& sdata = graph->getData(src);
     sdata.value = 0;
     sdata.nout = 0;
-    sdata.residual = 0;
-    sdata.delta = 0;
+    residual[src] = 0;
+    delta[src] = 0;
   }
 };
 
@@ -185,7 +186,9 @@ struct InitializeGraph {
     {
     Galois::do_all(_graph.begin(), _graph.end(), 
       InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), 
-      Galois::numrun(_graph.get_run_identifier()));
+      Galois::numrun(_graph.get_run_identifier()), 
+      Galois::write_set("reduce", "this->graph", "struct NodeData &", 
+        "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     }
 
     _graph.sync<writeSource, readSource, Reduce_set_residual, 
@@ -197,9 +200,9 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.value = 0;
-    sdata.residual = local_alpha;
+    residual[src] = local_alpha;
     bitset_residual.set(src);
-    sdata.delta = 0;
+    delta[src] = 0;
     Galois::atomicAdd(sdata.nout, 
       (uint32_t) std::distance(graph->edge_begin(src), 
                                    graph->edge_end(src)));
@@ -244,12 +247,12 @@ struct PageRank_delta {
 
   void operator()(WorkItem src) const {
     NodeData& sdata = graph->getData(src);
-    if (sdata.residual > this->local_tolerance) {
-      float residual_old = sdata.residual;
-      sdata.residual = 0;
+    if (residual[src] > this->local_tolerance) {
+      float residual_old = residual[src];
+      residual[src] = 0;
       sdata.value += residual_old;
       if (sdata.nout > 0) {
-        sdata.delta = residual_old * (1 - local_alpha) / sdata.nout;
+        delta[src] = residual_old * (1 - local_alpha) / sdata.nout;
       }
     }
   }
@@ -285,11 +288,19 @@ struct PageRank {
               PageRank{ &_graph }, 
               std::make_tuple(Galois::loopname("PageRank"), 
               Galois::thread_range(_graph.get_thread_ranges()),
+              Galois::write_set("reduce", "this->graph", 
+                                "struct NodeData &", 
+                                "struct PR_NodeData &" , "residual", 
+                                "float" , "add",  "0"), 
               Galois::numrun(_graph.get_run_identifier())));
 
           //Galois::do_all_local(_graph,
           //               PageRank{ &_graph }, 
           //               Galois::loopname("PageRank"), 
+          //               Galois::write_set("reduce", "this->graph", 
+          //                                 "struct NodeData &", 
+          //                                 "struct PR_NodeData &" , "residual", 
+          //                                 "float" , "add",  "0"), 
           //               Galois::numrun(_graph.get_run_identifier()));
 
         }
@@ -311,15 +322,13 @@ struct PageRank {
   }
 
   void operator()(WorkItem src) const {
-    NodeData& sdata = graph->getData(src);
-    if (sdata.delta > 0) {
-      float delta = sdata.delta;
-      sdata.delta = 0;
+    if (delta[src] > 0) {
+      float _delta = delta[src];
+      delta[src] = 0;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
           nbr != ee; ++nbr) {
         GNode dst = graph->getEdgeDst(nbr);
-        NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        Galois::atomicAdd(residual[dst], _delta);
         bitset_residual.set(dst);
       }
       DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
@@ -402,31 +411,31 @@ struct PageRankSanity {
   /* Gets the max, min rank from all owned nodes and
    * also the sum of ranks */
   void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
 
     if (graph->isOwned(graph->getGID(src))) {
-      if (current_max < src_data.value) {
-        current_max = src_data.value;
+      if (current_max < sdata.value) {
+        current_max = sdata.value;
       }
 
-      if (current_min > src_data.value) {
-        current_min = src_data.value;
+      if (current_min > sdata.value) {
+        current_min = sdata.value;
       }
 
-      if (current_max_residual < src_data.residual) {
-        current_max_residual = src_data.residual;
+      if (current_max_residual < residual[src]) {
+        current_max_residual = residual[src];
       }
 
-      if (current_min_residual > src_data.residual) {
-        current_min_residual = src_data.residual;
+      if (current_min_residual > residual[src]) {
+        current_min_residual = residual[src];
       }
 
-      if (src_data.residual > local_tolerance) {
+      if (residual[src] > local_tolerance) {
         DGAccumulator_residual_over_tolerance += 1;
       }
 
-      DGAccumulator_sum += src_data.value;
-      DGAccumulator_sum_residual += src_data.residual;
+      DGAccumulator_sum += sdata.value;
+      DGAccumulator_sum_residual += residual[src];
     }
   }
 };
@@ -519,6 +528,8 @@ int main(int argc, char** argv) {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, scalefactor,
                              transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
+    residual.allocateInterleaved(hg->size());
+    delta.allocateInterleaved(hg->size());
 
 
 #ifdef __GALOIS_HET_CUDA__
