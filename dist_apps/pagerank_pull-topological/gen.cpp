@@ -126,7 +126,7 @@ typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 typedef typename Graph::GraphNode GNode;
 
 Galois::LargeArray<float> delta;
-Galois::LargeArray<std::atomic<float> > residual;
+Galois::LargeArray<float> residual;
 
 #include "gen_sync.hh"
 
@@ -312,12 +312,16 @@ struct PageRank {
   }
 
   void operator()(GNode src)const {
+    float sum = 0;
     for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       if (delta[dst] > 0) {
-        Galois::add(residual[src], delta[dst]);
-        bitset_residual.set(src);
+        sum += delta[dst];
       }
+    }
+    if (sum > 0) {
+      Galois::add(residual[src], sum);
+      bitset_residual.set(src);
     }
   }
 };
