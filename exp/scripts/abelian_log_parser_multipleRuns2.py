@@ -396,9 +396,10 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   timer_graph_init_all_hosts = re.findall(timer_graph_init_regex, log_data)
 
   num_arr = numpy.array(map(int,timer_graph_init_all_hosts))
-  #avg_graph_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
-  max_graph_init_time = numpy.max(num_arr, axis=0)
-  #avg_graph_init_time = round((avg_graph_init_time / divisor),3)
+  if(num_arr.size > 0):
+    #avg_graph_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+    max_graph_init_time = numpy.max(num_arr, axis=0)
+    #avg_graph_init_time = round((avg_graph_init_time / divisor),3)
 
   print "max_graph_init time : ", max_graph_init_time
 
@@ -412,17 +413,20 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
   num_arr = numpy.array(map(int,timer_hg_init_all_hosts))
   #avg_hg_init_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
-  max_hg_init_time = numpy.max(num_arr, axis=0)
-  #avg_hg_init_time = round((avg_hg_init_time / divisor),3)
-  hg_init_time = max_hg_init_time
+  if(num_arr.size > 0):
+    max_hg_init_time = numpy.max(num_arr, axis=0)
+    #avg_hg_init_time = round((avg_hg_init_time / divisor),3)
+    hg_init_time = max_hg_init_time
 
   timer_comm_setup_regex = re.compile((run_identifier) +r',\(NULL\),0\s,\sCOMMUNICATION_SETUP_TIME' + r',\d*,\d*,(\d*)')
   timer_comm_setup_all_hosts = re.findall(timer_comm_setup_regex, log_data)
 
+  max_comm_setup_time = 0
   num_arr = numpy.array(map(int,timer_comm_setup_all_hosts))
-  #avg_comm_setup_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
-  max_comm_setup_time = numpy.max(num_arr, axis=0)
-  #max_comm_setup_time = round((avg_comm_setup_time / divisor),3)
+  if(num_arr.size > 0):
+    #avg_comm_setup_time = float(numpy.sum(num_arr, axis=0))/float(total_hosts)
+    max_comm_setup_time = numpy.max(num_arr, axis=0)
+    #max_comm_setup_time = round((avg_comm_setup_time / divisor),3)
 
   print "max_comm_setup time : ", max_comm_setup_time
 
