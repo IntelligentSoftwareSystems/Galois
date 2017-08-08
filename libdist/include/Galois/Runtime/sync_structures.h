@@ -704,6 +704,114 @@ struct Reduce_min_##fieldname {\
 }
 #endif
 
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
+struct Reduce_pair_wise_avg_array_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return node.fieldname;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                              data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+      return true;\
+    }\
+    assert(personality == CPU);\
+    { Galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                         data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+    { Galois::resetVec(node.fieldname); }\
+  }\
+}
+#else
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
+struct Reduce_pair_wise_avg_array_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return node.fieldname;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { Galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+    { Galois::resetVec(node.fieldname); }\
+  }\
+}
+#endif
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Broadcast
 ////////////////////////////////////////////////////////////////////////////////

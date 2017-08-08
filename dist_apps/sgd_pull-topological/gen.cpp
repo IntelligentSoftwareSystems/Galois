@@ -108,10 +108,11 @@ struct NodeData {
   std::array<double, LATENT_VECTOR_SIZE> latent_vector;
   //NodeData():latent_vector(LATENT_VECTOR_SIZE){}
   //std::vector<double> latent_vector;
-  uint64_t updates;
-  uint64_t edge_offset;
+  unsigned int updates;
+  unsigned int edge_offset;
 };
 
+#include "gen_sync.hh"
 
 #if 0
 typedef hGraph<NodeData, double> Graph;
@@ -169,244 +170,6 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    	struct Broadcast_0 {
-    		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_updates_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.updates;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_updates_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void setVal (uint32_t node_id, struct NodeData & node, unsigned long y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_updates_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				node.updates = y;
-    		}
-    		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		typedef unsigned long ValTy;
-    	};
-    	struct Broadcast_1 {
-    		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_edge_offset_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.edge_offset;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_edge_offset_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void setVal (uint32_t node_id, struct NodeData & node, unsigned long y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_edge_offset_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				node.edge_offset = y;
-    		}
-    		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		typedef unsigned long ValTy;
-    	};
-    	struct Broadcast_2 {
-        //static std::vector<double> extract(uint32_t node_id, const struct NodeData & node) {
-    		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.latent_vector;
-    		}
-    		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_batch(unsigned from_id, std::array<double, LATENT_VECTOR_SIZE> *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_node_latent_vector_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void setVal (uint32_t node_id, struct NodeData & node, std::array<double, LATENT_VECTOR_SIZE> y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_latent_vector_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				node.latent_vector = y;
-            }
-    		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
-    	};
-    	struct Reduce_0 {
-    		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_updates_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.updates;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_updates_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool reduce (uint32_t node_id, struct NodeData & node, unsigned long y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_updates_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				{ Galois::set(node.updates, y);}
-            return true;
-    		}
-    		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_updates_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void reset (uint32_t node_id, struct NodeData & node ) {
-    		}
-    		typedef unsigned long ValTy;
-    	};
-    	struct Reduce_1 {
-    		static unsigned long extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_edge_offset_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.edge_offset;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_edge_offset_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool reduce (uint32_t node_id, struct NodeData & node, unsigned long y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_edge_offset_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				{ Galois::set(node.edge_offset, y); }
-            return true;
-    		}
-    		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, unsigned long *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_edge_offset_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void reset (uint32_t node_id, struct NodeData & node ) {
-    		}
-    		typedef unsigned long ValTy;
-    	};
-    	struct Reduce_2 {
-    		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.latent_vector;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool extract_reset_batch(unsigned from_id, std::array<double, LATENT_VECTOR_SIZE> *y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_get_mirror_node_latent_vector_cuda(cuda_ctx, from_id, y); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static bool reduce (uint32_t node_id, struct NodeData & node, std::array<double, LATENT_VECTOR_SIZE> y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_latent_vector_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				{ Galois::set(node.latent_vector, y); }
-          return true;
-    		}
-    		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t s, DataCommMode data_mode) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) { batch_set_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-    			assert (personality == CPU);
-    		#endif
-    			return false;
-    		}
-    		static void reset (uint32_t node_id, struct NodeData & node ) {
-    		}
-    		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
-    	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + (_graph.get_run_identifier()));
@@ -417,9 +180,9 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
 
-    	_graph.sync<writeDestination, readSource, Reduce_0, Broadcast_0>("InitializeGraph");
-    	_graph.sync<writeDestination, readSource, Reduce_1, Broadcast_1>("InitializeGraph");
-    	_graph.sync<writeDestination, readSource, Reduce_2, Broadcast_2>("InitializeGraph");
+      _graph.sync<writeDestination, readSource, Reduce_set_updates, Broadcast_updates>("InitializeGraph");
+      _graph.sync<writeDestination, readSource, Reduce_set_edge_offset, Broadcast_edge_offset>("InitializeGraph");
+      _graph.sync<writeDestination, readSource, Reduce_set_latent_vector, Broadcast_latent_vector>("InitializeGraph");
 
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
   }
@@ -451,11 +214,12 @@ struct SGD_doPartialGradientUpdate {
 	       if (g.edge_begin(*ii) != g.edge_end(*ii))
 	         Movies.push_back(*ii);
 #endif
-      //Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
-      Galois::for_each(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate (&_graph, _step_size));
+      Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
+      //Galois::for_each(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate (&_graph, _step_size));
   }
-  template<typename Context>
-  void operator()(GNode src , Context& cnx) const {
+  //template<typename Context>
+  //void operator()(GNode src , Context& cnx) const {
+  void operator()(GNode src) const {
     NodeData& sdata= graph->getData(src);
     auto& movie_node = sdata.latent_vector;
 
@@ -507,92 +271,6 @@ struct SGD {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      	struct Broadcast_0 {
-      		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			//std::cout << "SGD:: Broadcast_0\n";
-      			return node.latent_vector;
-      		}
-      		static bool extract_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_batch(unsigned from_id, std::array<double, LATENT_VECTOR_SIZE> *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_node_latent_vector_cuda(cuda_ctx, from_id, y); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void setVal (uint32_t node_id, struct NodeData & node, std::array<double, LATENT_VECTOR_SIZE> y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_latent_vector_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				node.latent_vector = y;
-      		}
-      		static bool setVal_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_set_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
-      	};
-
-      	struct Reduce_2 {
-      		static std::array<double, LATENT_VECTOR_SIZE> extract(uint32_t node_id, const struct NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_latent_vector_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.latent_vector;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t *s, DataCommMode *data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode, {Galois::resetVec(node.latent_vector); }); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool extract_reset_batch(unsigned from_id, std::array<double, LATENT_VECTOR_SIZE> *y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_get_reset_node_latent_vector_cuda(cuda_ctx, from_id, y, {Galois::resetVec(node.latent_vector); }); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static bool reduce (uint32_t node_id, struct NodeData & node, std::array<double, LATENT_VECTOR_SIZE> y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) {Galois::pairWiseAvg_vec(node.latent_vector, y); }_node_latent_vector_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ { Galois::pairWiseAvg_vec(node.latent_vector, y); } }
-              return true;
-      		}
-      		static bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, std::array<double, LATENT_VECTOR_SIZE> *y, size_t s, DataCommMode data_mode) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) { batch_{Galois::pairWiseAvg_vec(node.latent_vector, y); }_node_latent_vector_cuda(cuda_ctx, from_id, b, o, y, s, data_mode); return true; }
-      			assert (personality == CPU);
-      		#endif
-      			return false;
-      		}
-      		static void reset (uint32_t node_id, struct NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_latent_vector_cuda(cuda_ctx, node_id, {Galois::resetVec(node.latent_vector); });
-      			else if (personality == CPU)
-      		#endif
-      				{ Galois::resetVec(node.latent_vector); }
-      		}
-      		typedef std::array<double, LATENT_VECTOR_SIZE> ValTy;
-      	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		std::string impl_str("CUDA_DO_ALL_IMPL_SGD_" + (_graph.get_run_identifier()));
@@ -606,8 +284,8 @@ struct SGD {
       #endif
       
 
-      	//_graph.sync<writeDestination, readSource, Reduce_2, Broadcast_0>("SGD");
-      	_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
+        _graph.sync<writeDestination, readSource, Reduce_pair_wise_avg_array_latent_vector, Broadcast_latent_vector>("SGD");
+        //_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
 
 
       Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"));
