@@ -132,7 +132,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   ##################### BROADCAST ##############################
   #### BROADCAST = BROADCAST_SEND + BROADCAST_EXTRACT + BROADCAST_RECV + BROADCAST_SET
   #Finding mean,max,sd BROADCAST time over all hosts
-  max_broadcast = 0
+  max_broadcast_time = 0
   sum_broadcast = 0
   for i in range(0,int(num_iter)):
     broadcast_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sBROADCAST_(?i)' + re.escape(benchmark) + r'_0_'+ re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
@@ -143,13 +143,13 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
       #print (" SYNC NUM_ARR", num_arr)
       max_broadcast_itr = numpy.max(num_arr, axis=0)
       #print ("MAX : ", max_compute)
-      max_broadcast += max_broadcast_itr
+      max_broadcast_time += max_broadcast_itr
       sum_broadcast += numpy.sum(num_arr, axis=0)
   mean_broadcast_time = float(sum_broadcast)/float(total_hosts)
 
 
   print "NEW BROADCAST_TIME ", mean_broadcast_time
-
+  '''
   ##################### BROADCAST SEND ##############################
   #Finding mean,max,sd BROADCAST time over all hosts
   max_broadcast_send = 0
@@ -234,14 +234,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   print "NEW broadcast_set_TIME ", mean_broadcast_set_time
-
+  '''
 
 
 
 
   ##################### REDUCE ##############################
   #Finding mean,max,sd REDUCE time over all hosts
-  max_reduce = 0
+  max_reduce_time = 0
   sum_reduce = 0
   for i in range(0,int(num_iter)):
     reduce_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\sREDUCE_(?i)' + re.escape(benchmark) + r'_0_'+ re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
@@ -252,14 +252,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
       #print (" SYNC NUM_ARR", num_arr)
       max_reduce_itr = numpy.max(num_arr, axis=0)
       #print ("MAX : ", max_compute)
-      max_reduce += max_reduce_itr
+      max_reduce_time += max_reduce_itr
       sum_reduce += numpy.sum(num_arr, axis=0)
   mean_reduce_time = float(sum_reduce)/float(total_hosts)
 
 
   print "NEW REDUCE_TIME ", mean_reduce_time
 
-
+  '''
   ##################### REDUCE SEND ##############################
   #Finding mean,max,sd reduce time over all hosts
   max_reduce_send = 0
@@ -343,6 +343,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   print "NEW reduce_set_TIME ", mean_reduce_set_time
+  '''
 
 
 
@@ -439,7 +440,8 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time /= divisor
     total_time = round(total_time, 3)
 
-  return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time
+  #return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time
+  return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time
 
 '''
   if timer_graph_init is not None:
@@ -624,7 +626,7 @@ def main(argv):
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
     #header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,hg_init_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes,max_comm_setup_time,max_graph_init_time"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time"
 
     header_csv_list = header_csv_str.split(',')
     try:
