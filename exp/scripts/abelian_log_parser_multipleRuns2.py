@@ -149,6 +149,17 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   print "NEW BROADCAST_TIME ", mean_broadcast_time
+
+  max_broadcast_set = 0
+  max_broadcast_recv = 0
+  max_broadcast_extract = 0
+  max_broadcast_send = 0
+
+  mean_broadcast_set_time = 0
+  mean_broadcast_recv_time = 0
+  mean_broadcast_extract_time = 0
+  mean_broadcast_send_time = 0
+
   '''
   ##################### BROADCAST SEND ##############################
   #Finding mean,max,sd BROADCAST time over all hosts
@@ -258,6 +269,16 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
 
 
   print "NEW REDUCE_TIME ", mean_reduce_time
+
+  max_reduce_set = 0
+  max_reduce_recv = 0
+  max_reduce_extract = 0
+  max_reduce_send = 0
+
+  mean_reduce_set_time = 0
+  mean_reduce_recv_time = 0
+  mean_reduce_extract_time = 0
+  mean_reduce_send_time = 0
 
   '''
   ##################### REDUCE SEND ##############################
@@ -440,8 +461,8 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
     total_time /= divisor
     total_time = round(total_time, 3)
 
-  #return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time
-  return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time
+  return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time
+  #return mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time
 
 '''
   if timer_graph_init is not None:
@@ -626,7 +647,8 @@ def main(argv):
     header_csv_str = "run-id,benchmark,platform,host,threads,"
     header_csv_str += "deviceKind,devices,"
     #header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,mean_exract_time,mean_set_time,mean_sync_time,total_sync_bytes,num_iter,num_work_items,hg_init_time,total_time,max_do_all,max_extract,max_set,max_sync,max_sync_bytes,max_comm_setup_time,max_graph_init_time"
-    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time"
+    header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,mean_broadcast_time,mean_broadcast_send_time,mean_broadcast_extract_time,mean_broadcast_recv_time,mean_broadcast_set_time,mean_reduce_time,mean_reduce_send_time,mean_reduce_extract_time,mean_reduce_recv_time,mean_reduce_set_time,max_comm_setup_time,max_graph_init_time"
+    #header_csv_str += "input,variant,partition,mean_time,rep_factor,mean_do_all,total_sync_bytes,sum_broadcast_bytes,sum_reduce_bytes,num_iter,total_work_item,hg_init_time,total_time,max_do_all,mean_sync_time,max_sync,mean_broadcast_time,max_broadcast_time,mean_reduce_time,max_reduce_time,max_comm_setup_time,max_graph_init_time"
 
     header_csv_list = header_csv_str.split(',')
     try:
