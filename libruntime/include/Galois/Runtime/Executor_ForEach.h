@@ -511,6 +511,10 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
 
+
+// TODO: Need to decide whether user should provide num_run tag or
+// num_run can be provided by loop instance which is guaranteed to be unique
+
 //! Normalize arguments to for_each
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
@@ -525,53 +529,23 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
-    auto ttpl = get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, numrun_tag(), wl_tag {}),
-            std::make_tuple(loopname {}, numrun {}, wl<defaultWL>()));
-    auto dtpl = std::tuple_cat(tpl, ttpl);
-    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
-
-    // Creates a timer for this do_all loop
-    std::string loopName(get_by_supertype<loopname_tag>(xtpl).value);
-    std::string num_run_identifier = get_by_supertype<numrun_tag>(xtpl).value;
-    std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-    Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
-
-    Timer_do_all_impl.start();
-
+    auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
     Runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl, 
           get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, numrun_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, numrun {}, wl<defaultWL>()))));
-
-    Timer_do_all_impl.stop();
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
   } else {
     auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
     auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
-    auto atpl = get_default_trait_values(dtpl, 
-            std::make_tuple(loopname_tag {}, numrun_tag(), wl_tag {}),
-            std::make_tuple(loopname {}, numrun {}, wl<defaultWL>()));
-    auto mtpl = std::tuple_cat(dtpl, atpl);
-    auto xtpl = std::tuple_cat(mtpl, typename function_traits<FunctionTy>::type {});
-
-    // Creates a timer for this do_all loop
-    std::string loopName(get_by_supertype<loopname_tag>(xtpl).value);
-    std::string num_run_identifier = get_by_supertype<numrun_tag>(xtpl).value;
-    std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-    Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
-
-    Timer_do_all_impl.start();
-
+    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
     Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl,
+        std::tuple_cat(xtpl, 
           get_default_trait_values(dtpl,
-            std::make_tuple(loopname_tag {}, numrun_tag(), wl_tag {}),
-            std::make_tuple(loopname {}, numrun {}, wl<defaultWL>()))));
-
-    Timer_do_all_impl.stop();
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
   }
 }
 

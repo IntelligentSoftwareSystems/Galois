@@ -194,8 +194,8 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) 
   // }
 // }
 
-/* Calls do_all_impl after parsing the args passed in (e.g. loopname, if you 
- * should steal work, etc.) */
+// TODO: Need to decide whether user should provide num_run tag or
+// num_run can be provided by loop instance which is guaranteed to be unique
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
@@ -204,20 +204,10 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, numrun_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, numrun{}, do_all_steal<>{})));
+        std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
+        std::make_tuple(loopname{}, do_all_steal<>{})));
 
-  // Creates a timer for this do_all loop
-  std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
-  std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
-  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-  Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
-
-  Timer_do_all_impl.start();
-
-  do_all_impl(r, fn, dtpl);
-
-  Timer_do_all_impl.stop();
+  do_all_impl( r, fn, dtpl);
 }
 
 
@@ -225,4 +215,3 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 } // end namespace Galois
 
 #endif
-
