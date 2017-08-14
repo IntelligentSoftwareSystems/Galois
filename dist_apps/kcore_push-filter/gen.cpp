@@ -241,14 +241,19 @@ struct InitializeGraph1 {
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      InitializeGraph1_all_cuda(cuda_ctx);
+      InitializeGraph1_cuda(*(_graph.begin()), *(_graph.ghost_end()), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph1{&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   InitializeGraph1{&_graph}, 
                    Galois::loopname("InitializeGraph1"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
+    // note that this sync is necessary to act as a barrier (current degree
+    // must be set to 0 among all hosts before calling InitializeGraph2)
+    // Bitset_current_degree will be empty, so it acts as a barrier (no
+    // non-trivial data should be sent)
     _graph.sync<writeSource, readDestination, Reduce_set_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph1");
 
@@ -262,8 +267,7 @@ struct InitializeGraph1 {
     src_data.flag = true;
     src_data.trim = 0;
     src_data.current_degree = 0;
-
-    bitset_current_degree.set(src);
+    // note that no bitset is set
   }
 };
 
