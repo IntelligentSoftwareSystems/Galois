@@ -522,7 +522,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
 
-  static const bool forceNew = false;
+  static constexpr bool forceNew = true;
   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
   static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
