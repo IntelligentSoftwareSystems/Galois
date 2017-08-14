@@ -182,24 +182,24 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
-    		InitializeGraph_all_cuda(cuda_ctx);
+
+        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()), 
+                                 cuda_ctx);
+
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
     {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   InitializeGraph {&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
     }
-
-    _graph.sync<writeSource, readAny, Reduce_set_comp_current, 
-                Broadcast_comp_current, Bitset_comp_current>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
-    bitset_comp_current.set(src);
   }
 };
 
