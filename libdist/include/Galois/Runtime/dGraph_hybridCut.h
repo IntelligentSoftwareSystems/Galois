@@ -209,8 +209,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                std::vector<unsigned> scalefactor, 
                bool transpose = false, 
                uint32_t VCutThreshold = 100, 
-               bool bipartite = false,
-               bool find_thread_ranges = false) : base_hGraph(host, _numHosts) {
+               bool bipartite = false) : base_hGraph(host, _numHosts) {
       if (!scalefactor.empty()) {
         if (base_hGraph::id == 0) {
           std::cerr << "WARNING: scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n";

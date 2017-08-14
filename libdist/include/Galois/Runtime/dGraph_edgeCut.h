@@ -171,8 +171,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned> scalefactor, 
-                   bool transpose = false,
-                   bool find_thread_ranges = false) : 
+                   bool transpose = false) : 
                     base_hGraph(host, _numHosts) {
       /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
        *  uint64_t& _totalNodes, unsigned _id )*/

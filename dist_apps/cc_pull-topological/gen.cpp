@@ -76,29 +76,73 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (Transpose graph)>"), cll::Required);
-static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+static cll::opt<std::string> inputFile(cll::Positional, 
+                                       cll::desc("<input file>"), 
+                                       cll::Required);
+static cll::opt<std::string> partFolder("partFolder", 
+                                        cll::desc("path to partitionFolder"), 
+                                        cll::init(""));
+static cll::opt<bool> transpose("transpose", 
+                                cll::desc("transpose the graph in memory "
+                                          "after partitioning"), 
+                                cll::init(false));
+static cll::opt<unsigned int> maxIterations("maxIterations", 
+                                            cll::desc("Maximum iterations: "
+                                                      "Default 1000"), 
+                                            cll::init(1000));
+static cll::opt<unsigned long long> src_node("srcNodeId", 
+                                             cll::desc("ID of the source node"), 
+                                             cll::init(0));
+static cll::opt<bool> verify("verify", 
+                             cll::desc("Verify results by outputting results "
+                                       "to file"), 
+                             cll::init(false));
 
-static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+static cll::opt<bool> enableVCut("enableVertexCut", 
+                                 cll::desc("Use vertex cut for graph "
+                                           "partitioning."), 
+                                 cll::init(false));
 
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
-static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
-       cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
-       cll::init(PL_VCUT));
-
+static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
+                                            cll::desc("Threshold for high "
+                                                      "degree edges."), 
+                                            cll::init(1000));
+static cll::opt<VertexCut> vertexcut("vertexcut", 
+                                     cll::desc("Type of vertex cut."),
+                                     cll::values(clEnumValN(PL_VCUT, "pl_vcut", 
+                                                            "Powerlyra Vertex Cut"), 
+                                         clEnumValN(CART_VCUT , "cart_vcut", 
+                                                    "Cartesian Vertex Cut"), 
+                                         clEnumValEnd),
+                                     cll::init(PL_VCUT));
 
 #ifdef __GALOIS_HET_CUDA__
-static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
+static cll::opt<int> gpudevice("gpu", 
+                                cll::desc("Select GPU to run on, "
+                                          "default is to choose automatically"), 
+                                cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
+      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
+                  clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
+                  clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), 
+                  clEnumValEnd),
       cll::init(CPU));
-static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
-static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for hosts on each physical node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init("c"));
+static cll::opt<unsigned> scalegpu("scalegpu", 
+      cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<unsigned> scalecpu("scalecpu", 
+      cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<int> num_nodes("num_nodes", 
+      cll::desc("Num of physical nodes with devices (default = num of hosts): " 
+                "detect GPU to use for each host automatically"), 
+      cll::init(-1));
+static cll::opt<std::string> personality_set("pset", 
+      cll::desc("String specifying personality for hosts on each physical "
+                "node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), 
+      cll::init("c"));
 #endif
 
 /******************************************************************************/
@@ -346,13 +390,13 @@ int main(int argc, char** argv) {
     if (enableVCut) {
       if(vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
+                                    scalefactor, transpose);
       else if(vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
+                                 scalefactor, transpose, VCutThreshold);
     } else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
+                             scalefactor, transpose);
     }
 
 #ifdef __GALOIS_HET_CUDA__

@@ -406,14 +406,14 @@ int main(int argc, char** argv) {
     if (enableVCut) {
       if (vertexcut == CART_VCUT)
         hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
+                                    scalefactor, transpose);
       else if (vertexcut == PL_VCUT)
         hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
+                                 scalefactor, transpose, VCutThreshold);
     }
     else {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
+                             scalefactor, transpose);
     }
 
 #ifdef __GALOIS_HET_CUDA__

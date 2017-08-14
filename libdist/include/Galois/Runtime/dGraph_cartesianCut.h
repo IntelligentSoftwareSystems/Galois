@@ -179,8 +179,7 @@ public:
   hGraph_cartesianCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
               unsigned _numHosts, std::vector<unsigned> scalefactor, 
-              bool transpose = false, 
-              bool find_thread_ranges = false) : base_hGraph(host, _numHosts) {
+              bool transpose = false) : base_hGraph(host, _numHosts) {
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
         std::cerr << "WARNING: scalefactor not supported for cartesian "
