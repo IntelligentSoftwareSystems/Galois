@@ -112,8 +112,6 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 static const float alpha = (1.0 - 0.85);
 struct NodeData {
   float value;
-  float delta;
-  std::atomic<float> residual;
   std::atomic<uint32_t> nout;
 };
 
@@ -126,6 +124,9 @@ typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
 
 typedef typename Graph::GraphNode GNode;
+
+Galois::LargeArray<float> delta;
+Galois::LargeArray<float> residual;
 
 #include "gen_sync.hh"
 
@@ -156,9 +157,9 @@ struct ResetGraph {
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
     sdata.value = 0;
-    sdata.delta = 0;
-    sdata.residual = 0;
     sdata.nout = 0;
+    delta[src] = 0;
+    residual[src] = 0;
   }
 };
 
@@ -194,9 +195,9 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
     sdata.value = 0;
-    sdata.residual = local_alpha;
+    residual[src] = local_alpha;
     bitset_residual.set(src);
-    sdata.delta = 0;
+    delta[src] = 0;
     for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
@@ -247,14 +248,14 @@ struct PageRank_delta {
   static Galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(GNode src)const {
     auto& sdata = graph->getData(src);
-    sdata.delta = 0;
-    if (sdata.residual > this->local_tolerance) {
-      sdata.value += sdata.residual;
+    delta[src] = 0;
+    if (residual[src] > this->local_tolerance) {
+      sdata.value += residual[src];
       if (sdata.nout > 0) {
-        sdata.delta = sdata.residual*(1-local_alpha)/sdata.nout;
+        delta[src] = residual[src]*(1-local_alpha)/sdata.nout;
         DGAccumulator_accum += 1;
       }
-      sdata.residual = 0;
+      residual[src] = 0;
     }
   }
 };
@@ -311,14 +312,16 @@ struct PageRank {
   }
 
   void operator()(GNode src)const {
-    auto& sdata = graph->getData(src);
+    float sum = 0;
     for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
-      auto& ddata = graph->getData(dst);
-      if (ddata.delta > 0) {
-        Galois::add(sdata.residual, ddata.delta);
-        bitset_residual.set(src);
+      if (delta[dst] > 0) {
+        sum += delta[dst];
       }
+    }
+    if (sum > 0) {
+      Galois::add(residual[src], sum);
+      bitset_residual.set(src);
     }
   }
 };
@@ -399,31 +402,31 @@ struct PageRankSanity {
   /* Gets the max, min rank from all owned nodes and
    * also the sum of ranks */
   void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
 
     if (graph->isOwned(graph->getGID(src))) {
-      if (current_max < src_data.value) {
-        current_max = src_data.value;
+      if (current_max < sdata.value) {
+        current_max = sdata.value;
       }
 
-      if (current_min > src_data.value) {
-        current_min = src_data.value;
+      if (current_min > sdata.value) {
+        current_min = sdata.value;
       }
 
-      if (current_max_residual < src_data.residual) {
-        current_max_residual = src_data.residual;
+      if (current_max_residual < residual[src]) {
+        current_max_residual = residual[src];
       }
 
-      if (current_min_residual > src_data.residual) {
-        current_min_residual = src_data.residual;
+      if (current_min_residual > residual[src]) {
+        current_min_residual = residual[src];
       }
 
-      if (src_data.residual > local_tolerance) {
+      if (residual[src] > local_tolerance) {
         DGAccumulator_residual_over_tolerance += 1;
       }
 
-      DGAccumulator_sum += src_data.value;
-      DGAccumulator_sum_residual += src_data.residual;
+      DGAccumulator_sum += sdata.value;
+      DGAccumulator_sum_residual += residual[src];
     }
   }
 };
@@ -516,6 +519,8 @@ int main(int argc, char** argv) {
       hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, scalefactor,
                              transpose, Galois::doAllKind==Galois::DOALL_RANGE);
     }
+    residual.allocateInterleaved(hg->size());
+    delta.allocateInterleaved(hg->size());
 
 
 #ifdef __GALOIS_HET_CUDA__
