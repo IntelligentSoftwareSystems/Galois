@@ -216,6 +216,12 @@ s_wl<T, Args...> wl(Args&&... args) {
 }
 
 /**
+ * Presence of timeit option will automatically time the do_all or for_each loop 
+ * */
+struct timeit_tag {};
+struct timeit: public trait_has_type<bool>, timeit_tag {};
+
+/**
  * Indicates the operator may request the parallel loop to be suspended and a
  * given function run in serial
  */

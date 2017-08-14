@@ -529,23 +529,43 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
+    // TODO: not needed any more? Remove once sure
     auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+
+    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
+    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
+
+
+    timer.start();
+
+
     Runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl, 
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
+    timer.stop();
+
   } else {
     auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
     auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+
+    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
+    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
+
+
+    timer.start();
+
     Runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl, 
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
+
+    timer.stop();
   }
 }
 

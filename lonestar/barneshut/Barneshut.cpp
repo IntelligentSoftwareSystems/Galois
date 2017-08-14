@@ -515,6 +515,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
         [&] (Body* body) {
           treeBuilder.insert(body, &top, box.radius()); 
         }, 
+        Galois::timeit(),
         Galois::loopname("BuildTree"));
     T_build.stop();
 
@@ -533,6 +534,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
         },
         Galois::loopname("compute"), 
         Galois::wl<WLL> (),
+        Galois::timeit(),
         Galois::does_not_need_aborts (),
         Galois::does_not_need_push (),
         Galois::needs_per_iter_alloc ());
