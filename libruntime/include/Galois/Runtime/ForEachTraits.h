@@ -67,11 +67,11 @@ struct ExtractForEachTraits {
       needs_parallel_break_tag,
       needs_per_iter_alloc_tag> Tags;
   typedef std::tuple<
-      does_not_need_aborts<>,
-      does_not_need_stats<>,
-      does_not_need_push<>,
-      needs_parallel_break<>,
-      needs_per_iter_alloc<>> Values;
+      does_not_need_aborts,
+      does_not_need_stats,
+      does_not_need_push,
+      needs_parallel_break,
+      needs_per_iter_alloc> Values;
   typedef typename tuple_elements<Tags, NotDefault>::type tags_type;
   typedef typename tuple_elements<Values, NotDefault>::type values_type;
 };
