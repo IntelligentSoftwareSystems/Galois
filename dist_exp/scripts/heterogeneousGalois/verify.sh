@@ -9,11 +9,11 @@ execname=$1
 EXEC=${execdirname}/${execname}
 
 #inputdirname=/net/ohm/export/cdgc/dist-inputs
-inputdirname=/workspace/dist-inputs
+inputdirname=dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/net/ohm/export/cdgc/dist-outputs
+outputdirname=dist-outputs
 #outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
@@ -31,7 +31,8 @@ if [[ ($execname == *"bc"*) ]]; then
 fi
 
 # for bc, if using rmat15, then use all sources output (without ss)
-if [[ ($execname == *"bc"*) && ($inputname == "rmat15") ]]; then
+# TODO
+if [[ ($execname == *"bc"*) && ($inputname == "rmat16") ]]; then
   OUTPUT=${outputdirname}/rmat15.bc
 fi
 
@@ -57,20 +58,15 @@ fi
 source_file=${inputdirname}/source
 if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
+  FLAGS+=" -symmetricGraph"
   extension=sgr
-elif [[ $execname == *"pull"* ]]; then
-  FLAGS+=" -transpose"
-  #inputdirname=${inputdirname}/transpose
-  #extension=tgr
-#elif [[ $inputname == *"rmat"* ]]; then
-#  inputdirname=${inputdirname}/transpose
-#  extension=tgr
-#  FLAGS+=" -transpose"
-fi
+
+# for verify purposes, always pass in graph transpose just in case it is needed
+FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 
 # bc: if rmat15 is not used, specify single source flags else do
 # all sources for rmat15
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat15") ]]; then
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
   FLAGS+=" -singleSource"
   FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
 fi
@@ -95,23 +91,23 @@ else
   SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 fi
 
+FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
+#FLAGS+=" -edgeNuma"
+
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3; do
+for partition in 1 2 3 4; do
+  CUTTYPE=
+
   if [ $partition -eq 2 ]; then
-    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
-      FLAGS+=" -enableVertexCut"
-    else
-      break
-    fi
+    CUTTYPE+=" -partition=pl_vcut"
   elif [ $partition -eq 3 ]; then
-    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
-      FLAGS+=" -vertexcut=cart_vcut"
-    else
-      break
-    fi
+    CUTTYPE+=" -partition=cart_vcut"
+  elif [ $partition -eq 4 ]; then
+    CUTTYPE+=" -partition=iec"
   fi
+
   for task in $SET; do
     old_ifs=$IFS
     IFS=",";
@@ -127,9 +123,8 @@ for partition in 1 2 3; do
     fi
     rm -f output_*.log
 
-
-    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG
-    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG 2>&1
+    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG
+    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
     #outputs="output_${hostname}_0.log"
     #i=1
     #while [ $i -lt $2 ]; do
@@ -150,12 +145,14 @@ for partition in 1 2 3; do
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
-      if [ $partition -eq 3 ]; then
+      if [ $partition -eq 4 ]; then
+        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 3 ]; then
         failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 2 ]; then
         failed_cases+="powerlyra vertex-cut $1 devices with $3 threads; "
       else
-        failed_cases+="edge-cut $1 devices with $3 threads; "
+        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
