@@ -60,6 +60,7 @@ if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   FLAGS+=" -symmetricGraph"
   extension=sgr
+fi
 
 # for verify purposes, always pass in graph transpose just in case it is needed
 FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
