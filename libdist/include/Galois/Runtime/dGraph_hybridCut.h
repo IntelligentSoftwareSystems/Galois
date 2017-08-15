@@ -23,6 +23,9 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#ifndef _GALOIS_DIST_HGRAPHHYBRID_H
+#define _GALOIS_DIST_HGRAPHHYBRID_H
+
 #include <vector>
 #include <set>
 #include <algorithm>
@@ -36,6 +39,7 @@
 #include <sstream>
 
 #include "Galois/DoAllWrap.h"
+
 
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
@@ -958,4 +962,4 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
 
 };
-
+#endif

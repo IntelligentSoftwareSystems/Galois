@@ -24,6 +24,9 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#ifndef _GALOIS_DIST_HGRAPHEC_H
+#define _GALOIS_DIST_HGRAPHEC_H
+
 #include <vector>
 #include <set>
 #include <algorithm>
@@ -517,3 +520,4 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 };
+#endif

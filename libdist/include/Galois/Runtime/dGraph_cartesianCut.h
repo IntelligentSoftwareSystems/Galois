@@ -22,6 +22,8 @@
  *
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
+#ifndef _GALOIS_DIST_HGRAPHCC_H
+#define _GALOIS_DIST_HGRAPHCC_H
 
 #include <vector>
 #include <set>
@@ -672,4 +674,4 @@ public:
   }
 
 };
-
+#endif
