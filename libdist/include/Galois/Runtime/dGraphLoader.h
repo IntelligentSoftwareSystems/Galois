@@ -80,6 +80,47 @@ static cll::opt<unsigned int> VCutThreshold("VCutThreshold",
  * Graph-loading functions
  ******************************************************************************/
 /**
+ * Loads a symmetric graph file (i.e. directed graph with edges in both 
+ * directions)
+ *
+ * @tparam NodeData node data to store in graph
+ * @tparam EdgeData edge data to store in graph
+ * @param scaleFactor How to split nodes among hosts
+ * @returns a pointer to a newly allocated hGraph based on the command line
+ * loaded based on command line arguments
+ */
+template<typename NodeData, typename EdgeData>
+hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned> 
+                                                    scaleFactor) {
+  if (!inputFileSymmetric) {
+    GALOIS_DIE("Calling constructSymmetricGraph without inputFileSymmetric "
+               "flag");
+  }
+
+  typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  
+  switch(partitionScheme) {
+    case OEC:
+    case IEC:
+      return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
+                               scaleFactor, false);
+    case PL_VCUT:
+      return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
+                                 scaleFactor, false, VCutThreshold);
+    case CART_VCUT:
+      return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    default:
+      GALOIS_DIE("Error: partition scheme specified is invalid");
+      return nullptr;
+  }
+}
+
+/**
  * Loads a graph file with the purpose of iterating over the out edges
  * of the graph.
  *
@@ -123,7 +164,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
       return nullptr;
-}
+  }
 }
 
 /**
@@ -148,7 +189,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
-  
+
   switch(partitionScheme) {
     case OEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
