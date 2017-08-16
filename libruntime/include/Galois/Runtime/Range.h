@@ -136,7 +136,7 @@ public:
 
   /* Using the thread_beginnings array which tells you which node each thread
    * should begin at, we can get the local block range for a particular 
-   * thread. If the local range falls outside of 
+   * thread. If the local range falls outside of global range, do nothing.
    *
    * @returns A pair of iterators that specifies the beginning and end
    * of the range for this particular thread.
