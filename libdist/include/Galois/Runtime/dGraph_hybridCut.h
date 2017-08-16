@@ -387,6 +387,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::determine_thread_ranges_master();
       base_hGraph::determine_thread_ranges_with_edges();
+      base_hGraph::initialize_specific_ranges();
 
       StatTimer_graph_construct.stop();
 

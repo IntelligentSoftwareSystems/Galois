@@ -204,7 +204,8 @@ public:
   block_iterator block_end() const { return block_pair().second; }
 };
 
-/** * Creates a SpecificRange object.
+/** 
+ * Creates a SpecificRange object.
  *
  * @tparam IterTy The iterator type used by the range object
  * @param begin The global beginning of the range

@@ -144,6 +144,9 @@ class hGraph: public GlobalObject {
   std::vector<uint32_t> masterRanges;
   std::vector<uint32_t> withEdgeRanges;
 
+  std::vector<Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>>
+    specificRanges;
+
   //memoization optimization
   std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For broadcast
@@ -556,26 +559,22 @@ public:
     return graph.end();
   }
 
-  // return type is Galois::Runtime::StandardRange<boost::counting_iterator<size_t>>
-  auto allNodesRange() {
-    return Galois::Runtime::makeStandardRange(
-      boost::counting_iterator<size_t>(0),
-      boost::counting_iterator<size_t>(numNodes)
-    );
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[0];
   }
 
-  auto masterNodesRange() {
-    return Galois::Runtime::makeStandardRange(
-      boost::counting_iterator<size_t>(beginMaster),
-      boost::counting_iterator<size_t>(endMaster)
-    );
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  masterNodesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[1];
   }
-
-  auto allNodesWithEdgesRange() {
-    return Galois::Runtime::makeStandardRange(
-      boost::counting_iterator<size_t>(0),
-      boost::counting_iterator<size_t>(numNodesWithEdges)
-    );
+ 
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesWithEdgesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[2];
   }
 
   // DEPRECATED: do not use
@@ -678,6 +677,46 @@ public:
       graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges, 
                                   nodeAlphaRanges);
     }
+  }
+
+  /**
+   *
+   */
+  void initialize_specific_ranges() {
+    assert(specificRanges.size() == 0);
+
+    assert(graph.getThreadRangesVector().size() != 0);
+    assert(masterRanges.size() != 0);
+    assert(withEdgeRanges.size() != 0);
+
+    // 0 is all nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(numNodes),
+        graph.getThreadRanges()
+      )
+    );
+
+    // 1 is master nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(beginMaster),
+        boost::counting_iterator<size_t>(endMaster),
+        masterRanges.data()
+      )
+    );
+
+    // 2 is with edge nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(numNodesWithEdges),
+        withEdgeRanges.data()
+      )
+    );
+
+    assert(specificRanges.size() == 3);
   }
 
   void exchange_info_init(){
