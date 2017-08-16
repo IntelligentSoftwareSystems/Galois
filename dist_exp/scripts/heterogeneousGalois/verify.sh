@@ -60,10 +60,11 @@ if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   FLAGS+=" -symmetricGraph"
   extension=sgr
+else 
+  # for verify purposes, always pass in graph transpose just in case it is 
+  # needed for non-symmetric graphs
+  FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 fi
-
-# for verify purposes, always pass in graph transpose just in case it is needed
-FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 
 # bc: if rmat15 is not used, specify single source flags else do
 # all sources for rmat15
@@ -135,9 +136,9 @@ for partition in 1 2 3 4; do
     #eval "sort -nu ${outputs} -o output_${hostname}_*.log"
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
 
-    # higher threshold for bc
-    if [[ ($execname == *"bc"*) ]]; then
-      eval "python $checker -t=0.2 $OUTPUT output_${hostname}_0.log &> .output_diff"
+    # slightly higher threshold for bc + pagerank to reduce prints to log
+    if [[ ($execname == *"bc"*) || ($execname == *"pagerank"*) ]]; then
+      eval "python $checker -t=0.01 $OUTPUT output_${hostname}_0.log &> .output_diff"
     else
       eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
     fi
