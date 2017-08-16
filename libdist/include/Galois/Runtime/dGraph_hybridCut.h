@@ -222,7 +222,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       if (balanceEdges) {
         if (base_hGraph::id == 0) {
-          std::cerr << "WARNING: balanceEdges not supported for cartesian "
+          std::cerr << "WARNING: balanceEdges not supported for hybrid "
                        " vertex-cuts\n";
         }
         balanceEdges = false;
@@ -384,6 +384,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
         StatTimer_thread_ranges.stop();
       }
+
+      base_hGraph::determine_thread_ranges_master();
+      base_hGraph::determine_thread_ranges_with_edges();
 
       StatTimer_graph_construct.stop();
 
