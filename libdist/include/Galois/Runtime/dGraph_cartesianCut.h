@@ -259,7 +259,7 @@ public:
                  numEdges << "\n";
 
     base_hGraph::numNodes = numNodes;
-    base_hGraph::numNodesWithEdges = G2L(gid2host[base_hGraph::id].second - 1) + 1;
+    base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
     base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
     base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
 
@@ -304,6 +304,9 @@ public:
       base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
       StatTimer_thread_ranges.stop();
     }
+
+    base_hGraph::determine_thread_ranges_master();
+    base_hGraph::determine_thread_ranges_with_edges();
 
     StatTimer_graph_construct.stop();
 
@@ -655,7 +658,8 @@ public:
     return numNodes;
   }
 
-  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+  void reset_bitset(typename base_hGraph::SyncType syncType, 
+                    void (*bitset_reset_range)(size_t, size_t)) const {
     size_t first_owned = G2L(gid2host[base_hGraph::id].first);
     size_t last_owned = G2L(gid2host[base_hGraph::id].second - 1);
     assert(first_owned <= last_owned);
@@ -672,6 +676,5 @@ public:
       }
     }
   }
-
 };
 #endif
