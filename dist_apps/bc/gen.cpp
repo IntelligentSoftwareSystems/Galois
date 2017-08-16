@@ -47,6 +47,8 @@
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
+#include "Galois/Runtime/dGraphLoader.h"
+
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
@@ -70,10 +72,6 @@ std::string personality_str(Personality p) {
 }
 #endif
 
-enum VertexCut {
-  PL_VCUT, CART_VCUT
-};
-
 static const char* const name = "Betweeness Centrality - "
                                 "Distributed Heterogeneous.";
 static const char* const desc = "Betweeness Centrality on Distributed Galois.";
@@ -83,40 +81,13 @@ static const char* const url = 0;
 /* Declaration of command line arguments */
 /******************************************************************************/
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional,
-                                       cll::desc("<input file>"),
-                                       cll::Required);
-static cll::opt<std::string> partFolder("partFolder",
-                                        cll::desc("path to partitionFolder"),
-                                        cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
-static cll::opt<bool> transpose("transpose", 
-                                cll::desc("transpose the graph in memory after "
-                                          "partitioning"),
-                                cll::init(false));
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
                              cll::init(false));
-static cll::opt<bool> enableVCut("enableVertexCut", 
-                                 cll::desc("Use vertex cut for graph " 
-                                           "partitioning."), 
-                                 cll::init(false));
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
-                                            cll::desc("Threshold for high "
-                                                      "degree edges."),
-                                            cll::init(100));
-static cll::opt<VertexCut> vertexcut("vertexcut", 
-                                     cll::desc("Type of vertex cut."),
-                                     cll::values(clEnumValN(PL_VCUT, "pl_vcut",
-                                                        "Powerlyra Vertex Cut"),
-                                                 clEnumValN(CART_VCUT, 
-                                                   "cart_vcut", 
-                                                   "Cartesian Vertex Cut"),
-                                                 clEnumValEnd),
-                                     cll::init(PL_VCUT));
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
@@ -192,20 +163,14 @@ struct NodeData {
   uint8_t propogation_flag;
 };
 
-// second type (unsigned int) is for edge weights
-// activate if you want to use sssp
-//typedef hGraph<NodeData, unsigned int> Graph;
-//typedef hGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
-//typedef hGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
-//typedef hGraph_cartesianCut<NodeData, unsigned int> Graph_cartesianCut;
 
 // no edge data = bfs not sssp
 typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
-
 typedef typename Graph::GraphNode GNode;
+
+// second type (unsigned int) is for edge weights
+// uncomment this along with graph load below if you want to use sssp
+//typedef hGraph<NodeData, unsigned int> Graph;
 
 // bitsets for tracking updates
 Galois::DynamicBitSet bitset_to_add;
@@ -1530,18 +1495,10 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
 
     Graph* h_graph = nullptr;
-
-    if (enableVCut) {
-      if (vertexcut == CART_VCUT)
-        h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                         scalefactor, transpose);
-      else if (vertexcut == PL_VCUT)
-        h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                      scalefactor, transpose, VCutThreshold);
-    } else {
-      h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                                  scalefactor, transpose);
-    }
+    // uses sssp
+    //h_graph = constructGraph<NodeData, unsigned int>(scalefactor);
+    // uses bfs
+    h_graph = constructGraph<NodeData, void>(scalefactor);
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
