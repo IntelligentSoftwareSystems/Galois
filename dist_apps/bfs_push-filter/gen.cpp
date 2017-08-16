@@ -152,22 +152,30 @@ struct InitializeGraph {
                     graph(_graph){}
 
   void static go(Graph& _graph){
+    auto& allNodes = _graph.allNodesRange();
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()),
+        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-                   InitializeGraph {src_node, infinity, &_graph}, 
-                   Galois::loopname("InitializeGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+
+    Galois::Runtime::do_all_coupled(
+      allNodes,
+      InitializeGraph{src_node, infinity, &_graph}, 
+      std::make_tuple(
+        Galois::loopname("InitializeGraph"), 
+        Galois::numrun(_graph.get_run_identifier())
+      )
+    );
+
     }
   }
 
@@ -203,19 +211,20 @@ struct FirstItr_BFS{
     } else if (personality == CPU)
   #endif
     {
-    //Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
-    //            FirstItr_BFS{&_graph}, Galois::loopname("BFS"), 
-    //            Galois::numrun(_graph.get_run_identifier()));
-    Galois::do_all_choice(
-        Galois::Runtime::makeStandardRange(
-          _graph.begin() + __begin, 
-          _graph.begin() + __end
-        ), 
-        FirstItr_BFS{ &_graph }, 
-        std::make_tuple(Galois::loopname("BFS"), 
-          Galois::thread_range(_graph.get_thread_ranges()),
-          Galois::numrun(_graph.get_run_identifier())
-        ));
+    // one node, doesn't matter what do all you use
+    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
+                FirstItr_BFS{&_graph}, Galois::loopname("BFS"), 
+                Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all_choice(
+    //    Galois::Runtime::makeStandardRange(
+    //      _graph.begin() + __begin, 
+    //      _graph.begin() + __end
+    //    ), 
+    //    FirstItr_BFS{ &_graph }, 
+    //    std::make_tuple(Galois::loopname("BFS"), 
+    //      Galois::thread_range(_graph.get_thread_ranges()),
+    //      Galois::numrun(_graph.get_run_identifier())
+    //    ));
     }
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
@@ -251,6 +260,8 @@ struct BFS {
     FirstItr_BFS::go(_graph);
     
     unsigned _num_iterations = 1;
+
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
       _graph.set_num_iter(_num_iterations);
@@ -261,7 +272,8 @@ struct BFS {
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        BFS_all_cuda(__retval, cuda_ctx);
+        BFS_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
+                 __retval, cuda_ctx);
         DGAccumulator_accum += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -270,14 +282,10 @@ struct BFS {
       //Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
       //  Galois::loopname("BFS"),
       //  Galois::numrun(_graph.get_run_identifier()));
-      Galois::do_all_choice(
-        Galois::Runtime::makeStandardRange(
-          _graph.begin(), 
-          _graph.end()
-        ), 
+      Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
         BFS{ &_graph }, 
         std::make_tuple(Galois::loopname("BFS"), 
-          Galois::thread_range(_graph.get_thread_ranges()),
           Galois::numrun(_graph.get_run_identifier())
         ));
       //Galois::do_all_local(_graph,
