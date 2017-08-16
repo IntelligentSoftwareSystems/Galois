@@ -1,3 +1,31 @@
+/** dGraph loader -*- C++ -*-
+ * @file
+ * dGraphLoader.h
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * Command line arguments and functions for loading dGraphs into memory
+ *
+ * @author Loc Hoang <l_hoang@utexas.edu>
+ */
+
 #ifndef D_GRAPH_LOADER
 #define D_GRAPH_LOADER
 
@@ -6,11 +34,16 @@
 #include "Galois/Runtime/dGraph_cartesianCut.h"
 #include "Galois/Runtime/dGraph_hybridCut.h"
 
+/*******************************************************************************
+ * Supported partitioning schemes
+ ******************************************************************************/
 enum PARTITIONING_SCHEME {
   OEC, IEC, PL_VCUT, CART_VCUT
 };
-//enum EDGE_ITERATE { ITERATE_OUT, ITERATE_IN };
 
+/*******************************************************************************
+ * Graph-loading-related command line arguments
+ ******************************************************************************/
 namespace cll = llvm::cl;
 
 static cll::opt<std::string> inputFile(cll::Positional, 
@@ -43,7 +76,22 @@ static cll::opt<unsigned int> VCutThreshold("VCutThreshold",
                                                       "degree edges."), 
                                             cll::init(1000));
 
-
+/*******************************************************************************
+ * Graph-loading functions
+ ******************************************************************************/
+/**
+ * Loads a graph file with the purpose of iterating over the out edges
+ * of the graph.
+ *
+ * @tparam NodeData node data to store in graph
+ * @tparam EdgeData edge data to store in graph
+ * @tparam iterateOut says if you want to iterate over out edges or not; if
+ * false, will iterate over in edgse
+ * @tparam enable_if this function  will only be enabled if iterateOut is true
+ * @param scaleFactor How to split nodes among hosts
+ * @returns a pointer to a newly allocated hGraph based on the command line
+ * loaded based on command line arguments
+ */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<iterateOut>::type* = nullptr>
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
@@ -78,6 +126,20 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
 }
 }
 
+/**
+ * Loads a graph file with the purpose of iterating over the in edges
+ * of the graph.
+ *
+ * @tparam NodeData node data to store in graph
+ * @tparam EdgeData edge data to store in graph
+ * @tparam iterateOut says if you want to iterate over out edges or not; if
+ * false, will iterate over in edgse
+ * @tparam enable_if this function  will only be enabled if iterateOut is false
+ * (i.e. iterate over in-edges)
+ * @param scaleFactor How to split nodes among hosts
+ * @returns a pointer to a newly allocated hGraph based on the command line
+ * loaded based on command line arguments
+ */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<!iterateOut>::type* = nullptr>
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
@@ -105,7 +167,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                    scaleFactor, false, VCutThreshold);
       } else {
-        GALOIS_DIE("Error: iterate over in edges without transpose graph");
+        GALOIS_DIE("Error: (plc) iterate over in-edges without transpose graph");
         break;
       }
 
@@ -114,7 +176,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                       scaleFactor, false);
       } else {
-        GALOIS_DIE("Error: iterate over in edges without transpose graph");
+        GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
         break;
       }
     default:
