@@ -327,7 +327,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       
       base_hGraph::numOwned = numNodes;
-      base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
+      //base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
+      base_hGraph::numNodes = numNodes;
       base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
       base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
       base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
