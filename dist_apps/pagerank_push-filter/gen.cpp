@@ -45,9 +45,7 @@
 
 #include "Galois/DistAccumulator.h"
 
-enum VertexCut {
-  PL_VCUT, CART_VCUT
-};
+#include "Galois/Runtime/dGraphLoader.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_device.h"
@@ -71,38 +69,53 @@ std::string personality_str(Personality p) {
 }
 #endif
 
-/******************************************************************************/
-/* Declaration of command line arguments */
-/******************************************************************************/
-
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";
 static const char* const url = 0;
 
+/******************************************************************************/
+/* Declaration of command line arguments */
+/******************************************************************************/
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
-static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
+static cll::opt<float> tolerance("tolerance", 
+                                 cll::desc("tolerance for residual"), 
+                                 cll::init(0.000001));
+static cll::opt<unsigned int> maxIterations("maxIterations", 
+                                cll::desc("Maximum iterations: Default 1000"),
+                                cll::init(1000));
+static cll::opt<bool> verify("verify", 
+                         cll::desc("Verify ranks by printing to file"), 
+                         cll::init(false));
 
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
-static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
-       cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
-       cll::init(PL_VCUT));
 
 #ifdef __GALOIS_HET_CUDA__
-static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
+static cll::opt<int> gpudevice("gpu", 
+                                cll::desc("Select GPU to run on, "
+                                          "default is to choose automatically"), 
+                                cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
+      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
+                  clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
+                  clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), 
+                  clEnumValEnd),
       cll::init(CPU));
-static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
-static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for hosts on each physical node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init("c"));
+static cll::opt<unsigned> scalegpu("scalegpu", 
+      cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<unsigned> scalecpu("scalecpu", 
+      cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<int> num_nodes("num_nodes", 
+      cll::desc("Num of physical nodes with devices (default = num of hosts): " 
+                "detect GPU to use for each host automatically"), 
+      cll::init(-1));
+static cll::opt<std::string> personality_set("pset", 
+      cll::desc("String specifying personality for hosts on each physical "
+                "node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), 
+      cll::init("c"));
 #endif
 
 /******************************************************************************/
@@ -119,16 +132,12 @@ Galois::DynamicBitSet bitset_residual;
 Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
-
 typedef typename Graph::GraphNode GNode;
+typedef GNode WorkItem;
 
 Galois::LargeArray<float> delta;
 Galois::LargeArray<std::atomic<float> > residual;
 
-typedef GNode WorkItem;
 
 #include "gen_sync.hh"
 
@@ -506,21 +515,10 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
+    hg = constructGraph<NodeData, void>(scalefactor);
 
-    if (enableVCut){
-      if (vertexcut == CART_VCUT)
-        hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                    scalefactor, transpose);
-      else if (vertexcut == PL_VCUT)
-        hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold);
-    } else {
-      hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, scalefactor,
-                             transpose);
-    }
     residual.allocateInterleaved(hg->size());
     delta.allocateInterleaved(hg->size());
-
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
