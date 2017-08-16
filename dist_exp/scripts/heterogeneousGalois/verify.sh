@@ -31,7 +31,8 @@ if [[ ($execname == *"bc"*) ]]; then
 fi
 
 # for bc, if using rmat15, then use all sources output (without ss)
-# TODO
+# TODO currently even rmat15 uses single source, hence rmat16 which doesn't 
+# exist
 if [[ ($execname == *"bc"*) && ($inputname == "rmat16") ]]; then
   OUTPUT=${outputdirname}/rmat15.bc
 fi
@@ -68,6 +69,7 @@ fi
 
 # bc: if rmat15 is not used, specify single source flags else do
 # all sources for rmat15
+# TODO currently uses rmat16 (doesn't exist) so everything does single source
 if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
   FLAGS+=" -singleSource"
   FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
