@@ -36,7 +36,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/Mem.h"
 #include "Galois/WorkList/AltChunked.h"
 #include "Galois/WorkList/ExternalReference.h"

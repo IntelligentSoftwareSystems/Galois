@@ -41,7 +41,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/WorkList/Simple.h"
 
 #include <algorithm>

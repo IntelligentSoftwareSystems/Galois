@@ -22,7 +22,6 @@
  */
 
 #include "Galois/Runtime/PerHostStorage.h"
-#include "Galois/Runtime/ll/gio.h"
 
 #include <mutex>
 #include <algorithm>

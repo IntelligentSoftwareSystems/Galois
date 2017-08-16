@@ -34,7 +34,7 @@
 #include "Galois/RangePQ.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -57,7 +57,7 @@ class SortedRangeWindowWL: private boost::noncopyable {
 public:
 
   explicit SortedRangeWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {
-    Substrate::gPrint("Using SortedRangeWindowWL\n");
+    gPrint("Using SortedRangeWindowWL\n");
   }
 
   template <typename R>
@@ -216,7 +216,7 @@ class WindowWLbase: private boost::noncopyable {
 
 protected:
 
-  using dbg = Galois::Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 
   Cmp cmp;
   PerThrdWL m_wl;
@@ -433,7 +433,7 @@ public:
   explicit PQwindowWL (const Cmp& cmp=Cmp ())
     : Base (cmp)
   {
-    Substrate::gPrint("Using PQwindowWL\n");
+    gPrint("Using PQwindowWL\n");
   }
 
 
@@ -474,7 +474,7 @@ public:
   explicit SetWindowWL (const Cmp& cmp=Cmp ())
     : Base (cmp)
   {
-    Substrate::gPrint("Using SetwindowWL\n");
+    gPrint("Using SetwindowWL\n");
   }
 
 

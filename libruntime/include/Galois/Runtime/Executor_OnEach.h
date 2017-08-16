@@ -36,7 +36,7 @@
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
 #include "Galois/Threads.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
 
 #include <tuple>

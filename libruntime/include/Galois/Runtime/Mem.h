@@ -41,7 +41,7 @@
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Substrate/NumaMem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/PagePool.h"
 
 #include <memory>

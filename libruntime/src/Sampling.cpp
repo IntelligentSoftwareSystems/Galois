@@ -31,7 +31,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/EnvCheck.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include <cstdlib>
 
 static void endPeriod() {
@@ -57,14 +57,14 @@ static void begin() {
   if (!isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     __itt_resume();
   isOn = true;
-  Galois::Substrate::gDebug("vtune sampling started");
+  Galois::gDebug("vtune sampling started");
 }
 
 static void end() {
   if (isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     __itt_pause();
   isOn = false;
-  Galois::Substrate::gDebug("vtune sampling stopped");
+  Galois::gDebug("vtune sampling stopped");
 }
 }
 #else

@@ -43,7 +43,7 @@
 #include "Event.h"
 
 #include "Galois/PriorityQueue.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 //TODO: modeling one output for now. Need to extend for multiple outputs
 /**
@@ -110,7 +110,7 @@ public:
     if (inputTimes[inIdx] > e.getRecvTime () 
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
-      Galois::Substrate::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
+      Galois::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
 
       assert (inputTimes[inIdx] <= e.getRecvTime ());
 

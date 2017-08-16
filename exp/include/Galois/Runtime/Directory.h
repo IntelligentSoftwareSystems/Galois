@@ -33,7 +33,6 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Tracer.h"
-#include "Galois/Runtime/gio.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Runtime//TID.h"
 

@@ -55,7 +55,7 @@
 #include "Galois/Runtime/IKDGbase.h"
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Runtime/Mem.h"

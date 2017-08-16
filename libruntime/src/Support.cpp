@@ -30,7 +30,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/StatCollector.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/StaticInstance.h"
 #include "Galois/Runtime/Mem.h"
 #include <iostream>

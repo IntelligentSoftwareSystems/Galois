@@ -1,5 +1,5 @@
 #include "Galois/TwoLevelIteratorA.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <algorithm>
 #include <boost/iterator/counting_iterator.hpp>

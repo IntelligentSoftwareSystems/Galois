@@ -33,7 +33,7 @@
 #ifndef GALOIS_TWOLEVELITERATORA_H
 #define GALOIS_TWOLEVELITERATORA_H
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <cassert>

@@ -30,7 +30,7 @@
 #include "Galois/Substrate/PerThreadStorage.h"
 
 //#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include <mutex>
 
 __thread char* Galois::Substrate::ptsBase;

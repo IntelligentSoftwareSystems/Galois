@@ -31,7 +31,7 @@
 #ifndef GALOIS_LAZYOBJECT_H
 #define GALOIS_LAZYOBJECT_H
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/TypeTraits.h"
 
 // For consistent name, use boost rather than C++11 std::is_trivially_constuctible

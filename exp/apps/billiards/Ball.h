@@ -35,7 +35,7 @@
 #include "CollidingObject.h"
 
 #include "Galois/FlatSet.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -251,7 +251,7 @@ class BallOptimWrapper  {
   using CheckP = std::pair<E, B*>;
   using StateLog = Galois::gstl::List<CheckP>;
 
-  using dbg = Galois::Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 
   B* m_ball;
   BallAlloc m_alloc;

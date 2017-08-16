@@ -30,10 +30,10 @@
 #include "Galois/CilkInit.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
+#include "Galois/gIO.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/TID.h"
+#include "Galois/Substrate/EnvCheck.h"
 
 #ifdef HAVE_CILK
 #include <cilk/cilk.h>

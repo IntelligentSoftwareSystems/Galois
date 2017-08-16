@@ -32,7 +32,7 @@
 #define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
 
 #include "Galois/Runtime/PagePool.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"

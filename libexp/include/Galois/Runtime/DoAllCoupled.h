@@ -49,7 +49,7 @@
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include "Galois/Timer.h"
 #include "Galois/OrderedTraits.h"
@@ -131,7 +131,7 @@ namespace Galois {
 
     void print (void) const { 
       
-      Substrate::gPrint (m_name , " [" , m_values.size () , "]"
+      gPrint (m_name , " [" , m_values.size () , "]"
         , ", max = " , m_max
         , ", min = " , m_min
         , ", sum = " , m_sum
@@ -139,13 +139,13 @@ namespace Galois {
         , ", range = " , range () 
         , "\n");
 
-      Substrate::gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
+      gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
 
       for (typename std::vector<T>::const_iterator i = m_values.begin (), endi = m_values.end ();
           i != endi; ++i) {
-        Substrate::gPrint ( *i , ", ");
+        gPrint ( *i , ", ");
       }
-      Substrate::gPrint ("]\n");
+      gPrint ("]\n");
     }
 
   };
@@ -585,7 +585,7 @@ private:
     // work_timer.print ();
     // steal_timer.print ();
     // term_timer.print ();
-    Substrate::gPrint ("--------\n");
+    gPrint ("--------\n");
   }
 
 

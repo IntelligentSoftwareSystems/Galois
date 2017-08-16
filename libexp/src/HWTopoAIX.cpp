@@ -31,9 +31,9 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/EnvCheck.h"
+#include "Galois/gIO.h"
 
 #include <vector>
 #include <cerrno>
@@ -46,7 +46,7 @@
 #include <sys/processor.h>
 #include <sys/thread.h>
 
-using namespace Galois::Runtime::LL;
+using namespace Galois::Substrate;
 
 namespace {
 

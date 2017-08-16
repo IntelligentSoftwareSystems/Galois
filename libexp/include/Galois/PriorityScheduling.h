@@ -36,7 +36,7 @@
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListExperimental.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 namespace Exp {
 
@@ -93,7 +93,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-        Galois::Substrate::gInfo("WorkList ", #__x);                    \
+        Galois::gInfo("WorkList ", #__x);                    \
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<__x>()); \
@@ -103,7 +103,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-        Galois::Substrate::gInfo("WorkList ", "NI_" #__x);              \
+        Galois::gInfo("WorkList ", "NI_" #__x);              \
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<NoInlineFilter<__x>>()); \

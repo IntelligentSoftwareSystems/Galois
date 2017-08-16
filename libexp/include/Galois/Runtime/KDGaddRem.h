@@ -52,7 +52,7 @@
 
 #include "Galois/WorkList/WorkList.h"
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include "llvm/ADT/SmallVector.h"
 

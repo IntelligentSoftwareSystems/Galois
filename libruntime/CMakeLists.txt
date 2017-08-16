@@ -1,5 +1,6 @@
 set(sources
         src/Context.cpp
+        src/gio.cpp
         src/PreAlloc.cpp
         src/Support.cpp
         src/Threads.cpp
@@ -14,6 +15,7 @@ set(sources
         src/StatCollector.cpp
 )
 
+# FIXME: duplicate target
 add_library(galois_runtime STATIC ${sources})
 target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

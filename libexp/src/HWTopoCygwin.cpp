@@ -35,9 +35,9 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/EnvCheck.h"
+#include "Galois/gIO.h"
 
 #include <vector>
 #include <functional>
@@ -49,7 +49,7 @@
 
 #include <sched.h>
 
-using namespace Galois::Runtime::LL;
+using namespace Galois::Substrate;
 
 namespace {
 

@@ -12,8 +12,6 @@
 #include "Galois/Graphs/Graph3.h"
 #include "Galois/Runtime/DistSupport.h"
 
-#include "Galois/Runtime/ll/gio.h"
-
 #include <cassert>
 #include <stdlib.h>
 

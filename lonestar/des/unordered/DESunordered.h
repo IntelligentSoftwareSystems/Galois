@@ -35,7 +35,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/WorkList/WorkList.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include "DESunorderedBase.h"
 
@@ -111,7 +111,7 @@ class DESunordered: public DESunorderedBase {
         // should be past the fail-safe point by now
 
         if (DEBUG) {
-          Galois::Substrate::gDebug("processing : ", srcObj->str ().c_str ());
+          Galois::gDebug("processing : ", srcObj->str ().c_str ());
         }
 
         maxPending.update (srcObj->numPendingEvents ());
@@ -129,7 +129,7 @@ class DESunordered: public DESunorderedBase {
               && !bool (onWLflags [dstObj->getID ()])
               && onWLflags[dstObj->getID ()].cas (false, true)) {
             if (DEBUG) {
-              Galois::Substrate::gDebug ("Added %d neighbor: ", 
+              Galois::gDebug ("Added %d neighbor: ", 
                   bool (onWLflags[dstObj->getID ()]), dstObj->str ().c_str ());
             }
 
@@ -145,7 +145,7 @@ class DESunordered: public DESunorderedBase {
           lwl.push (activeNode);
           
           if (DEBUG) {
-            Galois::Substrate::gDebug ("Added %d self: " 
+            Galois::gDebug ("Added %d self: " 
                 , bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
 
@@ -153,7 +153,7 @@ class DESunordered: public DESunorderedBase {
           onWLflags[srcObj->getID ()] = false;
 
           if (DEBUG) {
-            Galois::Substrate::gDebug ("not adding %d self: ", 
+            Galois::gDebug ("not adding %d self: ", 
                 bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
         }

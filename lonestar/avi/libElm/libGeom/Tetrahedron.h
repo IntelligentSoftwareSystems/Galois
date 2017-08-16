@@ -29,7 +29,7 @@
 #ifndef TETRAHEDRON_H
 #define TETRAHEDRON_H
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <algorithm>
 #include <cassert>

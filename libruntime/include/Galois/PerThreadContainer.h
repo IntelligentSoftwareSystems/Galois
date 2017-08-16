@@ -56,7 +56,7 @@
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 namespace Galois {
 
