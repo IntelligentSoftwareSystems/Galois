@@ -246,7 +246,8 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
   return static_cast<char*>(base) + alignment;
 }
 
-void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, EdgeRange erange) {
+void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, 
+                             EdgeRange erange) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
     GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
@@ -400,14 +401,18 @@ uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
 FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
   size_t idx = 0;
   if (N > nodeOffset)
-    idx = std::min(convert_le64toh(outIdx[N-1-nodeOffset]), static_cast<uint64_t>(edgeOffset + numEdges)) - edgeOffset;
+    idx = std::min(convert_le64toh(outIdx[N-1-nodeOffset]), 
+                   static_cast<uint64_t>(edgeOffset + numEdges)) - 
+          edgeOffset;
   return edge_iterator(idx);
 }
 
 FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
   size_t idx = 0;
   if (N >= nodeOffset)
-    idx = std::min(convert_le64toh(outIdx[N-nodeOffset]), static_cast<uint64_t>(edgeOffset + numEdges)) - edgeOffset;
+    idx = std::min(convert_le64toh(outIdx[N-nodeOffset]), 
+                   static_cast<uint64_t>(edgeOffset + numEdges)) - 
+          edgeOffset;
   return edge_iterator(idx);
 }
 
