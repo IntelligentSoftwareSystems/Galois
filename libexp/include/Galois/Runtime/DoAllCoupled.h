@@ -722,8 +722,7 @@ void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple)
 
   // Creates a timer for this do_all loop
   std::string loopName(get_by_supertype<loopname_tag>(argsT).value);
-  std::string num_run_identifier = get_by_supertype<numrun_tag>(argsT).value;
-  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
+  std::string timer_do_all_str("DO_ALL_IMPL_" + loopName);
   Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
 
   Timer_do_all_impl.start();
