@@ -2941,9 +2941,16 @@ public:
     num_iteration = iteration;
   }
 
-  std::string get_run_identifier(){
-    return std::string(std::to_string(num_run) + "_" + std::to_string(num_iteration));
+  std::string get_run_identifier() {
+    return std::string(std::to_string(num_run) + "_" + 
+                       std::to_string(num_iteration));
   }
+
+  std::string get_run_identifier(std::string loop_name) {
+    return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
+                       "_" + std::to_string(num_iteration));
+  }
+
   /** Report stats to be printed.**/
   void reportStats(){
     statGhostNodes.report();
