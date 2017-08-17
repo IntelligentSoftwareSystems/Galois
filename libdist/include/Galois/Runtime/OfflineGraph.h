@@ -82,92 +82,84 @@ class OfflineGraph {
   Galois::Substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
-    //std::lock_guard<decltype(lock)> lg(lock);
+    std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + node) * sizeof(uint64_t);
 
-    return *((uint64_t*)((char*)file_buffer + pos));
-
     // move to correct position in file
-    //if (locEdgeDst != pos) {
-    //  numSeeksEdgeDst++;
-    //  fileEdgeDst.seekg(pos, fileEdgeDst.beg);
-    //  locEdgeDst = pos;
-    //}
+    if (locEdgeDst != pos) {
+      numSeeksEdgeDst++;
+      fileEdgeDst.seekg(pos, fileEdgeDst.beg);
+      locEdgeDst = pos;
+    }
 
-    //// read the value
-    //uint64_t retval;
-    //try {
-    //  fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-    //} catch (std::ifstream::failure e) {
-    //  std::cerr << "Exception while reading edge destinations:" << e.what() << "\n";
-    //  std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL " << fileEdgeDst.fail() << " BAD " << fileEdgeDst.bad() << "\n";
-    //}
+    // read the value
+    uint64_t retval;
+    try {
+      fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+    } catch (std::ifstream::failure e) {
+      std::cerr << "Exception while reading edge destinations:" << e.what() << "\n";
+      std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL " << fileEdgeDst.fail() << " BAD " << fileEdgeDst.bad() << "\n";
+    }
 
-    //// metadata update
-    //auto numBytesRead = fileEdgeDst.gcount();
-    //assert(numBytesRead == sizeof(uint64_t));
-    //locEdgeDst += numBytesRead;
-    //numBytesReadEdgeDst += numBytesRead;
+    // metadata update
+    auto numBytesRead = fileEdgeDst.gcount();
+    assert(numBytesRead == sizeof(uint64_t));
+    locEdgeDst += numBytesRead;
+    numBytesReadEdgeDst += numBytesRead;
 
-    //return retval;
+    return retval;
   }
 
   uint64_t outEdges(uint64_t edge) {
-    //std::lock_guard<decltype(lock)> lg(lock);
+    std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * 
                            (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
 
-
-    if (v2) {
-      return *((uint64_t*)((char*)file_buffer + pos));
-    } else {
-      return *((uint32_t*)((char*)file_buffer + pos));
+    // move to correct position
+    if (locIndex != pos){
+       numSeeksIndex++;
+       fileIndex.seekg(pos, fileEdgeDst.beg);
+       locIndex = pos;
     }
-    //// move to correct position
-    //if (locIndex != pos){
-    //   numSeeksIndex++;
-    //   fileIndex.seekg(pos, fileEdgeDst.beg);
-    //   locIndex = pos;
-    //}
 
-    //// v2 reads 64 bits, v1 reads 32 bits
-    //if (v2) {
-    //  uint64_t retval;
-    //  try {
-    //    fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
-    //  }
-    //  catch (std::ifstream::failure e) {
-    //    std::cerr << "Exception while reading index:" << e.what() << "\n";
-    //    std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
-    //  }
+    // v2 reads 64 bits, v1 reads 32 bits
+    if (v2) {
+      uint64_t retval;
+      try {
+        fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+      }
+      catch (std::ifstream::failure e) {
+        std::cerr << "Exception while reading index:" << e.what() << "\n";
+        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
+      }
 
-    //  auto numBytesRead = fileIndex.gcount();
-    //  assert(numBytesRead == sizeof(uint64_t));
-    //  locIndex += numBytesRead;
-    //  numBytesReadIndex += numBytesRead;
-    //  return retval;
-    //} else {
-    //  uint32_t retval;
-    //  try {
-    //    fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
-    //  }
-    //  catch (std::ifstream::failure e) {
-    //    std::cerr << "Exception while reading index:" << e.what() << "\n";
-    //    std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
-    //  }
+      auto numBytesRead = fileIndex.gcount();
+      assert(numBytesRead == sizeof(uint64_t));
+      locIndex += numBytesRead;
+      numBytesReadIndex += numBytesRead;
+      return retval;
+    } else {
+      uint32_t retval;
+      try {
+        fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+      }
+      catch (std::ifstream::failure e) {
+        std::cerr << "Exception while reading index:" << e.what() << "\n";
+        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
+      }
 
-    //  auto numBytesRead = fileIndex.gcount();
-    //  assert(numBytesRead == sizeof(uint32_t));
-    //  locIndex += numBytesRead;
-    //  numBytesReadIndex += numBytesRead;
-    //  return retval;
-    //}
+      auto numBytesRead = fileIndex.gcount();
+      assert(numBytesRead == sizeof(uint32_t));
+      locIndex += numBytesRead;
+      numBytesReadIndex += numBytesRead;
+      return retval;
+    }
   }
 
   template<typename T>
   T edgeData(uint64_t edge) {
     assert(sizeof(T) <= sizeEdgeData);
-    //std::lock_guard<decltype(lock)> lg(lock);
+    std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + numEdges * 
                          (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
 
@@ -175,32 +167,30 @@ class OfflineGraph {
     pos = (pos + 7) & ~7;
     pos += edge * sizeEdgeData;
 
-    return *((uint64_t*)(((char*)file_buffer) + pos));
+    if (locEdgeData != pos){
+       numSeeksEdgeData++;
+       fileEdgeData.seekg(pos, fileEdgeDst.beg);
+       locEdgeData = pos;
+    }
 
-    //if (locEdgeData != pos){
-    //   numSeeksEdgeData++;
-    //   fileEdgeData.seekg(pos, fileEdgeDst.beg);
-    //   locEdgeData = pos;
-    //}
+    T retval;
+    try {
+      fileEdgeData.read(reinterpret_cast<char*>(&retval), sizeof(T));
+    } catch (std::ifstream::failure e) {
+      std::cerr << "Exception while reading edge data:" << e.what() << "\n";
+      std::cerr << "IO error flags: EOF " << fileEdgeData.eof() << " FAIL " << fileEdgeData.fail() << " BAD " << fileEdgeData.bad() << "\n";
+    }
 
-    //T retval;
-    //try {
-    //  fileEdgeData.read(reinterpret_cast<char*>(&retval), sizeof(T));
-    //} catch (std::ifstream::failure e) {
-    //  std::cerr << "Exception while reading edge data:" << e.what() << "\n";
-    //  std::cerr << "IO error flags: EOF " << fileEdgeData.eof() << " FAIL " << fileEdgeData.fail() << " BAD " << fileEdgeData.bad() << "\n";
-    //}
-
-    //auto numBytesRead = fileEdgeData.gcount();
-    //assert(numBytesRead == sizeof(T));
-    //locEdgeData += numBytesRead;
-    //numBytesReadEdgeData += numBytesRead;
-    ///*fprintf(stderr, "READ:: %ld[", edge);
-    //for(int i=0; i<sizeof(T); ++i){
-    //   fprintf(stderr, "%c", reinterpret_cast<char*>(&retval)[i]);
-    //}
-    //fprintf(stderr, "]");*/
-    //return retval;
+    auto numBytesRead = fileEdgeData.gcount();
+    assert(numBytesRead == sizeof(T));
+    locEdgeData += numBytesRead;
+    numBytesReadEdgeData += numBytesRead;
+    /*fprintf(stderr, "READ:: %ld[", edge);
+    for(int i=0; i<sizeof(T); ++i){
+       fprintf(stderr, "%c", reinterpret_cast<char*>(&retval)[i]);
+    }
+    fprintf(stderr, "]");*/
+    return retval;
   }
 
 public:
@@ -265,10 +255,6 @@ public:
     fileEdgeDst.seekg(0, std::ios_base::beg);
     fileEdgeData.seekg(0, std::ios_base::beg);
     fileIndex.seekg(0, std::ios_base::beg);
-
-    int fd = open(name.c_str(), O_RDONLY);
-    file_buffer = mmap(nullptr, length, PROT_READ, MAP_PRIVATE, fd, 0);
-    fprintf(stderr, "mmap of file successful\n");
   }
 
   uint64_t num_seeks(){
