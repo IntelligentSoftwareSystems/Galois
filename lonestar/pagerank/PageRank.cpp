@@ -214,7 +214,8 @@ int main(int argc, char **argv) {
   Galois::StatTimer Tmain;
   Tmain.start();  
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  Galois::for_each_local(graph, PageRank{graph, tolerance}, Galois::wl<WL>());
+  Galois::for_each_local(graph, PageRank{graph, tolerance}, Galois::wl<WL>(), 
+                         Galois::loopname("Lonestar Pagerank For Each"));
   Tmain.stop();
   
   Galois::reportPageAlloc("MeminfoPost");
