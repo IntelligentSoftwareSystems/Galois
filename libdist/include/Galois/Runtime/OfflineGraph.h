@@ -433,6 +433,7 @@ class OfflineGraphWriter {
   std::fstream file;
   uint64_t numNodes, numEdges;
   bool smallData;
+  uint64_t ver;
 
   std::deque<uint64_t> edgeOffsets;
 
@@ -463,10 +464,24 @@ class OfflineGraphWriter {
   }
 
 
+  void setEdge_sorted(uint64_t dst) {
+    if(ver = 1){
+      uint32_t dst32 = dst;
+      file.write(reinterpret_cast<char*>(&dst), sizeof(uint32_t));
+    }
+    else{
+      file.write(reinterpret_cast<char*>(&dst), sizeof(uint64_t));
+    }
+  }
+
+  //void setEdge64_sorted(uint64_t dst) {
+    //file.write(reinterpret_cast<char*>(&dst), sizeof(uint32_t));
+  //}
+
+
 public:
-OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::ios_base::in | std::ios_base::out | std::ios_base::binary | std::ios_base::trunc), numNodes(0), numEdges(0), smallData(use32) {
+OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes=0, uint64_t _numEdges=0) :file(name, std::ios_base::in | std::ios_base::out | std::ios_base::binary | std::ios_base::trunc), numNodes(_numNodes), numEdges(_numEdges), smallData(use32),ver(1) {
     if (!file.is_open() || !file.good()) throw "Bad filename";
-    uint64_t ver = 1;
     uint64_t etSize = smallData ? sizeof(float) : sizeof(double);
     file.write(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
     file.write(reinterpret_cast<char*>(&etSize), sizeof(uint64_t));
@@ -482,8 +497,20 @@ OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::i
     edgeOffsets = std::move(edgeCounts);
     numNodes = edgeOffsets.size();
     numEdges = std::accumulate(edgeOffsets.begin(),edgeOffsets.end(),0);
+    std::cout << " NUM EDGES  : " << numEdges << "\n";
     std::partial_sum(edgeOffsets.begin(), edgeOffsets.end(), edgeOffsets.begin());
-    file.seekg(sizeof(uint64_t)*2, std::ios_base::beg);
+    //Nodes are greater than 2^32 so need ver = 2. 
+    if(numNodes >= 4294967296){
+      ver = 2;
+    }
+    else{
+      ver = 1;
+    }
+    uint64_t etSize = 0; //smallData ? sizeof(float) : sizeof(double);
+    file.seekg(0, std::ios_base::beg);
+    file.write(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
+    file.write(reinterpret_cast<char*>(&etSize), sizeof(uint64_t));
+    //file.seekg(sizeof(uint64_t)*2, std::ios_base::beg);
     file.write(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
     file.write(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
     for (auto i : edgeOffsets)
@@ -496,6 +523,13 @@ OfflineGraphWriter(const std::string& name, bool use32=false) :file(name, std::i
       setEdge32(src,offset,dst,val);
     else
       setEdge64(src,offset,dst,val);
+  }
+  void setEdgeSorted(uint64_t dst) {
+      setEdge_sorted(dst);
+  }
+
+  void seekEdgesDstStart(){
+    file.seekg(offsetOfDst(0), std::ios_base::beg);
   }
 };
 
