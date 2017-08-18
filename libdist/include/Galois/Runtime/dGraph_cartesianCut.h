@@ -76,7 +76,6 @@ private:
   }
 
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
-    // return (blockID / numRowHosts); // blocked, contiguous
     return (blockID % numColumnHosts); // round-robin, non-contiguous
   }
 
@@ -279,6 +278,9 @@ public:
     Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
     StatTimer_graph_construct.start();
     Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
+
+    // only used to determine node splits among hosts; abandonded later
+    // for the FileGraph which mmaps appropriate regions of memory
     Galois::Graph::OfflineGraph g(filename);
 
     base_hGraph::totalNodes = g.size();
@@ -294,8 +296,27 @@ public:
       computeOwnersBlockedNodes(g, g.size(), scalefactor);
     }
 
+    // at this point gid2Host has pairs for how to split nodes among
+    // hosts; pair has begin and end
+    uint64_t nodeBegin = gid2host[base_hGraph::id].first;
+    typename Galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
+      g.edge_begin(nodeBegin);
+
+    uint64_t nodeEnd = gid2host[base_hGraph::id].second;
+    typename Galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
+      g.edge_begin(nodeEnd);
+    
+    // file graph that is mmapped for much faster reading; will use this
+    // when possible from now on in the code
+    Galois::Graph::FileGraph fileGraph;
+
+    fileGraph.partFromFile(filename,
+      std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
+                     boost::make_counting_iterator<uint64_t>(nodeEnd)),
+      std::make_pair(edgeBegin, edgeEnd));
+
     std::vector<uint64_t> prefixSumOfEdges;
-    loadStatistics(g, prefixSumOfEdges); // first pass of the graph file
+    loadStatistics(g, fileGraph, prefixSumOfEdges); // first pass of the graph file
 
     std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
                  base_hGraph::totalOwnedNodes << "\n";
@@ -315,7 +336,7 @@ public:
     base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
 
     if (numNodes > 0) {
-      assert(numEdges > 0);
+      //assert(numEdges > 0);
 
       assert(prefixSumOfEdges.size() == numNodes);
 
@@ -336,7 +357,7 @@ public:
       }
     }
 
-    loadEdges(base_hGraph::graph, g); // second pass of the graph file
+    loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
     std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
@@ -361,6 +382,7 @@ public:
   }
 
   void loadStatistics(Galois::Graph::OfflineGraph& g, 
+                      Galois::Graph::FileGraph& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
 
@@ -386,12 +408,12 @@ public:
     Galois::Timer timer;
     timer.start();
     g.reset_seek_counters();
-    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
     for (auto src = gid2host[base_hGraph::id].first; src < gid2host[base_hGraph::id].second; ++src) {
       auto ii = ee;
-      ee = g.edge_end(src);
+      ee = fileGraph.edge_end(src);
       for (; ii < ee; ++ii) {
-        auto dst = g.getEdgeDst(ii);
+        auto dst = fileGraph.getEdgeDst(ii);
         auto h = getColumnHostID(dst);
         hasIncomingEdge[h].set(getColumnIndex(dst));
         numOutgoingEdges[h][src - rowOffset]++;
@@ -478,7 +500,9 @@ public:
   }
 
   template<typename GraphTy>
-  void loadEdges(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+  void loadEdges(GraphTy& graph, 
+                 Galois::Graph::OfflineGraph& g,
+                 Galois::Graph::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
@@ -494,7 +518,7 @@ public:
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_hGraph::totalOwnedNodes;
     Galois::on_each([&](unsigned tid, unsigned nthreads){
-      if (tid == 0) loadEdgesFromFile(graph, g);
+      if (tid == 0) loadEdgesFromFile(graph, g, fileGraph);
       // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
       if ((nthreads == 1) || (tid == 1)) receiveEdges(graph, numNodesWithEdges);
     });
@@ -505,13 +529,15 @@ public:
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdgesFromFile(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+  void loadEdgesFromFile(GraphTy& graph, 
+                         Galois::Graph::OfflineGraph& g,
+                         Galois::Graph::FileGraph& fileGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
     std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(numColumnHosts);
 
-    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
       uint32_t lsrc = 0;
       uint64_t cur = 0;
@@ -520,7 +546,7 @@ public:
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
       }
       auto ii = ee;
-      ee = g.edge_end(n);
+      ee = fileGraph.edge_end(n);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         gdst_vec[i].clear();
         gdata_vec[i].clear();
@@ -528,8 +554,8 @@ public:
         gdata_vec[i].reserve(std::distance(ii, ee));
       }
       for (; ii < ee; ++ii) {
-        uint64_t gdst = g.getEdgeDst(ii);
-        auto gdata = g.getEdgeData<typename GraphTy::edge_data_type>(ii);
+        uint64_t gdst = fileGraph.getEdgeDst(ii);
+        auto gdata = fileGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
         int i = getColumnHostID(gdst);
         if ((h_offset + i) == base_hGraph::id) {
           assert(isLocal(n));
@@ -557,12 +583,14 @@ public:
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdgesFromFile(GraphTy& graph, Galois::Graph::OfflineGraph& g) {
+  void loadEdgesFromFile(GraphTy& graph, 
+                         Galois::Graph::OfflineGraph& g,
+                         Galois::Graph::FileGraph& fileGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
 
-    auto ee = g.edge_begin(gid2host[base_hGraph::id].first);
+    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
       uint32_t lsrc = 0;
       uint64_t cur = 0;
@@ -571,13 +599,13 @@ public:
         cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
       }
       auto ii = ee;
-      ee = g.edge_end(n);
+      ee = fileGraph.edge_end(n);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         gdst_vec[i].clear();
         gdst_vec[i].reserve(std::distance(ii, ee));
       }
       for (; ii < ee; ++ii) {
-        uint64_t gdst = g.getEdgeDst(ii);
+        uint64_t gdst = fileGraph.getEdgeDst(ii);
         int i = getColumnHostID(gdst);
         if ((h_offset + i) == base_hGraph::id) {
           assert(isLocal(n));

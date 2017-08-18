@@ -230,9 +230,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
-      Galois::Graph::FileGraph mMappedGraph;
+      Galois::Graph::FileGraph fileGraph;
 
-      mMappedGraph.partFromFile(filename,
+      fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
                        boost::make_counting_iterator<uint64_t>(nodeEnd)),
         std::make_pair(edgeBegin, edgeEnd));
@@ -285,12 +285,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // we own can also be marked a ghost here if there's an outgoing edge to 
       // it)
       // Also determine prefix sums
-      auto ee = mMappedGraph.edge_begin(nodeBegin);
+      auto ee = fileGraph.edge_begin(nodeBegin);
       for (auto n = nodeBegin; n < nodeEnd; ++n) {
         auto ii = ee;
-        ee = mMappedGraph.edge_end(n);
+        ee = fileGraph.edge_end(n);
         for (; ii < ee; ++ii) {
-          ghosts[mMappedGraph.getEdgeDst(ii)] = true;
+          ghosts[fileGraph.getEdgeDst(ii)] = true;
           current_edge_sum++;
         }
 
@@ -380,7 +380,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::graph.constructNodes();
       //std::cerr << "[" << base_hGraph::id << "] Construct nodes done" << "\n";
 
-      loadEdges(base_hGraph::graph, mMappedGraph);
+      loadEdges(base_hGraph::graph, fileGraph);
       std::cerr << "[" << base_hGraph::id << "] Edges loaded" << "\n";
 
       if (transpose) {
@@ -446,7 +446,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& mMappedGraph) {
+  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
     }
@@ -456,14 +456,14 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     //g.reset_seek_counters();
 
     uint64_t cur = 0;
-    auto ee = mMappedGraph.edge_begin(gid2host[base_hGraph::id].first);
+    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
       auto ii = ee;
-      ee = mMappedGraph.edge_end(n);
+      ee = fileGraph.edge_end(n);
       for (; ii < ee; ++ii) {
-        auto gdst = mMappedGraph.getEdgeDst(ii);
+        auto gdst = fileGraph.getEdgeDst(ii);
         decltype(gdst) ldst = G2L(gdst);
-        auto gdata = mMappedGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
+        auto gdata = fileGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
         graph.constructEdge(cur++, ldst, gdata);
       }
       graph.fixEndEdge(G2L(n), cur);
@@ -479,7 +479,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& mMappedGraph) {
+  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
     }
@@ -489,12 +489,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     //g.reset_seek_counters();
 
     uint64_t cur = 0;
-    auto ee = mMappedGraph.edge_begin(gid2host[base_hGraph::id].first);
+    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
     for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
       auto ii = ee;
-      ee = mMappedGraph.edge_end(n);
+      ee = fileGraph.edge_end(n);
       for (; ii < ee; ++ii) {
-        auto gdst = mMappedGraph.getEdgeDst(ii);
+        auto gdst = fileGraph.getEdgeDst(ii);
         decltype(gdst) ldst = G2L(gdst);
         graph.constructEdge(cur++, ldst);
       }
