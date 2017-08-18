@@ -141,6 +141,10 @@ class hGraph: public GlobalObject {
   uint32_t beginMaster; // local id of the beginning of master nodes.
   uint32_t endMaster; // local id of the end of master nodes.
 
+  // Master nodes on each host.
+  std::vector<std::pair<uint64_t, uint64_t>> gid2host;
+  uint64_t last_nodeID_withEdges_bipartite;
+
   std::vector<uint32_t> masterRanges;
   std::vector<uint32_t> withEdgeRanges;
 
@@ -240,6 +244,98 @@ class hGraph: public GlobalObject {
       auto& r = graph.getEdgeData(ni, mflag);
       return r;
    }
+
+private:
+
+  // compute owners by blocking Nodes
+  void computeMastersBlockedNodes(Galois::Graph::OfflineGraph& g, 
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+    if (scalefactor.empty() || (numHosts == 1)) {
+      for (unsigned i = 0; i < numHosts; ++i)
+        gid2host.push_back(Galois::block_range(
+                             0U, (unsigned)numNodes_to_divide, i, 
+                             numHosts));
+    } else {
+      assert(scalefactor.size() == numHosts);
+
+      unsigned numBlocks = 0;
+      for (unsigned i = 0; i < numHosts; ++i)
+        numBlocks += scalefactor[i];
+
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      for (unsigned i = 0; i < numBlocks; ++i)
+        blocks.push_back(Galois::block_range(
+                           0U, (unsigned)numNodes_to_divide, i, numBlocks));
+
+      std::vector<unsigned> prefixSums;
+      prefixSums.push_back(0);
+      for (unsigned i = 1; i < numHosts; ++i)
+        prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
+      for (unsigned i = 0; i < numHosts; ++i) {
+        unsigned firstBlock = prefixSums[i];
+        unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
+        gid2host.push_back(std::make_pair(blocks[firstBlock].first, 
+                                          blocks[lastBlock].second));
+      }
+    }
+  }
+
+  // compute owners while trying to balance edges
+  void computeMastersBalancedEdges(Galois::Graph::OfflineGraph& g,
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (id == 0) {
+      // compute owners for all hosts and send that info to all hosts
+      Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
+                           numHosts,
+                           gid2host, nodeAlphaBalance, scalefactor);
+      for (unsigned h = 1; h < numHosts; ++h) {
+        Galois::Runtime::SendBuffer b;
+        Galois::Runtime::gSerialize(b, gid2host);
+        net.sendTagged(h, Galois::Runtime::evilPhase, b);
+      }
+      net.flush();
+    } else {
+      // receive computed owners from host 0
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first == 0);
+      auto& b = p->second;
+      Galois::Runtime::gDeserialize(b, gid2host);
+    }
+    ++Galois::Runtime::evilPhase;
+  }
+
+protected:
+
+  uint64_t computeMasters(Galois::Graph::OfflineGraph& g,
+      std::vector<unsigned>& scalefactor,
+      bool isBipartite = false) {
+    uint64_t numNodes_to_divide = 0;
+
+    if (isBipartite) {
+      for (uint64_t n = 0; n < g.size(); ++n){
+        if(std::distance(g.edge_begin(n), g.edge_end(n))){
+                ++numNodes_to_divide;
+                last_nodeID_withEdges_bipartite = n;
+        }
+      }
+    } else {
+      numNodes_to_divide = g.size();
+    }
+
+    // compute masters for all nodes
+    if (balanceEdges) {
+      computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor);
+    } else {
+      computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor);
+    }
+
+    return numNodes_to_divide;
+  }
 
 public:
    GraphTy & getGraph() {

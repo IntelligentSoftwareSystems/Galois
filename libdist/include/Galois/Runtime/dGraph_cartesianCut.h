@@ -93,7 +93,7 @@ private:
     for (auto b = 0U; b <= blockID; ++b) {
       if (getColumnHostIDOfBlock(b) == h) {
         uint64_t start, end;
-        std::tie(start, end) = gid2host[b];
+        std::tie(start, end) = base_hGraph::gid2host[b];
         if (gid < end) {
           columnIndex += gid - start;
           break; // redundant
@@ -135,75 +135,11 @@ private:
     return false;
   }
 
-  // compute owners by blocking Nodes
-  void computeOwnersBlockedNodes(Galois::Graph::OfflineGraph& g, 
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
-    if (scalefactor.empty() || (base_hGraph::numHosts == 1)) {
-      for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-        gid2host.push_back(Galois::block_range(
-                             0U, (unsigned)numNodes_to_divide, i, 
-                             base_hGraph::numHosts));
-    } else {
-      assert(scalefactor.size() == base_hGraph::numHosts);
-
-      unsigned numBlocks = 0;
-      for (unsigned i = 0; i < base_hGraph::numHosts; ++i)
-        numBlocks += scalefactor[i];
-
-      std::vector<std::pair<uint64_t, uint64_t>> blocks;
-      for (unsigned i = 0; i < numBlocks; ++i)
-        blocks.push_back(Galois::block_range(
-                           0U, (unsigned)numNodes_to_divide, i, numBlocks));
-
-      std::vector<unsigned> prefixSums;
-      prefixSums.push_back(0);
-      for (unsigned i = 1; i < base_hGraph::numHosts; ++i)
-        prefixSums.push_back(prefixSums[i - 1] + scalefactor[i - 1]);
-      for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-        unsigned firstBlock = prefixSums[i];
-        unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
-        gid2host.push_back(std::make_pair(blocks[firstBlock].first, 
-                                          blocks[lastBlock].second));
-      }
-    }
-  }
-
-  // compute owners while trying to balance edges
-  void computeOwnersBalancedEdges(Galois::Graph::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    if (base_hGraph::id == 0) {
-      // compute owners for all hosts and send that info to all hosts
-      Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
-                           base_hGraph::numHosts,
-                           gid2host, nodeAlphaBalance, scalefactor);
-      for (unsigned h = 1; h < base_hGraph::numHosts; ++h) {
-        Galois::Runtime::SendBuffer b;
-        Galois::Runtime::gSerialize(b, gid2host);
-        net.sendTagged(h, Galois::Runtime::evilPhase, b);
-      }
-      net.flush();
-    } else {
-      // receive computed owners from host 0
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first == 0);
-      auto& b = p->second;
-      Galois::Runtime::gDeserialize(b, gid2host);
-    }
-    ++Galois::Runtime::evilPhase;
-  }
-
 public:
   // GID = localToGlobalVector[LID]
   std::vector<uint64_t> localToGlobalVector; // TODO use LargeArray instead
   // LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
-  //LID Node owned by host i. Stores ghost nodes from each host.
-  std::vector<std::pair<uint64_t, uint64_t>> gid2host; // for reading graph only
 
   uint32_t numNodes;
   uint64_t numEdges;
@@ -213,7 +149,7 @@ public:
     assert(gid < base_hGraph::totalNodes);
     for (auto h = 0U; h < base_hGraph::numHosts; ++h) {
       uint64_t start, end;
-      std::tie(start, end) = gid2host[h];
+      std::tie(start, end) = base_hGraph::gid2host[h];
       if (gid >= start && gid < end) {
         return h;
       }
@@ -225,7 +161,7 @@ public:
   // Return if gid is Owned by local host.
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
-    std::tie(start, end) = gid2host[base_hGraph::id];
+    std::tie(start, end) = base_hGraph::gid2host[base_hGraph::id];
     return gid >= start && gid < end;
   }
 
@@ -289,20 +225,15 @@ public:
     }
     factorize_hosts();
 
-    // compute owners for all nodes
-    if (balanceEdges) {
-      computeOwnersBalancedEdges(g, g.size(), scalefactor);
-    } else {
-      computeOwnersBlockedNodes(g, g.size(), scalefactor);
-    }
+    base_hGraph::computeMasters(g, scalefactor, false);
 
     // at this point gid2Host has pairs for how to split nodes among
     // hosts; pair has begin and end
-    uint64_t nodeBegin = gid2host[base_hGraph::id].first;
+    uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
     typename Galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
       g.edge_begin(nodeBegin);
 
-    uint64_t nodeEnd = gid2host[base_hGraph::id].second;
+    uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
     typename Galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
     
@@ -332,8 +263,8 @@ public:
 
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
-    base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
-    base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
+    base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+    base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
 
     if (numNodes > 0) {
       //assert(numEdges > 0);
@@ -384,7 +315,7 @@ public:
   void loadStatistics(Galois::Graph::OfflineGraph& g, 
                       Galois::Graph::FileGraph& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
-    base_hGraph::totalOwnedNodes = gid2host[base_hGraph::id].second - gid2host[base_hGraph::id].first;
+    base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - base_hGraph::gid2host[base_hGraph::id].first;
 
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -392,7 +323,7 @@ public:
       for (auto b = 0U; b < base_hGraph::numHosts; ++b) {
         if (getColumnHostIDOfBlock(b) == i) {
           uint64_t start, end;
-          std::tie(start, end) = gid2host[b];
+          std::tie(start, end) = base_hGraph::gid2host[b];
           columnBlockSize += end - start;
         }
       }
@@ -403,13 +334,13 @@ public:
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
     }
-    uint64_t rowOffset = gid2host[base_hGraph::id].first;
+    uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
     Galois::Timer timer;
     timer.start();
     g.reset_seek_counters();
-    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
-    for (auto src = gid2host[base_hGraph::id].first; src < gid2host[base_hGraph::id].second; ++src) {
+    auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
+    for (auto src = base_hGraph::gid2host[base_hGraph::id].first; src < base_hGraph::gid2host[base_hGraph::id].second; ++src) {
       auto ii = ee;
       ee = fileGraph.edge_end(src);
       for (; ii < ee; ++ii) {
@@ -458,7 +389,7 @@ public:
     globalToLocalMap.reserve(max_nodes);
     prefixSumOfEdges.reserve(max_nodes);
     unsigned leaderHostID = gridRowID() * numColumnHosts;
-    uint64_t src = gid2host[leaderHostID].first;
+    uint64_t src = base_hGraph::gid2host[leaderHostID].first;
     numNodes = 0;
     numEdges = 0;
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -487,8 +418,8 @@ public:
     for (unsigned i = 0; i < numRowHosts; ++i) {
       unsigned hostID = (i * numColumnHosts) + gridColumnID();
       if (hostID == base_hGraph::id) continue;
-      uint64_t dst = gid2host[hostID].first;
-      uint64_t dst_end = gid2host[hostID].second;
+      uint64_t dst = base_hGraph::gid2host[hostID].first;
+      uint64_t dst_end = base_hGraph::gid2host[hostID].second;
       for (; dst < dst_end; ++dst) {
         if (hasIncomingEdge[0].test(getColumnIndex(dst))) {
           localToGlobalVector.push_back(dst);
@@ -537,8 +468,8 @@ public:
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
     std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(numColumnHosts);
 
-    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
-    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+    auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
+    for (auto n = base_hGraph::gid2host[base_hGraph::id].first; n < base_hGraph::gid2host[base_hGraph::id].second; ++n) {
       uint32_t lsrc = 0;
       uint64_t cur = 0;
       if (isLocal(n)) {
@@ -590,8 +521,8 @@ public:
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
 
-    auto ee = fileGraph.edge_begin(gid2host[base_hGraph::id].first);
-    for (auto n = gid2host[base_hGraph::id].first; n < gid2host[base_hGraph::id].second; ++n) {
+    auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
+    for (auto n = base_hGraph::gid2host[base_hGraph::id].first; n < base_hGraph::gid2host[base_hGraph::id].second; ++n) {
       uint32_t lsrc = 0;
       uint64_t cur = 0;
       if (isLocal(n)) {
@@ -684,8 +615,8 @@ public:
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       unsigned hostID = (gridRowID() * numColumnHosts) + i;
       if (hostID == base_hGraph::id) continue;
-      uint64_t src = gid2host[hostID].first;
-      uint64_t src_end = gid2host[hostID].second;
+      uint64_t src = base_hGraph::gid2host[hostID].first;
+      uint64_t src_end = base_hGraph::gid2host[hostID].second;
       mirrorNodes[hostID].reserve(mirrorNodes[hostID].size() + src_end - src);
       for (; src < src_end; ++src) {
         if (globalToLocalMap.find(src) != globalToLocalMap.end()) {
@@ -697,8 +628,8 @@ public:
     for (unsigned i = 0; i < numRowHosts; ++i) {
       unsigned hostID = (i * numColumnHosts) + gridColumnID();
       if (hostID == base_hGraph::id) continue;
-      uint64_t dst = gid2host[hostID].first;
-      uint64_t dst_end = gid2host[hostID].second;
+      uint64_t dst = base_hGraph::gid2host[hostID].first;
+      uint64_t dst_end = base_hGraph::gid2host[hostID].second;
       mirrorNodes[hostID].reserve(mirrorNodes[hostID].size() + dst_end - dst);
       for (; dst < dst_end; ++dst) {
         if (globalToLocalMap.find(dst) != globalToLocalMap.end()) {
@@ -726,8 +657,8 @@ public:
 
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    size_t first_owned = G2L(gid2host[base_hGraph::id].first);
-    size_t last_owned = G2L(gid2host[base_hGraph::id].second - 1);
+    size_t first_owned = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+    size_t last_owned = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1);
     assert(first_owned <= last_owned);
     assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
     if (syncType == base_hGraph::syncBroadcast) { // reset masters
