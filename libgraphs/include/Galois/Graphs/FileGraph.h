@@ -54,6 +54,7 @@
 #include <vector>
 #include <string.h>
 
+// TODO kill references to uint32t
 namespace Galois {
 namespace Graph {
 
@@ -61,7 +62,7 @@ namespace Graph {
 //! Graph serialized to a file
 class FileGraph {
 public:
-  typedef uint32_t GraphNode;
+  typedef uint64_t GraphNode;
 
 private:
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
@@ -89,21 +90,23 @@ private:
   uint64_t numEdges;
 
   uint64_t* outIdx;
-  uint32_t* outs;
+  void* outs;
   char* edgeData;
 
+  int graphVersion;
+
   //! adjustments to node index when we load only part of a graph
-  uint32_t nodeOffset;
+  uint64_t nodeOffset;
   //! adjustments to edge index when we load only part of a graph
   uint64_t edgeOffset;
 
   void move_assign(FileGraph&&);
   uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
-  uint32_t* raw_neighbor_begin(GraphNode N) const;
-  uint32_t* raw_neighbor_end(GraphNode N) const;
+  void* raw_neighbor_begin(GraphNode N) const;
+  void* raw_neighbor_end(GraphNode N) const;
 
   //! Initializes a graph from block of memory
-  void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset, uint64_t);
+  void fromMem(void* m, uint64_t nodeOffset, uint64_t edgeOffset, uint64_t);
 
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
@@ -134,10 +137,10 @@ protected:
    * @return pointer to begining of edgeData in graph
    */
   void* fromArrays(uint64_t* outIdx, uint64_t numNodes,
-      uint32_t* outs, uint64_t numEdges,
+      void* outs, uint64_t numEdges,
       char* edgeData, size_t sizeofEdgeData,
-      uint32_t nodeOffset, uint64_t edgeOffset,
-      bool converted);
+      uint64_t nodeOffset, uint64_t edgeOffset,
+      bool converted, int oGraphVersion=1);
 
 public:
   // Node Handling
@@ -172,36 +175,90 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
-    typedef LargeArray<GraphNode> EdgeDst;
-    typedef LargeArray<EdgeTy> EdgeData;
-    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
+    if (graphVersion == 1) {
+      typedef LargeArray<uint32_t> EdgeDst;
+      typedef LargeArray<EdgeTy> EdgeData;
+  
+      typedef detail::EdgeSortIterator<GraphNode, uint64_t,
+                                       EdgeDst,EdgeData,Convert32> edge_sort_iterator;
+  
+      EdgeDst edgeDst(outs, numEdges);
+      EdgeData ed(edgeData, numEdges);
 
-    EdgeDst edgeDst(outs, numEdges);
-    EdgeData ed(edgeData, numEdges);
+      edge_sort_iterator begin(std::distance((uint32_t*)outs, 
+                                 (uint32_t*)raw_neighbor_begin(N)), 
+                               &edgeDst, &ed);
+      edge_sort_iterator end(std::distance((uint32_t*)outs, 
+                               (uint32_t*)raw_neighbor_end(N)), 
+                             &edgeDst, &ed);
+      std::sort(begin, end, 
+                detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
+                                            CompTy>(comp));
+    } else if (graphVersion == 2) {
+      typedef LargeArray<uint64_t> EdgeDst;
+      typedef LargeArray<EdgeTy> EdgeData;
+  
+      typedef detail::EdgeSortIterator<GraphNode, uint64_t,
+                                       EdgeDst,EdgeData,Convert64> edge_sort_iterator;
+  
+      EdgeDst edgeDst(outs, numEdges);
+      EdgeData ed(edgeData, numEdges);
 
-    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
-
-    std::sort(begin, end, detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+      edge_sort_iterator begin(std::distance((uint64_t*)outs, 
+                                 (uint64_t*)raw_neighbor_begin(N)), 
+                               &edgeDst, &ed);
+      edge_sort_iterator end(std::distance((uint64_t*)outs, 
+                               (uint64_t*)raw_neighbor_end(N)), 
+                             &edgeDst, &ed);
+      std::sort(begin, end, 
+                detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
+                                            CompTy>(comp));
+    } else {
+      GALOIS_DIE("unknown file version at sortEdgesByEdgeData", graphVersion);
+    }
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   * Sorts outgoing edges of a node. 
+   * Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
+    if (graphVersion == 1) {
+      typedef LargeArray<uint32_t> EdgeDst;
+      typedef LargeArray<EdgeTy> EdgeData;
+      typedef detail::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
+                                       Convert32> edge_sort_iterator;
 
-    typedef LargeArray<GraphNode> EdgeDst;
-    typedef LargeArray<EdgeTy> EdgeData;
-    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
+      EdgeDst edgeDst(outs, numEdges);
+      EdgeData ed(edgeData, numEdges);
 
-    EdgeDst edgeDst(outs, numEdges);
-    EdgeData ed(edgeData, numEdges);
+      edge_sort_iterator begin(std::distance((uint32_t*)outs, 
+                                 (uint32_t*)raw_neighbor_begin(N)), 
+                               &edgeDst, &ed);
+      edge_sort_iterator end(std::distance((uint32_t*)outs, 
+                                 (uint32_t*)raw_neighbor_end(N)), 
+                             &edgeDst, &ed);
+      std::sort(begin, end, comp);
+    } else if (graphVersion == 2) {
+      typedef LargeArray<uint64_t> EdgeDst;
+      typedef LargeArray<EdgeTy> EdgeData;
+      typedef detail::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
+                                       Convert64> edge_sort_iterator;
 
-    edge_sort_iterator begin(std::distance(outs, raw_neighbor_begin(N)), &edgeDst, &ed);
-    edge_sort_iterator end(std::distance(outs, raw_neighbor_end(N)), &edgeDst, &ed);
+      EdgeDst edgeDst(outs, numEdges);
+      EdgeData ed(edgeData, numEdges);
 
-    std::sort(begin, end, comp);
+      edge_sort_iterator begin(std::distance((uint64_t*)outs, 
+                                 (uint64_t*)raw_neighbor_begin(N)), 
+                               &edgeDst, &ed);
+      edge_sort_iterator end(std::distance((uint64_t*)outs, 
+                               (uint64_t*)raw_neighbor_end(N)), 
+                             &edgeDst, &ed);
+      std::sort(begin, end, comp);
+    } else {
+      GALOIS_DIE("unknown file version at sortEdgesByEdgeData", graphVersion);
+    }
   }
 
   template<typename EdgeTy> 
@@ -223,12 +280,16 @@ public:
   typedef boost::transform_iterator<Convert64, uint64_t*> edge_id_iterator;
   typedef boost::counting_iterator<uint64_t> iterator;
   
+  // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
   neighbor_iterator neighbor_begin(GraphNode N) const {
-    return boost::make_transform_iterator(raw_neighbor_begin(N), Convert32());
+    return boost::make_transform_iterator((uint32_t*)raw_neighbor_begin(N), 
+                                          Convert32());
   }
 
+  // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
   neighbor_iterator neighbor_end(GraphNode N) const {
-    return boost::make_transform_iterator(raw_neighbor_end(N), Convert32());
+    return boost::make_transform_iterator((uint32_t*)raw_neighbor_end(N), 
+                                          Convert32());
   }
 
   template<typename EdgeTy>
@@ -336,8 +397,12 @@ public:
  */
 class FileGraphWriter: public FileGraph {
   std::vector<uint64_t> outIdx;
+
   std::vector<uint32_t> starts;
   std::vector<uint32_t> outs;
+  std::vector<uint64_t> starts64;
+  std::vector<uint64_t> outs64;
+
   size_t sizeofEdgeData;
   size_t numNodes;
   size_t numEdges;
@@ -373,29 +438,56 @@ public:
     }
     assert(outIdx[numNodes-1] == numEdges);
 
-    starts.resize(numNodes);
-    outs.resize(numEdges);
+    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
+      // version 1
+      starts.resize(numNodes);
+      outs.resize(numEdges);
+    } else {
+      // version 2
+      starts64.resize(numNodes);
+      outs64.resize(numEdges);
+    }
   }
 
   //! Adds a neighbor between src and dst
   size_t addNeighbor(size_t src, size_t dst) {
-    size_t base = src ? outIdx[src-1] : 0;
-    size_t idx = base + starts[src]++;
-    assert(idx < outIdx[src]);
-    outs[idx] = dst;
-    return idx;
+    size_t base = src ? outIdx[src - 1] : 0;
+
+    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
+      // version 1
+      size_t idx = base + starts[src]++;
+      assert(idx < outIdx[src]);
+      outs[idx] = dst;
+      return idx;
+    } else {
+      // version 2
+      size_t idx = base + (starts64)[src]++;
+      assert(idx < outIdx[src]);
+      outs64[idx] = dst;
+      return idx;
+    } 
   }
 
   /** 
    * Finish making graph. Returns pointer to block of memory that should be
    * used to store edge data.
    */
-  template<typename T>
+  template<typename T> 
   T* finish() { 
-    void* ret = fromArrays(&outIdx[0], numNodes, &outs[0], numEdges, nullptr, sizeofEdgeData, 0, 0, false);
+    void* ret;
+    if (numNodes <= std::numeric_limits<uint32_t>::max()) {
+      // version 1
+      ret = fromArrays(&outIdx[0], numNodes, &outs[0], numEdges, nullptr, 
+                       sizeofEdgeData, 0, 0, false, 1);
+      starts.clear();
+      outs.clear();
+    } else {
+      // version 2
+      ret = fromArrays(&outIdx[0], numNodes, &outs64[0], numEdges, nullptr, 
+                       sizeofEdgeData, 0, 0, false, 2);
+    }
+
     outIdx.clear();
-    starts.clear();
-    outs.clear();
     return reinterpret_cast<T*>(ret);
   }
 };

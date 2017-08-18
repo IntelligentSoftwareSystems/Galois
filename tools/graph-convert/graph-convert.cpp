@@ -1892,6 +1892,8 @@ struct Pbbs2Gr: public HasOnlyVoidSpecialization {
   }
 };
 
+// TODO 
+// gr Version 2 support doesn't exist
 struct Gr2Pbbsedges: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
@@ -1937,6 +1939,8 @@ struct Gr2Pbbsedges: public HasNoVoidSpecialization {
  * ...
  * ]
  */
+// TODO 
+// gr Version 2 support doesn't exist
 struct Gr2Pbbs: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
