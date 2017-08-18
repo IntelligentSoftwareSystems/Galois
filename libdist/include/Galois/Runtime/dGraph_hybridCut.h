@@ -217,13 +217,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         scalefactor.clear();
       }
-      if (balanceEdges) {
-        if (base_hGraph::id == 0) {
-          std::cerr << "WARNING: balanceEdges not supported for hybrid "
-                       " vertex-cuts\n";
-        }
-        balanceEdges = false;
-      }
 
       Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT PL", 0, 0);
 

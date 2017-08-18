@@ -70,40 +70,56 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
-#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
 namespace cll = llvm::cl;
+#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
 static cll::opt<unsigned> buffSize("sendBuffSize", 
                        cll::desc("max size for send buffers in element count"), 
                        cll::init(4096));
 #endif
 
-llvm::cl::opt<bool> useGidMetadata("useGidMetadata", 
-  llvm::cl::desc("Use Global IDs in indices metadata (only when -metadata=2)"), 
-  llvm::cl::init(false));
+cll::opt<bool> useGidMetadata("useGidMetadata", 
+  cll::desc("Use Global IDs in indices metadata (only when -metadata=2)"), 
+  cll::init(false));
 
-static llvm::cl::opt<bool> useNumaAlloc("useNumaAlloc", 
-                             llvm::cl::desc("Setting to use numa allocation"),
-                             llvm::cl::init(false));
+static cll::opt<bool> useNumaAlloc("useNumaAlloc", 
+                             cll::desc("Setting to use numa allocation"),
+                             cll::init(false));
 
-static llvm::cl::opt<bool> edgeNuma("edgeNuma", 
-                             llvm::cl::desc("Flag to use exp. edge-centric "
+static cll::opt<bool> edgeNuma("edgeNuma", 
+                             cll::desc("Flag to use exp. edge-centric "
                              "numa allocation for threads"),
-                             llvm::cl::init(false));
+                             cll::init(false));
 
-static llvm::cl::opt<bool> balanceEdges("balanceEdges", 
-                             llvm::cl::desc("Partitioner assigns masters to hosts "
-                             "such that the edges of those masters are balanced"),
-                             llvm::cl::init(false));
+enum MASTERS_DISTRIBUTION {
+  BALANCED_MASTERS, BALANCED_EDGES_OF_MASTERS, BALANCED_MASTERS_AND_EDGES
+};
 
-static llvm::cl::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges", 
-                             llvm::cl::desc("Determines weight of nodes when "
+static cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
+                                     cll::desc("Type of masters distribution."),
+                                     cll::values(
+                                       clEnumValN(BALANCED_MASTERS, "nodes", 
+                                                  "Balance nodes only"), 
+                                       clEnumValN(BALANCED_EDGES_OF_MASTERS, "edges", 
+                                                  "Balance edges only (default)"), 
+                                       clEnumValN(BALANCED_MASTERS_AND_EDGES, "both", 
+                                                  "Balance both nodes and edges"), 
+                                       clEnumValEnd),
+                                     cll::init(BALANCED_EDGES_OF_MASTERS));
+
+static cll::opt<uint32_t> nodeWeightOfMaster("nodeWeight", 
+                             cll::desc("Determines weight of nodes when "
+                             "distributing masterst to hosts"),
+                             cll::init(0));
+
+//static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight", 
+//                             cll::desc("Determines weight of edges when "
+//                             "distributing masters to hosts"),
+//                             cll::init(0));
+
+static cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges", 
+                             cll::desc("Determines weight of nodes when "
                              "partitioning among threads"),
-                             llvm::cl::init(0));
-
-static llvm::cl::opt<uint32_t> nodeAlphaBalance("nodeAlphaBalance", 
-                             llvm::cl::desc("Determines weight of nodes when "
-                             "partitioning among hosts"),
-                             llvm::cl::init(0));
+                             cll::init(0));
 
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
@@ -288,7 +304,39 @@ private:
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
                            numHosts,
-                           gid2host, nodeAlphaBalance, scalefactor);
+                           gid2host, 0, scalefactor);
+      for (unsigned h = 1; h < numHosts; ++h) {
+        Galois::Runtime::SendBuffer b;
+        Galois::Runtime::gSerialize(b, gid2host);
+        net.sendTagged(h, Galois::Runtime::evilPhase, b);
+      }
+      net.flush();
+    } else {
+      // receive computed owners from host 0
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first == 0);
+      auto& b = p->second;
+      Galois::Runtime::gDeserialize(b, gid2host);
+    }
+    ++Galois::Runtime::evilPhase;
+  }
+
+  // compute owners while trying to balance nodes and edges
+  void computeMastersBalancedNodesAndEdges(Galois::Graph::OfflineGraph& g,
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (id == 0) {
+      if (nodeWeightOfMaster == 0) {
+        nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
+      }
+      // compute owners for all hosts and send that info to all hosts
+      Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
+                           numHosts,
+                           gid2host, nodeWeightOfMaster, scalefactor);
       for (unsigned h = 1; h < numHosts; ++h) {
         Galois::Runtime::SendBuffer b;
         Galois::Runtime::gSerialize(b, gid2host);
@@ -328,10 +376,17 @@ protected:
     }
 
     // compute masters for all nodes
-    if (balanceEdges) {
-      computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor);
-    } else {
-      computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor);
+    switch(masters_distribution) {
+      case BALANCED_MASTERS:
+        computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor);
+        break;
+      case BALANCED_MASTERS_AND_EDGES:
+        computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor);
+        break;
+      case BALANCED_EDGES_OF_MASTERS:
+      default:
+        computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor);
+        break;
     }
 
     return numNodes_to_divide;
