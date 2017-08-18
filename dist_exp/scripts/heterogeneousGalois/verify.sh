@@ -13,8 +13,8 @@ inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/net/ohm/export/cdgc/dist-outputs
 #outputdirname=/workspace/dist-outputs
+outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
 problem=${EXECP[0]}
@@ -31,55 +31,52 @@ if [[ ($execname == *"bc"*) ]]; then
 fi
 
 # for bc, if using rmat15, then use all sources output (without ss)
-if [[ ($execname == *"bc"*) && ($inputname == "rmat15") ]]; then
+# TODO currently even rmat15 uses single source, hence rmat16 which doesn't 
+# exist
+if [[ ($execname == *"bc"*) && ($inputname == "rmat16") ]]; then
   OUTPUT=${outputdirname}/rmat15.bc
 fi
 
 MPI=mpiexec
 LOG=.verify_log
 
-#FLAGS=" -maxIterations=200"
-#FLAGS+=" -numComputeSubsteps=8"
-#FLAGS+=" -numPipelinedPhases=8"
+FLAGS=
+FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
+FLAGS+=" -balanceEdges"
+# kcore flag
+if [[ $execname == *"kcore"* ]]; then
+  FLAGS+=" -kcore=100"
+fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
-if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=3"
-fi
-# kcore flag
-if [[ $execname == *"kcore"* ]]; then
-  FLAGS+=" -kcore=100"
+
+# bc: if rmat15 is not used, specify single source flags else do
+# all sources for rmat15
+# TODO currently uses rmat16 (doesn't exist) so everything does single source
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+  FLAGS+=" -singleSource"
+  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
 fi
 
 source_file=${inputdirname}/source
 if [[ $execname == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
-elif [[ $execname == *"pull"* ]]; then
-  FLAGS+=" -transpose"
-  #inputdirname=${inputdirname}/transpose
-  #extension=tgr
-#elif [[ $inputname == *"rmat"* ]]; then
-#  inputdirname=${inputdirname}/transpose
-#  extension=tgr
-#  FLAGS+=" -transpose"
-fi
-
-# bc: if rmat15 is not used, specify single source flags else do
-# all sources for rmat15
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat15") ]]; then
-  FLAGS+=" -singleSource"
-  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  FLAGS+=" -symmetricGraph"
+else 
+  # for verify purposes, always pass in graph transpose just in case it is 
+  # needed for non-symmetric graphs
+  FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 fi
 
 grep "${inputname}.${extension}" ${source_file} >>$LOG
 INPUT=${inputdirname}/${inputname}.${extension}
 
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
-  ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/GaloisCpp
+  ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/Galois
 fi
 checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
 #checker=./result_checker.py
@@ -95,29 +92,27 @@ else
   SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 fi
 
+
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3; do
+for partition in 1 2 3 4; do
+  CUTTYPE=
+
   if [ $partition -eq 2 ]; then
-    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
-      FLAGS+=" -enableVertexCut"
-    else
-      break
-    fi
+    CUTTYPE+=" -partition=pl_vcut"
   elif [ $partition -eq 3 ]; then
-    if [ -z "$ABELIAN_EDGE_CUT_ONLY" ]; then
-      FLAGS+=" -vertexcut=cart_vcut"
-    else
-      break
-    fi
+    CUTTYPE+=" -partition=cart_vcut"
+  elif [ $partition -eq 4 ]; then
+    CUTTYPE+=" -partition=iec"
   fi
+
   for task in $SET; do
     old_ifs=$IFS
     IFS=",";
     set $task;
     if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-      PFLAGS="-pset=$1 -num_nodes=1"
+      PFLAGS=" -pset=$1 -num_nodes=1"
     else
       PFLAGS=""
     fi
@@ -127,35 +122,23 @@ for partition in 1 2 3; do
     fi
     rm -f output_*.log
 
+    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG
+    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
 
-    echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG
-    eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} -verify" >>$LOG 2>&1
-    #outputs="output_${hostname}_0.log"
-    #i=1
-    #while [ $i -lt $2 ]; do
-    #  outputs+=" output_${hostname}_${i}.log"
-    #  let i=i+1
-    #done
-    #eval "sort -nu ${outputs} -o output_${hostname}_*.log"
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
-
-    # higher threshold for bc
-    if [[ ($execname == *"bc"*) ]]; then
-      eval "python $checker -t=0.2 $OUTPUT output_${hostname}_0.log &> .output_diff"
-    else
-      eval "python $checker $OUTPUT output_${hostname}_0.log &> .output_diff"
-    fi
-
+    eval "python $checker -t=0.1 $OUTPUT output_${hostname}_0.log &> .output_diff"
 
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
-      if [ $partition -eq 3 ]; then
+      if [ $partition -eq 4 ]; then
+        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 3 ]; then
         failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 2 ]; then
-        failed_cases+="powerlyra vertex-cut $1 devices with $3 threads; "
+        failed_cases+="hybrid vertex-cut $1 devices with $3 threads; "
       else
-        failed_cases+="edge-cut $1 devices with $3 threads; "
+        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
@@ -178,4 +161,3 @@ else
   echo "Status: FAILED"
 fi
 echo "---------------------------------------------------------------------------------------"
-

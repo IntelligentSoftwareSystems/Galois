@@ -476,6 +476,17 @@ public:
     return threadRanges.data();
   }
 
+  /**
+   * Returns the thread ranges vector that specifies division of nodes among
+   * threads 
+   * 
+   * @returns An vector of uint32_t that specifies which thread gets which 
+   * nodes.
+   */
+  std::vector<uint32_t>& getThreadRangesVector() {
+    return threadRanges;
+  }
+
   // DEPRECATED: do not use, only use 1 that takes prefix sum + nodes
   ///** 
   // * Call ONLY after graph is completely constructed. Attempts to more evenly 
@@ -626,6 +637,133 @@ public:
   //  printf("ranges found\n");
   //}
 
+  /**
+   * Determines thread ranges for a given range of nodes and returns it as
+   * an offset vector in the passed in vector.
+   *
+   * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
+   * the graph is already constructed.
+   * 
+   * @param beginNode Beginning of range
+   * @param endNode End of range, non-inclusive
+   * @param returnRanges Vector to store thread offsets for ranges in
+   * @param nodeAlpha The higher the number, the more weight nodes have in
+   * determining division of nodes.
+   */
+  void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
+                             std::vector<uint32_t>& returnRanges, 
+                             uint32_t nodeAlpha=0) {
+    uint32_t num_threads = Galois::Runtime::activeThreads;
+    uint32_t total_nodes = endNode - beginNode;
+
+    returnRanges.resize(num_threads + 1);
+
+    // corner case; assign nothing
+    if (beginNode == endNode) {
+      returnRanges[0] = beginNode;
+      for (uint32_t i = 0; i < num_threads; i++) {
+        returnRanges[i+1] = beginNode;
+      }
+      return;
+    }
+
+    // Single thread case
+    if (num_threads == 1) {
+      returnRanges[0] = beginNode;
+      returnRanges[1] = endNode;
+
+      return;
+    } else if (num_threads > total_nodes) {
+      // more threads than nodes
+      uint32_t current_node = beginNode;
+
+      returnRanges[0] = current_node;
+      for (uint32_t i = 0; i < total_nodes; i++) {
+        returnRanges[i+1] = ++current_node;
+      }
+
+      // deal with remainder threads
+      for (uint32_t i = total_nodes; i < num_threads; i++) {
+        returnRanges[i+1] = total_nodes;
+      }
+
+      return;
+    }
+
+    uint64_t node_weight = (uint64_t)total_nodes * (uint64_t)nodeAlpha;
+
+    // theoretically how many units we want to distributed to each thread
+    uint64_t units_per_thread = (edge_end(endNode - 1) - edge_begin(beginNode)) /
+                                num_threads + node_weight;
+
+    uint32_t current_thread = 0;
+    uint32_t current_element = beginNode;
+    uint64_t current_unit_count = 0;
+
+    returnRanges[0] = beginNode;
+
+    while (current_element < endNode && current_thread < num_threads) {
+      uint32_t nodes_remaining = endNode - current_element;
+      uint32_t threads_remaining = num_threads - current_thread;
+     
+      assert(nodes_remaining >= threads_remaining);
+
+      if (threads_remaining == 1) {
+        returnRanges[current_thread + 1] = endNode;
+        break;
+      } else if (nodes_remaining == threads_remaining) {
+        // Out of nodes to assign: finish up assignments (at this point,
+        // each remaining thread gets 1 node) and break
+        for (uint32_t i = 0; i < threads_remaining; i++) {
+          current_element++;
+          returnRanges[++current_thread] = current_element;
+        }
+
+        assert(current_element == endNode);
+        assert(current_thread == num_threads);
+        break;
+      }
+
+      // calculate number of units this node is worth
+      uint64_t num_edges = std::distance(edge_begin(current_element), 
+                                         edge_end(current_element));
+      uint64_t num_units = num_edges + nodeAlpha;
+
+      if (num_units > (3 * units_per_thread / 4)) {
+        if (current_unit_count > (units_per_thread / 2)) {
+          assert(current_element != beginNode);
+
+          // assign to the NEXT thread (i.e. end this thread and move
+          // on to the next)
+          // beginning of next thread is current local node (the big one)
+          returnRanges[current_thread + 1] = current_element;
+          current_thread++;
+
+          current_unit_count = 0;
+
+          // go back to beginning of loop without incrementing
+          // current_element so the loop can handle this next node
+          continue;
+        }
+      }
+
+      current_unit_count += num_units;
+
+      if (current_unit_count >= units_per_thread) {
+        // This thread has enough units; save end of this node and move on
+        // mark beginning of next thread as the next node
+        returnRanges[current_thread + 1] = current_element + 1;
+        current_unit_count = 0;
+        current_thread++;
+      } 
+
+      current_element++;
+    }
+
+    // sanity checks
+    assert(returnRanges[0] == beginNode);
+    assert(returnRanges[num_threads] == endNode);
+  }
 
   /**
    * Uses a pre-computed prefix sum of edges to determine division of nodes 
@@ -679,7 +817,7 @@ public:
     uint64_t units_per_thread = edgePrefixSum[totalNodes - 1] / num_threads +
                                 node_weight;
 
-    printf("Optimally want %lu units per thread\n", units_per_thread);
+    //printf("Optimally want %lu units per thread\n", units_per_thread);
 
     uint32_t current_thread = 0;
     uint32_t current_element = 0;
@@ -962,16 +1100,16 @@ public:
     numNodes = nNodes;
     numEdges = nEdges;
     if (UseNumaAlloc) {
-      //nodeData.allocateLocal(numNodes);
-      //edgeIndData.allocateLocal(numNodes);
-      //edgeDst.allocateLocal(numEdges);
-      //edgeData.allocateLocal(numEdges);
-      //this->outOfLineAllocateLocal(numNodes);
-      nodeData.allocateInterleaved(numNodes);
-      edgeIndData.allocateInterleaved(numNodes);
-      edgeDst.allocateInterleaved(numEdges);
-      edgeData.allocateInterleaved(numEdges);
-      this->outOfLineAllocateInterleaved(numNodes);
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes);
+      //nodeData.allocateInterleaved(numNodes);
+      //edgeIndData.allocateInterleaved(numNodes);
+      //edgeDst.allocateInterleaved(numEdges);
+      //edgeData.allocateInterleaved(numEdges);
+      //this->outOfLineAllocateInterleaved(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
@@ -1112,7 +1250,7 @@ public:
 
   /**
    * A version of allocateFrom that takes into account node/edge distribution
-   * and tries to make the allocation of memory more. 
+   * and tries to make the allocation of memory more even. 
    * Based on divideByNode in Lonestar.
    *
    * @param nNodes Number to allocate for node data

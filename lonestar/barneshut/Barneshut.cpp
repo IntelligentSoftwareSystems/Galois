@@ -158,15 +158,11 @@ typedef Galois::InsertBag<Body*> BodyPtrs;
 //FIXME: reclaim memory for multiple steps
 typedef Galois::InsertBag<Octree> Tree;
 
+
+
 struct BuildOctree {
-  Octree* root;
+
   Tree& T;
-  double root_radius;
-
-  BuildOctree(Octree* _root, Tree& _t, double radius) 
-    : root(_root), T(_t), root_radius(radius) {  }
-
-  void operator()(Body* b) const { insert(b, root, root_radius); }
 
   void insert(Body* b, Octree* node, double radius) const {
     int index = getIndex(node->pos, b->pos);
@@ -286,25 +282,24 @@ Point updateForce(Point delta, double psq, double mass) {
 
 struct ComputeForces {
   // Optimize runtime for no conflict case
-  typedef int tt_does_not_need_aborts;
-  typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_push;
+  // typedef int tt_does_not_need_aborts;
+  // typedef int tt_needs_per_iter_alloc;
+  // typedef int tt_does_not_need_push;
 
   Octree* top;
-  double diameter;
   double root_dsq;
 
-  ComputeForces(Octree* _top, double _diameter) :
-    top(_top),
-    diameter(_diameter) {
+  ComputeForces(Octree* _top, double diameter) :
+    top(_top) {
+    assert(diameter > 0.0 && "non positive diameter of bb");
     root_dsq = diameter * diameter * config.itolsq;
   }
   
   template<typename Context>
-  void operator()(Body* b, Context& cnx) {
+  void computeForce(Body* b, Context& cnx) {
     Point p = b->acc;
     b->acc = Point(0.0, 0.0, 0.0);
-    iterate(*b, root_dsq, cnx);
+    iterate(*b, cnx);
     b->vel += (b->acc - p) * config.dthf;
   }
 
@@ -315,7 +310,7 @@ struct ComputeForces {
   };
 
   template<typename Context>
-  void iterate(Body& b, double root_dsq, Context& cnx) {
+  void iterate(Body& b, Context& cnx) {
     std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
     stack.push_back(Frame(top, root_dsq));
 
@@ -352,36 +347,6 @@ struct ComputeForces {
 	}
       }
     }
-  }
-};
-
-struct AdvanceBodies {
-  // Optimize runtime for no conflict case
-  typedef int tt_does_not_need_aborts;
-
-  AdvanceBodies() { }
-
-  template<typename Context>
-  void operator()(Body* b, Context&) const {
-    operator()(b);
-  }
-
-  void operator()(Body* b) const {
-    Point dvel(b->acc);
-    dvel *= config.dthf;
-    Point velh(b->vel);
-    velh += dvel;
-    b->pos += velh * config.dtime;
-    b->vel = velh + dvel;
-  }
-};
-
-struct InsertBody {
-  BodyPtrs& pBodies;
-  Bodies& bodies;
-  InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
-  void operator()(const Body& b) const {
-    pBodies.push_back(&(bodies.push_back(b)));
   }
 };
 
@@ -475,7 +440,12 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
 
   //sort and copy out
   divide(tmp.begin(), tmp.end(), gen);
-  Galois::do_all(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
+
+  Galois::do_all(tmp.begin(), tmp.end(), 
+      [&pBodies, &bodies] (const Body& b) {
+        pBodies.push_back(&(bodies.push_back(b)));
+      },
+      Galois::loopname("InsertBody"));
 }
 
 struct CheckAllPairs {
@@ -526,17 +496,27 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     // Do tree building sequentially
     Galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
-    Galois::do_all_local(pBodies, [&boxes] (const Body* b) {boxes.update(b->pos);},
-                         Galois::loopname("reduceBoxes"), Galois::do_all_steal<true>());
+    Galois::do_all_local(pBodies, 
+        [&boxes] (const Body* b) {
+          boxes.update(b->pos);
+        },
+        Galois::loopname("reduceBoxes"), Galois::do_all_steal<true>());
+
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 
     Tree t;
+    BuildOctree treeBuilder {t};
     Octree& top = t.emplace(box.center());
 
     Galois::StatTimer T_build("BuildTime");
     T_build.start();
-    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()), Galois::loopname("BuildTree"));
+    Galois::do_all_local(pBodies,
+        [&] (Body* body) {
+          treeBuilder.insert(body, &top, box.radius()); 
+        }, 
+        Galois::timeit(),
+        Galois::loopname("BuildTree"));
     T_build.stop();
 
     //update centers of mass in tree
@@ -544,16 +524,36 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     //printTree(&top);
     std::cout << "Tree Size: " << size << "\n";
 
+    ComputeForces cf(&top, box.diameter());
+
     Galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
-    Galois::for_each_local(pBodies, ComputeForces(&top, box.diameter()), Galois::loopname("compute"), Galois::wl<WLL>());
+    Galois::for_each_local(pBodies, 
+        [&] (Body* b, auto& cnx) {
+          cf.computeForce(b, cnx);
+        },
+        Galois::loopname("compute"), 
+        Galois::wl<WLL> (),
+        Galois::timeit(),
+        Galois::does_not_need_aborts (),
+        Galois::does_not_need_push (),
+        Galois::needs_per_iter_alloc ());
     T_compute.stop();
 
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
     //Done in compute forces
-    Galois::do_all_local(pBodies, AdvanceBodies(), Galois::loopname("advance"));
+    Galois::do_all_local(pBodies, 
+        [] (Body* b) {
+          Point dvel(b->acc);
+          dvel *= config.dthf;
+          Point velh(b->vel);
+          velh += dvel;
+          b->pos += velh * config.dtime;
+          b->vel = velh + dvel;
+        },
+        Galois::loopname("advance"));
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 

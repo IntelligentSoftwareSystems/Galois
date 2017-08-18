@@ -24,6 +24,9 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#ifndef _GALOIS_DIST_HGRAPHEC_H
+#define _GALOIS_DIST_HGRAPHEC_H
+
 #include <vector>
 #include <set>
 #include <algorithm>
@@ -171,8 +174,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned> scalefactor, 
-                   bool transpose = false,
-                   bool find_thread_ranges = false) : 
+                   bool transpose = false) : 
                     base_hGraph(host, _numHosts) {
       /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
        *  uint64_t& _totalNodes, unsigned _id )*/
@@ -336,7 +338,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // transpose is usually used for incoming edge cuts: this makes it
       // so you consider ghosts as having edges as well (since in IEC ghosts
-      // have outgoing edges
+      // have outgoing edges)
       if (transpose) {
         base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
       } else {
@@ -378,9 +380,20 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
 
         StatTimer_thread_ranges.start();
+
         base_hGraph::determine_thread_ranges(_numNodes, prefixSumOfOutEdges);
+
+        // experimental test of new thread ranges
+        //base_hGraph::determine_thread_ranges(0, _numNodes, 
+        //                              base_hGraph::graph.getThreadRangesVector());
+
         StatTimer_thread_ranges.stop();
       }
+
+      // find ranges for master + nodes with edges
+      base_hGraph::determine_thread_ranges_master();
+      base_hGraph::determine_thread_ranges_with_edges();
+      base_hGraph::initialize_specific_ranges();
 
       StatTimer_graph_construct.stop();
 
@@ -518,3 +531,4 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 };
+#endif

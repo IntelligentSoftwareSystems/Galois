@@ -385,6 +385,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
 //}
 
 inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& data) {
+     gSerializeObj(buf, data.size());
      gSerializeObj(buf, data.get_vec());
 }
 
@@ -523,7 +524,10 @@ void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
 }
 
 inline void gDeserializeObj(DeSerializeBuffer& buf, Galois::DynamicBitSet& data) {
-     gDeserializeObj(buf, data.get_vec());
+  size_t size = 0;
+  gDeserializeObj(buf, size);
+  data.resize(size);
+  gDeserializeObj(buf, data.get_vec());
 }
 
 } //namespace detail

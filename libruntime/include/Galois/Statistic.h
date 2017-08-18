@@ -121,6 +121,9 @@ public:
 };
 
 //! Provides statistic interface around timer
+// TODO: switch to const char* const or 
+// a specialized "small string" type that doesn't allocate memory
+// and compare with std::string to see if faster or equal
 class StatTimer : public TimeAccumulator {
   std::string name;
   std::string loopname;
@@ -168,6 +171,33 @@ public:
       Galois::Runtime::endSampling();
   }
 };
+
+template <bool Enable> 
+class CondStatTimer: public StatTimer {
+public:
+  CondStatTimer(const char* name): StatTimer(name) {}
+};
+
+template <> class CondStatTimer<false> {
+public:
+
+  CondStatTimer(const char* name) {}
+
+  void start(void) const {}
+
+  void stop(void) const {}
+};
+
+template <typename F>
+void timeThis(F& f, const char* const name) {
+  StatTimer t(name);
+
+  t.start();
+
+  f();
+
+  t.stop();
+}
 
 }
 #endif

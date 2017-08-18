@@ -23,6 +23,9 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
+#ifndef _GALOIS_DIST_HGRAPHHYBRID_H
+#define _GALOIS_DIST_HGRAPHHYBRID_H
+
 #include <vector>
 #include <set>
 #include <algorithm>
@@ -36,6 +39,7 @@
 #include <sstream>
 
 #include "Galois/DoAllWrap.h"
+
 
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
@@ -209,8 +213,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                std::vector<unsigned> scalefactor, 
                bool transpose = false, 
                uint32_t VCutThreshold = 100, 
-               bool bipartite = false,
-               bool find_thread_ranges = false) : base_hGraph(host, _numHosts) {
+               bool bipartite = false) : base_hGraph(host, _numHosts) {
       if (!scalefactor.empty()) {
         if (base_hGraph::id == 0) {
           std::cerr << "WARNING: scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n";
@@ -219,7 +222,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       if (balanceEdges) {
         if (base_hGraph::id == 0) {
-          std::cerr << "WARNING: balanceEdges not supported for cartesian "
+          std::cerr << "WARNING: balanceEdges not supported for hybrid "
                        " vertex-cuts\n";
         }
         balanceEdges = false;
@@ -324,7 +327,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       
       base_hGraph::numOwned = numNodes;
-      base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
+      //base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
+      base_hGraph::numNodes = numNodes;
       base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
       base_hGraph::beginMaster = G2L(gid2host[base_hGraph::id].first);
       base_hGraph::endMaster = G2L(gid2host[base_hGraph::id].second - 1) + 1;
@@ -380,6 +384,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
         StatTimer_thread_ranges.stop();
       }
+
+      base_hGraph::determine_thread_ranges_master();
+      base_hGraph::determine_thread_ranges_with_edges();
+      base_hGraph::initialize_specific_ranges();
 
       StatTimer_graph_construct.stop();
 
@@ -959,4 +967,4 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
 
 };
-
+#endif

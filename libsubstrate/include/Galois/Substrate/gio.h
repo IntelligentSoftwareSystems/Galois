@@ -96,7 +96,7 @@ template<typename... Args>
 void gError(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
-  //  gErrorStr(os.str());
+  gErrorStr(os.str());
 }
 
 void gFlush();

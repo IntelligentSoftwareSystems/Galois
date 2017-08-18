@@ -216,40 +216,41 @@ s_wl<T, Args...> wl(Args&&... args) {
 }
 
 /**
+ * Presence of timeit option will automatically time the do_all or for_each loop 
+ * */
+struct timeit_tag {};
+struct timeit: public trait_has_type<bool>, timeit_tag {};
+
+/**
  * Indicates the operator may request the parallel loop to be suspended and a
  * given function run in serial
  */
 struct needs_parallel_break_tag {};
-template<typename T = bool>
-struct needs_parallel_break: public trait_has_type<T>, needs_parallel_break_tag {};
+struct needs_parallel_break: public trait_has_type<bool>, needs_parallel_break_tag {};
 
 /**
  * Indicates the operator does not generate new work and push it on the worklist
  */
 struct does_not_need_push_tag {};
-template<typename T = bool>
-struct does_not_need_push: public trait_has_type<T>, does_not_need_push_tag {};
+struct does_not_need_push: public trait_has_type<bool>, does_not_need_push_tag {};
 
 /**
  * Indicates the operator may request the access to a per-iteration allocator
  */
 struct needs_per_iter_alloc_tag {};
-template<typename T = bool>
-struct needs_per_iter_alloc: public trait_has_type<T>, needs_per_iter_alloc_tag {};
+struct needs_per_iter_alloc: public trait_has_type<bool>, needs_per_iter_alloc_tag {};
 
 /**
  * Indicates the operator doesn't need its execution stats recorded
  */
 struct does_not_need_stats_tag {};
-template<typename T = bool>
-struct does_not_need_stats: public trait_has_type<T>, does_not_need_stats_tag { };
+struct does_not_need_stats: public trait_has_type<bool>, does_not_need_stats_tag { };
 
 /**
  * Indicates the operator doesn't need abort support
  */
 struct does_not_need_aborts_tag {};
-template<typename T = bool>
-  struct does_not_need_aborts: public trait_has_type<T>, does_not_need_aborts_tag {};
+struct does_not_need_aborts: public trait_has_type<bool>, does_not_need_aborts_tag {};
 
 /**
  * Indicates that the neighborhood set does not change through out i.e. is not
@@ -259,15 +260,13 @@ template<typename T = bool>
  * based on some predicate. 
  */
 struct has_fixed_neighborhood_tag {};
-template<typename T = bool>
-struct has_fixed_neighborhood: public trait_has_type<T>, has_fixed_neighborhood_tag {};
+struct has_fixed_neighborhood: public trait_has_type<bool>, has_fixed_neighborhood_tag {};
 
 /**
  * Indicates that the operator uses the intent to read flag.
  */
 struct has_intent_to_read_tag {};
-template<typename T = bool>
-struct has_intent_to_read: public trait_has_type<T>, has_intent_to_read_tag {};
+struct has_intent_to_read: public trait_has_type<bool>, has_intent_to_read_tag {};
 
 /**
  * Indicates the operator has a function that visits the neighborhood of the
@@ -337,14 +336,15 @@ struct op_tag {};
  * Stats of multiple instance of a loop will be combined 
  * if this tag is passed
  */
+// TODO: delete this feature
 struct combine_stats_by_name_tag {};
-template <typename T=bool>
-struct combine_stats_by_name: public trait_has_type<T>, combine_stats_by_name_tag {}; 
+struct combine_stats_by_name: public trait_has_type<bool>, combine_stats_by_name_tag {}; 
 
 /**
  * Array of uint32_t. Could be used for various things, but main use case now
  * is to pass in information for thread work splitting.
  */
+// TODO: delete this feature
 struct thread_range_tag {};
 
 struct thread_range: public trait_has_value<const uint32_t*>, thread_range_tag {

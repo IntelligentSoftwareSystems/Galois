@@ -41,9 +41,7 @@
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
-enum VertexCut {
-  PL_VCUT, CART_VCUT
-};
+#include "Galois/Runtime/dGraphLoader.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_device.h"
@@ -76,29 +74,45 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<bool> transpose("transpose", cll::desc("transpose the graph in memory after partitioning"), cll::init(false));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1000"), cll::init(1000));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
-
-static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
-
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", cll::desc("Threshold for high degree edges."), cll::init(1000));
-static cll::opt<VertexCut> vertexcut("vertexcut", cll::desc("Type of vertex cut."),
-       cll::values(clEnumValN(PL_VCUT, "pl_vcut", "Powerlyra Vertex Cut"), clEnumValN(CART_VCUT , "cart_vcut", "Cartesian Vertex Cut"), clEnumValEnd),
-       cll::init(PL_VCUT));
-
+static cll::opt<unsigned int> maxIterations("maxIterations", 
+                                            cll::desc("Maximum iterations: "
+                                                      "Default 1000"), 
+                                            cll::init(1000));
+static cll::opt<unsigned long long> src_node("srcNodeId", 
+                                             cll::desc("ID of the source node"), 
+                                             cll::init(0));
+static cll::opt<bool> verify("verify", 
+                             cll::desc("Verify results by outputting results "
+                                       "to file"), 
+                             cll::init(false));
 
 #ifdef __GALOIS_HET_CUDA__
-static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
+static cll::opt<int> gpudevice("gpu", 
+                                cll::desc("Select GPU to run on, "
+                                          "default is to choose automatically"), 
+                                cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
+      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
+                  clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
+                  clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), 
+                  clEnumValEnd),
       cll::init(CPU));
-static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", cll::desc("Num of physical nodes with devices (default = num of hosts): detect GPU to use for each host automatically"), cll::init(-1));
-static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for hosts on each physical node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init("c"));
+static cll::opt<unsigned> scalegpu("scalegpu", 
+      cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<unsigned> scalecpu("scalecpu", 
+      cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally "
+                "equal workload to CPU and GPU (1)"), 
+      cll::init(1));
+static cll::opt<int> num_nodes("num_nodes", 
+      cll::desc("Num of physical nodes with devices (default = num of hosts): " 
+                "detect GPU to use for each host automatically"), 
+      cll::init(-1));
+static cll::opt<std::string> personality_set("pset", 
+      cll::desc("String specifying personality for hosts on each physical "
+                "node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), 
+      cll::init("c"));
 #endif
 
 /******************************************************************************/
@@ -115,10 +129,6 @@ struct NodeData {
 Galois::DynamicBitSet bitset_comp_current;
 
 typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
-
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"
@@ -134,30 +144,28 @@ struct InitializeGraph {
 
   void static go(Graph& _graph) {
     #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		InitializeGraph_all_cuda(cuda_ctx);
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
+        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        StatTimer_cuda.start();
+        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()), 
+                                 cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
     #endif
     {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   InitializeGraph {&_graph}, 
                    Galois::loopname("InitializeGraph"), 
                    Galois::numrun(_graph.get_run_identifier()));
     }
-
-    _graph.sync<writeSource, readDestination, Reduce_set_comp_current, 
-                Broadcast_comp_current, Bitset_comp_current>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
     sdata.comp_old = graph->getGID(src);
-    bitset_comp_current.set(src);
   }
 };
 
@@ -230,7 +238,8 @@ struct ConnectedComp {
       DGAccumulator_accum.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
+        std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
+                             (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
@@ -407,16 +416,13 @@ int main(int argc, char** argv) {
 
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
-    if (enableVCut) {
-      if(vertexcut == CART_VCUT)
-        hg = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
-      else if(vertexcut == PL_VCUT)
-        hg = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scalefactor, transpose, VCutThreshold, false, Galois::doAllKind==Galois::DOALL_RANGE);
+
+    // the symmetric flag needs to be explicitly set
+    if (inputFileSymmetric) {
+      hg = constructSymmetricGraph<NodeData, void>(scalefactor);
     } else {
-      hg = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scalefactor, transpose, Galois::doAllKind==Galois::DOALL_RANGE);
+      GALOIS_DIE("must pass inputFileSymmetric with symmetric graph to "
+                 "connected-components");
     }
 
 #ifdef __GALOIS_HET_CUDA__

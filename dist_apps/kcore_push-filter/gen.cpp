@@ -44,6 +44,8 @@
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
+#include "Galois/Runtime/dGraphLoader.h"
+
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
@@ -67,10 +69,6 @@ std::string personality_str(Personality p) {
 }
 #endif
 
-enum VertexCut {
-  PL_VCUT, CART_VCUT
-};
-
 static const char* const name = "KCore - Distributed Heterogeneous Push Filter.";
 static const char* const desc = "KCore on Distributed Galois.";
 static const char* const url = 0;
@@ -79,12 +77,6 @@ static const char* const url = 0;
 /* Declaration of command line arguments */
 /******************************************************************************/
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional,
-                                       cll::desc("<input file>"),
-                                       cll::Required);
-static cll::opt<std::string> partFolder("partFolder",
-                                        cll::desc("path to partitionFolder"),
-                                        cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
@@ -92,27 +84,6 @@ static cll::opt<bool> verify("verify",
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
                              cll::init(false));
-static cll::opt<bool> transpose("transpose", 
-                                cll::desc("transpose the graph in memory after "
-                                          "partitioning"),
-                                cll::init(false));
-static cll::opt<bool> enableVCut("enableVertexCut", 
-                                 cll::desc("Use vertex cut for graph " 
-                                           "partitioning."), 
-                                 cll::init(false));
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
-                                            cll::desc("Threshold for high "
-                                                      "degree edges."),
-                                            cll::init(100));
-static cll::opt<VertexCut> vertexcut("vertexcut", 
-                                     cll::desc("Type of vertex cut."),
-                                     cll::values(clEnumValN(PL_VCUT, "pl_vcut",
-                                                        "Powerlyra Vertex Cut"),
-                                                 clEnumValN(CART_VCUT, 
-                                                   "cart_vcut", 
-                                                   "Cartesian Vertex Cut"),
-                                                 clEnumValEnd),
-                                     cll::init(PL_VCUT));
 
 // required k specification for k-core
 static cll::opt<unsigned int> k_core_num("kcore",
@@ -165,10 +136,6 @@ struct NodeData {
 };
 
 typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
-typedef hGraph_cartesianCut<NodeData, void> Graph_cartesianCut;
-
 typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates
@@ -241,14 +208,19 @@ struct InitializeGraph1 {
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      InitializeGraph1_all_cuda(cuda_ctx);
+      InitializeGraph1_cuda(*(_graph.begin()), *(_graph.ghost_end()), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph1{&_graph}, 
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   InitializeGraph1{&_graph}, 
                    Galois::loopname("InitializeGraph1"), 
                    Galois::numrun(_graph.get_run_identifier()));
 
+    // note that this sync is necessary to act as a barrier (current degree
+    // must be set to 0 among all hosts before calling InitializeGraph2)
+    // Bitset_current_degree will be empty, so it acts as a barrier (no
+    // non-trivial data should be sent)
     _graph.sync<writeSource, readDestination, Reduce_set_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph1");
 
@@ -262,8 +234,7 @@ struct InitializeGraph1 {
     src_data.flag = true;
     src_data.trim = 0;
     src_data.current_degree = 0;
-
-    bitset_current_degree.set(src);
+    // note that no bitset is set
   }
 };
 
@@ -499,18 +470,7 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
 
     Graph* h_graph = nullptr;
-
-    if (enableVCut) {
-      if (vertexcut == CART_VCUT)
-        h_graph = new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
-                                         scalefactor, transpose);
-      else if (vertexcut == PL_VCUT)
-        h_graph = new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                      scalefactor, transpose, VCutThreshold);
-    } else {
-      h_graph = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                             scalefactor, transpose);
-    }
+    h_graph = constructGraph<NodeData, void>(scalefactor);
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {

@@ -46,7 +46,7 @@ void batch_min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 
 void FirstItr_SSSP_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
 void FirstItr_SSSP_all_cuda(struct CUDA_Context *ctx);
-void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const uint32_t & local_infinity, uint32_t local_src_node, struct CUDA_Context *ctx);
+void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context *ctx);
 void InitializeGraph_all_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context *ctx);
 void SSSP_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
 void SSSP_all_cuda(int & __retval, struct CUDA_Context *ctx);

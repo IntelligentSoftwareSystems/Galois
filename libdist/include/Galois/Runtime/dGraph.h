@@ -141,6 +141,12 @@ class hGraph: public GlobalObject {
   uint32_t beginMaster; // local id of the beginning of master nodes.
   uint32_t endMaster; // local id of the end of master nodes.
 
+  std::vector<uint32_t> masterRanges;
+  std::vector<uint32_t> withEdgeRanges;
+
+  std::vector<Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>>
+    specificRanges;
+
   //memoization optimization
   std::vector<std::vector<size_t>> mirrorNodes; // mirror nodes from different hosts. For reduce
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For broadcast
@@ -553,24 +559,25 @@ public:
     return graph.end();
   }
 
-  //return type is Galois::Runtime::StandardRange<boost::counting_iterator<size_t>>
-  auto allNodesRange() {
-    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
-                boost::counting_iterator<size_t> (numNodes));
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[0];
   }
 
-  auto masterNodesRange() {
-    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (beginMaster),
-                boost::counting_iterator<size_t> (endMaster));
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  masterNodesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[1];
+  }
+ 
+  Galois::Runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesWithEdgesRange() {
+    assert(specificRanges.size() == 3);
+    return specificRanges[2];
   }
 
-  auto allNodesWithEdgesRange() {
-    return Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
-                boost::counting_iterator<size_t> (numNodesWithEdges));
-  }
-
-
-  // DEPRECATED: do not use, only use 1 that takes prefix sum + nodes
+  // DEPRECATED: do not use
   ///** 
   // * Call after graph is completely constructed. Attempts to more evenly 
   // * distribute nodes among threads by checking the number of edges per
@@ -581,6 +588,23 @@ public:
   //void determine_thread_ranges() {
   //  graph.determineThreadRanges();
   //}
+
+  /**
+   * A version of determine_thread_ranges that computes the range offsets
+   * for a specific range of the graph. 
+   *
+   * Note that threadRangesEdge is not determined for this variant, meaning
+   * allocateSpecified will not work if you choose to use this variant.
+   *
+   * @param beginNode Beginning of range
+   * @param endNode End of range, non-inclusive
+   * @param returnRanges Vector to store thread offsets for ranges in
+   */
+  void determine_thread_ranges(uint32_t beginNode, uint32_t endNode,
+                               std::vector<uint32_t>& returnRanges) {
+    graph.determineThreadRanges(beginNode, endNode, returnRanges,
+                                nodeAlphaRanges);
+  }
 
   /**
    * A version of determine_thread_ranges that uses a pre-computed prefix sum
@@ -604,6 +628,95 @@ public:
    */
   void determine_thread_ranges_edge(std::vector<uint64_t> edge_prefix_sum) {
     graph.determineThreadRangesEdge(edge_prefix_sum);
+  }
+
+
+  /** 
+   * Determines the thread ranges for master nodes only and saves them to
+   * the object.
+   *
+   * Only call after graph is constructed + only call once
+   */
+  void determine_thread_ranges_master() {
+    // make sure this hasn't been called before
+    assert(masterRanges.size() == 0);
+
+    // first check if we even need to do any work; if already calculated,
+    // use already calculated vector
+    if (beginMaster == 0 && endMaster == numNodes) {
+      masterRanges = graph.getThreadRangesVector();
+    } else if (beginMaster == 0 && endMaster == numNodesWithEdges &&
+               withEdgeRanges.size() != 0) {
+      masterRanges = withEdgeRanges;
+    } else {
+      printf("Manually det. master thread ranges\n");
+      graph.determineThreadRanges(beginMaster, endMaster, masterRanges, 
+                                  nodeAlphaRanges);
+    }
+  }
+
+  /** 
+   * Determines the thread ranges for nodes with edges only and saves them to
+   * the object.
+   *
+   * Only call after graph is constructed + only call once
+   */
+  void determine_thread_ranges_with_edges() {
+    // make sure not called before
+    assert(withEdgeRanges.size() == 0);
+
+    // first check if we even need to do any work; if already calculated,
+    // use already calculated vector
+    if (numNodesWithEdges == numNodes) {
+      withEdgeRanges = graph.getThreadRangesVector();
+    } else if (beginMaster == 0 && endMaster == numNodesWithEdges &&
+               masterRanges.size() != 0) {
+      withEdgeRanges = masterRanges;
+    } else {
+      printf("Manually det. with edges thread ranges\n");
+      graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges, 
+                                  nodeAlphaRanges);
+    }
+  }
+
+  /**
+   *
+   */
+  void initialize_specific_ranges() {
+    assert(specificRanges.size() == 0);
+
+    assert(graph.getThreadRangesVector().size() != 0);
+    assert(masterRanges.size() != 0);
+    assert(withEdgeRanges.size() != 0);
+
+    // 0 is all nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(numNodes),
+        graph.getThreadRanges()
+      )
+    );
+
+    // 1 is master nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(beginMaster),
+        boost::counting_iterator<size_t>(endMaster),
+        masterRanges.data()
+      )
+    );
+
+    // 2 is with edge nodes
+    specificRanges.push_back(
+      Galois::Runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(numNodesWithEdges),
+        withEdgeRanges.data()
+      )
+    );
+
+    assert(specificRanges.size() == 3);
   }
 
   void exchange_info_init(){
@@ -2828,9 +2941,16 @@ public:
     num_iteration = iteration;
   }
 
-  std::string get_run_identifier(){
-    return std::string(std::to_string(num_run) + "_" + std::to_string(num_iteration));
+  std::string get_run_identifier() {
+    return std::string(std::to_string(num_run) + "_" + 
+                       std::to_string(num_iteration));
   }
+
+  std::string get_run_identifier(std::string loop_name) {
+    return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
+                       "_" + std::to_string(num_iteration));
+  }
+
   /** Report stats to be printed.**/
   void reportStats(){
     statGhostNodes.report();
@@ -2845,6 +2965,28 @@ public:
    */
   const uint32_t* get_thread_ranges() {
     return graph.getThreadRanges();
+  }
+
+  /**
+   * Returns the thread ranges array that specifies division of nodes among
+   * threads for only master nodes
+   *
+   * @returns An array of unsigned ints which spcifies which thread gets which
+   * nodes.
+   */
+  const uint32_t* get_thread_ranges_master() {
+    return masterRanges.data();
+  }
+
+  /**
+   * Returns the thread ranges array that specifies division of nodes among
+   * threads for only nodes with edges
+   *
+   * @returns An array of unsigned ints which spcifies which thread gets which
+   * nodes.
+   */
+  const uint32_t* get_thread_ranges_with_edges() {
+    return withEdgeRanges.data();
   }
 
   //////////////////////////////////////////////////////////////////////////////
