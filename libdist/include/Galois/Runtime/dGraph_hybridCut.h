@@ -44,7 +44,6 @@
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
-
   public:
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     /** Utilities for reading partitioned graphs. **/
@@ -285,7 +284,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       uint64_t nodeEnd = gid2host[base_hGraph::id].second;
       typename Galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
-
+    
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
       Galois::Graph::FileGraph mMappedGraph;
