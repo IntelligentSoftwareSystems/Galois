@@ -75,8 +75,8 @@ void perEdge(std::istream& is,
   uint64_t totalBytes = 0;
 
   const std::regex problemLine("^p[[:space:]]+[[:alpha:]]+[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)");
-  const std::regex noData(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]");
-  const std::regex noData_nospace(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)");
+  const std::regex noData(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]*");
+  //const std::regex noData_nospace(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)");
   const std::regex intData(  "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+(-?[[:digit:]]+)");
   const std::regex floatData("^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+(-?[[:digit:]]+\\.[[:digit:]]+)");
 
@@ -115,7 +115,7 @@ void perEdge(std::istream& is,
       else
         data.ival = std::stoll( matches[3].str());
       match = true;
-    } else if (std::regex_match(line, matches, noData) || std::regex_match(line, matches, noData_nospace)) {
+    } else if (std::regex_match(line, matches, noData)){ // || std::regex_match(line, matches, noData_nospace)) {
       data.ival = 0;
       match = true;
     } else if (std::regex_match(line, matches, problemLine)) {
@@ -191,6 +191,7 @@ void go_edgesSorted(std::istream& input, uint64_t numNodes) {
                 //std::cout << "CHANGES : " << src << " : " << curr_src << " COUNT : " << curr_src_edgeCount << "\n";
                 if(src < curr_src){
                   std::cerr << " ERROR : File is not sorted\n";
+                  abort();
                 }
                 edgeCount[curr_src] = curr_src_edgeCount;
                 curr_src = src;
