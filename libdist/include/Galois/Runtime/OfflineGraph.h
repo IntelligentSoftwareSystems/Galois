@@ -434,6 +434,8 @@ class OfflineGraphWriter {
   uint64_t numNodes, numEdges;
   bool smallData;
   uint64_t ver;
+  std::vector<uint64_t> bufferDst;
+  uint32_t counter;
 
   std::deque<uint64_t> edgeOffsets;
 
@@ -465,13 +467,21 @@ class OfflineGraphWriter {
 
 
   void setEdge_sorted(uint64_t dst) {
-    if(ver = 1){
+    if(ver == 1){
       uint32_t dst32 = dst;
-      file.write(reinterpret_cast<char*>(&dst), sizeof(uint32_t));
+      file.write(reinterpret_cast<char*>(&dst32), sizeof(uint32_t));
     }
     else{
       file.write(reinterpret_cast<char*>(&dst), sizeof(uint64_t));
     }
+  }
+
+  void setEdge_sortedBuffer(){
+    if(ver == 1){
+      std::vector<uint32_t> tmp(bufferDst.begin(), bufferDst.end());
+      file.write(reinterpret_cast<char*>(&tmp[0]), (sizeof(uint32_t)*tmp.size()));
+    }
+    file.write(reinterpret_cast<char*>(&bufferDst[0]), (sizeof(uint64_t)*bufferDst.size()));
   }
 
   //void setEdge64_sorted(uint64_t dst) {
@@ -488,6 +498,8 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
     file.write(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
     file.write(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
     file.seekg(0, std::ios_base::beg);
+    //bufferDst.resize(1024);
+    //counter = 0;
   }
 
   ~OfflineGraphWriter() {}
@@ -506,6 +518,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
     else{
       ver = 1;
     }
+    std::cout << " USING VERSION : " << ver << "\n";
     uint64_t etSize = 0; //smallData ? sizeof(float) : sizeof(double);
     file.seekg(0, std::ios_base::beg);
     file.write(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
@@ -525,6 +538,14 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
       setEdge64(src,offset,dst,val);
   }
   void setEdgeSorted(uint64_t dst) {
+#if 0
+      bufferDst[counter] = dst;
+      ++counter;
+      if(counter == 1024){
+        setEdge_sortedBuffer();
+        counter = 0;
+      }
+#endif
       setEdge_sorted(dst);
   }
 
