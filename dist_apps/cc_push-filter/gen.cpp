@@ -143,6 +143,8 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+    auto& allNodes = _graph.allNodesRange();
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
@@ -155,10 +157,19 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     {
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-                   InitializeGraph {&_graph}, 
-                   Galois::loopname("InitializeGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   //InitializeGraph {&_graph}, 
+                   //Galois::loopname("InitializeGraph"), 
+                   //Galois::numrun(_graph.get_run_identifier()));
+    Galois::Runtime::do_all_coupled(
+      allNodes,
+      InitializeGraph{&_graph}, 
+      std::make_tuple(
+        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+        Galois::timeit()
+      )
+    );
+
     }
   }
 
@@ -174,6 +185,7 @@ struct FirstItr_ConnectedComp{
   FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 
   void static go(Graph& _graph) {
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
@@ -189,14 +201,24 @@ struct FirstItr_ConnectedComp{
       //  FirstItr_ConnectedComp{&_graph}, Galois::loopname("ConnectedComp"), 
       //  Galois::numrun(_graph.get_run_identifier()));
 
-      Galois::do_all_choice(
-        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-        FirstItr_ConnectedComp{&_graph}, 
+      //Galois::do_all_choice(
+        //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        //FirstItr_ConnectedComp{&_graph}, 
+        //std::make_tuple(
+          //Galois::thread_range(_graph.get_thread_ranges()),
+          //Galois::loopname("ConnectedComp"), 
+          //Galois::numrun(_graph.get_run_identifier()))
+      //);
+
+      Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        FirstItr_ConnectedComp{ &_graph },
         std::make_tuple(
-          Galois::thread_range(_graph.get_thread_ranges()),
-          Galois::loopname("ConnectedComp"), 
-          Galois::numrun(_graph.get_run_identifier()))
+          Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
+          Galois::timeit()
+        )
       );
+
     }
     _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                 Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
@@ -233,6 +255,7 @@ struct ConnectedComp {
     
     unsigned _num_iterations = 1;
     
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     do { 
       _graph.set_num_iter(_num_iterations);
       DGAccumulator_accum.reset();
@@ -252,14 +275,24 @@ struct ConnectedComp {
         //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
         //               Galois::loopname("ConnectedComp"), 
         //               Galois::numrun(_graph.get_run_identifier()));
-        Galois::do_all_choice(
-          Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-          ConnectedComp{&_graph}, 
-          std::make_tuple(
-            Galois::thread_range(_graph.get_thread_ranges()),
-            Galois::loopname("ConnectedComp"), 
-            Galois::numrun(_graph.get_run_identifier()))
-        );
+        //Galois::do_all_choice(
+          //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+          //ConnectedComp{&_graph}, 
+          //std::make_tuple(
+            //Galois::thread_range(_graph.get_thread_ranges()),
+            //Galois::loopname("ConnectedComp"), 
+            //Galois::numrun(_graph.get_run_identifier()))
+        //);
+
+      Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        ConnectedComp{ &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
+          Galois::timeit()
+        )
+      );
+
 
       }
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 

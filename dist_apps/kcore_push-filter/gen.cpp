@@ -158,6 +158,8 @@ struct InitializeGraph2 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
@@ -168,9 +170,19 @@ struct InitializeGraph2 {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
-                   Galois::loopname("InitializeGraph2"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
+                   //Galois::loopname("InitializeGraph2"), 
+                   //Galois::numrun(_graph.get_run_identifier()));
+
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        InitializeGraph2{ &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
+          Galois::timeit()
+        )
+      );
+
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
@@ -202,7 +214,9 @@ struct InitializeGraph1 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-  #ifdef __GALOIS_HET_CUDA__
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
                            (_graph.get_run_identifier()));
@@ -212,10 +226,19 @@ struct InitializeGraph1 {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-                   InitializeGraph1{&_graph}, 
-                   Galois::loopname("InitializeGraph1"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
+                   //InitializeGraph1{&_graph}, 
+                   //Galois::loopname("InitializeGraph1"), 
+                   //Galois::numrun(_graph.get_run_identifier()));
+
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        InitializeGraph1{ &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
+          Galois::timeit()
+        )
+      );
 
     // note that this sync is necessary to act as a barrier (current degree
     // must be set to 0 among all hosts before calling InitializeGraph2)
@@ -248,6 +271,7 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
@@ -259,9 +283,18 @@ struct KCoreStep2 {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
-                   Galois::loopname("KCoreStep2"),
-                   Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
+                   //Galois::loopname("KCoreStep2"),
+                   //Galois::numrun(_graph.get_run_identifier()));
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        KCoreStep2{ &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
+          Galois::timeit()
+        )
+      );
+
   }
 
   void operator()(GNode src) const {
@@ -292,6 +325,8 @@ struct KCoreStep1 {
   void static go(Graph& _graph){
     unsigned iterations = 0;
     
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+
     do {
       _graph.set_num_iter(iterations);
       DGAccumulator_accum.reset();
@@ -308,10 +343,19 @@ struct KCoreStep1 {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      Galois::do_all(_graph.begin(), _graph.end(), 
-                     KCoreStep1(k_core_num, &_graph), 
-                     Galois::loopname("KCoreStep1"),
-                     Galois::numrun(_graph.get_run_identifier()));
+      //Galois::do_all(_graph.begin(), _graph.end(), 
+                     //KCoreStep1(k_core_num, &_graph), 
+                     //Galois::loopname("KCoreStep1"),
+                     //Galois::numrun(_graph.get_run_identifier()));
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        KCoreStep1{ k_core_num, &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+          Galois::timeit()
+        )
+      );
+
 
       // do the trim sync
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 

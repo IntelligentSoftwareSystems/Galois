@@ -114,17 +114,17 @@ struct NodeData {
 
 #include "gen_sync.hh"
 
-#if 0
 typedef hGraph<NodeData, double> Graph;
 typedef hGraph_edgeCut<NodeData, double> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, double> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, double> Graph_cartesianCut;
-#endif
 
+#if 0
 typedef hGraph<NodeData, uint32_t> Graph;
 typedef hGraph_edgeCut<NodeData, uint32_t> Graph_edgeCut;
 typedef hGraph_vertexCut<NodeData, uint32_t> Graph_vertexCut;
 typedef hGraph_cartesianCut<NodeData, uint32_t> Graph_cartesianCut;
+#endif
 
 typedef typename Graph::GraphNode GNode;
 
@@ -214,13 +214,13 @@ struct SGD_doPartialGradientUpdate {
 	       if (g.edge_begin(*ii) != g.edge_end(*ii))
 	         Movies.push_back(*ii);
 #endif
-      Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
-      //Galois::for_each(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate (&_graph, _step_size));
+      //Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
+      Galois::for_each(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate (&_graph, _step_size));
   }
-  //template<typename Context>
-  //void operator()(GNode src , Context& cnx) const {
-  void operator()(GNode src) const {
-    NodeData& sdata= graph->getData(src);
+  template<typename Context>
+  void operator()(GNode src , Context& cnx) const {
+  //void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
     auto& movie_node = sdata.latent_vector;
 
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
@@ -233,9 +233,6 @@ struct SGD_doPartialGradientUpdate {
       //doGradientUpdate
      double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
      double cur_error = edge_rating - old_dp;
-     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-           //   std::cout << " Cur_error : " << cur_error << "\n";
-      }
      assert(cur_error < 1000 && cur_error > -1000);
      for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
        double prevUser = user_node[i];
@@ -285,8 +282,6 @@ struct SGD {
       
 
         _graph.sync<writeDestination, readSource, Reduce_pair_wise_avg_array_latent_vector, Broadcast_latent_vector>("SGD");
-        //_graph.sync_exchange<Reduce_2, Broadcast_0>("SGD");
-
 
       Galois::do_all(_graph.begin(), _graph.end(), SGD { &_graph, step_size }, Galois::loopname("SGD"));
       ++iteration;

@@ -150,6 +150,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
@@ -159,10 +160,19 @@ struct ResetGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), 
-                   ResetGraph{ &_graph }, 
-                   Galois::loopname("ResetGraph"), 
-                   Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.end(), 
+                   //ResetGraph{ &_graph }, 
+                   //Galois::loopname("ResetGraph"), 
+                   //Galois::numrun(_graph.get_run_identifier()));
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        ResetGraph{ &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
+          Galois::timeit()
+        )
+      );
+
   }
 
   void operator()(GNode src) const {
@@ -182,6 +192,8 @@ struct InitializeGraph {
     local_alpha(_alpha), graph(_graph){}
 
   void static go(Graph& _graph) {
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
@@ -193,9 +205,19 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     {
-    Galois::do_all(_graph.begin(), _graph.end(), 
-      InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), 
-      Galois::numrun(_graph.get_run_identifier()));
+    //Galois::do_all(_graph.begin(), _graph.end(), 
+      //InitializeGraph{ alpha, &_graph }, Galois::loopname("InitializeGraph"), 
+      //Galois::numrun(_graph.get_run_identifier()));
+
+     Galois::Runtime::do_all_coupled(
+        nodesWithEdges,
+        InitializeGraph{alpha, &_graph },
+        std::make_tuple(
+          Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+          Galois::timeit()
+        )
+      );
+
     }
 
     _graph.sync<writeSource, readSource, Reduce_set_residual, 
@@ -229,6 +251,8 @@ struct PageRank_delta {
                  graph(_graph){}
 
   void static go(Graph& _graph) {
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
@@ -239,12 +263,21 @@ struct PageRank_delta {
     } else if (personality == CPU)
   #endif
     {
-      Galois::do_all_choice(
-        Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-        PageRank_delta{ alpha, tolerance, &_graph }, 
-        std::make_tuple(Galois::loopname("PageRank"), 
-        Galois::thread_range(_graph.get_thread_ranges()),
-        Galois::numrun(_graph.get_run_identifier())));
+      //Galois::do_all_choice(
+        //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+        //PageRank_delta{ alpha, tolerance, &_graph }, 
+        //std::make_tuple(Galois::loopname("PageRank"), 
+          //Galois::thread_range(_graph.get_thread_ranges()),
+          //Galois::numrun(_graph.get_run_identifier())));
+      Galois::Runtime::do_all_coupled(
+          nodesWithEdges,
+          PageRank_delta{ alpha, tolerance, &_graph },
+          std::make_tuple(
+            Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
+            Galois::timeit()
+            )
+      );
+
       //Galois::do_all_local(_graph,
       //               PageRank_delta{ alpha, tolerance, &_graph }, 
       //               Galois::loopname("PageRank"), 
@@ -274,6 +307,7 @@ struct PageRank {
   void static go(Graph& _graph) {
     unsigned _num_iterations = 0;
     
+    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     do { 
       _graph.set_num_iter(_num_iterations);
       PageRank_delta::go(_graph);
@@ -290,12 +324,20 @@ struct PageRank {
         } else if (personality == CPU)
       #endif
         {
-          Galois::do_all_choice(
-              Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-              PageRank{ &_graph }, 
-              std::make_tuple(Galois::loopname("PageRank"), 
-              Galois::thread_range(_graph.get_thread_ranges()),
-              Galois::numrun(_graph.get_run_identifier())));
+          //Galois::do_all_choice(
+              //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
+              //PageRank{ &_graph }, 
+              //std::make_tuple(Galois::loopname("PageRank"), 
+              //Galois::thread_range(_graph.get_thread_ranges()),
+              //Galois::numrun(_graph.get_run_identifier())));
+      Galois::Runtime::do_all_coupled(
+          nodesWithEdges,
+          PageRank{ &_graph },
+          std::make_tuple(
+            Galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
+            Galois::timeit()
+            )
+      );
 
           //Galois::do_all_local(_graph,
           //               PageRank{ &_graph }, 
