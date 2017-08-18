@@ -477,6 +477,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
     else{
       ver = 1;
     }
+    std::cout << " USING VERSION : " << ver << "\n";
     uint64_t etSize = 0; //smallData ? sizeof(float) : sizeof(double);
     file.seekg(0, std::ios_base::beg);
     file.write(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
