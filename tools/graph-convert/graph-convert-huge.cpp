@@ -55,6 +55,8 @@ static cll::opt<std::string> inputFilename(cll::Positional,
 static cll::opt<std::string> outputFilename(cll::Positional,
     cll::desc("<output file>"), cll::Required);
 static cll::opt<bool> useSmallData("32bitData", cll::desc("Use 32 bit data"), cll::init(false));
+static cll::opt<bool> edgesSorted("edgesSorted", cll::desc("Edges are sorted by the sourceIDs."), cll::init(false));
+static cll::opt<unsigned long long> numNodes("numNodes", cll::desc("Total number of nodes given."), cll::init(0));
 
 union dataTy {
   int64_t ival;
@@ -67,13 +69,14 @@ void perEdge(std::istream& is,
              std::function<void(uint64_t, uint64_t, dataTy)> fn, 
              std::function<void(uint64_t, uint64_t)> fnPreSize) {
   std::string line;
-  
+
   uint64_t bytes = 0;
   uint64_t counter = 0;
   uint64_t totalBytes = 0;
 
   const std::regex problemLine("^p[[:space:]]+[[:alpha:]]+[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)");
   const std::regex noData(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]");
+  const std::regex noData_nospace(   "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)");
   const std::regex intData(  "^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+(-?[[:digit:]]+)");
   const std::regex floatData("^a?[[:space:]]*([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+(-?[[:digit:]]+\\.[[:digit:]]+)");
 
@@ -112,7 +115,7 @@ void perEdge(std::istream& is,
       else
         data.ival = std::stoll( matches[3].str());
       match = true;
-    } else if (std::regex_match(line, matches, noData)) {
+    } else if (std::regex_match(line, matches, noData) || std::regex_match(line, matches, noData_nospace)) {
       data.ival = 0;
       match = true;
     } else if (std::regex_match(line, matches, problemLine)) {
@@ -145,7 +148,7 @@ void perEdge(std::istream& is,
 void go(std::istream& input) {
   try {
     std::deque<uint64_t> edgeCount;
-    perEdge(input, 
+    perEdge(input,
             [&edgeCount] (uint64_t src, uint64_t, dataTy) { if (edgeCount.size() <= src) edgeCount.resize(src + 1); ++edgeCount[src];},
             [&edgeCount] (uint64_t nodes, uint64_t edges) { edgeCount.resize(nodes); }
             );
@@ -163,6 +166,43 @@ void go(std::istream& input) {
             },
             [] (uint64_t, uint64_t) {}
             );
+  } catch( const char* c) {
+    std::cerr << "Failed with: " << c << "\n";
+    abort();
+  }
+}
+
+void go_edgesSorted(std::istream& input, uint64_t numNodes) {
+  try {
+    std::deque<uint64_t> edgeCount(numNodes, 0);
+    input.clear();
+    input.seekg(0, std::ios_base::beg);
+    Galois::Graph::OfflineGraphWriter outFile(outputFilename, useSmallData, numNodes);
+    outFile.setCounts(edgeCount);
+    outFile.seekEdgesDstStart();
+    uint64_t curr_src = 0;
+    uint64_t curr_src_edgeCount = 0;
+    perEdge(input,
+            [&outFile, &edgeCount, &curr_src, &curr_src_edgeCount] (uint64_t src, uint64_t dst, dataTy data) {
+              if(src == curr_src){
+                ++curr_src_edgeCount;
+              }
+              else{
+                //std::cout << "CHANGES : " << src << " : " << curr_src << " COUNT : " << curr_src_edgeCount << "\n";
+                if(src < curr_src){
+                  std::cerr << " ERROR : File is not sorted\n";
+                }
+                edgeCount[curr_src] = curr_src_edgeCount;
+                curr_src = src;
+                curr_src_edgeCount = 1;
+              }
+                outFile.setEdgeSorted(dst);
+            },
+            [] (uint64_t, uint64_t) {}
+            );
+    //To take care of the last src node ID.
+    edgeCount[curr_src] = curr_src_edgeCount;
+    outFile.setCounts(edgeCount);
   } catch( const char* c) {
     std::cerr << "Failed with: " << c << "\n";
     abort();
@@ -188,7 +228,12 @@ int main(int argc, char** argv) {
   // //   std::istream instream(&inbuf);
   // //   go(instream);
   // // } else {
-  go(infile);
+  if(numNodes > 0 && edgesSorted){
+    go_edgesSorted(infile, numNodes);
+  }
+  else{
+    go(infile);
+  }
   //  }
 
   return 0;
