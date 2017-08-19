@@ -45,6 +45,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Accumulator.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -101,7 +102,7 @@ private:
   uint64_t edgeOffset;
 
   // graph reading speed variables
-  uint64_t numBytesReadIndex, numBytesReadEdgeDst, numBytesReadEdgeData;
+  Galois::GAccumulator<uint64_t> numBytesReadIndex, numBytesReadEdgeDst, numBytesReadEdgeData;
 
 
   void move_assign(FileGraph&&);
@@ -152,14 +153,16 @@ public:
    * Reset the num bytes counters
    */
   void reset_byte_counters() {
-    numBytesReadEdgeDst = numBytesReadIndex = numBytesReadEdgeData = 0;
+    numBytesReadEdgeDst.reset();
+    numBytesReadIndex.reset();
+    numBytesReadEdgeData.reset();
   }
 
   /**
    * Return all bytes read
    */
   uint64_t num_bytes_read() {
-     return numBytesReadEdgeDst + numBytesReadEdgeData + numBytesReadIndex;
+     return numBytesReadEdgeDst.reduce() + numBytesReadEdgeData.reduce() + numBytesReadIndex.reduce();
   }
 
   // Node Handling
