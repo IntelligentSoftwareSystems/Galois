@@ -38,7 +38,7 @@
  * Supported partitioning schemes
  ******************************************************************************/
 enum PARTITIONING_SCHEME {
-  OEC, IEC, HIVC, HOVC, CART_VCUT
+  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT
 };
 
 /*******************************************************************************
@@ -65,11 +65,13 @@ static cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                                                   "Outgoing edge cut"), 
                                        clEnumValN(IEC, "iec", 
                                                   "Incoming edge cut"), 
-                                      clEnumValN(HIVC, "hivc", 
-                                                  "Incoming Hybrid Vertex Cut"),
                                        clEnumValN(HOVC, "hovc", 
                                                   "Outgoing Hybrid Vertex Cut"), 
-                                       clEnumValN(CART_VCUT , "cart_vcut", 
+                                       clEnumValN(HIVC, "hivc", 
+                                                  "Incoming Hybrid Vertex Cut"),
+                                       clEnumValN(BOARD2D_VCUT , "2dvc", 
+                                                  "2d Checkerboard Vertex Cut"), 
+                                       clEnumValN(CART_VCUT , "cvc", 
                                                   "Cartesian Vertex Cut"), 
                                        clEnumValEnd),
                                      cll::init(OEC));
@@ -102,6 +104,7 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -114,6 +117,9 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
     case HIVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
                                  scaleFactor, false, VCutThreshold);
+    case BOARD2D_VCUT:
+      return new Graph_checkerboardCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
@@ -141,7 +147,8 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut; // assumes push-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -170,7 +177,9 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
                    "graph");
         break;
       }
-
+    case BOARD2D_VCUT:
+      return new Graph_checkerboardCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
@@ -199,7 +208,8 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true> Graph_cartesianCut; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, true, true> Graph_checkerboardCut; // assumes pull-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -216,7 +226,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
                    "graph");
         break;
       }
-   case HOVC:
+    case HOVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
                                  scaleFactor, true, VCutThreshold);
     case HIVC:
@@ -228,14 +238,14 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         break;
       }
 
-    //case PL_VCUT:
-      //if (inputFileTranspose.size()) {
-        //return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, net.Num, 
-                                   //scaleFactor, false, VCutThreshold);
-      //} else {
-        //GALOIS_DIE("Error: (plc) iterate over in-edges without transpose graph");
-        //break;
-      //}
+    case BOARD2D_VCUT:
+      if (inputFileTranspose.size()) {
+        return new Graph_checkerboardCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                                      scaleFactor, false);
+      } else {
+        GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
+        break;
+      }
 
     case CART_VCUT:
       if (inputFileTranspose.size()) {
