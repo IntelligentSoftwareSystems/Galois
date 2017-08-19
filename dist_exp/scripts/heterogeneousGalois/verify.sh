@@ -42,7 +42,6 @@ LOG=.verify_log
 
 FLAGS=
 FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
-FLAGS+=" -balanceEdges"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
   FLAGS+=" -kcore=100"
@@ -78,7 +77,7 @@ INPUT=${inputdirname}/${inputname}.${extension}
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/Galois
 fi
-checker=${ABELIAN_GALOIS_ROOT}/exp/scripts/result_checker.py
+checker=${ABELIAN_GALOIS_ROOT}/dist_exp/scripts/result_checker.py
 #checker=./result_checker.py
 
 hostname=`hostname`
@@ -92,18 +91,27 @@ else
   SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 fi
 
-
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3 4; do
+for partition in 1 2 3 4 5 6 7 8; do
   CUTTYPE=
 
-  if [ $partition -eq 2 ]; then
-    CUTTYPE+=" -partition=pl_vcut"
+  if [ $partition -eq 1 ]; then
+    CUTTYPE+=" -partition=cvc"
+  elif [ $partition -eq 2 ]; then
+    CUTTYPE+=" -partition=cvc -balanceMasters=nodes"
   elif [ $partition -eq 3 ]; then
-    CUTTYPE+=" -partition=cart_vcut"
+    CUTTYPE+=" -partition=cvc -balanceMasters=both"
   elif [ $partition -eq 4 ]; then
+    CUTTYPE+=" -partition=2dvc -balanceMasters=nodes"
+  elif [ $partition -eq 5 ]; then
+    CUTTYPE+=" -partition=hovc"
+  elif [ $partition -eq 6 ]; then
+    CUTTYPE+=" -partition=hivc"
+  elif [ $partition -eq 7 ]; then
+    CUTTYPE+=" -partition=oec"
+  elif [ $partition -eq 8 ]; then
     CUTTYPE+=" -partition=iec"
   fi
 
@@ -126,19 +134,27 @@ for partition in 1 2 3 4; do
     eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
 
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
-    eval "python $checker -t=0.1 $OUTPUT output_${hostname}_0.log &> .output_diff"
+    eval "python $checker -t=1 $OUTPUT output_${hostname}_0.log &> .output_diff"
 
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
-      if [ $partition -eq 4 ]; then
-        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
-      elif [ $partition -eq 3 ]; then
-        failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+      if [ $partition -eq 1 ]; then
+        failed_cases+="balanced cartesian vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 2 ]; then
-        failed_cases+="hybrid vertex-cut $1 devices with $3 threads; "
-      else
-        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
+        failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 3 ]; then
+        failed_cases+="both balanced cartesian vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 4 ]; then
+        failed_cases+="2d checkerboard vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 5 ]; then
+        failed_cases+="balanced hybrid outgoing vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 6 ]; then
+        failed_cases+="balanced hybrid incoming vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 7 ]; then
+        failed_cases+="balanced outgoing edge-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 8 ]; then
+        failed_cases+="balanced incoming edge-cut $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
