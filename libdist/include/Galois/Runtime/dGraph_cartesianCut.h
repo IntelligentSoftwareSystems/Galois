@@ -352,22 +352,30 @@ public:
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
     }
-    uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
     Galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
-    auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
-    for (auto src = base_hGraph::gid2host[base_hGraph::id].first; src < base_hGraph::gid2host[base_hGraph::id].second; ++src) {
-      auto ii = ee;
-      ee = fileGraph.edge_end(src);
-      for (; ii < ee; ++ii) {
-        auto dst = fileGraph.getEdgeDst(ii);
-        auto h = getColumnHostID(dst);
-        hasIncomingEdge[h].set(getColumnIndex(dst));
-        numOutgoingEdges[h][src - rowOffset]++;
-      }
-    }
+    uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id].first;
+    auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
+    auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
+    Galois::Runtime::do_all_coupled(
+      Galois::Runtime::makeStandardRange(beginIter, endIter),
+      [&] (auto src) {
+        auto ii = fileGraph.edge_begin(src);
+        auto ee = fileGraph.edge_end(src);
+        for (; ii < ee; ++ii) {
+          auto dst = fileGraph.getEdgeDst(ii);
+          auto h = this->getColumnHostID(dst);
+          hasIncomingEdge[h].set(this->getColumnIndex(dst));
+          numOutgoingEdges[h][src - rowOffset]++;
+        }
+      },
+      std::make_tuple(
+        Galois::loopname("EdgeInspection"),
+        Galois::timeit()
+      )
+    );
     timer.stop();
     fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
         base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
