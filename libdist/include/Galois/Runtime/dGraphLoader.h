@@ -38,7 +38,7 @@
  * Supported partitioning schemes
  ******************************************************************************/
 enum PARTITIONING_SCHEME {
-  OEC, IEC, PL_VCUT, CART_VCUT
+  OEC, IEC, HIVC, HOVC, CART_VCUT
 };
 
 /*******************************************************************************
@@ -65,8 +65,10 @@ static cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                                                   "Outgoing edge cut"), 
                                        clEnumValN(IEC, "iec", 
                                                   "Incoming edge cut"), 
-                                       clEnumValN(PL_VCUT, "pl_vcut", 
-                                                  "Powerlyra Vertex Cut"), 
+                                      clEnumValN(HIVC, "hivc", 
+                                                  "Incoming Hybrid Vertex Cut"),
+                                       clEnumValN(HOVC, "hovc", 
+                                                  "Outgoing Hybrid Vertex Cut"), 
                                        clEnumValN(CART_VCUT , "cart_vcut", 
                                                   "Cartesian Vertex Cut"), 
                                        clEnumValEnd),
@@ -108,7 +110,8 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
     case IEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
                                scaleFactor, false);
-    case PL_VCUT:
+    case HOVC:
+    case HIVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
                                  scaleFactor, false, VCutThreshold);
     case CART_VCUT:
@@ -155,9 +158,19 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
                    "graph");
         break;
       }
-    case PL_VCUT:
+    case HOVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
                                  scaleFactor, false, VCutThreshold);
+    case HIVC:
+      if (inputFileTranspose.size()) {
+        return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                                 scaleFactor, true, VCutThreshold);
+      } else {
+        GALOIS_DIE("Error: attempting incoming hybrid cut without transpose "
+                   "graph");
+        break;
+      }
+
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
@@ -203,14 +216,26 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
                    "graph");
         break;
       }
-    case PL_VCUT:
+   case HOVC:
+      return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
+                                 scaleFactor, true, VCutThreshold);
+    case HIVC:
       if (inputFileTranspose.size()) {
         return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, net.Num, 
-                                   scaleFactor, false, VCutThreshold);
+                                 scaleFactor, false, VCutThreshold);
       } else {
-        GALOIS_DIE("Error: (plc) iterate over in-edges without transpose graph");
+        GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
         break;
       }
+
+    //case PL_VCUT:
+      //if (inputFileTranspose.size()) {
+        //return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                                   //scaleFactor, false, VCutThreshold);
+      //} else {
+        //GALOIS_DIE("Error: (plc) iterate over in-edges without transpose graph");
+        //break;
+      //}
 
     case CART_VCUT:
       if (inputFileTranspose.size()) {
