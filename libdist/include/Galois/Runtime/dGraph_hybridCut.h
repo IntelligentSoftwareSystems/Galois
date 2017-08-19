@@ -461,15 +461,19 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::vector<uint64_t> num_assigned_edges_perhost(base_hGraph::numHosts);
       num_total_edges_to_receive = 0; 
 
+      base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
+                                     base_hGraph::gid2host[base_hGraph::id].first;
+#if 0
       /***Finding maximum owned nodes across hosts, for padding numOutgoingEdges****/
-      uint32_t maxOwnedNodes = 0;
+      size_t maxOwnedNodes = 0;
       for(uint32_t i = 0; i < base_hGraph::numHosts; ++i){
-        uint64_t tmp = (base_hGraph::gid2host[i].second - base_hGraph::gid2host[i].first);
+        size_t tmp = (base_hGraph::gid2host[i].second - base_hGraph::gid2host[i].first);
         if(maxOwnedNodes < tmp)
           maxOwnedNodes = tmp;
       }
+#endif
       for(uint32_t i = 0; i < base_hGraph::numHosts; ++i){
-        numOutgoingEdges[i].assign(maxOwnedNodes, 0);
+        numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
         num_assigned_edges_perhost[i] = 0;
       }
 
@@ -477,8 +481,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       timer.start();
       g.reset_seek_counters();
 
-      base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
-                                     base_hGraph::gid2host[base_hGraph::id].first;
+      //base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
+                                     //base_hGraph::gid2host[base_hGraph::id].first;
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
       auto ee_end = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
@@ -590,14 +594,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_hGraph::id, numNodes, numEdges);
 
-#if 0
-      if(base_hGraph::id == 0){
-        std::cout << "\n\n";
-        for(auto i : mirrorNodes[1]){
-          std::cout << "HHMIRROR : : " << i << "\t";
-        }
-      }
-#endif
     }
 
 
