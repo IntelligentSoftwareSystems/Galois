@@ -33,6 +33,8 @@
 #include <unordered_map>
 #include "Galois/Runtime/dGraph.h"
 #include "Galois/Runtime/OfflineGraph.h"
+#include "Galois/Galois.h"
+#include "Galois/DoAllWrap.h"
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;
@@ -188,7 +190,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
                           _numEdges << "\n";
 
-      std::vector<bool> ghosts(g.size());
+      Galois::DynamicBitSet ghosts;
+      ghosts.resize(g.size());
 
       Galois::Timer timer;
       timer.start();
@@ -196,36 +199,39 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // vector to hold a prefix sum for use in thread work distribution
       std::vector<uint64_t> prefixSumOfOutEdges(base_hGraph::numOwned);
-      uint64_t current_edge_sum = 0;
-      uint32_t current_node = 0;
 
       // loop through all nodes we own and determine ghosts (note a node
       // we own can also be marked a ghost here if there's an outgoing edge to 
       // it)
       // Also determine prefix sums
-      auto ee = fileGraph.edge_begin(nodeBegin);
-      for (auto n = nodeBegin; n < nodeEnd; ++n) {
-        auto ii = ee;
-        ee = fileGraph.edge_end(n);
-        for (; ii < ee; ++ii) {
-          ghosts[fileGraph.getEdgeDst(ii)] = true;
-          current_edge_sum++;
-        }
-
-        prefixSumOfOutEdges[current_node++] = current_edge_sum;
-      }
+      auto edgeOffset = fileGraph.edge_begin(nodeBegin);
+      auto beginIter = boost::make_counting_iterator(nodeBegin);
+      auto endIter = boost::make_counting_iterator(nodeEnd);
+      Galois::Runtime::do_all_coupled(
+        Galois::Runtime::makeStandardRange(beginIter, endIter),
+        [&] (auto n) {
+          auto ii = fileGraph.edge_begin(n);
+          auto ee = fileGraph.edge_end(n);
+          for (; ii < ee; ++ii) {
+            ghosts.set(fileGraph.getEdgeDst(ii));
+          }
+          prefixSumOfOutEdges[n - nodeBegin] = std::distance(edgeOffset, ee);
+        },
+        std::make_tuple(
+          Galois::loopname("EdgeInspection"),
+          Galois::timeit()
+        )
+      );
 
       timer.stop();
 
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
-      std::cerr << "[" << base_hGraph::id << "] Ghost Finding Done " << 
-                   std::count(ghosts.begin(), ghosts.end(), true) << "\n";
+          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
       // only nodes we do not own are actual ghosts (i.e. filter the "ghosts"
       // found above)
       for (uint64_t x = 0; x < g.size(); ++x)
-        if (ghosts[x] && !isOwned(x))
+        if (ghosts.test(x) && !isOwned(x))
           ghostMap.push_back(x);
       std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
                    ghostMap.size() << "\n";
@@ -392,7 +398,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     timer.stop();
     fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
+        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
@@ -403,7 +409,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     Galois::Timer timer;
     timer.start();
-    //g.reset_seek_counters();
+    fileGraph.reset_byte_counters();
 
     uint64_t cur = 0;
     auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
@@ -423,8 +429,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge loading time : %f seconds\n", 
-            base_hGraph::id, timer.get_usec()/1000000.0f);
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
+        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){

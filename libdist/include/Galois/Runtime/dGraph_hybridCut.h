@@ -442,7 +442,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       timer.stop();
       fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
+          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
     }
 
     // Just calculating the number of edges to send to other hosts
@@ -455,9 +455,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //Go over assigned nodes and distribute edges.
 
       auto& net = Galois::Runtime::getSystemNetworkInterface();
-      std::vector<bool> ghosts(g.size());
+      Galois::DynamicBitSet ghosts;
+      ghosts.resize(g.size());
       std::vector<std::vector<uint64_t>> numOutgoingEdges(base_hGraph::numHosts);
-      std::vector<uint64_t> num_assigned_edges_perhost(base_hGraph::numHosts);
+      std::vector<Galois::GAccumulator<uint64_t>> num_assigned_edges_perhost(base_hGraph::numHosts);
       num_total_edges_to_receive = 0; 
 
       base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
@@ -473,7 +474,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
       for(uint32_t i = 0; i < base_hGraph::numHosts; ++i){
         numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
-        num_assigned_edges_perhost[i] = 0;
       }
 
       Galois::Timer timer;
@@ -483,41 +483,47 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
                                      //base_hGraph::gid2host[base_hGraph::id].first;
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
-
-      auto ee_end = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
-      for(auto src = base_hGraph::gid2host[base_hGraph::id].first; 
-          src != base_hGraph::gid2host[base_hGraph::id].second; 
-          ++src) {
-        auto ee = ee_end;
-        ee_end = fileGraph.edge_end(src);
-        auto num_edges = std::distance(ee, ee_end);
-        if(num_edges > VCutThreshold){
-          //Assign edges for high degree nodes to the destination
-          for(; ee != ee_end; ++ee){
-            auto gdst = fileGraph.getEdgeDst(ee);
-            auto h = find_hostID(gdst);
-            numOutgoingEdges[h][src - globalOffset]++;
-            num_assigned_edges_perhost[h]++;
+      auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
+      auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
+      auto& id = base_hGraph::id;
+      Galois::Runtime::do_all_coupled(
+        Galois::Runtime::makeStandardRange(beginIter, endIter),
+        [&] (auto src) {
+          auto ee = fileGraph.edge_begin(src);
+          auto ee_end = fileGraph.edge_end(src);
+          auto num_edges = std::distance(ee, ee_end);
+          if(num_edges > VCutThreshold){
+            //Assign edges for high degree nodes to the destination
+            for(; ee != ee_end; ++ee){
+              auto gdst = fileGraph.getEdgeDst(ee);
+              auto h = this->find_hostID(gdst);
+              numOutgoingEdges[h][src - globalOffset]++;
+              num_assigned_edges_perhost[h] += 1;
+            }
+          } else {
+            //keep all edges with the source node
+            for(; ee != ee_end; ++ee){
+              numOutgoingEdges[id][src - globalOffset]++;
+              num_assigned_edges_perhost[id] += 1;
+              auto gdst = fileGraph.getEdgeDst(ee);
+              if(!this->isOwned(gdst))
+                ghosts.set(gdst);
+            }
           }
-        } else {
-          //keep all edges with the source node
-          for(; ee != ee_end; ++ee){
-            numOutgoingEdges[base_hGraph::id][src - globalOffset]++;
-            num_assigned_edges_perhost[base_hGraph::id]++;
-            auto gdst = fileGraph.getEdgeDst(ee);
-            if(!isOwned(gdst))
-              ghosts[gdst] = true;
-          }
-        }
-      }
+        },
+        std::make_tuple(
+          Galois::loopname("EdgeInspection"),
+          Galois::timeit()
+        )
+      );
       timer.stop();
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
+          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
-        //std::cout << "from : " << base_hGraph::id << " to : " << h << " : edges assigned : " << num_assigned_edges_perhost[h] << "\n";
-        check_numEdges += num_assigned_edges_perhost[h];
+        //std::cout << "from : " << base_hGraph::id << " to : " << h << " : edges assigned : " << num_assigned_edges_perhost[h].reduce() << "\n";
+        check_numEdges += num_assigned_edges_perhost[h].reduce();
       }
 
       assert(check_numEdges == numEdges_distribute);
@@ -527,7 +533,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
         Galois::Runtime::SendBuffer b;
-        Galois::Runtime::gSerialize(b, num_assigned_edges_perhost[x]);
+        Galois::Runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
         Galois::Runtime::gSerialize(b, numOutgoingEdges[x]);
         net.sendTagged(x, Galois::Runtime::evilPhase, b);
         //std::cerr << "sending size  : " <<  numOutgoingEdges[x].size() << "\n";
@@ -574,8 +580,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             globalToLocalMap[src] = numNodes++;
             prefixSumOfEdges.push_back(numEdges);
             if(!isOwned(src))
-              ghosts[src] = true;
-          } else if (ghosts[src]){
+              ghosts.set(src);
+          } else if (ghosts.test(src)){
             localToGlobalVector.push_back(src);
             globalToLocalMap[src] = numNodes++;
             prefixSumOfEdges.push_back(numEdges);
@@ -584,7 +590,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
       for (uint64_t x = 0; x < g.size(); ++x){
-        if (ghosts[x] && !isOwned(x)){
+        if (ghosts.test(x) && !isOwned(x)){
           auto h = find_hostID(x);
           mirrorNodes[h].push_back(x);
         }

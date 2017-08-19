@@ -3,7 +3,6 @@
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 #SBATCH -A Galois
-#SBATCH --reservation=Galois
 PART=$3
 PSET=$4
 THREADS=$5
@@ -50,7 +49,7 @@ grep "${inputname}.${extension}" ${source_file} >>$LOG
 INPUT=${inputdirname}/${inputname}.${extension}
 
 if [[ ($execname == *"pagerank"*) ]]; then
-  FLAGS+=" -maxIterations=200"
+  FLAGS+=" -maxIterations=100"
 fi
 FLAGS+=" -partition=${PART}"
 #if [[ ($PART == "cvc") ]]; then
