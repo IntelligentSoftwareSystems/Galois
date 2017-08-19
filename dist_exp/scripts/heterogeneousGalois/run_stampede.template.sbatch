@@ -3,63 +3,73 @@
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 #SBATCH -A Galois
-PSET=$3
-THREADS=$4
+#SBATCH --reservation=Galois
+PART=$3
+PSET=$4
+THREADS=$5
 
 execname=$1
-execdir=$WORK/GaloisCpp-build-lwci/exp/apps/compiler_outputs
+execdir=$WORK/Galois-build/dist_apps
 EXEC=${execdir}/${execname}
 
 inputname=$2
-inputdir=$SCRATCH/dist-inputs
+inputdirname=$SCRATCH/dist-inputs
 extension=gr
 
 statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 
 FLAGS=" -statOutputFile=${execdir}/${statname}"
+# kcore flag
+if [[ $execname == *"kcore"* ]]; then
+  FLAGS+=" -kcore=100"
+fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdir}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
   fi
 fi
+# bc: if rmat15 is not used, specify single source flags else do
+# all sources for rmat15
+# TODO currently uses rmat16 (doesn't exist) so everything does single source
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+  FLAGS+=" -singleSource"
+  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+fi
 
-source_file=${inputdir}/source
+source_file=${inputdirname}/source
 if [[ $execname == *"cc"* ]]; then
-  inputdir=${inputdir}/symmetric
+  inputdirname=${inputdirname}/symmetric
   extension=sgr
-elif [[ $execname == *"pull"* ]]; then
-  inputdir=${inputdir}/transpose
-  extension=tgr
-elif [[ $inputname == *"rmat"* ]]; then
-  inputdir=${inputdir}/transpose
-  extension=tgr
-  FLAGS+=" -transpose"
+  FLAGS+=" -symmetricGraph"
+else 
+  # for verify purposes, always pass in graph transpose just in case it is 
+  # needed for non-symmetric graphs
+  FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 fi
-grep "${inputname}.${extension}" ${source_file}
-INPUT=${inputdir}/${inputname}.${extension}
+grep "${inputname}.${extension}" ${source_file} >>$LOG
+INPUT=${inputdirname}/${inputname}.${extension}
 
-if [ -n "$ABELIAN_VERTEX_CUT" ]; then
-  FLAGS+=" -enableVertexCut"
-elif [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
-  FLAGS+=" -scalegpu=2"
-fi
-if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=3"
-fi
 if [[ ($execname == *"pagerank"*) ]]; then
-  FLAGS+=" -maxIterations=125"
+  FLAGS+=" -maxIterations=200"
+fi
+FLAGS+=" -partition=${PART}"
+#if [[ ($PART == "cvc") ]]; then
+#  FLAGS+=" -balanceMasters=both"
+#fi
+if [[ ($PART == "2dvc") ]]; then
+  FLAGS+=" -balanceMasters=nodes"
 fi
 
 RUN=ibrun
 
-source $HOME/GaloisCpp/load_modules_dist_hetero.sh
+#source $HOME/Galois/load_modules.sh
 
 # move to working directory
-WORK_DIR=$SCRATCH/GaloisCpp
+WORK_DIR=$SCRATCH/Galois
 cd $WORK_DIR
 
 set -x #echo on
-MV2_USE_LAZY_MEM_UNREGISTER=0 MV2_ENABLE_AFFINITY=0 GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -pset=$PSET -t=$THREADS -num_nodes=$SLURM_NNODES $FLAGS
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -t=$THREADS $FLAGS
 set +x #echo off
 
 echo "Algorithm: " $execname
