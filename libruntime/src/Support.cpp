@@ -55,6 +55,7 @@ using namespace Galois::Runtime;
 
 static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
 
+#if 0
 void Galois::Runtime::reportLoopInstance(const char* loopname) {
   SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
@@ -81,6 +82,7 @@ void Galois::Runtime::reportStat(const std::string& loopname, const std::string&
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
   SM.get()->addToStat(loopname, category, value, TID, 0);
 }
+#endif
 
 void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
 }
@@ -96,6 +98,7 @@ static std::ofstream& openIfNot_output(std::string fname) {
   return output_file;
 }
 
+#if 0
 void Galois::Runtime::printStats() {
     // SM.get()->printDistStats(std::cout);
     SM.get()->printStats(std::cout);
@@ -112,6 +115,7 @@ void Galois::Runtime::printStats(std::string fname) {
     out.close();
   }
 }
+#endif
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
   for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
