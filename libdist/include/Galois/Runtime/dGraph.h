@@ -362,6 +362,10 @@ protected:
   uint64_t computeMasters(Galois::Graph::OfflineGraph& g,
       std::vector<unsigned>& scalefactor,
       bool isBipartite = false) {
+    Galois::Timer timer;
+    timer.start();
+    g.reset_seek_counters();
+
     uint64_t numNodes_to_divide = 0;
 
     if (isBipartite) {
@@ -389,6 +393,8 @@ protected:
         break;
     }
 
+    timer.stop();
+    fprintf(stderr, "[%u] Master distribution time : %f seconds to read %lu bytes in %lu seeks\n", id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
     return numNodes_to_divide;
   }
 
