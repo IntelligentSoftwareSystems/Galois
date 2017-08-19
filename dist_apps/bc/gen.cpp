@@ -1440,6 +1440,7 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     Galois::StatManager statManager;
 
+    {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
@@ -1604,6 +1605,9 @@ int main(int argc, char** argv) {
 #endif
       free(v_out);
     }
+    }
+    Galois::Runtime::getHostBarrier().wait();
+    statManager.reportStat();
     return 0;
   } catch(const char* c) {
     std::cout << "Error: " << c << "\n";

@@ -464,6 +464,7 @@ int main(int argc, char** argv) {
     }
 
     }
+    Galois::Runtime::getHostBarrier().wait();
     statManager.reportStat();
 
     return 0;
