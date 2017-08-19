@@ -35,7 +35,7 @@
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/DoAllWrap.h"
 
-template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
@@ -76,7 +76,11 @@ private:
   }
 
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
-    return (blockID % numColumnHosts); // round-robin, non-contiguous
+    if (columnBlocked) {
+      return (blockID / numColumnHosts); // blocked, contiguous
+    } else {
+      return (blockID % numColumnHosts); // round-robin, non-contiguous
+    }
   }
 
   unsigned getColumnHostID(uint64_t gid) const {
@@ -187,14 +191,22 @@ public:
   virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      if (columnBlocked) {
+        return false;
+      } else {
+        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      }
     }
     return true;
   }
   virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      if (columnBlocked) {
+        return false;
+      } else {
+        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      }
     }
     return true;
   }
