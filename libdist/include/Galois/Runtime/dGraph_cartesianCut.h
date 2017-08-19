@@ -35,7 +35,7 @@
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/DoAllWrap.h"
 
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
@@ -50,6 +50,9 @@ private:
     while ((base_hGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
     numRowHosts = base_hGraph::numHosts/numColumnHosts;
     assert(numRowHosts>=numColumnHosts);
+    if (moreColumnHosts) {
+      std::swap(numRowHosts, numColumnHosts);
+    }
     if (base_hGraph::id == 0) {
       std::cerr << "Cartesian grid: " << numRowHosts << " x " << numColumnHosts << "\n";
     }

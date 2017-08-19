@@ -147,8 +147,8 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut; // assumes push-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -208,8 +208,8 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true> Graph_cartesianCut; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, true, true> Graph_checkerboardCut; // assumes pull-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
 
