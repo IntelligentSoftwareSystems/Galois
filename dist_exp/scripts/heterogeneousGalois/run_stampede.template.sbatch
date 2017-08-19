@@ -16,7 +16,7 @@ inputname=$2
 inputdirname=$SCRATCH/dist-inputs
 extension=gr
 
-statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
+statname=${execname}_${inputname}_${PART}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 
 FLAGS=" -statOutputFile=${execdir}/${statname}"
 # kcore flag
