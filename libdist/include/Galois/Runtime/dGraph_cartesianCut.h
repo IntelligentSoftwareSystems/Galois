@@ -44,6 +44,9 @@ private:
   unsigned numRowHosts;
   unsigned numColumnHosts;
 
+  // only for checkerboard partitioning, i.e., columnBlocked = true
+  uint32_t dummyOutgoingNodes; // nodes without outgoing edges that are stored with nodes having outgoing edges (to preserve original ordering locality)
+
   // factorize numHosts such that difference between factors is minimized
   void factorize_hosts() {
     numColumnHosts = sqrt(base_hGraph::numHosts);
@@ -80,7 +83,7 @@ private:
 
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
     if (columnBlocked) {
-      return (blockID / numColumnHosts); // blocked, contiguous
+      return (blockID / numRowHosts); // blocked, contiguous
     } else {
       return (blockID % numColumnHosts); // round-robin, non-contiguous
     }
@@ -405,6 +408,7 @@ public:
     prefixSumOfEdges.reserve(max_nodes);
     unsigned leaderHostID = gridRowID() * numColumnHosts;
     uint64_t src = base_hGraph::gid2host[leaderHostID].first;
+    dummyOutgoingNodes = 0;
     numNodes = 0;
     numEdges = 0;
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -417,8 +421,12 @@ public:
           createNode = true;
         } else if ((gridColumnID() == getColumnHostID(src)) 
           && hasIncomingEdge[0].test(getColumnIndex(src))) {
-          assert(false); // should be owned
-          fprintf(stderr, "WARNING: Partitioning of vertices resulted in some inconsistency");
+          if (columnBlocked) {
+            ++dummyOutgoingNodes;
+          } else {
+            assert(false); // should be owned
+            fprintf(stderr, "WARNING: Partitioning of vertices resulted in some inconsistency");
+          }
           createNode = true;
         }
         if (createNode) {
@@ -431,8 +439,16 @@ public:
     }
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID = (i * numColumnHosts) + gridColumnID();
+      unsigned hostID;
+      if (columnBlocked) {
+        hostID = (gridColumnID() * numRowHosts) + i;
+      } else {
+        hostID = (i * numColumnHosts) + gridColumnID();
+      }
       if (hostID == base_hGraph::id) continue;
+      if (columnBlocked) {
+        if ((hostID >= leaderHostID) && (hostID < (leaderHostID + numColumnHosts))) continue;
+      }
       uint64_t dst = base_hGraph::gid2host[hostID].first;
       uint64_t dst_end = base_hGraph::gid2host[hostID].second;
       for (; dst < dst_end; ++dst) {
@@ -462,7 +478,7 @@ public:
     g.reset_seek_counters();
 
     std::atomic<uint32_t> numNodesWithEdges;
-    numNodesWithEdges = base_hGraph::totalOwnedNodes;
+    numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
     Galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g, fileGraph);
       // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
@@ -640,9 +656,18 @@ public:
       }
     }
     // mirrors for incoming edges
+    unsigned leaderHostID = gridRowID() * numColumnHosts;
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID = (i * numColumnHosts) + gridColumnID();
+      unsigned hostID;
+      if (columnBlocked) {
+        hostID = (gridColumnID() * numRowHosts) + i;
+      } else {
+        hostID = (i * numColumnHosts) + gridColumnID();
+      }
       if (hostID == base_hGraph::id) continue;
+      if (columnBlocked) {
+        if ((hostID >= leaderHostID) && (hostID < (leaderHostID + numColumnHosts))) continue;
+      }
       uint64_t dst = base_hGraph::gid2host[hostID].first;
       uint64_t dst_end = base_hGraph::gid2host[hostID].second;
       mirrorNodes[hostID].reserve(mirrorNodes[hostID].size() + dst_end - dst);
