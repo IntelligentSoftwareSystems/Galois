@@ -115,20 +115,6 @@ private:
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
   /**
-   * Reset the num bytes counters
-   */
-  void reset_byte_counters() {
-    numBytesReadEdgeDst = numBytesReadIndex = numBytesReadEdgeData = 0;
-  }
-
-  /**
-   * Return all bytes read
-   */
-  uint64_t num_bytes_read() {
-     return numBytesReadEdgeDst + numBytesReadEdgeData + numBytesReadIndex;
-  }
-
-  /**
    * Finds the first node N such that
    *
    *  N * nodeSize + 
@@ -161,6 +147,21 @@ protected:
       bool converted, int oGraphVersion=1);
 
 public:
+
+  /**
+   * Reset the num bytes counters
+   */
+  void reset_byte_counters() {
+    numBytesReadEdgeDst = numBytesReadIndex = numBytesReadEdgeData = 0;
+  }
+
+  /**
+   * Return all bytes read
+   */
+  uint64_t num_bytes_read() {
+     return numBytesReadEdgeDst + numBytesReadEdgeData + numBytesReadIndex;
+  }
+
   // Node Handling
 
   //! Checks if a node is in the graph (already added)

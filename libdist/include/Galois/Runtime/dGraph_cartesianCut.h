@@ -356,7 +356,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
-    g.reset_seek_counters();
+    fileGraph.reset_byte_counters();
     auto ee = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
     for (auto src = base_hGraph::gid2host[base_hGraph::id].first; src < base_hGraph::gid2host[base_hGraph::id].second; ++src) {
       auto ii = ee;
@@ -369,7 +369,8 @@ public:
       }
     }
     timer.stop();
-    fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
+    fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
+        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -475,7 +476,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
-    g.reset_seek_counters();
+    fileGraph.reset_byte_counters();
 
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
@@ -487,7 +488,8 @@ public:
     ++Galois::Runtime::evilPhase;
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
+    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
+        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>

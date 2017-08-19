@@ -418,7 +418,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       Galois::Timer timer;
       timer.start();
-      //g.reset_seek_counters();
+      fileGraph.reset_byte_counters();
 
       assigned_edges_perhost.resize(base_hGraph::numHosts);
 
@@ -441,9 +441,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       ++Galois::Runtime::evilPhase;
 
       timer.stop();
-      //fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes in %lu seeks\n", base_hGraph::id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks());
-      fprintf(stderr, "[%u] Edge loading time : %f seconds to read\n", 
-              base_hGraph::id, timer.get_usec()/1000000.0f);
+      fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
+          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
     }
 
     // Just calculating the number of edges to send to other hosts
@@ -479,7 +478,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       Galois::Timer timer;
       timer.start();
-      g.reset_seek_counters();
+      fileGraph.reset_byte_counters();
 
       //base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
                                      //base_hGraph::gid2host[base_hGraph::id].first;
@@ -512,10 +511,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
       timer.stop();
-      fprintf(stderr, 
-              "[%u] Edge inspection time : %f seconds to read %lu bytes in %lu seeks\n", 
-              base_hGraph::id, timer.get_usec()/1000000.0f, 
-              g.num_bytes_read(), g.num_seeks());
+      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
+          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/timer.get_usec());
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
