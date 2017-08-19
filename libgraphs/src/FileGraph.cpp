@@ -88,7 +88,8 @@ namespace Graph {
 FileGraph::FileGraph()
   : sizeofEdge(0), numNodes(0), numEdges(0),
     outIdx(0), outs(0), edgeData(0), graphVersion(-1),
-    nodeOffset(0), edgeOffset(0)
+    nodeOffset(0), edgeOffset(0),
+    numBytesReadIndex(0), numBytesReadEdgeDst(0), numBytesReadEdgeData(0)
 { }
 
 /**
@@ -111,8 +112,10 @@ FileGraph& FileGraph::operator=(const FileGraph& other) {
 
 FileGraph::FileGraph(FileGraph&& other)
   : sizeofEdge(0), numNodes(0), numEdges(0),
-    outIdx(0), outs(0), edgeData(0),
-    nodeOffset(0), edgeOffset(0) {
+    outIdx(0), outs(0), edgeData(0), graphVersion(-1),
+    nodeOffset(0), edgeOffset(0), 
+    numBytesReadIndex(0), numBytesReadEdgeDst(0), numBytesReadEdgeData(0)
+    {
   move_assign(std::move(other));
 }
 
@@ -487,7 +490,7 @@ void FileGraph::toFile(const std::string& file) {
 }
 
 // TODO verify
-uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
+uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
   if (graphVersion == 1) {
     for (auto ii = (uint32_t*)raw_neighbor_begin(src), 
               ei = (uint32_t*)raw_neighbor_end(src); 
@@ -566,7 +569,7 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
 }
 
 // TODO verify
-void* FileGraph::raw_neighbor_begin(GraphNode N) const {
+void* FileGraph::raw_neighbor_begin(GraphNode N) {
   if (graphVersion == 1) {
     return &(((uint32_t*)outs)[*edge_begin(N)]);
   } else if (graphVersion == 2) {
@@ -579,7 +582,7 @@ void* FileGraph::raw_neighbor_begin(GraphNode N) const {
 }
 
 // TODO verify
-void* FileGraph::raw_neighbor_end(GraphNode N) const {
+void* FileGraph::raw_neighbor_end(GraphNode N) {
   if (graphVersion == 1) {
     return &(((uint32_t*)outs)[*edge_end(N)]);
   } else if (graphVersion == 2) {
@@ -591,30 +594,42 @@ void* FileGraph::raw_neighbor_end(GraphNode N) const {
   return nullptr;
 }
 
-FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
+FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) {
   size_t idx = 0;
-  if (N > nodeOffset)
+  if (N > nodeOffset) {
+    numBytesReadIndex += 8;
     idx = std::min(convert_le64toh(outIdx[N-1-nodeOffset]), 
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
+  } else if (N != nodeOffset) {
+    printf("WARNING: reading node out of bounds for this file graph");
+    // TODO die here?
+  }
   return edge_iterator(idx);
 }
 
-FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
+FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) {
   size_t idx = 0;
-  if (N >= nodeOffset)
+  if (N >= nodeOffset) {
+    numBytesReadIndex += 8;
     idx = std::min(convert_le64toh(outIdx[N-nodeOffset]), 
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
+  } else {
+    printf("WARNING: reading node out of bounds for this file graph");
+    // TODO die here?
+  }
   return edge_iterator(idx);
 }
 
 // TODO verify
-FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) const {
+FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) {
   if (graphVersion == 1) {
+    numBytesReadEdgeDst += 4;
     // can safely return 32 bit as 64 bit
     return convert_le32toh(((uint32_t*)outs)[*it]);
   } else if (graphVersion == 2) {
+    numBytesReadEdgeDst += 8;
     return convert_le64toh(((uint64_t*)outs)[*it]);
   } else {
     GALOIS_DIE("unknown file version at getEdgeDst", graphVersion);
@@ -643,7 +658,7 @@ FileGraph::edge_id_iterator FileGraph::edge_id_end() const {
   return boost::make_transform_iterator(&outIdx[numNodes], Convert64());
 }
 
-bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2) const {
+bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2) {
   return getEdgeIdx(N1,N2) != ~static_cast<uint64_t>(0);
 }
 

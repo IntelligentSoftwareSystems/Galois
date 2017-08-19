@@ -100,15 +100,33 @@ private:
   //! adjustments to edge index when we load only part of a graph
   uint64_t edgeOffset;
 
+  // graph reading speed variables
+  uint64_t numBytesReadIndex, numBytesReadEdgeDst, numBytesReadEdgeData;
+
+
   void move_assign(FileGraph&&);
-  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
-  void* raw_neighbor_begin(GraphNode N) const;
-  void* raw_neighbor_end(GraphNode N) const;
+  uint64_t getEdgeIdx(GraphNode src, GraphNode dst);
+  void* raw_neighbor_begin(GraphNode N);
+  void* raw_neighbor_end(GraphNode N);
 
   //! Initializes a graph from block of memory
   void fromMem(void* m, uint64_t nodeOffset, uint64_t edgeOffset, uint64_t);
 
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
+
+  /**
+   * Reset the num bytes counters
+   */
+  void reset_byte_counters() {
+    numBytesReadEdgeDst = numBytesReadIndex = numBytesReadEdgeData = 0;
+  }
+
+  /**
+   * Return all bytes read
+   */
+  uint64_t num_bytes_read() {
+     return numBytesReadEdgeDst + numBytesReadEdgeData + numBytesReadIndex;
+  }
 
   /**
    * Finds the first node N such that
@@ -154,13 +172,14 @@ public:
   template<typename EdgeTy>
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
     assert(sizeofEdge == sizeof(EdgeTy));
+    numBytesReadEdgeData += sizeof(EdgeTy);
     return reinterpret_cast<EdgeTy*>(edgeData)[getEdgeIdx(src, dst)];
   }
 
   // Iterators
   typedef boost::counting_iterator<uint64_t> edge_iterator;
-  edge_iterator edge_begin(GraphNode N) const;
-  edge_iterator edge_end(GraphNode N) const;
+  edge_iterator edge_begin(GraphNode N);
+  edge_iterator edge_end(GraphNode N);
 
   Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
     return detail::make_no_deref_range(edge_begin(N), edge_end(N));
@@ -261,19 +280,20 @@ public:
     }
   }
 
-  template<typename EdgeTy> 
-  const EdgeTy& getEdgeData(edge_iterator it) const {
-    assert(edgeData);
-    return reinterpret_cast<const EdgeTy*>(edgeData)[*it];
-  }
+  //template<typename EdgeTy> 
+  //const EdgeTy& getEdgeData(edge_iterator it) const {
+  //  assert(edgeData);
+  //  return reinterpret_cast<const EdgeTy*>(edgeData)[*it];
+  //}
 
   template<typename EdgeTy>
   EdgeTy& getEdgeData(edge_iterator it) {
     assert(edgeData);
+    numBytesReadEdgeData += sizeof(EdgeTy);
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
-  GraphNode getEdgeDst(edge_iterator it) const;
+  GraphNode getEdgeDst(edge_iterator it);
 
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
   typedef boost::transform_iterator<Convert32, uint32_t*> node_id_iterator;
@@ -281,13 +301,13 @@ public:
   typedef boost::counting_iterator<uint64_t> iterator;
   
   // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
-  neighbor_iterator neighbor_begin(GraphNode N) const {
+  neighbor_iterator neighbor_begin(GraphNode N) {
     return boost::make_transform_iterator((uint32_t*)raw_neighbor_begin(N), 
                                           Convert32());
   }
 
   // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
-  neighbor_iterator neighbor_end(GraphNode N) const {
+  neighbor_iterator neighbor_end(GraphNode N) {
     return boost::make_transform_iterator((uint32_t*)raw_neighbor_end(N), 
                                           Convert32());
   }
@@ -324,7 +344,7 @@ public:
   edge_id_iterator edge_id_begin() const;
   edge_id_iterator edge_id_end() const;
 
-  bool hasNeighbor(GraphNode N1, GraphNode N2) const;
+  bool hasNeighbor(GraphNode N1, GraphNode N2);
 
   //! Returns the number of nodes in the graph
   size_t size() const { return numNodes; }
