@@ -301,9 +301,19 @@ public:
       base_hGraph::graph.constructNodes();
 
       //std::cerr << "Construct nodes done\n";
-      for (uint32_t n = 0; n < numNodes; ++n) {
-        base_hGraph::graph.fixEndEdge(n, prefixSumOfEdges[n]);
-      }
+      auto beginIter = boost::make_counting_iterator((uint32_t)0);
+      auto endIter = boost::make_counting_iterator(numNodes);
+      auto& base_graph = base_hGraph::graph;
+      Galois::Runtime::do_all_coupled(
+        Galois::Runtime::makeStandardRange(beginIter, endIter),
+        [&] (auto n) {
+          base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
+        },
+        std::make_tuple(
+          Galois::loopname("EdgeLoading"),
+          Galois::timeit()
+        )
+      );
     }
 
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
@@ -486,8 +496,9 @@ public:
     timer.start();
     fileGraph.reset_byte_counters();
 
-    std::atomic<uint32_t> numNodesWithEdges;
+    uint32_t numNodesWithEdges;
     numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
+    // TODO: try to parallelize this better
     Galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g, fileGraph);
       // using multiple threads to receive is mostly slower and leads to a deadlock or hangs sometimes
@@ -603,7 +614,7 @@ public:
   }
 
   template<typename GraphTy>
-  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
+  void receiveEdges(GraphTy& graph, uint32_t& numNodesWithEdges) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     while (numNodesWithEdges < base_hGraph::numOwned) {
       decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;

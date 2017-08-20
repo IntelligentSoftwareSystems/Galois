@@ -348,9 +348,19 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::graph.constructNodes();
 
-      for (uint32_t n = 0; n < numNodes; ++n) {
-        base_hGraph::graph.fixEndEdge(n, prefixSumOfEdges[n]);
-      }
+      auto beginIter = boost::make_counting_iterator((uint32_t)0);
+      auto endIter = boost::make_counting_iterator(numNodes);
+      auto& base_graph = base_hGraph::graph;
+      Galois::Runtime::do_all_coupled(
+        Galois::Runtime::makeStandardRange(beginIter, endIter),
+        [&] (auto n) {
+          base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
+        },
+        std::make_tuple(
+          Galois::loopname("EdgeLoading"),
+          Galois::timeit()
+        )
+      );
 
       StatTimer_allocate_local_DS.stop();
 
@@ -430,6 +440,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
        *            edges assigned to this host by other hosts.
        *
        ********************************************************/
+      // TODO: try to parallelize this better
       Galois::on_each([&](unsigned tid, unsigned nthreads){
           if(tid == 0)
               assign_load_send_edges(graph, fileGraph, 
