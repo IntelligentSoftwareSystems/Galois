@@ -13,7 +13,7 @@ execdir=/pylon5/ci560jp/roshand/Galois-build/dist_apps
 EXEC=${execdir}/${execname}
 
 inputname=$2
-inputdirname=/pylon2/ci560jp/roshand/dist-inputs
+inputdirname=/pylon5/ci560jp/roshand/dist-inputs
 extension=gr
 
 statname=${execname}_${inputname}_${PART}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
