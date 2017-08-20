@@ -36,6 +36,7 @@ namespace cll = llvm::cl;
 enum StatMode {
   degreehist,
   degrees,
+  maxDegreeNode,
   dsthist,
   indegreehist,
   sortedlogoffsethist,
@@ -48,6 +49,7 @@ static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
     cll::values(
       clEnumVal(degreehist, "Histogram of degrees"),
       clEnumVal(degrees, "Node degrees"),
+      clEnumVal(maxDegreeNode, "Max Degree Node"),
       clEnumVal(dsthist, "Histogram of destinations"),
       clEnumVal(indegreehist, "Histogram of indegrees"),
       clEnumVal(sortedlogoffsethist, "Histogram of neighbor offsets with sorted edges"),
@@ -72,6 +74,20 @@ void doDegrees(Graph& graph) {
   }
 }
 
+void findMaxDegreeNode(Graph& graph){
+  uint64_t nodeId = 0;
+  size_t MaxDegree = 0;
+  uint64_t MaxDegreeNode = 0;
+  for (auto n : graph) {
+    size_t degree = std::distance(graph.edge_begin(n), graph.edge_end(n));
+    if(MaxDegree < degree){
+      MaxDegree = degree;
+      MaxDegreeNode = nodeId;
+    }
+    ++nodeId;
+  }
+  std::cout << "MaxDegreeNode : " << MaxDegreeNode << " , MaxDegree : " << MaxDegree << "\n";
+}
 void printHistogram(const std::string& name, std::map<uint64_t, uint64_t>& hists) {
   auto max = hists.rbegin()->first;
   if (numBins <= 0) {
@@ -214,6 +230,7 @@ int main(int argc, char** argv) {
       switch (statModeList[i]) {
       case degreehist: doDegreeHistogram(graph); break;
       case degrees: doDegrees(graph); break;
+      case maxDegreeNode: findMaxDegreeNode(graph); break;
       case dsthist: doDestinationHistogram(graph); break;
       case indegreehist: doInDegreeHistogram(graph); break;
       case sortedlogoffsethist: doSortedLogOffsetHistogram(graph); break;
