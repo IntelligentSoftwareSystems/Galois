@@ -3,7 +3,6 @@
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 #SBATCH --mail-type=begin
-#SBATCH --res roshand
 PART=$3
 NUM_TASKS=$4
 PSET=$5

@@ -1,13 +1,11 @@
 #!/bin/sh
 
-EXECS=( "bfs_push-filter" )
 EXECS=( "bfs_push-filter" "pagerank_pull-topological" "kcore_push-filter" "cc_push-filter" "sssp_push-filter" )
 
 SET="1,02:00:00 2,01:30:00 4,01:00:00" #rmat28 gpu
 SET="4,03:30:00 8,03:30:00 16,03:00:00 32,02:45:00 64,02:30:00 128,02:00:00" #clueweb12
 SET="1,2:00:00 2,01:30:00 4,01:00:00 8,01:00:00 16,01:00:00 32,00:45:00 64,00:30:00 128,00:30:00" #rmat28
-SET="4,01:00:00"
-SET="64,02:30:00" #clueweb12
+SET="16,03:00:00 32,02:45:00 64,02:30:00" #clueweb12
 
 INPUTS=("rmat20;\"${SET}\"")
 INPUTS=("uk-2007;\"${SET}\"")
@@ -15,15 +13,14 @@ INPUTS=("twitter-ICWSM10-component;\"${SET}\"")
 INPUTS=("rmat28;\"${SET}\"")
 INPUTS=("twitter-WWW10-component;\"${SET}\"")
 INPUTS=("clueweb12;\"${SET}\"")
+INPUTS=("rmat30;\"${SET}\"")
 
 QUEUE=GPU-shared
 QUEUE=GPU
 QUEUE=RM
 
-PARTS=( "cvc" "hivc" "2dvc" "oec" )
-PARTS=( "cvc" )
-PARTS=( "oec" )
-PARTS=( "hivc" )
+PARTS=( "cvc" "hivc" "2dvc" "oec" ) #clueweb12
+PARTS=( "cvc" "hovc" "2dvc" "iec" ) #rmat30
 
 for j in "${INPUTS[@]}"
 do
