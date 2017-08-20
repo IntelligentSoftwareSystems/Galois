@@ -88,8 +88,7 @@ namespace Graph {
 FileGraph::FileGraph()
   : sizeofEdge(0), numNodes(0), numEdges(0),
     outIdx(0), outs(0), edgeData(0), graphVersion(-1),
-    nodeOffset(0), edgeOffset(0),
-    numBytesReadIndex(0), numBytesReadEdgeDst(0), numBytesReadEdgeData(0)
+    nodeOffset(0), edgeOffset(0)
 { }
 
 /**
@@ -113,8 +112,7 @@ FileGraph& FileGraph::operator=(const FileGraph& other) {
 FileGraph::FileGraph(FileGraph&& other)
   : sizeofEdge(0), numNodes(0), numEdges(0),
     outIdx(0), outs(0), edgeData(0), graphVersion(-1),
-    nodeOffset(0), edgeOffset(0), 
-    numBytesReadIndex(0), numBytesReadEdgeDst(0), numBytesReadEdgeData(0)
+    nodeOffset(0), edgeOffset(0)
     {
   move_assign(std::move(other));
 }

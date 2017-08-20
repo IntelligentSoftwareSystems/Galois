@@ -395,7 +395,7 @@ protected:
 
     timer.stop();
     fprintf(stderr, "[%u] Master distribution time : %f seconds to read %lu bytes in %lu seeks (%f MBPS)\n", 
-        id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks(), g.num_bytes_read()/timer.get_usec());
+        id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks(), g.num_bytes_read()/(float)timer.get_usec());
     return numNodes_to_divide;
   }
 

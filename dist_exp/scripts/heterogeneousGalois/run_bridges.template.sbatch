@@ -1,84 +1,77 @@
 #!/bin/bash
-#SBATCH --mail-user=gill@cs.utexas.edu
+#SBATCH --mail-user=roshan@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 #SBATCH --mail-type=begin
-NUM_TASKS=$3
-PSET=$4
-THREADS=$5
-VCUT=$6
+PART=$3
+NUM_TASKS=$4
+PSET=$5
+THREADS=$6
 
 execname=$1
-#execdir=/pylon2/ci4s88p/roshand/GaloisCpp-build-lwci/exp/apps/compiler_outputs
-execdir=/pylon2/ci4s88p/ggill/build_dist_hetero_new/release/exp/apps/compiler_outputs
+execdir=/pylon5/ci560jp/roshand/Galois-build/dist_apps
 EXEC=${execdir}/${execname}
 
 inputname=$2
-inputdir=/pylon2/ci560jp/roshand/dist-inputs
+inputdirname=/pylon2/ci560jp/roshand/dist-inputs
 extension=gr
 
-if [[ "$ABELIAN_VERTEX_CUT" == 1 ]]; then
-   stat_ext="vcut_$VCUT"
-else
-   stat_ext="ecut"
-fi
+statname=${execname}_${inputname}_${PART}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 
-statname=${execname}_${inputname}_${SLURM_NNODES}_${PSET}_${stat_ext}_${SLURM_JOB_ID}.stats
-
-FLAGS=" -statOutputFile=${execdir}/${statname}"
 FLAGS=
-#FLAGS=" -runs=1"
-#FLAGS+=" -numComputeSubsteps=4"
-#FLAGS+=" -numPipelinedPhases=4"
-#FLAGS+=" -numPipelinedPhases=${NUM_TASKS}"
+#FLAGS+=" -statOutputFile=${execdir}/${statname}"
+#FLAGS+=" -runs=1"
+# kcore flag
+if [[ $execname == *"kcore"* ]]; then
+  FLAGS+=" -kcore=100"
+fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdir}/${inputname}.source" ]]; then
     FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
   fi
 fi
-source_file=${inputdir}/source
+# bc: if rmat15 is not used, specify single source flags else do
+# all sources for rmat15
+# TODO currently uses rmat16 (doesn't exist) so everything does single source
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+  FLAGS+=" -singleSource"
+  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+fi
+
+source_file=${inputdirname}/source
 if [[ $execname == *"cc"* ]]; then
-  inputdir=${inputdir}/symmetric
+  inputdirname=${inputdirname}/symmetric
   extension=sgr
-  FLAGS+=" -enableVertexCut"
-elif [[ $execname == *"pull"* ]]; then
-  inputdir=${inputdir}/transpose
-  extension=tgr
-elif [[ $inputname == *"rmat"* ]]; then
-#else
-  inputdir=${inputdir}/transpose
-  extension=tgr
-  FLAGS+=" -transpose"
+  FLAGS+=" -symmetricGraph"
+else 
+  # for verify purposes, always pass in graph transpose just in case it is 
+  # needed for non-symmetric graphs
+  FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 fi
-grep "${inputname}.${extension}" ${source_file}
-INPUT=${inputdir}/${inputname}.${extension}
+grep "${inputname}.${extension}" ${source_file} >>$LOG
+INPUT=${inputdirname}/${inputname}.${extension}
 
-#if [ -n "$ABELIAN_VERTEX_CUT" ]; then
-if [[ "$ABELIAN_VERTEX_CUT" == 1 ]]; then
-  FLAGS+=" -enableVertexCut" 
-elif [[ ($PSET == *"gc"*) || ($PSET == *"cg"*) ]]; then
-  FLAGS+=" -scalegpu=4"
-fi
-if [[ $execname == *"worklist"* ]]; then
-  FLAGS+=" -cuda_wl_dup_factor=4"
-fi
 if [[ ($execname == *"pagerank"*) ]]; then
-  FLAGS+=" -maxIterations=125"
+  FLAGS+=" -maxIterations=100"
+fi
+FLAGS+=" -partition=${PART}"
+#if [[ ($PART == "cvc") ]]; then
+#  FLAGS+=" -balanceMasters=both"
+#fi
+if [[ ($PART == "2dvc") ]]; then
+  FLAGS+=" -balanceMasters=nodes"
 fi
 
-FLAGS+=" -vertexcut=$VCUT"
 RUN=mpirun
 
-#source $HOME/GaloisCpp/load_modules_dist_hetero.sh
+#source $HOME/Galois/load_modules.sh
 
 # move to working directory
-#WORK_DIR=/pylon5/ci4s88p/roshand/GaloisCpp
-WORK_DIR=/pylon5/ci4s88p/ggill/GaloisCpp
+WORK_DIR=/pylon5/ci560jp/roshand/Galois
 cd $WORK_DIR
 
 set -x #echo on
 MV2_USE_LAZY_MEM_UNREGISTER=0 MV2_ENABLE_AFFINITY=0 GALOIS_DO_NOT_BIND_THREADS=1 $RUN -np $NUM_TASKS $EXEC ${INPUT} -pset=$PSET -t=$THREADS -num_nodes=$SLURM_NNODES $FLAGS
-
 set +x #echo off
 
 echo "Algorithm: " $execname
