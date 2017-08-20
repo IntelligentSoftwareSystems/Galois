@@ -36,7 +36,7 @@ namespace Galois {
   const Ty atomicMax(std::atomic<Ty>& a, const Ty b){
     Ty old_a = a;
     // if old value is less than new value, atomically exchange
-    while (old_a < b && !a.compare_exchange_weak(old_a, b));
+    while (old_a < b && !a.compare_exchange_weak(old_a, b, std::memory_order_relaxed));
     return old_a;
   }
 
@@ -64,7 +64,7 @@ namespace Galois {
   template<typename Ty>
     const Ty atomicMin(std::atomic<Ty>& a, const Ty b){
       Ty old_a = a;
-      while(old_a > b && !a.compare_exchange_weak(old_a,b));
+      while(old_a > b && !a.compare_exchange_weak(old_a,b, std::memory_order_relaxed));
       return old_a;
     }
 
@@ -90,7 +90,7 @@ namespace Galois {
   template<typename Ty>
     const Ty atomicAdd(std::atomic<Ty>& val, Ty delta){
       Ty old_val = val;
-      while(!val.compare_exchange_weak(old_val, old_val + delta));
+      while(!val.compare_exchange_weak(old_val, old_val + delta, std::memory_order_relaxed));
       return old_val;
     }
 
