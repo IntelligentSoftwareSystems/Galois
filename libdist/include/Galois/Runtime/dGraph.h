@@ -111,10 +111,10 @@ static cll::opt<uint32_t> nodeWeightOfMaster("nodeWeight",
                              "distributing masterst to hosts"),
                              cll::init(0));
 
-//static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight", 
-//                             cll::desc("Determines weight of edges when "
-//                             "distributing masters to hosts"),
-//                             cll::init(0));
+static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight", 
+                             cll::desc("Determines weight of edges when "
+                             "distributing masters to hosts"),
+                             cll::init(0));
 
 static cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges", 
                              cll::desc("Determines weight of nodes when "
@@ -299,7 +299,11 @@ private:
   // compute owners while trying to balance edges
   void computeMastersBalancedEdges(Galois::Graph::OfflineGraph& g,
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+    if (edgeWeightOfMaster == 0) {
+      edgeWeightOfMaster = 1;
+    }
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+#ifdef SERIALIZE_COMPUTE_MASTERS
     if (id == 0) {
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
@@ -323,16 +327,51 @@ private:
       Galois::Runtime::gDeserialize(b, gid2host);
     }
     ++Galois::Runtime::evilPhase;
+#else
+    gid2host.resize(numHosts);
+    auto r = g.divideByNode(0, edgeWeightOfMaster, id, numHosts, scalefactor);
+    gid2host[id].first = *(r.first.first);
+    gid2host[id].second = *(r.first.second);
+
+    //printf("[%d] first is %lu, second is %lu\n", id, gid2host[id].first, gid2host[id].second);
+    //printf("[%d] first edge is %lu, second edge is %lu\n", id, *(r.second.first), *(r.second.second));
+    //std::cout << "id " << id << " " << gid2host[id].first << " " << gid2host[id].second << "\n";
+
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) continue;
+      Galois::Runtime::SendBuffer b;
+      Galois::Runtime::gSerialize(b, gid2host[id]);
+      net.sendTagged(h, Galois::Runtime::evilPhase, b);
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      Galois::Runtime::gDeserialize(b, gid2host[p->first]);
+      ++received;
+    }
+    ++Galois::Runtime::evilPhase;
+#endif
   }
 
   // compute owners while trying to balance nodes and edges
   void computeMastersBalancedNodesAndEdges(Galois::Graph::OfflineGraph& g,
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+    if (nodeWeightOfMaster == 0) {
+      nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
+    }
+    if (edgeWeightOfMaster == 0) {
+      edgeWeightOfMaster = 1;
+    }
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+#ifdef SERIALIZE_COMPUTE_MASTERS
     if (id == 0) {
-      if (nodeWeightOfMaster == 0) {
-        nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
-      }
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
                            numHosts,
@@ -355,6 +394,32 @@ private:
       Galois::Runtime::gDeserialize(b, gid2host);
     }
     ++Galois::Runtime::evilPhase;
+#else
+    gid2host.resize(numHosts);
+    auto r = g.divideByNode(nodeWeightOfMaster, edgeWeightOfMaster, id, numHosts, scalefactor);
+    gid2host[id].first = *r.first.first;
+    gid2host[id].second = *r.first.second;
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) continue;
+      Galois::Runtime::SendBuffer b;
+      Galois::Runtime::gSerialize(b, gid2host[id]);
+      net.sendTagged(h, Galois::Runtime::evilPhase, b);
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      Galois::Runtime::gDeserialize(b, gid2host[p->first]);
+      ++received;
+    }
+    ++Galois::Runtime::evilPhase;
+#endif
   }
 
 protected:
@@ -425,7 +490,7 @@ public:
      Galois::Runtime::gDeserialize(buf, hostID, numItems);
 
      Galois::Runtime::gDeserialize(buf, masterNodes[hostID]);
-     std::cout << "from : " << hostID << " -> " << numItems << " --> " << masterNodes[hostID].size() << "\n";
+     //std::cout << "from : " << hostID << " -> " << numItems << " --> " << masterNodes[hostID].size() << "\n";
    }
 
    template<typename FnTy>
@@ -811,7 +876,7 @@ public:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      printf("Manually det. master thread ranges\n");
+      //printf("Manually det. master thread ranges\n");
       graph.determineThreadRanges(beginMaster, endMaster, masterRanges, 
                                   nodeAlphaRanges);
     }
@@ -835,7 +900,7 @@ public:
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
-      printf("Manually det. with edges thread ranges\n");
+      //printf("Manually det. with edges thread ranges\n");
       graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges, 
                                   nodeAlphaRanges);
     }
