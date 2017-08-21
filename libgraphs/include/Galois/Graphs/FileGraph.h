@@ -57,7 +57,6 @@
 #include <vector>
 #include <string.h>
 
-// TODO kill references to uint32t
 namespace Galois {
 namespace Graph {
 

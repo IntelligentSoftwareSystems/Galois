@@ -408,28 +408,29 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
   numEdges = partNumEdges;
 }
 
+// Note this is the original find index; kept for divideByEdge
 size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
                             size_t lb, size_t ub) {
-  return Galois::Graph::findIndex<FileGraph, uint64_t>(*this, nodeSize, 
-    edgeSize, targetSize, lb, ub, nodeOffset, edgeOffset);
-  //while (lb < ub) {
-  //  size_t mid = lb + (ub - lb) / 2;
-  //  size_t num_edges = *edge_begin(mid) - edgeOffset;
-  //  size_t size = num_edges * edgeSize + (mid - nodeOffset) * nodeSize;
-  //  if (size < targetSize)
-  //    lb = mid + 1;
-  //  else
-  //    ub = mid;
-  //}
-  //return lb;
+  while (lb < ub) {
+    size_t mid = lb + (ub - lb) / 2;
+    size_t num_edges = *edge_begin(mid) - edgeOffset;
+    size_t size = num_edges * edgeSize + (mid - nodeOffset) * nodeSize;
+    if (size < targetSize)
+      lb = mid + 1;
+    else
+      ub = mid;
+  }
+  return lb;
 }
 
 auto 
 FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
 -> GraphRange {
   std::vector<unsigned> dummy;
+  // note this calls into another findIndex (not the one directly above)....
   return Galois::Graph::divideNodesBinarySearch<FileGraph, uint64_t>(
     *this, nodeSize, edgeSize, id, total, dummy, nodeOffset, edgeOffset);
+
   //size_t size = numNodes * nodeSize + numEdges * edgeSize;
   //size_t block = (size + total - 1) / total;
   //size_t aa = numEdges;
@@ -446,6 +447,12 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
   //return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
+/**
+ * Divides nodes only considering edges.
+ *
+ * Note that it may potentially not return all nodes in the graph (it will 
+ * return up to the last node with edges).
+ */
 auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, 
                              size_t total) -> std::pair<NodeRange, EdgeRange> {
   size_t size = numEdges;
