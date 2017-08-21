@@ -138,7 +138,7 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  * @param nodeOffset number of nodes to subtract (offset)
  * @param edgeOffset number of edges to subtract (offset)
  */
-template <typename GraphClass, typename NodeType = uint32_t> inline
+template <typename GraphClass, typename NodeType = uint64_t> inline
 std::pair<std::pair<boost::counting_iterator<NodeType>,
                     boost::counting_iterator<NodeType>>,
           std::pair<boost::counting_iterator<uint64_t>,
@@ -164,9 +164,10 @@ divideNodesBinarySearch(GraphClass& inputGraph,
   assert(total >= 1);
   assert(id >= 0 && id < total);
 
-
   NodeType numNodes = inputGraph.size();
-  NodeType numEdges = inputGraph.sizeEdges();
+  uint64_t numEdges = inputGraph.sizeEdges();
+
+  //printf("num nodes is %lu num edges is %lu\n", numNodes, numEdges);
 
   // weight of all data
   uint64_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
