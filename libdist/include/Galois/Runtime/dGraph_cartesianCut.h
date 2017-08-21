@@ -281,10 +281,11 @@ public:
 
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
-    base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-    base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
 
     if (numNodes > 0) {
+      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
+
       //assert(numEdges > 0);
 
       assert(prefixSumOfEdges.size() == numNodes);
