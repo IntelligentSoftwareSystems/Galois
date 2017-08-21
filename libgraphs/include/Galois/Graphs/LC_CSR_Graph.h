@@ -903,7 +903,7 @@ public:
     threadRangesEdge[0] = 0;
 
     for (uint32_t i = 0; i < numThreads; i++) {
-      auto nodeEdgeSplits = divideByNode(1, 10, i, numThreads, edgePrefixSum);
+      auto nodeEdgeSplits = divideByNode(0, 1, i, numThreads, edgePrefixSum);
 
       auto nodeSplits = nodeEdgeSplits.first;
       auto edgeSplits = nodeEdgeSplits.second;
@@ -1132,6 +1132,7 @@ public:
     threadRangesEdge[0] = 0;
 
     for (uint32_t i = 0; i < numThreads; i++) {
+      // uses filegraph's divide by node call with same params as constructfrom
       auto nodeEdgeSplits = graph.divideByNode(
           NodeData::size_of::value + EdgeIndData::size_of::value + 
           LC_CSR_Graph::size_of_out_of_line::value,
