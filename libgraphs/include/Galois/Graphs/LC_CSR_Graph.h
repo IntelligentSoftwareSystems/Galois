@@ -394,6 +394,9 @@ public:
    */
   size_t findIndex(size_t nodeWeight, size_t edgeWeight, size_t targetWeight, 
                    size_t lb, size_t ub, std::vector<uint64_t> edgePrefixSum) {
+    // TODO make node weight 0 work
+    assert(nodeWeight != 0);
+
     while (lb < ub) {
       size_t mid = lb + (ub - lb) / 2;
       size_t num_edges;
@@ -434,6 +437,9 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
                     size_t total, std::vector<uint64_t> edgePrefixSum)
       -> GraphRange {
+    // TODO make node weight 0 work
+    assert(nodeWeight != 0);
+
     // weight of all data
     size_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
 
@@ -937,7 +943,7 @@ public:
   }
 
   /**
-   * Uses the divideByNode function from FileGraph to do partitioning
+   * Uses the divideByNode function stolen from FileGraph to do partitioning
    * of nodes/edges among threads.
    *
    * @param edgePrefixSum A prefix sum of edges
@@ -962,11 +968,7 @@ public:
     threadRangesEdge[0] = 0;
 
     for (uint32_t i = 0; i < numThreads; i++) {
-      auto nodeEdgeSplits = divideByNode(
-          NodeData::size_of::value + EdgeIndData::size_of::value + 
-          LC_CSR_Graph::size_of_out_of_line::value,
-          EdgeDst::size_of::value + EdgeData::size_of::value,
-          i, numThreads, edgePrefixSum);
+      auto nodeEdgeSplits = divideByNode(1, 10, i, numThreads, edgePrefixSum);
 
       auto nodeSplits = nodeEdgeSplits.first;
       auto edgeSplits = nodeEdgeSplits.second;
@@ -1259,7 +1261,7 @@ public:
    */
   void allocateFromByNode(uint32_t nNodes, uint64_t nEdges, 
                           std::vector<uint64_t> edgePrefixSum) {
-    printf("by node allocate specified\n");
+    //printf("by node allocate specified\n");
     numNodes = nNodes;
     numEdges = nEdges;
 
@@ -1271,14 +1273,19 @@ public:
     edgeIndData.allocateSpecified(numNodes, threadRanges);
     //nodeData.allocateLocal(numNodes);
     //edgeIndData.allocateLocal(numNodes);
+    //nodeData.allocateInterleaved(numNodes);
+    //edgeIndData.allocateInterleaved(numNodes);
 
     // edge based alloc
     edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     edgeData.allocateSpecified(numEdges, threadRangesEdge);
     //edgeDst.allocateLocal(numEdges);
     //edgeData.allocateLocal(numEdges);
+    //edgeDst.allocateInterleaved(numEdges);
+    //edgeData.allocateInterleaved(numEdges);
 
     this->outOfLineAllocateSpecified(numNodes, threadRanges);
+    //this->outOfLineAllocateInterleaved(numNodes);
   }
 
   void constructNodes() {

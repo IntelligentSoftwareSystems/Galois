@@ -343,7 +343,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::graph.allocateFrom(numNodes, numEdges);
       } else {
         printf("Edge based NUMA division on\n");
-        base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
+                                              prefixSumOfEdges);
       }
 
       base_hGraph::graph.constructNodes();

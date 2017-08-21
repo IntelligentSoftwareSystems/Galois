@@ -293,7 +293,9 @@ public:
         base_hGraph::graph.allocateFrom(numNodes, numEdges);
       } else {
         printf("Edge based NUMA division on\n");
-        base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
+                                              prefixSumOfEdges);
       }
 
       //std::cerr << "Allocate done\n";

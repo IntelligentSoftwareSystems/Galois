@@ -774,8 +774,12 @@ public:
    */
   void determine_thread_ranges(uint32_t total_nodes, 
                                std::vector<uint64_t> edge_prefix_sum) {
-    graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
-    graph.determineThreadRangesEdge(edge_prefix_sum);
+    // Old way that determined thread ranges with a linear scan.
+    //graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
+    //graph.determineThreadRangesEdge(edge_prefix_sum);
+
+    // uses a binary search to find divisions
+    graph.determineThreadRangesByNode(edge_prefix_sum);
   }
   
   /**

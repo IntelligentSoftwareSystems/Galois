@@ -294,9 +294,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       } else {
         // determine division of nodes among threads and allocate based on that
         printf("Edge based NUMA division on\n");
-        base_hGraph::graph.allocateFrom(_numNodes, _numEdges, prefixSumOfEdges);
-        //base_hGraph::graph.allocateFromByNode(_numNodes, _numEdges, 
-        //                                      prefixSumOfEdges);
+        //base_hGraph::graph.allocateFrom(_numNodes, _numEdges, prefixSumOfEdges);
+        base_hGraph::graph.allocateFromByNode(_numNodes, _numEdges, 
+                                              prefixSumOfEdges);
       }
       //std::cerr << "[" << base_hGraph::id << "] Allocate done" << "\n";
 
@@ -319,7 +319,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       loadEdges(base_hGraph::graph, fileGraph);
       std::cerr << "[" << base_hGraph::id << "] Edges loaded" << "\n";
-
+      
       if (transpose) {
         base_hGraph::graph.transpose(edgeNuma);
         base_hGraph::transposed = true;
