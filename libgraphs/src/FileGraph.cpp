@@ -221,7 +221,8 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
                             size_t sizeof_edge_data, uint64_t node_offset, 
                             uint64_t edge_offset, bool converted, 
                             int oGraphVersion) {
-  size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data, graphVersion);
+  size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data, oGraphVersion);
+
   char* base = (char*)mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE, 
                                _MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED)
@@ -296,7 +297,9 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
 
   // "load" filegraph from our constructed base pointer
   fromMem(base, node_offset, edge_offset, 0);
-  //graphVersion = oGraphVersion;
+  // graph version should be set in from mem
+
+  assert(graphVersion == oGraphVersion);
 
   return edgeData;
 }
