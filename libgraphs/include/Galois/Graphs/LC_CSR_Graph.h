@@ -39,6 +39,7 @@
 #include "Galois/Graphs/Details.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Galois.h"
+#include "Galois/Graphs/GraphHelpers.h"
 
 #include <type_traits>
 
@@ -378,45 +379,6 @@ public:
     Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
   }
 
-  // find index + divide by node swiped from FileGraph.cpp with some edits
-
-  /**
-   * Return a suitable index between an upper bound and a lower bound that
-   * attempts to get close to the target size (i.e. find a good chunk that
-   * corresponds to some size). 
-   *
-   * @param nodeWeight weight to give to a node in division
-   * @param edgeWeight weight to give to an edge in division
-   * @param targetWeight The amount of weight we want from the returned index
-   * @param lb lower bound to start search from
-   * @param ub upper bound to start search from
-   * @param edgePrefixSum prefix sum of edges
-   */
-  size_t findIndex(size_t nodeWeight, size_t edgeWeight, size_t targetWeight, 
-                   size_t lb, size_t ub, std::vector<uint64_t> edgePrefixSum) {
-    // TODO make node weight 0 work
-    assert(nodeWeight != 0);
-
-    while (lb < ub) {
-      size_t mid = lb + (ub - lb) / 2;
-      size_t num_edges;
-
-      if (mid != 0) {
-        num_edges = edgePrefixSum[mid - 1];
-      } else {
-        num_edges = 0;
-      }
-      //size_t num_edges = *edge_begin(mid);
-
-      size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
-
-      if (weight < targetWeight)
-        lb = mid + 1;
-      else
-        ub = mid;
-    }
-    return lb;
-  }
 
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
@@ -435,41 +397,14 @@ public:
    * @param edgePrefixSum a prefix sum of edges of the graph
    */
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
-                    size_t total, std::vector<uint64_t> edgePrefixSum)
+                    size_t total, std::vector<uint64_t>& edgePrefixSum)
       -> GraphRange {
-    // TODO make node weight 0 work
-    assert(nodeWeight != 0);
+    std::vector<unsigned> dummy;
 
-    // weight of all data
-    size_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
-
-    // weight of a block (one block for each division)
-    size_t block = (weight + total - 1) / total;
-  
-    size_t edgesLower = numEdges;
-    size_t edgesUpper = numEdges;
-  
-    size_t nodesLower = findIndex(nodeWeight, edgeWeight, block * id, 0, 
-                                  numNodes, edgePrefixSum);
-    size_t nodesUpper = findIndex(nodeWeight, edgeWeight, block * (id + 1), 
-                                  nodesLower, numNodes, edgePrefixSum);
-  
-    // correct number of edges
-    if (nodesLower != nodesUpper) {
-      if (nodesLower != 0) {
-        edgesLower = edgePrefixSum[nodesLower - 1];
-      } else {
-        edgesLower = 0;
-      }
-      edgesUpper = edgePrefixSum[nodesUpper - 1];
-    }
-
-    return GraphRange(NodeRange(iterator(nodesLower), 
-                                iterator(nodesUpper)), 
-                      EdgeRange(edge_iterator(edgesLower), 
-                                edge_iterator(edgesUpper)));
+    return 
+      Galois::Graph::divideNodesBinarySearch<LC_CSR_Graph, uint32_t>(
+        *this, nodeWeight, edgeWeight, id, total, dummy, 0, 0, edgePrefixSum);
   }
-
 
   /**
    * Returns the thread ranges array that specifies division of nodes among

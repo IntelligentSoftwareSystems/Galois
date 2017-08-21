@@ -410,35 +410,40 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
 
 size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
                             size_t lb, size_t ub) {
-  while (lb < ub) {
-    size_t mid = lb + (ub - lb) / 2;
-    size_t num_edges = *edge_begin(mid) - edgeOffset;
-    size_t size = num_edges * edgeSize + (mid - nodeOffset) * nodeSize;
-    if (size < targetSize)
-      lb = mid + 1;
-    else
-      ub = mid;
-  }
-  return lb;
+  return Galois::Graph::findIndex<FileGraph, uint64_t>(*this, nodeSize, 
+    edgeSize, targetSize, lb, ub, nodeOffset, edgeOffset);
+  //while (lb < ub) {
+  //  size_t mid = lb + (ub - lb) / 2;
+  //  size_t num_edges = *edge_begin(mid) - edgeOffset;
+  //  size_t size = num_edges * edgeSize + (mid - nodeOffset) * nodeSize;
+  //  if (size < targetSize)
+  //    lb = mid + 1;
+  //  else
+  //    ub = mid;
+  //}
+  //return lb;
 }
 
 auto 
 FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
 -> GraphRange {
-  size_t size = numNodes * nodeSize + numEdges * edgeSize;
-  size_t block = (size + total - 1) / total;
-  size_t aa = numEdges;
-  size_t ea = numEdges;
-  size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
-  size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
-  if (bb != eb) {
-    aa = *edge_begin(bb);
-    ea = *edge_end(eb-1);
-  }
-  if (false) {
-    Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
-  }
-  return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+  std::vector<unsigned> dummy;
+  return Galois::Graph::divideNodesBinarySearch<FileGraph, uint64_t>(
+    *this, nodeSize, edgeSize, id, total, dummy, nodeOffset, edgeOffset);
+  //size_t size = numNodes * nodeSize + numEdges * edgeSize;
+  //size_t block = (size + total - 1) / total;
+  //size_t aa = numEdges;
+  //size_t ea = numEdges;
+  //size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
+  //size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
+  //if (bb != eb) {
+  //  aa = *edge_begin(bb);
+  //  ea = *edge_end(eb-1);
+  //}
+  //if (false) {
+  //  Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+  //}
+  //return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
 auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, 
