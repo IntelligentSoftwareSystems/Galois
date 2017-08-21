@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
   
   totalTime.start();
   Array array;
-  unsigned numPackageUsed = Galois::Substrate::ThreadPool::getThreadPool().getCumulativeMaxPackage(Galois::Runtime::activeThreads)+1;
+  unsigned numPackageUsed = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::Runtime::activeThreads)+1;
   PerPackageArray perPackageArray(numArrayEntry/numPackageUsed);
 
   if(algo == Algo::local) {

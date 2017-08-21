@@ -255,7 +255,20 @@ void ThreadPool::runDedicated(std::function<void(void)>& f) {
   //FIXME: Galois::setActiveThreads(Galois::getActiveThreads());
 }
 
-ThreadPool& ThreadPool::getThreadPool() {
-  static ThreadPool p;
-  return p;
+static Galois::Substrate::ThreadPool* tpool = nullptr;
+
+void Galois::Substrate::internal::initThreadPool() {
+  GALOIS_ASSERT(!tpool, "Double initialization of ThreadPool");
+  tpool = new ThreadPool();
+}
+
+void Galois::Substrate::internal::finishThreadPool() {
+  delete tpool;
+  tpool = nullptr;
+}
+
+
+Galois::Substrate::ThreadPool& Galois::Substrate::getThreadPool(void) {
+  GALOIS_ASSERT(tpool, "ThreadPool not initialized");
+  return *tpool;
 }

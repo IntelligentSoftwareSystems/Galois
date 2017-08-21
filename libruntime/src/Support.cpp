@@ -53,34 +53,45 @@ extern unsigned activeThreads;
 using namespace Galois;
 using namespace Galois::Runtime;
 
-static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
+// static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
+static Galois::Runtime::StatCollector* SM;
+
+void Galois::Runtime::internal::initStatManager(void) {
+  GALOIS_ASSERT(!SM, "Support.cpp: Double Initialization of SM");
+  SM = new StatCollector();
+}
+
+void Galois::Runtime::internal::deleteStatManager(void) {
+  delete SM;
+  SM = nullptr;
+}
 
 #if 0
 void Galois::Runtime::reportLoopInstance(const char* loopname) {
-  SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
+  SM->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
 
 //FIXME: fix on Networked
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
-  SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
+  SM->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value, TID, 0);
 }
 //FIXME: fix on Networked
 void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID) {
-  SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
+  SM->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value, TID, 0);
 }
 
 //FIXME: fix on Networked
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
-  SM.get()->addToStat(loopname, category, value, TID, 0);
+  SM->addToStat(loopname, category, value, TID, 0);
 }
 
 //FIXME: fix on Networked
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
-  SM.get()->addToStat(loopname, category, value, TID, 0);
+  SM->addToStat(loopname, category, value, TID, 0);
 }
 #endif
 
@@ -100,18 +111,18 @@ static std::ofstream& openIfNot_output(std::string fname) {
 
 #if 0
 void Galois::Runtime::printStats() {
-    // SM.get()->printDistStats(std::cout);
-    SM.get()->printStats(std::cout);
-  //SM.get()->printStatsForR(std::cout, false);
-  //  SM.get()->printStatsForR(std::cout, true);
+    // SM->printDistStats(std::cout);
+    SM->printStats(std::cout);
+  //SM->printStatsForR(std::cout, false);
+  //  SM->printStatsForR(std::cout, true);
 }
 
 void Galois::Runtime::printStats(std::string fname) {
   if(fname == "")
-    SM.get()->printStatsForR(std::cout, false);
+    SM->printStatsForR(std::cout, false);
   else{
     auto& out = openIfNot_output(fname);
-    SM.get()->printStatsForR(out, false);
+    SM->printStatsForR(out, false);
     out.close();
   }
 }
@@ -123,11 +134,11 @@ void Galois::Runtime::reportPageAlloc(const char* category) {
 }
 
 void Galois::Runtime::reportNumaAlloc(const char* category) {
-  int nodes = Substrate::ThreadPool::getThreadPool().getMaxNumaNodes();
+  int nodes = Substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {
     //auto rStat = Stats.getRemote(x);
     //std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
     //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
   }
-  //  SM.get()->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
+  //  SM->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
 }

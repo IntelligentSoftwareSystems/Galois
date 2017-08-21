@@ -6,6 +6,7 @@ set(sources
             src/Barrier_Topo.cpp 
             src/Barrier_Pthread.cpp
             src/Barrier_Simple.cpp
+            src/gIO.cpp
             src/ThreadPool.cpp
             src/SimpleLock.cpp
             src/PtrLock.cpp
@@ -15,6 +16,7 @@ set(sources
             src/Termination.cpp
             src/NumaMem.cpp
             src/PageAlloc.cpp
+            src/Init.cpp
 )
 
 # FIXME: duplicate library target. 

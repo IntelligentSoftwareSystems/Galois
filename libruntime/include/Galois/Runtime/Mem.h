@@ -212,7 +212,7 @@ class FreeListHeap : public SourceHeap {
   };
   FreeNode* head;
 
-  using dbg = Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 public:
   enum { AllocSize = SourceHeap::AllocSize };
 
@@ -602,7 +602,7 @@ class PageHeap: public StaticSingleInstance<PageHeap> {
 
   InnerHeap innerHeap;
 
-  using dbg = Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 
   PageHeap (): innerHeap () {
     dbg::print ("New instance of PageHeap: ", this);

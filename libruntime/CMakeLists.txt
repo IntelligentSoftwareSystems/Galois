@@ -1,6 +1,6 @@
 set(sources
+        src/Init.cpp
         src/Context.cpp
-        src/gio.cpp
         src/PreAlloc.cpp
         src/Support.cpp
         src/Threads.cpp

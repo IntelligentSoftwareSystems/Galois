@@ -31,6 +31,8 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
+#include "Galois/Substrate/Init.h"
+#include "Galois/Runtime/Init.h"
 #include "Galois/Runtime/Executor_Deterministic.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Executor_ForEach.h"
@@ -52,6 +54,23 @@
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
 namespace Galois {
+
+/**
+ * explicit class to initialize the Galois Runtime
+ * Runtime is destroyed when this object is destroyed
+ */
+class Instance {
+public:
+  Instance(void) {
+    Substrate::init();
+    Runtime::init();
+  }
+
+  ~Instance(void) {
+    Runtime::finish();
+    Substrate::finish();
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
@@ -172,7 +191,7 @@ void on_each(const FunctionTy& fn, const Args&... args) {
 static inline void preAlloc(int num) {
   static const bool DISABLE_PREALLOC = false;
   if (DISABLE_PREALLOC) {
-    Galois::Substrate::gWarn("preAlloc disabled");
+    Galois::gWarn("preAlloc disabled");
 
   } else {
     Runtime::preAlloc_impl(num);

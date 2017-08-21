@@ -40,6 +40,7 @@
 #include "Galois/Traits.h"
 #include "Galois/Statistic.h"
 #include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"
 
@@ -111,7 +112,7 @@ class DoAllExecutor {
     //Then try stealing from neighbors
     unsigned myID = Substrate::ThreadPool::getTID();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     //try package neighbors
     for (unsigned x = 0; x < activeThreads; ++x) {
       if (x != myID && tp.getPackage(x) == myPkg) {
@@ -171,21 +172,21 @@ public:
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+  Substrate::getThreadPool().run(activeThreads, std::ref(W));
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 // void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
 // 
   // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+  // Substrate::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    // Substrate::getThreadPool().run(activeThreads, std::ref(W));
   // } else {
     // FunctionTy f_cpy (f);
-    // Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    // Substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
         // auto begin = range.local_begin();
         // auto end = range.local_end();
         // while (begin != end)

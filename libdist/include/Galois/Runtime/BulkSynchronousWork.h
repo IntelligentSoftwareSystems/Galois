@@ -161,7 +161,7 @@ struct WIDb {
   unsigned tid;
   unsigned pid;
   explicit WIDb(unsigned t): tid(t) {
-    pid = Substrate::ThreadPool::getThreadPool().getLeader(tid);
+    pid = Substrate::getThreadPool().getLeader(tid);
   }
 };
 
@@ -190,7 +190,7 @@ struct BagMaster: boost::noncopyable {
   GALOIS_ATTRIBUTE_NOINLINE
   size_t mapSlow(const WIDb& id, FnTy fn, int mark) { 
     size_t iterations = 0;
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     while (true) {
       unsigned failures = 0;
 
@@ -522,7 +522,7 @@ static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFn
   typedef Executor<FilteredItemsVector, FnsTy, InitialWork> Work;
 
   Work W(fns, InitialWork(range, initFn), loopname);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+  Substrate::getThreadPool().run(activeThreads, std::ref(W));
 }
 
 } // end Anonymous

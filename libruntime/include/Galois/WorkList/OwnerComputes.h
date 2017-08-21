@@ -63,7 +63,7 @@ public:
 
   void push(const value_type& val)  {
     unsigned int index = Fn(val);
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned int mindex = tp.getPackage(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
     if (mindex == Substrate::ThreadPool::getPackage())

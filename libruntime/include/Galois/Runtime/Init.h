@@ -1,8 +1,8 @@
-/** Stuff from libSubstrate which we only want to instantiate once -*- C++ -*-
+/** Runtime Init -*- C++ -*-
  * @file
  * @section License
  *
- * This file is part of Galois.  Galois is a framework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -25,16 +25,23 @@
  * reserved.
  *
  * @section Description
+ * Initializes the components of Galois::Runtime library
  *
- * Things which are imported from libsubstrate.
- *
- * @author Andrew Lenharth <andrew@lenharth.org>
+ * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
 
-#include "Galois/Runtime/Substrate.h"
-#include "Galois/Substrate/BarrierImpl.h"
-#include "Galois/Substrate/Init.h"
+#ifndef GALOIS_RUNTIME_INIT_H
+#define GALOIS_RUNTIME_INIT_H
 
-Galois::Substrate::Barrier& Galois::Runtime::getBarrier(unsigned activeThreads) {
-  return Galois::Substrate::getBarrier(activeThreads);
+namespace Galois {
+namespace Runtime {
+
+void init(void);
+
+void finish(void);
+
 }
+}
+
+
+#endif// GALOIS_RUNTIME_INIT_H

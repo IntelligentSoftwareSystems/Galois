@@ -86,6 +86,7 @@ class StatCollector {
 
 public:
 
+
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
@@ -97,6 +98,11 @@ public:
 
   void beginLoopInstance(const std::string& str);
 };
+
+namespace internal {
+  void initStatManager(void);
+  void deleteStatManager(void);
+}
 
 } // end namespace Runtime
 } // end namespace Galois

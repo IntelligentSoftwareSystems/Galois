@@ -45,6 +45,7 @@
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/gIO.h"
 #include "Galois/Runtime/Mem.h"

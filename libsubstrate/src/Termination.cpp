@@ -31,6 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
+#include "Galois/gIO.h"
 #include "Galois/Substrate/Termination.h"
 
 using namespace Galois::Substrate;
@@ -110,10 +111,23 @@ public:
   }
 };
 
+static LocalTerminationDetection* localTerm = nullptr;
+
+static void initLocalTerm(void) {
+  GALOIS_ASSERT(!localTerm, "Double initialization of LocalTerminationDetection");
+  localTerm = new LocalTerminationDetection();
+}
+
+static void finishLocalTerm(void) {
+  delete localTerm;
+  localTerm = nullptr;
+}
+
+
 static LocalTerminationDetection& getLocalTermination(unsigned activeThreads) {
-  static LocalTerminationDetection term;
-  term.init(activeThreads);
-  return term;
+  GALOIS_ASSERT(localTerm, "LocalTerminationDetection not initialized");
+  localTerm->init(activeThreads);
+  return *localTerm;
 }
 
 
@@ -230,14 +244,36 @@ public:
   }
 };
 
+static TreeTerminationDetection* treeTerm = nullptr;
+
+static void initTreeTerm(void) {
+  GALOIS_ASSERT(!treeTerm, "Double initialization of TreeTerminationDetection");
+  treeTerm = new TreeTerminationDetection();
+}
+
+static void finishTreeTerm(void) {
+  delete treeTerm;
+  treeTerm = nullptr;
+}
+
+
+
 __attribute__((unused))
 static TreeTerminationDetection& getTreeTermination(unsigned activeThreads) {
-  static TreeTerminationDetection term;
-  term.init(activeThreads);
-  return term;
+  GALOIS_ASSERT(treeTerm, "TreeTerminationDetection not initialized");
+  treeTerm->init(activeThreads);
+  return *treeTerm;
 }
 
 } // namespace
+
+void Galois::Substrate::internal::initTermDetect(void) {
+  initLocalTerm();
+}
+
+void Galois::Substrate::internal::finishTermDetect(void) {
+  finishLocalTerm();
+}
 
 Galois::Substrate::TerminationDetection& Galois::Substrate::getSystemTermination(unsigned activeThreads) {
   return getLocalTermination(activeThreads);

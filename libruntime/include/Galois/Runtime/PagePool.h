@@ -55,6 +55,14 @@ int numPagePoolAllocTotal();
 //! Returns total large pages allocated for thread by Galois memory management subsystem
 int numPagePoolAllocForThread(unsigned tid);
 
+namespace internal {
+  //! Initialize PagePool, used by Runtime::init();
+  void initPagePool(void);
+
+  //! Destroy  PagePool, used by Runtime::finish();
+  void destroyPagePool(void);
+} // end namespace internal
+
 } // end namespace Runtime
 } // end namespace Galois
 

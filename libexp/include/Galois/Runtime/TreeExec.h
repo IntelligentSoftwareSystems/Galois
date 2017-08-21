@@ -405,7 +405,7 @@ void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
 
   e.initWork (initTask);
 
-  Substrate::ThreadPool::getThreadPool().run (Galois::getActiveThreads(),
+  Substrate::getThreadPool().run (Galois::getActiveThreads(),
       [&e] () { e.initThread(); },
       std::ref (e));
 }

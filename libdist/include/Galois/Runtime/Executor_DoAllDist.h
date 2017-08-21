@@ -204,7 +204,7 @@ public:
   template<typename RangeTy, typename FunctionTy, typename ArgsTy>
     void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
       DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-      Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+      Substrate::getThreadPool().run(activeThreads, std::ref(W));
     }
 };
 
@@ -212,14 +212,14 @@ public:
 // void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
 // 
   // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+  // Substrate::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    // Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
+    // Substrate::getThreadPool().run(activeThreads, std::ref(W));
   // } else {
     // FunctionTy f_cpy (f);
-    // Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    // Substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
         // auto begin = range.local_begin();
         // auto end = range.local_end();
         // while (begin != end)

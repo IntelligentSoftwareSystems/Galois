@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   if (num <= 0)
     num = 1024 * 1024 * 1024;
 
-  unsigned M = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads();
+  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());

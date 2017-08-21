@@ -78,7 +78,7 @@ public:
 
   virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::ThreadPool::getThreadPool().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -95,7 +95,7 @@ public:
     size_t i = runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
 
-    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }
@@ -381,7 +381,7 @@ public:
 
   virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -414,7 +414,7 @@ public:
            BilliardsPOunsorted::AddNextEvents, RemoveAndSortEvents> 
              (table, workList, endtime, enablePrints);
 
-    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }

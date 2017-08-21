@@ -73,6 +73,11 @@ public:
 //returns an object.  The object will be reused, but reinitialized to activeThreads
 TerminationDetection& getSystemTermination(unsigned activeThreads);
 
+namespace internal {
+  void initTermDetect(void);
+  void finishTermDetect(void);
+}
+
 } // end namespace Runtime
 } // end namespace Galois
 

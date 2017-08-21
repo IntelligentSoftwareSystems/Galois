@@ -567,7 +567,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  Galois::Instance G;
   LonestarStart(argc, argv, name, desc, url);
 
   std::cout << config << "\n";
@@ -582,4 +582,5 @@ int main(int argc, char** argv) {
   T.start();
   run(bodies, pBodies, nbodies);
   T.stop();
+
 }

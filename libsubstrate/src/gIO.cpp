@@ -61,7 +61,7 @@ static void printString(bool error, bool newline, const std::string& prefix, con
 }
 
 void Galois::gDebugStr(const std::string& s) {
-  static bool skip = EnvCheck("GALOIS_DEBUG_SKIP");
+  static bool skip = Galois::Substrate::EnvCheck("GALOIS_DEBUG_SKIP");
   if (skip) return;
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
@@ -76,7 +76,7 @@ void Galois::gDebugStr(const std::string& s) {
   std::ostringstream os;
   os << "[" << time_str << " " << std::setw(3) << Galois::Substrate::ThreadPool::getTID() << "] " << s;
 
-  if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+  if (Galois::Substrate::EnvCheck("GALOIS_DEBUG_TO_FILE")) {
     static Galois::Substrate::SimpleLock dIOLock;
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;

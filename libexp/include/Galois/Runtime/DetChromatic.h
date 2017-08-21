@@ -1328,14 +1328,14 @@ struct ChromaticExecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_chromatic (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
 
   ChromaticExecutor<G, M, F> executor {graph, dagManager, func, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+  Galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1772,13 +1772,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+  Galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1917,13 +1917,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphDAGtopologyDriven<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+  Galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -2352,13 +2352,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_hybrid (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
   HybridInputDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+  Galois::Substrate::getThreadPool ().beKind ();
 
 }
 
