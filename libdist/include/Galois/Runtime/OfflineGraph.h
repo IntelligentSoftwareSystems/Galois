@@ -195,9 +195,9 @@ class OfflineGraph {
   }
 
 public:
-  typedef boost::counting_iterator<uint32_t> iterator;
+  typedef boost::counting_iterator<uint64_t> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
-  typedef uint32_t GraphNode;
+  typedef uint64_t GraphNode;
 
   OfflineGraph(const std::string& name) :
      fileEdgeDst(name, std::ios_base::binary), 
@@ -327,7 +327,7 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
                     std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
-    return Galois::Graph::divideNodesBinarySearch<OfflineGraph, uint32_t>(
+    return Galois::Graph::divideNodesBinarySearch(
       *this, nodeWeight, edgeWeight, id, total, scaleFactor);
   }
 };
