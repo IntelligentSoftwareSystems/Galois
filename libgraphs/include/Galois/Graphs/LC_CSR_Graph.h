@@ -399,11 +399,9 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
                     size_t total, std::vector<uint64_t>& edgePrefixSum)
       -> GraphRange {
-    std::vector<unsigned> dummy;
-
     return 
-      Galois::Graph::divideNodesBinarySearch<LC_CSR_Graph, uint32_t>(
-        *this, nodeWeight, edgeWeight, id, total, dummy, 0, 0, edgePrefixSum);
+      Galois::Graph::divideNodesBinarySearch<std::vector<uint64_t>, uint32_t>(
+        numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
   /**

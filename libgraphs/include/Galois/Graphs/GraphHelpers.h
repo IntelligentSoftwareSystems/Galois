@@ -40,49 +40,51 @@
 namespace Galois {
 namespace Graph {
 
-/**
- * Return a suitable index between an upper bound and a lower bound that
- * attempts to get close to the target size (i.e. find a good chunk that
- * corresponds to some size). 
- *
- * @tparam GraphClass class of the input graph; should have edge_end function
- * @tparam NodeType type of node data
- *
- * @param inputGraph graph to find index in
- * @param nodeWeight weight to give to a node in division
- * @param edgeWeight weight to give to an edge in division
- * @param targetWeight The amount of weight we want from the returned index
- * @param lb lower bound to start search from
- * @param ub upper bound to start search from
- * @param nodeOffset number of nodes to subtract (offset)
- * @param edgeOffset number of edges to subtract (offset)
- */
-template <typename GraphClass, typename NodeType>
-inline uint64_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWeight, 
-                 uint64_t targetWeight, uint64_t lb, uint64_t ub,
-                 NodeType nodeOffset = 0, uint64_t edgeOffset = 0) {
-  assert(nodeWeight != 0 || edgeWeight != 0);
-
-  while (lb < ub) {
-    uint64_t mid = lb + (ub - lb) / 2;
-    uint64_t num_edges = *(inputGraph.edge_begin(mid)) - edgeOffset;
-    uint64_t weight = (num_edges * edgeWeight) + ((mid - nodeOffset) * nodeWeight);
-
-    if (weight < targetWeight)
-      lb = mid + 1;
-    else if (weight == targetWeight)
-      lb = mid + 1;
-    else
-      ub = mid;
-  }
-
-  return lb;
-}
+///**
+// * Return a suitable index between an upper bound and a lower bound that
+// * attempts to get close to the target size (i.e. find a good chunk that
+// * corresponds to some size). 
+// *
+// * @tparam GraphClass class of the input graph; should have edge_end function
+// * @tparam NodeType type of node data
+// *
+// * @param inputGraph graph to find index in
+// * @param nodeWeight weight to give to a node in division
+// * @param edgeWeight weight to give to an edge in division
+// * @param targetWeight The amount of weight we want from the returned index
+// * @param lb lower bound to start search from
+// * @param ub upper bound to start search from
+// * @param nodeOffset number of nodes to subtract (offset)
+// * @param edgeOffset number of edges to subtract (offset)
+// */
+//template <typename GraphClass, typename NodeType>
+//inline uint64_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWeight, 
+//                 uint64_t targetWeight, uint64_t lb, uint64_t ub,
+//                 NodeType nodeOffset = 0, uint64_t edgeOffset = 0) {
+//  assert(nodeWeight != 0 || edgeWeight != 0);
+//
+//  while (lb < ub) {
+//    uint64_t mid = lb + (ub - lb) / 2;
+//    uint64_t num_edges = *(inputGraph.edge_begin(mid)) - edgeOffset;
+//    uint64_t weight = (num_edges * edgeWeight) + ((mid - nodeOffset) * nodeWeight);
+//
+//    if (weight < targetWeight)
+//      lb = mid + 1;
+//    else if (weight == targetWeight)
+//      lb = mid + 1;
+//    else
+//      ub = mid;
+//  }
+//
+//  return lb;
+//}
 
 /**
  * Return a suitable index between an upper bound and a lower bound that
  * attempts to get close to the target size (i.e. find a good chunk that
  * corresponds to some size) using a prefix sum.
+ *
+ * TODO
  *
  * @param nodeWeight weight to give to a node in division
  * @param edgeWeight weight to give to an edge in division
@@ -91,10 +93,14 @@ inline uint64_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edge
  * @param ub upper bound to start search from
  * @param edgePrefixSum prefix sum of edges
  */
+template <typename PrefixSumType>
 inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
-                          size_t targetWeight, size_t lb, size_t ub, 
-                          std::vector<uint64_t> edgePrefixSum) {
+                          size_t targetWeight, uint64_t lb, uint64_t ub, 
+                          PrefixSumType& edgePrefixSum,
+                          uint64_t nodeOffset = 0, uint64_t edgeOffset = 0) {
   assert(nodeWeight != 0 || edgeWeight != 0);
+
+  // TODO offset incorporation
 
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
@@ -126,9 +132,8 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  * function attempts to split them evenly among threads given some kind of
  * weighting
  *
- * @tparam GraphClass type of the input graph
- * @tparam NodeType type of node data
-
+ * TODO
+ *
  * @param nodeWeight weight to give to a node in division
  * @param edgeWeight weight to give to an edge in division
  * @param id Division number you want the ranges for
@@ -138,20 +143,21 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  * @param nodeOffset number of nodes to subtract (offset)
  * @param edgeOffset number of edges to subtract (offset)
  */
-template <typename GraphClass, typename NodeType = uint64_t> inline
+template <typename PrefixSumType, typename NodeType = uint64_t> inline
 std::pair<std::pair<boost::counting_iterator<NodeType>,
                     boost::counting_iterator<NodeType>>,
           std::pair<boost::counting_iterator<uint64_t>,
                     boost::counting_iterator<uint64_t>>>
-divideNodesBinarySearch(GraphClass& inputGraph, 
+divideNodesBinarySearch(NodeType numNodes,
+                   uint64_t numEdges,
                    size_t nodeWeight, 
                    size_t edgeWeight, 
                    size_t id, 
                    size_t total,
+                   PrefixSumType& edgePrefixSum, 
                    std::vector<unsigned> scaleFactor = std::vector<unsigned>(),
                    NodeType nodeOffset = 0, 
-                   uint64_t edgeOffset = 0,
-                   std::vector<uint64_t> edgePrefixSum = std::vector<uint64_t>())
+                   uint64_t edgeOffset = 0)
 { 
   typedef boost::counting_iterator<NodeType> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
@@ -163,9 +169,6 @@ divideNodesBinarySearch(GraphClass& inputGraph,
 
   assert(total >= 1);
   assert(id >= 0 && id < total);
-
-  NodeType numNodes = inputGraph.size();
-  uint64_t numEdges = inputGraph.sizeEdges();
 
   //printf("num nodes is %lu num edges is %lu\n", numNodes, numEdges);
 
@@ -214,50 +217,28 @@ divideNodesBinarySearch(GraphClass& inputGraph,
   uint64_t edgesLower = numEdges;
   uint64_t edgesUpper = numEdges;
 
-  if (edgePrefixSum.size() == 0) {
-    // find allocation of nodes for this division
-    if (blockLower == 0) {
-      nodesLower = 0;
-    } else {
-      nodesLower = findIndex(inputGraph, nodeWeight, edgeWeight, 
-                             blockWeight * blockLower, 0, numNodes,
-                             nodeOffset, edgeOffset);
-    }
-
-    nodesUpper = findIndex(inputGraph, nodeWeight, edgeWeight,
-                           blockWeight * blockUpper, nodesLower,
-                           numNodes, nodeOffset, edgeOffset);
-
-    // correct number of edges based on nodes allocated to division if
-    // necessary
-    if (nodesLower != nodesUpper) {
-      edgesLower = *(inputGraph.edge_begin(nodesLower));
-      edgesUpper = *(inputGraph.edge_end(nodesUpper - 1));
-    }
+  // use prefix sums
+  if (blockLower == 0) {
+    nodesLower = 0;
   } else {
-    // use prefix sums
-    assert((uint64_t)edgePrefixSum.size() == numNodes);
+    nodesLower = findIndexPrefixSum(nodeWeight, edgeWeight, 
+                                    blockWeight * blockLower, 0, numNodes, 
+                                    edgePrefixSum, nodeOffset, edgeOffset);
+  }
+  nodesUpper = findIndexPrefixSum(nodeWeight, edgeWeight, 
+                                  blockWeight * blockUpper, nodesLower, 
+                                  numNodes, edgePrefixSum, nodeOffset, 
+                                  edgeOffset);
 
-    if (blockLower == 0) {
-      nodesLower = 0;
+  // correct number of edges
+  if (nodesLower != nodesUpper) {
+    // TODO incorporate offset into this as well
+    if (nodesLower != 0) {
+      edgesLower = edgePrefixSum[nodesLower - 1];
     } else {
-      nodesLower = findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                      blockWeight * blockLower, 0, numNodes, 
-                                      edgePrefixSum);
+      edgesLower = 0;
     }
-    nodesUpper = findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                    blockWeight * blockUpper, nodesLower, 
-                                    numNodes, edgePrefixSum);
- 
-    // correct number of edges
-    if (nodesLower != nodesUpper) {
-      if (nodesLower != 0) {
-        edgesLower = edgePrefixSum[nodesLower - 1];
-      } else {
-        edgesLower = 0;
-      }
-      edgesUpper = edgePrefixSum[nodesUpper - 1];
-    }
+    edgesUpper = edgePrefixSum[nodesUpper - 1];
   }
 
   return GraphRange(NodeRange(iterator(nodesLower), 

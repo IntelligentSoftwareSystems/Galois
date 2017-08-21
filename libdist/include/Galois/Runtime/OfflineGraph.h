@@ -306,6 +306,13 @@ public:
     return edgeData<T>(*ni);
   }
 
+  /**
+   * Accesses the prefix sum on disk.
+   */
+  uint64_t operator[](uint64_t n) { 
+    return outIndexs(n - 1);
+  }
+
   // typedefs used by divide by node below
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
@@ -327,10 +334,11 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
                     std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
-    return Galois::Graph::divideNodesBinarySearch(
-      *this, nodeWeight, edgeWeight, id, total, scaleFactor);
+    return Galois::Graph::divideNodesBinarySearch<OfflineGraph, uint64_t>(
+      numNodes, numEdges, nodeWeight, edgeWeight, id, total, *this, scaleFactor);
   }
 };
+
 
 class OfflineGraphWriter {
   std::fstream file;

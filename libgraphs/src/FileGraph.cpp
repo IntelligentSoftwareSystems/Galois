@@ -428,8 +428,9 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
 -> GraphRange {
   std::vector<unsigned> dummy;
   // note this calls into another findIndex (not the one directly above)....
-  return Galois::Graph::divideNodesBinarySearch<FileGraph, uint64_t>(
-    *this, nodeSize, edgeSize, id, total, dummy, nodeOffset, edgeOffset);
+  return Galois::Graph::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
+                                                edgeSize, id, total, outIdx, 
+                                                dummy, nodeOffset, edgeOffset);
 
   //size_t size = numNodes * nodeSize + numEdges * edgeSize;
   //size_t block = (size + total - 1) / total;
