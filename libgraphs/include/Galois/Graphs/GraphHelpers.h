@@ -58,18 +58,19 @@ namespace Graph {
  * @param edgeOffset number of edges to subtract (offset)
  */
 template <typename GraphClass, typename NodeType>
-inline size_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWeight, 
-                 size_t targetWeight, size_t lb, size_t ub,
+inline uint64_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWeight, 
+                 uint64_t targetWeight, uint64_t lb, uint64_t ub,
                  NodeType nodeOffset = 0, uint64_t edgeOffset = 0) {
-  // TODO make node weight 0 work
-  assert(nodeWeight != 0);
+  assert(nodeWeight != 0 || edgeWeight != 0);
 
   while (lb < ub) {
-    size_t mid = lb + (ub - lb) / 2;
-    size_t num_edges = *(inputGraph.edge_begin(mid)) - edgeOffset;
-    size_t weight = (num_edges * edgeWeight) + ((mid - nodeOffset) * nodeWeight);
+    uint64_t mid = lb + (ub - lb) / 2;
+    uint64_t num_edges = *(inputGraph.edge_begin(mid)) - edgeOffset;
+    uint64_t weight = (num_edges * edgeWeight) + ((mid - nodeOffset) * nodeWeight);
 
     if (weight < targetWeight)
+      lb = mid + 1;
+    else if (weight == targetWeight)
       lb = mid + 1;
     else
       ub = mid;
@@ -93,8 +94,7 @@ inline size_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWe
 inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
                           size_t targetWeight, size_t lb, size_t ub, 
                           std::vector<uint64_t> edgePrefixSum) {
-  // TODO make node weight 0 work
-  assert(nodeWeight != 0);
+  assert(nodeWeight != 0 || edgeWeight != 0);
 
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
@@ -105,11 +105,12 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
     } else {
       num_edges = 0;
     }
-    //size_t num_edges = *edge_begin(mid);
 
     size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
 
-    if (weight < targetWeight)
+    if (weight <= targetWeight)
+      lb = mid + 1;
+    else if (weight == targetWeight)
       lb = mid + 1;
     else
       ub = mid;
@@ -158,8 +159,7 @@ divideNodesBinarySearch(GraphClass& inputGraph,
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
 
-  // TODO make it work with 0
-  assert(nodeWeight != 0);
+  assert(nodeWeight != 0 || edgeWeight != 0);
 
   assert(total >= 1);
   assert(id >= 0 && id < total);
@@ -208,16 +208,21 @@ divideNodesBinarySearch(GraphClass& inputGraph,
 
   assert(blockLower <= blockUpper);
 
-  size_t nodesLower;
-  size_t nodesUpper;
-  size_t edgesLower = numEdges;
-  size_t edgesUpper = numEdges;
+  uint64_t nodesLower;
+  uint64_t nodesUpper;
+  uint64_t edgesLower = numEdges;
+  uint64_t edgesUpper = numEdges;
 
   if (edgePrefixSum.size() == 0) {
     // find allocation of nodes for this division
-    nodesLower = findIndex(inputGraph, nodeWeight, edgeWeight, 
-                           blockWeight * blockLower, 0, numNodes,
-                           nodeOffset, edgeOffset);
+    if (blockLower == 0) {
+      nodesLower = 0;
+    } else {
+      nodesLower = findIndex(inputGraph, nodeWeight, edgeWeight, 
+                             blockWeight * blockLower, 0, numNodes,
+                             nodeOffset, edgeOffset);
+    }
+
     nodesUpper = findIndex(inputGraph, nodeWeight, edgeWeight,
                            blockWeight * blockUpper, nodesLower,
                            numNodes, nodeOffset, edgeOffset);
@@ -232,9 +237,13 @@ divideNodesBinarySearch(GraphClass& inputGraph,
     // use prefix sums
     assert((uint64_t)edgePrefixSum.size() == numNodes);
 
-    nodesLower = findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                    blockWeight * blockLower, 0, numNodes, 
-                                    edgePrefixSum);
+    if (blockLower == 0) {
+      nodesLower = 0;
+    } else {
+      nodesLower = findIndexPrefixSum(nodeWeight, edgeWeight, 
+                                      blockWeight * blockLower, 0, numNodes, 
+                                      edgePrefixSum);
+    }
     nodesUpper = findIndexPrefixSum(nodeWeight, edgeWeight, 
                                     blockWeight * blockUpper, nodesLower, 
                                     numNodes, edgePrefixSum);
