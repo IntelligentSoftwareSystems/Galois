@@ -308,7 +308,7 @@ private:
     if (id == 0) {
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
-                           numHosts,
+                           numHosts*DecomposeFactor,
                            gid2host, 0, scalefactor);
       for (unsigned h = 1; h < numHosts; ++h) {
         Galois::Runtime::SendBuffer b;
@@ -329,10 +329,12 @@ private:
     }
     ++Galois::Runtime::evilPhase;
 #else
-    gid2host.resize(numHosts);
-    auto r = g.divideByNode(0, edgeWeightOfMaster, id, numHosts, scalefactor);
-    gid2host[id].first = *(r.first.first);
-    gid2host[id].second = *(r.first.second);
+    gid2host.resize(numHosts*DecomposeFactor);
+    for(auto d = 0; d < DecomposeFactor; ++d){
+      auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d*numHosts), numHosts*DecomposeFactor, scalefactor);
+      gid2host[id + d*numHosts].first = *(r.first.first);
+      gid2host[id + d*numHosts].second = *(r.first.second);
+    }
 
     //printf("[%d] first is %lu, second is %lu\n", id, gid2host[id].first, gid2host[id].second);
     //printf("[%d] first edge is %lu, second edge is %lu\n", id, *(r.second.first), *(r.second.second));
@@ -341,7 +343,9 @@ private:
     for (unsigned h = 0; h < numHosts; ++h) {
       if (h == id) continue;
       Galois::Runtime::SendBuffer b;
-      Galois::Runtime::gSerialize(b, gid2host[id]);
+      for(auto d = 0; d < DecomposeFactor; ++d){
+        Galois::Runtime::gSerialize(b, gid2host[id + d*numHosts]);
+      }
       net.sendTagged(h, Galois::Runtime::evilPhase, b);
     }
     net.flush();
@@ -354,10 +358,17 @@ private:
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
-      Galois::Runtime::gDeserialize(b, gid2host[p->first]);
+      for(auto d = 0; d < DecomposeFactor; ++d){
+        Galois::Runtime::gDeserialize(b, gid2host[p->first + d*numHosts]);
+      }
       ++received;
     }
     ++Galois::Runtime::evilPhase;
+    //for(auto i = 0; i < numHosts*DecomposeFactor; ++i){
+      //std::stringstream ss;
+       //ss << i << "  : " << gid2host[i].first << " , " << gid2host[i].second << "\n";
+       //std::cerr << ss.str();
+    //}
 #endif
   }
 
