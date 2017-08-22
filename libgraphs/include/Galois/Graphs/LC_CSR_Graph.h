@@ -396,11 +396,12 @@ public:
    * @param total Total number of divisions
    * @param edgePrefixSum a prefix sum of edges of the graph
    */
+  template <typename VectorTy>
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
-                    size_t total, std::vector<uint64_t>& edgePrefixSum)
+                    size_t total, VectorTy& edgePrefixSum)
       -> GraphRange {
     return 
-      Galois::Graph::divideNodesBinarySearch<std::vector<uint64_t>, uint32_t>(
+      Galois::Graph::divideNodesBinarySearch<VectorTy, uint32_t>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
@@ -880,7 +881,8 @@ public:
    *
    * @param edgePrefixSum A prefix sum of edges
    */
-  void determineThreadRangesByNode(std::vector<uint64_t>& edgePrefixSum) {
+  template <typename VectorTy>
+  void determineThreadRangesByNode(VectorTy& edgePrefixSum) {
     uint32_t numThreads = Galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
