@@ -175,7 +175,7 @@ public:
 template <bool Enable> 
 class CondStatTimer: public StatTimer {
 public:
-  CondStatTimer(const char* name): StatTimer(name) {}
+  CondStatTimer(const char* name): StatTimer("Time", name) {}
 };
 
 template <> class CondStatTimer<false> {
@@ -190,7 +190,7 @@ public:
 
 template <typename F>
 void timeThis(F& f, const char* const name) {
-  StatTimer t(name);
+  StatTimer t("Time", name);
 
   t.start();
 
