@@ -13,7 +13,7 @@ inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-#outputdirname=/workspace/dist-outputs
+#outputdirname=/net/ohm/export/cdgc/dist-outputs
 outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
@@ -41,7 +41,7 @@ MPI=mpiexec
 LOG=.verify_log
 
 FLAGS=
-FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
+#FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
   FLAGS+=" -kcore=100"
@@ -100,9 +100,9 @@ for partition in 1 2 3 4 5 6 7 8; do
   if [ $partition -eq 1 ]; then
     CUTTYPE+=" -partition=cvc"
   elif [ $partition -eq 2 ]; then
-    CUTTYPE+=" -partition=cvc -balanceMasters=nodes"
+    CUTTYPE+=" -partition=jcvc"
   elif [ $partition -eq 3 ]; then
-    CUTTYPE+=" -partition=cvc -balanceMasters=both"
+    CUTTYPE+=" -partition=jbvc"
   elif [ $partition -eq 4 ]; then
     CUTTYPE+=" -partition=2dvc -balanceMasters=nodes"
   elif [ $partition -eq 5 ]; then
@@ -140,21 +140,21 @@ for partition in 1 2 3 4 5 6 7 8; do
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
       if [ $partition -eq 1 ]; then
-        failed_cases+="balanced cartesian vertex-cut $1 devices with $3 threads; "
-      elif [ $partition -eq 2 ]; then
         failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 2 ]; then
+        failed_cases+="jagged cyclic vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 3 ]; then
-        failed_cases+="both balanced cartesian vertex-cut $1 devices with $3 threads; "
+        failed_cases+="jagged blocked vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 4 ]; then
         failed_cases+="2d checkerboard vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 5 ]; then
-        failed_cases+="balanced hybrid outgoing vertex-cut $1 devices with $3 threads; "
+        failed_cases+="hybrid outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 6 ]; then
-        failed_cases+="balanced hybrid incoming vertex-cut $1 devices with $3 threads; "
+        failed_cases+="hybrid incoming vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 7 ]; then
-        failed_cases+="balanced outgoing edge-cut $1 devices with $3 threads; "
+        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 8 ]; then
-        failed_cases+="balanced incoming edge-cut $1 devices with $3 threads; "
+        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
