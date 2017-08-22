@@ -310,7 +310,7 @@ public:
    * Accesses the prefix sum on disk.
    */
   uint64_t operator[](uint64_t n) { 
-    return outIndexs(n - 1);
+    return outIndexs(n);
   }
 
   // typedefs used by divide by node below
