@@ -36,7 +36,7 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/DoAllWrap.h"
 
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
@@ -360,7 +360,9 @@ private:
     fileGraph.reset_byte_counters();
     auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
     auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
-    std::vector<std::atomic<uint64_t>> indegree(base_hGraph::totalNodes); // TODO use LargeArray
+    size_t numColumnChunks = (base_hGraph::totalNodes + columnChunkSize - 1)/columnChunkSize;
+    std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
+    std::vector<std::atomic<uint64_t>> indegree(numColumnChunks); // TODO use LargeArray
     Galois::Runtime::do_all_coupled(
       Galois::Runtime::makeStandardRange(beginIter, endIter),
       [&] (auto src) {
@@ -368,7 +370,8 @@ private:
         auto ee = fileGraph.edge_end(src);
         for (; ii < ee; ++ii) {
           auto dst = fileGraph.getEdgeDst(ii);
-          Galois::atomicAdd(indegree[dst], (uint64_t)1);
+          //++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
+          Galois::atomicAdd(indegree[dst/columnChunkSize], (uint64_t)1);
         }
       },
       std::make_tuple(
@@ -381,15 +384,14 @@ private:
         base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
     // TODO move this to a common helper function
-    std::vector<uint64_t> prefixSumOfInEdges(base_hGraph::totalNodes); // TODO use LargeArray
     auto& activeThreads = Galois::Runtime::activeThreads;
     std::vector<uint64_t> prefixSumOfThreadBlocks(activeThreads, 0);
     Galois::on_each([&](unsigned tid, unsigned nthreads) {
         assert(nthreads == activeThreads);
-        auto range = Galois::block_range(beginIter, endIter,
+        auto range = Galois::block_range((size_t)0, numColumnChunks,
           tid, nthreads);
-        auto begin = *range.first;
-        auto end = *range.second;
+        auto begin = range.first;
+        auto end = range.second;
         // find prefix sum of each block
         if (begin < end) {
           prefixSumOfInEdges[begin] = indegree[begin];
@@ -409,10 +411,10 @@ private:
     Galois::on_each([&](unsigned tid, unsigned nthreads) {
         assert(nthreads == activeThreads);
         if (tid > 0) {
-          auto range = Galois::block_range(beginIter, endIter,
+          auto range = Galois::block_range((size_t)0, numColumnChunks,
             tid, nthreads);
           // update prefix sum from previous block
-          for (auto i = (*range.first) + 1; i < *range.second; ++i) {
+          for (auto i = range.first; i < range.second; ++i) {
             prefixSumOfInEdges[i] += prefixSumOfThreadBlocks[tid-1];
           }
         }
@@ -425,6 +427,10 @@ private:
       auto pair = Galois::prefix_range(prefixSumOfInEdges, 
           (uint64_t)0U, prefixSumOfInEdges.size(),
           i, base_hGraph::numHosts);
+      pair.first *= columnChunkSize;
+      pair.second *= columnChunkSize; 
+      if (pair.first > base_hGraph::totalNodes) pair.first = base_hGraph::totalNodes;
+      if (pair.second > base_hGraph::totalNodes) pair.second = base_hGraph::totalNodes;
       jaggedColumnMap[gridColumnID()].push_back(pair);
     }
 
@@ -571,9 +577,11 @@ private:
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     src = base_hGraph::gid2host[leaderHostID].first;
     for (uint64_t dst = 0; dst < base_hGraph::totalNodes; ++dst) {
-      if (dst == src) { // skip nodes which have been allocated above
-        dst = src_end - 1;
-        continue;
+      if (src != src_end) {
+        if (dst == src) { // skip nodes which have been allocated above
+          dst = src_end - 1;
+          continue;
+        }
       }
       assert((dst < src) || (dst >= src_end));
       bool createNode = false;
