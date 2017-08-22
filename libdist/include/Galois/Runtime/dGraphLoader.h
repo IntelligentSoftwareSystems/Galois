@@ -39,7 +39,7 @@
  * Supported partitioning schemes
  ******************************************************************************/
 enum PARTITIONING_SCHEME {
-  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT, JAGGED_BLOCKED_VCUT
+  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT, JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT
 };
 
 /*******************************************************************************
@@ -78,6 +78,10 @@ static cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                                                   "Jagged Cyclic Vertex-Cut"), 
                                        clEnumValN(JAGGED_BLOCKED_VCUT, "jbvc", 
                                                   "Jagged Blocked Vertex-Cut"), 
+                                       clEnumValN(OVER_DECOMPOSE_2_VCUT, "od2vc", 
+                                                  "Over decomposed by 2 cartesian Vertex-Cut"), 
+                                       clEnumValN(OVER_DECOMPOSE_4_VCUT, "od4vc", 
+                                                  "Over decomposed by 4 cartesian Vertex-Cut"), 
                                        clEnumValEnd),
                                      cll::init(OEC));
 static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
@@ -112,6 +116,8 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
   typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
   typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
   typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 2> Graph_cartesianCut_overDecomposeBy2;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 4> Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -135,6 +141,12 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
                                     scaleFactor, false);
     case JAGGED_BLOCKED_VCUT:
       return new Graph_jaggedBlockedCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case OVER_DECOMPOSE_2_VCUT:
+      return new Graph_cartesianCut_overDecomposeBy2(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case OVER_DECOMPOSE_4_VCUT:
+      return new Graph_cartesianCut_overDecomposeBy4(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -164,6 +176,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut; // assumes push-style
   typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut; // assumes push-style
   typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut; // assumes push-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 2> Graph_cartesianCut_overDecomposeBy2;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 4> Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -204,6 +218,12 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
     case JAGGED_BLOCKED_VCUT:
       return new Graph_jaggedBlockedCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
+    case OVER_DECOMPOSE_2_VCUT:
+      return new Graph_cartesianCut_overDecomposeBy2(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case OVER_DECOMPOSE_4_VCUT:
+      return new Graph_cartesianCut_overDecomposeBy4(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
       return nullptr;
@@ -233,6 +253,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, true, true> Graph_checkerboardCut; // assumes pull-style
   typedef hGraph_jaggedCut<NodeData, EdgeData, false, true> Graph_jaggedCut; // assumes pull-style
   typedef hGraph_jaggedCut<NodeData, EdgeData, true, true> Graph_jaggedBlockedCut; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, false, 2> Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, false, 4> Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -283,7 +305,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_jaggedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                       scaleFactor, false);
       } else {
-        GALOIS_DIE("Error: (jvc) iterate over in-edges without transpose graph");
+        GALOIS_DIE("Error: (jcvc) iterate over in-edges without transpose graph");
         break;
       }
     case JAGGED_BLOCKED_VCUT:
@@ -291,9 +313,26 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_jaggedBlockedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                       scaleFactor, false);
       } else {
-        GALOIS_DIE("Error: (jvc) iterate over in-edges without transpose graph");
+        GALOIS_DIE("Error: (jbvc) iterate over in-edges without transpose graph");
         break;
       }
+    case OVER_DECOMPOSE_2_VCUT:
+      if (inputFileTranspose.size()) {
+        return new Graph_cartesianCut_overDecomposeBy2(inputFileTranspose, partFolder, net.ID, 
+                                                        net.Num, scaleFactor, false);
+      } else {
+        GALOIS_DIE("Error: (od2vc) iterate over in-edges without transpose graph");
+        break;
+      }
+    case OVER_DECOMPOSE_4_VCUT:
+      if (inputFileTranspose.size()) {
+        return new Graph_cartesianCut_overDecomposeBy4(inputFileTranspose, partFolder, net.ID, 
+                                                        net.Num, scaleFactor, false);
+      } else {
+        GALOIS_DIE("Error: (od4vc) iterate over in-edges without transpose graph");
+        break;
+      }
+
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
       return nullptr;

@@ -133,10 +133,9 @@ private:
         case writeSource:
           return (gridRowID() != gridRowID(host));
         case writeDestination:
-          return (gridColumnID() != gridColumnID(host));
         case writeAny:
-          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
-          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
+          // columns do not match processor grid
+          return false; 
         default:
           assert(false);
       }
@@ -145,10 +144,9 @@ private:
         case readSource:
           return (gridRowID() != gridRowID(host));
         case readDestination:
-          return (gridColumnID() != gridColumnID(host));
         case readAny:
-          assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
-          return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
+          // columns do not match processor grid
+          return false; 
         default:
           assert(false);
       }
@@ -208,22 +206,14 @@ public:
   virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      if (syncType == base_hGraph::syncReduce) { // does not match processor grid
-        return false;
-      } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
-      }
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
   virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      if (syncType == base_hGraph::syncReduce) { // does not match processor grid
-        return false;
-      } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
-      }
+      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
@@ -552,11 +542,11 @@ private:
         } else if (isOwned(src)) {
           createNode = true;
         } else {
-          for (unsigned i = 0; i < numColumnHosts; ++i) {
-            if (i == gridColumnID()) continue;
-            auto h = getColumnHostID(i, src);
+          for (unsigned k = 0; k < numColumnHosts; ++k) {
+            if (k == gridColumnID()) continue;
+            auto h = getColumnHostID(k, src);
             if (h == gridColumnID()) {
-              if (hasIncomingEdge[i].test(getColumnIndex(i, src))) {
+              if (hasIncomingEdge[k].test(getColumnIndex(k, src))) {
                 createNode = true;
                 ++dummyOutgoingNodes;
                 break;
@@ -797,7 +787,12 @@ public:
   }
 
   bool is_vertex_cut() const{
-    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
+    if (moreColumnHosts) {
+      // IEC and OEC will be reversed, so do not handle it as an edge-cut
+      if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
+    } else {
+      if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
+    }
     return true;
   }
 
