@@ -283,7 +283,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_jaggedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                       scaleFactor, false);
       } else {
-        GALOIS_DIE("Error: (jvc) iterate over in-edges without transpose graph");
+        GALOIS_DIE("Error: (jcvc) iterate over in-edges without transpose graph");
         break;
       }
     case JAGGED_BLOCKED_VCUT:
@@ -291,7 +291,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
         return new Graph_jaggedBlockedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
                                       scaleFactor, false);
       } else {
-        GALOIS_DIE("Error: (jvc) iterate over in-edges without transpose graph");
+        GALOIS_DIE("Error: (jbvc) iterate over in-edges without transpose graph");
         break;
       }
     default:

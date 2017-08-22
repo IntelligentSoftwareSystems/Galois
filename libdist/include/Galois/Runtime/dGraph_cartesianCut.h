@@ -241,7 +241,7 @@ public:
   virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      if (syncType == base_hGraph::syncReduce) { // does not match processor grid
+      if (columnBlocked) { // does not match processor grid
         return false;
       } else {
         return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
@@ -252,7 +252,7 @@ public:
   virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
     auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      if (syncType == base_hGraph::syncReduce) { // does not match processor grid
+      if (columnBlocked) { // does not match processor grid
         return false;
       } else {
         return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
@@ -830,7 +830,12 @@ public:
   }
 
   bool is_vertex_cut() const{
-    if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
+    if (moreColumnHosts) {
+      // IEC and OEC will be reversed, so do not handle it as an edge-cut
+      if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
+    } else {
+      if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
+    }
     return true;
   }
 
