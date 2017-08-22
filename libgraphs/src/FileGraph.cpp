@@ -616,7 +616,7 @@ FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) {
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
   } else if (N != nodeOffset) {
-    printf("WARNING: reading node out of bounds for this file graph");
+    printf("WARNING: reading node out of bounds for this file graph\n");
     // TODO die here?
   }
   return edge_iterator(idx);
@@ -630,7 +630,7 @@ FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) {
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
   } else {
-    printf("WARNING: reading node out of bounds for this file graph");
+    printf("WARNING: reading node out of bounds for this file graph\n");
     // TODO die here?
   }
   return edge_iterator(idx);
