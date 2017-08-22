@@ -1738,6 +1738,7 @@ private:
      auto activeThreads = Galois::getActiveThreads();
      std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
      Galois::on_each([&](unsigned tid, unsigned nthreads) {
+         // TODO use block_range instead
          unsigned int block_size = bitset_comm.size() / nthreads;
          if ((bitset_comm.size() % nthreads) > 0) ++block_size;
          assert((block_size * nthreads) >= bitset_comm.size());
@@ -1757,6 +1758,7 @@ private:
      if (bit_set_count > 0) {
        offsets.resize(bit_set_count);
        Galois::on_each([&](unsigned tid, unsigned nthreads) {
+           // TODO use block_range instead
            unsigned int block_size = bitset_comm.size() / nthreads;
            if ((bitset_comm.size() % nthreads) > 0) ++block_size;
            assert((block_size * nthreads) >= bitset_comm.size());
