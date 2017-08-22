@@ -392,10 +392,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (transpose && (numNodes > 0)) {
         base_hGraph::graph.transpose(edgeNuma);
         base_hGraph::transposed = true;
-      }
-
-      // TODO revise how this works and make it consistent across cuts
-      if (!edgeNuma) {
+      } else if (!edgeNuma) {
+        // elseif because transpose will find thread ranges for you
         Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
 
         StatTimer_thread_ranges.start();
