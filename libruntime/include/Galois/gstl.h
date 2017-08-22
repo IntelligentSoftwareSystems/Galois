@@ -175,11 +175,20 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
   // TODO change edge var names to something else (since this can be used in
   // a more general sense as well)
   // TODO make accesses to vector more efficient
-
   assert(division_id < num_divisions);
 
   uint64_t num_elements = end - begin;
   assert(edge_prefix_sum.size() == num_elements);
+
+  // TODO get rid of this for result collecting; debug purposes
+  for (uint64_t i = 1; i < num_elements; i++) {
+
+    if (edge_prefix_sum[i] < edge_prefix_sum[i-1]) {
+      printf("failed, id is %lu, value is %lu, id - 1 value is %lu\n",
+             i, edge_prefix_sum[i], edge_prefix_sum[i-1]);
+      assert(false);
+    }
+  }
 
   // Single division case
   if (num_divisions == 1) {
@@ -225,8 +234,34 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
 
   // theoretically how many edges we want to distributed to each division
   uint64_t edges_per_division = edge_prefix_sum.back() / num_divisions;
-
   //printf("Optimally want %lu edges per division\n", edges_per_division);
+
+  // deal with corner case where edge per division is 0; all nodes get even split
+  if (edges_per_division == 0) {
+    uint64_t nodes_per_division = num_elements / num_divisions;
+
+    uint64_t beginN;
+    uint64_t endN;
+
+    if (division_id != 0) {
+      if (division_id != (num_divisions - 1)) {
+        beginN = nodes_per_division * division_id;
+        endN = nodes_per_division * (division_id + 1);
+      } else {
+        beginN = nodes_per_division * division_id;
+        endN = num_elements;
+      }
+    } else {
+      beginN = 0;
+      endN = nodes_per_division;
+    }
+    printf("For division %u/%u we have begin %lu and end %lu with "
+           "%lu edges\n", 
+           division_id, num_divisions - 1, beginN, endN, 
+           edge_prefix_sum[endN] - edge_prefix_sum[beginN]);
+
+    return std::make_pair(beginN, endN);
+  }
 
   while (current_element < num_elements && current_division < num_divisions) {
     uint32_t divisions_remaining = num_divisions - current_division;
@@ -237,21 +272,19 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
       // assign remaining elements to last division
       assert(current_division == num_divisions - 1);
 
-      //if (current_element != 0) {
-      //  printf("For division %u/%u we have begin %lu and end %lu with "
-      //         "%lu edges\n", 
-      //         division_id, num_divisions - 1, begin_element, 
-      //         current_element + 1, 
-      //         edge_prefix_sum[current_element] - 
-      //           edge_prefix_sum[begin_element - 1]);
-
-
-      //} else {
-      //  printf("For division %u/%u we have begin %lu and end %lu with "
-      //         "%lu edges\n", 
-      //         division_id, num_divisions - 1, begin_element, 
-      //         current_element + 1, edge_prefix_sum.back());
-      //}
+      if (current_element != 0) {
+        printf("For division %u/%u we have begin %lu and end %lu with "
+               "%lu edges\n", 
+               division_id, num_divisions - 1, begin_element, 
+               num_elements, 
+               edge_prefix_sum.back() - 
+                 edge_prefix_sum[begin_element - 1]);
+      } else {
+        printf("For division %u/%u we have begin %lu and end %lu with "
+               "%lu edges\n", 
+               division_id, num_divisions - 1, begin_element, 
+               num_elements, edge_prefix_sum.back());
+      }
 
       return std::make_pair(begin + current_element, end);
     } else if ((num_elements - current_element) == divisions_remaining) {
