@@ -333,7 +333,7 @@ private:
     ++Galois::Runtime::evilPhase;
 #else
     gid2host.resize(numHosts*DecomposeFactor);
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d*numHosts), numHosts*DecomposeFactor, scalefactor);
       gid2host[id + d*numHosts].first = *(r.first.first);
       gid2host[id + d*numHosts].second = *(r.first.second);
@@ -346,7 +346,7 @@ private:
     for (unsigned h = 0; h < numHosts; ++h) {
       if (h == id) continue;
       Galois::Runtime::SendBuffer b;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gSerialize(b, gid2host[id + d*numHosts]);
       }
       net.sendTagged(h, Galois::Runtime::evilPhase, b);
@@ -361,7 +361,7 @@ private:
       } while (!p);
       assert(p->first != id);
       auto& b = p->second;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gDeserialize(b, gid2host[p->first + d*numHosts]);
       }
       ++received;

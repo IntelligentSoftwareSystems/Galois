@@ -211,7 +211,7 @@ public:
   // Return if gid is Owned by local host.
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::tie(start, end) = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts];
       if(gid >= start && gid < end)
         return true;
@@ -296,7 +296,7 @@ public:
     std::vector<typename Galois::Graph::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
     std::vector<typename Galois::Graph::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
     std::cerr << " SIZE : " << base_hGraph::gid2host.size() << "\n";
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       nodeBegin[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
       edgeBegin[d] = g.edge_begin(nodeBegin[d]);
       nodeEnd[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second;
@@ -307,7 +307,7 @@ public:
     // when possible from now on in the code
     std::vector<Galois::Graph::FileGraph> fileGraph(DecomposeFactor);
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::stringstream ss;
       ss <<"Host : " << base_hGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
       std::cout << ss.str();
@@ -419,7 +419,7 @@ public:
                       std::vector<Galois::Graph::FileGraph>& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = 0;
-    for (auto d = 0; d < DecomposeFactor; ++d)
+    for(unsigned d = 0; d < DecomposeFactor; ++d)
       base_hGraph::totalOwnedNodes += base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
 
     //printf("[%d] owns %lu nodes\n", base_hGraph::id, base_hGraph::totalOwnedNodes);
@@ -438,14 +438,14 @@ public:
     }
 
     std::vector<std::vector<std::vector<uint64_t>>> numOutgoingEdges(DecomposeFactor);
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       numOutgoingEdges[d].resize(numColumnHosts);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         numOutgoingEdges[d][i].assign((base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first), 0);
       }
     }
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       Galois::Timer timer;
       timer.start();
       fileGraph[d].reset_byte_counters();
@@ -459,7 +459,7 @@ public:
           auto ii = fileGraph[d].edge_begin(src);
           auto ee = fileGraph[d].edge_end(src);
           for (; ii < ee; ++ii) {
-          auto dst = fileGraph[d].getEdgeDst(ii);
+          unsigned dst = fileGraph[d].getEdgeDst(ii);
           auto h = this->getColumnHostID(dst);
           hasIncomingEdge[h].set(this->getColumnIndex(dst));
           numOutgoingEdges[d][h][src - rowOffset]++;
@@ -480,7 +480,7 @@ public:
       unsigned h = (gridRowID() * numColumnHosts) + i;
       if (h == base_hGraph::id) continue;
       Galois::Runtime::SendBuffer b;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gSerialize(b, numOutgoingEdges[d][i]);
       }
       Galois::Runtime::gSerialize(b, hasIncomingEdge[i]);
@@ -496,7 +496,7 @@ public:
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
       auto& b = p->second;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gDeserialize(b, numOutgoingEdges[d][h]);
       }
       Galois::Runtime::gDeserialize(b, hasIncomingEdge[h]);
@@ -509,7 +509,7 @@ public:
 
     auto max_nodes = hasIncomingEdge[0].size();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         max_nodes += numOutgoingEdges[d][i].size();
       }
     }
@@ -521,8 +521,8 @@ public:
     numNodes = 0;
     numEdges = 0;
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
-      unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
+      //unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       unsigned hostID = (base_hGraph::id + d*base_hGraph::numHosts);
       uint64_t src = base_hGraph::gid2host[hostID].first;
       unsigned i = gridColumnID();
@@ -536,7 +536,7 @@ public:
       }
     }
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         unsigned hostID = leaderHostID + i;
@@ -572,7 +572,8 @@ public:
 
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID, hostID_virtual;
+      //unsigned hostID;
+      unsigned hostID_virtual;
       if (columnBlocked) {
         hostID_virtual = (gridColumnID() * numRowHosts) + i;
       } else {
@@ -582,7 +583,7 @@ public:
       if (virtual2RealHost(hostID_virtual) == (base_hGraph::id)) continue;
       if (columnBlocked) {
         bool skip = false;
-        for(auto d = 0; d < DecomposeFactor; ++d){
+        for(unsigned d = 0; d < DecomposeFactor; ++d){
           unsigned leaderHostID = gridRowID(base_hGraph::id + i*base_hGraph::numHosts) * numColumnHosts;
           if ((hostID_virtual >= leaderHostID) && (hostID_virtual < (leaderHostID + numColumnHosts))) 
             skip = true;
@@ -617,7 +618,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       fileGraph[d].reset_byte_counters();
     }
 
@@ -632,7 +633,7 @@ public:
     ++Galois::Runtime::evilPhase;
 
     timer.stop();
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
     }
@@ -644,7 +645,7 @@ public:
                          std::vector<Galois::Graph::FileGraph>& fileGraph) {
 
     //XXX h_offset not correct
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -701,7 +702,7 @@ public:
   void loadEdgesFromFile(GraphTy& graph, 
                          Galois::Graph::OfflineGraph& g,
                          std::vector<Galois::Graph::FileGraph>& fileGraph) {
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -803,7 +804,7 @@ public:
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
     // mirrors for outgoing edges
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       for(unsigned i = 0; i < numColumnHosts; ++i){
         //unsigned hostID = (gridRowID() * numColumnHosts) + i;
         unsigned hostID_virtual = (gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts) + i;
@@ -821,7 +822,7 @@ public:
     }
 
     // mirrors for incoming edges
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       for (unsigned i = 0; i < numRowHosts; ++i) {
         unsigned hostID_virtual;
