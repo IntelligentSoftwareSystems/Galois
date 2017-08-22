@@ -1,5 +1,5 @@
 /** Page rank application -*- C++ -*-
-* @file
+ * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
@@ -25,7 +25,6 @@
 
 
 #include "Galois/Galois.h"
-//#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/TypeTraits.h"
@@ -51,13 +50,14 @@ static const char* url = 0;
 cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 
-static const float alpha = 0.85; 
+static const float alpha = 0.85;
 typedef double PRTy;
 
 
 struct LNode {
   PRTy value;
-  std::atomic<PRTy> residual; 
+  std::atomic<PRTy> residual;
+  // Initialize pagerank values
   void init() { value = 1.0 - alpha; residual = 0.0; }
   friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
     os << "{PR " << n.value << ", residual " << n.residual << "}";
@@ -102,14 +102,11 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   }
 
   Top top;
-  
-  //std::cout<<"print PageRank\n";
+
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.value/sum; // normalized PR (divide PR by sum)
-    //float value = n.getPageRank(); // raw PR 
-    //std::cout<<value<<" "; 
+    float value = n.value / sum; // normalized PR (divide PR by sum)
     Pair key(value, src);
 
     if ((int) top.size() < topn) {
@@ -122,7 +119,6 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
       top.insert(std::make_pair(key, src));
     }
   }
-  //std::cout<<"\nend of print\n";
 
   int rank = 1;
   std::cout << "Rank PageRank Id\n";
@@ -143,13 +139,13 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 struct PageRank {
   Graph& graph;
   PRTy tolerance;
-  
+
   PageRank(Graph& g, PRTy t) : graph(g), tolerance(t) {}
-  
+
   void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-    LNode& sdata = graph.getData(src);      
+    LNode& sdata = graph.getData(src);
     Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
-    
+
     if (std::fabs(sdata.residual) > tolerance) {
       PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.value += oldResidual;
@@ -163,31 +159,32 @@ struct PageRank {
         if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
           ctx.push(dst);
       }
-    } else { // might need to reschedule self
-      //Why?
-      //      ctx.push(src);
+    } else { // might need to reschedule self. But why?
+      // ctx.push(src);
     }
   }
 };
 
 
 void initResidual(Graph& graph) {
-
   //use residual for the partial, scaled initial residual
-  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
-      //contribute residual
-      auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
-      for (auto ii : graph.edges(src)) {
-        auto dst = graph.getEdgeDst(ii);
-        auto& ddata = graph.getData(dst);
-        atomicAdd(ddata.residual, 1.0/nout);
-      }
-    }, Galois::do_all_steal<true>());
+  Galois::do_all_local(graph,
+                       [&graph] (const typename Graph::GraphNode& src) {
+                         //contribute residual
+                         auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
+                         for (auto ii : graph.edges(src)) {
+                           auto dst = graph.getEdgeDst(ii);
+                           auto& ddata = graph.getData(dst);
+                           atomicAdd(ddata.residual, 1.0/nout);
+                         }
+                       }, Galois::do_all_steal<true>());
   //scale residual
-  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
-      auto& data = graph.getData(src);
-      data.residual = data.residual * alpha * (1.0-alpha);
-    }, Galois::do_all_steal<true>());
+  Galois::do_all_local(graph,
+                       [&graph] (const typename Graph::GraphNode& src) {
+                         auto& data = graph.getData(src);
+                         data.residual = data.residual * alpha * (1.0-alpha);
+                       },
+                       Galois::do_all_steal<true>());
 }
 
 int main(int argc, char **argv) {
@@ -198,7 +195,7 @@ int main(int argc, char **argv) {
   T.start();
 
   Graph graph;
-  
+
   Galois::Graph::readGraph(graph, filename);
 
   std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
@@ -210,16 +207,21 @@ int main(int argc, char **argv) {
   std::cout << "tolerance: " << tolerance << "\n";
   Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   initResidual(graph);
+  typedef Galois::WorkList::dChunkedFIFO<256> WL;
+  PageRank pr(graph, tolerance);
 
   Galois::StatTimer Tmain;
-  Tmain.start();  
-  typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  Galois::for_each_local(graph, PageRank{graph, tolerance}, Galois::wl<WL>(), 
-                         Galois::loopname("Lonestar Pagerank For Each"));
+  Tmain.start();
+  Galois::for_each_local(graph,
+                         [&pr] (GNode src, auto& ctx) {
+                           pr(src, ctx);
+                         },
+                         Galois::wl<WL>(),
+                         Galois::loopname("Lonestar PageRank For Each"));
   Tmain.stop();
-  
+
   Galois::reportPageAlloc("MeminfoPost");
-  
+
   if (!skipVerify) {
     printTop(graph, 10, "EdgeAsync", numThreads);
   }
