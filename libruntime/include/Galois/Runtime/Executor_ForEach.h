@@ -162,6 +162,7 @@ public:
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
+//TODO: implement more_stats instead of does_not_need_stats which show aborts/pushes etc. 
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:

@@ -34,6 +34,8 @@
 #include "Galois/Galois.h"
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/OrderedTraits.h"
+#include "Galois/Runtime/Executor_DoAll_Old.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Substrate/EnvCheck.h"
 
@@ -49,8 +51,8 @@
 namespace Galois {
 
 enum DoAllTypes { 
-  DOALL_GALOIS, DOALL_GALOIS_STEAL, DOALL_GALOIS_FOREACH, DOALL_COUPLED, 
-  DOALL_COUPLED_RANGE,
+  DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL, 
+  DO_ALL_RANGE,
   DOALL_CILK, DOALL_OPENMP, DOALL_RANGE
 };
 
@@ -60,16 +62,16 @@ cll::opt<DoAllTypes> doAllKind (
     "doAllKind",
     cll::desc ("DoAll Implementation"),
     cll::values (
-      clEnumVal (DOALL_GALOIS, "DOALL_GALOIS"),
-      clEnumVal (DOALL_GALOIS_STEAL, "DOALL_GALOIS_STEAL"),
+      clEnumVal (DO_ALL_OLD, "DO_ALL_OLD"),
+      clEnumVal (DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
       clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
-      clEnumVal (DOALL_COUPLED, "DOALL_COUPLED"),
-      clEnumVal (DOALL_COUPLED_RANGE, "DOALL_COUPLED_RANGE"),
+      clEnumVal (DO_ALL, "DO_ALL"),
+      clEnumVal (DO_ALL_RANGE, "DO_ALL_RANGE"),
       clEnumVal (DOALL_CILK, "DOALL_CILK"),
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
       clEnumValEnd),
-    cll::init (DOALL_GALOIS)); // default is regular DOALL
+    cll::init (DO_ALL_OLD)); // default is regular DOALL
 
 
 void setDoAllImpl (const DoAllTypes& type);
@@ -86,21 +88,21 @@ struct DoAllImpl {
 };
 
 template <>
-struct DoAllImpl<DOALL_GALOIS> {
+struct DoAllImpl<DO_ALL_OLD> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, 
                          const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen(range, func, 
+    Galois::Runtime::do_all_gen_old(range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<false> ()), argsTuple));
   }
 };
 
 template <>
-struct DoAllImpl<DOALL_GALOIS_STEAL> {
+struct DoAllImpl<DO_ALL_OLD_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go(const R& range, const F& func, 
                         const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen (range, func, 
+    Galois::Runtime::do_all_gen_old (range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<true>()), argsTuple));
   }
 };
@@ -138,10 +140,10 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 };
 
 template <>
-struct DoAllImpl<DOALL_COUPLED> {
+struct DoAllImpl<DO_ALL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_coupled(range, func, argsTuple);
+    Galois::Runtime::do_all_gen(range, func, argsTuple);
   }
 };
 
@@ -149,7 +151,7 @@ struct DoAllImpl<DOALL_COUPLED> {
  * among threads
  */
 template <>
-struct DoAllImpl<DOALL_COUPLED_RANGE> {
+struct DoAllImpl<DO_ALL_RANGE> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
     auto defaultArgsTuple = std::tuple_cat(
@@ -166,7 +168,7 @@ struct DoAllImpl<DOALL_COUPLED_RANGE> {
 
     assert(thread_ranges != nullptr);
 
-    Galois::Runtime::do_all_coupled(Runtime::makeSpecificRange(range.begin(),
+    Galois::Runtime::do_all_gen(Runtime::makeSpecificRange(range.begin(),
                                     range.end(), thread_ranges),
                                     func, argsTuple);
   }
@@ -251,20 +253,20 @@ template <typename R, typename F, typename ArgsTuple>
 void do_all_choice(const R& range, const F& func, const DoAllTypes& type, 
                    const ArgsTuple& argsTuple) {
   switch (type) {
-    case DOALL_GALOIS_STEAL:
-      DoAllImpl<DOALL_GALOIS_STEAL>::go(range, func, argsTuple);
+    case DO_ALL_OLD_STEAL:
+      DoAllImpl<DO_ALL_OLD_STEAL>::go(range, func, argsTuple);
       break;
     case DOALL_GALOIS_FOREACH:
       DoAllImpl<DOALL_GALOIS_FOREACH>::go(range, func, argsTuple);
       break;
-    case DOALL_GALOIS:
-      DoAllImpl<DOALL_GALOIS>::go(range, func, argsTuple);
+    case DO_ALL_OLD:
+      DoAllImpl<DO_ALL_OLD>::go(range, func, argsTuple);
       break;
-    case DOALL_COUPLED:
-      DoAllImpl<DOALL_COUPLED>::go(range, func, argsTuple);
+    case DO_ALL:
+      DoAllImpl<DO_ALL>::go(range, func, argsTuple);
       break;
-    case DOALL_COUPLED_RANGE:
-      DoAllImpl<DOALL_COUPLED_RANGE>::go(range, func, argsTuple);
+    case DO_ALL_RANGE:
+      DoAllImpl<DO_ALL_RANGE>::go(range, func, argsTuple);
       break;
     case DOALL_CILK:
       DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
