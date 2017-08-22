@@ -265,13 +265,13 @@ private:
 
   // compute owners by blocking Nodes
   void computeMastersBlockedNodes(Galois::Graph::OfflineGraph& g, 
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
-    if (scalefactor.empty() || (numHosts == 1)) {
-      for (unsigned i = 0; i < numHosts; ++i)
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
+    if (scalefactor.empty() || (numHosts*DecomposeFactor == 1)) {
+      for (unsigned i = 0; i < numHosts*DecomposeFactor; ++i)
         gid2host.push_back(Galois::block_range(
                              0U, (unsigned)numNodes_to_divide, i, 
-                             numHosts));
-    } else {
+                             numHosts*DecomposeFactor));
+    } else { //TODO: not compatible with DecomposeFactor.
       assert(scalefactor.size() == numHosts);
 
       unsigned numBlocks = 0;
@@ -296,9 +296,10 @@ private:
     }
   }
 
+  //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance edges
   void computeMastersBalancedEdges(Galois::Graph::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
     if (edgeWeightOfMaster == 0) {
       edgeWeightOfMaster = 1;
     }
@@ -360,9 +361,10 @@ private:
 #endif
   }
 
+  //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance nodes and edges
   void computeMastersBalancedNodesAndEdges(Galois::Graph::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
     if (nodeWeightOfMaster == 0) {
       nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
     }
@@ -426,7 +428,7 @@ protected:
 
   uint64_t computeMasters(Galois::Graph::OfflineGraph& g,
       std::vector<unsigned>& scalefactor,
-      bool isBipartite = false) {
+      bool isBipartite = false, unsigned DecomposeFactor = 1) {
     Galois::Timer timer;
     timer.start();
     g.reset_seek_counters();
@@ -447,14 +449,14 @@ protected:
     // compute masters for all nodes
     switch(masters_distribution) {
       case BALANCED_MASTERS:
-        computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor);
+        computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
       case BALANCED_MASTERS_AND_EDGES:
-        computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor);
+        computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
       case BALANCED_EDGES_OF_MASTERS:
       default:
-        computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor);
+        computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
     }
 
