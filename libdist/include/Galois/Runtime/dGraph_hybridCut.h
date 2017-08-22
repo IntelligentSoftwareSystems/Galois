@@ -302,8 +302,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       uint64_t numEdges_distribute = edgeEnd - edgeBegin; 
-      std::cerr << "[" << base_hGraph::id << 
-                   "] Total edges to distribute : " << 
+      std::cerr << "[" << base_hGraph::id << "] Total edges to distribute : " << 
                    numEdges_distribute << "\n";
 
       /********************************************
@@ -328,8 +327,17 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
       base_hGraph::numNodes = numNodes;
       base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
-      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
+
+      if (base_hGraph::totalOwnedNodes > 0) {
+        base_hGraph::beginMaster = 
+          G2L(base_hGraph::gid2host[base_hGraph::id].first);
+        base_hGraph::endMaster = 
+          G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
+      } else {
+        base_hGraph::beginMaster = 0;
+        base_hGraph::endMaster = 0;
+      }
+
       //ss_cout << base_hGraph::id << " : numNodes : " << numNodes << " , numEdges : " << numEdges << "\n";
 
       /******************************************
@@ -464,7 +472,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                              uint64_t numEdges_distribute, 
                              uint32_t VCutThreshold, 
                              std::vector<uint64_t>& prefixSumOfEdges, 
-                             std::vector<std::vector<size_t>>& mirrorNodes){
+                             std::vector<std::vector<size_t>>& mirrorNodes) {
       //Go over assigned nodes and distribute edges.
 
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -609,7 +617,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
       fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_hGraph::id, numNodes, numEdges);
-
     }
 
 
@@ -644,8 +651,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
           }
 
-          if(num_edges > VCutThreshold){
-            //Assign edges for high degree nodes to the destination
+          if (num_edges > VCutThreshold) {
+            // Assign edges for high degree nodes to the destination
             for(; ee != ee_end; ++ee){
               auto gdst = fileGraph.getEdgeDst(ee);
               auto gdata = fileGraph.getEdgeData<typename GraphTy::edge_data_type>(ee);
@@ -653,9 +660,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               gdst_vec[h].push_back(gdst);
               gdata_vec[h].push_back(gdata);
             }
-          }
-          else{
-            //keep all edges with the source node
+          } else {
+            // keep all edges with the source node
             for(; ee != ee_end; ++ee){
               auto gdst = fileGraph.getEdgeDst(ee);
               auto gdata = fileGraph.getEdgeData<typename GraphTy::edge_data_type>(ee);
@@ -772,7 +778,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
-        if(p){
+        if (p) {
           std::vector<uint64_t> _gdst_vec;
           uint64_t _src;
           Galois::Runtime::gDeserialize(p->second, _src, _gdst_vec);
@@ -946,19 +952,36 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
-      size_t first_owned = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      size_t last_owned = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1);
-      assert(first_owned <= last_owned);
-      assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
+      size_t first_owned = 0;
+      size_t last_owned = 0;
+
+      if (base_hGraph::totalOwnedNodes > 0) {
+        first_owned = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+        last_owned = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1);
+        assert(first_owned <= last_owned);
+        assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
+      } 
+
       if (syncType == base_hGraph::syncBroadcast) { // reset masters
-        bitset_reset_range(first_owned, last_owned);
+        // only reset if we actually own something
+        if (base_hGraph::totalOwnedNodes > 0)
+          bitset_reset_range(first_owned, last_owned);
       } else { // reset mirrors
         assert(syncType == base_hGraph::syncReduce);
-        if (first_owned > 0) {
-          bitset_reset_range(0, first_owned - 1);
-        }
-        if (last_owned < (numNodes - 1)) {
-          bitset_reset_range(last_owned + 1, numNodes - 1);
+
+        if (base_hGraph::totalOwnedNodes > 0) {
+          if (first_owned > 0) {
+            bitset_reset_range(0, first_owned - 1);
+          }
+          if (last_owned < (numNodes - 1)) {
+            bitset_reset_range(last_owned + 1, numNodes - 1);
+          }
+        } else {
+          // only time we care is if we have ghost nodes, i.e. 
+          // numNodes is non-zero
+          if (numNodes > 0) {
+            bitset_reset_range(0, numNodes - 1);
+          }
         }
       }
     }
