@@ -254,6 +254,12 @@ public:
     uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
     typename Galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
+
+    //printf("[%d] node begin and node end are %lu and %lu\n", base_hGraph::id,
+    //       nodeBegin, nodeEnd);
+
+    //printf("[%d] edge begin and edge end are %lu and %lu\n", base_hGraph::id,
+    //       *edgeBegin, *edgeEnd);
     
     // file graph that is mmapped for much faster reading; will use this
     // when possible from now on in the code
@@ -282,25 +288,23 @@ public:
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
 
+
+    assert(prefixSumOfEdges.size() == numNodes);
+
+    // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
+    if (!edgeNuma) {
+      base_hGraph::graph.allocateFrom(numNodes, numEdges);
+    } else {
+      printf("Edge based NUMA division on\n");
+      //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+      base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
+                                            prefixSumOfEdges);
+    }
+
+    //std::cerr << "Allocate done\n";
+
     if (numNodes > 0) {
-      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
-
       //assert(numEdges > 0);
-
-      assert(prefixSumOfEdges.size() == numNodes);
-
-      if (!edgeNuma) {
-        base_hGraph::graph.allocateFrom(numNodes, numEdges);
-      } else {
-        printf("Edge based NUMA division on\n");
-        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                              prefixSumOfEdges);
-      }
-
-      //std::cerr << "Allocate done\n";
-
       base_hGraph::graph.constructNodes();
 
       //std::cerr << "Construct nodes done\n";
@@ -317,13 +321,29 @@ public:
           Galois::timeit()
         )
       );
+    } 
+
+    if (base_hGraph::totalOwnedNodes != 0) {
+      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
+    } else {
+      // no owned nodes, therefore empty masters
+      base_hGraph::beginMaster = 0; 
+      base_hGraph::endMaster = 0;
     }
 
+    //printf("[%d] begin master and end master are %u and %u\n", base_hGraph::id,
+    //       base_hGraph::beginMaster, base_hGraph::endMaster);
+
+
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
-    std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
+    fprintf(stderr, "[%d] Edges loaded\n", base_hGraph::id);
+    //std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
+
+    //printf("[%d] about to thread range\n", base_hGraph::id);
     // TODO revise how this works and make it consistent across cuts
     if (!edgeNuma) {
       Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
@@ -332,8 +352,11 @@ public:
       StatTimer_thread_ranges.stop();
     }
 
+    //printf("[%d] about to master thread range\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_master();
+    //printf("[%d] about to with edges\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_with_edges();
+    //printf("[%d] about to init spec ranges\n", base_hGraph::id);
     base_hGraph::initialize_specific_ranges();
 
     StatTimer_graph_construct.stop();
@@ -341,12 +364,16 @@ public:
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
     StatTimer_graph_construct_comm.stop();
+    //printf("[%d] all done\n", base_hGraph::id);
   }
 
   void loadStatistics(Galois::Graph::OfflineGraph& g, 
                       Galois::Graph::FileGraph& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
-    base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - base_hGraph::gid2host[base_hGraph::id].first;
+    base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
+                                   base_hGraph::gid2host[base_hGraph::id].first;
+
+    //printf("[%d] owns %lu nodes\n", base_hGraph::id, base_hGraph::totalOwnedNodes);
 
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -619,10 +646,13 @@ public:
   template<typename GraphTy>
   void receiveEdges(GraphTy& graph, uint32_t& numNodesWithEdges) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+    // receive edges for all ghost nodes
     while (numNodesWithEdges < base_hGraph::numOwned) {
       decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
       net.handleReceives();
       p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+
       if (p) {
         auto& rb = p->second;
         uint64_t n;
@@ -679,6 +709,7 @@ public:
         }
       }
     }
+
     // mirrors for incoming edges
     unsigned leaderHostID = gridRowID() * numColumnHosts;
     for (unsigned i = 0; i < numRowHosts; ++i) {
@@ -721,17 +752,22 @@ public:
 
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    assert(base_hGraph::beginMaster < base_hGraph::endMaster);
-    assert((base_hGraph::endMaster - base_hGraph::beginMaster) == base_hGraph::totalOwnedNodes);
-    if (syncType == base_hGraph::syncBroadcast) { // reset masters
-      bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
-    } else { // reset mirrors
-      assert(syncType == base_hGraph::syncReduce);
-      if (base_hGraph::beginMaster > 0) {
-        bitset_reset_range(0, base_hGraph::beginMaster - 1);
-      }
-      if (base_hGraph::endMaster < numNodes) {
-        bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+    uint32_t numMasters = base_hGraph::endMaster - base_hGraph::beginMaster;
+
+    assert(base_hGraph::beginMaster <= base_hGraph::endMaster);
+    assert(numMasters == base_hGraph::totalOwnedNodes);
+
+    if (numMasters != 0) {
+      if (syncType == base_hGraph::syncBroadcast) { // reset masters
+        bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
+      } else { // reset mirrors
+        assert(syncType == base_hGraph::syncReduce);
+        if (base_hGraph::beginMaster > 0) {
+          bitset_reset_range(0, base_hGraph::beginMaster - 1);
+        }
+        if (base_hGraph::endMaster < numNodes) {
+          bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+        }
       }
     }
   }
