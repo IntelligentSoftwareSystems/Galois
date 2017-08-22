@@ -1295,8 +1295,9 @@ public:
 
     // recalculate thread ranges for nodes and edges
     clearRanges();
-    determineThreadRanges(numNodes, edgeIndData_temp);
-    determineThreadRangesEdge(edgeIndData_temp);
+    determineThreadRangesByNode(edgeIndData_temp);
+    //determineThreadRanges(numNodes, edgeIndData_temp);
+    //determineThreadRangesEdge(edgeIndData_temp);
 
     // reallocate nodeData
     if (reallocate) {
