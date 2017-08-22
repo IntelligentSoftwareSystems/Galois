@@ -50,7 +50,7 @@ void init(void);
 /**
  * Destroys the Substrate library components
  */
-void finish(void);
+void kill(void);
 
 /**
  * return a reference to system thread pool
@@ -67,7 +67,7 @@ namespace internal {
 
 void initBarrier();
 
-void finishBarrier();
+void killBarrier();
 
 struct BarrierInstance {
   unsigned m_num_threads;

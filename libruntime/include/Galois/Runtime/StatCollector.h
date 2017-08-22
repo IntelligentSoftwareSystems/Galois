@@ -86,7 +86,6 @@ class StatCollector {
 
 public:
 
-
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
@@ -101,7 +100,7 @@ public:
 
 namespace internal {
   void initStatManager(void);
-  void deleteStatManager(void);
+  void killStatManager(void);
 }
 
 } // end namespace Runtime

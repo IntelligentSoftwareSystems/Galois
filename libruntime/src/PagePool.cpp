@@ -128,7 +128,7 @@ void Galois::Runtime::internal::initPagePool(void) {
 
 // TODO: make sure that all the allocated memory and pages are freed
 // There should be no memory leaks
-void Galois::Runtime::internal::destroyPagePool(void) {
+void Galois::Runtime::internal::killPagePool(void) {
   delete PA;
   PA = nullptr;
 }

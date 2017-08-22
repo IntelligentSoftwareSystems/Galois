@@ -9,9 +9,9 @@ void Galois::Runtime::init(void) {
 }
 
 
-void Galois::Runtime::finish(void) {
+void Galois::Runtime::kill(void) {
   using namespace Galois::Runtime;
-  internal::deleteStatManager();
-  internal::destroyPagePool();
+  internal::killStatManager();
+  internal::killPagePool();
 }
 

@@ -60,7 +60,7 @@ namespace internal {
   void initPagePool(void);
 
   //! Destroy  PagePool, used by Runtime::finish();
-  void destroyPagePool(void);
+  void killPagePool(void);
 } // end namespace internal
 
 } // end namespace Runtime

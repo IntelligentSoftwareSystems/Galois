@@ -61,7 +61,8 @@ void Galois::Runtime::internal::initStatManager(void) {
   SM = new StatCollector();
 }
 
-void Galois::Runtime::internal::deleteStatManager(void) {
+void Galois::Runtime::internal::killStatManager(void) {
+  Galois::Runtime::printStats();
   delete SM;
   SM = nullptr;
 }

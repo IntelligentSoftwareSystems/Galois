@@ -59,16 +59,16 @@ namespace Galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class Instance {
+class System {
 public:
-  Instance(void) {
+  System(void) {
     Substrate::init();
     Runtime::init();
   }
 
-  ~Instance(void) {
-    Runtime::finish();
-    Substrate::finish();
+  ~System(void) {
+    Runtime::kill();
+    Substrate::kill();
   }
 };
 

@@ -15,10 +15,10 @@ void Galois::Substrate::init(void) {
   internal::initTermDetect();
 }
 
-void Galois::Substrate::finish(void) {
-  internal::finishTermDetect();
-  internal::finishBarrier();
-  internal::finishThreadPool();
+void Galois::Substrate::kill(void) {
+  internal::killTermDetect();
+  internal::killBarrier();
+  internal::killThreadPool();
 
 }
 
@@ -29,7 +29,7 @@ void Galois::Substrate::internal::initBarrier(void) {
   bPtr = new BarrierInstance();
 }
 
-void Galois::Substrate::internal::finishBarrier(void) {
+void Galois::Substrate::internal::killBarrier(void) {
   delete bPtr;
   bPtr = nullptr;
 }

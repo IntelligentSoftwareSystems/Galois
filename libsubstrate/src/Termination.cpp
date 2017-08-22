@@ -118,7 +118,7 @@ static void initLocalTerm(void) {
   localTerm = new LocalTerminationDetection();
 }
 
-static void finishLocalTerm(void) {
+static void killLocalTerm(void) {
   delete localTerm;
   localTerm = nullptr;
 }
@@ -246,12 +246,14 @@ public:
 
 static TreeTerminationDetection* treeTerm = nullptr;
 
+__attribute__((unused))
 static void initTreeTerm(void) {
   GALOIS_ASSERT(!treeTerm, "Double initialization of TreeTerminationDetection");
   treeTerm = new TreeTerminationDetection();
 }
 
-static void finishTreeTerm(void) {
+__attribute__((unused))
+static void killTreeTerm(void) {
   delete treeTerm;
   treeTerm = nullptr;
 }
@@ -267,12 +269,14 @@ static TreeTerminationDetection& getTreeTermination(unsigned activeThreads) {
 
 } // namespace
 
+TerminationDetection::~TerminationDetection(void) {}
+
 void Galois::Substrate::internal::initTermDetect(void) {
   initLocalTerm();
 }
 
-void Galois::Substrate::internal::finishTermDetect(void) {
-  finishLocalTerm();
+void Galois::Substrate::internal::killTermDetect(void) {
+  killLocalTerm();
 }
 
 Galois::Substrate::TerminationDetection& Galois::Substrate::getSystemTermination(unsigned activeThreads) {

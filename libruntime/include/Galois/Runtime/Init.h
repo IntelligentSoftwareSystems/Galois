@@ -36,12 +36,18 @@
 namespace Galois {
 namespace Runtime {
 
+/**
+ * Initialize Runtime components
+ */
 void init(void);
 
-void finish(void);
+/**
+ * Destroy Runtime components
+ */
+void kill(void);
 
-}
-}
+} // end namespace Runtime
+} // end namespace Galois
 
 
 #endif// GALOIS_RUNTIME_INIT_H

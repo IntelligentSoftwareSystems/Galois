@@ -262,7 +262,7 @@ void Galois::Substrate::internal::initThreadPool() {
   tpool = new ThreadPool();
 }
 
-void Galois::Substrate::internal::finishThreadPool() {
+void Galois::Substrate::internal::killThreadPool() {
   delete tpool;
   tpool = nullptr;
 }

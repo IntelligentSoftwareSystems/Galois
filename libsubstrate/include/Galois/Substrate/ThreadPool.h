@@ -67,7 +67,7 @@ struct ExecuteTupleImpl<tpl, s, 0> {
 
 namespace internal {
   void initThreadPool(void);
-  void finishThreadPool(void);
+  void killThreadPool(void);
 
 } // end namespace internal
 

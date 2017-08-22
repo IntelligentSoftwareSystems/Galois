@@ -46,6 +46,7 @@ class TerminationDetection {
 protected:
   CacheLineStorage<std::atomic<int> > globalTerm;
 public:
+  virtual ~TerminationDetection(void);
   /**
    * Initializes the per-thread state.  All threads must call this
    * before any call localTermination.
@@ -75,7 +76,7 @@ TerminationDetection& getSystemTermination(unsigned activeThreads);
 
 namespace internal {
   void initTermDetect(void);
-  void finishTermDetect(void);
+  void killTermDetect(void);
 }
 
 } // end namespace Runtime
