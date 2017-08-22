@@ -244,26 +244,22 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         unsigned lid = ln + base_hGraph::numOwned;
         auto gid = ghostMap[ln];
         GlobalToLocalGhostMap[gid] = lid;
-        bool found = false;
 
         for (auto h = 0U; h < base_hGraph::gid2host.size(); ++h) {
           auto& p = base_hGraph::gid2host[h];
           if (gid >= p.first && gid < p.second) {
             hostNodes[h].first = std::min(hostNodes[h].first, lid);
             hostNodes[h].second = lid + 1;
-            found = true;
             break;
           } else if (isBipartite) {
             auto& p2 = gid2host_withoutEdges[h];
             if(gid >= p2.first && gid < p2.second) {
               hostNodes[h].first = std::min(hostNodes[h].first, lid);
               hostNodes[h].second = lid + 1;
-              found = true;
               break;
              }
           }
         }
-        assert(found);
       }
 
       base_hGraph::numNodes = numNodes = 
