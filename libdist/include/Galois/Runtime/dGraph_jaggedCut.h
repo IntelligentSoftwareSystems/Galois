@@ -554,7 +554,6 @@ private:
           createNode = true;
         } else {
           for (unsigned k = 0; k < numColumnHosts; ++k) {
-            if (k == gridColumnID()) continue;
             auto h = getColumnHostID(k, src);
             if (h == gridColumnID()) {
               if (hasIncomingEdge[k].test(getColumnIndex(k, src))) {
