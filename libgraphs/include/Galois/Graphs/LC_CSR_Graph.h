@@ -767,10 +767,9 @@ public:
     threadRanges[0] = 0;
 
     while (current_element < totalNodes && current_thread < num_threads) {
-      uint64_t elements_remaining = totalNodes - current_element;
       uint32_t threads_remaining = num_threads - current_thread;
 
-      assert(elements_remaining >= threads_remaining);
+      assert((totalNodes - current_element) >= threads_remaining);
 
       if (threads_remaining == 1) {
         // assign remaining elements to last thread
@@ -952,22 +951,18 @@ public:
       for (uint32_t i = 0; i < totalThreads; i++) {
         uint32_t beginNode = threadRanges[i];
         uint32_t endNode = threadRanges[i + 1];
-
-        uint64_t beginEdge;
-        if (beginNode > 0) {
-          beginEdge = edgePrefixSum[beginNode - 1];
-        } else {
-          beginEdge = 0;
-        }
-
         uint64_t endEdge = edgePrefixSum[endNode - 1];
 
-        assert(beginEdge <= endEdge);
+        if (beginNode > 0) {
+          assert(edgePrefixSum[beginNode - 1] <= endEdge);
+          assert(threadRangesEdge[i] == edgePrefixSum[beginNode - 1]);
+        } else {
+          assert(0 <= endEdge);
+          assert(threadRangesEdge[i] == 0);
+        }
+
         assert(endEdge <= numEdges);
 
-        assert(threadRangesEdge[i] == beginEdge);
-        //printf("[%u] begin edge is %lu, end edge is %lu\n", i, beginEdge, 
-        //       endEdge);
         threadRangesEdge[i + 1] = endEdge;
       }
     } else {

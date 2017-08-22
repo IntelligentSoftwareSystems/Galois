@@ -171,8 +171,8 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
                                        IterTy begin, IterTy end, 
                                        uint32_t division_id, 
                                        uint32_t num_divisions) {
-  // TODO changed vector uint64_t? 64 bit overkill by any chance?
-  // TODO change edge references to something else (since this can be used in
+  // TODO changed vector uint64_t? 64 bit too big by any chance?
+  // TODO change edge var names to something else (since this can be used in
   // a more general sense as well)
   // TODO make accesses to vector more efficient
 
@@ -229,16 +229,14 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
   //printf("Optimally want %lu edges per division\n", edges_per_division);
 
   while (current_element < num_elements && current_division < num_divisions) {
-    uint64_t elements_remaining = num_elements - current_element;
     uint32_t divisions_remaining = num_divisions - current_division;
 
-    assert(elements_remaining >= divisions_remaining);
+    assert(num_elements - current_element >= divisions_remaining);
 
     if (divisions_remaining == 1) {
       // assign remaining elements to last division
       assert(current_division == num_divisions - 1);
 
-      // TODO these prints are off
       //if (current_element != 0) {
       //  printf("For division %u/%u we have begin %lu and end %lu with "
       //         "%lu edges\n", 
@@ -288,7 +286,8 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
       }
 
       // shouldn't get out here...
-      assert(false);
+      GALOIS_DIE("should return something before reaching this die statement "
+                 "(prefix range)");
     }
 
     // Determine various edge count numbers
@@ -367,7 +366,8 @@ std::pair<IterTy, IterTy> prefix_range(std::vector<uint64_t> edge_prefix_sum,
 
   // You shouldn't get out here.... (something should be returned before
   // this....)
-  assert(false);
+  GALOIS_DIE("reached end of prefix range when should have returned something");
+  return std::make_pair(-1, -1);
 }
 
 
