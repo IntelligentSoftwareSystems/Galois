@@ -125,7 +125,10 @@ namespace Galois {
       size_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
       bit_offset <<= (index%bits_uint64);
-      bitvec[bit_index].fetch_or(bit_offset);
+      if ((bitvec[bit_index] & bit_offset) == 0) { // test and set
+        size_t old_val = bitvec[bit_index];
+        while(!bitvec[bit_index].compare_exchange_weak(old_val, old_val | bit_offset, std::memory_order_relaxed));
+      }
     }
 
 #if 0

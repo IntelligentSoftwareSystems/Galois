@@ -33,12 +33,13 @@
 #include "Galois/Runtime/dGraph_edgeCut.h"
 #include "Galois/Runtime/dGraph_cartesianCut.h"
 #include "Galois/Runtime/dGraph_hybridCut.h"
+#include "Galois/Runtime/dGraph_jaggedCut.h"
 
 /*******************************************************************************
  * Supported partitioning schemes
  ******************************************************************************/
 enum PARTITIONING_SCHEME {
-  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT
+  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT, JAGGED_BLOCKED_VCUT
 };
 
 /*******************************************************************************
@@ -62,17 +63,21 @@ static cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                                      cll::desc("Type of partitioning."),
                                      cll::values(
                                        clEnumValN(OEC, "oec", 
-                                                  "Outgoing edge cut"), 
+                                                  "Outgoing Edge-Cut"), 
                                        clEnumValN(IEC, "iec", 
-                                                  "Incoming edge cut"), 
+                                                  "Incoming Edge-Cut"), 
                                        clEnumValN(HOVC, "hovc", 
-                                                  "Outgoing Hybrid Vertex Cut"), 
+                                                  "Outgoing Hybrid Vertex-Cut"), 
                                        clEnumValN(HIVC, "hivc", 
-                                                  "Incoming Hybrid Vertex Cut"),
-                                       clEnumValN(BOARD2D_VCUT , "2dvc", 
-                                                  "2d Checkerboard Vertex Cut"), 
-                                       clEnumValN(CART_VCUT , "cvc", 
-                                                  "Cartesian Vertex Cut"), 
+                                                  "Incoming Hybrid Vertex-Cut"),
+                                       clEnumValN(BOARD2D_VCUT, "2dvc", 
+                                                  "2d Checkerboard Vertex-Cut"), 
+                                       clEnumValN(CART_VCUT, "cvc", 
+                                                  "Cartesian Vertex-Cut"), 
+                                       clEnumValN(JAGGED_CYCLIC_VCUT, "jcvc", 
+                                                  "Jagged Cyclic Vertex-Cut"), 
+                                       clEnumValN(JAGGED_BLOCKED_VCUT, "jbvc", 
+                                                  "Jagged Blocked Vertex-Cut"), 
                                        clEnumValEnd),
                                      cll::init(OEC));
 static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
@@ -105,6 +110,8 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
+  typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
+  typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -122,6 +129,12 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
                                     scaleFactor, false);
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case JAGGED_CYCLIC_VCUT:
+      return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case JAGGED_BLOCKED_VCUT:
+      return new Graph_jaggedBlockedCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -149,6 +162,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
   typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut; // assumes push-style
+  typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut; // assumes push-style
+  typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut; // assumes push-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   
@@ -183,6 +198,12 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
+    case JAGGED_CYCLIC_VCUT:
+      return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
+    case JAGGED_BLOCKED_VCUT:
+      return new Graph_jaggedBlockedCut(inputFile, partFolder, net.ID, net.Num, 
+                                    scaleFactor, false);
     default:
       GALOIS_DIE("Error: partition scheme specified is invalid");
       return nullptr;
@@ -210,6 +231,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, true> Graph_cartesianCut; // assumes pull-style
   typedef hGraph_cartesianCut<NodeData, EdgeData, true, true> Graph_checkerboardCut; // assumes pull-style
+  typedef hGraph_jaggedCut<NodeData, EdgeData, false, true> Graph_jaggedCut; // assumes pull-style
+  typedef hGraph_jaggedCut<NodeData, EdgeData, true, true> Graph_jaggedBlockedCut; // assumes pull-style
 
   auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -253,6 +276,22 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
                                       scaleFactor, false);
       } else {
         GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
+        break;
+      }
+    case JAGGED_CYCLIC_VCUT:
+      if (inputFileTranspose.size()) {
+        return new Graph_jaggedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                                      scaleFactor, false);
+      } else {
+        GALOIS_DIE("Error: (jcvc) iterate over in-edges without transpose graph");
+        break;
+      }
+    case JAGGED_BLOCKED_VCUT:
+      if (inputFileTranspose.size()) {
+        return new Graph_jaggedBlockedCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                                      scaleFactor, false);
+      } else {
+        GALOIS_DIE("Error: (jbvc) iterate over in-edges without transpose graph");
         break;
       }
     default:

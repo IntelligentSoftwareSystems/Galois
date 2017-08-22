@@ -111,10 +111,10 @@ static cll::opt<uint32_t> nodeWeightOfMaster("nodeWeight",
                              "distributing masterst to hosts"),
                              cll::init(0));
 
-//static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight", 
-//                             cll::desc("Determines weight of edges when "
-//                             "distributing masters to hosts"),
-//                             cll::init(0));
+static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight", 
+                             cll::desc("Determines weight of edges when "
+                             "distributing masters to hosts"),
+                             cll::init(0));
 
 static cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges", 
                              cll::desc("Determines weight of nodes when "
@@ -265,13 +265,13 @@ private:
 
   // compute owners by blocking Nodes
   void computeMastersBlockedNodes(Galois::Graph::OfflineGraph& g, 
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
-    if (scalefactor.empty() || (numHosts == 1)) {
-      for (unsigned i = 0; i < numHosts; ++i)
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
+    if (scalefactor.empty() || (numHosts*DecomposeFactor == 1)) {
+      for (unsigned i = 0; i < numHosts*DecomposeFactor; ++i)
         gid2host.push_back(Galois::block_range(
                              0U, (unsigned)numNodes_to_divide, i, 
-                             numHosts));
-    } else {
+                             numHosts*DecomposeFactor));
+    } else { //TODO: not compatible with DecomposeFactor.
       assert(scalefactor.size() == numHosts);
 
       unsigned numBlocks = 0;
@@ -296,14 +296,19 @@ private:
     }
   }
 
+  //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance edges
   void computeMastersBalancedEdges(Galois::Graph::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
+    if (edgeWeightOfMaster == 0) {
+      edgeWeightOfMaster = 1;
+    }
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+#ifdef SERIALIZE_COMPUTE_MASTERS
     if (id == 0) {
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
-                           numHosts,
+                           numHosts*DecomposeFactor,
                            gid2host, 0, scalefactor);
       for (unsigned h = 1; h < numHosts; ++h) {
         Galois::Runtime::SendBuffer b;
@@ -323,16 +328,63 @@ private:
       Galois::Runtime::gDeserialize(b, gid2host);
     }
     ++Galois::Runtime::evilPhase;
+#else
+    gid2host.resize(numHosts*DecomposeFactor);
+    for(auto d = 0; d < DecomposeFactor; ++d){
+      auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d*numHosts), numHosts*DecomposeFactor, scalefactor);
+      gid2host[id + d*numHosts].first = *(r.first.first);
+      gid2host[id + d*numHosts].second = *(r.first.second);
+    }
+
+    //printf("[%d] first is %lu, second is %lu\n", id, gid2host[id].first, gid2host[id].second);
+    //printf("[%d] first edge is %lu, second edge is %lu\n", id, *(r.second.first), *(r.second.second));
+    //std::cout << "id " << id << " " << gid2host[id].first << " " << gid2host[id].second << "\n";
+
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) continue;
+      Galois::Runtime::SendBuffer b;
+      for(auto d = 0; d < DecomposeFactor; ++d){
+        Galois::Runtime::gSerialize(b, gid2host[id + d*numHosts]);
+      }
+      net.sendTagged(h, Galois::Runtime::evilPhase, b);
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      for(auto d = 0; d < DecomposeFactor; ++d){
+        Galois::Runtime::gDeserialize(b, gid2host[p->first + d*numHosts]);
+      }
+      ++received;
+    }
+    ++Galois::Runtime::evilPhase;
+    //for(auto i = 0; i < numHosts*DecomposeFactor; ++i){
+      //std::stringstream ss;
+       //ss << i << "  : " << gid2host[i].first << " , " << gid2host[i].second << "\n";
+       //std::cerr << ss.str();
+    //}
+#endif
   }
 
+  //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance nodes and edges
   void computeMastersBalancedNodesAndEdges(Galois::Graph::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor) {
+      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
+    if (nodeWeightOfMaster == 0) {
+      nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
+    }
+    if (edgeWeightOfMaster == 0) {
+      edgeWeightOfMaster = 1;
+    }
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+#ifdef SERIALIZE_COMPUTE_MASTERS
     if (id == 0) {
-      if (nodeWeightOfMaster == 0) {
-        nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
-      }
       // compute owners for all hosts and send that info to all hosts
       Galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
                            numHosts,
@@ -355,13 +407,39 @@ private:
       Galois::Runtime::gDeserialize(b, gid2host);
     }
     ++Galois::Runtime::evilPhase;
+#else
+    gid2host.resize(numHosts);
+    auto r = g.divideByNode(nodeWeightOfMaster, edgeWeightOfMaster, id, numHosts, scalefactor);
+    gid2host[id].first = *r.first.first;
+    gid2host[id].second = *r.first.second;
+    for (unsigned h = 0; h < numHosts; ++h) {
+      if (h == id) continue;
+      Galois::Runtime::SendBuffer b;
+      Galois::Runtime::gSerialize(b, gid2host[id]);
+      net.sendTagged(h, Galois::Runtime::evilPhase, b);
+    }
+    net.flush();
+    unsigned received = 1;
+    while (received < numHosts) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != id);
+      auto& b = p->second;
+      Galois::Runtime::gDeserialize(b, gid2host[p->first]);
+      ++received;
+    }
+    ++Galois::Runtime::evilPhase;
+#endif
   }
 
 protected:
 
   uint64_t computeMasters(Galois::Graph::OfflineGraph& g,
       std::vector<unsigned>& scalefactor,
-      bool isBipartite = false) {
+      bool isBipartite = false, unsigned DecomposeFactor = 1) {
     Galois::Timer timer;
     timer.start();
     g.reset_seek_counters();
@@ -382,14 +460,14 @@ protected:
     // compute masters for all nodes
     switch(masters_distribution) {
       case BALANCED_MASTERS:
-        computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor);
+        computeMastersBlockedNodes(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
       case BALANCED_MASTERS_AND_EDGES:
-        computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor);
+        computeMastersBalancedNodesAndEdges(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
       case BALANCED_EDGES_OF_MASTERS:
       default:
-        computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor);
+        computeMastersBalancedEdges(g, numNodes_to_divide, scalefactor, DecomposeFactor);
         break;
     }
 
@@ -425,7 +503,7 @@ public:
      Galois::Runtime::gDeserialize(buf, hostID, numItems);
 
      Galois::Runtime::gDeserialize(buf, masterNodes[hostID]);
-     std::cout << "from : " << hostID << " -> " << numItems << " --> " << masterNodes[hostID].size() << "\n";
+     //std::cout << "from : " << hostID << " -> " << numItems << " --> " << masterNodes[hostID].size() << "\n";
    }
 
    template<typename FnTy>
@@ -774,8 +852,12 @@ public:
    */
   void determine_thread_ranges(uint32_t total_nodes, 
                                std::vector<uint64_t> edge_prefix_sum) {
-    graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
-    graph.determineThreadRangesEdge(edge_prefix_sum);
+    // Old way that determined thread ranges with a linear scan.
+    //graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
+    //graph.determineThreadRangesEdge(edge_prefix_sum);
+
+    // uses a binary search to find divisions
+    graph.determineThreadRangesByNode(edge_prefix_sum);
   }
   
   /**
@@ -807,7 +889,7 @@ public:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      printf("Manually det. master thread ranges\n");
+      //printf("Manually det. master thread ranges\n");
       graph.determineThreadRanges(beginMaster, endMaster, masterRanges, 
                                   nodeAlphaRanges);
     }
@@ -831,7 +913,7 @@ public:
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
-      printf("Manually det. with edges thread ranges\n");
+      //printf("Manually det. with edges thread ranges\n");
       graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges, 
                                   nodeAlphaRanges);
     }
@@ -1669,6 +1751,7 @@ private:
      auto activeThreads = Galois::getActiveThreads();
      std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
      Galois::on_each([&](unsigned tid, unsigned nthreads) {
+         // TODO use block_range instead
          unsigned int block_size = bitset_comm.size() / nthreads;
          if ((bitset_comm.size() % nthreads) > 0) ++block_size;
          assert((block_size * nthreads) >= bitset_comm.size());
@@ -1688,6 +1771,7 @@ private:
      if (bit_set_count > 0) {
        offsets.resize(bit_set_count);
        Galois::on_each([&](unsigned tid, unsigned nthreads) {
+           // TODO use block_range instead
            unsigned int block_size = bitset_comm.size() / nthreads;
            if ((bitset_comm.size() % nthreads) > 0) ++block_size;
            assert((block_size * nthreads) >= bitset_comm.size());

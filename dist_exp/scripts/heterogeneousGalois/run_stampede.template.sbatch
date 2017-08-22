@@ -23,8 +23,8 @@ if [[ $execname == *"kcore"* ]]; then
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
-  if [[ -f "${inputdir}/${inputname}.source" ]]; then
-    FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
+  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
 # bc: if rmat15 is not used, specify single source flags else do

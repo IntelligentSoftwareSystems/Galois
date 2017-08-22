@@ -13,7 +13,7 @@ execdir=/pylon5/ci560jp/roshand/Galois-build/dist_apps
 EXEC=${execdir}/${execname}
 
 inputname=$2
-inputdirname=/pylon2/ci560jp/roshand/dist-inputs
+inputdirname=/pylon5/ci560jp/roshand/dist-inputs
 extension=gr
 
 statname=${execname}_${inputname}_${PART}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
@@ -26,8 +26,8 @@ if [[ $execname == *"kcore"* ]]; then
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
-  if [[ -f "${inputdir}/${inputname}.source" ]]; then
-    FLAGS+=" -srcNodeId=`cat ${inputdir}/${inputname}.source`"
+  if [[ -f "${inputdirname}/${inputname}.source" ]]; then
+    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
 # bc: if rmat15 is not used, specify single source flags else do

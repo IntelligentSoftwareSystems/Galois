@@ -70,7 +70,9 @@ public:
     size_t bit_index = id/64;
     unsigned long long int bit_offset = 1;
     bit_offset <<= (id%64);
-    atomicOr(&bit_vector[bit_index], bit_offset);
+    if ((bit_vector[bit_index] & bit_offset) == 0) { // test and set
+      atomicOr(&bit_vector[bit_index], bit_offset);
+    }
   }
 
   // different indices can be updated in parallel

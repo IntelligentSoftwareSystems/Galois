@@ -221,7 +221,8 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
                             size_t sizeof_edge_data, uint64_t node_offset, 
                             uint64_t edge_offset, bool converted, 
                             int oGraphVersion) {
-  size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data, graphVersion);
+  size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data, oGraphVersion);
+
   char* base = (char*)mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE, 
                                _MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED)
@@ -296,7 +297,9 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
 
   // "load" filegraph from our constructed base pointer
   fromMem(base, node_offset, edge_offset, 0);
-  //graphVersion = oGraphVersion;
+  // graph version should be set in from mem
+
+  assert(graphVersion == oGraphVersion);
 
   return edgeData;
 }
@@ -405,6 +408,7 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
   numEdges = partNumEdges;
 }
 
+// Note this is the original find index; kept for divideByEdge
 size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
                             size_t lb, size_t ub) {
   while (lb < ub) {
@@ -422,22 +426,34 @@ size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize,
 auto 
 FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
 -> GraphRange {
-  size_t size = numNodes * nodeSize + numEdges * edgeSize;
-  size_t block = (size + total - 1) / total;
-  size_t aa = numEdges;
-  size_t ea = numEdges;
-  size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
-  size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
-  if (bb != eb) {
-    aa = *edge_begin(bb);
-    ea = *edge_end(eb-1);
-  }
-  if (false) {
-    Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
-  }
-  return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+  std::vector<unsigned> dummy;
+  // note this calls into another findIndex (not the one directly above)....
+  return Galois::Graph::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
+                                                edgeSize, id, total, outIdx, 
+                                                dummy, nodeOffset, edgeOffset);
+
+  //size_t size = numNodes * nodeSize + numEdges * edgeSize;
+  //size_t block = (size + total - 1) / total;
+  //size_t aa = numEdges;
+  //size_t ea = numEdges;
+  //size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
+  //size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
+  //if (bb != eb) {
+  //  aa = *edge_begin(bb);
+  //  ea = *edge_end(eb-1);
+  //}
+  //if (false) {
+  //  Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+  //}
+  //return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
+/**
+ * Divides nodes only considering edges.
+ *
+ * Note that it may potentially not return all nodes in the graph (it will 
+ * return up to the last node with edges).
+ */
 auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, 
                              size_t total) -> std::pair<NodeRange, EdgeRange> {
   size_t size = numEdges;
