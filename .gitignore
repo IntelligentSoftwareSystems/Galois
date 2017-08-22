@@ -9,3 +9,11 @@
 # no cscope/ctags files
 cscope.out
 tags
+.vscode
+
+/GPATH
+/GRTAGS
+/GTAGS
+/build*
+/.project
+/.dir-locals.el
