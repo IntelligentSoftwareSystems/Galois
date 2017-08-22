@@ -422,16 +422,23 @@ private:
 
     jaggedColumnMap.resize(numColumnHosts);
     for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-      // TODO use divideByNode() instead
       // partition based on indegree-count only
-      auto pair = Galois::prefix_range(prefixSumOfInEdges, 
-          (uint64_t)0U, prefixSumOfInEdges.size(),
-          i, base_hGraph::numHosts);
-      pair.first *= columnChunkSize;
-      pair.second *= columnChunkSize; 
-      if (pair.first > base_hGraph::totalNodes) pair.first = base_hGraph::totalNodes;
-      if (pair.second > base_hGraph::totalNodes) pair.second = base_hGraph::totalNodes;
-      jaggedColumnMap[gridColumnID()].push_back(pair);
+
+      //auto pair = Galois::prefix_range(prefixSumOfInEdges, 
+      //    (uint64_t)0U, prefixSumOfInEdges.size(),
+      //    i, base_hGraph::numHosts);
+      auto pair = Galois::Graph::divideNodesBinarySearch(
+        prefixSumOfInEdges.size(), prefixSumOfInEdges.back(),
+        0, 1, i, base_hGraph::numHosts, prefixSumOfInEdges).first;
+
+      // pair is iterators; i_pair is uints
+      auto i_pair = std::make_pair(*(pair.first), *(pair.second));
+      
+      i_pair.first *= columnChunkSize;
+      i_pair.second *= columnChunkSize; 
+      if (i_pair.first > base_hGraph::totalNodes) i_pair.first = base_hGraph::totalNodes;
+      if (i_pair.second > base_hGraph::totalNodes) i_pair.second = base_hGraph::totalNodes;
+      jaggedColumnMap[gridColumnID()].push_back(i_pair);
     }
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
