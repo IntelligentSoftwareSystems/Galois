@@ -70,6 +70,9 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
+// Temporary fix due to bug in parallel compute masters
+#define SERIALIZE_COMPUTE_MASTERS
+
 namespace cll = llvm::cl;
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
 static cll::opt<unsigned> buffSize("sendBuffSize", 
