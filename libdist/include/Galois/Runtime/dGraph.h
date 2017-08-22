@@ -877,6 +877,7 @@ public:
       masterRanges = withEdgeRanges;
     } else {
       //printf("Manually det. master thread ranges\n");
+      // TODO use binary search
       graph.determineThreadRanges(beginMaster, endMaster, masterRanges, 
                                   nodeAlphaRanges);
     }
@@ -901,6 +902,7 @@ public:
       withEdgeRanges = masterRanges;
     } else {
       //printf("Manually det. with edges thread ranges\n");
+      // TODO use binary search
       graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges, 
                                   nodeAlphaRanges);
     }
