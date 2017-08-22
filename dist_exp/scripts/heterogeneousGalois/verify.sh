@@ -95,7 +95,7 @@ fi
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3 4 5 6 7 8; do
+for partition in 1 2 3 4 5 6 7 8 9 10; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
