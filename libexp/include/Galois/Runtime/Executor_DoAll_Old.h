@@ -198,7 +198,7 @@ void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& ar
 // TODO: Need to decide whether user should provide num_run tag or
 // num_run can be provided by loop instance which is guaranteed to be unique
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
-void do_all_old_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+void do_all_gen_old(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
