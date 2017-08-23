@@ -5,7 +5,7 @@ set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "3")
 set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-set(GALOIS_COPYRIGHT_YEAR "2015") # Also in COPYRIGHT
+set(GALOIS_COPYRIGHT_YEAR "2017") # Also in COPYRIGHT
 
 #adding additional compiler flags for mpip profiling
 #set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
@@ -62,8 +62,8 @@ enable_testing()
 ###### Configure compiler ######
 
 #Always include debug info and aggressive warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -fno-use-cxa-atexit")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -fno-use-cxa-atexit")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
@@ -351,6 +351,8 @@ function(compileApp name)
   add_executable(${name} ${Sources})
 endfunction(compileApp)
 
+# TODO: sepearte out shared and dist libraries to link
+# one way to go about it is to create two functions
 function(app name)
   set(options DISTSAFE EXP_OPT)
   set(oneValueArgs)
