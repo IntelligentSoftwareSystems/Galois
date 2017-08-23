@@ -357,16 +357,26 @@ public:
       auto beginIter = boost::make_counting_iterator((uint32_t)0);
       auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
-      Galois::Runtime::do_all_coupled(
-        Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //Galois::Runtime::do_all_coupled(
+      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //  [&] (auto n) {
+      //    base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
+      //  },
+      //  std::make_tuple(
+      //    Galois::loopname("EdgeLoading"),
+      //    Galois::timeit()
+      //  )
+      //);
+      Galois::do_all(
+        beginIter, endIter,
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        std::make_tuple(
-          Galois::loopname("EdgeLoading"),
-          Galois::timeit()
-        )
+        Galois::loopname("EdgeLoading"),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
+
     } 
 
     if (base_hGraph::totalOwnedNodes != 0) {
@@ -453,23 +463,40 @@ public:
       uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
       auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first);
       auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second);
-      Galois::Runtime::do_all_coupled(
-          Galois::Runtime::makeStandardRange(beginIter, endIter),
-          [&] (auto src) {
-          auto ii = fileGraph[d].edge_begin(src);
-          auto ee = fileGraph[d].edge_end(src);
-          for (; ii < ee; ++ii) {
-          unsigned dst = fileGraph[d].getEdgeDst(ii);
-          auto h = this->getColumnHostID(dst);
-          hasIncomingEdge[h].set(this->getColumnIndex(dst));
-          numOutgoingEdges[d][h][src - rowOffset]++;
-          }
-          },
-          std::make_tuple(
-            Galois::loopname("EdgeInspection"),
-            Galois::timeit()
-            )
-          );
+      //Galois::Runtime::do_all_coupled(
+      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //  [&] (auto src) {
+      //  auto ii = fileGraph[d].edge_begin(src);
+      //  auto ee = fileGraph[d].edge_end(src);
+      //  for (; ii < ee; ++ii) {
+      //  unsigned dst = fileGraph[d].getEdgeDst(ii);
+      //  auto h = this->getColumnHostID(dst);
+      //  hasIncomingEdge[h].set(this->getColumnIndex(dst));
+      //  numOutgoingEdges[d][h][src - rowOffset]++;
+      //  }
+      //  },
+      //  std::make_tuple(
+      //    Galois::loopname("EdgeInspection"),
+      //    Galois::timeit()
+      //  )
+      //);
+      Galois::do_all(
+        beginIter, endIter,
+        [&] (auto src) {
+        auto ii = fileGraph[d].edge_begin(src);
+        auto ee = fileGraph[d].edge_end(src);
+        for (; ii < ee; ++ii) {
+        unsigned dst = fileGraph[d].getEdgeDst(ii);
+        auto h = this->getColumnHostID(dst);
+        hasIncomingEdge[h].set(this->getColumnIndex(dst));
+        numOutgoingEdges[d][h][src - rowOffset]++;
+        }
+        },
+        Galois::loopname("EdgeInspection"),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
+      );
+
       timer.stop();
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
