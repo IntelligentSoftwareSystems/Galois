@@ -216,8 +216,7 @@ int main(int argc, char **argv) {
                          [&pr] (GNode src, auto& ctx) {
                            pr(src, ctx);
                          },
-                         Galois::wl<WL>(),
-                         Galois::loopname("Lonestar PageRank For Each"));
+                         Galois::wl<WL>());
   Tmain.stop();
 
   Galois::reportPageAlloc("MeminfoPost");
