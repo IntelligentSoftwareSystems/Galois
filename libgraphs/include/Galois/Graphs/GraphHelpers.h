@@ -106,6 +106,7 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
     size_t mid = lb + (ub - lb) / 2;
     size_t num_edges;
 
+
     if (mid != 0) {
       num_edges = edgePrefixSum[mid - 1];
     } else {
@@ -115,8 +116,6 @@ inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
     size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
 
     if (weight <= targetWeight)
-      lb = mid + 1;
-    else if (weight == targetWeight)
       lb = mid + 1;
     else
       ub = mid;
