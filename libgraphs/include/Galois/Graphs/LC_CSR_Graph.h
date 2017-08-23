@@ -1322,14 +1322,16 @@ public:
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
     // before the ith node have
-    edgeIndData_temp[0] = 0;
-    Galois::do_all(boost::counting_iterator<uint32_t>(1), 
-                   boost::counting_iterator<uint32_t>(numNodes),
-                   [&](uint32_t n){
-                     edgeIndData_temp[n] = edgeIndData[n-1];
-                   }, 
-                   Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
-                   Galois::numrun("0"));
+    if (numNodes >= 1) {
+      edgeIndData_temp[0] = 0;
+      Galois::do_all(boost::counting_iterator<uint32_t>(1), 
+                     boost::counting_iterator<uint32_t>(numNodes),
+                     [&](uint32_t n){
+                       edgeIndData_temp[n] = edgeIndData[n-1];
+                     }, 
+                     Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
+                     Galois::numrun("0"));
+    }
 
     // reallocate edgeDst
     if (reallocate) {
