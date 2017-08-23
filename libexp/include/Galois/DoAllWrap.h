@@ -36,7 +36,6 @@
 #include "Galois/OrderedTraits.h"
 #include "Galois/Runtime/Executor_DoAll_Old.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Substrate/EnvCheck.h"
 
 #ifdef GALOIS_USE_TBB
