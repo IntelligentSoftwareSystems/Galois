@@ -70,6 +70,10 @@ static const char* const name = "BFS pull - Distributed Heterogeneous";
 static const char* const desc = "BFS pull on Distributed Galois.";
 static const char* const url = 0;
 
+// system initialization TODO: this is a clunky fix to DGAccumulator issue:
+// find a way to put this in main
+static Galois::System G;
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -148,6 +152,7 @@ struct InitializeGraph {
                     graph(_graph){}
 
   void static go(Graph& _graph){
+    // TODO GPU range
     auto& allNodes = _graph.allNodesRange();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -165,13 +170,20 @@ struct InitializeGraph {
                    //InitializeGraph {src_node, infinity, &_graph}, 
                    //Galois::loopname("InitializeGraph"), 
                    //Galois::numrun(_graph.get_run_identifier()));
-    Galois::Runtime::do_all_coupled(
+    //Galois::Runtime::do_all_coupled(
+    //  allNodes,
+    //  InitializeGraph{src_node, infinity, &_graph}, 
+    //  std::make_tuple(
+    //    Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+    //    Galois::timeit()
+    //  )
+    //);
+    Galois::do_all_local(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
-      std::make_tuple(
-        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
-      )
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
     );
 
     }
@@ -222,13 +234,20 @@ struct BFS {
             //Galois::thread_range(_graph.get_thread_ranges()),
             //Galois::numrun(_graph.get_run_identifier())
           //));
-      Galois::Runtime::do_all_coupled(
+      //Galois::Runtime::do_all_coupled(
+      //  nodesWithEdges,
+      //  BFS{ &_graph },
+      //  std::make_tuple(
+      //    Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
+      //    Galois::timeit()
+      //  )
+      //);
+      Galois::do_all_local(
         nodesWithEdges,
         BFS{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-          Galois::timeit()
-        )
+        Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
 
       }
@@ -336,6 +355,7 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
+
     LonestarStart(argc, argv, name, desc, url);
     Galois::StatManager statManager(statOutputFile);
     {
