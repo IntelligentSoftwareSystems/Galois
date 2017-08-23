@@ -1,6 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/gslist.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/Mem.h"
 #include <map>
 

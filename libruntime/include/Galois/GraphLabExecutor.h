@@ -284,7 +284,7 @@ class SyncEngine {
     message_type getMessage(size_t id) {
       message_type ret;
       if (NeedMessages) {
-        auto& tp = Galois::Substrate::ThreadPool::getThreadPool();
+        auto& tp = Galois::Substrate::getThreadPool();
         for (unsigned int i = 0; i < self->messages.size(); ++i) {
           if (!tp.isLeader(i))
             continue;

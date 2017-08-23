@@ -33,7 +33,7 @@
 
 #include "Galois/Substrate/PageAlloc.h"
 #include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <mutex>
 

@@ -35,7 +35,7 @@
 
 #include "Galois/Runtime/Mem.h"
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 
 #include <boost/iterator/iterator_facade.hpp>
@@ -53,7 +53,7 @@ namespace Galois {
 template <typename T, const size_t SZ=0>
 class SerialBag {
 
-  using dbg = Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 
   using PageHeap = Runtime::PageHeap;
   using FSheap = Runtime::FixedSizeHeap;

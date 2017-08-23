@@ -25,8 +25,6 @@
 #ifndef _ELEMENT_H
 #define _ELEMENT_H
 
-//#include "Galois/Runtime/ll/gio.h"
-
 #include <cassert>
 #include <stdlib.h>
 

@@ -33,7 +33,7 @@
 
 #include "Galois/Substrate/BarrierImpl.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #if defined(GALOIS_HAVE_PTHREAD)
 

@@ -263,14 +263,14 @@ Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 /******************************************************************************/
 
 /* Get/print the number of members in node 0's component */
-struct Node0ComponentSize {
-  const uint64_t zero_component;
+struct SourceComponentSize {
+  const uint64_t src_comp;
   Graph* graph;
 
   static Galois::DGAccumulator<uint64_t> DGAccumulator_accum;
 
-  Node0ComponentSize(const uint64_t _zero_component, Graph* _graph) : 
-    zero_component(_zero_component), graph(_graph){}
+  SourceComponentSize(const uint64_t _src_comp, Graph* _graph) : 
+    src_comp(_src_comp), graph(_graph){}
 
   void static go(Graph& _graph) {
   #ifdef __GALOIS_HET_CUDA__
@@ -283,38 +283,39 @@ struct Node0ComponentSize {
 
     DGAccumulator_accum.reset();
 
-    if (_graph.isOwned(0)) {
-      DGAccumulator_accum += _graph.getData(_graph.getLID(0)).comp_current;
+    if (_graph.isOwned(src_node)) {
+      DGAccumulator_accum += _graph.getData(_graph.getLID(src_node)).comp_current;
     }
 
-    uint64_t z_comp = DGAccumulator_accum.reduce();
+    uint64_t src_comp = DGAccumulator_accum.reduce();
 
     DGAccumulator_accum.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   Node0ComponentSize(z_comp, &_graph), 
-                   Galois::loopname("Node0ComponentSize"));
+                   SourceComponentSize(src_comp, &_graph), 
+                   Galois::loopname("SourceComponentSize"));
 
     uint64_t num_in_component = DGAccumulator_accum.reduce();
 
     // Only node 0 will print the number visited
     if (_graph.id == 0) {
-      printf("Number of nodes in node 0's component is %lu\n", num_in_component);
+      printf("Number of nodes in node %lu's component is %lu\n", (uint64_t)src_node, 
+             num_in_component);
     }
   }
 
-  /* Check if an owned node's component is the same as node 0's.
+  /* Check if an owned node's component is the same as src's.
    * if yes, then increment an accumulator */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     if (graph->isOwned(graph->getGID(src)) && 
-        src_data.comp_current == zero_component) {
+        src_data.comp_current == src_comp) {
       DGAccumulator_accum += 1;
     }
   }
 };
-Galois::DGAccumulator<uint64_t> Node0ComponentSize::DGAccumulator_accum;
+Galois::DGAccumulator<uint64_t> SourceComponentSize::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Main */
@@ -380,7 +381,7 @@ int main(int argc, char** argv) {
     if (inputFileSymmetric) {
       hg = constructSymmetricGraph<NodeData, void>(scalefactor);
     } else {
-      GALOIS_DIE("must pass inputFileSymmetric with symmetric graph to "
+      GALOIS_DIE("must pass symmetricGraph flag with symmetric graph to "
                  "connected-components");
     }
 
@@ -412,7 +413,7 @@ int main(int argc, char** argv) {
         ConnectedComp::go((*hg));
       StatTimer_main.stop();
 
-      Node0ComponentSize::go(*hg);
+      SourceComponentSize::go(*hg);
 
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__

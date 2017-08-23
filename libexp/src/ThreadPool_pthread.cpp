@@ -29,10 +29,10 @@
 
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/EnvCheck.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/TID.h"
+#include "Galois/gIO.h"
 
 #include "boost/utility.hpp"
 

@@ -33,17 +33,8 @@
 
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/Init.h"
 
 Galois::Substrate::Barrier& Galois::Runtime::getBarrier(unsigned activeThreads) {
-  static unsigned int num = ~0;
-  static std::unique_ptr<Substrate::Barrier> ptr;
-  if (!ptr) {
-    ptr = Substrate::createTopoBarrier(activeThreads);
-    num = activeThreads;
-  }
-  if (num != activeThreads) {
-    ptr->reinit(activeThreads);
-    num = activeThreads;
-  }
-  return *(ptr.get());
+  return Galois::Substrate::getBarrier(activeThreads);
 }

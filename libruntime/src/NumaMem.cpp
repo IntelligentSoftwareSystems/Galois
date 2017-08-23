@@ -32,7 +32,7 @@
 
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <fstream>
 #include <limits>

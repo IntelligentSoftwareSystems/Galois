@@ -47,7 +47,7 @@
 #include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/Mem.h"
 

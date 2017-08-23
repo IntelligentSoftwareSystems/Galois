@@ -41,7 +41,7 @@
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Substrate/NumaMem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/PagePool.h"
 
 #include <memory>
@@ -212,7 +212,7 @@ class FreeListHeap : public SourceHeap {
   };
   FreeNode* head;
 
-  using dbg = Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 public:
   enum { AllocSize = SourceHeap::AllocSize };
 
@@ -602,7 +602,7 @@ class PageHeap: public StaticSingleInstance<PageHeap> {
 
   InnerHeap innerHeap;
 
-  using dbg = Substrate::debug<0>;
+  using dbg = Galois::debug<0>;
 
   PageHeap (): innerHeap () {
     dbg::print ("New instance of PageHeap: ", this);

@@ -77,7 +77,7 @@ class AbortHandler {
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = tp.getPackage();
     queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
   }
@@ -94,7 +94,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = Substrate::ThreadPool::getLeader();
     if (tid != leader) {
@@ -117,7 +117,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
@@ -138,7 +138,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = Substrate::ThreadPool::getThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = Substrate::getThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -162,6 +162,7 @@ public:
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
+//TODO: implement more_stats instead of does_not_need_stats which show aborts/pushes etc. 
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
@@ -504,7 +505,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
-  Substrate::ThreadPool::getThreadPool().run(activeThreads,
+  Substrate::getThreadPool().run(activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));
@@ -530,20 +531,20 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
     // TODO: not needed any more? Remove once sure
-    auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+    auto ftpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+
+    auto xtpl = std::tuple_cat(ftpl, 
+          get_default_trait_values(tpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(default_loopname {}, wl<defaultWL>())));
 
     constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
 
-
     timer.start();
 
+    Runtime::for_each_impl(r, fn, xtpl);
 
-    Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl, 
-          get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>()))));
     timer.stop();
 
   } else {
@@ -551,19 +552,19 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
-    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+    auto ftpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+
+    auto xtpl = std::tuple_cat(ftpl, 
+          get_default_trait_values(tpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(default_loopname {}, wl<defaultWL>())));
 
     constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
 
-
     timer.start();
 
-    Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl, 
-          get_default_trait_values(dtpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>()))));
+    Runtime::for_each_impl(r, fn, xtpl);
 
     timer.stop();
   }

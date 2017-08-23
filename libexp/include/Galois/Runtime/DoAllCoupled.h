@@ -49,7 +49,7 @@
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include "Galois/Timer.h"
 #include "Galois/OrderedTraits.h"
@@ -131,7 +131,7 @@ namespace Galois {
 
     void print (void) const { 
       
-      Substrate::gPrint (m_name , " [" , m_values.size () , "]"
+      gPrint (m_name , " [" , m_values.size () , "]"
         , ", max = " , m_max
         , ", min = " , m_min
         , ", sum = " , m_sum
@@ -139,13 +139,13 @@ namespace Galois {
         , ", range = " , range () 
         , "\n");
 
-      Substrate::gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
+      gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
 
       for (typename std::vector<T>::const_iterator i = m_values.begin (), endi = m_values.end ();
           i != endi; ++i) {
-        Substrate::gPrint ( *i , ", ");
+        gPrint ( *i , ", ");
       }
-      Substrate::gPrint ("]\n");
+      gPrint ("]\n");
     }
 
   };
@@ -187,7 +187,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (Substrate::ThreadPool::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (Substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -404,7 +404,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
 
     const unsigned maxT = Galois::getActiveThreads ();
     const unsigned my_pack = Substrate::ThreadPool::getPackage ();
@@ -439,7 +439,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::ThreadPool::getThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = Galois::getActiveThreads ();
@@ -519,7 +519,7 @@ private:
 
     Substrate::asmPause ();
 
-    if (Substrate::ThreadPool::getThreadPool().isLeader(poor.id)) {
+    if (Substrate::getThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
@@ -585,7 +585,7 @@ private:
     // work_timer.print ();
     // steal_timer.print ();
     // term_timer.print ();
-    Substrate::gPrint ("--------\n");
+    gPrint ("--------\n");
   }
 
 
@@ -732,7 +732,7 @@ void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple)
 
   Substrate::Barrier& barrier = getBarrier(activeThreads);
 
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, 
+  Substrate::getThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));

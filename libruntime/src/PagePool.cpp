@@ -32,7 +32,7 @@
 #define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
 
 #include "Galois/Runtime/PagePool.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"
@@ -72,7 +72,7 @@ class PAState {
 
 public:
   PAState() { 
-    auto num = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads();
+    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
   }
@@ -118,28 +118,40 @@ public:
   }
 };
 
-static PAState PA;
+static PAState* PA;
 } //end namespace ""
 
+void Galois::Runtime::internal::initPagePool(void) {
+  GALOIS_ASSERT(!PA, "PagePool.cpp: Double Initialization of PAState");
+  PA = new PAState();
+}
+
+// TODO: make sure that all the allocated memory and pages are freed
+// There should be no memory leaks
+void Galois::Runtime::internal::killPagePool(void) {
+  delete PA;
+  PA = nullptr;
+}
+
 int Galois::Runtime::numPagePoolAllocTotal() {
-  return PA.countAll();
+  return PA->countAll();
 }
 
 int Galois::Runtime::numPagePoolAllocForThread(unsigned tid) {
-  return PA.count(tid);
+  return PA->count(tid);
 }
 
 void* Galois::Runtime::pagePoolAlloc() {
-  return PA.pageAlloc();
+  return PA->pageAlloc();
 }
 
 void Galois::Runtime::pagePoolPreAlloc(unsigned num) {
   while (num--)
-    PA.pagePreAlloc();
+    PA->pagePreAlloc();
 }
 
 void Galois::Runtime::pagePoolFree(void* ptr) {
-  PA.pageFree(ptr);
+  PA->pageFree(ptr);
 }
 
 size_t Galois::Runtime::pagePoolSize() {

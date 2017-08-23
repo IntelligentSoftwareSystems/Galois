@@ -13,7 +13,7 @@ inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-#outputdirname=/workspace/dist-outputs
+#outputdirname=/net/ohm/export/cdgc/dist-outputs
 outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
@@ -41,7 +41,7 @@ MPI=mpiexec
 LOG=.verify_log
 
 FLAGS=
-FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
+#FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
   FLAGS+=" -kcore=100"
@@ -88,21 +88,22 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   SET="g,1,16 gg,2,8 gc,2,8 cg,2,8, ggc,3,4 cgg,3,4 c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 else
   #SET="c,1,48 cc,2,24 cccc,4,12 cccccccc,8,6 cccccccccccccccc,16,3"
+  #SET="c,1,80 cc,2,40 cccc,4,20 cccccccc,8,10 ccccccccccccccc,16,5"
   SET="c,1,16 cc,2,8 ccc,3,4 cccc,4,4 ccccc,5,2 cccccc,6,2 ccccccc,7,2 cccccccc,8,2 ccccccccc,9,1 cccccccccc,10,1 ccccccccccc,11,1 cccccccccccc,12,1 ccccccccccccc,13,1 cccccccccccccc,14,1 cccccccccccccc,15,1 ccccccccccccccc,16,1"
 fi
 
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3 4 5 6 7 8; do
+for partition in 1 2 3 4 5 6 7 8 9 10; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
     CUTTYPE+=" -partition=cvc"
   elif [ $partition -eq 2 ]; then
-    CUTTYPE+=" -partition=cvc -balanceMasters=nodes"
+    CUTTYPE+=" -partition=jcvc"
   elif [ $partition -eq 3 ]; then
-    CUTTYPE+=" -partition=cvc -balanceMasters=both"
+    CUTTYPE+=" -partition=jbvc"
   elif [ $partition -eq 4 ]; then
     CUTTYPE+=" -partition=2dvc -balanceMasters=nodes"
   elif [ $partition -eq 5 ]; then
@@ -113,6 +114,10 @@ for partition in 1 2 3 4 5 6 7 8; do
     CUTTYPE+=" -partition=oec"
   elif [ $partition -eq 8 ]; then
     CUTTYPE+=" -partition=iec"
+  elif [ $partition -eq 9 ]; then
+    CUTTYPE+=" -partition=od2vc"
+  elif [ $partition -eq 10 ]; then
+    CUTTYPE+=" -partition=od4vc"
   fi
 
   for task in $SET; do
@@ -140,21 +145,25 @@ for partition in 1 2 3 4 5 6 7 8; do
     if ! grep -q "SUCCESS" .output_diff ; then
       let fail=fail+1
       if [ $partition -eq 1 ]; then
-        failed_cases+="balanced cartesian vertex-cut $1 devices with $3 threads; "
-      elif [ $partition -eq 2 ]; then
         failed_cases+="cartesian vertex-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 2 ]; then
+        failed_cases+="jagged cyclic vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 3 ]; then
-        failed_cases+="both balanced cartesian vertex-cut $1 devices with $3 threads; "
+        failed_cases+="jagged blocked vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 4 ]; then
         failed_cases+="2d checkerboard vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 5 ]; then
-        failed_cases+="balanced hybrid outgoing vertex-cut $1 devices with $3 threads; "
+        failed_cases+="hybrid outgoing vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 6 ]; then
-        failed_cases+="balanced hybrid incoming vertex-cut $1 devices with $3 threads; "
+        failed_cases+="hybrid incoming vertex-cut $1 devices with $3 threads; "
       elif [ $partition -eq 7 ]; then
-        failed_cases+="balanced outgoing edge-cut $1 devices with $3 threads; "
+        failed_cases+="outgoing edge-cut $1 devices with $3 threads; "
       elif [ $partition -eq 8 ]; then
-        failed_cases+="balanced incoming edge-cut $1 devices with $3 threads; "
+        failed_cases+="incoming edge-cut $1 devices with $3 threads; "
+      elif [ $partition -eq 9 ]; then
+        failed_cases+="over-decompose 2 cvc $1 devices with $3 threads; "
+      elif [ $partition -eq 10 ]; then
+        failed_cases+="over-decompose 4 cvc $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1

@@ -311,7 +311,7 @@ public:
     unsigned level = 0;
 
     ParCounter numAdds;
-    Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
 #ifdef BFS_WF_USE_BAG
     while (!currWL->empty ()) {
@@ -334,7 +334,7 @@ public:
 #endif
       ++level;
     }
-    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     numIter += numAdds.reduce ();
 

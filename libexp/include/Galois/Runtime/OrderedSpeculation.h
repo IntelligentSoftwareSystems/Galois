@@ -45,7 +45,7 @@
 #include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Runtime/Mem.h"
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
@@ -2145,12 +2145,12 @@ void for_each_ordered_spec_impl (const R& range, const Cmp& cmp, const NhFunc& n
   
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
-  Substrate::ThreadPool::getThreadPool().burnPower (Galois::getActiveThreads());
+  Substrate::getThreadPool().burnPower (Galois::getActiveThreads());
 
   e.push_initial (range);
   e.execute();
 
-  Substrate::ThreadPool::getThreadPool().beKind();
+  Substrate::getThreadPool().beKind();
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>

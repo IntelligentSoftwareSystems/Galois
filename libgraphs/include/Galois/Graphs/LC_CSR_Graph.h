@@ -396,11 +396,12 @@ public:
    * @param total Total number of divisions
    * @param edgePrefixSum a prefix sum of edges of the graph
    */
+  template <typename VectorTy>
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
-                    size_t total, std::vector<uint64_t>& edgePrefixSum)
+                    size_t total, VectorTy& edgePrefixSum)
       -> GraphRange {
     return 
-      Galois::Graph::divideNodesBinarySearch<std::vector<uint64_t>, uint32_t>(
+      Galois::Graph::divideNodesBinarySearch<VectorTy, uint32_t>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
@@ -767,10 +768,9 @@ public:
     threadRanges[0] = 0;
 
     while (current_element < totalNodes && current_thread < num_threads) {
-      uint64_t elements_remaining = totalNodes - current_element;
       uint32_t threads_remaining = num_threads - current_thread;
 
-      assert(elements_remaining >= threads_remaining);
+      assert((totalNodes - current_element) >= threads_remaining);
 
       if (threads_remaining == 1) {
         // assign remaining elements to last thread
@@ -881,7 +881,8 @@ public:
    *
    * @param edgePrefixSum A prefix sum of edges
    */
-  void determineThreadRangesByNode(std::vector<uint64_t>& edgePrefixSum) {
+  template <typename VectorTy>
+  void determineThreadRangesByNode(VectorTy& edgePrefixSum) {
     uint32_t numThreads = Galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
@@ -952,22 +953,18 @@ public:
       for (uint32_t i = 0; i < totalThreads; i++) {
         uint32_t beginNode = threadRanges[i];
         uint32_t endNode = threadRanges[i + 1];
-
-        uint64_t beginEdge;
-        if (beginNode > 0) {
-          beginEdge = edgePrefixSum[beginNode - 1];
-        } else {
-          beginEdge = 0;
-        }
-
         uint64_t endEdge = edgePrefixSum[endNode - 1];
 
-        assert(beginEdge <= endEdge);
+        if (beginNode > 0) {
+          assert(edgePrefixSum[beginNode - 1] <= endEdge);
+          assert(threadRangesEdge[i] == edgePrefixSum[beginNode - 1]);
+        } else {
+          assert(0 <= endEdge);
+          assert(threadRangesEdge[i] == 0);
+        }
+
         assert(endEdge <= numEdges);
 
-        assert(threadRangesEdge[i] == beginEdge);
-        //printf("[%u] begin edge is %lu, end edge is %lu\n", i, beginEdge, 
-        //       endEdge);
         threadRangesEdge[i + 1] = endEdge;
       }
     } else {
@@ -1298,8 +1295,9 @@ public:
 
     // recalculate thread ranges for nodes and edges
     clearRanges();
-    determineThreadRanges(numNodes, edgeIndData_temp);
-    determineThreadRangesEdge(edgeIndData_temp);
+    determineThreadRangesByNode(edgeIndData_temp);
+    //determineThreadRanges(numNodes, edgeIndData_temp);
+    //determineThreadRangesEdge(edgeIndData_temp);
 
     // reallocate nodeData
     if (reallocate) {

@@ -32,7 +32,7 @@
 */
 #include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <vector>
 #include <set>

@@ -795,10 +795,9 @@ void prefix_range(Galois::Graph::OfflineGraph& graph,
   //printf("Optimally want %lu units this division\n", units_this_division);
 
   while (current_element < total_nodes && current_division < num_divisions) {
-    uint64_t elements_remaining = total_nodes - current_element;
     uint32_t divisions_remaining = num_divisions - current_division;
 
-    assert(elements_remaining >= divisions_remaining);
+    assert((total_nodes - current_element) >= divisions_remaining);
 
     if (divisions_remaining == 1) {
       // assign remaining elements to last division

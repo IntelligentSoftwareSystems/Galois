@@ -19,14 +19,14 @@ static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(
 static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(1));
 
 void runDoAllBurn(size_t num) {
-  Galois::Substrate::ThreadPool::getThreadPool().burnPower(Galois::getActiveThreads());
+  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
 
   for (int r = 0; r < rounds; ++r) {
     Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
                    [&](int i) { asm volatile("" ::: "memory"); });
   }
 
-  Galois::Substrate::ThreadPool::getThreadPool().beKind();
+  Galois::Substrate::getThreadPool().beKind();
 }
 
 void runDoAll(size_t num) {
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
   EXIT = 0;
   std::function<void(void)> f = [] () { while (!EXIT) { std::cerr << "."; std::this_thread::sleep_for(std::chrono::milliseconds(100)); } };
-  Galois::Substrate::ThreadPool::getThreadPool().runDedicated(f);
+  Galois::Substrate::getThreadPool().runDedicated(f);
 
   std::cout
     << "threads: " << Galois::getActiveThreads() 

@@ -1,5 +1,5 @@
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 typedef Galois::Graph::FileGraph Graph;
 

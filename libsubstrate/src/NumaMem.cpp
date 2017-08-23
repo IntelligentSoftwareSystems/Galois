@@ -31,7 +31,7 @@
 #include "Galois/Substrate/NumaMem.h"
 #include "Galois/Substrate/PageAlloc.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <cassert>
 
@@ -47,7 +47,7 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize,
     for (size_t x = 0; x < len; x += pageSize / 2)
       ptr[x] = 0;
   } else {
-    ThreadPool::getThreadPool().run(numThreads, 
+    getThreadPool().run(numThreads, 
      [ptr, len, pageSize, numThreads, finegrained] () 
       {
         auto myID = ThreadPool::getTID();
@@ -96,7 +96,7 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
   char* ptr = static_cast<char*>(_ptr);
 
   if (numThreads > 1) {
-    ThreadPool::getThreadPool().run(numThreads, 
+    getThreadPool().run(numThreads, 
       [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
         auto myID = ThreadPool::getTID();
 

@@ -2,7 +2,7 @@
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
 #include "Galois/Timer.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/counting_iterator.hpp>

@@ -37,7 +37,7 @@
  */
 #include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <algorithm>
 #include <cassert>
@@ -89,9 +89,9 @@ static unsigned getNumaNode(cpuinfo& c) {
 #ifdef GALOIS_USE_NUMA
     numaAvail = numa_available() >= 0;
     if (!numaAvail)
-      gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
+      Galois::gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
 #else
-    gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
+    Galois::gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
 #endif
   }
 
@@ -317,12 +317,12 @@ bool Galois::Substrate::bindThreadSelf(unsigned osContext) {
   
   /* sched_setaffinity returns 0 in success */
   if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
-    gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
+    Galois::gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
     return false;
   }
   return true;
 #else
-  gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  Galois::gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
   return false;
 #endif
 }

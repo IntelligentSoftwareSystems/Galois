@@ -32,7 +32,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/EnvCheck.h"
 #include "Galois/Substrate/ThreadPool.h"
@@ -60,8 +60,8 @@ static void printString(bool error, bool newline, const std::string& prefix, con
     o << "\n";
 }
 
-void Galois::Substrate::gDebugStr(const std::string& s) {
-  static bool skip = EnvCheck("GALOIS_DEBUG_SKIP");
+void Galois::gDebugStr(const std::string& s) {
+  static bool skip = Galois::Substrate::EnvCheck("GALOIS_DEBUG_SKIP");
   if (skip) return;
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
@@ -76,7 +76,7 @@ void Galois::Substrate::gDebugStr(const std::string& s) {
   std::ostringstream os;
   os << "[" << time_str << " " << std::setw(3) << Galois::Substrate::ThreadPool::getTID() << "] " << s;
 
-  if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+  if (Galois::Substrate::EnvCheck("GALOIS_DEBUG_TO_FILE")) {
     static Galois::Substrate::SimpleLock dIOLock;
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;
@@ -94,22 +94,22 @@ void Galois::Substrate::gDebugStr(const std::string& s) {
   }
 }
 
-void Galois::Substrate::gPrintStr(const std::string& s) {
+void Galois::gPrintStr(const std::string& s) {
   printString(false, false, "", s);
 }
 
-void Galois::Substrate::gInfoStr(const std::string& s) {
+void Galois::gInfoStr(const std::string& s) {
   printString(false, true, "INFO", s);
 }
 
-void Galois::Substrate::gWarnStr(const std::string& s) {
+void Galois::gWarnStr(const std::string& s) {
   printString(false, true, "WARNING", s);
 }
 
-void Galois::Substrate::gErrorStr(const std::string& s) {
+void Galois::gErrorStr(const std::string& s) {
   printString(true, true, "ERROR", s);
 }
 
-void Galois::Substrate::gFlush() {
+void Galois::gFlush() {
   fflush(stdout);
 }

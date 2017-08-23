@@ -45,8 +45,9 @@
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/Mem.h"
 #include "Galois/WorkList/WorkList.h"
 
@@ -883,7 +884,7 @@ public:
         char buf[1024];
         snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
             inner, commitRatio, allcommitted, alliterations, local.window, local.delta);
-        Substrate::gPrint(buf);
+        gPrint(buf);
       }
     }
   }

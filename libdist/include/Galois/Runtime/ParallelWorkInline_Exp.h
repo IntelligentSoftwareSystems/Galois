@@ -77,7 +77,7 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = Substrate::ThreadPool::getThreadPool().getLeader(tid);
+    pid = Substrate::getThreadPool().getLeader(tid);
   }
   WID() {
     tid = Substrate::ThreadPool::getTID();
@@ -214,7 +214,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = Substrate::ThreadPool::getThreadPool().getLeader(i);
+      id.pid = Substrate::getThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }
@@ -471,7 +471,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   Executor e (opFunc, preFunc, loopname);
   Substrate::Barrier& barrier = Runtime::getBarrier (activeThreads);
 
-  Substrate::ThreadPool::getThreadPool ().run (activeThreads, 
+  Substrate::getThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));

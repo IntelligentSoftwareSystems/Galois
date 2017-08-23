@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   if (!iter)
     iter = 16*1024;
   if (argc > 2)
-    numThreads = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads();
+    numThreads = Galois::Substrate::getThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));
   using namespace Galois::Substrate;

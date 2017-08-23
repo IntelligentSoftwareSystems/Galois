@@ -120,7 +120,7 @@ protected:
     if (offset == ~0U)
       return;
     
-    for (unsigned n = 0; n < ThreadPool::getThreadPool().getMaxThreads(); ++n)
+    for (unsigned n = 0; n < getThreadPool().getMaxThreads(); ++n)
       reinterpret_cast<T*>(b->getRemote(n, offset))->~T();
     b->deallocOffset(offset, sizeof(T));
     offset = ~0U;
@@ -133,7 +133,7 @@ public:
   PerThreadStorage(Args&&... args) :b(&getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    auto& tp = ThreadPool::getThreadPool();
+    auto& tp = getThreadPool();
 
     offset = b->allocOffset(sizeof(T));
     for (unsigned n = 0; n < tp.getMaxThreads(); ++n)
@@ -187,7 +187,7 @@ public:
   }
 
   unsigned size() const {
-    return ThreadPool::getThreadPool().getMaxThreads();
+    return getThreadPool().getMaxThreads();
   }
 };
 
@@ -201,7 +201,7 @@ protected:
   PerBackend& b;
 
   void destruct() {
-    auto& tp = ThreadPool::getThreadPool();
+    auto& tp = getThreadPool();
     for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
       reinterpret_cast<T*>(b.getRemote(tp.getLeaderForPackage(n), offset))->~T();
     b.deallocOffset(offset, sizeof(T));
@@ -213,10 +213,10 @@ public:
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    ThreadPool::getThreadPool();
+    getThreadPool();
 
     offset = b.allocOffset(sizeof(T));
-    auto& tp = ThreadPool::getThreadPool();
+    auto& tp = getThreadPool();
     for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
       new (b.getRemote(tp.getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
   }
@@ -267,17 +267,17 @@ public:
   }
 
   T* getRemoteByPkg(unsigned int pkg) {
-    void* ditem = b.getRemote(ThreadPool::getThreadPool().getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getThreadPool().getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getRemoteByPkg(unsigned int pkg) const {
-    void* ditem = b.getRemote(ThreadPool::getThreadPool().getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getThreadPool().getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   unsigned size() const {
-    return ThreadPool::getThreadPool().getMaxThreads();
+    return getThreadPool().getMaxThreads();
   }
 };
 

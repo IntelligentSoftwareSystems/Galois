@@ -32,6 +32,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+#include "Galois/gIO.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Substrate/PageAlloc.h"
 
@@ -464,8 +465,8 @@ auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
   size_t eb = findIndex(0, 1, ea, bb, numNodes);
 
   if (true) {
-    Substrate::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, 
-                     "], [", aa, " ", ea, " ", ea - aa, "]");
+    Galois::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, 
+                  "], [", aa, " ", ea, " ", ea - aa, "]");
   }
 
   return GraphRange(NodeRange(iterator(bb), iterator(eb)), 
@@ -616,7 +617,7 @@ FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) {
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
   } else if (N != nodeOffset) {
-    printf("WARNING: reading node out of bounds for this file graph");
+    printf("WARNING: reading node out of bounds for this file graph\n");
     // TODO die here?
   }
   return edge_iterator(idx);
@@ -630,7 +631,7 @@ FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) {
                    static_cast<uint64_t>(edgeOffset + numEdges)) - 
           edgeOffset;
   } else {
-    printf("WARNING: reading node out of bounds for this file graph");
+    printf("WARNING: reading node out of bounds for this file graph\n");
     // TODO die here?
   }
   return edge_iterator(idx);

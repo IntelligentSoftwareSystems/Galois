@@ -36,7 +36,7 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/DoAllWrap.h"
 
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, bool BSPNode = false, bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
@@ -285,23 +285,19 @@ public:
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
 
+    assert(prefixSumOfEdges.size() == numNodes);
+
+    if (!edgeNuma) {
+      base_hGraph::graph.allocateFrom(numNodes, numEdges);
+    } else {
+      printf("Edge based NUMA division on\n");
+      //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+      base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
+                                            prefixSumOfEdges);
+    }
+
     if (numNodes > 0) {
-      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
-
       //assert(numEdges > 0);
-
-      assert(prefixSumOfEdges.size() == numNodes);
-
-      if (!edgeNuma) {
-        base_hGraph::graph.allocateFrom(numNodes, numEdges);
-      } else {
-        printf("Edge based NUMA division on\n");
-        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                              prefixSumOfEdges);
-      }
-
       //std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
@@ -320,6 +316,15 @@ public:
           Galois::timeit()
         )
       );
+    }
+
+    if (base_hGraph::totalOwnedNodes != 0) {
+      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+      base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
+    } else {
+      // no owned nodes, therefore empty masters
+      base_hGraph::beginMaster = 0; 
+      base_hGraph::endMaster = 0;
     }
 
     loadEdges(base_hGraph::graph, g, fileGraph); // third pass of the graph file
@@ -355,7 +360,9 @@ private:
     fileGraph.reset_byte_counters();
     auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
     auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
-    std::vector<std::atomic<uint64_t>> indegree(base_hGraph::totalNodes); // TODO use LargeArray
+    size_t numColumnChunks = (base_hGraph::totalNodes + columnChunkSize - 1)/columnChunkSize;
+    std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
+    std::vector<std::atomic<uint64_t>> indegree(numColumnChunks); // TODO use LargeArray
     Galois::Runtime::do_all_coupled(
       Galois::Runtime::makeStandardRange(beginIter, endIter),
       [&] (auto src) {
@@ -363,7 +370,8 @@ private:
         auto ee = fileGraph.edge_end(src);
         for (; ii < ee; ++ii) {
           auto dst = fileGraph.getEdgeDst(ii);
-          Galois::atomicAdd(indegree[dst], (uint64_t)1);
+          //++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
+          Galois::atomicAdd(indegree[dst/columnChunkSize], (uint64_t)1);
         }
       },
       std::make_tuple(
@@ -376,15 +384,14 @@ private:
         base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
     // TODO move this to a common helper function
-    std::vector<uint64_t> prefixSumOfInEdges(base_hGraph::totalNodes); // TODO use LargeArray
     auto& activeThreads = Galois::Runtime::activeThreads;
     std::vector<uint64_t> prefixSumOfThreadBlocks(activeThreads, 0);
     Galois::on_each([&](unsigned tid, unsigned nthreads) {
         assert(nthreads == activeThreads);
-        auto range = Galois::block_range(beginIter, endIter,
+        auto range = Galois::block_range((size_t)0, numColumnChunks,
           tid, nthreads);
-        auto begin = *range.first;
-        auto end = *range.second;
+        auto begin = range.first;
+        auto end = range.second;
         // find prefix sum of each block
         if (begin < end) {
           prefixSumOfInEdges[begin] = indegree[begin];
@@ -404,10 +411,10 @@ private:
     Galois::on_each([&](unsigned tid, unsigned nthreads) {
         assert(nthreads == activeThreads);
         if (tid > 0) {
-          auto range = Galois::block_range(beginIter, endIter,
+          auto range = Galois::block_range((size_t)0, numColumnChunks,
             tid, nthreads);
           // update prefix sum from previous block
-          for (auto i = (*range.first) + 1; i < *range.second; ++i) {
+          for (auto i = range.first; i < range.second; ++i) {
             prefixSumOfInEdges[i] += prefixSumOfThreadBlocks[tid-1];
           }
         }
@@ -415,12 +422,23 @@ private:
 
     jaggedColumnMap.resize(numColumnHosts);
     for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-      // TODO use divideByNode() instead
       // partition based on indegree-count only
-      auto pair = Galois::prefix_range(prefixSumOfInEdges, 
-          (uint64_t)0U, prefixSumOfInEdges.size(),
-          i, base_hGraph::numHosts);
-      jaggedColumnMap[gridColumnID()].push_back(pair);
+
+      //auto pair = Galois::prefix_range(prefixSumOfInEdges, 
+      //    (uint64_t)0U, prefixSumOfInEdges.size(),
+      //    i, base_hGraph::numHosts);
+      auto pair = Galois::Graph::divideNodesBinarySearch(
+        prefixSumOfInEdges.size(), prefixSumOfInEdges.back(),
+        0, 1, i, base_hGraph::numHosts, prefixSumOfInEdges).first;
+
+      // pair is iterators; i_pair is uints
+      auto i_pair = std::make_pair(*(pair.first), *(pair.second));
+      
+      i_pair.first *= columnChunkSize;
+      i_pair.second *= columnChunkSize; 
+      if (i_pair.first > base_hGraph::totalNodes) i_pair.first = base_hGraph::totalNodes;
+      if (i_pair.second > base_hGraph::totalNodes) i_pair.second = base_hGraph::totalNodes;
+      jaggedColumnMap[gridColumnID()].push_back(i_pair);
     }
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -543,7 +561,6 @@ private:
           createNode = true;
         } else {
           for (unsigned k = 0; k < numColumnHosts; ++k) {
-            if (k == gridColumnID()) continue;
             auto h = getColumnHostID(k, src);
             if (h == gridColumnID()) {
               if (hasIncomingEdge[k].test(getColumnIndex(k, src))) {
@@ -566,9 +583,11 @@ private:
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     src = base_hGraph::gid2host[leaderHostID].first;
     for (uint64_t dst = 0; dst < base_hGraph::totalNodes; ++dst) {
-      if (dst == src) { // skip nodes which have been allocated above
-        dst = src_end - 1;
-        continue;
+      if (src != src_end) {
+        if (dst == src) { // skip nodes which have been allocated above
+          dst = src_end - 1;
+          continue;
+        }
       }
       assert((dst < src) || (dst >= src_end));
       bool createNode = false;
@@ -805,17 +824,22 @@ public:
 
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    assert(base_hGraph::beginMaster < base_hGraph::endMaster);
-    assert((base_hGraph::endMaster - base_hGraph::beginMaster) == base_hGraph::totalOwnedNodes);
-    if (syncType == base_hGraph::syncBroadcast) { // reset masters
-      bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
-    } else { // reset mirrors
-      assert(syncType == base_hGraph::syncReduce);
-      if (base_hGraph::beginMaster > 0) {
-        bitset_reset_range(0, base_hGraph::beginMaster - 1);
-      }
-      if (base_hGraph::endMaster < numNodes) {
-        bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+    uint32_t numMasters = base_hGraph::endMaster - base_hGraph::beginMaster;
+
+    assert(base_hGraph::beginMaster <= base_hGraph::endMaster);
+    assert(numMasters == base_hGraph::totalOwnedNodes);
+
+    if (numMasters != 0) {
+      if (syncType == base_hGraph::syncBroadcast) { // reset masters
+        bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
+      } else { // reset mirrors
+        assert(syncType == base_hGraph::syncReduce);
+        if (base_hGraph::beginMaster > 0) {
+          bitset_reset_range(0, base_hGraph::beginMaster - 1);
+        }
+        if (base_hGraph::endMaster < numNodes) {
+          bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+        }
       }
     }
   }

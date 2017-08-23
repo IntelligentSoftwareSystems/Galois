@@ -591,7 +591,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   WorkTy W(b, e, loopname);
   
   using namespace Galois::Runtime;
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
+  Substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }
 
 template<typename PipelineTy,typename TaskTy>

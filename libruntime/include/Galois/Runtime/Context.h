@@ -33,7 +33,7 @@
 
 #include "Galois/MethodFlags.h"
 #include "Galois/Substrate/PtrLock.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 
 #include <boost/utility.hpp>
 

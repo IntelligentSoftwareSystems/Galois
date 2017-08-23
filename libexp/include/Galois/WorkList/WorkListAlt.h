@@ -46,7 +46,7 @@ stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
-  auto& tp = Substrate::ThreadPool::getThreadPool();
+  auto& tp = Substrate::getThreadPool();
   for (unsigned i = id + 1; i < num; ++i)
     if (tp.getPackage(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
@@ -246,7 +246,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = Substrate::ThreadPool::getThreadPool().getPackage(index);
+      unsigned int mindex = Substrate::getThreadPool().getPackage(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }

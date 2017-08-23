@@ -159,11 +159,21 @@ divideNodesBinarySearch(NodeType numNodes,
                    NodeType nodeOffset = 0, 
                    uint64_t edgeOffset = 0)
 { 
+
   typedef boost::counting_iterator<NodeType> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
+
+  //printf("[%lu] num nodes %lu num edges %lu\n", id, numNodes, numEdges);
+  // deal with corner case
+  if (numNodes == 0) {
+    return GraphRange(NodeRange(iterator(0), 
+                                iterator(0)), 
+                      EdgeRange(edge_iterator(0), 
+                                edge_iterator(0)));
+  }
 
   assert(nodeWeight != 0 || edgeWeight != 0);
 

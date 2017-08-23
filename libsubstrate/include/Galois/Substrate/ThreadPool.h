@@ -65,7 +65,14 @@ struct ExecuteTupleImpl<tpl, s, 0> {
 
 }
 
+namespace internal {
+  void initThreadPool(void);
+  void killThreadPool(void);
+
+} // end namespace internal
+
 class ThreadPool {
+  friend void internal::initThreadPool(void);
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
   struct fastmode_ty {bool mode;}; //! type for setting fastmode
@@ -201,8 +208,9 @@ public:
   static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
-  static ThreadPool& getThreadPool();
 };
+
+ThreadPool& getThreadPool(void);
 
 } //Substrate
 } //Galois

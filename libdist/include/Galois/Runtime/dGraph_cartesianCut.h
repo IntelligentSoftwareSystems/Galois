@@ -211,7 +211,7 @@ public:
   // Return if gid is Owned by local host.
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::tie(start, end) = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts];
       if(gid >= start && gid < end)
         return true;
@@ -296,7 +296,7 @@ public:
     std::vector<typename Galois::Graph::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
     std::vector<typename Galois::Graph::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
     std::cerr << " SIZE : " << base_hGraph::gid2host.size() << "\n";
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       nodeBegin[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
       edgeBegin[d] = g.edge_begin(nodeBegin[d]);
       nodeEnd[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second;
@@ -307,7 +307,7 @@ public:
     // when possible from now on in the code
     std::vector<Galois::Graph::FileGraph> fileGraph(DecomposeFactor);
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::stringstream ss;
       ss <<"Host : " << base_hGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
       std::cout << ss.str();
@@ -334,27 +334,23 @@ public:
 
     base_hGraph::numNodes = numNodes;
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
+
+    // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
+    if (!edgeNuma) {
+      base_hGraph::graph.allocateFrom(numNodes, numEdges);
+    } else {
+      printf("Edge based NUMA division on\n");
+      //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
+      base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
+                                            prefixSumOfEdges);
+    }
+
+    //std::cerr << "Allocate done\n";
+
+    assert(prefixSumOfEdges.size() == numNodes);
+
     if (numNodes > 0) {
-    base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-    base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id + (DecomposeFactor-1)*base_hGraph::numHosts].second - 1) + 1;
-
-      //base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      //base_hGraph::endMaster = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
-
       //assert(numEdges > 0);
-      assert(prefixSumOfEdges.size() == numNodes);
-
-      if (!edgeNuma) {
-        base_hGraph::graph.allocateFrom(numNodes, numEdges);
-      } else {
-        printf("Edge based NUMA division on\n");
-        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                              prefixSumOfEdges);
-      }
-
-      //std::cerr << "Allocate done\n";
-
       base_hGraph::graph.constructNodes();
 
       //std::cerr << "Construct nodes done\n";
@@ -371,13 +367,31 @@ public:
           Galois::timeit()
         )
       );
+    } 
+
+    if (base_hGraph::totalOwnedNodes != 0) {
+      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+      base_hGraph::endMaster = G2L(base_hGraph::gid2host[
+                                     base_hGraph::id + (DecomposeFactor-1)*
+                                     base_hGraph::numHosts].second - 1) + 1;
+    } else {
+      // no owned nodes, therefore empty masters
+      base_hGraph::beginMaster = 0; 
+      base_hGraph::endMaster = 0;
     }
 
+    //printf("[%d] begin master and end master are %u and %u\n", base_hGraph::id,
+    //       base_hGraph::beginMaster, base_hGraph::endMaster);
+
+
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
-    std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
+    fprintf(stderr, "[%d] Edges loaded\n", base_hGraph::id);
+    //std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
+
+    //printf("[%d] about to thread range\n", base_hGraph::id);
     // TODO revise how this works and make it consistent across cuts
     if (!edgeNuma) {
       Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
@@ -386,8 +400,11 @@ public:
       StatTimer_thread_ranges.stop();
     }
 
+    //printf("[%d] about to master thread range\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_master();
+    //printf("[%d] about to with edges\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_with_edges();
+    //printf("[%d] about to init spec ranges\n", base_hGraph::id);
     base_hGraph::initialize_specific_ranges();
 
     StatTimer_graph_construct.stop();
@@ -395,16 +412,17 @@ public:
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
     StatTimer_graph_construct_comm.stop();
+    //printf("[%d] all done\n", base_hGraph::id);
   }
 
   void loadStatistics(Galois::Graph::OfflineGraph& g, 
-      std::vector<Galois::Graph::FileGraph>& fileGraph, 
-      std::vector<uint64_t>& prefixSumOfEdges) {
-
+                      std::vector<Galois::Graph::FileGraph>& fileGraph, 
+                      std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = 0;
-    for(auto d = 0; d < DecomposeFactor; ++d)
+    for(unsigned d = 0; d < DecomposeFactor; ++d)
       base_hGraph::totalOwnedNodes += base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
 
+    //printf("[%d] owns %lu nodes\n", base_hGraph::id, base_hGraph::totalOwnedNodes);
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t columnBlockSize = 0;
@@ -420,14 +438,14 @@ public:
     }
 
     std::vector<std::vector<std::vector<uint64_t>>> numOutgoingEdges(DecomposeFactor);
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       numOutgoingEdges[d].resize(numColumnHosts);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         numOutgoingEdges[d][i].assign((base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first), 0);
       }
     }
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       Galois::Timer timer;
       timer.start();
       fileGraph[d].reset_byte_counters();
@@ -441,7 +459,7 @@ public:
           auto ii = fileGraph[d].edge_begin(src);
           auto ee = fileGraph[d].edge_end(src);
           for (; ii < ee; ++ii) {
-          auto dst = fileGraph[d].getEdgeDst(ii);
+          unsigned dst = fileGraph[d].getEdgeDst(ii);
           auto h = this->getColumnHostID(dst);
           hasIncomingEdge[h].set(this->getColumnIndex(dst));
           numOutgoingEdges[d][h][src - rowOffset]++;
@@ -462,7 +480,7 @@ public:
       unsigned h = (gridRowID() * numColumnHosts) + i;
       if (h == base_hGraph::id) continue;
       Galois::Runtime::SendBuffer b;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gSerialize(b, numOutgoingEdges[d][i]);
       }
       Galois::Runtime::gSerialize(b, hasIncomingEdge[i]);
@@ -478,7 +496,7 @@ public:
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
       auto& b = p->second;
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         Galois::Runtime::gDeserialize(b, numOutgoingEdges[d][h]);
       }
       Galois::Runtime::gDeserialize(b, hasIncomingEdge[h]);
@@ -491,7 +509,7 @@ public:
 
     auto max_nodes = hasIncomingEdge[0].size();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
-      for(auto d = 0; d < DecomposeFactor; ++d){
+      for(unsigned d = 0; d < DecomposeFactor; ++d){
         max_nodes += numOutgoingEdges[d][i].size();
       }
     }
@@ -503,8 +521,8 @@ public:
     numNodes = 0;
     numEdges = 0;
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
-      unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
+      //unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       unsigned hostID = (base_hGraph::id + d*base_hGraph::numHosts);
       uint64_t src = base_hGraph::gid2host[hostID].first;
       unsigned i = gridColumnID();
@@ -518,7 +536,7 @@ public:
       }
     }
 
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         unsigned hostID = leaderHostID + i;
@@ -554,7 +572,8 @@ public:
 
     base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID, hostID_virtual;
+      //unsigned hostID;
+      unsigned hostID_virtual;
       if (columnBlocked) {
         hostID_virtual = (gridColumnID() * numRowHosts) + i;
       } else {
@@ -564,7 +583,7 @@ public:
       if (virtual2RealHost(hostID_virtual) == (base_hGraph::id)) continue;
       if (columnBlocked) {
         bool skip = false;
-        for(auto d = 0; d < DecomposeFactor; ++d){
+        for(unsigned d = 0; d < DecomposeFactor; ++d){
           unsigned leaderHostID = gridRowID(base_hGraph::id + i*base_hGraph::numHosts) * numColumnHosts;
           if ((hostID_virtual >= leaderHostID) && (hostID_virtual < (leaderHostID + numColumnHosts))) 
             skip = true;
@@ -599,7 +618,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       fileGraph[d].reset_byte_counters();
     }
 
@@ -614,7 +633,7 @@ public:
     ++Galois::Runtime::evilPhase;
 
     timer.stop();
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
     }
@@ -626,7 +645,7 @@ public:
                          std::vector<Galois::Graph::FileGraph>& fileGraph) {
 
     //XXX h_offset not correct
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -683,7 +702,7 @@ public:
   void loadEdgesFromFile(GraphTy& graph, 
                          Galois::Graph::OfflineGraph& g,
                          std::vector<Galois::Graph::FileGraph>& fileGraph) {
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -734,10 +753,13 @@ public:
   template<typename GraphTy>
   void receiveEdges(GraphTy& graph, uint32_t& numNodesWithEdges) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+    // receive edges for all ghost nodes
     while (numNodesWithEdges < base_hGraph::numOwned) {
       decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
       net.handleReceives();
       p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+
       if (p) {
         auto& rb = p->second;
         uint64_t n;
@@ -782,7 +804,7 @@ public:
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
     // mirrors for outgoing edges
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       for(unsigned i = 0; i < numColumnHosts; ++i){
         //unsigned hostID = (gridRowID() * numColumnHosts) + i;
         unsigned hostID_virtual = (gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts) + i;
@@ -798,8 +820,9 @@ public:
         }
       }
     }
+
     // mirrors for incoming edges
-    for(auto d = 0; d < DecomposeFactor; ++d){
+    for(unsigned d = 0; d < DecomposeFactor; ++d){
       unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
       for (unsigned i = 0; i < numRowHosts; ++i) {
         unsigned hostID_virtual;
@@ -848,17 +871,22 @@ public:
 
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    assert(base_hGraph::beginMaster < base_hGraph::endMaster);
-    assert((base_hGraph::endMaster - base_hGraph::beginMaster) == base_hGraph::totalOwnedNodes);
-    if (syncType == base_hGraph::syncBroadcast) { // reset masters
-      bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
-    } else { // reset mirrors
-      assert(syncType == base_hGraph::syncReduce);
-      if (base_hGraph::beginMaster > 0) {
-        bitset_reset_range(0, base_hGraph::beginMaster - 1);
-      }
-      if (base_hGraph::endMaster < numNodes) {
-        bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+    uint32_t numMasters = base_hGraph::endMaster - base_hGraph::beginMaster;
+
+    assert(base_hGraph::beginMaster <= base_hGraph::endMaster);
+    assert(numMasters == base_hGraph::totalOwnedNodes);
+
+    if (numMasters != 0) {
+      if (syncType == base_hGraph::syncBroadcast) { // reset masters
+        bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
+      } else { // reset mirrors
+        assert(syncType == base_hGraph::syncReduce);
+        if (base_hGraph::beginMaster > 0) {
+          bitset_reset_range(0, base_hGraph::beginMaster - 1);
+        }
+        if (base_hGraph::endMaster < numNodes) {
+          bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+        }
       }
     }
   }

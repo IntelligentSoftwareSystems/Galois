@@ -1,4 +1,4 @@
-/** heap building blocks -*- C++ -*-
+/** Runtime Init -*- C++ -*-
  * @file
  * @section License
  *
@@ -25,45 +25,29 @@
  * reserved.
  *
  * @section Description
+ * Initializes the components of Galois::Runtime library
  *
- * Strongly inspired by heap layers:
- *  http://www.heaplayers.org/
- * FSB is modified from:
- *  http://warp.povusers.org/FSBAllocator/
- *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PAGEPOOL_H
-#define GALOIS_RUNTIME_PAGEPOOL_H
 
-#include <cstddef>
+#ifndef GALOIS_RUNTIME_INIT_H
+#define GALOIS_RUNTIME_INIT_H
 
 namespace Galois {
 namespace Runtime {
 
-//! Low level page pool (individual pages, use largeMalloc for large blocks)
+/**
+ * Initialize Runtime components
+ */
+void init(void);
 
-void* pagePoolAlloc();
-void pagePoolFree(void*);
-void pagePoolPreAlloc(unsigned);
-
-//Size of returned pages
-size_t pagePoolSize();
-
-//! Returns total large pages allocated by Galois memory management subsystem
-int numPagePoolAllocTotal();
-//! Returns total large pages allocated for thread by Galois memory management subsystem
-int numPagePoolAllocForThread(unsigned tid);
-
-namespace internal {
-  //! Initialize PagePool, used by Runtime::init();
-  void initPagePool(void);
-
-  //! Destroy  PagePool, used by Runtime::finish();
-  void killPagePool(void);
-} // end namespace internal
+/**
+ * Destroy Runtime components
+ */
+void kill(void);
 
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif
+
+#endif// GALOIS_RUNTIME_INIT_H

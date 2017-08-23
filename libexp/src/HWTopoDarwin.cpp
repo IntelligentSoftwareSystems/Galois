@@ -30,12 +30,12 @@
  * 
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/gIO.h"
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
-using namespace Galois::Runtime::LL;
+using namespace Galois::Substrate;
 
 namespace {
 

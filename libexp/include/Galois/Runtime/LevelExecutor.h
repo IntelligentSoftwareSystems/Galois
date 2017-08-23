@@ -39,7 +39,7 @@
 #include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 
@@ -440,7 +440,7 @@ public:
     }
 
     if (isMasterThread ()) {
-      Substrate::gPrint("Level-by-Level, critical path length: ", steps, ", avg. parallelism: ", totalWork/(double) steps, "\n");
+      gPrint("Level-by-Level, critical path length: ", steps, ", avg. parallelism: ", totalWork/(double) steps, "\n");
     }
 
   }

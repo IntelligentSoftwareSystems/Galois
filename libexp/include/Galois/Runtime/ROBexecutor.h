@@ -49,7 +49,7 @@
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Runtime/Mem.h"
@@ -528,13 +528,13 @@ public:
 
     double ar = double (numTotal.reduce () - numCommitted.reduce ()) / double (numTotal.reduce ());
     double totalAborts = double (abortSelfByConflict.reduce () + abortSelfBySignal.reduce () + abortByOther.reduce ());
-    Substrate::gPrint("Total Iterations: ", numTotal.reduce(), "\n");
-    Substrate::gPrint("Number Committed: ", numCommitted.reduce(), "\n");
-    Substrate::gPrint("Abort Ratio: ", ar, "\n");
-    Substrate::gPrint("abortSelfByConflict: ", abortSelfByConflict.reduce(), ", ", (100.0*abortSelfByConflict.reduce())/totalAborts, "%", "\n");
-    Substrate::gPrint("abortSelfBySignal: ", abortSelfBySignal.reduce(), ", ", (100.0*abortSelfBySignal.reduce())/totalAborts, "%", "\n");
-    Substrate::gPrint("abortByOther: ", abortByOther.reduce(), ", ", (100.0*abortByOther.reduce())/totalAborts, "%", "\n");
-    Substrate::gPrint("Number of Global Cleanups: ", numGlobalCleanups.reduce(), "\n");
+    gPrint("Total Iterations: ", numTotal.reduce(), "\n");
+    gPrint("Number Committed: ", numCommitted.reduce(), "\n");
+    gPrint("Abort Ratio: ", ar, "\n");
+    gPrint("abortSelfByConflict: ", abortSelfByConflict.reduce(), ", ", (100.0*abortSelfByConflict.reduce())/totalAborts, "%", "\n");
+    gPrint("abortSelfBySignal: ", abortSelfBySignal.reduce(), ", ", (100.0*abortSelfBySignal.reduce())/totalAborts, "%", "\n");
+    gPrint("abortByOther: ", abortByOther.reduce(), ", ", (100.0*abortByOther.reduce())/totalAborts, "%", "\n");
+    gPrint("Number of Global Cleanups: ", numGlobalCleanups.reduce(), "\n");
   }
 
 private:

@@ -309,7 +309,7 @@ static Galois::LargeArray<Galois::Runtime::Lockable> locks;
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
-   Galois::Substrate::ThreadPool::getThreadPool().burnPower(bots_arg_size_2);
+   Galois::Substrate::getThreadPool().burnPower(bots_arg_size_2);
    Galois::preAlloc(5*bots_arg_size_2);
    Galois::reportPageAlloc("MeminfoPre");
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
@@ -636,7 +636,7 @@ void sparselu_par_call(float **BENCH)
 
 void sparselu_fini (float **BENCH, char *pass)
 {
-  Galois::Substrate::ThreadPool::getThreadPool().beKind();
+  Galois::Substrate::getThreadPool().beKind();
    print_structure(pass, BENCH);
    locks.destroy();
    locks.deallocate();

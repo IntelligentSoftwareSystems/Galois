@@ -36,7 +36,7 @@
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
 #include "Galois/Threads.h"
-#include "Galois/Substrate/gio.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
 
 #include <tuple>
@@ -58,7 +58,7 @@ struct OnEachExecutor {
 template<typename FunctionTy>
 void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
   auto activeThreads = getActiveThreads();
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn, activeThreads));
+  Substrate::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn, activeThreads));
 }
 
 template<typename FunctionTy, typename TupleTy>

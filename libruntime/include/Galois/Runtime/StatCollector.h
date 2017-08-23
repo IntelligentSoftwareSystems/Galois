@@ -98,6 +98,11 @@ public:
   void beginLoopInstance(const std::string& str);
 };
 
+namespace internal {
+  void initStatManager(void);
+  void killStatManager(void);
+}
+
 } // end namespace Runtime
 } // end namespace Galois
 
