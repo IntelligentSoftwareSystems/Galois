@@ -352,6 +352,26 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
   return static_cast<char*>(base) + alignment;
 }
 
+static void pageInterleaved(void* ptr, uint64_t length, uint32_t hugePageSize,
+                            unsigned int numThreads) {
+  Galois::Substrate::getThreadPool().run(numThreads, 
+   [ptr, length, hugePageSize, numThreads] () {
+      auto myID = Galois::Substrate::ThreadPool::getTID();
+
+      volatile char* cptr = reinterpret_cast<volatile char*>(ptr);
+
+      // round robin page distribution among threads (e.g. thread 0 gets
+      // a page, then thread 1, then thread n, then back to thread 0 and 
+      // so on until the end of the region)
+      for (size_t x = hugePageSize * myID; 
+           x < length; 
+           x += hugePageSize * numThreads)
+        // this should do an access
+        cptr[x];
+   }
+ );
+}
+
 /**
  * Loads/mmaps particular portions of a graph corresponding to a node
  * range and edge range into memory.
@@ -361,7 +381,7 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
  * @param erange Edge range to load
  */
 void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, 
-                             EdgeRange erange) {
+                             EdgeRange erange, bool numaMap) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
     GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
@@ -407,6 +427,43 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
 
   numNodes = partNumNodes;
   numEdges = partNumEdges;
+
+  // do interleaved numa allocation with current number of threads
+  if (numaMap) {
+    unsigned int numThreads = Galois::Runtime::activeThreads;
+    const size_t hugePageSize = 2 * 1024 * 1024; // 2MB
+
+    void* ptr;
+
+    // doesn't really matter if only 1 thread; i.e. do nothing i
+    // that case
+    if (numThreads != 1) {
+      // node pointer to edge dest array
+      ptr = (void*)outIdx; 
+      length = numNodes * sizeof(uint64_t);
+
+      pageInterleaved(ptr, length, hugePageSize, numThreads);
+
+      // edge dest array
+      ptr = (void*)outs;
+      if (graphVersion == 1) {
+        length = numEdges * sizeof(uint32_t);
+      } else {
+        // v2
+        length = numEdges * sizeof(uint64_t);
+      }
+
+      pageInterleaved(ptr, length, hugePageSize, numThreads);
+
+      // edge data (if it exists)
+      if (sizeofEdge) {
+        ptr = (void*)edgeData;
+        length = numEdges * sizeofEdge;
+
+        pageInterleaved(ptr, length, hugePageSize, numThreads);
+      }
+    } 
+  }
 }
 
 // Note this is the original find index; kept for divideByEdge

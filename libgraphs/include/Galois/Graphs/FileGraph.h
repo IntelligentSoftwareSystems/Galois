@@ -45,6 +45,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Substrate/NumaMem.h"
 #include "Galois/Accumulator.h"
 
 #include <boost/iterator/counting_iterator.hpp>
@@ -377,7 +378,8 @@ public:
    *
    * \snippet test/filegraph.cpp Reading part of graph
    */
-  void partFromFile(const std::string& filename, NodeRange nrange, EdgeRange erange);
+  void partFromFile(const std::string& filename, NodeRange nrange, 
+                    EdgeRange erange, bool numaMap=false);
 
   /**
    * Reads graph connectivity information from file. Tries to balance memory
