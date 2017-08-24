@@ -121,6 +121,11 @@ static cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges",
                              "partitioning among threads"),
                              cll::init(0));
 
+static cll::opt<unsigned> numFileThreads("ft", 
+                             cll::desc("Number of file reading threads or I/O requests "
+                             "per host"),
+                             cll::init(4));
+
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
 

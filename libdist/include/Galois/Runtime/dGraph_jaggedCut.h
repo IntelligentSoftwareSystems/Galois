@@ -365,6 +365,9 @@ private:
 
   void determineJaggedColumnMapping(Galois::Graph::OfflineGraph& g, 
                       Galois::Graph::FileGraph& fileGraph) {
+    auto activeThreads = Galois::Runtime::activeThreads;
+    Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+
     Galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
@@ -406,8 +409,9 @@ private:
     fprintf(stderr, "[%u] In-degree calculation time : %f seconds to read %lu bytes (%f MBPS)\n", 
         base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
+    Galois::setActiveThreads(activeThreads); // revert to prior active threads
+
     // TODO move this to a common helper function
-    auto& activeThreads = Galois::Runtime::activeThreads;
     std::vector<uint64_t> prefixSumOfThreadBlocks(activeThreads, 0);
     Galois::on_each([&](unsigned tid, unsigned nthreads) {
         assert(nthreads == activeThreads);

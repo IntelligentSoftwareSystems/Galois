@@ -504,6 +504,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
       }
 
+      auto activeThreads = Galois::Runtime::activeThreads;
+      Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+
       Galois::Timer timer;
       timer.start();
       fileGraph.reset_byte_counters();
@@ -579,6 +582,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       timer.stop();
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+
+      Galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){

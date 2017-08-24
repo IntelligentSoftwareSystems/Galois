@@ -193,6 +193,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
 
+      auto activeThreads = Galois::Runtime::activeThreads;
+      Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+
       Galois::Timer timer;
       timer.start();
       fileGraph.reset_byte_counters();
@@ -237,11 +240,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         Galois::do_all_steal<true>()
       );
 
-
       timer.stop();
-
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+
+      Galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       // only nodes we do not own are actual ghosts (i.e. filter the "ghosts"
       // found above)

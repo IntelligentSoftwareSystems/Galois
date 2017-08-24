@@ -455,6 +455,8 @@ public:
       }
     }
 
+    auto activeThreads = Galois::Runtime::activeThreads;
+    Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       Galois::Timer timer;
       timer.start();
@@ -501,6 +503,7 @@ public:
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
     }
+    Galois::setActiveThreads(activeThreads); // revert to prior active threads
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
