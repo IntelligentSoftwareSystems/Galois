@@ -1,4 +1,4 @@
-/**KCore -*- C++ -*-
+/** KCore -*- C++ -*-
  * @file
  * @section License
  *
@@ -166,23 +166,18 @@ struct InitializeGraph2 {
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      InitializeGraph2_all_cuda(cuda_ctx);
+      InitializeGraph2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+                            cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    //Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph2{&_graph}, 
-                   //Galois::loopname("InitializeGraph2"), 
-                   //Galois::numrun(_graph.get_run_identifier()));
-
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
-        InitializeGraph2{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-          Galois::timeit()
-        )
-      );
-
+    Galois::do_all_local(
+      nodesWithEdges,
+      InitializeGraph2{ &_graph },
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
+    );
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
@@ -214,7 +209,7 @@ struct InitializeGraph1 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto allNodes = _graph.allNodesRange();
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -222,30 +217,17 @@ struct InitializeGraph1 {
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      InitializeGraph1_cuda(*(_graph.begin()), *(_graph.ghost_end()), cuda_ctx);
+      InitializeGraph1_cuda(*(allNodes.begin()), *(allNodes.end()), 
+                            cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-                   //InitializeGraph1{&_graph}, 
-                   //Galois::loopname("InitializeGraph1"), 
-                   //Galois::numrun(_graph.get_run_identifier()));
-
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
+     Galois::do_all(
+        allNodes.begin(), allNodes.end(),
         InitializeGraph1{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-          Galois::timeit()
-        )
+        Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
+        Galois::timeit()
       );
-
-    // note that this sync is necessary to act as a barrier (current degree
-    // must be set to 0 among all hosts before calling InitializeGraph2)
-    // Bitset_current_degree will be empty, so it acts as a barrier (no
-    // non-trivial data should be sent)
-    _graph.sync<writeSource, readDestination, Reduce_set_current_degree, 
-      Broadcast_current_degree, Bitset_current_degree>("InitializeGraph1");
 
     // degree calculation
     InitializeGraph2::go(_graph);
@@ -257,7 +239,6 @@ struct InitializeGraph1 {
     src_data.flag = true;
     src_data.trim = 0;
     src_data.current_degree = 0;
-    // note that no bitset is set
   }
 };
 
@@ -271,37 +252,30 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto allNodes = _graph.allNodesRange();
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-
       StatTimer_cuda.start();
-      KCoreStep2_all_cuda(cuda_ctx);
+      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    //Galois::do_all(_graph.begin(), _graph.end(), KCoreStep2(&_graph), 
-                   //Galois::loopname("KCoreStep2"),
-                   //Galois::numrun(_graph.get_run_identifier()));
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
-        KCoreStep2{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
-          Galois::timeit()
-        )
-      );
-
+     Galois::do_all(
+       allNodes.begin(), allNodes.end(),
+       KCoreStep2{ &_graph },
+       Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
+       Galois::timeit()
+     );
   }
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // we currently do not care about degree for dead nodes, so updates to
-    // it are ignored
+    // we currently do not care about degree for dead nodes, 
+    // so we ignore those (i.e. if flag isn't set, do nothing)
     if (src_data.flag) {
       if (src_data.trim > 0) {
         src_data.current_degree = src_data.current_degree - src_data.trim;
@@ -316,21 +290,22 @@ struct KCoreStep2 {
  * if it is */
 struct KCoreStep1 {
   cll::opt<uint32_t>& local_k_core_num;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
   Graph* graph;
 
-  KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph) : 
-    local_k_core_num(_kcore), graph(_graph){}
+  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
-  void static go(Graph& _graph){
+  KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph,
+             Galois::DGAccumulator<unsigned int>& _dga) : 
+    local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
+
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto allNodes = _graph.allNodesRange();
 
     do {
       _graph.set_num_iter(iterations);
-      DGAccumulator_accum.reset();
-
+      dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
@@ -338,24 +313,19 @@ struct KCoreStep1 {
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        KCoreStep1_all_cuda(__retval, k_core_num, cuda_ctx);
-        DGAccumulator_accum += __retval;
+        KCoreStep1_cuda(*allNodes.begin(), *allNodes.end(),
+                        __retval, k_core_num, cuda_ctx);
+        dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      //Galois::do_all(_graph.begin(), _graph.end(), 
-                     //KCoreStep1(k_core_num, &_graph), 
-                     //Galois::loopname("KCoreStep1"),
-                     //Galois::numrun(_graph.get_run_identifier()));
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
-        KCoreStep1{ k_core_num, &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
-          Galois::timeit()
-        )
+      Galois::do_all_local(
+        allNodes,
+        KCoreStep1{ k_core_num, &_graph, dga },
+        Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
-
 
       // do the trim sync
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
@@ -365,8 +335,7 @@ struct KCoreStep1 {
       KCoreStep2::go(_graph);
 
       iterations++;
-    } while ((iterations < maxIterations) && DGAccumulator_accum.reduce());
-
+    } while ((iterations < maxIterations) && dga.reduce());
   }
 
   void operator()(GNode src) const {
@@ -394,7 +363,6 @@ struct KCoreStep1 {
     }
   }
 };
-Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Sanity check operators */
@@ -403,12 +371,18 @@ Galois::DGAccumulator<int> KCoreStep1::DGAccumulator_accum;
 /* Gets the total number of nodes that are still alive */
 struct GetAliveDead {
   Graph* graph;
-  static Galois::DGAccumulator<uint32_t> DGAccumulator_accum;
-  static Galois::DGAccumulator<uint32_t> DGAccumulator_accum2;
+  Galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
+  Galois::DGAccumulator<uint64_t>& DGAccumulator_accum2;
 
-  GetAliveDead(Graph* _graph) : graph(_graph){}
+  GetAliveDead(Graph* _graph, 
+               Galois::DGAccumulator<uint64_t>& _DGAccumulator_accum,
+               Galois::DGAccumulator<uint64_t>& _DGAccumulator_accum2) : 
+      graph(_graph), DGAccumulator_accum(_DGAccumulator_accum),
+      DGAccumulator_accum2(_DGAccumulator_accum2) {}
 
-  void static go(Graph& _graph) {
+  void static go(Graph& _graph,
+    Galois::DGAccumulator<uint64_t>& dga1,
+    Galois::DGAccumulator<uint64_t>& dga2) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
@@ -416,16 +390,16 @@ struct GetAliveDead {
              "wrong results.\n");
     }
   #endif
+    dga1.reset();
+    dga2.reset();
 
-    DGAccumulator_accum.reset();
-    DGAccumulator_accum2.reset();
-
-    Galois::do_all(_graph.begin(), _graph.end(), GetAliveDead(&_graph), 
+    Galois::do_all(_graph.begin(), _graph.end(), 
+                   GetAliveDead(&_graph, dga1, dga2), 
                    Galois::loopname("GetAliveDead"),
                    Galois::numrun(_graph.get_run_identifier()));
 
-    uint32_t num_alive = DGAccumulator_accum.reduce();
-    uint32_t num_dead = DGAccumulator_accum2.reduce();
+    uint32_t num_alive = dga1.reduce();
+    uint32_t num_dead = dga2.reduce();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
@@ -447,8 +421,6 @@ struct GetAliveDead {
     }
   }
 };
-Galois::DGAccumulator<uint32_t> GetAliveDead::DGAccumulator_accum;
-Galois::DGAccumulator<uint32_t> GetAliveDead::DGAccumulator_accum2;
 
 /******************************************************************************/
 /* Main method for running */
@@ -456,6 +428,7 @@ Galois::DGAccumulator<uint32_t> GetAliveDead::DGAccumulator_accum2;
 
 int main(int argc, char** argv) {
   try {
+    Galois::System G;
     LonestarStart(argc, argv, name, desc, url);
     Galois::StatManager statManager;
 
@@ -539,17 +512,21 @@ int main(int argc, char** argv) {
       InitializeGraph1::go((*h_graph));
     StatTimer_graph_init.stop();
 
+    Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+    Galois::DGAccumulator<uint64_t> dga1;
+    Galois::DGAccumulator<uint64_t> dga2;
+
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] KCoreStep1::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-        KCoreStep1::go((*h_graph));
+        KCoreStep1::go(*h_graph, DGAccumulator_accum);
       StatTimer_main.stop();
 
       // sanity check
-      GetAliveDead::go(*h_graph);
+      GetAliveDead::go(*h_graph, dga1, dga2);
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
