@@ -194,7 +194,8 @@ struct ConnectedComp {
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        ConnectedComp_all_cuda(__retval, cuda_ctx);
+        ConnectedComp_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+                           __retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)

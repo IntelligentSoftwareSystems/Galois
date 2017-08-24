@@ -151,7 +151,7 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()), 
+        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()), 
                                  cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -186,7 +186,8 @@ struct FirstItr_ConnectedComp{
                              (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      FirstItr_ConnectedComp_all_cuda(cuda_ctx);
+      FirstItr_ConnectedComp_cuda(*nodesWithEdges.begin(), 
+                                  *nodesWithEdges.end(), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
