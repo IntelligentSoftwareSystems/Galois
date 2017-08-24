@@ -161,13 +161,9 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     {
-    auto loopOperator = InitializeGraph(src_node, infinity, &_graph);
-
     Galois::do_all_local(
       allNodes,
-      [&] (GNode src) {
-        loopOperator(src);
-      },
+      InitializeGraph(src_node, infinity, &_graph),
       Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       Galois::do_all_steal<true>(),
       Galois::timeit()
