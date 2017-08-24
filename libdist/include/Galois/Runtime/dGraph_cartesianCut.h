@@ -486,7 +486,7 @@ public:
         auto ii = fileGraph[d].edge_begin(src);
         auto ee = fileGraph[d].edge_end(src);
         for (; ii < ee; ++ii) {
-        unsigned dst = fileGraph[d].getEdgeDst(ii);
+        auto dst = fileGraph[d].getEdgeDst(ii);
         auto h = this->getColumnHostID(dst);
         hasIncomingEdge[h].set(this->getColumnIndex(dst));
         numOutgoingEdges[d][h][src - rowOffset]++;

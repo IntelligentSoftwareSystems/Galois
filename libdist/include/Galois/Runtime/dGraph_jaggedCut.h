@@ -372,7 +372,6 @@ private:
     auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
     size_t numColumnChunks = (base_hGraph::totalNodes + columnChunkSize - 1)/columnChunkSize;
     std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
-    std::vector<std::atomic<uint64_t>> indegree(numColumnChunks); // TODO use LargeArray
     //Galois::Runtime::do_all_coupled(
     //  Galois::Runtime::makeStandardRange(beginIter, endIter),
     //  [&] (auto src) {
@@ -380,8 +379,7 @@ private:
     //    auto ee = fileGraph.edge_end(src);
     //    for (; ii < ee; ++ii) {
     //      auto dst = fileGraph.getEdgeDst(ii);
-    //      //++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
-    //      Galois::atomicAdd(indegree[dst/columnChunkSize], (uint64_t)1);
+    //      ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
     //    }
     //  },
     //  std::make_tuple(
@@ -396,8 +394,7 @@ private:
         auto ee = fileGraph.edge_end(src);
         for (; ii < ee; ++ii) {
           auto dst = fileGraph.getEdgeDst(ii);
-          //++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
-          Galois::atomicAdd(indegree[dst/columnChunkSize], (uint64_t)1);
+          ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
         }
       },
       Galois::loopname("CalculateIndegree"),
@@ -419,11 +416,8 @@ private:
         auto begin = range.first;
         auto end = range.second;
         // find prefix sum of each block
-        if (begin < end) {
-          prefixSumOfInEdges[begin] = indegree[begin];
-        }
         for (auto i = begin + 1; i < end; ++i) {
-          prefixSumOfInEdges[i] = prefixSumOfInEdges[i-1] + indegree[i];
+          prefixSumOfInEdges[i] += prefixSumOfInEdges[i-1];
         }
         if (begin < end) {
           prefixSumOfThreadBlocks[tid] = prefixSumOfInEdges[end - 1];
