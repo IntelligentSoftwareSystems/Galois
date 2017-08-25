@@ -327,7 +327,10 @@ struct KCoreStep1 {
         Galois::timeit()
       );
 
-      // do the trim sync
+      // do the trim sync; readSource because in symmetric graph 
+      // source=destination; not a readAny because any will grab non 
+      // source/dest nodes (which have degree 0, so they won't have a trim 
+      // anyways)
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCoreStep1");
 
@@ -336,6 +339,13 @@ struct KCoreStep1 {
 
       iterations++;
     } while ((iterations < maxIterations) && dga.reduce());
+
+    if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
+      Galois::Runtime::reportStat("(NULL)", 
+        "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
+        (unsigned long)iterations, 0);
+    }
+
   }
 
   void operator()(GNode src) const {
@@ -345,8 +355,9 @@ struct KCoreStep1 {
     if (src_data.flag) {
       if (src_data.current_degree < local_k_core_num) {
         // set flag to 0 (false) and increment trim on outgoing neighbors
+        // (if they exist)
         src_data.flag = false;
-        DGAccumulator_accum += 1;
+        DGAccumulator_accum += 1; // can be optimized: node may not have edges
 
         for (auto current_edge = graph->edge_begin(src), 
                   end_edge = graph->edge_end(src);
@@ -488,7 +499,13 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
 
     Graph* h_graph = nullptr;
-    h_graph = constructGraph<NodeData, void>(scalefactor);
+
+    if (inputFileSymmetric) {
+      h_graph = constructSymmetricGraph<NodeData, void>(scalefactor);
+    } else {
+      GALOIS_DIE("must pass symmetricGraph flag with symmetric graph to "
+                 "kcore");
+    }
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
