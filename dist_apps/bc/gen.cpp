@@ -250,7 +250,7 @@ struct InitializeIteration {
                        local_current_src_node(_local_current_src_node),
                        graph(_graph){}
 
-  /* Reset graph metadata for next iteration of SSSP/BFS */
+  /* Reset necessary graph metadata for next iteration of SSSP/BFS */
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
@@ -276,13 +276,6 @@ struct InitializeIteration {
       //Galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
       Galois::timeit()
     );
-
-    // The following are read from dest + haven't been sync'd yet, 
-    // i.e. you need to sync
-    // TODO determine if you need to do this/how to get rid of it
-    _graph.sync<writeSource, readDestination, Reduce_set_dependency,
-                //Broadcast_dependency>("InitializeIteration_dep");
-                Broadcast_dependency>("InitializeIteration");
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -290,7 +283,9 @@ struct InitializeIteration {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // assertion only for source nodes (dsts = no)
+    // this assertion only for source nodes (dsts will not have it reset,
+    // which is fine, but we can't use this assert since this operator
+    // goes over dst nodes as well)
     //assert(src_data.num_shortest_paths == 0);
 
     bool is_source = graph->getGID(src) == local_current_src_node;
@@ -298,6 +293,7 @@ struct InitializeIteration {
     if (!is_source) {
       src_data.current_length = local_infinity;
       src_data.old_length = local_infinity;
+      src_data.propogation_flag = false;
     } else {
       src_data.current_length = 0;
       src_data.old_length = 0; 
@@ -305,6 +301,12 @@ struct InitializeIteration {
       src_data.propogation_flag = true;
     }
 
+    // this is read on dst too, and since this operator loops over all
+    // nodes, we reset there as well
+    src_data.dependency = 0;
+
+    // both of these end up being 0 on both source and dest over course
+    // of computation
     assert(src_data.num_predecessors == 0);
     assert(src_data.num_successors == 0);
 
@@ -1108,7 +1110,7 @@ struct BC {
 
     Galois::add(src_data.betweeness_centrality, src_data.dependency);
     // done with it, reset
-    src_data.dependency = 0;
+    //src_data.dependency = 0;
   }
 };
  
