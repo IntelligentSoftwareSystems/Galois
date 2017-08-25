@@ -264,7 +264,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
                        boost::make_counting_iterator<uint64_t>(nodeEnd)),
-        std::make_pair(edgeBegin, edgeEnd));
+        std::make_pair(edgeBegin, edgeEnd),
+        true);
 
 #if 0
       else {

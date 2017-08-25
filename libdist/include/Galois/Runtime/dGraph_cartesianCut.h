@@ -314,7 +314,8 @@ public:
       fileGraph[d].partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin[d]), 
                      boost::make_counting_iterator<uint64_t>(nodeEnd[d])),
-        std::make_pair(edgeBegin[d], edgeEnd[d]));
+        std::make_pair(edgeBegin[d], edgeEnd[d]),
+        true);
     }
 
     std::vector<uint64_t> prefixSumOfEdges;
