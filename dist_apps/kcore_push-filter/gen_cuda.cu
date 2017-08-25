@@ -239,7 +239,7 @@ __global__ void InitializeGraph1(CSRGraph graph,
   // FP: "9 -> 10;
 }
 __global__ void KCoreStep2(CSRGraph graph,
-  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_degree, uint32_t * p_trim)
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_degree, uint32_t * p_trim, bool * p_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -253,10 +253,14 @@ __global__ void KCoreStep2(CSRGraph graph,
     bool pop  = src < __end;
     if (pop)
     {
-      if (p_trim[src] > 0)
+      // manual addition to match current cpu code
+      if (p_flag[src]) 
       {
-        p_current_degree[src] = p_current_degree[src] - p_trim[src];
-        p_trim[src] = 0;
+        if (p_trim[src] > 0)
+        {
+          p_current_degree[src] = p_current_degree[src] - p_trim[src];
+          p_trim[src] = 0;
+        }
       }
     }
   }
@@ -491,7 +495,7 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "4 -> 5;
   KCoreStep2 <<<blocks, threads>>>(ctx->gg, 
     ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
-    ctx->trim.data.gpu_wr_ptr());
+    ctx->trim.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
