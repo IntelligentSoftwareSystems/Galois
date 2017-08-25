@@ -22,6 +22,7 @@ OUTPUT=${outputdirname}/${inputname}.${problem}
 
 # kcore output files have a number at the end specifying kcore number
 if [[ $execname == *"kcore"* ]]; then
+  # TODO: update this for non-100 kcore numbers
   OUTPUT=${outputdirname}/${inputname}.${problem}100
 fi
 
@@ -44,6 +45,7 @@ FLAGS=
 #FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
+  # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -61,7 +63,7 @@ if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
 fi
 
 source_file=${inputdirname}/source
-if [[ $execname == *"cc"* ]]; then
+if [[ $execname == *"cc"* || $execname == *"kcore"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
   FLAGS+=" -symmetricGraph"

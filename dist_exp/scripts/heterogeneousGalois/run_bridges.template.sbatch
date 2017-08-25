@@ -23,6 +23,7 @@ FLAGS=
 #FLAGS+=" -runs=1"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
+  # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -39,7 +40,7 @@ if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
 fi
 
 source_file=${inputdirname}/source
-if [[ $execname == *"cc"* ]]; then
+if [[ $execname == *"cc"* || $execname == *"kcore"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
   FLAGS+=" -symmetricGraph"
