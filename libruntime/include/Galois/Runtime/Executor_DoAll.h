@@ -34,13 +34,8 @@
 #ifndef GALOIS_RUNTIME_DOALLCOUPLED_H
 #define GALOIS_RUNTIME_DOALLCOUPLED_H
 
-#include <algorithm>
-#include <vector>
-#include <limits>
-
-#include <cstdio>
-#include <ctime>
-
+#include "Galois/gIO.h"
+#include "Galois/Statistic.h"
 
 #include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/Substrate/Barrier.h"
@@ -49,108 +44,6 @@
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/gIO.h"
-
-#include "Galois/Timer.h"
-#include "Galois/OrderedTraits.h"
-
-// TODO: implement more_stats flag, which shows per-thread timers
-
-namespace Galois {
-
-  template <bool enabled> 
-  class ThreadTimer {
-    timespec m_start;
-    timespec m_stop;
-    int64_t  m_nsec;
-
-  public:
-    ThreadTimer (): m_nsec (0) {};
-
-    void start (void) {
-      clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_start);
-    }
-
-    void stop (void) {
-      clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_stop);
-      m_nsec += (m_stop.tv_nsec - m_start.tv_nsec);
-      m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
-    }
-
-    int64_t get_nsec(void) const { return m_nsec; }
-
-    int64_t get_sec(void) const { return (m_nsec >> 30); }
-      
-  };
-
-  template <>
-  class ThreadTimer<false> {
-  public:
-    void start (void) const  {}
-    void stop (void) const  {}
-    int64_t get_nsec (void) const { return 0; }
-    int64_t get_sec (void) const  { return 0; }
-  };
-
-  template <typename T>
-  class AggStatistic {
-
-    const char* m_name;
-    std::vector<T> m_values;
-
-    T m_min;
-    T m_max;
-    T m_sum;
-
-  public:
-
-    AggStatistic (const char* name=NULL) : 
-      m_name (name),
-      m_values (),
-      m_min (std::numeric_limits<T>::max ()),
-      m_max (std::numeric_limits<T>::min ()),
-      m_sum ()
-    
-    {
-      if (name == NULL) {
-        m_name = "STAT";
-      }
-    }
-
-    void add (const T& val) {
-      m_values.push_back (val);
-
-      m_min = std::min (m_min, val);
-      m_max = std::max (m_max, val);
-
-      m_sum += val;
-    }
-
-    T range () const { return m_max - m_min; }
-
-    T average () const { return m_sum / T (m_values.size ()); }
-
-    void print (void) const { 
-      
-      gPrint (m_name , " [" , m_values.size () , "]"
-        , ", max = " , m_max
-        , ", min = " , m_min
-        , ", sum = " , m_sum
-        , ", avg = " , average ()
-        , ", range = " , range () 
-        , "\n");
-
-      gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
-
-      for (typename std::vector<T>::const_iterator i = m_values.begin (), endi = m_values.end ();
-          i != endi; ++i) {
-        gPrint ( *i , ", ");
-      }
-      gPrint ("]\n");
-    }
-
-  };
-} // end namespace Galois
 
 
 namespace Galois {
@@ -168,7 +61,9 @@ class DoAllStealingExec {
     HALF, FULL
   };
 
-  static const bool NEEDS_STATS = !exists_by_supertype<does_not_need_stats_tag, ArgsTuple>::value;
+  static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsTuple>::value;
+  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTuple>::value;
+  static constexpr bool USE_TERM = false;
 
   struct ThreadContext {
 
@@ -181,11 +76,6 @@ class DoAllStealingExec {
     size_t num_iter;
 
     // Stats
-    static const bool ENABLE_TIMER = false;
-    Galois::ThreadTimer<ENABLE_TIMER> timer;
-    Galois::ThreadTimer<ENABLE_TIMER> work_timer;
-    Galois::ThreadTimer<ENABLE_TIMER> steal_timer;
-    Galois::ThreadTimer<ENABLE_TIMER> term_timer;
 
     ThreadContext () 
       :
@@ -561,39 +451,6 @@ private:
   }
 
 
-
-
-  void printStats () {
-
-    Galois::AggStatistic<size_t> iter ("Iterations: ");
-    Galois::AggStatistic<int64_t> time ("Total time (nsec): ");
-    Galois::AggStatistic<int64_t> work_timer ("Work time (nsec): ");
-    Galois::AggStatistic<int64_t> steal_timer ("Steal time (nsec): ");
-    Galois::AggStatistic<int64_t> term_timer ("Termination time (nsec): ");
-
-
-    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
-      ThreadContext& ctx = *workers.getRemote (i);
-
-      iter.add (ctx.num_iter);
-      time.add (ctx.timer.get_nsec ());
-
-      work_timer.add (ctx.work_timer.get_nsec ());
-      steal_timer.add (ctx.steal_timer.get_nsec ());
-      term_timer.add (ctx.term_timer.get_nsec ());
-    }
-
-    // size_t  ave_iter =  total_iter / Galois::getActiveThreads ();
-
-    iter.print ();
-    time.print ();
-    // work_timer.print ();
-    // steal_timer.print ();
-    // term_timer.print ();
-    gPrint ("--------\n");
-  }
-
-
 private:
 
 
@@ -606,6 +463,11 @@ private:
   Substrate::TerminationDetection& term;
 
   // for stats
+  PerThreadTimer<MORE_STATS> totalTime;
+  PerThreadTimer<MORE_STATS> initTime;
+  PerThreadTimer<MORE_STATS> execTime;
+  PerThreadTimer<MORE_STATS> stealTime;
+  PerThreadTimer<MORE_STATS> termTime;
 
 
 
@@ -620,26 +482,30 @@ public:
       func (_func), 
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
       chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
-      term(Substrate::getSystemTermination(activeThreads))
+      term(Substrate::getSystemTermination(activeThreads)),
+      totalTime(loopname, "Total"),
+      initTime(loopname, "Init"),
+      execTime(loopname, "Execute"),
+      stealTime(loopname, "Steal"),
+      termTime(loopname, "Term")
   {
     assert (chunk_size > 0);
     // std::printf ("DoAllStealingExec loopname: %s, work size: %ld, chunk_size: %u\n", loopname, std::distance(range.begin (), range.end ()), chunk_size);
 
 
-
-    static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
-    static_assert(!exists_by_supertype<char const *, ArgsTuple>::value, "old loopname");
-    static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
-
   }
 
   // parallel call
   void initThread (void) {
+    initTime.start();
+
     term.initializeThread();
 
     unsigned id = Substrate::ThreadPool::getTID();
 
     *workers.getLocal(id) = ThreadContext(id, range.local_begin(), range.local_end());
+
+    initTime.stop();
   }
 
 
@@ -659,29 +525,28 @@ public:
   }
 
   void operator () (void) {
-    const bool USE_TERM = false;
 
     
     ThreadContext& ctx = *workers.getLocal ();
-    ctx.timer.start ();
+    totalTime.start ();
 
 
     while (true) {
       bool workHappened = false;
 
-      ctx.work_timer.start ();
+      execTime.start ();
 
       if (ctx.doWork (func, chunk_size)) {
         workHappened = true;
       }
 
-      ctx.work_timer.stop ();
+      execTime.stop ();
 
       assert (!ctx.hasWork ());
 
-      ctx.steal_timer.start ();
+      stealTime.start ();
       bool stole = trySteal (ctx);
-      ctx.steal_timer.stop ();
+      stealTime.stop ();
 
       if (stole) {
         continue;
@@ -690,11 +555,11 @@ public:
 
         assert (!ctx.hasWork ());
         if (USE_TERM) {
-          ctx.term_timer.start ();
+          termTime.start ();
           term.localTermination (workHappened);
 
           bool quit = term.globalTermination ();
-          ctx.term_timer.stop ();
+          termTime.stop ();
 
 
           if (quit) {
@@ -707,7 +572,7 @@ public:
 
     }
 
-    ctx.timer.stop ();
+    totalTime.stop ();
     assert (!ctx.hasWork ());
 
     // Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, ctx.id);
@@ -741,10 +606,24 @@ template <> struct ChooseDoAllImpl<false> {
 
     Runtime::on_each_impl([&] (const unsigned tid, const unsigned numT) {
 
-        static const bool NEEDS_STATS = !exists_by_supertype<does_not_need_stats_tag, ArgsT>::value;
+        static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsT>::value;
+        static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsT>::value;
+
+        const char* const loopname = get_by_supertype<loopname_tag> (argsTuple).value;
+
+        PerThreadTimer<MORE_STATS> totalTime(loopname, "Total");
+        PerThreadTimer<MORE_STATS> initTime(loopname, "Init");
+        PerThreadTimer<MORE_STATS> execTime(loopname, "Work");
+
+        totalTime.start();
+        initTime.start();
 
         auto begin = range.local_begin();
         const auto end = range.local_end();
+
+        initTime.stop();
+
+        execTime.start();
 
         size_t iter = 0;
 
@@ -754,13 +633,15 @@ template <> struct ChooseDoAllImpl<false> {
             ++iter;
           }
         }
+        execTime.stop();
+
+        totalTime.stop();
 
         if (NEEDS_STATS) {
-          const char* const loopname = get_by_supertype<loopname_tag> (argsTuple).value;
           Galois::Runtime::reportStat (loopname, "Iterations", iter, tid);
         }
 
-    });
+    }, std::make_tuple(no_stats(), loopname("DoAll-no-steal")));
   }
 
 };
@@ -795,66 +676,6 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
   timer.stop();
 }
 
-// TODO: combine with DoAllStealingExec
-template <typename R, typename F, typename ArgsTuple>
-void do_all_detailed_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
-
-  static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, ArgsTuple>::value, "old loopname");
-  static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
-
-  auto argsT = std::tuple_cat (argsTuple, 
-      get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, do_all_steal_tag{}), 
-        std::make_tuple (default_loopname {}, default_chunk_size {}, do_all_steal<false>{} )));
-
-  using ArgsT = decltype (argsT);
-
-  constexpr bool TIME_IT = exists_by_supertype<timeit_tag, ArgsT>::value;
-  CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(argsT).value);
-
-  timer.start();
-
-
-  details::DoAllStealingExec<R, F, ArgsT> exec (range, func, argsT);
-
-  Runtime::on_each_impl (
-      [&exec] (const unsigned tid, const unsigned numT) {
-        exec.initThread ();
-      });
-
-
-  std::vector<ThreadTimer<true> > perThrdTimer (Galois::getActiveThreads ());
-  
-
-  Runtime::on_each_impl(
-      [&exec, &perThrdTimer] (const unsigned tid, const unsigned numT) {
-
-        perThrdTimer[tid].start ();
-        exec ();
-        perThrdTimer[tid].stop ();
-        
-      });
-
-  int64_t maxTime = 0;
-  for (const auto& t: perThrdTimer) {
-    if (maxTime < t.get_nsec ()) {
-      maxTime = t.get_nsec ();
-    }
-  }
-
-  const char* const ln = get_by_supertype<loopname_tag> (argsT).value;
-
-  Runtime::on_each_impl( 
-      [&maxTime, &perThrdTimer, ln] (const unsigned tid, const unsigned numT) {
-        GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
-        Runtime::reportStat (ln, "LoadImbalance", (unsigned long)(maxTime - perThrdTimer[tid].get_nsec ()), 0);
-      });
-
-
-  timer.stop();
-
-}
 
 } // end namespace Runtime
 } // end namespace Galois

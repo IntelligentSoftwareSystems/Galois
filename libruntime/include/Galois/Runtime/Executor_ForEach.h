@@ -166,12 +166,13 @@ public:
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
-  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
-  static const bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
+  static constexpr bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
+  static constexpr bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static constexpr bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static constexpr bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
+  static constexpr bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+  static constexpr bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type; 
@@ -210,6 +211,9 @@ protected:
   FunctionTy origFunction;
   const char* loopname;
   bool broke;
+
+  PerThreadTimer<MORE_STATS> initTime;
+  PerThreadTimer<MORE_STATS> execTime;
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (needsPush) {
@@ -304,6 +308,9 @@ protected:
 
   template<bool couldAbort, bool isLeader>
   void go() {
+
+    execTime.start();
+
     // Thread-local data goes on the local stack to be NUMA friendly
     ThreadLocalData tld(origFunction, loopname);
     if (needsBreak)
@@ -313,6 +320,7 @@ protected:
     if (needsPush && !couldAbort)
       tld.facing.setFastPushBack(
           std::bind(&ForEachExecutor::fastPushBack, this, std::placeholders::_1));
+
     unsigned long old_iterations = 0;
     while (true) {
       do {
@@ -335,10 +343,16 @@ protected:
         Substrate::asmPause(); // Let token propagate
       } while (!term.globalTermination() && (!needsBreak || !broke));
 
-      if (checkEmpty(wl, tld, 0))
+      if (checkEmpty(wl, tld, 0)) {
+        execTime.stop();
         break;
-      if (needsBreak && broke)
+      }
+
+      if (needsBreak && broke) {
+        execTime.stop();
         break;
+      }
+
       term.initializeThread();
       barrier.wait();
     }
@@ -356,7 +370,9 @@ protected:
     wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
-    broke(false) 
+    broke(false),
+    initTime(loopname, "Init"),
+    execTime(loopname, "Execute")
   {
     if (!combineStats) {
       reportLoopInstance(loopname);
@@ -384,8 +400,13 @@ public:
 
   template<typename RangeTy>
   void initThread(const RangeTy& range) {
+
+    initTime.start();
+
     wl.push_initial(range);
     term.initializeThread();
+
+    initTime.stop();
   }
 
   void operator()() {

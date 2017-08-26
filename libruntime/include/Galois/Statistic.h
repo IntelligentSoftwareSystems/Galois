@@ -38,6 +38,7 @@
 #include "boost/utility.hpp"
 
 #include <deque>
+#include <limits>
 
 namespace Galois {
 
@@ -79,7 +80,6 @@ public:
   }
 
 };
-
 using Statistic = StatisticBase<unsigned long>;
 
 /**
@@ -198,6 +198,77 @@ void timeThis(F& f, const char* const name) {
 
   t.stop();
 }
+
+
+template <bool enabled>
+class PerThreadTimer {
+
+protected:
+
+  const char* const loopname;
+  const char* const category;
+
+  Substrate::PerThreadStorage<ThreadTimer<enabled> > timers;
+
+
+  void reportTimes(void) {
+
+    int64_t minTime = std::numeric_limits<int64_t>::max();
+
+    std::string timeCat = category + std::string("-per-thread-times(ns)");
+
+    for (unsigned i = 0; i < timers.size(); ++i) {
+
+      auto ns = timers.getRemote(i)->get_nsec();
+      Galois::Runtime::reportStat(loopname, timeCat.c_str(), ns, i);
+
+      minTime = std::min(minTime, ns);
+    }
+
+    std::string lagCat = category + std::string("-per-thread-lag(ns)");
+    for (unsigned i = 0; i < timers.size(); ++i) {
+
+      auto ns = timers.getRemote(i)->get_nsec();
+      auto lag = ns - minTime;
+      assert(lag > 0 && "negative time lag from min is impossible");
+
+      Galois::Runtime::reportStat(loopname, lagCat.c_str(), lag, i);
+    }
+  }
+
+public:
+
+  explicit PerThreadTimer(const char* const _loopname, const char* const _category)
+    :
+      loopname(_loopname),
+      category(_category)
+  {}
+
+  ~PerThreadTimer(void) {
+    reportTimes();
+  }
+
+  void start(void) {
+    timers.getLocal()->start();
+  }
+
+  void stop(void) {
+    timers.getLocal()->stop();
+  }
+};
+
+template<> class PerThreadTimer<false> {
+
+public:
+  explicit PerThreadTimer(const char* const _loopname, const char* const _category)
+  {}
+
+  void start(void) const {}
+
+  void stop(void) const {}
+
+};
+
 
 }
 #endif

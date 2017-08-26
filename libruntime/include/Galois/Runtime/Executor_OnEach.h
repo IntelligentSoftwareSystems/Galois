@@ -35,6 +35,7 @@
 
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
+#include "Galois/Statistic.h"
 #include "Galois/Threads.h"
 #include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
@@ -44,33 +45,48 @@
 namespace Galois {
 namespace Runtime {
 
-template<typename FunctionTy>
-struct OnEachExecutor {
-  const FunctionTy& origFunction;
-  unsigned int activeThreads;
-  explicit OnEachExecutor(const FunctionTy& f, unsigned int actT): origFunction(f), activeThreads(actT) { }
-  void operator()(void) {
-    FunctionTy fn(origFunction);
-    fn(Substrate::ThreadPool::getTID(), activeThreads);   
-  }
-};
+template <typename FunctionTy, typename ArgsTy> 
+void on_each_impl(const FunctionTy& fn, const ArgsTy& argsTuple) {
+  
+  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
-template<typename FunctionTy>
-void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
-  auto activeThreads = getActiveThreads();
-  Substrate::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn, activeThreads));
+  const char* const loopname = get_by_supertype<loopname_tag>(argsTuple).value;
+
+  PerThreadTimer<MORE_STATS> execTime(loopname, "Execute");
+
+  const auto numT = getActiveThreads();
+
+  auto runFun = [&] {
+
+    execTime.start();
+
+    fn(Substrate::ThreadPool::getTID(), numT);
+
+    execTime.stop();
+
+  };
+
+  Substrate::getThreadPool().run(numT, runFun);
 }
 
 template<typename FunctionTy, typename TupleTy>
 void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
         std::make_tuple(loopname_tag{}),
-        std::make_tuple(loopname{})));
+        std::make_tuple(default_loopname{})));
 
-  on_each_impl(fn, get_by_supertype<loopname_tag>(dtpl).value);
+    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
+    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);
+
+    timer.start();
+
+    on_each_impl(fn, get_by_supertype<loopname_tag>(dtpl).value);
+
+    timer.stop();
 }
 
 } // end namespace Runtime

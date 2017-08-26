@@ -466,7 +466,7 @@ struct OptionsCommon {
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
-  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
+  static const bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
   static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
   static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
