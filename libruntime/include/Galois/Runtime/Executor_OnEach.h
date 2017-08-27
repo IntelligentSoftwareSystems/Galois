@@ -79,14 +79,14 @@ void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
         std::make_tuple(loopname_tag{}),
         std::make_tuple(default_loopname{})));
 
-    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
-    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);
+  constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
+  CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);
 
-    timer.start();
+  timer.start();
 
-    on_each_impl(fn, get_by_supertype<loopname_tag>(dtpl).value);
+  on_each_impl(fn, dtpl);
 
-    timer.stop();
+  timer.stop();
 }
 
 } // end namespace Runtime
