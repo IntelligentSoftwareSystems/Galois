@@ -87,12 +87,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   #Finding mean,max,sd compute time over all hosts
   max_do_all = 0
   sum_do_all = 0
+  sum_std_do_all = 0;
   for i in range(0,int(num_iter)):
     do_all_regex = re.compile((run_identifier) + r',\(NULL\),0\s,\s.*DO_ALL_IMPL_(?i)' + re.escape(benchmark) + r'_0_'+ re.escape(str(i)) + r',.*' + r',\d*,(\d*)')
     do_all_all_hosts = re.findall(do_all_regex, log_data)
     num_arr = numpy.array(map(int,do_all_all_hosts))
 
     if len(num_arr) != 0:
+      sum_std_do_all += numpy.std(num_arr, axis=0)
       #print (" COMPUTE NUM_ARR", num_arr)
       max_compute = numpy.max(num_arr, axis=0)
       #print ("MAX : ", max_compute)
@@ -101,6 +103,8 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit, t
   print "max_do_all " , max_do_all
   print "sum_do_all " , sum_do_all
   mean_do_all = float(sum_do_all)/float(total_hosts)
+  mean_std_do_all = float(sum_std_do_all)/float(num_iter)
+  print "XXXXXXXXXXXXXXXXx STD DO ALL : " , mean_std_do_all
 
 
   print "mean_do_all", mean_do_all

@@ -108,6 +108,10 @@ namespace {
 
   std::string getSyncer(unsigned counter, const Write_set& i, std::string struct_type="") {
     std::stringstream s;
+    
+    llvm::errs() << "GALOIS_SYNC_STRUCTURE_" << i.REDUCE_OP_EXPR <<" _ " << i.FIELD_NAME << " , " << i.VAL_TYPE << "\n";
+    return s.str();
+#if 0
     s << "\tstruct Syncer_" << struct_type << counter << " {\n";
     s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
@@ -176,6 +180,7 @@ namespace {
     s << "\t\t}\n";
     s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
+#endif
     return s.str();
   }
 
