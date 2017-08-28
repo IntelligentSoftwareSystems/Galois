@@ -152,14 +152,13 @@ struct ResetGraph {
       local_alpha(_local_alpha), graph(_graph) {}
 
   void static go(Graph& _graph) {
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      // TODO recreate GPU code as operator changed (includes local_alpha now)
-      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
@@ -171,7 +170,6 @@ struct ResetGraph {
     );
   }
 
-  // TODO recreate GPU code as operator changed (includes local_alpha now)
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
     sdata.value = 0;
@@ -190,7 +188,7 @@ struct InitializeGraph {
     // init graph
     ResetGraph::go(_graph);
 
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -198,10 +196,8 @@ struct InitializeGraph {
         (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      // TODO recreate GPU code as operator changed (residual isn't set here 
-      // anymore)
-      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                           alpha, cuda_ctx);
+      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
+                           cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
@@ -216,12 +212,8 @@ struct InitializeGraph {
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph");
-    // TODO since residual is now set in ResetGraph, sync unnecessary; however,
-    // still necessary for GPU until GPU code is regenerated/changed
   }
 
-  // TODO recreate GPU code as operator changed (residual isn't set here 
-  // anymore)
   // Calculate "outgoing" edges for destination nodes (note we are using
   // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
@@ -252,7 +244,7 @@ struct PageRank_delta {
       DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -291,6 +283,8 @@ struct PageRank_delta {
   }
 };
 
+// TODO: GPU code operator does not match CPU's operator (cpu accumulates sum 
+// and adds all at once, GPU adds each pulled value individually/atomically)
 struct PageRank {
   Graph* graph;
 
@@ -298,7 +292,7 @@ struct PageRank {
 
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(_num_iterations);
@@ -413,8 +407,8 @@ struct PageRankSanity {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
     DGA_max.reset();

@@ -53,44 +53,55 @@ FileReader::~FileReader() {
   delete [] buffer;
 }
 
+void FileReader::pushToken(std::string token) {
+  tokenStack.push_back(token);
+}
+
 std::string FileReader::nextToken() {
   std::string token;
 
-  for ( ; cursor < bufferEnd; ++cursor ) {
-    // skip a line of comment
-    if (*cursor == '/' && *(cursor+1) == '/') {
-      while (*cursor != '\n') {
-        ++cursor;
-      }
-    }
+  if (!tokenStack.empty()) {
+    token = *(tokenStack.rbegin());
+    tokenStack.pop_back();
+  }
 
-    // skip a block of comments
-    if (*cursor == '/' && *(cursor+1) == '*') {
-      for (cursor = cursor+2; cursor < bufferEnd; ++cursor) {
-        if (*cursor == '*' && *(cursor+1) == '/') {
-          cursor += 2;
-          break;
+  else {
+    for ( ; cursor < bufferEnd; ++cursor ) {
+      // skip a line of comment
+      if (*cursor == '/' && *(cursor+1) == '/') {
+        while (*cursor != '\n') {
+          ++cursor;
         }
       }
-    }
 
-    if (isSeparator(*cursor)) {
-      if (!token.empty()) {
-        ++cursor;
+      // skip a block of comments
+      if (*cursor == '/' && *(cursor+1) == '*') {
+        for (cursor = cursor+2; cursor < bufferEnd; ++cursor) {
+          if (*cursor == '*' && *(cursor+1) == '/') {
+            cursor += 2;
+            break;
+          }
+        }
+      }
+
+      if (isSeparator(*cursor)) {
+        if (!token.empty()) {
+          ++cursor;
+          break;
+        }
+      } 
+      else if (isDelimiter(*cursor)) {
+        if (token.empty()) {
+           token.push_back(*cursor);
+           ++cursor;
+        }
         break;
+      } 
+      else {
+        token.push_back(*cursor);
       }
-    } 
-    else if (isDelimiter(*cursor)) {
-      if (token.empty()) {
-         token.push_back(*cursor);
-         ++cursor;
-      }
-      break;
-    } 
-    else {
-      token.push_back(*cursor);
-    }
-  } // end for cursor
+    } // end for cursor
+  } // end else
 
   return token;
 }

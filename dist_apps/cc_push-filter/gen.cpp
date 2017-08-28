@@ -120,9 +120,7 @@ static cll::opt<std::string> personality_set("pset",
 /******************************************************************************/
 
 struct NodeData {
-  // TODO should be uint64_t since component id is the lowest node id of the
-  // component
-  std::atomic<uint32_t> comp_current;
+  std::atomic<unsigned long long> comp_current;
   uint32_t comp_old;
 };
 
@@ -179,7 +177,7 @@ struct FirstItr_ConnectedComp{
   FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 
   void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
@@ -216,8 +214,8 @@ struct FirstItr_ConnectedComp{
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      uint32_t new_dist = snode.comp_current;
-      uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
+      unsigned long long new_dist = snode.comp_current;
+      unsigned long long old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
       if (old_dist > new_dist) bitset_comp_current.set(dst);
     }
   }
@@ -238,7 +236,7 @@ struct ConnectedComp {
     
     unsigned _num_iterations = 1;
     
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do { 
       _graph.set_num_iter(_num_iterations);
@@ -292,8 +290,8 @@ struct ConnectedComp {
            jj != ee; ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        uint32_t new_dist = snode.comp_current;
-        uint32_t old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
+        unsigned long long new_dist = snode.comp_current;
+        unsigned long long old_dist = Galois::atomicMin(dnode.comp_current, new_dist);
         if (old_dist > new_dist) bitset_comp_current.set(dst);
       }
 
@@ -308,21 +306,21 @@ struct ConnectedComp {
 
 /* Get/print the number of members in source node component */
 struct SourceComponentSize {
-  const uint64_t src_comp;
+  const unsigned long long src_comp;
   Graph* graph;
 
-  Galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
+  Galois::DGAccumulator<unsigned long long>& DGAccumulator_accum;
 
   SourceComponentSize(const uint64_t _src_comp, Graph* _graph, 
-                      Galois::DGAccumulator<uint64_t>& _dga) : 
+                      Galois::DGAccumulator<unsigned long long>& _dga) : 
     src_comp(_src_comp), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, Galois::DGAccumulator<uint64_t>& dga) {
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned long long>& dga) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
 
@@ -450,7 +448,7 @@ int main(int argc, char** argv) {
     StatTimer_init.stop();
 
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-    Galois::DGAccumulator<uint64_t> DGAccumulator_accum64;
+    Galois::DGAccumulator<unsigned long long> DGAccumulator_accum64;
 
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "[" << net.ID << "] ConnectedComp::go run " << run << " called\n";

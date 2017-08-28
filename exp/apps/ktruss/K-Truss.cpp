@@ -652,7 +652,7 @@ struct AsyncTrussTxAlgo {
 // 3. Repeat 2. until no more unsupported edges are found.
 //
 // edges update using atomic operations in C++
-struct AsyncTrussAlgo {
+/*struct AsyncTrussAlgo {
   // edge weight: (# triangles supported << 1) | removal
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
@@ -777,7 +777,7 @@ struct AsyncTrussAlgo {
     );
   } // end operator()
 }; // end AsyncTrussAlgo
-
+*/
 template<typename Algo>
 void run() {
   Algo algo;
@@ -826,7 +826,7 @@ int main(int argc, char **argv) {
     run<AsyncTrussTxAlgo>();
     break;
   case async: 
-    run<AsyncTrussAlgo>(); 
+//    run<AsyncTrussAlgo>(); 
     break;
   case asyncCoreThenTruss:
 //    run<AsyncCoreThenTrussAlgo>();

@@ -5,12 +5,12 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
-uint32_t * P_COMP_CURRENT;
+unsigned long long * P_COMP_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
 static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current)
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -30,7 +30,7 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
   }
   // FP: "7 -> 8;
 }
-__global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, Sum ret_val)
+__global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -116,8 +116,8 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
         jj = ns +_np_j;
         {
           index_type dst;
-          uint32_t new_comp;
-          uint32_t old_comp;
+          unsigned long long new_comp;
+          unsigned long long old_comp;
           dst = graph.getAbsDestination(jj);
           new_comp = p_comp_current[dst];
           if (p_comp_current[src] > new_comp) {
@@ -160,8 +160,8 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            uint32_t new_comp;
-            uint32_t old_comp;
+            unsigned long long new_comp;
+            unsigned long long old_comp;
             dst = graph.getAbsDestination(jj);
             new_comp = p_comp_current[dst];
             if (p_comp_current[src] > new_comp) {
@@ -195,8 +195,8 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          uint32_t new_comp;
-          uint32_t old_comp;
+          unsigned long long new_comp;
+          unsigned long long old_comp;
           dst = graph.getAbsDestination(jj);
           new_comp = p_comp_current[dst];
           if (p_comp_current[src] > new_comp) {

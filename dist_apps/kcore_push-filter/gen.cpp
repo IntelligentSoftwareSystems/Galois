@@ -158,7 +158,7 @@ struct InitializeGraph2 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -209,7 +209,7 @@ struct InitializeGraph1 {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -252,7 +252,7 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
@@ -301,7 +301,7 @@ struct KCoreStep1 {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
 
     do {
       _graph.set_num_iter(iterations);
@@ -397,8 +397,8 @@ struct GetAliveDead {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
     dga1.reset();
@@ -585,7 +585,7 @@ int main(int argc, char** argv) {
         }
     #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA) {
-        for(auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
                                      get_node_flag_cuda(cuda_ctx, *ii));

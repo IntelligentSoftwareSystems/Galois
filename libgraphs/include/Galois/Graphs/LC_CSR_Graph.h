@@ -31,6 +31,9 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+// TODO/FIXME change printfs to gDebug
+
+
 #ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
@@ -204,9 +207,7 @@ public:
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
 
   /**
-   * Initialize the thread ranges pointers to null pointer. This is EXTREMELY
-   * important for correctness and should be called if the initializer below
-   * isn't used.
+   * Clear thread ranges.
    */
   void clearRanges() {
     threadRanges.clear();
@@ -757,7 +758,7 @@ public:
     uint64_t units_per_thread = edgePrefixSum[totalNodes - 1] / num_threads +
                                 node_weight;
 
-    //printf("Optimally want %lu units per thread\n", units_per_thread);
+    Galois::gDebug("Optimally want ", units_per_thread, " units per thread");
 
     uint32_t current_thread = 0;
     uint32_t current_element = 0;
@@ -776,8 +777,8 @@ public:
         // assign remaining elements to last thread
         assert(current_thread == num_threads - 1); 
         threadRanges[current_thread + 1] = totalNodes;
-        printf("Thread %u begin %u end %u (1 thread)\n", current_thread,
-               threadRanges[current_thread], threadRanges[current_thread+1]);
+        //printf("Thread %u begin %u end %u (1 thread)\n", current_thread,
+        //       threadRanges[current_thread], threadRanges[current_thread+1]);
 
         break;
       } else if ((totalNodes - current_element) == threads_remaining) {
@@ -786,9 +787,9 @@ public:
         // thread which may have some already)
         for (uint32_t i = 0; i < threads_remaining; i++) {
           threadRanges[++current_thread] = (++current_element);
-          printf("Thread %u begin %u end %u (out of element)\n", 
-                 current_thread-1, threadRanges[current_thread-1], 
-                 threadRanges[current_thread]);
+          //printf("Thread %u begin %u end %u (out of element)\n", 
+          //       current_thread-1, threadRanges[current_thread-1], 
+          //       threadRanges[current_thread]);
         }
 
         assert(current_element == totalNodes);
@@ -839,9 +840,9 @@ public:
           // beginning of next thread is current local element (i.e. the big 
           // one we are giving up to the next)
           threadRanges[current_thread + 1] = current_element;
-          printf("Thread %u begin %u end %u (big)\n", 
-                 current_thread, threadRanges[current_thread], 
-                 threadRanges[current_thread+1]);
+          //printf("Thread %u begin %u end %u (big)\n", 
+          //       current_thread, threadRanges[current_thread], 
+          //       threadRanges[current_thread+1]);
 
           accounted_edges = edgePrefixSum[current_element - 1];
           accounted_elements = current_element;
@@ -859,9 +860,9 @@ public:
 
       if (unit_count_with_current >= units_per_thread) {
         threadRanges[++current_thread] = current_element + 1;
-        printf("Thread %u begin %u end %u (over)\n", current_thread-1,
-               threadRanges[current_thread - 1], 
-               threadRanges[current_thread]);
+        //printf("Thread %u begin %u end %u (over)\n", current_thread-1,
+        //       threadRanges[current_thread - 1], 
+        //       threadRanges[current_thread]);
         //printf("sum is %lu\n", edgePrefixSum[current_thread-1]);
 
         accounted_edges = edgePrefixSum[current_element];
@@ -887,11 +888,13 @@ public:
     assert(numThreads > 0);
 
     if (threadRanges.size() != 0) {
-      printf("Warning: Thread ranges already specified\n");
+      Galois::gDebug("Warning: Thread ranges already specified "
+                     "(in detThreadRangesByNode)");
     }
 
     if (threadRangesEdge.size() != 0) {
-      printf("Warning: Thread ranges edge already specified\n");
+      Galois::gDebug("Warning: Thread ranges edge already specified "
+                     "(in detThreadRangesByNode)");
     }
 
     clearRanges();
@@ -909,8 +912,6 @@ public:
 
       if (nodeSplits.first != nodeSplits.second) {
         if (i != 0) {
-          //printf("thread ranges edge i is %lu\n", threadRangesEdge[i]);
-          //printf("edgeSplits first is %lu\n", *edgeSplits.first);
           assert(threadRanges[i] == *(nodeSplits.first));
           assert(threadRangesEdge[i] == *(edgeSplits.first));
         } else {
@@ -928,10 +929,11 @@ public:
         threadRanges[i + 1] = threadRanges[i];
         threadRangesEdge[i + 1] = threadRangesEdge[i];
       }
-      printf("thread %u gets nodes %u to %u\n", i, threadRanges[i], 
-              threadRanges[i+1]);
-      printf("thread %u gets edges %lu to %lu\n", i, threadRangesEdge[i], 
-              threadRangesEdge[i+1]);
+
+      Galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ", 
+                     threadRanges[i+1]);
+      Galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ", 
+                     threadRangesEdge[i+1]);
     }
   }
 
@@ -968,8 +970,8 @@ public:
         threadRangesEdge[i + 1] = endEdge;
       }
     } else {
-      printf("WARNING: threadRangesEdge not calculated because threadRanges "
-             "isn't calculated.\n");
+      Galois::gDebug("WARNING: threadRangesEdge not calculated because "
+                     "threadRanges isn't calculated.");
     }
   }
 
@@ -1079,7 +1081,6 @@ public:
    */
   void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
                     std::vector<uint64_t> edgePrefixSum) {
-    //printf("My split\n");
     // update graph values
     numNodes = nNodes;
     numEdges = nEdges;
@@ -1113,7 +1114,6 @@ public:
    * @param graph A graph in the FileGraph class.
    */
   void allocateFromByNode(FileGraph& graph) {
-    //printf("alloc by node\n");
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
@@ -1158,10 +1158,10 @@ public:
         threadRanges[i + 1] = threadRanges[i];
         threadRangesEdge[i + 1] = threadRangesEdge[i];
       }
-      printf("thread %u gets nodes %u to %u\n", i, threadRanges[i], 
-              threadRanges[i+1]);
-      printf("thread %u gets edges %lu to %lu\n", i, threadRangesEdge[i], 
-              threadRangesEdge[i+1]);
+      //printf("thread %u gets nodes %u to %u\n", i, threadRanges[i], 
+      //        threadRanges[i+1]);
+      //printf("thread %u gets edges %lu to %lu\n", i, threadRangesEdge[i], 
+      //        threadRangesEdge[i+1]);
     }
 
     // node based alloc
@@ -1348,7 +1348,7 @@ public:
       else 
         e = edgeIndData_old[src - 1];
 
-      // get all outgoing edges of a particular node in the non-tranpose and
+      // get all outgoing edges of a particular node in the non-transpose and
       // convert to incoming
       while (e < edgeIndData_old[src]) {
         // destination nodde

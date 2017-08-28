@@ -38,6 +38,9 @@ static void setPrimaryInputSlew(FileReader& fRd, SDC *sdc) {
   else if ("-input_transition_rise" == token) {
     sdc->primaryInputRiseSlew = std::stof(fRd.nextToken());
   }
+  else {
+    fRd.pushToken(token);
+  }
 }
 
 static void setDrivingCell(FileReader& fRd, SDC *sdc) {

@@ -13,7 +13,7 @@ float * P_VALUE;
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
-__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float local_alpha, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -29,13 +29,13 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int _
     {
       p_value[src] = 0;
       p_delta[src] = 0;
-      p_residual[src] = 0;
+      p_residual[src] = local_alpha;
       p_nout[src] = 0;
     }
   }
   // FP: "10 -> 11;
 }
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *residual_is_updated, DynamicBitset *nout_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *nout_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -66,13 +66,6 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *residual_is_updat
     // FP: "6 -> 7;
     bool pop  = src < __end;
     // FP: "7 -> 8;
-    if (pop)
-    {
-      p_value[src] = 0;
-      p_residual[src] = local_alpha;
-      residual_is_updated->set(src);
-      p_delta[src] = 0;
-    }
     // FP: "12 -> 13;
     // FP: "15 -> 16;
     struct NPInspector1 _np = {0,0,0,0,0,0};
@@ -256,6 +249,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
   }
   ret_val.thread_exit<_br>(_ts);
 }
+// TODO: cpu version accumulates sum into local variable then adds all at once
 __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual)
 {
   unsigned tid = TID_1D;
@@ -464,7 +458,7 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
   }
   // FP: "100 -> 101;
 }
-void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -473,18 +467,18 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void ResetGraph_all_cuda(struct CUDA_Context * ctx)
+void ResetGraph_all_cuda(const float & local_alpha, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  ResetGraph_cuda(0, ctx->nowned, ctx);
+  ResetGraph_cuda(0, ctx->nowned, local_alpha, ctx);
   // FP: "2 -> 3;
 }
-void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -493,15 +487,15 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context * ctx)
+void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, local_alpha, ctx);
+  InitializeGraph_cuda(0, ctx->nowned, ctx);
   // FP: "2 -> 3;
 }
 void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)

@@ -186,7 +186,7 @@ struct SSSP {
 
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(_num_iterations);
@@ -271,8 +271,8 @@ struct SSSPSanityCheck {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
     dgas.reset();
