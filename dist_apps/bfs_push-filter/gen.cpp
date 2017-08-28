@@ -74,13 +74,16 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
+
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
+
 static cll::opt<unsigned long long> src_node("srcNodeId", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
+
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify results by outputting results "
                                        "to file"), 
@@ -144,8 +147,7 @@ struct InitializeGraph {
 
   InitializeGraph(cll::opt<unsigned long long> &_src_node, 
                   const uint32_t &_infinity, Graph* _graph) : 
-                    local_infinity(_infinity), local_src_node(_src_node), 
-                    graph(_graph){}
+    local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph){
     auto& allNodes = _graph.allNodesRange();
@@ -252,7 +254,7 @@ struct BFS {
 
     unsigned _num_iterations = 1;
 
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
       _graph.set_num_iter(_num_iterations);
@@ -337,12 +339,11 @@ struct BFSSanityCheck {
 
   void static go(Graph& _graph, Galois::DGAccumulator<uint64_t>& dgas,
                  Galois::DGAccumulator<uint32_t>& dgam) {
-
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
     dgas.reset();

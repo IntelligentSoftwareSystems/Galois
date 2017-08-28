@@ -61,7 +61,7 @@ std::string personality_str(Personality p) {
    case GPU_OPENCL:
       return "GPU_OPENCL";
    }
-   assert(false&& "Invalid personality");
+   assert(false && "Invalid personality");
    return "";
 }
 #endif
@@ -75,10 +75,12 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
+
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
+
 static cll::opt<unsigned long long> src_node("srcNodeId", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
@@ -187,7 +189,7 @@ struct BFS {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
 
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
       _graph.set_num_iter(_num_iterations);
       dga.reset();
@@ -271,8 +273,8 @@ struct BFSSanityCheck {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
     dgas.reset();
