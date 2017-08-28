@@ -8,13 +8,13 @@ execdirname="."
 execname=$1
 EXEC=${execdirname}/${execname}
 
-#inputdirname=/net/ohm/export/cdgc/dist-inputs
-inputdirname=/workspace/dist-inputs
+inputdirname=/net/ohm/export/cdgc/dist-inputs
+#inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-#outputdirname=/net/ohm/export/cdgc/dist-outputs
-outputdirname=/workspace/dist-outputs
+outputdirname=/net/ohm/export/cdgc/dist-outputs
+#outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
 problem=${EXECP[0]}
@@ -97,7 +97,8 @@ fi
 pass=0
 fail=0
 failed_cases=""
-for partition in 1 2 3 4 5 6 7 8 9 10; do
+#for partition in 1 2 3 4 5 6 7 8 9 10; do
+for partition in 1 2 3 5 6 7 8; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
