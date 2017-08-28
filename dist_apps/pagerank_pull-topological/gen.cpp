@@ -408,7 +408,7 @@ struct PageRankSanity {
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
       fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.");
+                      "wrong results.\n");
     }
   #endif
     DGA_max.reset();
