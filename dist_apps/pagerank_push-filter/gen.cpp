@@ -219,8 +219,6 @@ struct InitializeGraph {
                 Bitset_nout>("InitializeGraphNout");
   }
 
-  // TODO recreate/change GPU code as operator changed (some sets weren't 
-  // necessary in original operator if you call reset graph first)
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     residual[src] = local_alpha;
@@ -402,8 +400,8 @@ struct PageRankSanity {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.");
     }
   #endif
     DGA_max.reset();

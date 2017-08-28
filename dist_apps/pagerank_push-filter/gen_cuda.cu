@@ -35,7 +35,7 @@ __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int _
   }
   // FP: "9 -> 10;
 }
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *residual_is_updated, DynamicBitset *nout_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, uint32_t * p_nout, float * p_residual, float * p_delta, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *nout_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, uint32_t * p_nout, float * p_residual, float * p_delta, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -49,10 +49,12 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *residual_is_updat
     bool pop  = src < __end;
     if (pop)
     {
-      p_value[src] = 0;
+      // manual change by Loc to reflect newly changed CPU code
+      // some sets no longer necessary if reset graph called first
+      //p_value[src] = 0;
       p_residual[src] = local_alpha;
-      residual_is_updated->set(src);
-      p_delta[src] = 0;
+      //residual_is_updated->set(src);
+      //p_delta[src] = 0;
       atomicAdd(&p_nout[src], graph.getOutDegree(src));
       nout_is_updated->set(src);
     }
@@ -337,7 +339,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
