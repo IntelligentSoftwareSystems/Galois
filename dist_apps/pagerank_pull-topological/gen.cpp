@@ -152,7 +152,7 @@ struct ResetGraph {
       local_alpha(_local_alpha), graph(_graph) {}
 
   void static go(Graph& _graph) {
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
@@ -190,7 +190,7 @@ struct InitializeGraph {
     // init graph
     ResetGraph::go(_graph);
 
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -252,7 +252,7 @@ struct PageRank_delta {
       DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
-    auto allNodes = _graph.allNodesRange();
+    auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -298,7 +298,7 @@ struct PageRank {
 
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(_num_iterations);

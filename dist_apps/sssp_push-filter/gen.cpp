@@ -245,7 +245,7 @@ struct SSSP {
     
     unsigned _num_iterations = 1;
     
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do { 
       _graph.set_num_iter(_num_iterations);
