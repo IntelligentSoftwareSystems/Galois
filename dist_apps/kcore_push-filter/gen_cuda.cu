@@ -253,7 +253,8 @@ __global__ void KCoreStep2(CSRGraph graph,
     bool pop  = src < __end;
     if (pop)
     {
-      // manual addition to match current cpu code
+      // manual addition to match current cpu code; gpu should have been able
+      // to generate it
       if (p_flag[src]) 
       {
         if (p_trim[src] > 0)
