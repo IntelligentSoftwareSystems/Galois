@@ -58,9 +58,6 @@ public:
         while(p = workList.pop()){
         auto GID = graph.getGID(*p);
         assert(graph.getHostID(GID) < bag_vec.size());
-        if(graph.id == 0 && graph.getHostID(GID) == 1){
-          std::cout << "FOUND\n";
-        }
         bag_vec[graph.getHostID(GID)].push(GID);
         }
         }, Galois::loopname("worklist bags"));
@@ -127,6 +124,10 @@ public:
 
   bool empty() const {
     return local_wl.empty();
+  }
+
+  size_t size() const {
+    local_wl.size();
   }
 
 };
