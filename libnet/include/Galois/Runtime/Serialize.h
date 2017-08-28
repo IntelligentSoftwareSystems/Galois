@@ -36,6 +36,7 @@
 #include <Galois/gdeque.h>
 #include <Galois/Runtime/Dynamic_bitset.h>
 #include <Galois/Atomic_wrapper.h>
+#include "Galois/Bag.h"
 
 #ifndef _GALOIS_EXTRA_TRAITS_
 #define _GALOIS_EXTRA_TRAITS_
@@ -281,6 +282,11 @@ inline size_t gSizedObj(const DeSerializeBuffer& rbuf) {
   return rbuf.r_size();
 }
 
+template<typename T>
+inline size_t gSizedObj(const Galois::InsertBag<T>& bag){
+  return bag.size();
+}
+
 inline size_t adder() { return 0; }
 inline size_t adder(size_t a) { return a; }
 template<typename... Args>
@@ -388,6 +394,31 @@ inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& dat
      gSerializeObj(buf, data.size());
      gSerializeObj(buf, data.get_vec());
 }
+
+
+/**
+ * For serializing insertBag.
+ * Insert contigous memory chunks for each thread
+ * and clear it.
+ * Can not be const.
+ * Implemention below makes sure that it can be deserialized
+ * into a linear sequence like vector or deque.
+ */
+template<typename T>
+inline void gSerializeObj(SerializeBuffer& buf, Galois::InsertBag<T>& bag){
+  gSerializeObj(buf, bag.size());
+  auto headerVec = bag.getHeads();
+  size_t totalSize = 0;
+  for(auto h : headerVec){
+    size_t localSize = (h->dend - h->dbegin);
+    buf.insert((uint8_t*)h->dbegin, localSize*sizeof(T));
+    totalSize += (h->dend - h->dbegin);
+  }
+
+  assert(totalSize == bag.size());
+  bag.clear();
+}
+
 
 } //detail
 

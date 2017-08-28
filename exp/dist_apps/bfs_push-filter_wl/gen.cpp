@@ -254,7 +254,10 @@ struct BFS {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     using namespace Galois::WorkList;
 
-    FirstItr_BFS::go(_graph);
+    //FirstItr_BFS::go(_graph);
+    DIST_WL dist_wl(_graph);
+    if(_graph.isOwned(src_node))
+      dist_wl.push_initial(_graph.getLID(src_node));
 
     unsigned _num_iterations = 1;
 
@@ -277,11 +280,9 @@ struct BFS {
     #endif
     {
 
-      DIST_WL dist_wl(_graph);
-
-      //Galois::for_each(0, BFS{&_graph, dga}, Galois::loopname("BFS"), Galois::wl<DIST_WL>(_graph));
-      Galois::do_all_local(
-        nodesWithEdges,
+      auto nodesToWork = dist_wl.getRange();
+      Galois::do_all(
+        nodesToWork.begin(), nodesToWork.end(),
         BFS(&_graph, dga, dist_wl),
         Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
         Galois::do_all_steal<true>(),
@@ -310,8 +311,8 @@ struct BFS {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    if (snode.dist_old > snode.dist_current) {
-      snode.dist_old = snode.dist_current;
+    //if (snode.dist_old > snode.dist_current) {
+      //snode.dist_old = snode.dist_current;
 
       for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
            jj != ee;
@@ -320,12 +321,14 @@ struct BFS {
         auto& dnode = graph->getData(dst);
         uint32_t new_dist = 1 + snode.dist_current;
         uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
-        wl.push(dst);
-        if (old_dist > new_dist) bitset_dist_current.set(dst);
+        if (old_dist > new_dist){
+          wl.push(dst);
+          bitset_dist_current.set(dst);
+          DGAccumulator_accum += 1;
+        }
       }
 
-      DGAccumulator_accum += 1;
-    }
+    //}
   }
 };
 

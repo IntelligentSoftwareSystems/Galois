@@ -240,6 +240,31 @@ public:
     return true;
   }
 
+  size_t size() const {
+    size_t s = 0;
+    for (unsigned x = 0; x < heads.size(); ++x) {
+      header* h = heads.getRemote(x)->first;
+      if (h)
+        s += (h->dend - h->dbegin);
+    }
+    return s;
+  }
+
+  size_t sizeHeads() const {
+    return heads.size();
+  }
+
+  std::vector<header*> getHeads() const {
+    std::vector<header*> hVec;
+    for (unsigned x = 0; x < heads.size(); ++x) {
+      header* h = heads.getRemote(x)->first;
+      if(h)
+        hVec.push_back(h);
+    }
+    return hVec;
+  }
+
+
   //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {
