@@ -8,7 +8,7 @@ add_library(galois_python SHARED
   Reachability.cpp
   Coarsen.cpp
   $<TARGET_OBJECTS:gllvm_obj>
-  $<TARGET_OBJECTS:galois_obj> 
+  $<TARGET_OBJECTS:galois_shmem_obj> 
 )
 target_include_directories(galois_python PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include

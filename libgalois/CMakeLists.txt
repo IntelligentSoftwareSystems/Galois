@@ -37,29 +37,38 @@ set(sources
         src/OCFileGraph.cpp
 )
 
-add_library(galois STATIC ${sources})
-target_include_directories(galois PUBLIC 
+add_library(galois_shmem STATIC ${sources})
+target_include_directories(galois_shmem PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(galois_shmem gllvm)
 
-target_link_libraries(galois gllvm)
-if (NUMA_FOUND)
-  target_link_libraries(galois ${NUMA_LIBRARY})
+if (CMAKE_HAVE_PTHREAD_H)
+   add_definitions(-DGALOIS_HAVE_PTHREAD)
+   target_link_libraries(galois_shmem Threads::Threads)
+endif()
+
+find_package(NUMA)
+if(NUMA_FOUND)
+  add_definitions(-DGALOIS_USE_NUMA)
+  target_link_libraries(galois_shmem ${NUMA_LIBRARY})
+else()
+  message(WARNING "No NUMA Support.  Likely poor performance")
 endif()
 
 if (VTune_FOUND)
-  target_link_libraries(galois ${VTune_LIBRARIES})
-  target_link_libraries(galois dl)
+  target_link_libraries(galois_shmem ${VTune_LIBRARIES})
+  target_link_libraries(galois_shmem dl)
 endif()
 
-add_library(galois_obj OBJECT ${sources})
-target_include_directories(galois_obj PUBLIC 
+add_library(galois_shmem_obj OBJECT ${sources})
+target_include_directories(galois_shmem_obj PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-set_target_properties (galois_obj PROPERTIES 
+set_target_properties (galois_shmem_obj PROPERTIES 
   INTERFACE_POSITION_INDEPENDENT_CODE On 
   POSITION_INDEPENDENT_CODE On
 )

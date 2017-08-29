@@ -1,11 +1,4 @@
 set(sources
-        src/buffered.cpp
-        src/routed.cpp
-        src/pkt_mpi.cpp
-        src/NetworkLWCI.cpp
-        src/Network.cpp
-        src/Barrier.cpp
-        src/hash/crc32.cpp
 )
 
 add_library(galois_net STATIC ${sources})
