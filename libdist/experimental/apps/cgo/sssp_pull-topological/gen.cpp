@@ -125,7 +125,9 @@ struct NodeData {
   uint32_t dist_current;
 };
 
+#if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_dist_current;
+#endif
 
 typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -213,8 +215,23 @@ struct SSSP {
         );
       }
 
-      _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
+      #if __OPT_VERSION__ == 1
+      // naive sync of everything after operator 
+      _graph.sync<writeAny, readAny, Reduce_min_dist_current,
+                  Broadcast_dist_current>("SSSP");
+      #elif __OPT_VERSION__ == 2
+      // sync of touched fields (same as v1)
+      _graph.sync<writeAny, readAny, Reduce_min_dist_current,
+                  Broadcast_dist_current>("SSSP");
+      #elif __OPT_VERSION__ == 3
+      // with bitset
+      _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
+      #elif __OPT_VERSION__ == 4
+      // write aware (not read aware, i.e. conservative)
+      _graph.sync<writeSource, readAny, Reduce_min_dist_current, 
+                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+      #endif
 
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
@@ -239,7 +256,9 @@ struct SSSP {
       uint32_t new_dist = dnode.dist_current + graph->getEdgeData(jj);
       uint32_t old_dist = Galois::min(snode.dist_current, new_dist);
       if (old_dist > new_dist){
+        #if __OPT_VERSION__ >= 3
         bitset_dist_current.set(src);
+        #endif
         DGAccumulator_accum += 1;
       }
     }
@@ -326,6 +345,15 @@ int main(int argc, char** argv) {
                                   (unsigned long)maxIterations, 0);
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
                                   (unsigned long long)src_node, 0);
+      #if __OPT_VERSION__ == 1
+      Galois::gDebug("Version 1 of optimization");
+      #elif __OPT_VERSION__ == 2
+      Galois::gDebug("Version 2 of optimization");
+      #elif __OPT_VERSION__ == 3
+      Galois::gDebug("Version 3 of optimization");
+      #elif __OPT_VERSION__ == 4
+      Galois::gDebug("Version 4 of optimization");
+      #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
                       StatTimer_total("TIMER_TOTAL"), 
@@ -385,7 +413,9 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+    #if __OPT_VERSION__ >= 3
     bitset_dist_current.resize(hg->get_local_total_nodes());
+    #endif
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
@@ -414,10 +444,14 @@ int main(int argc, char** argv) {
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
+          #if __OPT_VERSION__ >= 3
           bitset_dist_current_reset_cuda(cuda_ctx);
+          #endif
         } else
       #endif
+        #if __OPT_VERSION__ >= 3
         bitset_dist_current.reset();
+        #endif
 
         //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
