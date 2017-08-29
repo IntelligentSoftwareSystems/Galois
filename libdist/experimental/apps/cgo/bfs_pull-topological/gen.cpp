@@ -452,7 +452,9 @@ int main(int argc, char** argv) {
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
+          #if __OPT_VERSION__ >= 3
           bitset_dist_current_reset_cuda(cuda_ctx);
+          #endif
         } else
       #endif
         #if __OPT_VERSION__ >= 3
