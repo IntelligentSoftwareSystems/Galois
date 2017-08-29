@@ -465,6 +465,16 @@ int main(int argc, char** argv) {
         (unsigned long)maxIterations, 0);
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
         (unsigned long)src_node, 0);
+
+      #if __OPT_VERSION__ == 1
+      Galois::gDebug("Version 1 of optimization");
+      #elif __OPT_VERSION__ == 2
+      Galois::gDebug("Version 2 of optimization");
+      #elif __OPT_VERSION__ == 3
+      Galois::gDebug("Version 3 of optimization");
+      #elif __OPT_VERSION__ == 4
+      Galois::gDebug("Version 4 of optimization");
+      #endif
     }
 
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
