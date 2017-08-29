@@ -31,7 +31,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -144,6 +144,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
           new_dist = p_comp_current[src];
           if (p_comp_current[dst] > new_dist) {
             unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
           }
         }
       }
@@ -187,6 +188,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
             new_dist = p_comp_current[src];
             if (p_comp_current[dst] > new_dist) {
               unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+              if (old_dist > new_dist) is_updated->set(dst);
             }
           }
         }
@@ -226,6 +228,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
           new_dist = p_comp_current[src];
           if (p_comp_current[dst] > new_dist) {
             unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
           }
         }
       }
@@ -240,7 +243,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
   }
   // FP: "101 -> 102;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old, Sum ret_val)
+__global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -364,6 +367,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           new_dist = p_comp_current[src];
           if (p_comp_current[dst] > new_dist) {
             unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
           }
         }
       }
@@ -407,6 +411,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
             new_dist = p_comp_current[src];
             if (p_comp_current[dst] > new_dist) {
               unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+              if (old_dist > new_dist) is_updated->set(dst);
             }
           }
         }
@@ -446,6 +451,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           new_dist = p_comp_current[src];
           if (p_comp_current[dst] > new_dist) {
             unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
+            if (old_dist > new_dist) is_updated->set(dst);
           }
         }
       }
@@ -491,7 +497,7 @@ void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, str
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
+  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -515,7 +521,7 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _rv);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
