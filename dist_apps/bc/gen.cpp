@@ -149,12 +149,13 @@ struct NodeData {
   uint32_t old_length;
 
   // Betweeness centrality vars
-  std::atomic<uint32_t> num_shortest_paths;
+  uint32_t num_shortest_paths;
   uint32_t num_successors;
   std::atomic<uint32_t> num_predecessors;
   std::atomic<uint32_t> trim;
   std::atomic<uint32_t> to_add;
 
+  uint32_t not_atomic_trim;
   float to_add_float;
   float dependency;
 
@@ -163,7 +164,6 @@ struct NodeData {
   // used to determine if data has been propogated yet
   uint8_t propogation_flag;
 };
-
 
 // no edge data = bfs not sssp
 typedef hGraph<NodeData, void> Graph;
@@ -1015,6 +1015,11 @@ struct BC {
   BC(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga){
+    std::string timer_str("ALLTIMER_0");
+    Galois::StatTimer all_main(timer_str.c_str());
+
+    all_main.start();
+    
     uint64_t start_i;
     uint64_t end_i;
     start_i = startSource;
@@ -1101,6 +1106,8 @@ struct BC {
       // all sources should have dependency value, meaning all sources will
       // update the BC value correctly; no sync required here 
     }
+
+    all_main.start();
   }
 
   /* adds dependency measure to BC measure (dependencies should be finalized,
