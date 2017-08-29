@@ -58,53 +58,55 @@ static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"), c
 static cll::opt<std::string> outputCircuit("o", cll::desc("output file for gate-sized .v"), cll::Required);
 static cll::opt<std::string> sdcFile("sdc", cll::desc("path to the sdc file"));
 
-// do not call clear() unless you are constructing new instances
-static CellLib cellLib;
-static VerilogModule vModule;
-static SDC sdc;
-
 void doGateSizing() {
 
 }
 
 int main(int argc, char** argv) {
+  Galois::System G;
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
+
+  // do not call clear() unless you are constructing new instances
 
   Galois::StatTimer T("TotalTime");
   T.start();
 
+  CellLib cellLib;
   cellLib.read(lib);
 //  cellLib.printCellLibDebug();
   std::cout << "parsed cell library" << std::endl;
 
+  VerilogModule vModule;
   vModule.read(inputCircuit, &cellLib);
 //  vModule.printVerilogModuleDebug();
   std::cout << "parsed verilog module" << std::endl;
 
+  SDC sdc;
   sdc.read(sdcFile, &cellLib);
 //  sdc.printSdcDebug();
   std::cout << "parsed sdc file" << std::endl;
 
-  constructCircuitGraph(graph, vModule);
-  initializeCircuitGraph(graph, sdc);
-//  printCircuitGraph(graph);
+  CircuitGraph graph;
+  graph.construct(vModule);
+  graph.initialize(sdc);
+//  graph.print();
   std::cout << "constructed circuit graph" << std::endl;
 
   doStaticTimingAnalysis(graph);
-  printCircuitGraph(graph);
+  graph.print();
   std::cout << "finished static timinig analysis" << std::endl;
 
   doGateSizing();
 //  vModule.printVerilogModuleDebug();
-//  printCircuitGraph(graph);
+//  graph.print();
   std::cout << "finished gate sizing" << std::endl;
 
   T.stop();
   vModule.writeVerilogModule(outputCircuit);
   std::cout << "wrote modified verilog module" << std::endl;
 
-  auto gStat = getCircuitGraphStatistics(graph);
+  auto gStat = graph.getStatistics();
   std::cout << gStat.first << " nodes, " << gStat.second << " edges" << std::endl;
   return 0;
 }

@@ -2,13 +2,9 @@
 
 #include <iostream>
 
-Graph graph;
-std::unordered_map<VerilogPin *, GNode> nodeMap;
-GNode dummySrc, dummySink;
-
 static auto unprotected = Galois::MethodFlag::UNPROTECTED;
 
-void constructCircuitGraph(Graph& g, VerilogModule& vModule) {
+void CircuitGraph::construct(VerilogModule& vModule) {
   dummySrc = g.createNode();
   g.addNode(dummySrc, unprotected);
   g.getData(dummySrc, unprotected).pin = nullptr;
@@ -86,9 +82,9 @@ void constructCircuitGraph(Graph& g, VerilogModule& vModule) {
   }
 
   nodeMap.clear();
-} // end constructCircuitGraph()
+} // end CircuitGraph::construct()
 
-void initializeCircuitGraph(Graph& g, SDC& sdc) {
+void CircuitGraph::initialize(SDC& sdc) {
   for (auto n: g) {
     auto& data = g.getData(n, unprotected);
     data.precondition = 0;
@@ -163,7 +159,7 @@ void initializeCircuitGraph(Graph& g, SDC& sdc) {
   }
 }
 
-static void printCircuitGraphPinName(GNode n, VerilogPin *pin, std::string prompt) {
+static void printCircuitGraphPinName(CircuitGraph& cg, GNode n, VerilogPin *pin, std::string prompt) {
   std::cout << prompt;
   if (pin) {
     if (pin->gate) {
@@ -172,15 +168,16 @@ static void printCircuitGraphPinName(GNode n, VerilogPin *pin, std::string promp
     std::cout << pin->name;
   }
   else {
-    std::cout << ((n == dummySink) ? "dummySink" : "dummySrc");
+    std::cout << ((n == cg.dummySink) ? "dummySink" : "dummySrc");
   }
   std::cout << std::endl;
 }
 
 template<typename T>
-static void printCircuitGraphEdge(Graph& g, T e, std::string prompt) {
+static void printCircuitGraphEdge(CircuitGraph& cg, T e, std::string prompt) {
+  auto& g = cg.g;
   auto dst = g.getEdgeDst(e);
-  printCircuitGraphPinName(dst, g.getData(dst, unprotected).pin, prompt);
+  printCircuitGraphPinName(cg, dst, g.getData(dst, unprotected).pin, prompt);
 
   auto& eData = g.getEdgeData(e);
   auto wire = eData.wire;
@@ -193,10 +190,10 @@ static void printCircuitGraphEdge(Graph& g, T e, std::string prompt) {
   }
 }
 
-void printCircuitGraph(Graph& g) {
+void CircuitGraph::print() {
   for (auto n: g) {
     auto& data = g.getData(n, unprotected);
-    printCircuitGraphPinName(n, data.pin, "node: ");
+    printCircuitGraphPinName(*this, n, data.pin, "node: ");
 
     std::cout << "  type = ";
     std::cout << ((data.isDummy) ? "dummy" : 
@@ -223,16 +220,16 @@ void printCircuitGraph(Graph& g) {
     }
 
     for (auto oe: g.edges(n)) {
-      printCircuitGraphEdge(g, oe, "  outgoing edge to ");
+      printCircuitGraphEdge(*this, oe, "  outgoing edge to ");
     } // end for oe
 
     for (auto ie: g.in_edges(n)) {
-      printCircuitGraphEdge(g, ie, "  incoming edge from ");
+      printCircuitGraphEdge(*this, ie, "  incoming edge from ");
     } // end for ie
   }
-} // end printCircuitGraph()
+} // end CircuitGraph::print()
 
-std::pair<size_t, size_t> getCircuitGraphStatistics(Graph& g) {
+std::pair<size_t, size_t> CircuitGraph::getStatistics() {
   size_t numNodes = std::distance(g.begin(), g.end());
   size_t numEdges = 0;
   for (auto n: g) {

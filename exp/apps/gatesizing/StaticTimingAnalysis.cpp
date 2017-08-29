@@ -123,7 +123,7 @@ struct ComputeRequiredTime {
   } // end operator()
 }; // end struct ComputeRequiredTime
 
-static void computeRequiredTime(Graph& g) {
+static void computeRequiredTime(Graph& g, GNode dummySink) {
   Galois::StatTimer TRequiredTime("RequiredTime");
   TRequiredTime.start();
   Galois::InsertBag<GNode> work;
@@ -276,7 +276,7 @@ struct SetForwardPrecondition {
   }
 };
 
-static void computeArrivalTimeAndPower(Graph& g) {
+static void computeArrivalTimeAndPower(Graph& g, GNode dummySrc) {
   Galois::StatTimer TArrivalTimeAndPower("ArrivalTimeAndPower");
   TArrivalTimeAndPower.start();
   Galois::do_all_local(g, SetForwardPrecondition{g}, Galois::do_all_steal<true>());
@@ -286,7 +286,7 @@ static void computeArrivalTimeAndPower(Graph& g) {
   TArrivalTimeAndPower.stop();
 }
 
-void doStaticTimingAnalysis(Graph& graph) {
-  computeArrivalTimeAndPower(graph);
-  computeRequiredTime(graph);
+void doStaticTimingAnalysis(CircuitGraph& graph) {
+  computeArrivalTimeAndPower(graph.g, graph.dummySrc);
+  computeRequiredTime(graph.g, graph.dummySink);
 }
