@@ -210,7 +210,6 @@ __global__ void InitializeGraph2(CSRGraph graph,
   // FP: "94 -> 95;
 }
 __global__ void InitializeGraph1(CSRGraph graph, 
-                                 DynamicBitset* is_updated,
                                  unsigned int __nowned, 
                                  unsigned int __begin, 
                                  unsigned int __end, 
@@ -233,7 +232,6 @@ __global__ void InitializeGraph1(CSRGraph graph,
       p_flag[src] = true;
       p_trim[src] = 0;
       p_current_degree[src] = 0;
-      is_updated->set(src);
     }
   }
   // FP: "9 -> 10;
@@ -472,7 +470,6 @@ void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph1 <<<blocks, threads>>>(ctx->gg, 
-    ctx->current_degree.is_updated.gpu_rd_ptr(),
     ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
     ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;

@@ -10,7 +10,7 @@ unsigned long long * P_COMP_CURRENT;
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
 static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -25,7 +25,6 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *is_updated, unsig
     if (pop)
     {
       p_comp_current[src] = graph.node_data[src];
-      is_updated->set(src);
     }
   }
   // FP: "7 -> 8;
@@ -226,7 +225,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->comp_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
