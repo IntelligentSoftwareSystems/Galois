@@ -1,8 +1,8 @@
-/** Memory allocator implementation -*- C++ -*-
+/** Large Allocatoins -*- C++ -*-
  * @file
  * @section License
  *
- * This file is part of Galois.  Galois is a framework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -21,260 +21,231 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
- * @section Description
- *
  * @author Andrew Lenharth <andrewl@lenharth.org>
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu> (largeMallocSpecified + helpers)
  */
 
-#include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/NumaMem.h"
+#include "Galois/Substrate/PageAlloc.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/gIO.h"
 
-#include <fstream>
-#include <limits>
-#include <vector>
-
-#ifdef GALOIS_USE_NUMA
-static int isNumaAvailable;
-#endif
+#include <cassert>
 
 using namespace Galois::Substrate;
 
-namespace Galois {
-namespace Runtime {
-extern unsigned activeThreads;
-}
-}
+/* Access pages on each thread so each thread has some pages already loaded 
+ * (preferably ones it will use) */
+static void pageIn(void* _ptr, size_t len, size_t pageSize, 
+                   unsigned numThreads, bool finegrained) {
+  char* ptr = static_cast<char*>(_ptr);
 
-//! Define to get version of library that does not depend on Galois thread primatives
-//#define GALOIS_FORCE_STANDALONE
-
-void Galois::Runtime::printInterleavedStats(int minPages) {
-  std::ifstream f("/proc/self/numa_maps");
-
-  if (!f) {
-    gInfo("No NUMA support");
-    return;
-  }
-
-  char line[2048];
-  gInfo("INTERLEAVED STATS BEGIN");
-  while (f.getline(line, sizeof(line)/sizeof(*line))) { 
-    // Chomp \n
-    size_t len = strlen(line);
-    if (len && line[len-1] == '\n')
-      line[len-1] = '\0';
-
-    char* start;
-    if (strstr(line, "interleave") != 0) {
-      gInfo(line);
-    } else if ((start = strstr(line, "anon=")) != 0) {
-      int pages;
-      if (sscanf(start, "anon=%d", &pages) == 1 && pages >= minPages) {
-        gInfo(line);
-      }
-    } else if ((start = strstr(line, "mapped=")) != 0) {
-      int pages;
-      if (sscanf(start, "mapped=%d", &pages) == 1 && pages >= minPages) {
-        gInfo(line);
-      }
-    }
-  }
-  gInfo("INTERLEAVED STATS END");
-}
-
-static int numNumaPagesFor(unsigned nodeid) {
-  std::ifstream f("/proc/self/numa_maps");
-  if (!f) {
-    return 0;
-  }
-
-  char format[2048];
-  char search[2048];
-  snprintf(format, sizeof(format), "N%u=%%d", nodeid);
-  snprintf(search, sizeof(search), "N%u=", nodeid);
-
-  char line[2048];
-  int totalPages = 0;
-  while (f.getline(line, sizeof(line)/sizeof(*line))) {
-    char* start;
-    if ((start = strstr(line, search)) != 0) {
-      int pages;
-      if (sscanf(start, format, &pages) == 1) {
-        totalPages += pages;
-      }
-    }
-  }
-
-  return totalPages;
-}
-
-int Galois::Runtime::numNumaAllocForNode(unsigned nodeid) {
-  return numNumaPagesFor(nodeid);
-}
-
-#ifdef GALOIS_USE_NUMA
-static void *allocInterleaved(size_t len, unsigned num) {
-  auto& tp = Galois::Substrate::getThreadPool();
-  bitmask* nm = numa_allocate_nodemask();
-  for (unsigned i = 0; i < num; ++i) {
-    numa_bitmask_setbit(nm, tp.getOSNumaNode(i));
-  }
-  void* data = numa_alloc_interleaved_subset(len, nm);
-  numa_free_nodemask(nm);
-  // NB(ddn): Some strange bugs when empty interleaved mappings are
-  // coalesced. Eagerly fault in interleaved pages to circumvent.
-  if (data)
-    Galois::Runtime::pageIn(data, len, Galois::Runtime::pageSize);
-  return data;
-}
-#endif
-
-#ifdef GALOIS_USE_NUMA
-static bool checkIfInterleaved(void* data, size_t len, unsigned total) {
-  // Assume small allocations are interleaved properly
-  if (len < Galois::Runtime::hugePageSize * Galois::Runtime::numNumaNodes())
-    return true;
-
-  union { void* as_vptr; char* as_cptr; uintptr_t as_uint; } d = { data };
-  size_t pageSize = Galois::Runtime::pageSize;
-  int numNodes = Galois::Runtime::numNumaNodes();
-
-  std::vector<size_t> hist(numNodes);
-  for (size_t i = 0; i < len; i += pageSize) {
-    int node;
-    char *mem = d.as_cptr + i;
-    if (get_mempolicy(&node, NULL, 0, mem, MPOL_F_NODE|MPOL_F_ADDR) < 0) {
-      //Galois::Runtime::LL::gInfo("unknown status[", mem, "]: ", strerror(errno));
-    } else {
-      hist[node] += 1;
-    }
-  }
-
-  size_t least = std::numeric_limits<size_t>::max();
-  size_t greatest = std::numeric_limits<size_t>::min();
-  for (unsigned i = 0; i < total; ++i) {
-    int node = getNumaNode(i);
-    least = std::min(least, hist[node]);
-    greatest = std::max(greatest, hist[node]);
-  }
-
-  return !total || least / (double) greatest > 0.5;
-}
-#endif
-
-#ifndef GALOIS_FORCE_STANDALONE
-// Figure out which subset of threads will participate in pageInInterleaved
-static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
-  std::vector<bool> hist(Galois::Runtime::numNumaNodes());
-  uniqueNodes = 0;
-  for (unsigned i = 0; i < mapping.size(); ++i) {
-    int node = getNumaNode(i);
-    if (hist[node])
-      continue;
-    hist[node] = true;
-    uniqueNodes += 1;
-    mapping[i] = node + 1;
-  }
-}
-#endif
-
-#ifndef GALOIS_FORCE_STANDALONE
-static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping, unsigned numNodes) {
-  // XXX Don't know whether memory is backed by hugepages or not, so stick with
-  // smaller page size
-  size_t blockSize = Galois::Runtime::pageSize;
-#ifdef GALOIS_FORCE_STANDALONE
-  unsigned tid = 0;
-#else
-  unsigned tid = ThreadPool::getTID();
-#endif
-  int id = mapping[tid] - 1;
-  if (id < 0)
-    return;
-  size_t start = id * blockSize;
-  size_t stride = numNodes * blockSize;
-  if (len <= start)
-    return;
-  union { void* as_vptr; char* as_cptr; } d = { data };
-
-  Galois::Runtime::pageIn(d.as_cptr + start, len - start, stride);
-}
-#endif
-
-static inline bool isNumaAlloc(void* data, size_t len) {
-  union { void* as_vptr; char* as_cptr; } d = { data };
-  return d.as_cptr[len-1] != 0;
-}
-
-static inline void setNumaAlloc(void* data, size_t len, bool isNuma) {
-  union { void* as_vptr; char* as_cptr; } d = { data };
-  d.as_cptr[len-1] = isNuma;
-}
-
-void* Galois::Runtime::largeInterleavedAlloc(size_t len, bool full) {
-  void* data;
-#ifdef GALOIS_FORCE_STANDALONE
-  unsigned __attribute__((unused)) total = 1;
-  bool inForEach = false;
-#else
-  unsigned total = full ? getThreadPool().getMaxCores() : activeThreads;
-  bool inForEach = Substrate::getThreadPool().isRunning();
-#endif
-  bool numaAlloc = false;
-
-  len += 1; // space for allocation metadata
-
-  if (inForEach) {
-    if (checkNuma()) {
-#ifdef GALOIS_USE_NUMA
-      data = allocInterleaved(len, total);
-      numaAlloc = true;
-#else
-      data = largeAlloc(len, false);
-#endif
-    } else {
-      data = largeAlloc(len, false);
-    }
+  if (numThreads == 1) {
+    for (size_t x = 0; x < len; x += pageSize / 2)
+      ptr[x] = 0;
   } else {
-    // DDN: Depend on first-touch policy to place memory rather than libnuma
-    // calls because numa_alloc_interleaved seems to have issues properly
-    // interleaving memory.
-    data = largeAlloc(len, false);
-#ifndef GALOIS_FORCE_STANDALONE
-    unsigned uniqueNodes;
-    std::vector<int> mapping(total);
-    createMapping(mapping, uniqueNodes);
-    Substrate::getThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
-#endif
+    getThreadPool().run(numThreads, 
+     [ptr, len, pageSize, numThreads, finegrained] () 
+      {
+        auto myID = ThreadPool::getTID();
+
+        if (finegrained) {
+          // round robin page distribution among threads (e.g. thread 0 gets
+          // a page, then thread 1, then thread n, then back to thread 0 and 
+          // so on until the end of the region)
+          for (size_t x  = pageSize * myID; x < len; x += pageSize * numThreads)
+            ptr[x] = 0;
+        } else {
+          // sectioned page distribution (e.g. thread 0 gets first chunk, thread
+          // 1 gets next chunk, ... last thread gets last chunk)
+          for (size_t x = myID * len / numThreads; 
+               x < len && x < (myID + 1) * len / numThreads; 
+               x += pageSize)
+            ptr[x] = 0;
+        }
+      }
+    );
   }
-
-  if (!data)
-    abort();
-
-  setNumaAlloc(data, len, numaAlloc);
-
-#ifdef GALOIS_USE_NUMA
-  // numa_alloc_interleaved sometimes fails to interleave pages
-  if (numaAlloc && !checkIfInterleaved(data, len, total))
-    gWarn("NUMA interleaving failed: ", data, " size: ", len);
-#endif
-
-  return data;
 }
 
-void Galois::Runtime::largeInterleavedFree(void* data, size_t len) {
-  len += 1; // space for allocation metadata
+/**
+ * Causes each thread to page in a specified region of the provided memory
+ * based on some distribution of elements as specified by a provided array.
+ *
+ * @tparam RangeArrayTy Type of threadRanges array: should either be uint32_t*
+ * or uint64_t*
+ * @param _ptr Pointer to the memory to page in
+ * @param len Length of the memory passed in
+ * @param pageSize Size of a page
+ * @param numThreads Number of threads to split work amongst
+ * @param threadRanges Array that specifies distribution of elements among 
+ * threads
+ * @param elementSize Size of an element that is to be distributed among 
+ * threads
+ */
+template<typename RangeArrayTy>
+static void pageInSpecified(void* _ptr, size_t len, size_t pageSize, 
+                   unsigned numThreads, RangeArrayTy threadRanges,
+                   size_t elementSize) {
+  assert(numThreads > 0);
+  assert(elementSize > 0);
+
+  char* ptr = static_cast<char*>(_ptr);
+
+  if (numThreads > 1) {
+    getThreadPool().run(numThreads, 
+      [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
+        auto myID = ThreadPool::getTID();
+
+        uint64_t beginLocation = threadRanges[myID];
+        uint64_t endLocation = threadRanges[myID + 1];
+
+        assert(beginLocation <= endLocation);
+
+        //printf("[%u] begin location %u and end location %u\n", myID,
+        //       beginLocation, endLocation);
+
+        // if equal, then no memory needed to allocate in first place
+        if (beginLocation != endLocation) {
+          size_t beginByte = beginLocation * elementSize;
+          size_t endByte;
+
+          if (endLocation != 0) {
+            // -1 since end * element will result in the first byte of the
+            // next element
+            endByte = (endLocation * elementSize) - 1;
+          } else {
+            endByte = 0;
+          }
+
+          assert(beginByte <= endByte);
+
+          //memset(ptr + beginByte, 0, (endByte - beginByte + 1));
+
+          uint32_t beginPage = beginByte / pageSize;
+          uint32_t endPage = endByte / pageSize;
+
+          assert(beginPage <= endPage);
+
+          //printf("thread %u gets begin page %u and end page %u\n", myID,
+          //        beginPage, endPage);
+
+          // write a byte to every page this thread occupies
+          for (uint32_t i = beginPage; i <= endPage; i++) {
+            ptr[i * pageSize] = 0;
+          }
+        }
+      }
+    );
+  } else {
+    // 1 thread case
+    for (size_t x = 0; x < len; x += pageSize / 2)
+      ptr[x] = 0;
+  }
+}
+
+static void largeFree(void* ptr, size_t bytes) {
+  freePages(ptr, bytes/allocSize());
+}
+
+void Galois::Substrate::detail::largeFreer::operator()(void* ptr) const {
+  largeFree(ptr, bytes);
+}
+
+// round data to a multiple of mult
+static size_t roundup (size_t data, size_t mult) {
+  auto rem = data % mult;
+
+  if (!rem)
+    return data;
+  return data + (mult - rem);
+}
+
+LAptr Galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThreads) {
+  // round up to hugePageSize
+  bytes = roundup(bytes, allocSize());
 
 #ifdef GALOIS_USE_NUMA
-  if (isNumaAlloc(data, len)) {
-    numa_free(data, len);
-    return;
-  }
+  // We don't use numa_alloc_interleaved_subset because we really want huge 
+  // pages
+  // yes this is a comment in a ifdef, but if libnuma improves, this is where 
+  // the alloc would go
 #endif
-  largeFree(data, len);
+  // Get a non-prefaulted allocation
+  void* data = allocPages(bytes/allocSize(), false);
+
+  // Then page in based on thread number
+  if (data)
+    // true = round robin paging
+    pageIn(data, bytes, allocSize(), numThreads, true);
+
+  return LAptr{data, detail::largeFreer{bytes}};
 }
+
+LAptr Galois::Substrate::largeMallocLocal(size_t bytes) {
+  // round up to hugePageSize
+  bytes = roundup(bytes, allocSize());
+  // Get a prefaulted allocation
+  return LAptr{allocPages(bytes/allocSize(), true), detail::largeFreer{bytes}};
+}
+
+LAptr Galois::Substrate::largeMallocFloating(size_t bytes) {
+  // round up to hugePageSize
+  bytes = roundup(bytes, allocSize());
+  // Get a non-prefaulted allocation
+  return LAptr{allocPages(bytes/allocSize(), false), detail::largeFreer{bytes}};
+}
+
+LAptr Galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
+  // round up to hugePageSize
+  bytes = roundup(bytes, allocSize());
+  // Get a non-prefaulted allocation
+  void* data = allocPages(bytes/allocSize(), false);
+  if (data)
+    // false = blocked paging
+    pageIn(data, bytes, allocSize(), numThreads, false);
+  return LAptr{data, detail::largeFreer{bytes}};
+}
+
+/** 
+ * Allocates pages for some specified number of bytes, then does NUMA page
+ * faulting based on a specified distribution of elements among threads.
+ *
+ * @tparam RangeArrayTy Type of threadRanges array: should either be uint32_t*
+ * or uint64_t*
+ * @param bytes Number of bytes to allocate
+ * @param numThreads Number of threads to page in regions for
+ * @param threadRanges Array specifying distribution of elements among threads
+ * @param elementSize Size of a data element that will be stored in the 
+ * allocated memory
+ * @returns The allocated memory along with a freer object
+ */
+template<typename RangeArrayTy>
+LAptr Galois::Substrate::largeMallocSpecified(size_t bytes, 
+          uint32_t numThreads, RangeArrayTy& threadRanges, 
+          size_t elementSize) {
+  // ceiling to nearest page
+  bytes = roundup(bytes, allocSize());
+
+  void* data = allocPages(bytes / allocSize(), false);
+
+  // NUMA aware page in based on element distribution specified in threadRanges
+  if (data) 
+    pageInSpecified(data, bytes, allocSize(), numThreads, threadRanges, 
+                    elementSize);
+
+  return LAptr{data, detail::largeFreer{bytes}};
+}
+// Explicit template declarations since the template is defined in the .h
+// file
+template
+LAptr Galois::Substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes, 
+          uint32_t numThreads, std::vector<uint32_t>& threadRanges, 
+          size_t elementSize);
+template
+LAptr Galois::Substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes, 
+          uint32_t numThreads, std::vector<uint64_t>& threadRanges, 
+          size_t elementSize);
