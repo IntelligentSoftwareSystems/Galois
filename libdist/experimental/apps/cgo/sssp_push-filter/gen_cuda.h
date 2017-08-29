@@ -28,7 +28,10 @@ void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 
-void bitset_dist_old_clear_cuda(struct CUDA_Context *ctx);
+void get_bitset_dist_old_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
+void bitset_dist_old_reset_cuda(struct CUDA_Context *ctx);
+void bitset_dist_old_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end);
+
 uint32_t get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v);
 void add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID, uint32_t v);

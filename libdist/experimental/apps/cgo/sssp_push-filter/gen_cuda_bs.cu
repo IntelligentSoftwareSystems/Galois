@@ -31,7 +31,10 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old)
+//__global__ void FirstItr_SSSP(CSRGraph graph, DynamicBitset *old_is_updated, 
+//DynamicBitset *cur_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old)
+__global__ void FirstItr_SSSP(CSRGraph graph, 
+DynamicBitset *cur_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -65,6 +68,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned in
     if (pop)
     {
       p_dist_old[src] = p_dist_current[src];
+      //old_is_updated->set(src);
     }
     // FP: "10 -> 11;
     // FP: "13 -> 14;
@@ -144,6 +148,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned in
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           if (p_dist_current[dst] > new_dist) {
             uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            if (old_dist > new_dist) cur_is_updated->set(dst);
           }
         }
       }
@@ -187,6 +192,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned in
             new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
             if (p_dist_current[dst] > new_dist) {
               uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+              if (old_dist > new_dist) cur_is_updated->set(dst);
             }
           }
         }
@@ -226,6 +232,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned in
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           if (p_dist_current[dst] > new_dist) {
             uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            if (old_dist > new_dist) cur_is_updated->set(dst);
           }
         }
       }
@@ -240,7 +247,8 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __nowned, unsigned in
   }
   // FP: "101 -> 102;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, Sum ret_val)
+//__global__ void SSSP(CSRGraph graph, DynamicBitset *old_is_updated, DynamicBitset *cur_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, Sum ret_val)
+__global__ void SSSP(CSRGraph graph, DynamicBitset *cur_is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -279,6 +287,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
       if (p_dist_old[src] > p_dist_current[src])
       {
         p_dist_old[src] = p_dist_current[src];
+        //old_is_updated->set(src);
         ret_val.do_return( 1);
       }
       else
@@ -364,6 +373,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           if (p_dist_current[dst] > new_dist) {
             uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            if (old_dist > new_dist) cur_is_updated->set(dst);
           }
         }
       }
@@ -407,6 +417,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
             new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
             if (p_dist_current[dst] > new_dist) {
               uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+              if (old_dist > new_dist) cur_is_updated->set(dst);
             }
           }
         }
@@ -446,6 +457,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __nowned, unsigned int __begin
           new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
           if (p_dist_current[dst] > new_dist) {
             uint32_t old_dist = atomicMin(&p_dist_current[dst], new_dist);
+            if (old_dist > new_dist) cur_is_updated->set(dst);
           }
         }
       }
@@ -491,7 +503,10 @@ void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_SSSP <<<blocks, __tb_FirstItr_SSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
+  FirstItr_SSSP <<<blocks, __tb_FirstItr_SSSP>>>(ctx->gg, 
+  //ctx->dist_old.is_updated.gpu_rd_ptr(),
+  ctx->dist_current.is_updated.gpu_rd_ptr(), 
+  ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -515,7 +530,9 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), _rv);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, 
+  //ctx->dist_old.is_updated.gpu_rd_ptr(),
+  ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

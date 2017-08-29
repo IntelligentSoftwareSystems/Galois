@@ -114,8 +114,16 @@ void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->dist_current, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void bitset_dist_old_clear_cuda(struct CUDA_Context *ctx) {
+void get_bitset_dist_old_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute) {
+	ctx->dist_old.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
+}
+
+void bitset_dist_old_reset_cuda(struct CUDA_Context *ctx) {
 	ctx->dist_old.is_updated.cpu_rd_ptr()->reset();
+}
+
+void bitset_dist_old_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end) {
+  reset_bitset_field(&ctx->dist_old, begin, end);
 }
 
 uint32_t get_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned LID) {
