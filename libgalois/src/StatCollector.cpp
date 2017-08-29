@@ -30,9 +30,9 @@
 // TODO: this file was copied over from libruntime/src/StatCollector.cpp. 
 // TODO: remove the duplicated code after inheriting from Galois::Runtime::StatCollector
 
-#include "Galois/Runtime/DistStatCollector.h"
+#include "Galois/Runtime/StatCollector.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Network.h"
+// #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Substrate/StaticInstance.h"
 

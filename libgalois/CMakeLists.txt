@@ -13,32 +13,53 @@ set(sources
         src/Version.cpp
         src/PagePool.cpp
         src/StatCollector.cpp
+        src/Barrier.cpp
+        src/Barrier_Counting.cpp
+        src/Barrier_Dissemination.cpp 
+        src/Barrier_MCS.cpp
+        src/Barrier_Topo.cpp 
+        src/Barrier_Pthread.cpp
+        src/Barrier_Simple.cpp
+        src/gIO.cpp
+        src/ThreadPool.cpp
+        src/SimpleLock.cpp
+        src/PtrLock.cpp
+        src/EnvCheck.cpp
+        src/PerThreadStorage.cpp
+        src/HWTopoLinux.cpp
+        src/Termination.cpp
+        src/NumaMem.cpp
+        src/PageAlloc.cpp
+        src/SubsInit.cpp
+        src/FileGraph.cpp
+        src/FileGraphParallel_cpp11.cpp
+#        src/FileGraphParallel_pthread.cpp
+        src/OCFileGraph.cpp
 )
 
-# FIXME: duplicate target
-add_library(galois_runtime STATIC ${sources})
-target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-#TODO: move this linking to distirbuted only
-target_link_libraries(galois_runtime galois_net)
-target_link_libraries(galois_runtime galois_substrate)
-target_link_libraries(galois_runtime gllvm)
-if (NUMA_FOUND)
-  target_link_libraries(galois_runtime ${NUMA_LIBRARY})
-endif()
-#TODO: move this to toplevel CMakeLists
-if (VTune_FOUND)
-  target_link_libraries(galois_runtime ${VTune_LIBRARY})
-  target_link_libraries(galois_runtime dl)
-endif()
-
-add_library(galois_runtime_obj OBJECT ${sources})
-target_include_directories(galois_runtime_obj PUBLIC 
+add_library(galois STATIC ${sources})
+target_include_directories(galois PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
-  ${CMAKE_SOURCE_DIR}/libsubstrate/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
-set_target_properties (galois_runtime_obj PROPERTIES 
+
+
+target_link_libraries(galois gllvm)
+if (NUMA_FOUND)
+  target_link_libraries(galois ${NUMA_LIBRARY})
+endif()
+
+if (VTune_FOUND)
+  target_link_libraries(galois ${VTune_LIBRARIES})
+  target_link_libraries(galois dl)
+endif()
+
+add_library(galois_obj OBJECT ${sources})
+target_include_directories(galois_obj PUBLIC 
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+set_target_properties (galois_obj PROPERTIES 
   INTERFACE_POSITION_INDEPENDENT_CODE On 
   POSITION_INDEPENDENT_CODE On
 )
