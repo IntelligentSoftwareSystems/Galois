@@ -131,7 +131,7 @@ struct NodeData {
 
 #if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_dist_current;
-Galois::DynamicBitSet bitset_dist_old;
+//Galois::DynamicBitSet bitset_dist_old;
 #endif
 
 typedef hGraph<NodeData, void> Graph;
@@ -224,26 +224,26 @@ struct FirstItr_BFS{
     // naive sync of everything after operator 
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current>("BFS");
-    _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                Broadcast_dist_old>("BFS");
+    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+    //            Broadcast_dist_old>("BFS");
     #elif __OPT_VERSION__ == 2
     // sync of touched fields (same as v1 in this case)
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current>("BFS");
-    _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                Broadcast_dist_old>("BFS");
+    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+    //            Broadcast_dist_old>("BFS");
     #elif __OPT_VERSION__ == 3
     // with bitset
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
-    _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                Broadcast_dist_old, Bitset_dist_old>("BFS");
+    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+    //            Broadcast_dist_old, Bitset_dist_old>("BFS");
     #elif __OPT_VERSION__ == 4
     // write aware (not read aware, i.e. conservative)
     _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
-    _graph.sync<writeSource, readAny, Reduce_min_dist_old,
-                Broadcast_dist_old, Bitset_dist_old>("BFS");
+    //_graph.sync<writeSource, readAny, Reduce_min_dist_old,
+    //            Broadcast_dist_old, Bitset_dist_old>("BFS");
     #endif
 
     // gold standard sync
@@ -259,7 +259,7 @@ struct FirstItr_BFS{
     snode.dist_old = snode.dist_current;
 
     #if __OPT_VERSION__ >= 3
-    bitset_dist_old.set(src);
+    //bitset_dist_old.set(src);
     #endif
 
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
@@ -322,26 +322,26 @@ struct BFS {
       // naive sync of everything after operator 
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current>("BFS");
-      _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                  Broadcast_dist_old>("BFS");
+      //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+      //            Broadcast_dist_old>("BFS");
       #elif __OPT_VERSION__ == 2
       // sync of touched fields (same as v1 in this case)
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current>("BFS");
-      _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                  Broadcast_dist_old>("BFS");
+      //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+      //            Broadcast_dist_old>("BFS");
       #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
-      _graph.sync<writeAny, readAny, Reduce_min_dist_old,
-                  Broadcast_dist_old, Bitset_dist_old>("BFS");
+      //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
+      //            Broadcast_dist_old, Bitset_dist_old>("BFS");
       #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
-      _graph.sync<writeSource, readAny, Reduce_min_dist_old,
-                  Broadcast_dist_old, Bitset_dist_old>("BFS");
+      //_graph.sync<writeSource, readAny, Reduce_min_dist_old,
+      //            Broadcast_dist_old, Bitset_dist_old>("BFS");
       #endif
 
       //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -366,7 +366,7 @@ struct BFS {
     if (snode.dist_old > snode.dist_current) {
       snode.dist_old = snode.dist_current;
       #if __OPT_VERSION__ >= 3
-      bitset_dist_old.set(src);
+      //bitset_dist_old.set(src);
       #endif
 
       for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
@@ -535,7 +535,7 @@ int main(int argc, char** argv) {
 #endif
     #if __OPT_VERSION__ >= 3
     bitset_dist_current.resize(hg->get_local_total_nodes());
-    bitset_dist_old.resize(hg->get_local_total_nodes());
+    //bitset_dist_old.resize(hg->get_local_total_nodes());
     #endif
     StatTimer_hg_init.stop();
 
@@ -567,13 +567,13 @@ int main(int argc, char** argv) {
         if (personality == GPU_CUDA) { 
           #if __OPT_VERSION__ >= 3
           bitset_dist_current_reset_cuda(cuda_ctx);
-          bitset_dist_old_reset_cuda(cuda_ctx);
+          //bitset_dist_old_reset_cuda(cuda_ctx);
           #endif
         } else
       #endif
         #if __OPT_VERSION__ >= 3
         bitset_dist_current.reset();
-        bitset_dist_old.reset();
+        //bitset_dist_old.reset();
         #endif
 
         //Galois::Runtime::getHostBarrier().wait();
