@@ -124,7 +124,9 @@ struct NodeData {
   unsigned long long comp_current;
 };
 
+#if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_comp_current;
+#endif
 
 typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -206,8 +208,26 @@ struct ConnectedComp {
         Galois::timeit()
       );
 
-      _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
-                  Broadcast_comp_current, Bitset_comp_current>("BFS");
+      #if __OPT_VERSION__ == 1
+      // naive sync of everything after operator 
+      _graph.sync<writeAny, readAny, Reduce_min_comp_current,
+                  Broadcast_comp_current>("ConnectedComp");
+      #elif __OPT_VERSION__ == 2
+      // sync of touched fields 
+      _graph.sync<writeAny, readAny, Reduce_min_comp_current,
+                  Broadcast_comp_current>("ConnectedComp");
+      #elif __OPT_VERSION__ == 3
+      // with bitset
+      _graph.sync<writeAny, readAny, Reduce_min_comp_current,
+                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+      #elif __OPT_VERSION__ == 4
+      // write aware (not read aware, i.e. conservative)
+      _graph.sync<writeSource, readAny, Reduce_min_comp_current,
+                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+      #endif
+
+      //_graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
+      //            Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
       
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
@@ -231,7 +251,9 @@ struct ConnectedComp {
       unsigned long long new_comp = dnode.comp_current;
       unsigned long long old_comp = Galois::min(snode.comp_current, new_comp);
       if (old_comp > new_comp){
+        #if __OPT_VERSION__ >= 3
         bitset_comp_current.set(src);
+        #endif
         DGAccumulator_accum += 1;
       }
     }
@@ -311,6 +333,16 @@ int main(int argc, char** argv) {
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
         (unsigned long)maxIterations, 0);
+
+      #if __OPT_VERSION__ == 1
+      Galois::gDebug("Version 1 of optimization");
+      #elif __OPT_VERSION__ == 2
+      Galois::gDebug("Version 2 of optimization");
+      #elif __OPT_VERSION__ == 3
+      Galois::gDebug("Version 3 of optimization");
+      #elif __OPT_VERSION__ == 4
+      Galois::gDebug("Version 4 of optimization");
+      #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
@@ -376,7 +408,9 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+    #if __OPT_VERSION__ >= 3
     bitset_comp_current.resize(hg->get_local_total_nodes());
+    #endif
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
@@ -401,10 +435,14 @@ int main(int argc, char** argv) {
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
+          #if __OPT_VERSION__ >= 3
           bitset_comp_current_reset_cuda(cuda_ctx);
+          #endif
         } else
       #endif
+        #if __OPT_VERSION__ >= 3
         bitset_comp_current.reset();
+        #endif
 
         //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
