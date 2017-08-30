@@ -216,58 +216,57 @@ class hGraph: public GlobalObject {
 #endif
 
 
-   uint32_t numPipelinedPhases;
-   uint32_t num_recv_expected; // Number of receives expected for local completion.
-   uint32_t num_run; //Keep track of number of runs.
-   uint32_t num_iteration; //Keep track of number of iterations.
+  uint32_t numPipelinedPhases;
+  uint32_t num_recv_expected; // Number of receives expected for local completion.
+  uint32_t num_run; //Keep track of number of runs.
+  uint32_t num_iteration; //Keep track of number of iterations.
 
   //Stats: for rough estimate of sendBytes.
-   Galois::Statistic statGhostNodes;
+  Galois::Statistic statGhostNodes;
 
    /****** checkpointing **********/
-   Galois::Runtime::RecvBuffer checkpoint_recvBuffer;
+  Galois::Runtime::RecvBuffer checkpoint_recvBuffer;
   // Select from edgeCut or vertexCut
   //typedef typename std::conditional<PartitionTy, DS_vertexCut ,DS_edgeCut>::type DS_type;
   //DS_type DS;
 
 
-   template<bool en, typename std::enable_if<en>::type* = nullptr>
-   NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = graph.getData(N, mflag);
-      return round ? r.first : r.second;
-   }
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+    auto& r = graph.getData(N, mflag);
+    return round ? r.first : r.second;
+  }
 
-   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-   NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = graph.getData(N, mflag);
-      return r;
-   }
+  template<bool en, typename std::enable_if<!en>::type* = nullptr>
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+     auto& r = graph.getData(N, mflag);
+     return r;
+  }
 
-   template<bool en, typename std::enable_if<en>::type* = nullptr>
-   const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
-      auto& r = graph.getData(N, mflag);
-      return round ? r.first : r.second;
-   }
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
+  const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
+     auto& r = graph.getData(N, mflag);
+     return round ? r.first : r.second;
+  }
 
-   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-   const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
-      auto& r = graph.getData(N, mflag);
-      return r;
-   }
-   template<bool en, typename std::enable_if<en>::type* = nullptr>
-   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = graph.getEdgeData(ni, mflag);
-      return round ? r.first : r.second;
-   }
+  template<bool en, typename std::enable_if<!en>::type* = nullptr>
+  const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const {
+     auto& r = graph.getData(N, mflag);
+     return r;
+  }
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+     auto& r = graph.getEdgeData(ni, mflag);
+     return round ? r.first : r.second;
+  }
 
-   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
-      auto& r = graph.getEdgeData(ni, mflag);
-      return r;
-   }
+  template<bool en, typename std::enable_if<!en>::type* = nullptr>
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
+     auto& r = graph.getEdgeData(ni, mflag);
+     return r;
+  }
 
 private:
-
   // compute owners by blocking Nodes
   void computeMastersBlockedNodes(Galois::Graph::OfflineGraph& g, 
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor, unsigned DecomposeFactor = 1) {
@@ -2562,7 +2561,6 @@ private:
    }
 
 public:
-
    template<WriteLocation writeLocation, ReadLocation readLocation, 
      typename ReduceFnTy, typename BroadcastFnTy, 
      typename BitsetFnTy = Galois::InvalidBitsetFnTy>
@@ -2599,6 +2597,108 @@ public:
 
      StatTimer_sync.stop();
    }
+
+  /**
+   * Given a structure that contains flags signifying what needs to be
+   * synchronized, sync_on_demand will call an appropriate sync call to
+   * synchronize what is necessary based on the read location of the
+   * field.
+   *
+   * @tparam FieldFlags struct which contains flags for a field
+   * @tparam readLocation Location in which field will need to be read
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct which holds a bitset which can be used
+   * to control synchronization at a more fine grain level
+   * @param loopName Name of loop this sync is for for naming timers
+   */
+  template<typename FieldFlags, ReadLocation readLocation, 
+           typename ReduceFnTy, typename BroadcastFnTy, 
+           typename BitsetFnTy = Galois::InvalidBitsetFnTy>
+  void sync_on_demand(std::string loopName) {
+    std::string timer_str("SYNC_ON_DEMAND" + loopName + "_" + get_run_identifier());
+    Galois::StatTimer StatTimer_sync(timer_str.c_str());
+    StatTimer_sync.start();
+
+    // FIXME/TODO can be a bit more precise with clearing flags, but this
+    // should be correct/sufficient for now
+    if (readLocation == readSource) {
+      if (FieldFlags::src_to_src() && FieldFlags::dst_to_src()) {
+        sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (FieldFlags::src_to_src()) {
+        sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (FieldFlags::dst_to_src()) {
+        sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } 
+
+      FieldFlags::clear_read_src();
+    } else if (readLocation == readDestination) {
+      if (FieldFlags::src_to_dst() && FieldFlags::dst_to_dst()) {
+        sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (FieldFlags::src_to_dst()) {
+        sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (FieldFlags::dst_to_dst()) {
+        sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } 
+
+      FieldFlags::clear_read_dst();
+    } else if (readLocation == readAny) {
+      bool src_write = FieldFlags::src_to_src() || FieldFlags::src_to_dst();
+      bool dst_write = FieldFlags::dst_to_src() || FieldFlags::dst_to_dst();
+
+      if (!(src_write && dst_write)) {
+        // src or dst write flags aren't set (potentially both are not set),
+        // but it's NOT the case that both are set, meaning "any" isn't
+        // required in the "from"; can work at granularity of just src
+        // write or dst wrte
+
+        if (src_write) {
+          if (FieldFlags::src_to_src() && FieldFlags::src_to_dst()) {
+            sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (FieldFlags::src_to_src()) {
+            sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // src to dst is set
+            sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        } else if (dst_write) {
+          if (FieldFlags::dst_to_src() && FieldFlags::dst_to_dst()) {
+            sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (FieldFlags::dst_to_src()) {
+            sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // dst to dst is set
+            sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        }
+
+        // note the "no flags are set" case will enter into this block
+        // as well, and it is correctly handled by doing nothing since
+        // both src/dst_write will be false
+
+      } else {
+        // it is the case that both src/dst write flags are set, so "any"
+        // is required in the "from"; what remains to be determined is 
+        // the use of src, dst, or any for the destination of the sync
+        bool src_read = FieldFlags::src_to_src() || FieldFlags::dst_to_src();
+        bool dst_read = FieldFlags::src_to_dst() || FieldFlags::dst_to_dst();
+
+        if (src_read && dst_read) {
+          sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else if (src_read) {
+          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // dst_read
+          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
+      }
+
+      FieldFlags::clear_read_src();
+      FieldFlags::clear_read_dst();
+    } else {
+     GALOIS_DIE("Invalid readLocation in sync_on_demand");
+    }
+
+    StatTimer_sync.stop();
+  }
+
 
    // just like any other sync_*, this is expected to be a collective call
    // but it does not synchronize with other hosts
