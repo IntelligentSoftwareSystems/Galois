@@ -64,9 +64,13 @@ if (USE_GGC)
   ##############################
   # kcore
   ##############################
-  # TODO bitset version
+  # no bitset
   cuda_add_library(kcore_push-filter_cuda_v kcore_push-filter/gen_cuda.cu)
   target_link_libraries(kcore_push-filter_cuda_v ggrt)
+
+  # bitset
+  cuda_add_library(kcore_push-filter_cuda_vbs kcore_push-filter/gen_cuda_bs.cu)
+  target_link_libraries(kcore_push-filter_cuda_vbs ggrt)
 
   # TODO kcore pull version?
   # TODO bc
@@ -351,37 +355,37 @@ endif()
 # KCore
 ################################################################################
 
-#app(kcore_push-filter_v1 kcore_push-filter/gen.cpp DISTSAFE)
-#target_link_libraries(kcore_push-filter_v1 galois_dist)
-#target_compile_definitions(kcore_push-filter_v1 PRIVATE __OPT_VERSION__=1)
-#if(USE_GGC)
-#  target_compile_definitions(kcore_push-filter_v1 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=1)
-#  target_link_libraries(kcore_push-filter_v1 kcore_push-filter_cuda_v)
-#endif()
-#
-#app(kcore_push-filter_v2 kcore_push-filter/gen.cpp DISTSAFE)
-#target_link_libraries(kcore_push-filter_v2 galois_dist)
-#target_compile_definitions(kcore_push-filter_v2 PRIVATE __OPT_VERSION__=2)
-#if(USE_GGC)
-#  target_compile_definitions(kcore_push-filter_v2 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=2)
-#  target_link_libraries(kcore_push-filter_v2 kcore_push-filter_cuda_v)
-#endif()
-#
-#app(kcore_push-filter_v3 kcore_push-filter/gen.cpp DISTSAFE)
-#target_link_libraries(kcore_push-filter_v3 galois_dist)
-#target_compile_definitions(kcore_push-filter_v3 PRIVATE __OPT_VERSION__=3)
-#if(USE_GGC)
-#  target_compile_definitions(kcore_push-filter_v3 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=3)
-#  target_link_libraries(kcore_push-filter_v3 kcore_push-filter_cuda_v)
-#endif()
-#
-#app(kcore_push-filter_v4 kcore_push-filter/gen.cpp DISTSAFE)
-#target_link_libraries(kcore_push-filter_v4 galois_dist)
-#target_compile_definitions(kcore_push-filter_v4 PRIVATE __OPT_VERSION__=4)
-#if(USE_GGC)
-#  target_compile_definitions(kcore_push-filter_v4 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=4)
-#  target_link_libraries(kcore_push-filter_v4 kcore_push-filter_cuda_v)
-#endif()
+app(kcore_push-filter_v1 kcore_push-filter/gen.cpp DISTSAFE)
+target_link_libraries(kcore_push-filter_v1 galois_dist)
+target_compile_definitions(kcore_push-filter_v1 PRIVATE __OPT_VERSION__=1)
+if(USE_GGC)
+  target_compile_definitions(kcore_push-filter_v1 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=1)
+  target_link_libraries(kcore_push-filter_v1 kcore_push-filter_cuda_v)
+endif()
+
+app(kcore_push-filter_v2 kcore_push-filter/gen.cpp DISTSAFE)
+target_link_libraries(kcore_push-filter_v2 galois_dist)
+target_compile_definitions(kcore_push-filter_v2 PRIVATE __OPT_VERSION__=2)
+if(USE_GGC)
+  target_compile_definitions(kcore_push-filter_v2 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=2)
+  target_link_libraries(kcore_push-filter_v2 kcore_push-filter_cuda_v)
+endif()
+
+app(kcore_push-filter_v3 kcore_push-filter/gen.cpp DISTSAFE)
+target_link_libraries(kcore_push-filter_v3 galois_dist)
+target_compile_definitions(kcore_push-filter_v3 PRIVATE __OPT_VERSION__=3)
+if(USE_GGC)
+  target_compile_definitions(kcore_push-filter_v3 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=3)
+  target_link_libraries(kcore_push-filter_v3 kcore_push-filter_cuda_vbs)
+endif()
+
+app(kcore_push-filter_v4 kcore_push-filter/gen.cpp DISTSAFE)
+target_link_libraries(kcore_push-filter_v4 galois_dist)
+target_compile_definitions(kcore_push-filter_v4 PRIVATE __OPT_VERSION__=4)
+if(USE_GGC)
+  target_compile_definitions(kcore_push-filter_v4 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=4)
+  target_link_libraries(kcore_push-filter_v4 kcore_push-filter_cuda_vbs)
+endif()
 
 
 # TODO BC, SGD, Kcore Pull (?)

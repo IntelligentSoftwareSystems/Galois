@@ -132,7 +132,7 @@ static cll::opt<int> num_nodes("num_nodes",
 struct NodeData {
   std::atomic<uint32_t> current_degree;
   std::atomic<uint32_t> trim;
-  bool flag;
+  uint8_t flag;
 };
 
 typedef hGraph<NodeData, void> Graph;
@@ -140,7 +140,10 @@ typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates
 Galois::DynamicBitSet bitset_current_degree;
+#if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_trim;
+Galois::DynamicBitSet bitset_flag;
+#endif
 
 // add all sync/bitset structs (needs above declarations)
 #include "gen_sync.hh"
@@ -179,8 +182,17 @@ struct InitializeGraph2 {
       Galois::timeit()
     );
 
+    // TODO
+    // note I do readAny instead of readSource here for versions 1-3 because
+    // those will reduce from destination unnecessarily, meaning dest has
+    // to have the correct value
+    #if __OPT_VERSION__ <= 3
+    _graph.sync<writeDestination, readAny, Reduce_add_current_degree, 
+      Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
+    #else
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
+    #endif
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -269,6 +281,33 @@ struct KCoreStep2 {
        Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
        Galois::timeit()
      );
+
+      #if __OPT_VERSION__ == 1
+      // min trim here because reset to 0
+      _graph.sync<writeAny, readAny, Reduce_min_trim, 
+                  Broadcast_trim>("KCoreStep2");
+      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
+                  Broadcast_current_degree>("KCoreStep2");
+      // min basically works as an AND for boolean flags (0 = false)
+      _graph.sync<writeAny, readAny, Reduce_min_flag, 
+                  Broadcast_flag>("KCoreStep2");
+      #elif __OPT_VERSION__ == 2
+      _graph.sync<writeAny, readAny, Reduce_min_trim, 
+                  Broadcast_trim>("KCoreStep2");
+      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
+                  Broadcast_current_degree>("KCoreStep2");
+      #elif __OPT_VERSION__ == 3
+      _graph.sync<writeAny, readAny, Reduce_min_trim, Broadcast_trim, 
+                  Bitset_trim>("KCoreStep2");
+      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
+                  Broadcast_current_degree, Bitset_current_degree>("KCoreStep2");
+      #elif __OPT_VERSION__ == 4
+      _graph.sync<writeSource, readAny, Reduce_min_trim, Broadcast_trim, 
+                  Bitset_trim>("KCoreStep2");
+      _graph.sync<writeSource, readAny, Reduce_min_current_degree, 
+                  Broadcast_current_degree, Bitset_current_degree>("KCoreStep2");
+      #endif
+
   }
 
   void operator()(GNode src) const {
@@ -280,6 +319,11 @@ struct KCoreStep2 {
       if (src_data.trim > 0) {
         src_data.current_degree = src_data.current_degree - src_data.trim;
         src_data.trim = 0;
+
+        #if __OPT_VERSION__ >= 3
+        bitset_current_degree.set(src);
+        bitset_trim.set(src);
+        #endif
       }
     }
   }
@@ -327,12 +371,39 @@ struct KCoreStep1 {
         Galois::timeit()
       );
 
+      #if __OPT_VERSION__ == 1
+      _graph.sync<writeAny, readAny, Reduce_add_trim, 
+                  Broadcast_trim>("KCoreStep1");
+      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
+                  Broadcast_current_degree>("KCoreStep1");
+      // min basically works as an AND for boolean flags (0 = false)
+      _graph.sync<writeAny, readAny, Reduce_min_flag, 
+                  Broadcast_flag>("KCoreStep1");
+      #elif __OPT_VERSION__ == 2
+      _graph.sync<writeAny, readAny, Reduce_add_trim, 
+                  Broadcast_trim>("KCoreStep1");
+      _graph.sync<writeAny, readAny, Reduce_min_flag, 
+                  Broadcast_flag>("KCoreStep1");
+      #elif __OPT_VERSION__ == 3
+      _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
+                  Bitset_trim>("KCoreStep1");
+      _graph.sync<writeAny, readAny, Reduce_min_flag, Broadcast_flag,
+                  Bitset_flag>("KCoreStep1");
+      #elif __OPT_VERSION__ == 4
+      _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
+                  Bitset_trim>("KCoreStep1");
+      _graph.sync<writeSource, readAny, Reduce_min_flag, Broadcast_flag,
+                  Bitset_flag>("KCoreStep1");
+      #endif
+
+
+      // gold standard sync
       // do the trim sync; readSource because in symmetric graph 
       // source=destination; not a readAny because any will grab non 
       // source/dest nodes (which have degree 0, so they won't have a trim 
       // anyways)
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
-                  Bitset_trim>("KCoreStep1");
+      //_graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
+      //            Bitset_trim>("KCoreStep1");
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);
@@ -357,6 +428,9 @@ struct KCoreStep1 {
         // set flag to 0 (false) and increment trim on outgoing neighbors
         // (if they exist)
         src_data.flag = false;
+        #if __OPT_VERSION__ >= 3
+        bitset_flag.set(src);
+        #endif
         DGAccumulator_accum += 1; // can be optimized: node may not have edges
 
         for (auto current_edge = graph->edge_begin(src), 
@@ -368,7 +442,9 @@ struct KCoreStep1 {
            auto& dst_data = graph->getData(dst);
 
            Galois::atomicAdd(dst_data.trim, (uint32_t)1);
+           #if __OPT_VERSION__ >= 3
            bitset_trim.set(dst);
+           #endif
         }
       }
     }
@@ -448,6 +524,15 @@ int main(int argc, char** argv) {
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
+      #if __OPT_VERSION__ == 1
+      Galois::gDebug("Version 1 of optimization");
+      #elif __OPT_VERSION__ == 2
+      Galois::gDebug("Version 2 of optimization");
+      #elif __OPT_VERSION__ == 3
+      Galois::gDebug("Version 3 of optimization");
+      #elif __OPT_VERSION__ == 4
+      Galois::gDebug("Version 4 of optimization");
+      #endif
     }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
@@ -518,9 +603,11 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
   #endif
-
     bitset_current_degree.resize(h_graph->get_local_total_nodes());
+    #if __OPT_VERSION__ >= 3
     bitset_trim.resize(h_graph->get_local_total_nodes());
+    bitset_flag.resize(h_graph->get_local_total_nodes());
+    #endif
 
     StatTimer_hg_init.stop();
 
@@ -553,11 +640,19 @@ int main(int argc, char** argv) {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
           bitset_current_degree_reset_cuda(cuda_ctx);
+          #if __OPT_VERSION__ >= 3
           bitset_trim_reset_cuda(cuda_ctx);
+          bitset_flag_reset_cuda(cuda_ctx);
+          #endif
         } else
       #endif
-        { bitset_current_degree.reset();
-        bitset_trim.reset(); }
+        {
+        bitset_current_degree.reset();
+        #if __OPT_VERSION__ >= 3
+        bitset_trim.reset(); 
+        bitset_flag.reset(); 
+        #endif
+        }
 
         InitializeGraph1::go((*h_graph));
       }
@@ -574,8 +669,7 @@ int main(int argc, char** argv) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             // prints the flag (alive/dead)
             Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                         (*h_graph).getData(*ii).flag);
-
+                                         (bool)(*h_graph).getData(*ii).flag);
 
           // does a sanity check as well: 
           // degree higher than kcore if node is alive
@@ -588,7 +682,7 @@ int main(int argc, char** argv) {
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                     get_node_flag_cuda(cuda_ctx, *ii));
+                                     (bool)get_node_flag_cuda(cuda_ctx, *ii));
                                      
         }
       }
