@@ -21,8 +21,8 @@ void batch_get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 void batch_get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode);
 void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v);
 void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode);
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, uint32_t i);
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, uint32_t i);
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, unsigned long long i);
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, unsigned long long i);
 void batch_set_mirror_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t v_size, DataCommMode data_mode);
 void batch_set_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t v_size, DataCommMode data_mode);
 void batch_add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t v_size, DataCommMode data_mode);

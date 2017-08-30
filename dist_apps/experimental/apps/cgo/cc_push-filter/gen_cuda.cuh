@@ -90,11 +90,11 @@ void batch_get_mirror_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned 
 	batch_get_shared_field<unsigned long long, sharedMirror, false>(ctx, &ctx->comp_current, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, uint32_t i) {
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, unsigned long long i) {
 	batch_get_shared_field<unsigned long long, sharedMirror, true>(ctx, &ctx->comp_current, from_id, v, i);
 }
 
-void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, uint32_t i) {
+void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, unsigned long long i) {
 	batch_get_shared_field<unsigned long long, sharedMirror, true>(ctx, &ctx->comp_current, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
 }
 
@@ -158,11 +158,11 @@ void batch_get_mirror_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from
 	batch_get_shared_field<unsigned long long, sharedMirror, false>(ctx, &ctx->comp_old, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
-void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, uint32_t i) {
+void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long *v, unsigned long long i) {
 	batch_get_shared_field<unsigned long long, sharedMirror, true>(ctx, &ctx->comp_old, from_id, v, i);
 }
 
-void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, unsigned long i) {
+void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, unsigned long long *v, size_t *v_size, DataCommMode *data_mode, unsigned long long i) {
 	batch_get_shared_field<unsigned long long, sharedMirror, true>(ctx, &ctx->comp_old, from_id, bitset_comm, offsets, v, v_size, data_mode, i);
 }
 
