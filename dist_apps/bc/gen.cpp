@@ -155,7 +155,9 @@ struct NodeData {
   std::atomic<uint32_t> trim;
   std::atomic<uint32_t> to_add;
 
-  uint32_t not_atomic_trim;
+  // TODO use this for dep prop?
+  //uint32_t not_atomic_trim;
+
   float to_add_float;
   float dependency;
 
@@ -1015,11 +1017,6 @@ struct BC {
   BC(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga){
-    std::string timer_str("ALLTIMER_0");
-    Galois::StatTimer all_main(timer_str.c_str());
-
-    all_main.start();
-    
     uint64_t start_i;
     uint64_t end_i;
     start_i = startSource;
@@ -1106,8 +1103,6 @@ struct BC {
       // all sources should have dependency value, meaning all sources will
       // update the BC value correctly; no sync required here 
     }
-
-    all_main.start();
   }
 
   /* adds dependency measure to BC measure (dependencies should be finalized,
