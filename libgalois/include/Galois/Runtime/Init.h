@@ -33,13 +33,16 @@
 #ifndef GALOIS_RUNTIME_INIT_H
 #define GALOIS_RUNTIME_INIT_H
 
+#include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/PagePool.h"
+
 namespace Galois {
 namespace Runtime {
 
 /**
  * Initialize Runtime components
  */
-void init(void);
+void init(Galois::Runtime::StatCollector* sc);
 
 /**
  * Destroy Runtime components

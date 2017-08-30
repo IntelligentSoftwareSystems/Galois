@@ -32,40 +32,5 @@
 #ifndef GALOIS_RUNTIME_SUPPORT_H
 #define GALOIS_RUNTIME_SUPPORT_H
 
-#include <string>
-
-namespace Galois {
-namespace Runtime {
-
-//! Begin a new loop instance
-void reportLoopInstance(const char* loopname);
-inline void reportLoopInstance(const std::string& loopname) {
-  reportLoopInstance(loopname.c_str());
-}
-
-//! Reports stats for a given thread
-void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
-void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
-void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
-void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
-//! Reports Galois system memory stats for all threads
-void reportPageAlloc(const char* category);
-//! Reports NUMA memory stats for all NUMA nodes
-void reportNumaAlloc(const char* category);
-
-
-void reportStatGlobal(const std::string& category, const std::string& val);
-void reportStatGlobal(const std::string& category, unsigned long val);
-
-
-//! Prints all stats
-void printStats();
-void printStats(std::string);
-// TODO: separate to dist
-void printDistStats();
-
-}
-} // end namespace Galois
-
 #endif
 

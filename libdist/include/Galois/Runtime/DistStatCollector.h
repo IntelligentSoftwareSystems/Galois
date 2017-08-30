@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
-#define GALOIS_RUNTIME_STATCOLLECTOR_H
+#ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
+#define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
 //TODO: remove dist stuff 
 #include "Galois/gdeque.h"
@@ -46,52 +46,7 @@ namespace Galois {
 namespace Runtime {
 
 
-// TODO: Rename to DistStatCollector and inherit from Galois::Runtime::StatCollector
-// TODO: remove duplicated code copied over form StatCollector
-
-class StatCollector {
-
-  template<typename Ty>
-  using StringPair = std::pair<const std::string*, Ty>;
-
-  //////////////////////////////////////
-  //Symbol Table
-  //////////////////////////////////////
-  std::set<std::string> symbols;
-  const std::string* getSymbol(const std::string& str) const;
-  const std::string* getOrInsertSymbol(const std::string& str);
-
-  //////////////////////////////////////
-  //Loop instance counter
-  //////////////////////////////////////
-  std::vector<StringPair<unsigned> > loopInstances;
-
-  unsigned getInstanceNum(const std::string& str) const;
-  void addInstanceNum(const std::string& str);
-
-  //////////////////////////////////////
-  //Stat list
-  //////////////////////////////////////
-  struct RecordTy {
-    char mode; // 0 - int, 1 - double, 2 - string
-    union {
-      size_t valueInt;
-      double valueDouble;
-      std::string valueStr;
-    };
-    RecordTy(size_t value);
-    RecordTy(double value);
-    RecordTy(const std::string& value);
-    RecordTy(const RecordTy& r);
-    ~RecordTy();
-
-    void print(std::ostream& out) const;
-  };
-
-  //stats  HostID,ThreadID,loop,category,instance -> Record
-  
-  std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
-  Galois::Substrate::SimpleLock StatsLock;
+class DistStatCollector: public StatCollector {
 
 public:
 
@@ -109,10 +64,9 @@ public:
   void printStats(std::ostream& out);
   void printDistStats(std::ostream& out);
 
-  void beginLoopInstance(const std::string& str);
 };
 
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif
+#endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H

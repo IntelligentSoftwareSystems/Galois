@@ -59,14 +59,16 @@ namespace Galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class System {
+class SharedMemSys {
+  Runtime::StatCollector m_sc;
+
 public:
-  System(void) {
+  explicit SharedMemSys(void) {
     Substrate::init();
-    Runtime::init();
+    Runtime::init(&m_sc);
   }
 
-  ~System(void) {
+  ~SharedMemSys(void) {
     Runtime::kill();
     Substrate::kill();
   }

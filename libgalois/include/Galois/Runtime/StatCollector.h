@@ -36,6 +36,9 @@
 
 #include <string>
 #include <set>
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace Galois {
 namespace Runtime {
@@ -86,6 +89,9 @@ class StatCollector {
 
 public:
 
+  static boost::uuids::uuid UUID;
+  static boost::uuids::uuid getUUID();
+
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
@@ -98,9 +104,37 @@ public:
   void beginLoopInstance(const std::string& str);
 };
 
+
+//! Begin a new loop instance
+void reportLoopInstance(const char* loopname);
+inline void reportLoopInstance(const std::string& loopname) {
+  reportLoopInstance(loopname.c_str());
+}
+
+//! Reports stats for a given thread
+void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
+void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
+void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
+void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
+//! Reports Galois system memory stats for all threads
+void reportPageAlloc(const char* category);
+//! Reports NUMA memory stats for all NUMA nodes
+void reportNumaAlloc(const char* category);
+
+
+void reportStatGlobal(const std::string& category, const std::string& val);
+void reportStatGlobal(const std::string& category, unsigned long val);
+
+
+//! Prints all stats
+void printStats();
+void printStats(std::string);
+// TODO: separate to dist
+void printDistStats();
+
+
 namespace internal {
-  void initStatManager(void);
-  void killStatManager(void);
+  void setStatCollector(StatCollector* sc);
 }
 
 } // end namespace Runtime

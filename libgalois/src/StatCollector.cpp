@@ -27,14 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-// TODO: this file was copied over from libruntime/src/StatCollector.cpp. 
-// TODO: remove the duplicated code after inheriting from Galois::Runtime::StatCollector
-
 #include "Galois/Runtime/StatCollector.h"
-#include "Galois/Runtime/Support.h"
-// #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Substrate.h"
-#include "Galois/Substrate/StaticInstance.h"
 
 #include <cmath>
 #include <new>
@@ -48,8 +42,20 @@
 #include <iostream>
 #include <fstream>
 
+namespace Galois {
+namespace Runtime {
+extern unsigned activeThreads;
+} } //end namespaces
+
 using namespace Galois;
 using namespace Galois::Runtime;
+
+static Galois::Runtime::StatCollector* SC;
+
+void Galois::Runtime::internal::setStatCollector(Galois::Runtime::StatCollector* sc) {
+  GALOIS_ASSERT(!(SC && sc), "StatCollector.cpp: Double Initialization of SC");
+  SC = sc;
+}
 
 const std::string* Galois::Runtime::StatCollector::getSymbol(const std::string& str) const {
   auto ii = symbols.find(str);
@@ -155,14 +161,10 @@ boost::uuids::uuid Galois::Runtime::StatCollector::getUUID(){
 }
 //assumne called serially
 void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
-
-  //Print header only on HOST 0
-  if(getHostID() == 0){
-    if (json)
-      out << "[\n";
-    else
-      out << "LOOP,INSTANCE,CATEGORY,HOST,THREAD,VAL\n";
-  }
+  if (json)
+    out << "[\n";
+  else
+    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
   MAKE_LOCK_GUARD(StatsLock);
   for (auto& p : Stats) {
     if (json)
@@ -192,8 +194,6 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
       v.resize(tid+1);
     v[tid] += p.second.valueInt;
   }
-
-  //  auto& net = Galois::Runtime::getSystemNetworkInterface();
   //print header
   out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
   for (unsigned x = 0; x <= maxThreadID; ++x)
@@ -218,50 +218,33 @@ void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);
 }
 
-//Implementation
-
-static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
 
 void Galois::Runtime::reportLoopInstance(const char* loopname) {
-  SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
-}
-
-static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, unsigned long value, unsigned TID) {
-  if (getHostID())
-    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
-  else 
-    SM.get()->addToStat(loopname, category, value, TID, HostID);
-}
-
-static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, const std::string value, unsigned TID) {
-  if (getHostID())
-    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
-  else 
-    SM.get()->addToStat(loopname, category, value, TID, HostID);
-}
-
-// TODO: following 4 variants are duplicated from libruntime/src/Support.cpp
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
-  reportStatImpl(getHostID(), loopname, category, value, TID);
-}
-
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string &value, unsigned TID) {
-  reportStatImpl(getHostID(), loopname, category, value, TID);
-  //out << loopname <<  ","  << 0 << ","<< category << "," << getHostID() << "," << TID << "," << value<<"\n";
+  SC->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
-  reportStatImpl(getHostID(),
-                 std::string(loopname ? loopname : "(NULL)"), 
-                 std::string(category ? category : "(NULL)"),
-                 value, TID);
+  SC->addToStat(std::string(loopname ? loopname : "(NULL)"), 
+		      std::string(category ? category : "(NULL)"),
+		      value, TID, 0);
+}
+void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID) {
+  SC->addToStat(std::string(loopname ? loopname : "(NULL)"), 
+		      std::string(category ? category : "(NULL)"),
+		      value, TID, 0);
 }
 
-void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string &value, unsigned TID) {
-  reportStatImpl(getHostID(),
-                 std::string(loopname ? loopname : "(NULL)"), 
-                 std::string(category ? category : "(NULL)"),
-                 value, TID);
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
+  SC->addToStat(loopname, category, value, TID, 0);
+}
+
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
+  SC->addToStat(loopname, category, value, TID, 0);
+}
+
+void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
+}
+void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
 }
 
 static std::ofstream& openIfNot_output(std::string fname) {
@@ -274,28 +257,33 @@ static std::ofstream& openIfNot_output(std::string fname) {
 }
 
 void Galois::Runtime::printStats() {
-  //getSystemNetworkInterface().reportStats();
-  Galois::Runtime::getHostBarrier().wait();
-  //SM.get()->printDistStats(std::cout);
-  //SM.get()->printStats(std::cout);
-  SM.get()->printStatsForR(std::cout, false);
+    // SC->printDistStats(std::cout);
+    SC->printStats(std::cout);
+  //SC->printStatsForR(std::cout, false);
+  //  SC->printStatsForR(std::cout, true);
 }
 
-// TODO: duplicated in libruntime/src/Support.cpp. Use that
 void Galois::Runtime::printStats(std::string fname) {
-  //getSystemNetworkInterface().reportStats();
-  Galois::Runtime::getHostBarrier().wait();
-  //SM.get()->printDistStats(std::cout);
-  //SM.get()->printStats(std::cout);
   if(fname == "")
-    SM.get()->printStatsForR(std::cout, false);
+    SC->printStatsForR(std::cout, false);
   else{
     auto& out = openIfNot_output(fname);
-    SM.get()->printStatsForR(out, false);
+    SC->printStatsForR(out, false);
     out.close();
   }
-  if (getHostID() == 0) {
-    std::cerr << "STAT FILENAME : " << fname << "\n";
+}
+
+void Galois::Runtime::reportPageAlloc(const char* category) {
+  for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
+    reportStat("(NULL)", category, static_cast<unsigned long>(numPagePoolAllocForThread(x)), x);
+}
+
+void Galois::Runtime::reportNumaAlloc(const char* category) {
+  int nodes = Substrate::getThreadPool().getMaxNumaNodes();
+  for (int x = 0; x < nodes; ++x) {
+    //auto rStat = Stats.getRemote(x);
+    //std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
+    //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
   }
-  Galois::Runtime::getHostBarrier().wait();
+  //  SC->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
 }

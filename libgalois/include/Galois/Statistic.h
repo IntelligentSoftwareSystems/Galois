@@ -31,7 +31,7 @@
 #define GALOIS_STATISTIC_H
 
 #include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/StatCollector.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Timer.h"
 
