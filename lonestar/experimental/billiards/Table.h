@@ -63,7 +63,7 @@ protected:
   unsigned numBalls;
   FP length;
   FP width;
-  std::vector<Galois::gstl::Vector<Event> > eventsPerBall;
+  std::vector<Galois::Vector<Event> > eventsPerBall;
   
 
   std::vector<Cushion*> cushions;

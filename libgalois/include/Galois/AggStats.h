@@ -68,7 +68,7 @@ public:
 template <typename T>
 class RunningVec {
 
-  using Vec = gstl::Vector<T>
+  using Vec = Galois::Vector<T>;
 
   Vec m_vec;
 

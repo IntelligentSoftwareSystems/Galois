@@ -32,7 +32,7 @@
 #include "Galois/Galois.h"
 #include "Galois/LargeArray.h"
 #include "Galois/NoDerefIterator.h"
-#include "Galois/gstl.h"
+#include "Galois/Galois.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
 #include <boost/iterator/transform_iterator.hpp>

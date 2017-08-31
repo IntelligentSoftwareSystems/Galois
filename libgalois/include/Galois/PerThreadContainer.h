@@ -526,10 +526,10 @@ public:
 };
 
 template<typename T>
-class PerThreadVector: public PerThreadContainer<typename gstl::template Vector<T> > {
+class PerThreadVector: public PerThreadContainer<typename Galois::template Vector<T> > {
 public:
-  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
-  typedef typename gstl::template Vector<T>  container_type;
+  typedef typename Galois::template Pow2Alloc<T>  Alloc_ty;
+  typedef typename Galois::template Vector<T>  container_type;
 
 protected:
   typedef PerThreadContainer<container_type> Super_ty;
@@ -554,13 +554,13 @@ public:
 
 template<typename T>
 class PerThreadDeque: 
-  public PerThreadContainer<typename gstl::template Deque<T> > {
+  public PerThreadContainer<typename Galois::template Deque<T> > {
 
 public:
-  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
+  typedef typename Galois::template Pow2Alloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template Deque<T>  container_type;
+  typedef typename Galois::template Deque<T>  container_type;
   typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
@@ -585,13 +585,13 @@ public:
 
 template<typename T>
 class PerThreadList:
-  public PerThreadContainer<typename gstl::template List<T> > {
+  public PerThreadContainer<typename Galois::template List<T> > {
 
 public:
-  typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
+  typedef typename Galois::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template List<T>  container_type;
+  typedef typename Galois::template List<T>  container_type;
   typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
@@ -604,13 +604,13 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadSet: 
-  public PerThreadContainer<typename gstl::template Set<T, C> > {
+  public PerThreadContainer<typename Galois::template Set<T, C> > {
 
 public:
-  typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
+  typedef typename Galois::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template Set<T, C>  container_type;
+  typedef typename Galois::template Set<T, C>  container_type;
   typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
@@ -635,14 +635,14 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadMinHeap:
-  public PerThreadContainer<typename gstl::template PQ<T, C> > {
+  public PerThreadContainer<typename Galois::template PQ<T, C> > {
 
 public:
-  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
+  typedef typename Galois::template Pow2Alloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template Vector<T>  Vec_ty;
-  typedef typename gstl::template PQ<T, C>  container_type;
+  typedef typename Galois::template Vector<T>  Vec_ty;
+  typedef typename Galois::template PQ<T, C>  container_type;
   typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
