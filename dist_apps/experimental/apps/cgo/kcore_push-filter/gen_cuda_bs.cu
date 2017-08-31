@@ -237,8 +237,8 @@ __global__ void InitializeGraph1(CSRGraph graph,
   // FP: "9 -> 10;
 }
 __global__ void KCoreStep2(CSRGraph graph,
-  DynamicBitset* cur_is_updated,
-  DynamicBitset* trim_is_updated,
+  //DynamicBitset* cur_is_updated,
+  //DynamicBitset* trim_is_updated,
   unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_degree, uint32_t * p_trim, uint8_t * p_flag)
 {
   unsigned tid = TID_1D;
@@ -260,18 +260,16 @@ __global__ void KCoreStep2(CSRGraph graph,
         if (p_trim[src] > 0)
         {
           p_current_degree[src] = p_current_degree[src] - p_trim[src];
-          p_trim[src] = 0;
-
-          trim_is_updated->set(src);
-          cur_is_updated->set(src);
         }
       }
+
+      p_trim[src] = 0;
     }
   }
   // FP: "10 -> 11;
 }
 __global__ void KCoreStep1(CSRGraph graph, 
-    DynamicBitset* flag_is_updated,
+    //DynamicBitset* flag_is_updated,
     DynamicBitset* trim_is_updated,
     unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, Sum ret_val)
 {
@@ -312,7 +310,7 @@ __global__ void KCoreStep1(CSRGraph graph,
         if (p_current_degree[src] < local_k_core_num)
         {
           p_flag[src] = false;
-          flag_is_updated->set(src);
+          //flag_is_updated->set(src);
           ret_val.do_return( 1);
           //continue;
         }
@@ -500,8 +498,8 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   KCoreStep2 <<<blocks, threads>>>(ctx->gg, 
-    ctx->current_degree.is_updated.gpu_rd_ptr(),
-    ctx->trim.is_updated.gpu_rd_ptr(),
+    //ctx->current_degree.is_updated.gpu_rd_ptr(),
+    //ctx->trim.is_updated.gpu_rd_ptr(),
     ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
     ctx->trim.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -528,7 +526,7 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval,
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, 
-  ctx->flag.is_updated.gpu_rd_ptr(),
+  //ctx->flag.is_updated.gpu_rd_ptr(),
   ctx->trim.is_updated.gpu_rd_ptr(),
   ctx->nowned, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;

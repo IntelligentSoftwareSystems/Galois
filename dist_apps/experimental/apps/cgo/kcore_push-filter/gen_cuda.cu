@@ -258,9 +258,11 @@ __global__ void KCoreStep2(CSRGraph graph,
         if (p_trim[src] > 0)
         {
           p_current_degree[src] = p_current_degree[src] - p_trim[src];
-          p_trim[src] = 0;
         }
       }
+
+      // always reset
+      p_trim[src] = 0;
     }
   }
   // FP: "10 -> 11;

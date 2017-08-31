@@ -142,7 +142,6 @@ typedef typename Graph::GraphNode GNode;
 Galois::DynamicBitSet bitset_current_degree;
 #if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_trim;
-Galois::DynamicBitSet bitset_flag;
 #endif
 
 // add all sync/bitset structs (needs above declarations)
@@ -182,17 +181,8 @@ struct InitializeGraph2 {
       Galois::timeit()
     );
 
-    // TODO
-    // note I do readAny instead of readSource here for versions 1-3 because
-    // those will reduce from destination unnecessarily, meaning dest has
-    // to have the correct value
-    #if __OPT_VERSION__ <= 3
-    _graph.sync<writeDestination, readAny, Reduce_add_current_degree, 
-      Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
-    #else
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
-    #endif
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -281,33 +271,6 @@ struct KCoreStep2 {
        Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
        Galois::timeit()
      );
-
-      #if __OPT_VERSION__ == 1
-      // min trim here because reset to 0
-      _graph.sync<writeAny, readAny, Reduce_min_trim, 
-                  Broadcast_trim>("KCoreStep2");
-      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
-                  Broadcast_current_degree>("KCoreStep2");
-      // min basically works as an AND for boolean flags (0 = false)
-      _graph.sync<writeAny, readAny, Reduce_min_flag, 
-                  Broadcast_flag>("KCoreStep2");
-      #elif __OPT_VERSION__ == 2
-      _graph.sync<writeAny, readAny, Reduce_min_trim, 
-                  Broadcast_trim>("KCoreStep2");
-      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
-                  Broadcast_current_degree>("KCoreStep2");
-      #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_min_trim, Broadcast_trim, 
-                  Bitset_trim>("KCoreStep2");
-      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
-                  Broadcast_current_degree, Bitset_current_degree>("KCoreStep2");
-      #elif __OPT_VERSION__ == 4
-      _graph.sync<writeSource, readAny, Reduce_min_trim, Broadcast_trim, 
-                  Bitset_trim>("KCoreStep2");
-      _graph.sync<writeSource, readAny, Reduce_min_current_degree, 
-                  Broadcast_current_degree, Bitset_current_degree>("KCoreStep2");
-      #endif
-
   }
 
   void operator()(GNode src) const {
@@ -318,14 +281,13 @@ struct KCoreStep2 {
     if (src_data.flag) {
       if (src_data.trim > 0) {
         src_data.current_degree = src_data.current_degree - src_data.trim;
-        src_data.trim = 0;
-
-        #if __OPT_VERSION__ >= 3
-        bitset_current_degree.set(src);
-        bitset_trim.set(src);
-        #endif
       }
     }
+
+    // always reset trim (it should be reset on dest by reduce, but
+    // doing it here doesn't hurt; on sources it definitely needs
+    // to be reset)
+    src_data.trim = 0;
   }
 };
 
@@ -374,28 +336,16 @@ struct KCoreStep1 {
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
                   Broadcast_trim>("KCoreStep1");
-      _graph.sync<writeAny, readAny, Reduce_min_current_degree, 
-                  Broadcast_current_degree>("KCoreStep1");
-      // min basically works as an AND for boolean flags (0 = false)
-      _graph.sync<writeAny, readAny, Reduce_min_flag, 
-                  Broadcast_flag>("KCoreStep1");
       #elif __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
                   Broadcast_trim>("KCoreStep1");
-      _graph.sync<writeAny, readAny, Reduce_min_flag, 
-                  Broadcast_flag>("KCoreStep1");
       #elif __OPT_VERSION__ == 3
       _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
                   Bitset_trim>("KCoreStep1");
-      _graph.sync<writeAny, readAny, Reduce_min_flag, Broadcast_flag,
-                  Bitset_flag>("KCoreStep1");
       #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
                   Bitset_trim>("KCoreStep1");
-      _graph.sync<writeSource, readAny, Reduce_min_flag, Broadcast_flag,
-                  Bitset_flag>("KCoreStep1");
       #endif
-
 
       // gold standard sync
       // do the trim sync; readSource because in symmetric graph 
@@ -416,7 +366,6 @@ struct KCoreStep1 {
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations, 0);
     }
-
   }
 
   void operator()(GNode src) const {
@@ -428,9 +377,6 @@ struct KCoreStep1 {
         // set flag to 0 (false) and increment trim on outgoing neighbors
         // (if they exist)
         src_data.flag = false;
-        #if __OPT_VERSION__ >= 3
-        bitset_flag.set(src);
-        #endif
         DGAccumulator_accum += 1; // can be optimized: node may not have edges
 
         for (auto current_edge = graph->edge_begin(src), 
@@ -442,6 +388,7 @@ struct KCoreStep1 {
            auto& dst_data = graph->getData(dst);
 
            Galois::atomicAdd(dst_data.trim, (uint32_t)1);
+
            #if __OPT_VERSION__ >= 3
            bitset_trim.set(dst);
            #endif
@@ -606,7 +553,6 @@ int main(int argc, char** argv) {
     bitset_current_degree.resize(h_graph->get_local_total_nodes());
     #if __OPT_VERSION__ >= 3
     bitset_trim.resize(h_graph->get_local_total_nodes());
-    bitset_flag.resize(h_graph->get_local_total_nodes());
     #endif
 
     StatTimer_hg_init.stop();
@@ -650,7 +596,6 @@ int main(int argc, char** argv) {
         bitset_current_degree.reset();
         #if __OPT_VERSION__ >= 3
         bitset_trim.reset(); 
-        bitset_flag.reset(); 
         #endif
         }
 
