@@ -34,9 +34,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -1122,9 +1122,8 @@ struct BC {
 
 int main(int argc, char** argv) {
   try {
-    Galois::System G;
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager;
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -1298,7 +1297,7 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+
     return 0;
   } catch(const char* c) {
     std::cout << "Error: " << c << "\n";
