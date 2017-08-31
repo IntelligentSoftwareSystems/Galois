@@ -91,6 +91,13 @@ struct Flags_##fieldname {\
     _##fieldname##_d2d = true;\
   }\
 \
+  static void set_write_any() {\
+    _##fieldname##_s2s = true;\
+    _##fieldname##_s2d = true;\
+    _##fieldname##_d2s = true;\
+    _##fieldname##_d2d = true;\
+  }\
+\
   static void clear_read_src() {\
     _##fieldname##_s2s = false;\
     _##fieldname##_d2s = false;\
