@@ -4,6 +4,7 @@
 #include <sstream>
 #include <climits>
 #include <vector>
+#include <algorithm>
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -106,8 +107,28 @@ namespace {
     string VAL_TYPE;
   };
 
+  std::string stringToUpper(std::string input){
+    std::transform(input.begin(), input.end(), input.begin(), ::toupper);
+    return input;
+  }
   std::string getSyncer(unsigned counter, const Write_set& i, std::string struct_type="") {
     std::stringstream s;
+     s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+     return s.str();
+  }
+
+
+  typedef std::map<std::string, std::vector<std::string>> SyncCall_map;
+          //std::map<std::string, std::vector<std::string>> syncCall_map;
+  std::string getSyncer(unsigned counter, const Write_set& i, SyncCall_map& syncCall_map,std::string struct_type="") {
+    std::stringstream s;
+     s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+
+     std::string str_reduce_call = "Reduce_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME;
+     syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
+
+
+#if 0
     s << "\tstruct Syncer_" << struct_type << counter << " {\n";
     s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
@@ -176,11 +197,30 @@ namespace {
     s << "\t\t}\n";
     s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
+#endif
     return s.str();
   }
 
   std::string getSyncerPull(unsigned counter, const Write_set& i, std::string struct_type="") {
     std::stringstream s;
+     s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
+
+     return s.str();
+  }
+
+
+  std::string getSyncerPull(unsigned counter, const Write_set& i, SyncCall_map& syncCall_map, std::string struct_type="") {
+    std::stringstream s;
+     s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
+
+     std::string str_broadcast_call = "Broadcast_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME;
+     std::string str_bitset = "Bitset_" + i.FIELD_NAME;
+     syncCall_map[i.FIELD_NAME].push_back(str_broadcast_call);
+     syncCall_map[i.FIELD_NAME].push_back(str_bitset);
+
+#if 0
     s << "\tstruct SyncerPull_" << struct_type << counter << " {\n";
     s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
@@ -222,6 +262,7 @@ namespace {
       << "\t\t}\n";
     s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
+#endif
     return s.str();
   }
 
@@ -418,9 +459,10 @@ namespace {
 
 
             stringstream SSSyncer;
+            std::map<std::string, std::vector<std::string>> syncCall_map;
             unsigned counter = 0;
             for(auto i : write_set_vec_PUSH) {
-              SSSyncer << getSyncer(counter, i);
+              SSSyncer << getSyncer(counter, i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
               SSSyncer.str(string());
               SSSyncer.clear();
@@ -431,7 +473,7 @@ namespace {
             stringstream SSSyncer_pull;
             counter = 0;
             for(auto i : write_set_vec_PULL) {
-              SSSyncer_pull << getSyncerPull(counter, i);
+              SSSyncer_pull << getSyncerPull(counter, i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
               SSSyncer_pull.str(string());
               SSSyncer_pull.clear();
@@ -443,14 +485,14 @@ namespace {
             counter = 0;
             for(auto i : write_set_vec_PUSH_PULL) {
               if(i.SYNC_TYPE == "sync_push"){
-                SSSyncer_vertexCut << getSyncerPull(counter, i, "vertexCut_");
+                SSSyncer_vertexCut << getSyncerPull(counter, i, syncCall_map, "vertexCut_");
                 rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
                 SSSyncer_vertexCut.str(string());
                 SSSyncer_vertexCut.clear();
                 ++counter;
               }
               else if(i.SYNC_TYPE == "sync_pull"){
-                SSSyncer_vertexCut << getSyncer(counter, i, "vertexCut_");
+                SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map ,"vertexCut_");
                 rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
                 SSSyncer_vertexCut.str(string());
                 SSSyncer_vertexCut.clear();
@@ -478,6 +520,25 @@ namespace {
 
             // Adding sync calls for write set
             stringstream SSAfter;
+            for(auto i : syncCall_map){
+              SSAfter <<"\n\t" << "_graph.sync<";
+              uint32_t c = 0;
+              for(auto j : i.second){
+                if((c + 1) < i.second.size())
+                  SSAfter << j << ",";
+                else
+                  SSAfter << j;
+                ++c;
+              }
+
+              SSAfter << ">\(\"" << OperatorStructName << "\");\n";
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+
+#if 0
+            stringstream SSAfter;
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
                 SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
@@ -494,7 +555,7 @@ namespace {
               SSAfter.str(string());
               SSAfter.clear();
             }
-
+#endif
 
 
 #if 0
@@ -872,8 +933,10 @@ namespace {
 
             stringstream SSSyncer;
             unsigned counter = 0;
+            // map from FIELD_NAME -> reduce, broadcast, bitset;
+            std::map<std::string, std::vector<std::string>> syncCall_map;
             for(auto i : write_set_vec_PUSH) {
-              SSSyncer << getSyncer(counter, i);
+              SSSyncer << getSyncer(counter, i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
               SSSyncer.str(string());
               SSSyncer.clear();
@@ -884,31 +947,36 @@ namespace {
             stringstream SSSyncer_pull;
             counter = 0;
             for(auto i : write_set_vec_PULL) {
-              SSSyncer_pull << getSyncerPull(counter, i);
+              SSSyncer_pull << getSyncerPull(counter, i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
               SSSyncer_pull.str(string());
               SSSyncer_pull.clear();
               ++counter;
             }
 
+
             // Addding additional structs for vertex cut
             stringstream SSSyncer_vertexCut;
             counter = 0;
             for(auto i : write_set_vec_PUSH_PULL) {
               if(i.SYNC_TYPE == "sync_push"){
-                SSSyncer_vertexCut << getSyncerPull(counter, i, "vertexCut_");
+                SSSyncer_vertexCut << getSyncerPull(counter, i, syncCall_map, "vertexCut_");
                 rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
                 SSSyncer_vertexCut.str(string());
                 SSSyncer_vertexCut.clear();
                 ++counter;
               }
               else if(i.SYNC_TYPE == "sync_pull"){
-                SSSyncer_vertexCut << getSyncer(counter, i, "vertexCut_");
+                SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
                 rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
                 SSSyncer_vertexCut.str(string());
                 SSSyncer_vertexCut.clear();
                 ++counter;
               }
+            }
+
+            for(auto i : syncCall_map){
+              llvm::outs() << "__________________> : " << i.first << " ---- > " <<  i.second[0] << " , "<<  i.second[1] << "\n";
             }
 
             auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
@@ -969,9 +1037,27 @@ namespace {
 
             // Adding Syn calls for write set
             stringstream SSAfter;
+            for(auto i : syncCall_map){
+              SSAfter <<"\n\t" << "_graph.sync<";
+              uint32_t c = 0;
+              for(auto j : i.second){
+                if((c + 1) < i.second.size())
+                  SSAfter << j << ",";
+                else
+                  SSAfter << j;
+                ++c;
+              }
+
+              SSAfter << ">\(\"" << OperatorStructName << "\");\n";
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+#if 0
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
               if(write_set_vec_PUSH_PULL[i].SYNC_TYPE == "sync_push"){
-                SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                //SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");";
+                SSAfter <<"\n\t" << "_graph.sync_forward<Syncer_" << i << ", SyncerPull_vertexCut_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
                 //SSAfter << "\n}\n";
                 rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               }
@@ -985,6 +1071,7 @@ namespace {
               SSAfter.str(string());
               SSAfter.clear();
             }
+#endif
 
 
 #if 0
@@ -1047,7 +1134,7 @@ namespace {
     FunctionForEachHandler forEachHandler;
   public:
     GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), forEachHandler(R) {
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all"))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop"), &functionCallHandler);
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(anyOf(hasName("Galois::do_all"),hasName("Galois::do_all_local")))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop"), &functionCallHandler);
 
       /** for Galois::for_each. Needs different treatment. **/
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version"))))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop_forEach"), &forEachHandler);

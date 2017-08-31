@@ -50,6 +50,12 @@
     string SYNC_TYPE;
   };
 
+  struct SyncFlag_entry {
+    string FIELD_NAME;
+    string RW; // read or write
+    string AT; // src or dest
+  };
+
   struct FirstIter_struct_entry{
     //pair: type, varName
     vector<pair<string,string>> MEMBER_FIELD_VEC;
@@ -66,6 +72,7 @@
       map<string, vector<NodeField_entry>> fieldData_map;
       map<string, vector<ReductionOps_entry>> reductionOps_map;
       map<string, vector<FirstIter_struct_entry>> FirstItr_struct_map;
+      map<string, vector<SyncFlag_entry>>syncFlags_map;
   };
 
 

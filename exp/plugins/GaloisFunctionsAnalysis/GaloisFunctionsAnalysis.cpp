@@ -915,6 +915,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
   };
 
 
+
 }
 
 static FrontendPluginRegistry::Add<GaloisFunctionsAction> X("galois-analysis", "find galois function names");

@@ -55,21 +55,27 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+            /** For making the read set at the source **/
+            string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
             string str_min = "min_" + j.VAR_NAME + "_" + i.first;
 
+
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifCompare = "ifCompare_" + j.VAR_NAME+ "_" + i.first;
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+              auto field_nonRef = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl_nonRef);
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
               auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
               auto min_op = Results.Nodes.getNodeAs<clang::Stmt>(str_min);
+              auto ifCompare = Results.Nodes.getNodeAs<clang::Stmt>(str_ifCompare);
 
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
@@ -78,6 +84,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
+
               //memExpr->dump();
               if(memExpr){
                 //memExpr->dump();
@@ -135,6 +142,18 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
+                /** non ref field for read entry **/
+                if(field_nonRef || ifCompare){
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "read";
+                  syncFlags_entry.AT = "source";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+                  break;
+                }
+
                 if(assignmentOP_vec) {
                   //assignmentOP_vec->dump();
                 }
@@ -177,6 +196,16 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   }
+
+                  /** Add to the write set **/
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "write";
+                  syncFlags_entry.AT = "source";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+
                   break;
                 }
                 /*
@@ -242,6 +271,16 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   field_entry.RESET_VAL = "0";
                   field_entry.SYNC_TYPE = "sync_pull_maybe";
                   info->fieldData_map[i.first].push_back(field_entry);
+
+                  /** Add to the read set **/
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "read";
+                  syncFlags_entry.AT = "source";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+
                   break;
                 }
               }

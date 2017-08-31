@@ -115,6 +115,21 @@ bool syncPull_reduction_exists(EntryTy entry, vector<EntryTy> entry_vec){
   return false;
 }
 
+/** Check for a duplicate entry in the map **/
+template <typename EntryTy>
+bool syncFlags_entry_exists(EntryTy entry, vector<EntryTy> entry_vec){
+  if(entry_vec.size() == 0){
+    return false;
+  }
+  for(auto it : entry_vec){
+    if((it.FIELD_NAME == entry.FIELD_NAME) && (it.RW == entry.RW) && (it.AT == entry.AT)){
+      return true;
+    }
+  }
+  return false;
+}
+
+
 bool is_vector_type(string inputStr, string& Type, string& Num_ele) {
   /** Check if type is suppose to be a vector **/
   //llvm::outs()<< "inside is_vec : " <<  inputStr << "\n ";
@@ -238,13 +253,39 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
     else if(j.SYNC_TYPE == "sync_pull")
       SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
   }
+
+  //TODO: Hack.. For now I am assuming is range has begin, all nodes with edges to be operated on.
+  std::string operator_range = "";
+  std::string operator_range_definition = "";
+  std::string orig_operator_range = entry.OPERATOR_RANGE;
+  //To remove the , in the range.
+  orig_operator_range = orig_operator_range.substr(0,orig_operator_range.find(",",0));
+  bool onlyOneNode = false;
+  if(orig_operator_range.find(std::string("begin")) != std::string::npos){
+    operator_range_definition = "\nauto nodesWithEdges = _graph.allNodesWithEdgesRange(); \n";
+    operator_range = "nodesWithEdges,";
+  } else {
+    operator_range_definition = "\n uint32_t __begin, __end;\n if (_graph.isLocal(" + orig_operator_range + ")) {\n __begin = _graph.getLID(" + orig_operator_range + ");\n__end = __begin + 1;\n} else {\n__begin = 0;\n__end = 0;\n}\n";
+
+    operator_range = " _graph.begin() + __begin , _graph.end() + __end,";
+    onlyOneNode = true;
+    
+  }
   /** Adding static go function **/
   //TODO: Assuming graph type is Graph
   string static_go = "void static go(Graph& _graph) {\n";
-  static_go += "Galois::do_all(" + entry.OPERATOR_RANGE;
+  static_go += operator_range_definition;
+  if(onlyOneNode)
+    static_go += "Galois::do_all(" + operator_range;
+  else
+    static_go += "Galois::do_all_local(" + operator_range;
   static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
-  static_go += "Galois::loopname(\"" + orig_functor_name + "\"), ";
-  static_go += "Galois::numrun(_graph.get_run_identifier())" + SS_write_set.str() + ");\n}\n";
+  static_go += "Galois::loopname(_graph.get_run_identifier(\"" + orig_functor_name + "\").c_str()),";
+  if(!onlyOneNode)
+    static_go += "\nGalois::do_all_steal<true>(),";
+
+  static_go += "\nGalois::timeit()";
+  static_go += SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
   string operator_func = entry.OPERATOR_BODY + "\n";

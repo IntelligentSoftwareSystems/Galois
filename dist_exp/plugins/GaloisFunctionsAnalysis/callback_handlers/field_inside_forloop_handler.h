@@ -55,6 +55,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
 
             string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
             string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
@@ -62,6 +63,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
             string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifCompare = "ifCompare_" + j.VAR_NAME+ "_" + i.first;
 
             string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
@@ -77,11 +79,13 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+              auto field_nonRef = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl_nonRef);
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
 
               auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
+              auto ifCompare = Results.Nodes.getNodeAs<clang::Stmt>(str_ifCompare);
               auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
 
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
@@ -144,6 +148,28 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
                 reduceOP_entry.SYNC_TYPE = "sync_push";
+
+                if(field_nonRef || ifCompare){
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "read";
+                  syncFlags_entry.AT = "destination";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+                  break;
+                }
+
+
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op || ifMinOp || whileCAS_op) {
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "write";
+                  syncFlags_entry.AT = "destination";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+                }
 
                 if(assignplusOP) {
                   //assignplusOP->dump();
@@ -300,6 +326,15 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.RESET_VALTYPE = field_entry.VAR_TYPE;
                   field_entry.SYNC_TYPE = "sync_push";
                   info->fieldData_map[i.first].push_back(field_entry);
+
+                  /** Add to the read set **/
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.RW = "read";
+                  syncFlags_entry.AT = "destination";
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
                   break;
                 }
               }

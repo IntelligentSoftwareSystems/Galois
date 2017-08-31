@@ -52,6 +52,8 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
             string str_main_struct = "main_struct_" + i.first;
             string str_forLoop_2LT = "forLoop_2LT_" + i.first;
             string str_method_operator  = "methodDecl_" + i.first;
+            string str_struct_constructor = "constructorDecl_" + i.first;
+            string str_struct_constructor_initList = "constructorDeclInitList_" + i.first;
             string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
             string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
 
@@ -67,6 +69,9 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
               /**2: extract operator body without if statement (order matters) **/
               auto method_operator = Results.Nodes.getNodeAs<clang::CXXMethodDecl>(str_method_operator);
+              /** extract constructor **/
+              //auto struct_constructor = Results.Nodes.getNodeAs<clang::CXXConstructorDecl>(str_struct_constructor);
+              //auto struct_constructorInitList = Results.Nodes.getNodeAs<clang::DeclRefExpr>(str_struct_constructor_initList);
               // remove UserContext : assuming it is 2nd argument
               assert(method_operator->getNumParams() == 2);
               auto OP_parm_itr = method_operator->param_begin();
@@ -79,8 +84,14 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               first_itr_entry.OPERATOR_BODY = operator_body;
               
               /**Adding Distributed Galois accumulator **/
+              //REMOVED
+#if 0
               SourceLocation method_operator_begin = method_operator->getSourceRange().getBegin();
               rewriter.InsertTextBefore(method_operator_begin, ("static " + galois_distributed_accumulator_type + galois_distributed_accumulator_name + ";\n"));
+#endif
+
+              //SourceLocation struct_constructor_begin = struct_constructorInitList->getSourceRange().getBegin();
+              //rewriter.InsertTextBefore(struct_constructor_begin, ("static " + galois_distributed_accumulator_type + galois_distributed_accumulator_name + ";\n"));
 
 
               /**3: add new if statement (order matters) **/
@@ -145,11 +156,12 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               //TODO:: get _graph from go struct IMPORTANT
               // change for_each to do_all
               string galois_foreach = "Galois::for_each(";
-              string galois_doall = "Galois::do_all(_graph.begin(), _graph.end(), ";
+              string galois_doall = "Galois::do_all_local(nodesWithEdges, ";
               rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
-              string num_run = ", Galois::numrun(_graph.get_run_identifier())";
+              string num_run = ",\nGalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \nGalois::do_all_steal<true>(), \nGalois::timeit())";
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
               string firstItr_func_call = "\nFirstItr_" + i.first + "::go(_graph);\n";
+              string nodesWithEdgesRange_str = "\nauto nodesWithEdges = _graph.allNodesWithEdgesRange(); \n";
               string iteration = "\nunsigned _num_iterations = 1;\n";
               size_t found = operator_range.find(",");
               assert(found != string::npos);
@@ -157,20 +169,25 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
                 iteration += "\nunsigned long _num_work_items = 1;\n";
               else
                 iteration += "\nunsigned long _num_work_items = _graph.end() - _graph.begin();\n";
+
+              iteration += nodesWithEdgesRange_str;
               string do_while = firstItr_func_call + iteration + "do { \n _graph.set_num_iter(_num_iterations);\n" +  galois_distributed_accumulator_name + ".reset();\n";
               rewriter.InsertText(for_each_loc_begin, do_while, true, true);
 
-              string iteration_inc = "++_num_iterations;\n";
+              string iteration_inc = "\n++_num_iterations;\n";
               iteration_inc += "_num_work_items += " + galois_distributed_accumulator_name + ".read();\n";
               string while_conditional = "}while("+ galois_distributed_accumulator_name + ".reduce());\n";
               string report_iteration = "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
               report_iteration += "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
               rewriter.InsertText(for_each_loc_end, iteration_inc + while_conditional + report_iteration, true, true);
 
+#if 0
+              //REMOVED
               /**8. Adding definition for static accumulator field name **/
               string galois_accumulator_def = "\n" + galois_distributed_accumulator_type + " " + i.first + "::" + galois_distributed_accumulator_name + ";\n";
               SourceLocation main_struct_loc_end = main_struct->getSourceRange().getEnd().getLocWithOffset(2);
               rewriter.InsertText(main_struct_loc_end, galois_accumulator_def, true, true);
+#endif
               break;
             }
           }
