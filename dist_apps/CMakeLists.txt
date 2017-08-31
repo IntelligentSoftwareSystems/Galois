@@ -8,6 +8,8 @@ target_include_directories(distbench PUBLIC
 target_link_libraries(distbench galois_shmem galois_dist gllvm)
 
 include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/libdist/include)
+include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 if(USE_GGC)
   # for debugging 
@@ -22,10 +24,13 @@ endif()
 function(distApp name)
   app(${name} ${name}/gen.cpp DISTSAFE)
   target_link_libraries(${name} galois_dist distbench)
+  target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+
   if(USE_GGC)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
     target_link_libraries(${name} ${name}_cuda distbench)
     cuda_add_library(${name}_cuda ${name}/gen_cuda.cu)
+    target_include_directories(${name}_cuda PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
     target_link_libraries(${name}_cuda ggrt distbench)
   endif()
 endfunction()
