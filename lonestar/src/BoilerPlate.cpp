@@ -33,8 +33,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Version.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/DataCommMode.h"
 
 #include <iostream>
 #include <sstream>
@@ -43,17 +41,6 @@
 llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
-llvm::cl::opt<int> numRuns("runs", llvm::cl::desc("Number of runs"), llvm::cl::init(3));
-
-llvm::cl::opt<bool> savegraph("savegraph", llvm::cl::desc("Bool flag to enable save graph"), llvm::cl::init(false));
-llvm::cl::opt<std::string> outputfile("outputfile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
-llvm::cl::opt<std::string> outputfolder("outputfolder", llvm::cl::desc("Output folder name to store the local graph structure"), llvm::cl::init("."));
-
-llvm::cl::opt<bool> verifyMax("verifyMax", llvm::cl::desc("Just print the max value of nodes fields"), llvm::cl::init(false));
-llvm::cl::opt<std::string> statOutputFile("statOutputFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
-llvm::cl::opt<unsigned int> enforce_metadata("metadata", llvm::cl::desc("Enforce communication metadata: 0 - auto (default), 1 - bitset, 2 - indices, 3 - no metadata"), llvm::cl::init(0));
-
-DataCommMode enforce_data_mode = noData;
 
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
@@ -67,8 +54,6 @@ void LonestarStart(int argc, char** argv,
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
-  assert(enforce_metadata <= 3);
-  enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 
   LonestarPrintVersion();
   std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
@@ -88,12 +73,9 @@ void LonestarStart(int argc, char** argv,
   }
   Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
   Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
-  Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
 
   char name[256];
   gethostname(name, 256);
   Galois::Runtime::reportStat("(NULL)", "Hostname", name, 0);
 
-  if(savegraph)
-    Galois::Runtime::reportStat("(NULL)", "Saving Graph structure to:", (outputfolder + "/" + outputfile).c_str(), 0);
 }

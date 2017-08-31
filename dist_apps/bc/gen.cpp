@@ -34,9 +34,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -149,11 +149,14 @@ struct NodeData {
   uint32_t old_length;
 
   // Betweeness centrality vars
-  std::atomic<uint32_t> num_shortest_paths;
+  uint32_t num_shortest_paths;
   uint32_t num_successors;
   std::atomic<uint32_t> num_predecessors;
   std::atomic<uint32_t> trim;
   std::atomic<uint32_t> to_add;
+
+  // TODO use this for dep prop?
+  //uint32_t not_atomic_trim;
 
   float to_add_float;
   float dependency;
@@ -163,7 +166,6 @@ struct NodeData {
   // used to determine if data has been propogated yet
   uint8_t propogation_flag;
 };
-
 
 // no edge data = bfs not sssp
 typedef hGraph<NodeData, void> Graph;
@@ -1120,9 +1122,8 @@ struct BC {
 
 int main(int argc, char** argv) {
   try {
-    Galois::System G;
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager;
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -1296,7 +1297,7 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+
     return 0;
   } catch(const char* c) {
     std::cout << "Error: " << c << "\n";

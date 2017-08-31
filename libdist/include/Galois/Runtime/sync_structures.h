@@ -52,6 +52,56 @@
 #ifndef SYNC_STRUCT_MACROS
 #define SYNC_STRUCT_MACROS
 
+
+////////////////////////////////////////////////////////////////////////////////
+// Field flag structure
+////////////////////////////////////////////////////////////////////////////////
+
+
+#define GALOIS_SYNC_STRUCTURE_FLAGS(fieldname)\
+static uint8_t _##fieldname##_s2s = false;\
+static uint8_t _##fieldname##_s2d = false;\
+static uint8_t _##fieldname##_d2s = false;\
+static uint8_t _##fieldname##_d2d = false;\
+\
+struct Flags_##fieldname {\
+  static bool src_to_src() {\
+    return _##fieldname##_s2s;\
+  }\
+\
+  static bool src_to_dst() {\
+    return _##fieldname##_s2d;\
+  }\
+\
+  static bool dst_to_src() {\
+    return _##fieldname##_d2s;\
+  }\
+\
+  static bool dst_to_dst() {\
+    return _##fieldname##_d2d;\
+  }\
+\
+  static void set_write_src() {\
+    _##fieldname##_s2s = true;\
+    _##fieldname##_s2d = true;\
+  }\
+\
+  static void set_write_dst() {\
+    _##fieldname##_d2s = true;\
+    _##fieldname##_d2d = true;\
+  }\
+\
+  static void clear_read_src() {\
+    _##fieldname##_s2s = false;\
+    _##fieldname##_d2s = false;\
+  }\
+\
+  static void clear_read_dst() {\
+    _##fieldname##_s2d = false;\
+    _##fieldname##_d2d = false;\
+  }\
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Add
 ////////////////////////////////////////////////////////////////////////////////

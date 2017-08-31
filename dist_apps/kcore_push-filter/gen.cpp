@@ -32,9 +32,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -132,7 +132,7 @@ static cll::opt<int> num_nodes("num_nodes",
 struct NodeData {
   std::atomic<uint32_t> current_degree;
   std::atomic<uint32_t> trim;
-  bool flag;
+  uint8_t flag;
 };
 
 typedef hGraph<NodeData, void> Graph;
@@ -439,9 +439,8 @@ struct GetAliveDead {
 
 int main(int argc, char** argv) {
   try {
-    Galois::System G;
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager;
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -574,7 +573,7 @@ int main(int argc, char** argv) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             // prints the flag (alive/dead)
             Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                         (*h_graph).getData(*ii).flag);
+                                         (bool)(*h_graph).getData(*ii).flag);
 
 
           // does a sanity check as well: 
@@ -588,7 +587,7 @@ int main(int argc, char** argv) {
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                     get_node_flag_cuda(cuda_ctx, *ii));
+                                       (bool)get_node_flag_cuda(cuda_ctx, *ii));
                                      
         }
       }
@@ -596,7 +595,7 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";
