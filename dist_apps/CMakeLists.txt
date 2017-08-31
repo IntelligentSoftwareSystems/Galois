@@ -50,4 +50,4 @@ distApp(kcore_push-filter)
 
 distApp(bc)
 
-distApp(sgd_pull-topological)
+#distApp(sgd_pull-topological)
