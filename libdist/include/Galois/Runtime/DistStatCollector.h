@@ -30,39 +30,29 @@
 #ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
-//TODO: remove dist stuff 
-#include "Galois/gdeque.h"
-#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/Network.h"
-
-#include <string>
-#include <set>
-#include <boost/uuid/uuid.hpp>            // uuid class
-#include <boost/uuid/uuid_generators.hpp> // generators
-#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace Galois {
 namespace Runtime {
 
 
 class DistStatCollector: public StatCollector {
+protected:
+
+  using Base = StatCollector;
+
+  virtual void printStats(void);
 
 public:
 
-  static boost::uuids::uuid UUID;
-  static boost::uuids::uuid getUUID();
+  DistStatCollector(const std::string& outfile="");
 
-  void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
-  void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
-  void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
+private:
 
-  void printStatsForR(std::ostream& out, bool json);
-  static void printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf);
-
-  //still assumes int values
-  void printStats(std::ostream& out);
-  void printDistStats(std::ostream& out);
+  void combineAtHost_0(void);
 
 };
 

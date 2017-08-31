@@ -125,6 +125,8 @@ void reportStat(const char* loopname, const char* category, unsigned long value,
 void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
+
+void reportStatDist(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes

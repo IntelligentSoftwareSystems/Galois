@@ -261,6 +261,11 @@ void Galois::Runtime::reportStat(const std::string& loopname, const std::string&
   SC->addToStat(loopname, category, value, TID, 0);
 }
 
+void Galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
+  SC->addToStat(loopname, category, value, TID, HostID);
+}
+
+
 void Galois::Runtime::reportPageAlloc(const char* category) {
   for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
     reportStat("(NULL)", category, static_cast<unsigned long>(numPagePoolAllocForThread(x)), x);
