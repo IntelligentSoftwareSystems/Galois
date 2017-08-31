@@ -129,7 +129,6 @@ struct NodeData {
 
 #if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_dist_current;
-//Galois::DynamicBitSet bitset_dist_old;
 #endif
 
 typedef hGraph<NodeData, unsigned int> Graph;
@@ -212,34 +211,22 @@ struct FirstItr_SSSP {
     }
 
     #if __OPT_VERSION__ == 1
-    //  _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-    //            Broadcast_dist_current>("SSSP");
-
     // naive sync of everything after operator 
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current>("SSSP");
-    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
-    //            Broadcast_dist_old>("SSSP");
     #elif __OPT_VERSION__ == 2
     // sync of touched fields (same as v1 in this case)
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current>("SSSP");
-    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
-    //            Broadcast_dist_old>("SSSP");
     #elif __OPT_VERSION__ == 3
     // with bitset
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current, Bitset_dist_current>("SSSP");
-    //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
-    //            Broadcast_dist_old, Bitset_dist_old>("SSSP");
     #elif __OPT_VERSION__ == 4
     // write aware (not read aware, i.e. conservative)
     _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
                 Broadcast_dist_current, Bitset_dist_current>("SSSP");
-    //_graph.sync<writeSource, readAny, Reduce_min_dist_old,
-    //            Broadcast_dist_old, Bitset_dist_old>("SSSP");
     #endif
-
 
     //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
     //            Broadcast_dist_current, Bitset_dist_current>("SSSP");
@@ -262,7 +249,6 @@ struct FirstItr_SSSP {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
-      //uint32_t new_dist = 1 + snode.dist_current;
       uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
       #if __OPT_VERSION__ >= 3
       if (old_dist > new_dist) bitset_dist_current.set(dst);
@@ -316,26 +302,18 @@ struct SSSP {
       // naive sync of everything after operator 
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current>("SSSP");
-      //_graph.sync<writeDestination, readAny, Reduce_min_dist_old,
-      //            Broadcast_dist_old>("SSSP");
       #elif __OPT_VERSION__ == 2
       // sync of touched fields (same as v1 in this case)
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current>("SSSP");
-      //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
-      //            Broadcast_dist_old>("SSSP");
       #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
-      //_graph.sync<writeAny, readAny, Reduce_min_dist_old,
-      //            Broadcast_dist_old, Bitset_dist_old>("SSSP");
       #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
-      //_graph.sync<writeSource, readAny, Reduce_min_dist_old,
-      //            Broadcast_dist_old, Bitset_dist_old>("SSSP");
       #endif
 
       //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -362,17 +340,12 @@ struct SSSP {
     if (snode.dist_old > snode.dist_current) {
       snode.dist_old = snode.dist_current;
 
-      #if __OPT_VERSION__ >= 3
-      //bitset_dist_old.set(src);
-      #endif
-
       for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
            jj != ee; 
            ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
         uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
-        //uint32_t new_dist = 1 + snode.dist_current;
         uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
         #if __OPT_VERSION__ >= 3
         if (old_dist > new_dist) bitset_dist_current.set(dst);
@@ -537,7 +510,6 @@ int main(int argc, char** argv) {
 #endif
     #if __OPT_VERSION__ >= 3
     bitset_dist_current.resize(hg->get_local_total_nodes());
-    //bitset_dist_old.resize(hg->get_local_total_nodes());
     #endif
 
     StatTimer_hg_init.stop();
@@ -569,13 +541,11 @@ int main(int argc, char** argv) {
         if (personality == GPU_CUDA) { 
           #if __OPT_VERSION__ >= 3
           bitset_dist_current_reset_cuda(cuda_ctx);
-          //bitset_dist_old_reset_cuda(cuda_ctx);
           #endif
         } else
       #endif
         #if __OPT_VERSION__ >= 3
         bitset_dist_current.reset();
-        //bitset_dist_old.reset();
         #endif
 
         //Galois::Runtime::getHostBarrier().wait();
