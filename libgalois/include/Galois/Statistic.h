@@ -82,6 +82,7 @@ public:
 };
 using Statistic = StatisticBase<unsigned long>;
 
+#if 0 // Deprecated 
 /**
  * Controls lifetime of stats. Users usually instantiate in main to print out
  * statistics at program exit.
@@ -119,6 +120,7 @@ public:
     stat_printed = true;
   }
 };
+#endif
 
 //! Provides statistic interface around timer
 // TODO: switch to const char* const or 

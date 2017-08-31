@@ -31,6 +31,7 @@
 #define GALOIS_RUNTIME_STATCOLLECTOR_H
 
 #include "Galois/gdeque.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 
@@ -45,6 +46,7 @@ namespace Runtime {
 
 class StatCollector {
 
+protected:
   template<typename Ty>
   using StringPair = std::pair<const std::string*, Ty>;
 
@@ -82,12 +84,20 @@ class StatCollector {
     void print(std::ostream& out) const;
   };
 
+
+  virtual void printStats(void);
+
   //stats  HostID,ThreadID,loop,category,instance -> Record
   
+  std::string m_outfile;
   std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
   Galois::Substrate::SimpleLock StatsLock;
 
 public:
+
+  explicit StatCollector(const std::string& outfile="");
+
+  virtual ~StatCollector(void);
 
   static boost::uuids::uuid UUID;
   static boost::uuids::uuid getUUID();
@@ -95,13 +105,12 @@ public:
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
+  void beginLoopInstance(const std::string& str);
 
+private:
   void printStatsForR(std::ostream& out, bool json);
-
-  //still assumes int values
   void printStats(std::ostream& out);
 
-  void beginLoopInstance(const std::string& str);
 };
 
 
@@ -120,18 +129,6 @@ void reportStat(const std::string& loopname, const std::string& category, const 
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
 void reportNumaAlloc(const char* category);
-
-
-void reportStatGlobal(const std::string& category, const std::string& val);
-void reportStatGlobal(const std::string& category, unsigned long val);
-
-
-//! Prints all stats
-void printStats();
-void printStats(std::string);
-// TODO: separate to dist
-void printDistStats();
-
 
 namespace internal {
   void setStatCollector(StatCollector* sc);

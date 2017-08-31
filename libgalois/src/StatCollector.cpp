@@ -28,7 +28,6 @@
  */
 
 #include "Galois/Runtime/StatCollector.h"
-#include "Galois/Runtime/Substrate.h"
 
 #include <cmath>
 #include <new>
@@ -55,6 +54,12 @@ static Galois::Runtime::StatCollector* SC;
 void Galois::Runtime::internal::setStatCollector(Galois::Runtime::StatCollector* sc) {
   GALOIS_ASSERT(!(SC && sc), "StatCollector.cpp: Double Initialization of SC");
   SC = sc;
+}
+
+StatCollector::StatCollector(const std::string& outfile): m_outfile(outfile) {}
+
+StatCollector::~StatCollector() {
+  printStats();
 }
 
 const std::string* Galois::Runtime::StatCollector::getSymbol(const std::string& str) const {
@@ -178,6 +183,21 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
     out << "]\n";
 }
 
+void Galois::Runtime::StatCollector::printStats(void) {
+  if (m_outfile == "") {
+    printStats(std::cout);
+
+  } else {
+    std::ofstream outf(m_outfile);
+    if (outf.good()) {
+      printStatsForR(outf, false);
+    } else {
+      gWarn("Could not open stats file for writing, file provided:", m_outfile);
+      printStats(std::cerr);
+    }
+  }
+}
+
 //Assume called serially
 //still assumes int values
 //This ignores HostID.  Thus this is not safe for the network version
@@ -218,7 +238,6 @@ void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);
 }
 
-
 void Galois::Runtime::reportLoopInstance(const char* loopname) {
   SC->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
@@ -240,37 +259,6 @@ void Galois::Runtime::reportStat(const std::string& loopname, const std::string&
 
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
   SC->addToStat(loopname, category, value, TID, 0);
-}
-
-void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
-}
-void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
-}
-
-static std::ofstream& openIfNot_output(std::string fname) {
-  static std::ofstream output_file;
-  if(!output_file.is_open()){
-    output_file.open(fname, std::ios_base::app);
-  }
-  assert(output_file.is_open());
-  return output_file;
-}
-
-void Galois::Runtime::printStats() {
-    // SC->printDistStats(std::cout);
-    SC->printStats(std::cout);
-  //SC->printStatsForR(std::cout, false);
-  //  SC->printStatsForR(std::cout, true);
-}
-
-void Galois::Runtime::printStats(std::string fname) {
-  if(fname == "")
-    SC->printStatsForR(std::cout, false);
-  else{
-    auto& out = openIfNot_output(fname);
-    SC->printStatsForR(out, false);
-    out.close();
-  }
 }
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
