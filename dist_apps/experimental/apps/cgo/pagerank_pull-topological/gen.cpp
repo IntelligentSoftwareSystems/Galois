@@ -127,7 +127,9 @@ struct NodeData {
   std::atomic<uint32_t> nout;
 };
 
+#if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_residual;
+#endif
 Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<NodeData, void> Graph;
@@ -317,8 +319,23 @@ struct PageRank {
         Galois::timeit()
       );
 
-      _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
-                  Bitset_residual>("PageRank");
+      // residual
+      #if __OPT_VERSION__ == 1
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
+                  Broadcast_residual>("PageRank");
+      #elif __OPT_VERSION__ == 2
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
+                  Broadcast_residual>("PageRank");
+      #elif __OPT_VERSION__ == 3
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
+                  Broadcast_residual, Bitset_residual>("PageRank");
+      #elif __OPT_VERSION__ == 4
+      _graph.sync<writeSource, readAny, Reduce_add_residual,
+                  Broadcast_residual, Bitset_residual>("PageRank");
+      #endif
+
+      //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
+      //            Bitset_residual>("PageRank");
       
       Galois::Runtime::reportStat("(NULL)", 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
@@ -350,7 +367,10 @@ struct PageRank {
 
     if (sum > 0) {
       Galois::add(residual[src], sum);
+
+      #if __OPT_VERSION__ >= 3
       bitset_residual.set(src);
+      #endif
     }
   }
 };
@@ -572,7 +592,10 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+
+    #if __OPT_VERSION__ >= 3
     bitset_residual.resize(hg->get_local_total_nodes());
+    #endif
     bitset_nout.resize(hg->get_local_total_nodes());
     StatTimer_hg_init.stop();
 
@@ -621,12 +644,16 @@ int main(int argc, char** argv) {
         //Galois::Runtime::getHostBarrier().wait();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
+          #if __OPT_VERSION__ >= 3
           bitset_residual_reset_cuda(cuda_ctx);
+          #endif
           bitset_nout_reset_cuda(cuda_ctx);
         } else
       #endif
         { 
+          #if __OPT_VERSION__ >= 3
           bitset_residual.reset();
+          #endif
           bitset_nout.reset(); 
         }
 

@@ -250,7 +250,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
   ret_val.thread_exit<_br>(_ts);
 }
 // TODO: cpu version accumulates sum into local variable then adds all at once
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual)
+__global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -361,6 +361,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           if (p_delta[dst] > 0)
           {
             atomicAdd(&p_residual[src], p_delta[dst]);
+            is_updated->set(src);
           }
         }
       }
@@ -403,6 +404,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
             if (p_delta[dst] > 0)
             {
               atomicAdd(&p_residual[src], p_delta[dst]);
+              is_updated->set(src);
             }
           }
         }
@@ -441,6 +443,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           if (p_delta[dst] > 0)
           {
             atomicAdd(&p_residual[src], p_delta[dst]);
+            is_updated->set(src);
           }
         }
       }
@@ -530,7 +533,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr());
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
