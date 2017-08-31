@@ -126,7 +126,10 @@ struct NodeData {
   std::atomic<uint32_t> nout;
 };
 
+
+#if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_residual;
+#endif
 Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<NodeData, void> Graph;
@@ -315,9 +318,24 @@ struct PageRank {
         );
       }
 
-      _graph.sync<writeDestination, readSource, Reduce_add_residual, 
+      // residual
+      #if __OPT_VERSION__ == 1
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
+                  Broadcast_residual>("PageRank");
+      #elif __OPT_VERSION__ == 2
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
+                  Broadcast_residual>("PageRank");
+      #elif __OPT_VERSION__ == 3
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
                   Broadcast_residual, Bitset_residual>("PageRank");
-      
+      #elif __OPT_VERSION__ == 4
+      _graph.sync<writeDestination, readAny, Reduce_add_residual,
+                  Broadcast_residual, Bitset_residual>("PageRank");
+      #endif
+
+      //_graph.sync<writeDestination, readSource, Reduce_add_residual, 
+      //            Broadcast_residual, Bitset_residual>("PageRank");
+
       Galois::Runtime::reportStat("(NULL)", 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
           (unsigned long)dga.read_local(), 0);
@@ -341,7 +359,10 @@ struct PageRank {
         GNode dst = graph->getEdgeDst(nbr);
 
         Galois::atomicAdd(residual[dst], _delta);
+
+        #if __OPT_VERSION__ >= 3
         bitset_residual.set(dst);
+        #endif
       }
       DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
     }
@@ -504,6 +525,16 @@ int main(int argc, char** argv) {
       std::ostringstream ss;
       ss << tolerance;
       Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
+
+      #if __OPT_VERSION__ == 1
+      Galois::gDebug("Version 1 of optimization");
+      #elif __OPT_VERSION__ == 2
+      Galois::gDebug("Version 2 of optimization");
+      #elif __OPT_VERSION__ == 3
+      Galois::gDebug("Version 3 of optimization");
+      #elif __OPT_VERSION__ == 4
+      Galois::gDebug("Version 4 of optimization");
+      #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
@@ -564,7 +595,10 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+
+    #if __OPT_VERSION__ >= 3
     bitset_residual.resize(hg->get_local_total_nodes());
+    #endif
     bitset_nout.resize(hg->get_local_total_nodes());
     StatTimer_hg_init.stop();
 
@@ -614,11 +648,16 @@ int main(int argc, char** argv) {
         //Galois::Runtime::getHostBarrier().wait();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
+          #if __OPT_VERSION__ >= 3
           bitset_residual_reset_cuda(cuda_ctx);
+          #endif
           bitset_nout_reset_cuda(cuda_ctx);
         } else
       #endif
-        { bitset_residual.reset();
+        { 
+        #if __OPT_VERSION__ >= 3
+        bitset_residual.reset();
+        #endif
         bitset_nout.reset(); }
 
         (*hg).reset_num_iter(run+1);

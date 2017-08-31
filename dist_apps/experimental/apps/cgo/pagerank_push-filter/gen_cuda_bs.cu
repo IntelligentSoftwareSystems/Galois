@@ -90,7 +90,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
   }
   // FP: "8 -> 9;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_residual, float * p_delta, Sum ret_val)
+__global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_residual, float * p_delta, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -216,6 +216,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           float dst_residual_old;
           dst = graph.getAbsDestination(nbr);
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
+          is_updated->set(dst);
         }
       }
       // FP: "60 -> 61;
@@ -256,6 +257,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
             float dst_residual_old;
             dst = graph.getAbsDestination(nbr);
             dst_residual_old = atomicAdd(&p_residual[dst], delta);
+            is_updated->set(dst);
           }
         }
       }
@@ -292,6 +294,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
           float dst_residual_old;
           dst = graph.getAbsDestination(nbr);
           dst_residual_old = atomicAdd(&p_residual[dst], delta);
+          is_updated->set(dst);
         }
       }
       // FP: "101 -> 102;
@@ -380,7 +383,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, s
   Sum _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), _rv);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->residual.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
