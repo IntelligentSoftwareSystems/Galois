@@ -30,9 +30,9 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/DoAllWrap.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
@@ -514,10 +514,9 @@ float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() /
 
 int main(int argc, char** argv) {
   try {
-    Galois::System G;
-    LonestarStart(argc, argv, name, desc, url);
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::StatManager statManager(statOutputFile);
     {
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
@@ -690,7 +689,6 @@ int main(int argc, char** argv) {
 
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
 
     return 0;
   } catch (const char* c) {
