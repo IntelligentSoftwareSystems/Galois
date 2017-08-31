@@ -30,24 +30,26 @@ function(distApp name)
   endif()
 endfunction()
 
-distApp(bfs_pull-topological)
+function(distAppNoGPU name)
+  app(${name} ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name} galois_dist distbench)
+endfunction()
 
+distApp(bfs_pull-topological)
 distApp(bfs_push-filter)
 
 distApp(cc_pull-topological)
-
 distApp(cc_push-filter)
 
 distApp(pagerank_pull-topological)
-
 distApp(pagerank_push-filter)
 
 distApp(sssp_pull-topological)
-
 distApp(sssp_push-filter)
 
 distApp(kcore_push-filter)
 
 distApp(bc)
+distAppNoGPU(bc_pull)
 
-#distApp(sgd_pull-topological)
+distAppNoGPU(sgd_pull-topological)
