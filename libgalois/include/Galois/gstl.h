@@ -24,7 +24,7 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
-#include "PriorityQueue.h"
+#include "Galois/PriorityQueue.h"
 
 #include <algorithm>
 #include <iterator>
