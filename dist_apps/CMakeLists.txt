@@ -1,3 +1,14 @@
+add_library(distbench STATIC src/DistBenchStart.cpp)
+target_include_directories(distbench PUBLIC 
+  ${CMAKE_SOURCE_DIR}/libdist/include
+  ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libllvm/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(distbench galois_shmem galois_dist gllvm)
+
+include_directories(include)
+
 if(USE_GGC)
   # for debugging 
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -9,12 +20,12 @@ if(USE_GGC)
 endif()
 
 app(bfs_pull-topological bfs_pull-topological/gen.cpp DISTSAFE)
-target_link_libraries(bfs_pull-topological galois_dist)
+target_link_libraries(bfs_pull-topological galois_dist distbench)
 if(USE_GGC)
   target_compile_definitions(bfs_pull-topological PRIVATE __GALOIS_HET_CUDA__=1)
-  target_link_libraries(bfs_pull-topological bfs_pull-topological_cuda)
+  target_link_libraries(bfs_pull-topological bfs_pull-topological_cuda distbench)
   cuda_add_library(bfs_pull-topological_cuda bfs_pull-topological/gen_cuda.cu)
-  target_link_libraries(bfs_pull-topological_cuda ggrt)
+  target_link_libraries(bfs_pull-topological_cuda ggrt distbench)
 endif()
 
 app(bfs_push-filter bfs_push-filter/gen.cpp DISTSAFE)
