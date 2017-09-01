@@ -97,6 +97,8 @@ namespace {
     string VAL_TYPE;
     string RESET_VAL_EXPR;
     string SYNC_TYPE;
+    string READ_FLAG;
+    string WRITE_FLAG;
   };
 
   struct Write_set_PULL {
@@ -124,7 +126,9 @@ namespace {
     std::stringstream s;
      s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
 
-     std::string str_reduce_call = "Reduce_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME;
+     std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
+     std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME + " ";
+     syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
      syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
 
 
@@ -215,8 +219,8 @@ namespace {
      s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
      s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
 
-     std::string str_broadcast_call = "Broadcast_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME;
-     std::string str_bitset = "Bitset_" + i.FIELD_NAME;
+     std::string str_broadcast_call = " Broadcast_" + i.FIELD_NAME + " ";
+     std::string str_bitset = " Bitset_" + i.FIELD_NAME + " ";
      syncCall_map[i.FIELD_NAME].push_back(str_broadcast_call);
      syncCall_map[i.FIELD_NAME].push_back(str_bitset);
 
@@ -837,7 +841,7 @@ namespace {
                         temp_str.erase(0,1);
                       }
 
-                      llvm::errs() << " ------- > " << temp_str << "\n";
+                      llvm::errs() << " ------- > " << temp_str << " Size : " << Temp_vec_PUSH.size() <<  "\n";
                       Temp_vec_PUSH.push_back(temp_str);
 
                     }
@@ -850,6 +854,8 @@ namespace {
                     WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
                     WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
                     WR_entry.SYNC_TYPE = "sync_push";
+                    WR_entry.READ_FLAG = Temp_vec_PUSH[8];
+                    WR_entry.WRITE_FLAG = Temp_vec_PUSH[9];
 
                     write_set_vec_PUSH.push_back(WR_entry);
                   }
@@ -883,6 +889,8 @@ namespace {
                     WR_entry.SYNC_TYPE = "sync_pull";
                     WR_entry.REDUCE_OP_EXPR = Temp_vec_PULL[6];
                     WR_entry.RESET_VAL_EXPR = Temp_vec_PULL[7];
+                    WR_entry.READ_FLAG = Temp_vec_PULL[8];
+                    WR_entry.WRITE_FLAG = Temp_vec_PULL[9];
 
                     write_set_vec_PULL.push_back(WR_entry);
                   }
@@ -931,6 +939,7 @@ namespace {
               rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
             }
 
+            //IMP: Ordering matter : All getSyncer calls should be before getSyncerPull
             stringstream SSSyncer;
             unsigned counter = 0;
             // map from FIELD_NAME -> reduce, broadcast, bitset;
@@ -942,6 +951,21 @@ namespace {
               SSSyncer.clear();
               ++counter;
             }
+
+            // Addding additional structs for vertex cut
+            stringstream SSSyncer_vertexCut;
+            //TODO: DO NOT NEED COUNTER.
+            counter = 0;
+            for(auto i : write_set_vec_PUSH_PULL) {
+              if(i.SYNC_TYPE == "sync_pull"){
+                SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
+                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                SSSyncer_vertexCut.str(string());
+                SSSyncer_vertexCut.clear();
+                ++counter;
+              }
+            }
+
 
             // Addding structure for pull sync
             stringstream SSSyncer_pull;
@@ -956,7 +980,7 @@ namespace {
 
 
             // Addding additional structs for vertex cut
-            stringstream SSSyncer_vertexCut;
+            //TODO: DO NOT NEED COUNTER.
             counter = 0;
             for(auto i : write_set_vec_PUSH_PULL) {
               if(i.SYNC_TYPE == "sync_push"){
@@ -966,14 +990,21 @@ namespace {
                 SSSyncer_vertexCut.clear();
                 ++counter;
               }
-              else if(i.SYNC_TYPE == "sync_pull"){
-                SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
-                rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
-                SSSyncer_vertexCut.str(string());
-                SSSyncer_vertexCut.clear();
-                ++counter;
-              }
             }
+
+             //Addding additional structs for vertex cut
+            //TODO: DO NOT NEED COUNTER.
+            //counter = 0;
+            //for(auto i : write_set_vec_PUSH_PULL) {
+              //if(i.SYNC_TYPE == "sync_push"){
+                //SSSyncer_vertexCut << getSyncerPull(counter, i, syncCall_map, "vertexCut_");
+                //rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                //SSSyncer_vertexCut.str(string());
+                //SSSyncer_vertexCut.clear();
+                //++counter;
+              //}
+            //}
+
 
             for(auto i : syncCall_map){
               llvm::outs() << "__________________> : " << i.first << " ---- > " <<  i.second[0] << " , "<<  i.second[1] << "\n";
@@ -1033,12 +1064,11 @@ namespace {
               rewriter.ReplaceText(ST_main, galois_doall.length() + single_source.length(), galois_doall + iterator_range);
             }
 
-            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
 
             // Adding Syn calls for write set
             stringstream SSAfter;
             for(auto i : syncCall_map){
-              SSAfter <<"\n\t" << "_graph.sync<";
+              SSAfter << "\n\t" << "_graph.sync_on_demand<";
               uint32_t c = 0;
               for(auto j : i.second){
                 if((c + 1) < i.second.size())
@@ -1048,10 +1078,36 @@ namespace {
                 ++c;
               }
 
-              SSAfter << ">\(\"" << OperatorStructName << "\");\n";
+              SSAfter << ">\(\"" << OperatorStructName << "\");\n\n";
               rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               SSAfter.str(string());
               SSAfter.clear();
+            }
+
+            //Inserting write flags after do_all
+            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
+            for(auto i : write_set_vec_PUSH_PULL) {
+              if(i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull"){
+                if(i.WRITE_FLAG == "writeDestination")
+                  SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_dst();\n";
+                else if(i.WRITE_FLAG == "writeSource")
+                  SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_src();\n";
+                else if(i.WRITE_FLAG == "writeAny")
+                  SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_both();\n";
+                else
+                  SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_none();\n";
+
+                rewriter.InsertText(ST, SSAfter.str(), true, true);
+                SSAfter.str(string());
+                SSAfter.clear();
+              }
+              //else if(i.SYNC_TYPE == "sync_pull"){
+                //SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
+                //rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+                //SSSyncer_vertexCut.str(string());
+                //SSSyncer_vertexCut.clear();
+                //++counter;
+              //}
             }
 #if 0
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {
