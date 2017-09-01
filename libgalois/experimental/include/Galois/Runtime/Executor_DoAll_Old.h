@@ -35,7 +35,7 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_OLD_H
 #define GALOIS_RUNTIME_EXECUTOR_DOALL_OLD_H
 
-#include "Galois/Galois.h"
+#include "Galois/gstl.h"
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
 #include "Galois/Statistic.h"

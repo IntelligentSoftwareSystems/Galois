@@ -240,7 +240,7 @@ struct OptimNItem: public OrdLocBase<OptimNItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<OptimNItem, Ctxt, CtxtCmp>;
 
   using Factory = OrdLocFactoryBase<OptimNItem, Ctxt, CtxtCmp>;
-  using HistList = Galois::Galois::List<Ctxt*>;
+  using HistList = Galois::gstl::List<Ctxt*>;
   using Lock_ty = Galois::Substrate::SimpleLock;
   using NF = OptimNItemFunctions<OptimNItem, Ctxt, CtxtCmp>;
 
@@ -604,8 +604,8 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
   using CtxtCmp = typename Base::CtxtCmp;
   using NItem = OptimNItem<OptimContext, CtxtCmp>;
   using NhoodMgr = PtrBasedNhoodMgr<NItem>;
-  using NhoodList = typename Galois::Vector<NItem*>;
-  using ChildList = typename Galois::Vector<OptimContext*>;
+  using NhoodList = typename gstl::Vector<NItem*>;
+  using ChildList = typename gstl::Vector<OptimContext*>;
 
   using CF = OptimContextFunctions<OptimContext, NItem>;
 
@@ -1512,7 +1512,7 @@ class PessimOrdContext: public SpecContextBase<T, Cmp, Exec> {
 public:
 
   using Base = SpecContextBase<T, Cmp, Exec>;
-  using NhoodList =  Galois::Galois::Vector<Lockable*>;
+  using NhoodList =  Galois::gstl::Vector<Lockable*>;
   using CtxtCmp = typename Base::CtxtCmp;
   using Executor = Exec;
 

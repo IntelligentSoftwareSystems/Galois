@@ -28,7 +28,7 @@
 #include <vector>
 #include <set>
 
-#include "Galois/Galois.h"
+#include "Galois/gstl.h"
 #include "Galois/Graphs/LC_CSR_Graph.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Network.h"

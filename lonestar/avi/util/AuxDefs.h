@@ -48,14 +48,14 @@ typedef size_t GlobalElementIndex;
 
 
 //! commonly used vector and vector<vector>
-typedef Galois::Vector<double> VecDouble;
-typedef Galois::Vector< Galois::Vector<double> > MatDouble;
-typedef Galois::Vector< Galois::Vector < Galois::Vector < Galois::Vector <double> > > > FourDVecDouble;
+typedef Galois::gstl::Vector<double> VecDouble;
+typedef Galois::gstl::Vector< Galois::gstl::Vector<double> > MatDouble;
+typedef Galois::gstl::Vector< Galois::gstl::Vector < Galois::gstl::Vector < Galois::gstl::Vector <double> > > > FourDVecDouble;
 
-typedef Galois::Vector<bool> VecBool;
-typedef Galois::Vector< Galois::Vector< bool> > MatBool;
+typedef Galois::gstl::Vector<bool> VecBool;
+typedef Galois::gstl::Vector< Galois::gstl::Vector< bool> > MatBool;
 
-using VecSize_t = Galois::Vector<size_t>;
+using VecSize_t = Galois::gstl::Vector<size_t>;
 
 
 //! constants

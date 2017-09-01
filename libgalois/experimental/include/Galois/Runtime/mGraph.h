@@ -31,7 +31,7 @@
 #include <unordered_map>
 #include <deque>
 
-#include "Galois/Galois.h"
+#include "Galois/gstl.h"
 #include "Galois/Graphs/LC_CSR_Graph.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Network.h"

@@ -78,7 +78,7 @@ template <typename Ctxt>
 struct SharerVec {
 
 public:
-  using Cont = typename Galois::Vector<Ctxt*>;
+  using Cont = typename gstl::Vector<Ctxt*>;
 
   Substrate::SimpleLock mutex;
   Cont sharers;

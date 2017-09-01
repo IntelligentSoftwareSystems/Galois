@@ -249,7 +249,7 @@ class BallOptimWrapper  {
 
   using BallAlloc = Galois::FixedSizeAllocator<B>;
   using CheckP = std::pair<E, B*>;
-  using StateLog = Galois::List<CheckP>;
+  using StateLog = Galois::gstl::List<CheckP>;
 
   using dbg = Galois::debug<0>;
 
