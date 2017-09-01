@@ -32,6 +32,8 @@
 
 #include <iostream>
 #include <limits>
+#include <random>
+
 #include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
 #include "DistBenchStart.h"
@@ -160,6 +162,7 @@ struct NodeData {
   uint8_t propogation_flag;
 };
 
+static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 // no edge data = bfs not sssp
 typedef hGraph<NodeData, void> Graph;
@@ -827,31 +830,41 @@ struct BC {
   BC(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga){
-    uint64_t start_i;
-    uint64_t end_i;
-    start_i = startSource;
+    uint64_t loop_end = 1;
+    bool use_random = false;
 
-    if (singleSourceBC) {
-      //start_i = startSource;
-      end_i = startSource + 1;
-    } else {
-      //start_i = 0;
+    auto random_sources_iterator = random_sources.begin();
+
+    if (!singleSourceBC) {
       if (numberOfSources != 0) {
-        end_i = start_i + numberOfSources;
+        loop_end = numberOfSources;
+        use_random = true;
       } else {
-        end_i = _graph.totalNodes;
+        loop_end = _graph.totalNodes;
       }
     }
 
-    Galois::gDebug("BC: Start is ", start_i, ", End is ", end_i);
+    for (uint64_t i = 0; i < loop_end; i++) {
+      if (singleSourceBC) {
+        // only 1 source; specified start source in command line
+        assert(loop_end == 1);
+        Galois::gDebug("This is single source node BC");
+        current_src_node = startSource;
+      } else if (use_random) {
+        // number of sources non-zero, so use random sources
+        current_src_node = *random_sources_iterator;
+        random_sources_iterator++;
+      } else {
+        // all sources
+        current_src_node = i;
+      }
 
-    for (uint64_t i = start_i; i < end_i; i++) {
-      current_src_node = i;
+      Galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (_graph.id == 0) {
         if (i % 5000 == 0) {
-          std::cout << "SSSP source node " << i << "\n";
+          std::cout << "SSSP source node #" << i << "\n";
         }
       }
       #endif
@@ -945,6 +958,10 @@ int main(int argc, char** argv) {
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
+
+
+
+
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
@@ -992,6 +1009,27 @@ int main(int argc, char** argv) {
     Graph* h_graph = nullptr;
     // uses bfs
     h_graph = constructGraph<NodeData, void, false>(scalefactor);
+
+    // random num generate for sources
+    std::minstd_rand0 r_generator;
+    r_generator.seed(100);
+    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->size() - 1);
+
+    if (numberOfSources != 0) {
+      random_sources.insert(startSource);
+
+      while (random_sources.size() < numberOfSources) {
+        random_sources.insert(r_dist(r_generator));
+      }
+    }
+
+    #ifndef NDEBUG
+    int counter = 0;
+    for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
+      printf("Source #%d: %lu\n", counter, *i);
+      counter++;
+    }
+    #endif
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
