@@ -48,28 +48,28 @@
 
 #include "Galois/Runtime/dGraphLoader.h"
 
-//#ifdef __GALOIS_HET_CUDA__
-//#include "Galois/Runtime/Cuda/cuda_device.h"
-//#include "gen_cuda.h"
-//struct CUDA_Context *cuda_ctx;
-//
-//enum Personality {
-//   CPU, GPU_CUDA, GPU_OPENCL
-//};
-//
-//std::string personality_str(Personality p) {
-//   switch (p) {
-//   case CPU:
-//      return "CPU";
-//   case GPU_CUDA:
-//      return "GPU_CUDA";
-//   case GPU_OPENCL:
-//      return "GPU_OPENCL";
-//   }
-//   assert(false && "Invalid personality");
-//   return "";
-//}
-//#endif
+#ifdef __GALOIS_HET_CUDA__
+#include "Galois/Runtime/Cuda/cuda_device.h"
+#include "gen_cuda.h"
+struct CUDA_Context *cuda_ctx;
+
+enum Personality {
+   CPU, GPU_CUDA, GPU_OPENCL
+};
+
+std::string personality_str(Personality p) {
+   switch (p) {
+   case CPU:
+      return "CPU";
+   case GPU_CUDA:
+      return "GPU_CUDA";
+   case GPU_OPENCL:
+      return "GPU_OPENCL";
+   }
+   assert(false && "Invalid personality");
+   return "";
+}
+#endif
 
 static const char* const name = "Betweeness Centrality - "
                                 "Distributed Heterogeneous.";
@@ -99,39 +99,39 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                           "betweeness-centraility"),
                                 cll::init(0));
 
-//#ifdef __GALOIS_HET_CUDA__
-//// If running on both CPUs and GPUs, below is included
-//static cll::opt<int> gpudevice("gpu", 
-//                      cll::desc("Select GPU to run on, default is "
-//                                "to choose automatically"), cll::init(-1));
-//static cll::opt<Personality> personality("personality", 
-//                 cll::desc("Personality"),
-//                 cll::values(clEnumValN(CPU, "cpu", "Galois CPU"),
-//                             clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),
-//                             clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
-//                             clEnumValEnd),
-//                 cll::init(CPU));
-//static cll::opt<std::string> personality_set("pset", 
-//                              cll::desc("String specifying personality for "
-//                                        "each host. 'c'=CPU,'g'=GPU/CUDA and "
-//                                        "'o'=GPU/OpenCL"),
-//                              cll::init(""));
-//static cll::opt<unsigned> scalegpu("scalegpu", 
-//                           cll::desc("Scale GPU workload w.r.t. CPU, default "
-//                                     "is proportionally equal workload to CPU "
-//                                     "and GPU (1)"), 
-//                           cll::init(1));
-//static cll::opt<unsigned> scalecpu("scalecpu", 
-//                           cll::desc("Scale CPU workload w.r.t. GPU, "
-//                                     "default is proportionally equal "
-//                                     "workload to CPU and GPU (1)"), 
-//                           cll::init(1));
-//static cll::opt<int> num_nodes("num_nodes", 
-//                      cll::desc("Num of physical nodes with devices (default "
-//                                "= num of hosts): detect GPU to use for each "
-//                                "host automatically"), 
-//                      cll::init(-1));
-//#endif
+#ifdef __GALOIS_HET_CUDA__
+// If running on both CPUs and GPUs, below is included
+static cll::opt<int> gpudevice("gpu", 
+                      cll::desc("Select GPU to run on, default is "
+                                "to choose automatically"), cll::init(-1));
+static cll::opt<Personality> personality("personality", 
+                 cll::desc("Personality"),
+                 cll::values(clEnumValN(CPU, "cpu", "Galois CPU"),
+                             clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),
+                             clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
+                             clEnumValEnd),
+                 cll::init(CPU));
+static cll::opt<std::string> personality_set("pset", 
+                              cll::desc("String specifying personality for "
+                                        "each host. 'c'=CPU,'g'=GPU/CUDA and "
+                                        "'o'=GPU/OpenCL"),
+                              cll::init(""));
+static cll::opt<unsigned> scalegpu("scalegpu", 
+                           cll::desc("Scale GPU workload w.r.t. CPU, default "
+                                     "is proportionally equal workload to CPU "
+                                     "and GPU (1)"), 
+                           cll::init(1));
+static cll::opt<unsigned> scalecpu("scalecpu", 
+                           cll::desc("Scale CPU workload w.r.t. GPU, "
+                                     "default is proportionally equal "
+                                     "workload to CPU and GPU (1)"), 
+                           cll::init(1));
+static cll::opt<int> num_nodes("num_nodes", 
+                      cll::desc("Num of physical nodes with devices (default "
+                                "= num of hosts): detect GPU to use for each "
+                                "host automatically"), 
+                      cll::init(-1));
+#endif
 
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 static uint64_t current_src_node = 0;
@@ -510,6 +510,8 @@ struct NumShortestPathsChanges {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
+
+    if (src_data.current_length != local_infinity) {
       if (src_data.num_predecessors == 0 && src_data.propogation_flag) {
         if (src_data.num_successors != 0) {
           // has had short path taken; reset the flag;
@@ -537,6 +539,7 @@ struct NumShortestPathsChanges {
           src_data.propogation_flag = true;
         }
       }
+    }
 
     // increment num_shortest_paths by to_add then reset
     if (src_data.to_add > 0) {
@@ -935,6 +938,7 @@ struct BC {
       Galois::add(src_data.betweeness_centrality, src_data.dependency);
       src_data.dependency = 0;
     }
+
   }
 };
  

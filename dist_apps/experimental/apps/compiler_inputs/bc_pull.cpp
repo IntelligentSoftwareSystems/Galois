@@ -630,6 +630,7 @@ struct BC {
       Galois::add(src_data.betweeness_centrality, src_data.dependency);
       src_data.dependency = 0;
     }
+
   }
 };
  
