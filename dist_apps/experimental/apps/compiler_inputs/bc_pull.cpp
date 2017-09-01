@@ -97,6 +97,9 @@ struct NodeData {
 
   // used to determine if data has been propogated yet
   uint8_t propogation_flag;
+
+  uint8_t num_short_paths_flag;
+  uint8_t dep_prop_flag;
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
@@ -296,16 +299,18 @@ struct PredAndSucc {
 };
 
 struct NumShortestPathsChanges {
+  const uint32_t &local_infinity;
   Graph* graph;
 
-  NumShortestPathsChanges(Graph* _graph) : graph(_graph){}
+  NumShortestPathsChanges(const uint32_t &_local_infinity, Graph* _graph) : 
+      local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
-      NumShortestPathsChanges{&_graph}, 
+      NumShortestPathsChanges{infinity, &_graph}, 
       Galois::loopname("NumShortestPathsChanges"), 
       Galois::timeit(),
       Galois::no_stats()
@@ -320,18 +325,16 @@ struct NumShortestPathsChanges {
         if (src_data.num_successors != 0) {
           // has had short path taken; reset the flag;
           // ...unless you are a leaf node,then keep flag on for 
-          // next operator
-          assert(src_data.trim == 0);
+          // next operator; this is safe because you have no successors,
+          // meaning nothing will pull from you anyways even if your flag
+          // is on
           src_data.propogation_flag = false;
         }
       } else {
-        // TODO this is a big problem......; flag will get turned on again
-        // after 1 round of being off unless I use another variable...
-        // if I'm at 0 predecessors, set the flag to true (i.e. says
-        // I'm ready to have my value pulled)
-        if (src_data.num_predecessors == 0) {
+        if (src_data.num_predecessors == 0 && !src_data.num_short_paths_flag) {
           assert(!src_data.propogation_flag);
           src_data.propogation_flag = true;
+          src_data.num_short_paths_flag = true;
         }
       }
     }
@@ -392,7 +395,7 @@ struct NumShortestPaths {
 
           uint32_t edge_weight = 1;
 
-          // only operate if a dst flag is set (i.e. no more pred, finalized
+          // only operate if a flag is set (i.e. no more pred, finalized
           // short paths to take)
           if (dst_data.propogation_flag) {
             // dest on shortest path with this node as successor
@@ -432,10 +435,9 @@ struct DependencyPropChanges {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
-      // TODO this causes flag to get turned on again unless I can
-      // track if succ changed or something between rounds
-      if (src_data.num_successors == 0) {
+      if (src_data.num_successors == 0 && !src_data.dep_prop_flag) {
         src_data.propogation_flag = true;
+        src_data.dep_prop_flag = true;
       }
     }
   }
@@ -654,51 +656,9 @@ int main(int argc, char** argv) {
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
-
-
-
-
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
-  #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = Galois::Runtime::getHostID();
-    int gpu_device = gpudevice;
-
-    if (num_nodes == -1) num_nodes = net.Num;
-    assert((net.Num % num_nodes) == 0);
-
-    // Parse arg string when running on multiple hosts and update/override 
-    // personality with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id]) {
-        case 'g':
-          personality = GPU_CUDA;
-          break;
-        case 'o':
-          assert(0); // o currently not supported
-          personality = GPU_OPENCL;
-          break;
-        case 'c':
-        default:
-          personality = CPU;
-          break;
-      }
-
-      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
-        gpu_device = get_gpu_device_id(personality_set, num_nodes);
-      }
-
-      if ((scalecpu > 1) || (scalegpu > 1)) {
-        for (unsigned i = 0; i < net.Num; ++i) {
-          if (personality_set.c_str()[i % num_nodes] == 'c') 
-            scalefactor.push_back(scalecpu);
-          else
-            scalefactor.push_back(scalegpu);
-        }
-      }
-    }
-  #endif
 
     StatTimer_hg_init.start();
 
@@ -726,19 +686,6 @@ int main(int argc, char** argv) {
       counter++;
     }
     #endif
-
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(my_host_id);
-      if (!init_CUDA_context(cuda_ctx, gpu_device))
-        return -1;
-      MarshalGraph m = (*h_graph).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m, net.Num);
-    } else if (personality == GPU_OPENCL) {
-      //Galois::OpenCL::cl_env.init(cldevice.Value);
-    }
-  #endif
-
 
     StatTimer_hg_init.stop();
 
