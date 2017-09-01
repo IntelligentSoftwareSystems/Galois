@@ -48,6 +48,8 @@
     string RESETVAL_EXPR;
     string GRAPH_NAME;
     string SYNC_TYPE;
+    string READFLAG;
+    string WRITEFLAG;
   };
 
   struct SyncFlag_entry {

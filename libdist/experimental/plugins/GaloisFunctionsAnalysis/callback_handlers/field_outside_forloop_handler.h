@@ -147,7 +147,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "read";
-                  syncFlags_entry.AT = "source";
+                  syncFlags_entry.AT = "readSource";
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -201,7 +201,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "write";
-                  syncFlags_entry.AT = "source";
+                  syncFlags_entry.AT = "writeSource";
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -276,7 +276,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "read";
-                  syncFlags_entry.AT = "source";
+                  syncFlags_entry.AT = "readSource";
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }

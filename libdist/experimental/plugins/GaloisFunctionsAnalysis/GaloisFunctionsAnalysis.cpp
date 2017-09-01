@@ -203,10 +203,32 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
           if((i.first == struct_name) &&  (i.second.size() > 0)){
             for(auto j : i.second){
               stringstream SSAfter;
+              j.READFLAG = "";
+              j.WRITEFLAG = "";
+              for(auto h : info->syncFlags_map[struct_name]){
+                if(h.FIELD_NAME == j.FIELD_NAME){
+                  for(auto k : info->syncFlags_map[struct_name]){
+                    if(k.FIELD_NAME == h.FIELD_NAME){
+                      if(k.RW == "read"){
+                        if(j.READFLAG == "")
+                          j.READFLAG = k.AT;
+                        else if((j.READFLAG == "readSource" || j.READFLAG == "readDestination") && !k.AT.empty())
+                          j.READFLAG = "readAny";
+                      }
+                      if(k.RW == "write"){
+                        if(j.WRITEFLAG == "")
+                          j.WRITEFLAG = k.AT;
+                        else if((j.WRITEFLAG == "writeSource" || j.WRITEFLAG == "writeDestination") && !k.AT.empty())
+                          j.WRITEFLAG = "writeAny";
+                      }
+                    }
+                  }
+                }
+              }
               if(j.SYNC_TYPE == "sync_push")
-                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR <<"\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG <<"\")";
 
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
