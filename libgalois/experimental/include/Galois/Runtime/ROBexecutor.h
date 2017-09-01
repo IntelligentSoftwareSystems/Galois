@@ -50,7 +50,6 @@
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/gIO.h"
-#include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Runtime/Mem.h"
 #include "Galois/Runtime/OrderedSpeculation.h"

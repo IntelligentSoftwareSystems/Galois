@@ -31,16 +31,14 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef GALOIS_THREAD_RW_LOCK_H
-#define GALOIS_THREAD_RW_LOCK_H
+#ifndef GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
+#define GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
 
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 
 namespace Galois {
-namespace Runtime {
-
-//FIXME: nothing in LL should depend on Runtime
+namespace Substrate {
 
 class ThreadRWlock {
 
@@ -77,9 +75,9 @@ public:
 };
 
 
-} // end namespace Runtime
+} // end namespace Substrate
 } // end namespace Galois
 
 
 
-#endif // GALOIS_THREAD_RW_LOCK_H
+#endif // GALOIS_SUBSTRATE_THREAD_RW_LOCK_H

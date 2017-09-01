@@ -46,7 +46,6 @@
 #include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/Mem.h"
 #include "Galois/Runtime/IKDGbase.h"
 

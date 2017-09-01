@@ -37,7 +37,7 @@
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListWrapper.h"
-#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Substrate/ThreadRWlock.h"
 #include "Galois/Runtime/Mem.h"
 #include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
@@ -69,7 +69,7 @@ public:
   using CachedLevel = Galois::optional<Level>;
 
 private:
-  ThreadRWlock rwmutex;
+  Substrate::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;
@@ -162,7 +162,7 @@ public:
   using CachedLevel = Galois::optional<Level>;
 
 private:
-  ThreadRWlock rwmutex;
+  Substrate::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;

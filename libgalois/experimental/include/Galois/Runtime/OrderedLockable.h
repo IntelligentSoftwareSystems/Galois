@@ -32,7 +32,7 @@
 #include "Galois/AltBag.h"
 #include "Galois/OrderedTraits.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Substrate/ThreadRWlock.h"
 #include "Galois/Runtime/UserContextAccess.h"
 
 #include <unordered_map>
@@ -351,7 +351,7 @@ public:
       MapAlloc
     > NhoodMap;
 
-  typedef Galois::Runtime::ThreadRWlock Lock_ty;
+  typedef Galois::Substrate::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
 
 protected:
