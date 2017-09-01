@@ -84,8 +84,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
 static cll::opt<bool> verify("verify", 
-                             cll::desc("Verify ranks by printing to "
-                                       "'page_ranks.#hid.csv' file"),
+                             cll::desc("Verify ranks by printing to a file"),
                              cll::init(false));
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
@@ -863,7 +862,7 @@ struct BC {
         current_src_node = i;
       }
 
-      Galois::gDebug("Current source node for BC is ", current_src_node);
+      //Galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (_graph.id == 0) {
