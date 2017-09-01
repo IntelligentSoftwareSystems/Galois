@@ -36,6 +36,7 @@
 #include <set>
 #include <deque>
 #include <list>
+#include <string>
 
 namespace Galois {
 
@@ -62,26 +63,8 @@ namespace gstl {
   template<typename T, typename C=std::less<T> >
   using PQ = MinHeap<T, C, Vector<T> >; 
 
-  // template<typename T>
-  // struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
-// 
-  // template<typename T>
-  // struct FixedSizeAlloc { typedef typename Runtime::MM::FixedSizeAllocator<T> type; };
-// 
-  // template<typename T>
-  // struct Vector { typedef typename std::vector<T, typename Pow2Alloc<T>::type > type; };
-// 
-  // template<typename T>
-  // struct Deque { typedef typename std::deque<T, typename Pow2Alloc<T>::type > type; };
-// 
-  // template<typename T>
-  // struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
-// 
-  // template<typename T, typename C>
-  // struct Set { typedef typename std::set<T, C, typename FixedSizeAlloc<T>::type > type; };
-// 
-  // template<typename T, typename C>
-  // struct PQ { typedef MinHeap<T, C, typename Vector<T>::type > type; };
+  using Str = std::basic_string<char, std::char_traits<char>, Pow2Alloc<char> >;
+
 } // end namespace gstl
 
 
