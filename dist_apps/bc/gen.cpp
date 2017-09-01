@@ -625,36 +625,39 @@ struct NumShortestPathsChanges {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // decrement predecessor by trim then reset
-    if (src_data.trim > 0) {
-      // TODO use a Galois assert here? this is extremely important
-      assert(src_data.trim <= src_data.num_predecessors); 
 
-      src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
-      src_data.trim = 0;
+    if (src_data.current_length != local_infinity) {
+      // decrement predecessor by trim then reset
+      if (src_data.trim > 0) {
+        // TODO use a Galois assert here? this is extremely important
+        assert(src_data.trim <= src_data.num_predecessors); 
 
-      // if I hit 0 predecessors after trim, set the flag to true (i.e. says
-      // I need to propogate my value)
-      if (src_data.num_predecessors == 0) {
-        assert(!src_data.propogation_flag);
-        src_data.propogation_flag = true;
+        src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
+        src_data.trim = 0;
 
-        // if I have no successors, then my flag will stay true; this
-        // needs to be sync'd at destination
-        if (src_data.num_successors == 0) {
-          bitset_propogation_flag.set(src);
+        // if I hit 0 predecessors after trim, set the flag to true (i.e. says
+        // I need to propogate my value)
+        if (src_data.num_predecessors == 0) {
+          assert(!src_data.propogation_flag);
+          src_data.propogation_flag = true;
+
+          // if I have no successors, then my flag will stay true; this
+          // needs to be sync'd at destination
+          if (src_data.num_successors == 0) {
+            bitset_propogation_flag.set(src);
+          }
         }
       }
-    }
 
-    // increment num_shortest_paths by to_add then reset
-    if (src_data.to_add > 0) {
-      src_data.num_shortest_paths += src_data.to_add;
-      src_data.to_add = 0;
+      // increment num_shortest_paths by to_add then reset
+      if (src_data.to_add > 0) {
+        src_data.num_shortest_paths += src_data.to_add;
+        src_data.to_add = 0;
 
-      // this bitset is used in the NumShortestPaths go method to 
-      // sync to destinations
-      bitset_num_shortest_paths.set(src);
+        // this bitset is used in the NumShortestPaths go method to 
+        // sync to destinations
+        bitset_num_shortest_paths.set(src);
+      }
     }
 
   }
@@ -1086,7 +1089,7 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+      auto& allNodes = _graph.allNodesRange();
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
@@ -1096,24 +1099,19 @@ struct BC {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+        BC_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      // TODO all nodes here? would remove unnecessary dep sync later, 
-      // but will cause destinations (which don't need to increment bc)
-      // to do extra work on each host
+      // TODO all nodes here? 
       Galois::do_all(
-        nodesWithEdges.begin(), 
-        nodesWithEdges.end(), 
+        allNodes.begin(), 
+        allNodes.end(), 
         BC(&_graph), 
         Galois::loopname("BC"),
         //Galois::loopname(_graph.get_run_identifier("BC").c_str()),
         Galois::timeit()
       );
-      
-      // all sources should have dependency value, meaning all sources will
-      // update the BC value correctly; no sync required here 
     }
   }
 
@@ -1122,9 +1120,10 @@ struct BC {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    Galois::add(src_data.betweeness_centrality, src_data.dependency);
-    // done with it, reset
-    //src_data.dependency = 0;
+    if (src_data.dependency > 0) {
+      Galois::add(src_data.betweeness_centrality, src_data.dependency);
+      src_data.dependency = 0;
+    }
   }
 };
  
