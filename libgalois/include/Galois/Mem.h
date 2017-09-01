@@ -44,12 +44,12 @@ typedef Galois::Runtime::ExternalHeapAllocator<char, IterAllocBaseTy> PerIterAll
 //! Scalable fixed-sized allocator for T that conforms to STL allocator interface but
 //! does not support variable sized allocations
 template<typename Ty>
-struct FixedSizeAllocator : public Galois::Runtime::FixedSizeAllocator<Ty> { };
+using FixedSizeAllocator = Galois::Runtime::FixedSizeAllocator<Ty>;
 
 //! Scalable variable-sized allocator for T that allocates blocks of sizes in powers of 2
 //! Useful for small and medium sized allocations, e.g. small or medium vectors, strings, deques
 template<typename T>
-  using Pow_2_VarSizeAlloc = typename Runtime::Pow_2_BlockAllocator<T>; 
+using Pow_2_VarSizeAlloc = typename Runtime::Pow_2_BlockAllocator<T>; 
 
 }
 #endif
