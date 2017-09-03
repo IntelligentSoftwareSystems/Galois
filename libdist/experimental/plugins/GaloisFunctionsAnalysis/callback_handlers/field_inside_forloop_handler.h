@@ -151,6 +151,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
                 if(field_nonRef || ifCompare){
                   SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "read";
                   syncFlags_entry.AT = "readDestination";
@@ -164,8 +165,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op || ifMinOp || whileCAS_op) {
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
                   syncFlags_entry.RW = "write";
                   syncFlags_entry.AT = "writeDestination";
+                  syncFlags_entry.IS_RESET = true;
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -331,6 +334,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "read";
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
                   syncFlags_entry.AT = "readDestination";
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);

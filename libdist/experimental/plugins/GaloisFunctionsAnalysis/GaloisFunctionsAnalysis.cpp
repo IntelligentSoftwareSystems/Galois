@@ -63,6 +63,7 @@
 #include "callback_handlers/field_used_in_forloop_handler.h"
 #include "callback_handlers/loop_transform_handler.h"
 #include "callback_handlers/sync_pull_call_handler.h"
+#include "callback_handlers/operator_split_handler.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -212,13 +213,15 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
                       if(k.RW == "read"){
                         if(j.READFLAG == "")
                           j.READFLAG = k.AT;
-                        else if((j.READFLAG == "readSource" || j.READFLAG == "readDestination") && !k.AT.empty())
+                        else if(((j.READFLAG == "readSource") && (k.AT == "readDestination")) || ((j.READFLAG == "readDestination") && (k.AT == "readSource"))){
+                          llvm::outs() << k.FIELD_NAME << " : " << j.READFLAG << " : k.AT : " << k.AT << "\n";
                           j.READFLAG = "readAny";
+                        }
                       }
                       if(k.RW == "write"){
                         if(j.WRITEFLAG == "")
                           j.WRITEFLAG = k.AT;
-                        else if((j.WRITEFLAG == "writeSource" || j.WRITEFLAG == "writeDestination") && !k.AT.empty())
+                        else if(((j.WRITEFLAG == "writeSource") && (k.AT == "writeDestination")) || ((j.WRITEFLAG == "writeDestination") && (k.AT == "writeSource")))
                           j.WRITEFLAG = "writeAny";
                       }
                     }
@@ -245,7 +248,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT, Matchers_syncpull_field;
+    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT, Matchers_syncpull_field, Matchers_splitOperator;
     FunctionCallHandler functionCallHandler;
     FindOperatorHandler findOperator;
     CallExprHandler callExprHandler;
@@ -256,9 +259,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     SyncPullInsideForLoopHandler syncPull_handler;
     SyncPullInsideForEdgeLoopHandler syncPullEdge_handler;
     LoopTransformHandler loopTransform_handler;
+    OperatorSplitHandler operatorSplit_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info), operatorSplit_handler(R, &info) {
 
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
@@ -380,6 +384,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
             string str_ifCompare = "ifCompare_" + j.VAR_NAME+ "_" + i.first;
+            string str_resetField = "reset_" + j.VAR_NAME + "_" + i.first;
+            string str_resetField_ifStmt = "reset_ifStmt_" + j.VAR_NAME + "_" + i.first;
 
             /***Find read set: Read at source for non ref Variables. ***/
             DeclarationMatcher f_1_nonRef = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -441,7 +447,12 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp),
 
                                                                      /** For vectors **/
-                                                                      binaryOperator(hasOperatorName("+="), hasDescendant(operatorCallExpr().bind("forVector"))).bind("OpforVector")
+                                                                      binaryOperator(hasOperatorName("+="), hasDescendant(operatorCallExpr().bind("forVector"))).bind("OpforVector"),
+
+                                                                      /** Galois Reset noticed, ASSUMES : reset is enclosed in an If stmt **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("reset"))))), 
+                                                                                                                hasAnyArgument(LHS_memExpr),
+                                                                                                                hasAncestor(ifStmt().bind(str_resetField_ifStmt))).bind(str_resetField)
 
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first)))/*,
@@ -499,6 +510,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME + "_" + i.first;
 
             string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
+            string str_resetField = "reset_" + j.VAR_NAME + "_" + i.first;
 
 
             /***Find read set: Read at source for non ref Variables. ***/
@@ -563,6 +575,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
                                                                       /** min **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("min"))))), hasAnyArgument(LHS_memExpr)).bind(str_min),
+
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("reset"))))), hasAnyArgument(LHS_memExpr)).bind(str_resetField),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp)
@@ -655,9 +669,21 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifCompare = "ifCompare_" + j.VAR_NAME+ "_" + i.first;
+            string str_resetField = "reset_" + j.VAR_NAME + "_" + i.first;
+
+            /***Find read set: Read at source for non ref Variables. ***/
+            DeclarationMatcher f_1_nonRef = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
+                                                                                                ))),
+                unless(hasType(references(AnyType))),
+                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                  ).bind(str_varDecl_nonRef);
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -708,6 +734,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                        /** Galois::atomicAdd(field, val) **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExpr)).bind(str_atomicAdd),
 
+                                                                      /** Galois Reset noticed **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("reset"))))), hasAnyArgument(LHS_memExpr)).bind(str_resetField),
+
                                                                       /** For arrays: field[i] += val **/
                                                                       binaryOperator(hasOperatorName("=") , hasLHS(arraySubscriptExpr(hasDescendant(LHS_declRefExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+=") , hasLHS(arraySubscriptExpr(hasDescendant(LHS_declRefExpr)).bind("arraySub"))).bind(str_plusOp),
@@ -747,11 +776,25 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             //StatementMatcher f_5 = forStmt(isExpansionInMainFile()).bind("arraySub");
             //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd")))[>, hasAnyArgument(LHS_memExpr)<])).bind(str_atomicAdd);
+            /** To consider the fields read in comparison : nodeData.field1 > something **/
+            StatementMatcher f_3_comparisonLHS = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"),
+                                                                                      hasLHS(hasDescendant(LHS_memExpr))),
+                                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                                      ))).bind(str_ifCompare);
+            /** To consider the fields read in comparison : something  > nodeData.field1 **/
+            StatementMatcher f_3_comparisonRHS = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"),
+                                                                                      hasRHS(hasDescendant(LHS_memExpr))),
+                                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                                      ))).bind(str_ifCompare);
+
 
             Matchers_gen_field.addMatcher(f_1, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_2, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_3, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_4, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_1_nonRef, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_3_comparisonRHS, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_3_comparisonLHS, &insideForLoopField_handler);
             //Matchers_gen_field.addMatcher(f_5, &insideForLoopField_handler);
 
 
@@ -801,11 +844,13 @@ class GaloisFunctionsConsumer : public ASTConsumer {
         int width = 25;
         llvm::outs() << center(string("FIELD_NAME"), width) << "|"
                      <<  center(string("RW"), width) << "|"
+                     <<  center(string("RESET"), width) << "|"
                      << center(string("AT"), width) << "\n";
         llvm::outs() << std::string(width*10 + 2*10, '-') << "\n";
         for( auto j : i.second) {
           llvm::outs() << center(j.FIELD_NAME,  width) << "|"
                        << center(j.RW,  width) << "|"
+                       << center(j.IS_RESET,  width) << "|"
                        << center(j.AT,  width) << "\n";
         }
       }
@@ -935,7 +980,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       Matchers_doall.matchAST(Context);
 
 
-      /*MATCHER 7: ********************Matchers for 2 loop transformations *******************/
+      /*MATCHER 7: ******************** Matchers for 2 loop transformations *******************/
       for (auto i : info.edgeData_map) {
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
@@ -986,8 +1031,62 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       Matchers_2LT.matchAST(Context);
-    }
-  };
+
+
+  /******* Split operator if required ***********/
+      for(auto i : info.syncFlags_map){
+        for(auto j : i.second){
+          if(j.IS_RESET && (j.AT == "writeSource")){
+            bool should_split = false;
+            for(auto k : info.syncFlags_map[i.first]){
+              if((k.FIELD_NAME == j.FIELD_NAME)){
+                if(k.AT == "writeDestination"){
+                  should_split = true;
+                }
+              }
+            }
+            if(should_split){
+              llvm::outs() << " GOING TO SPLIT " << j.VAR_NAME << "\n";
+              string str_memExpr = "memExpr_" + j.VAR_NAME + "_" + i.first;
+              string str_resetField = "reset_" + j.VAR_NAME + "_" + i.first;
+              string str_resetField_ifStmt = "reset_ifStmt_" + j.VAR_NAME + "_" + i.first;
+              string str_main_struct = "main_struct_" + i.first;
+              string str_method_operator  = "methodDecl_" + i.first;
+              string str_struct_constructor = "constructorDecl_" + i.first;
+              string str_struct_constructor_initList = "constructorDeclInitList_" + i.first;
+              string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
+              string str_resetField_expr = "reset_expr_" + j.VAR_NAME + "_" + i.first;
+              string str_do_all = "do_all_" + i.first;
+
+
+
+              StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr);
+              StatementMatcher f_1 = expr(isExpansionInMainFile(),
+                  /** Galois Reset noticed, ASSUMES : reset is enclosed in an If stmt **/
+                  callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("reset"))))),
+                    hasAnyArgument(LHS_memExpr),
+                    hasAncestor(ifStmt().bind(str_resetField_ifStmt))).bind(str_resetField),
+                  hasAncestor(recordDecl(hasName(i.first),
+                      hasDescendant(methodDecl(hasName("operator()"),
+                          hasParameter(0,decl().bind("src_arg")),
+                          hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata))
+                          ).bind(str_method_operator)), /*TODO: Get begin of constructor to add DGAccumulator */
+                      hasDescendant(constructorDecl(hasDescendant(declRefExpr().bind(str_struct_constructor_initList))).bind(str_struct_constructor)),
+                      hasDescendant(callExpr(callee(functionDecl(anyOf(hasName("Galois::do_all"),hasName("Galois::do_all_local"), hasName("Galois::for_each"))))).bind(str_do_all))
+                      ).bind(str_main_struct))
+                  ).bind(str_resetField_expr);
+
+              Matchers_splitOperator.addMatcher(f_1, &operatorSplit_handler);
+            }
+          }
+
+        }
+      }
+
+      Matchers_splitOperator.matchAST(Context);
+      }
+
+    };
 
   class GaloisFunctionsAction : public PluginASTAction {
   private:

@@ -65,6 +65,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_ifCompare = "ifCompare_" + j.VAR_NAME+ "_" + i.first;
+            string str_resetField = "reset_" + j.VAR_NAME + "_" + i.first;
+            string str_resetField_ifStmt = "reset_ifStmt_" + j.VAR_NAME + "_" + i.first;
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -76,6 +78,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
               auto min_op = Results.Nodes.getNodeAs<clang::Stmt>(str_min);
               auto ifCompare = Results.Nodes.getNodeAs<clang::Stmt>(str_ifCompare);
+              auto resetField = Results.Nodes.getNodeAs<clang::Stmt>(str_resetField);
+              auto resetField_ifStmt = Results.Nodes.getNodeAs<clang::Stmt>(str_resetField_ifStmt);
 
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
@@ -146,8 +150,22 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 if(field_nonRef || ifCompare){
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
                   syncFlags_entry.RW = "read";
                   syncFlags_entry.AT = "readSource";
+                  syncFlags_entry.IS_RESET = false;
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+                  break;
+                }
+                if(resetField){
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
+                  syncFlags_entry.RW = "write";
+                  syncFlags_entry.AT = "writeSource";
+                  syncFlags_entry.IS_RESET = true;
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -202,6 +220,10 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "write";
                   syncFlags_entry.AT = "writeSource";
+                  if(assignmentOP)
+                    syncFlags_entry.IS_RESET = true;
+                  else
+                    syncFlags_entry.IS_RESET = false;
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -275,8 +297,10 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   /** Add to the read set **/
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
+                  syncFlags_entry.VAR_NAME = j.VAR_NAME;
                   syncFlags_entry.RW = "read";
                   syncFlags_entry.AT = "readSource";
+                  syncFlags_entry.IS_RESET = false;
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }

@@ -1101,13 +1101,6 @@ namespace {
                 SSAfter.str(string());
                 SSAfter.clear();
               }
-              //else if(i.SYNC_TYPE == "sync_pull"){
-                //SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
-                //rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
-                //SSSyncer_vertexCut.str(string());
-                //SSSyncer_vertexCut.clear();
-                //++counter;
-              //}
             }
 #if 0
             for (unsigned i = 0; i < write_set_vec_PUSH_PULL.size(); i++) {

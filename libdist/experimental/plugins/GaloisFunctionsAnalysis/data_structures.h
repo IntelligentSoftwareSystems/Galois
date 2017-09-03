@@ -53,9 +53,11 @@
   };
 
   struct SyncFlag_entry {
+    string VAR_NAME;
     string FIELD_NAME;
     string RW; // read or write
     string AT; // src or dest
+    bool IS_RESET;
   };
 
   struct FirstIter_struct_entry{
