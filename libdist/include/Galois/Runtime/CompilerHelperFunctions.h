@@ -163,6 +163,16 @@ namespace Galois {
     return init_value;
   }
 
+  template<typename Ty>
+  void reset(Ty& var, Ty val) {
+    var = val;
+  }
+
+  template<typename Ty>
+  void reset(std::atomic<Ty>& var, Ty val) {
+    var = val;
+  }
+
   //like std::inner_product
     template<typename ItrTy, typename Ty >
     Ty innerProduct(ItrTy& a_arr, ItrTy& b_arr, Ty init_value) {
