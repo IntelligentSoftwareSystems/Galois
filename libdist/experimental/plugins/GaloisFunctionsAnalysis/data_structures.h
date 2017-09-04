@@ -50,6 +50,8 @@
     string SYNC_TYPE;
     string READFLAG;
     string WRITEFLAG;
+    bool IS_RESET;
+    bool IS_REDUCTION;
   };
 
   struct SyncFlag_entry {

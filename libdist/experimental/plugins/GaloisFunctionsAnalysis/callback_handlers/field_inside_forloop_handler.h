@@ -38,8 +38,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
   private:
       ASTContext* astContext;
       InfoClass *info;
+      Rewriter &rewriter;
     public:
-      FindingFieldInsideForLoopHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+      FindingFieldInsideForLoopHandler(CompilerInstance*  CI, InfoClass* _info, Rewriter &rewriter):astContext(&(CI->getASTContext())), info(_info), rewriter(rewriter){}
       virtual void run(const MatchFinder::MatchResult &Results) {
 
         clang::LangOptions LangOpts;
@@ -53,6 +54,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
@@ -82,6 +84,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
               auto field_nonRef = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl_nonRef);
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+              auto minusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_minusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
 
               auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
@@ -161,6 +164,66 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   break;
                 }
 
+               if(minusOP){
+
+                  string str_minusOP;
+                  llvm::raw_string_ostream s(str_minusOP);
+                  /** Returns something like snode.field_name.operator **/
+                  minusOP->printPretty(s, 0, Policy);
+                  str_minusOP = s.str();
+                  minusOP->dumpColor();
+                  llvm::outs() << "____________________________> : " << s.str() << "\n";
+
+                  SourceLocation minusOP_loc = minusOP->getSourceRange().getBegin();
+                  unsigned len_rm = minusOP->getSourceRange().getEnd().getRawEncoding() -  minusOP_loc.getRawEncoding() + 1;
+                  rewriter.RemoveText(minusOP_loc, len_rm);
+
+                  std::string new_field_name = std::string("contrib_" + field_entry.FIELD_NAME);
+
+                  findAndReplace(str_minusOP,field_entry.FIELD_NAME, new_field_name);
+                  findAndReplace(str_minusOP, "-=", "+=");
+
+                  //TODO:: Assuming reset type for field is zero.
+                  rewriter.InsertText(minusOP_loc, str_minusOP, true, true);
+
+
+                  auto varDecl_getData_src = Results.Nodes.getNodeAs<clang::VarDecl>("varDecl_getData_src");
+                  std::string str_varName_getData_src = "";
+                  if(varDecl_getData_src){
+                    str_varName_getData_src = varDecl_getData_src->getNameAsString();
+                  }
+                  auto edgeForLoop = Results.Nodes.getNodeAs<clang::Stmt>("forLoopName");
+                  SourceLocation edgeForLoop_loc = edgeForLoop->getSourceRange().getBegin();
+
+                  //Using new field to set the old field outside the for edge loop.
+                  //sdata.Field1 = sdata.contrib_Field1;
+                  std::string str_using_new_field = "\nif(" + str_varName_getData_src + "." + new_field_name + "){";
+                  str_using_new_field += "\n" + str_varName_getData_src + "." + field_entry.FIELD_NAME + " = " + str_varName_getData_src + "." + new_field_name + ";";
+                  std::string str_reset_new_field = std::string("\nGalois::reset(" + str_varName_getData_src + "." + new_field_name + " , " + field_entry.RESET_VALTYPE + "(" + std::to_string(0) + ")" + ");\n}\n");
+
+                  str_using_new_field += str_reset_new_field;
+                  rewriter.InsertText(edgeForLoop_loc, str_using_new_field, true, true);
+
+                  //Add an entry for new variable to be synced and split operator if required.
+                  reduceOP_entry.SYNC_TYPE = "sync_push";
+                  reduceOP_entry.OPERATION_EXPR = "add";
+                  reduceOP_entry.RESETVAL_EXPR = "0";
+                  reduceOP_entry.FIELD_NAME = new_field_name;
+                  if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
+                    info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  }
+
+                  /** Add to the write set **/
+                  SyncFlag_entry syncFlags_entry;
+                  syncFlags_entry.FIELD_NAME = new_field_name;
+                  syncFlags_entry.RW = "write";
+                  syncFlags_entry.AT = "writeDestination";
+                    syncFlags_entry.IS_RESET = true;
+                  if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
+                    info->syncFlags_map[i.first].push_back(syncFlags_entry);
+                  }
+                  break;
+                }
 
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op || ifMinOp || whileCAS_op) {
                   SyncFlag_entry syncFlags_entry;

@@ -37,7 +37,7 @@ using namespace std;
 static const TypeMatcher AnyType = anything();
 namespace{
 /*COMMAN MATCHER STATEMENTS  :*************** To match Galois style getData calls  *************************************/
-      StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData"))));
+      StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData")))).bind("getData_callExpr");
       StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl(hasType(references(AnyType))))))).bind("LHSRefVariable");
 

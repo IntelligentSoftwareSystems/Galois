@@ -206,6 +206,7 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
               stringstream SSAfter;
               j.READFLAG = "";
               j.WRITEFLAG = "";
+              j.IS_RESET = false;
               for(auto h : info->syncFlags_map[struct_name]){
                 if(h.FIELD_NAME == j.FIELD_NAME){
                   for(auto k : info->syncFlags_map[struct_name]){
@@ -219,15 +220,20 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
                         }
                       }
                       if(k.RW == "write"){
-                        if(j.WRITEFLAG == "")
+                        if(j.WRITEFLAG == ""){
                           j.WRITEFLAG = k.AT;
-                        else if(((j.WRITEFLAG == "writeSource") && (k.AT == "writeDestination")) || ((j.WRITEFLAG == "writeDestination") && (k.AT == "writeSource")))
+                          j.IS_RESET |= k.IS_RESET;
+                        }
+                        else if(((j.WRITEFLAG == "writeSource") && (k.AT == "writeDestination")) || ((j.WRITEFLAG == "writeDestination") && (k.AT == "writeSource"))){
                           j.WRITEFLAG = "writeAny";
+                          j.IS_RESET |= k.IS_RESET;
+                        }
                       }
                     }
                   }
                 }
               }
+
               if(j.SYNC_TYPE == "sync_push")
                 SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
@@ -262,7 +268,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     OperatorSplitHandler operatorSplit_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info), operatorSplit_handler(R, &info) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info, R), insideForLoop_handler(&Instance, &info, R), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info), operatorSplit_handler(R, &info) {
 
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
@@ -364,7 +370,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
         }
       }
 
-      /*MATCHER 5: *********************Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
+      /*MATCHER 5: ********************* Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
       for (auto i : info.getData_map) {
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
@@ -469,11 +475,26 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                       hasAncestor(recordDecl(hasName(i.first)))
                                                                                       ))).bind(str_ifCompare);
 
+            /** Non Reduction operations inside the for edge loop ***/
+            StatementMatcher f_1_non_reduction = expr(isExpansionInMainFile(), anyOf(
+                                                                      /** For builtInType : NodeData.field += val **/
+                                                                      binaryOperator(hasOperatorName("-="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_minusOp),
+
+                                                                      /** For ComplexType : NodeData.field += val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("-="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_minusOp)),
+                                                                   hasAncestor(recordDecl(hasName(i.first))),
+                                                                   hasAncestor(EdgeForLoopMatcher));
+
+
+
             Matchers_gen.addMatcher(f_1, &f_handler);
             Matchers_gen.addMatcher(f_2, &f_handler);
             Matchers_gen.addMatcher(f_1_nonRef, &f_handler);
             Matchers_gen.addMatcher(f_3_comparisonLHS, &f_handler);
             Matchers_gen.addMatcher(f_3_comparisonRHS, &f_handler);
+            Matchers_gen.addMatcher(f_1_non_reduction, &f_handler);
           }
         }
       }
@@ -615,9 +636,20 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                       hasAncestor(EdgeForLoopMatcher)
                                                                                       ))).bind(str_ifCompare);
 
-            //StatementMatcher f_5_comparison = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">")),
-                                                                                      //hasAncestor(EdgeForLoopMatcher)
-                                                                                      //))).bind(str_ifCompare);
+
+            /** Non Reduction operations inside the for edge loop ***/
+            StatementMatcher f_1_non_reduction = expr(isExpansionInMainFile(), anyOf(
+                                                                      /** For builtInType : NodeData.field += val **/
+                                                                      binaryOperator(hasOperatorName("-="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_minusOp),
+                                                                      /** For ComplexType : NodeData.field += val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("-="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_minusOp)),
+                                                                   hasAncestor(methodDecl(hasName("operator()"),
+                                                                                          hasDescendant(varDecl(hasDescendant(memberCallExpr(callee(functionDecl(hasName("getData")))))).bind("varDecl_getData_src"))).bind("op")),
+                                                                   hasAncestor(recordDecl(hasName(i.first))),
+                                                                   hasAncestor(EdgeForLoopMatcher));
+
 
             /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
 #if 0
@@ -637,8 +669,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             Matchers_gen.addMatcher(f_1_nonRef, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_5_comparisonLHS, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_5_comparisonRHS, &insideForLoop_handler);
+            Matchers_gen.addMatcher(f_1_non_reduction, &insideForLoop_handler);
             //Matchers_gen.addMatcher(f_syncPull_1, &insideForLoop_handler);
-            //Matchers_gen.addMatcher(f_5, &insideForLoop_handler);
           }
         }
       }

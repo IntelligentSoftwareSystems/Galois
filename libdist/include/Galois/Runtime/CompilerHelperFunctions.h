@@ -102,6 +102,13 @@ namespace Galois {
     }
 
   template<typename Ty>
+    const Ty add(Ty& a, std::atomic<Ty>& b) {
+      Ty old_a = a;
+      a = a + b.load();
+      return old_a;
+    }
+
+  template<typename Ty>
     const Ty add(Ty& a, const Ty& b) {
       Ty old_a = a;
       a += b;
