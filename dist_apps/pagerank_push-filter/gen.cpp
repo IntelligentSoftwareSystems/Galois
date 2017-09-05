@@ -254,8 +254,8 @@ struct PageRank_delta {
     } else if (personality == CPU)
   #endif
     {
-      Galois::do_all_local(
-        nodesWithEdges,
+      Galois::do_all(
+        nodesWithEdges.begin(), nodesWithEdges.end(),
         PageRank_delta{ alpha, tolerance, &_graph },
         Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
         Galois::do_all_steal<true>(),
