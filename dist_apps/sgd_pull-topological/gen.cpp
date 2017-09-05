@@ -128,13 +128,11 @@ static const double LAMBDA = 0.001; // Purdue: 1.0 Intel: 0.001
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 
-const unsigned int infinity = std::numeric_limits<unsigned int>::max()/4;
+const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
 unsigned iteration;
 
 struct NodeData {
   std::array<double, LATENT_VECTOR_SIZE> latent_vector;
-  //NodeData():latent_vector(LATENT_VECTOR_SIZE){}
-  //std::vector<double> latent_vector;
   unsigned int updates;
   unsigned int edge_offset;
 };
@@ -144,36 +142,32 @@ struct NodeData {
 typedef hGraph<NodeData, double> Graph;
 typedef typename Graph::GraphNode GNode;
 
-static double genRand () {
+static double genRand() {
   // generate a random double in (-1,1)
-  return 2.0 * ((double)std::rand () / (double)RAND_MAX) - 1.0;
+  return 2.0 * ((double)std::rand() / (double)RAND_MAX) - 1.0;
 }
 
+// Purdue learning function
 double getstep_size(unsigned int round) {
   return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(round + 1, 1.5));
 }
 
+/**
+ * Prediction of edge weight based on 2 latent vectors
+ */
 double calcPrediction (const NodeData& movie_data, const NodeData& user_data) {
-#if 0
-  double init_value = 0.0;
-  auto jj = user_data.latent_vector.begin();
-  for(auto ii = movie_data.latent_vector.begin(); 
-      ii != movie_data.latent_vector.end(); 
-      ++ii, ++jj) {
-        init_value += (*ii) * (*jj);
-  }
-#endif
-
   double pred = Galois::innerProduct(movie_data.latent_vector, 
                                      user_data.latent_vector, 
-                                     0.0); //init_value; //(double) Galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
+                                     0.0); 
   double p = pred;
 
-  pred = std::min (MAXVAL, pred);
-  pred = std::max (MINVAL, pred);
+  pred = std::min(MAXVAL, pred);
+  pred = std::max(MINVAL, pred);
 
+  #ifndef NDEBUG
   if (p != pred)
     std::cerr << "clamped " << p << " to " << pred << "\n";
+  #endif
 
   return pred;
 }
@@ -188,32 +182,26 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    #ifdef __GALOIS_HET_CUDA__
-      // TODO move this to thing below?
-      if (personality == GPU_CUDA) {
-        InitializeGraph_cuda(cuda_ctx);
-      } else if (personality == CPU)
-    #endif
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
-        );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-        StatTimer_cuda.start();
-        InitializeGraph_all_cuda(cuda_ctx);
-        StatTimer_cuda.stop();
-      } else if (personality == CPU)
-    #endif
+    auto& allNodes = _graph.allNodesRange();
 
-    _graph.sync<writeDestination, readSource, Reduce_set_updates, 
-                Broadcast_updates>("InitializeGraph");
-    _graph.sync<writeDestination, readSource, Reduce_set_edge_offset, 
-                Broadcast_edge_offset>("InitializeGraph");
-    _graph.sync<writeDestination, readSource, Reduce_set_latent_vector, 
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str(
+        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+      );
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    Galois::do_all(allNodes.begin(), allNodes.end(), 
+                   InitializeGraph {&_graph}, Galois::loopname("Init"));
+
+    // due to latent_vector being generated randomly, it should be sync'd
+    // to 1 consistent version across all hosts
+    _graph.sync<writeSource, readAny, Reduce_set_latent_vector, 
                 Broadcast_latent_vector>("InitializeGraph");
-
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
@@ -222,12 +210,14 @@ struct InitializeGraph {
     sdata.edge_offset = 0;
 
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-      sdata.latent_vector[i] = genRand();
+      sdata.latent_vector[i] = genRand(); // randomly create latent vector 
+
+      #ifndef NDEBUG
       if(!std::isnormal(sdata.latent_vector[i]))
-        std::cout << "GEN for " << i << sdata.latent_vector[i] << "\n";
+        Galois::gDebug("GEN for ", i, " ",  sdata.latent_vector[i]);
+      #endif
     }
   }
-
 };
 
 struct SGD_doPartialGradientUpdate {
@@ -238,47 +228,55 @@ struct SGD_doPartialGradientUpdate {
       graph(_graph), step_size(_step_size) {}
 
   void static go(Graph& _graph, double _step_size) {
-#if 0
-    std::deque<GNode> Movies;
-       for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
-         if (g.edge_begin(*ii) != g.edge_end(*ii))
-           Movies.push_back(*ii);
-#endif
-      //Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
-      Galois::for_each(_graph.begin(), _graph.end(), 
-                       SGD_doPartialGradientUpdate (&_graph, _step_size));
+    // TODO GPU hook?
+    // Galois::do_all(_graph.begin(), _graph.end(), SGD_doPartialGradientUpdate { &_graph, _step_size }, Galois::loopname("SGD_doPartialGradientUpdate"));
+    Galois::for_each(_graph.begin(), _graph.end(), 
+                     SGD_doPartialGradientUpdate(&_graph, _step_size));
+
+    // sync all latent vectors
+    _graph.sync<writeAny, readAny, Reduce_pair_wise_avg_array_latent_vector, 
+                Broadcast_latent_vector>("SGD");
   }
 
   template<typename Context>
-  void operator()(GNode src , Context& cnx) const {
+  void operator()(GNode src, Context& cnx) const {
   //void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     auto& movie_node = sdata.latent_vector;
 
-    for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
+    for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src);
+         jj != ej; 
+         ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& ddata = graph->getData(dst);
+
       auto& user_node = ddata.latent_vector;
       auto& sdata_up = sdata.updates;
+
       double edge_rating = graph->getEdgeData(dst);
 
-      //doGradientUpdate
-     double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
-     double cur_error = edge_rating - old_dp;
-     assert(cur_error < 1000 && cur_error > -1000);
-     for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
-       double prevUser = user_node[i];
-       double prevMovie = movie_node[i];
+      // doGradientUpdate
+      double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), 
+                                           movie_node.begin(), 0.0);
 
-       user_node[i] += step_size * (cur_error * prevMovie - LAMBDA * prevUser);
-       assert(std::isnormal(user_node[i]));
-       movie_node[i] += step_size * (cur_error * prevUser - LAMBDA * prevMovie);
-       assert(std::isnormal(movie_node[i]));
-     }
+      double cur_error = edge_rating - old_dp;
+
+      assert(cur_error < 1000 && cur_error > -1000);
+
+      // update both vectors based on error derived from 2 previous vectors
+      for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+        double prevUser = user_node[i];
+        double prevMovie = movie_node[i];
+
+        user_node[i] += step_size * (cur_error * prevMovie - LAMBDA * prevUser);
+        assert(std::isnormal(user_node[i]));
+
+        movie_node[i] += step_size * (cur_error * prevUser - LAMBDA * prevMovie);
+        assert(std::isnormal(movie_node[i]));
+      }
     }
   }
 };
-
 
 struct SGD {
   Graph* graph;
@@ -291,17 +289,13 @@ struct SGD {
   void static go(Graph& _graph) {
     iteration = 0;
     double rms_normalized = 0.0;
+
     do {
       auto step_size = getstep_size(iteration);
+
       SGD_doPartialGradientUpdate::go(_graph,step_size);
+
       DGAccumulator_accum.reset();
-      #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) {
-          int __retval = 0;
-          SGD_cuda(__retval, cuda_ctx);
-          DGAccumulator_accum += __retval;
-        } else if (personality == CPU)
-      #endif
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           std::string impl_str("CUDA_DO_ALL_IMPL_SGD_" + (_graph.get_run_identifier()));
@@ -313,18 +307,17 @@ struct SGD {
           StatTimer_cuda.stop();
         } else if (personality == CPU)
       #endif
-      
-
-      _graph.sync<writeDestination, readSource, 
-                  Reduce_pair_wise_avg_array_latent_vector, 
-                  Broadcast_latent_vector>("SGD");
 
       Galois::do_all(_graph.begin(), _graph.end(), 
                      SGD { &_graph, step_size }, Galois::loopname("SGD"));
       ++iteration;
-      rms_normalized = std::sqrt(DGAccumulator_accum.reduce()/_graph.get_totalEdges());
-      std::cout << " RMS Normalized  : " << rms_normalized << "\n";
+
+      // calculate root mean squared error
+      rms_normalized = std::sqrt(DGAccumulator_accum.reduce() /
+                                 _graph.get_totalEdges());
+      Galois::gDebug("RMS Normalized : ", rms_normalized;
     } while((iteration < maxIterations) && (rms_normalized > 10));
+    // loop until root mean squared error is low enough
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + 
@@ -344,8 +337,9 @@ struct SGD {
       auto& user_node = ddata.latent_vector;
       double edge_rating = graph->getEdgeData(dst);
 
+      // get error of prediction based on current latent vectors
       double cur_error2 = edge_rating - calcPrediction(sdata, ddata);
-      DGAccumulator_accum += (cur_error2*cur_error2);
+      DGAccumulator_accum += (cur_error2 * cur_error2);
     }
   }
 };
@@ -358,8 +352,9 @@ Galois::DGAccumulator<double> SGD::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     // TODO Galois::System G
-
+    // TODO
     LonestarStart(argc, argv, name, desc, url);
+
     Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
