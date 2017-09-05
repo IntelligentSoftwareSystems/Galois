@@ -454,9 +454,18 @@ struct SSSP {
           // will lead to incorrect results as it will not sync what is
           // necessary
 
+          //for (auto ii = _graph.begin(); ii != _graph.end(); ++ii) {
+          //  if (_graph.isOwned(_graph.getGID(*ii))) {
+          //    bitset_current_length.set(*ii);
+          //  }
+          //}
+
           _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-          //             Broadcast_current_length>("SSSP_cur_len_any_v");
+          //             Broadcast_current_length, Bitset_current_length>("SSSP");
                        Broadcast_current_length>("SSSP");
+          //_graph.sync<writeDestination, readAny, Reduce_min_current_length, 
+          ////             Broadcast_current_length>("SSSP_cur_len_any_v");
+          //             Broadcast_current_length>("SSSP");
         } else {
           _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
                       Broadcast_current_length, 
@@ -1053,7 +1062,7 @@ struct BC {
         current_src_node = i;
       }
 
-      Galois::gDebug("Current source node for BC is ", current_src_node);
+      //Galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (_graph.id == 0) {
