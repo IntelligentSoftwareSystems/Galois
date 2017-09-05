@@ -346,13 +346,13 @@ int main(int argc, char** argv) {
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
                                   (unsigned long long)src_node, 0);
       #if __OPT_VERSION__ == 1
-      Galois::gDebug("Version 1 of optimization");
+      printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
-      Galois::gDebug("Version 2 of optimization");
+      printf("Version 2 of optimization\n");
       #elif __OPT_VERSION__ == 3
-      Galois::gDebug("Version 3 of optimization");
+      printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
-      Galois::gDebug("Version 4 of optimization");
+      printf("Version 4 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
