@@ -52,10 +52,15 @@
 #ifndef SYNC_STRUCT_MACROS
 #define SYNC_STRUCT_MACROS
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Field flag structure
 ////////////////////////////////////////////////////////////////////////////////
+
+enum BITVECTOR_STATUS {
+  NONE_INVALID,
+  SRC_INVALID,
+  DST_INVALID
+};
 
 class FieldFlags {
 private:
@@ -64,6 +69,7 @@ private:
   uint8_t _d2s;
   uint8_t _d2d;
 public:
+  BITVECTOR_STATUS bitvectorStatus;
   /**
    * Field Flags constructor. Sets all flags to false
    */
@@ -72,6 +78,7 @@ public:
     _s2d = false;
     _d2s = false;
     _d2d = false;
+    bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
 
   bool src_to_src() {
@@ -122,6 +129,7 @@ public:
     _s2d = false;
     _d2s = false;
     _d2d = false;
+    bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
 };
 

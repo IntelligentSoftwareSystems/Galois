@@ -171,10 +171,22 @@ private:
     } else { // syncBroadcast
       switch(readLocation) {
         case readSource:
+          if (base_hGraph::currentBVFlag != nullptr) {
+            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::DST_INVALID;
+          }
+
           return (gridRowID() != gridRowID(host));
         case readDestination:
+          if (base_hGraph::currentBVFlag != nullptr) {
+            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::SRC_INVALID;
+          }
+
           return (gridColumnID() != gridColumnID(host));
         case readAny:
+          if (base_hGraph::currentBVFlag != nullptr) {
+            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::NONE_INVALID;
+          }
+
           assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
           return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
