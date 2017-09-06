@@ -278,6 +278,7 @@ struct ConnectedComp {
       _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
                             Broadcast_comp_current>(Flags_comp_current, 
                                                     "ConnectedComp");
+      // TODO would compiler insert a comp_old on demand sync here?
       #endif
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
