@@ -180,6 +180,13 @@ struct FirstItr_ConnectedComp{
 
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
+                          Broadcast_comp_current>(Flags_comp_current, 
+                                                  "ConnectedComp");
+    #endif
+
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
@@ -200,6 +207,10 @@ struct FirstItr_ConnectedComp{
         Galois::timeit()
       );
     }
+
+    #if __OPT_VERSION__ == 5
+    Flags_comp_current.set_write_dst();
+    #endif
 
     #if __OPT_VERSION__ == 1
     // naive sync of everything after operator 
@@ -263,6 +274,11 @@ struct ConnectedComp {
     do { 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
+                            Broadcast_comp_current>(Flags_comp_current, 
+                                                    "ConnectedComp");
+      #endif
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
@@ -285,6 +301,10 @@ struct ConnectedComp {
         Galois::timeit()
       );
       }
+
+      #if __OPT_VERSION__ == 5
+      Flags_comp_current.set_write_dst();
+      #endif
 
       #if __OPT_VERSION__ == 1
       // naive sync of everything after operator 
@@ -426,6 +446,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
@@ -526,6 +548,9 @@ int main(int argc, char** argv) {
       #endif
         #if __OPT_VERSION__ >= 3
         bitset_comp_current.reset();
+        #endif
+        #if __OPT_VERSION__ == 5
+        Flags_comp_current.clear_all();
         #endif
 
         //Galois::Runtime::getHostBarrier().wait();
