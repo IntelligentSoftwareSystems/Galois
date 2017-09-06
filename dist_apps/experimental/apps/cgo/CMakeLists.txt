@@ -91,6 +91,24 @@ function(versionGen name)
   endif()
 endfunction()
 
+function(versionGenNoGPU name)
+  app(${name}_v1 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v1 galois_dist distbench)
+  target_compile_definitions(${name}_v1 PRIVATE __OPT_VERSION__=1)
+  
+  app(${name}_v2 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v2 galois_dist distbench)
+  target_compile_definitions(${name}_v2 PRIVATE __OPT_VERSION__=2)
+  
+  app(${name}_v3 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v3 galois_dist distbench)
+  target_compile_definitions(${name}_v3 PRIVATE __OPT_VERSION__=3)
+  
+  app(${name}_v4 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v4 galois_dist distbench)
+  target_compile_definitions(${name}_v4 PRIVATE __OPT_VERSION__=4)
+endfunction()
+
 ################################################################################
 # BFS
 ################################################################################
@@ -125,6 +143,11 @@ versionGen(pagerank_push-filter)
 
 versionGen(kcore_push-filter)
 
+################################################################################
+# BC
+################################################################################
+
+versionGenNoGPU(bc_pull)
 
 # TODO BC, SGD, Kcore Pull (?)
 

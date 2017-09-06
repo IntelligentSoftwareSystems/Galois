@@ -218,7 +218,8 @@ struct InitializeGraph {
       );
     }
 
-    _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
+    // NOTE: Differs from optimized version as it does sync readAny
+    _graph.sync<writeSource, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraphNout");
   }
 
@@ -244,21 +245,24 @@ struct PageRank_delta {
       graph(_graph) {}
 
   void static go(Graph& _graph) {
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    // NOTE: differs from optimized version as it does all nodes and not just 
+    // nodes with edges (if you do only nodes with edges residual on mirrors
+    // will never be reset
+    auto& allNodes = _graph.allNodesRange();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      PageRank_delta_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+      PageRank_delta_cuda(*allNodes.begin(), *allNodes.end(),
                           alpha, tolerance, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
     {
-      Galois::do_all_local(
-        nodesWithEdges,
+      Galois::do_all(
+        allNodes.begin(), allNodes.end(), // differs from optimized version
         PageRank_delta{ alpha, tolerance, &_graph },
         Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
         Galois::do_all_steal<true>(),
@@ -526,13 +530,13 @@ int main(int argc, char** argv) {
       Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
 
       #if __OPT_VERSION__ == 1
-      Galois::gDebug("Version 1 of optimization");
+      printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
-      Galois::gDebug("Version 2 of optimization");
+      printf("Version 2 of optimization\n");
       #elif __OPT_VERSION__ == 3
-      Galois::gDebug("Version 3 of optimization");
+      printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
-      Galois::gDebug("Version 4 of optimization");
+      printf("Version 4 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),

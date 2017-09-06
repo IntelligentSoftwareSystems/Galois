@@ -259,8 +259,8 @@ struct PageRank_delta {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
-    Galois::do_all_local(
-      allNodes,
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
       Galois::do_all_steal<true>(),
@@ -294,6 +294,8 @@ struct PageRank {
     unsigned _num_iterations = 0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
+    //unsigned int reduced = 0;
+
     do {
       _graph.set_num_iter(_num_iterations);
       dga.reset();
@@ -324,6 +326,9 @@ struct PageRank {
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
           (unsigned long)dga.read_local(), 0);
 
+      //reduced = dga.reduce();
+      //printf("[%d] iter %u local is %u\n", _graph.id, _num_iterations, dga.read_local());
+      //printf("[%d] iter %u reduced is %u\n", _graph.id, _num_iterations, reduced);
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce());
 

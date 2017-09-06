@@ -196,6 +196,9 @@ struct InitializeIteration {
 
     assert(src_data.num_predecessors == 0);
     assert(src_data.num_successors == 0);
+
+    src_data.num_short_paths_flag = false;
+    src_data.dep_prop_flag = false;
   }
 };
 
@@ -229,7 +232,6 @@ struct SSSP {
       iterations++;
 
       accum_result = dga.reduce();
-
     } while (accum_result);
   }
 
@@ -329,6 +331,10 @@ struct NumShortestPathsChanges {
           // meaning nothing will pull from you anyways even if your flag
           // is on
           src_data.propogation_flag = false;
+
+          if (!src_data.num_short_paths_flag) {
+            src_data.num_short_paths_flag = true;
+          }
         }
       } else {
         if (src_data.num_predecessors == 0 && !src_data.num_short_paths_flag) {
@@ -494,7 +500,10 @@ struct DependencyPropogation {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.propogation_flag) {
-        assert(src_data.num_successors == 0);
+        if (src_data.num_successors != 0) {
+          printf("source is %lu\n", graph->L2G(src));
+          assert(src_data.num_successors == 0);
+        }
   
         for (auto current_edge = graph->edge_begin(src), 
                   end_edge = graph->edge_end(src); 
@@ -515,9 +524,10 @@ struct DependencyPropogation {
           // I am successor to destination
           if ((dst_data.current_length + edge_weight) == src_data.current_length) {
             dst_data.num_successors -= 1;
-            dst_data.dependency += (((float)dst_data.num_shortest_paths / 
-                                     (float)src_data.num_shortest_paths) * 
-                                   (float)(1.0 + dep))
+            Galois::atomicAdd(dst_data.dependency, 
+                                (((float)dst_data.num_shortest_paths / 
+                                      (float)src_data.num_shortest_paths) * 
+                                 (float)(1.0 + dep)));
 
             DGAccumulator_accum += 1;
           }
@@ -525,6 +535,9 @@ struct DependencyPropogation {
 
         // reset flag so that it doesn't propogate its info more than once
         src_data.propogation_flag = false;
+        if (!src_data.dep_prop_flag) {
+          src_data.dep_prop_flag = true;
+        }
       }
     }
   }
@@ -565,7 +578,7 @@ struct BC {
         current_src_node = i;
       }
 
-      Galois::gDebug("Current source node for BC is ", current_src_node);
+      //Galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (_graph.id == 0) {

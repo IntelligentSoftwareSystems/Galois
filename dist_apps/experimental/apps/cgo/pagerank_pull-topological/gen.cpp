@@ -261,8 +261,8 @@ struct PageRank_delta {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
-    Galois::do_all_local(
-      allNodes,
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
       Galois::do_all_steal<true>(),
@@ -531,6 +531,15 @@ int main(int argc, char** argv) {
       std::ostringstream ss;
       ss << tolerance;
       Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
+      #if __OPT_VERSION__ == 1
+      printf("Version 1 of optimization\n");
+      #elif __OPT_VERSION__ == 2
+      printf("Version 2 of optimization\n");
+      #elif __OPT_VERSION__ == 3
+      printf("Version 3 of optimization\n");
+      #elif __OPT_VERSION__ == 4
+      printf("Version 4 of optimization\n");
+      #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),

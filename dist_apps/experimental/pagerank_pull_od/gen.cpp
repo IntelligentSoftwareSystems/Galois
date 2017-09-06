@@ -351,21 +351,15 @@ struct PageRank {
 
   // Pull deltas from neighbor nodes, then add to self-residual
   void operator()(GNode src)const {
-    float sum = 0;
-
     for(auto nbr = graph->edge_begin(src), 
              ee = graph->edge_end(src); 
         nbr != ee; 
         ++nbr) {
       GNode dst = graph->getEdgeDst(nbr);
       if (delta[dst] > 0) {
-        sum += delta[dst];
+        Galois::add(residual[src], delta[dst]);
+        bitset_residual.set(src);
       }
-    }
-
-    if (sum > 0) {
-      Galois::add(residual[src], sum);
-      bitset_residual.set(src);
     }
   }
 };
