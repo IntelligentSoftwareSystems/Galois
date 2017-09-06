@@ -1,8 +1,9 @@
 #include "Galois/Bag.h"
 #include "Galois/Runtime/Serialize.h"
 #include <boost/range/iterator_range.hpp>
-#include<iostream>
+#include <iostream>
 #include <algorithm>
+#include <sstream>
 
 //TODO: move to libdist or delete
 namespace Galois {
@@ -19,6 +20,7 @@ class WLdistributed: public WL {
   WL workList;
   std::deque<uint64_t> local_wl;
   GraphTy& graph;
+  bool canTerminate;
 
 public:
 
@@ -36,6 +38,17 @@ public:
     workList.push(b,e);
   }
 
+  void convertGID2LID_localWL(){
+    uint32_t num = size();
+    Galois::do_all(boost::counting_iterator<uint32_t>(0),
+        boost::counting_iterator<uint32_t>(num),
+        [&](uint32_t n) {
+          local_wl[n] = graph.G2L(local_wl[n]);
+        },
+        Galois::loopname("G2L_wl"),
+        Galois::numrun(graph.get_run_identifier()));
+  }
+
   void insertToLocalWL(Galois::InsertBag<uint64_t>& bag){
     auto headerVec = bag.getHeads();
     size_t totalSize = bag.size();
@@ -51,8 +64,15 @@ public:
   }
 
   void sync(){
-    clear_wl();
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    //Did work in the previous round
+    if(local_wl.size() > 0 )
+      canTerminate = false;
+    else
+      canTerminate = true;
+
+    clear_wl();
+
     Galois::on_each([&] (const unsigned tid, const unsigned numT){
         Galois::optional<value_type> p;
         while(p = workList.pop()){
@@ -62,7 +82,11 @@ public:
         }
         }, Galois::loopname("worklist bags"));
 
+
     for(auto h = 0; h < net.Num; ++h){
+      if(canTerminate && (bag_vec[h].size() > 0)){
+        canTerminate = false;
+      }
       if(h == net.ID){
         insertToLocalWL(bag_vec[h]);
         continue;
@@ -70,9 +94,12 @@ public:
 
       size_t bagSize =  bag_vec[h].size();
       Galois::Runtime::SendBuffer b;
+      Galois::Runtime::gSerialize(b, canTerminate);
       Galois::Runtime::gSerialize(b, bag_vec[h]);
-      assert(b.size() == sizeof(uint64_t)*(bagSize + 1));
-      std::cerr << net.ID << " ] : SENDING : " << bagSize << "\n";
+      //assert(b.size() == sizeof(uint64_t)*(bagSize + 2));
+      //std::stringstream ss;
+      //ss << net.ID << " ] : SENDING : " << bagSize << "\n";
+      //std::cerr << ss.str();
       net.sendTagged(h, Galois::Runtime::evilPhase, b);
     }
     net.flush();
@@ -86,17 +113,26 @@ public:
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
       } while (!p);
+      bool other_canTerminate = true;
+      Galois::Runtime::gDeserialize(p->second,other_canTerminate);
+      canTerminate = (other_canTerminate && canTerminate);
+
       std::deque<uint64_t> s;
       //TODO avoid double copy
       Galois::Runtime::gDeserialize(p->second,s);
       insertToLocalWL(s);
-      std::cerr << net.ID << " ] : RECV : " << s.size() << "\n";
+      //std::stringstream ss;
+      //ss << net.ID << " ] : RECV : " << s.size() << " other CT : " << other_canTerminate << "\n";
+      //std::cerr << ss.str();
     }
     ++Galois::Runtime::evilPhase;
 
     //Sort and remove duplicates from the worklist.
     std::sort(local_wl.begin(), local_wl.end());
     std::unique(local_wl.begin(), local_wl.end());
+
+    //Convert Global to Local IDs
+    convertGID2LID_localWL();
 
   }
 
@@ -105,6 +141,9 @@ public:
       //local_wl.assign(range.begin(), range.end());
     //}
 
+  bool can_terminate(){
+    return canTerminate;
+  }
   template<typename Ty>
     void push_initial(Ty e) {
       local_wl.push_back(e);
@@ -127,7 +166,7 @@ public:
   }
 
   size_t size() const {
-    local_wl.size();
+    return local_wl.size();
   }
 
 };
