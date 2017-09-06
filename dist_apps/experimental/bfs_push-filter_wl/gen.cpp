@@ -255,19 +255,16 @@ struct BFS {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     using namespace Galois::WorkList;
 
-    //FirstItr_BFS::go(_graph);
     DIST_WL dist_wl(_graph);
     if(_graph.isOwned(src_node))
       dist_wl.push_initial(_graph.getLID(src_node));
 
-    //unsigned _num_iterations = 1;
     unsigned _num_iterations = 0;
 
     auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
       _graph.set_num_iter(_num_iterations);
-      dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
