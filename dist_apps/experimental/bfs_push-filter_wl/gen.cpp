@@ -28,10 +28,11 @@
  */
 
 #include <iostream>
+#include <sstream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -259,7 +260,8 @@ struct BFS {
     if(_graph.isOwned(src_node))
       dist_wl.push_initial(_graph.getLID(src_node));
 
-    unsigned _num_iterations = 1;
+    //unsigned _num_iterations = 1;
+    unsigned _num_iterations = 0;
 
     auto nodesWithEdges = _graph.allNodesWithEdgesRange();
     
@@ -277,29 +279,29 @@ struct BFS {
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
-    #endif
-    {
+#endif
+      {
 
-      auto nodesToWork = dist_wl.getRange();
-      Galois::do_all(
-        nodesToWork.begin(), nodesToWork.end(),
-        BFS(&_graph, dga, dist_wl),
-        Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-        Galois::do_all_steal<true>(),
-        Galois::timeit()
-      );
+        auto nodesToWork = dist_wl.getRange();
+        Galois::do_all(
+            nodesToWork.begin(), nodesToWork.end(),
+            BFS(&_graph, dga, dist_wl),
+            Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
+            Galois::do_all_steal<true>(),
+            Galois::timeit()
+            );
 
+        Galois::Runtime::reportStat("(NULL)", 
+            _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
+            (unsigned long)dist_wl.size(), 0);
 
-    dist_wl.sync();
-    }
+        dist_wl.sync();
+      }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+        Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      Galois::Runtime::reportStat("(NULL)", 
-        _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
-        (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) && dga.reduce());
+    } while ((_num_iterations < maxIterations) && !dist_wl.can_terminate());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
@@ -311,24 +313,18 @@ struct BFS {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    //if (snode.dist_old > snode.dist_current) {
-      //snode.dist_old = snode.dist_current;
-
-      for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-           jj != ee;
-           ++jj) {
-        GNode dst = graph->getEdgeDst(jj);
-        auto& dnode = graph->getData(dst);
-        uint32_t new_dist = 1 + snode.dist_current;
-        uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
-        if (old_dist > new_dist){
-          wl.push(dst);
-          bitset_dist_current.set(dst);
-          DGAccumulator_accum += 1;
-        }
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
+        jj != ee;
+        ++jj) {
+      GNode dst = graph->getEdgeDst(jj);
+      auto& dnode = graph->getData(dst);
+      uint32_t new_dist = 1 + snode.dist_current;
+      uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+      if (old_dist > new_dist){
+        wl.push(dst);
+        bitset_dist_current.set(dst);
       }
-
-    //}
+    }
   }
 };
 
@@ -402,9 +398,9 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    Galois::System G;
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager(statOutputFile);
+
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
@@ -537,7 +533,6 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
 
     return 0;
   } catch(const char* c) {
