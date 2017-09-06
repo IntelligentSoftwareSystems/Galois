@@ -44,9 +44,11 @@ protected:
 
   using Base = StatCollector;
 
-  virtual void printStats(void);
+  using Base::RecordTy;
 
 public:
+
+  void printStats(void);
 
   DistStatCollector(const std::string& outfile="");
 

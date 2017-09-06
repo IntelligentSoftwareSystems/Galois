@@ -61,6 +61,7 @@ public:
   }
 
   ~DistMemSys(void) {
+    m_sc.printStats();
     Runtime::kill();
     Substrate::kill();
   }

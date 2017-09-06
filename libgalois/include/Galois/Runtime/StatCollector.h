@@ -69,12 +69,18 @@ protected:
   //Stat list
   //////////////////////////////////////
   struct RecordTy {
-    char mode; // 0 - int, 1 - double, 2 - string
+    enum Type {
+      INT, DOUBLE, STR
+    };
+
+    Type mode;
+
     union {
       size_t valueInt;
       double valueDouble;
       std::string valueStr;
     };
+
     RecordTy(size_t value);
     RecordTy(double value);
     RecordTy(const std::string& value);
@@ -82,10 +88,13 @@ protected:
     ~RecordTy();
 
     void print(std::ostream& out) const;
+
+    size_t intVal(void) const;
+    double doubleVal(void) const;
+    const std::string& strVal(void) const;
   };
 
 
-  virtual void printStats(void);
 
   //stats  HostID,ThreadID,loop,category,instance -> Record
   
@@ -94,6 +103,8 @@ protected:
   Galois::Substrate::SimpleLock StatsLock;
 
 public:
+
+  void printStats(void);
 
   explicit StatCollector(const std::string& outfile="");
 
@@ -126,6 +137,8 @@ void reportStat(const char* loopname, const char* category, const std::string& v
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
 void reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID);
 
+void reportStatDist(const std::string& loopname, const std::string& category, const size_t value, unsigned TID, unsigned HostID);
+void reportStatDist(const std::string& loopname, const std::string& category, const double value, unsigned TID, unsigned HostID);
 void reportStatDist(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);

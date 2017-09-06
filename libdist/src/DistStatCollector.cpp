@@ -50,11 +50,17 @@ using namespace Galois::Runtime;
 DistStatCollector::DistStatCollector(const std::string& outfile): StatCollector(outfile) {}
 
 
-static void recvAtHost_0(uint32_t HostID, const std::string loopname, const std::string category, const std::string value, unsigned TID) {
-
+static void recvAtHost_0_int(uint32_t HostID, const std::string loopname, const std::string category, const size_t value, unsigned TID) {
   reportStatDist(loopname, category, value, TID, HostID);
 }
 
+static void recvAtHost_0_double(uint32_t HostID, const std::string loopname, const std::string category, const double value, unsigned TID) {
+  reportStatDist(loopname, category, value, TID, HostID);
+}
+
+static void recvAtHost_0_str(uint32_t HostID, const std::string loopname, const std::string category, const std::string value, unsigned TID) {
+  reportStatDist(loopname, category, value, TID, HostID);
+}
 
 void DistStatCollector::combineAtHost_0(void) {
   Galois::Runtime::getHostBarrier().wait();
@@ -65,11 +71,34 @@ void DistStatCollector::combineAtHost_0(void) {
       const auto& loopname = *std::get<2>(p.first);
       const auto& category = *std::get<3>(p.first);
 
-      std::ostringstream valStream;
-      p.second.print(valStream);
 
+      switch (p.second.mode) {
 
-      getSystemNetworkInterface().sendSimple(0, recvAtHost_0, loopname, category, valStream.str(), tid);
+        case StatCollector::RecordTy::INT: 
+          {
+            size_t val = p.second.intVal();
+            getSystemNetworkInterface().sendSimple(0, recvAtHost_0_int, loopname, category, val, tid);
+            break;
+          }
+
+        case StatCollector::RecordTy::DOUBLE: 
+          {
+            double val = p.second.doubleVal();
+            getSystemNetworkInterface().sendSimple(0, recvAtHost_0_double, loopname, category, val, tid);
+            break;
+          }
+
+        case StatCollector::RecordTy::STR: 
+          {
+            const std::string& val = p.second.strVal();
+            getSystemNetworkInterface().sendSimple(0, recvAtHost_0_str, loopname, category, val, tid);
+            break;
+          }
+        default:
+          std::abort();
+          break;
+      }
+
     }
   }
 

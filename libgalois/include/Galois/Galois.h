@@ -69,6 +69,7 @@ public:
   }
 
   ~SharedMemSys(void) {
+    m_sc.printStats();
     Runtime::kill();
     Substrate::kill();
   }
