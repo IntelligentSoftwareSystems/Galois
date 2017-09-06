@@ -174,7 +174,7 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
   if (json)
     out << "[\n";
   else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
+    out << "UUID,LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
   MAKE_LOCK_GUARD(StatsLock);
   for (auto& p : Stats) {
     if (json)
@@ -190,7 +190,7 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
 
 void Galois::Runtime::StatCollector::printStats(void) {
   if (m_outfile == "") {
-    printStats(std::cout);
+    printStatsForR(std::cout, false);
 
   } else {
     std::ofstream outf(m_outfile);
