@@ -89,6 +89,14 @@ function(versionGen name)
     target_compile_definitions(${name}_v4 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=4)
     target_link_libraries(${name}_v4 ${name}_cuda_vbs)
   endif()
+
+  app(${name}_v5 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v5 galois_dist distbench)
+  target_compile_definitions(${name}_v5 PRIVATE __OPT_VERSION__=5)
+  if(USE_GGC)
+    target_compile_definitions(${name}_v5 PRIVATE __GALOIS_HET_CUDA__=1 __OPT_VERSION__=5)
+    target_link_libraries(${name}_v5 ${name}_cuda_vbs)
+  endif()
 endfunction()
 
 function(versionGenNoGPU name)
@@ -107,6 +115,10 @@ function(versionGenNoGPU name)
   app(${name}_v4 ${name}/gen.cpp DISTSAFE)
   target_link_libraries(${name}_v4 galois_dist distbench)
   target_compile_definitions(${name}_v4 PRIVATE __OPT_VERSION__=4)
+
+  app(${name}_v5 ${name}/gen.cpp DISTSAFE)
+  target_link_libraries(${name}_v5 galois_dist distbench)
+  target_compile_definitions(${name}_v5 PRIVATE __OPT_VERSION__=5)
 endfunction()
 
 ################################################################################
