@@ -181,8 +181,14 @@ struct InitializeGraph2 {
       Galois::timeit()
     );
 
+    #if __OPT_VERSION__ == 5
+    Flags_current_degree.set_write_dst();
+    #endif
+
+    #if __OPT_VERSION__ <= 4
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
+    #endif
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -255,6 +261,14 @@ struct KCoreStep2 {
 
   void static go(Graph& _graph){
     auto& allNodes = _graph.allNodesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_add_trim, Broadcast_trim, 
+                          Bitset_trim>(Flags_trim, "KCoreStep2");
+    // flag not inserted because it is never written in an edge loop
+    // TODO will compiler know this?
+    #endif
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
@@ -312,6 +326,16 @@ struct KCoreStep1 {
     do {
       _graph.set_num_iter(iterations);
       dga.reset();
+
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readAny, Reduce_add_current_degree, 
+                            Broadcast_current_degree, 
+                            Bitset_current_degree>(Flags_current_degree,
+                                                   "KCoreStep1");
+      // flag not inserted because it is never written in an edge loop
+      // TODO will compiler know this?
+      #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
@@ -332,6 +356,10 @@ struct KCoreStep1 {
         Galois::do_all_steal<true>(),
         Galois::timeit()
       );
+
+      #if __OPT_VERSION__ == 5
+      Flags_trim.set_write_dst();
+      #endif
 
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
@@ -478,6 +506,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
 
@@ -597,6 +627,11 @@ int main(int argc, char** argv) {
         bitset_trim.reset(); 
         #endif
         }
+
+        #if __OPT_VERSION__ == 5
+        Flags_current_degree.clear_all();
+        Flags_trim.clear_all();
+        #endif
 
         InitializeGraph1::go((*h_graph));
       }
