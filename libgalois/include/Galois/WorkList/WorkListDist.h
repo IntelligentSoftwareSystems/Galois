@@ -136,17 +136,18 @@ public:
 
   }
 
-  //template<typename R>
-    //void push_initial(const R& range) {
-      //local_wl.assign(range.begin(), range.end());
-    //}
-
   bool can_terminate(){
     return canTerminate;
   }
+
   template<typename Ty>
     void push_initial(Ty e) {
       local_wl.push_back(e);
+    }
+
+  template<typename Itr>
+    void push_initial(Itr b, Itr e) {
+      local_wl.assign(b,e);
     }
 
   Galois::optional<value_type> pop() {
