@@ -57,7 +57,76 @@
 // Field flag structure
 ////////////////////////////////////////////////////////////////////////////////
 
+class FieldFlags {
+private:
+  uint8_t _s2s;
+  uint8_t _s2d;
+  uint8_t _d2s;
+  uint8_t _d2d;
+public:
+  /**
+   * Field Flags constructor. Sets all flags to false
+   */
+  FieldFlags() {
+    _s2s = false;
+    _s2d = false;
+    _d2s = false;
+    _d2d = false;
+  }
 
+  bool src_to_src() {
+    return _s2s;
+  }
+
+  bool src_to_dst() {
+    return _s2d;
+  }
+
+  bool dst_to_src() {
+    return _d2s;
+  }
+
+  bool dst_to_dst() {
+    return _d2d;
+  }
+
+  void set_write_src() {
+    _s2s = true;
+    _s2d = true;
+  }
+
+  void set_write_dst() {
+    _d2s = true;
+    _d2d = true;
+  }
+
+  void set_write_any() {
+    _s2s = true;
+    _s2d = true;
+    _d2s = true;
+    _d2d = true;
+  }
+
+  void clear_read_src() {
+    _s2s = false;
+    _d2s = false;
+  }
+
+  void clear_read_dst() {
+    _s2d = false;
+    _d2d = false;
+  }
+  
+  void clear_all() {
+    _s2s = false;
+    _s2d = false;
+    _d2s = false;
+    _d2d = false;
+  }
+};
+
+// Deprecated; use the class above with the sync on demand call that takes
+// flags as an argument
 #define GALOIS_SYNC_STRUCTURE_FLAGS(fieldname)\
 static uint8_t _##fieldname##_s2s = false;\
 static uint8_t _##fieldname##_s2d = false;\

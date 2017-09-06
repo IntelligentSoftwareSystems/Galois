@@ -42,6 +42,8 @@
 #include <unordered_map>
 #include <iostream>
 
+#include "Galois/Runtime/sync_structures.h"
+
 #include "Galois/Runtime/DataCommMode.h"
 #include "Galois/Runtime/Dynamic_bitset.h"
 #include <fcntl.h>
@@ -2599,6 +2601,8 @@ public:
    }
 
   /**
+   * DEPRECATED: use the version that takes the field flags as an argument.
+   *
    * Given a structure that contains flags signifying what needs to be
    * synchronized, sync_on_demand will call an appropriate sync call to
    * synchronize what is necessary based on the read location of the
@@ -2698,6 +2702,108 @@ public:
 
     StatTimer_sync.stop();
   }
+
+  /**
+   * Given a structure that contains flags signifying what needs to be
+   * synchronized, sync_on_demand will call an appropriate sync call to
+   * synchronize what is necessary based on the read location of the
+   * field.
+   *
+   * @tparam readLocation Location in which field will need to be read
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct which holds a bitset which can be used
+   * to control synchronization at a more fine grain level
+   * @param fieldFlags structure for field you are syncing
+   * @param loopName Name of loop this sync is for for naming timers
+   */
+  template<ReadLocation readLocation, 
+           typename ReduceFnTy, typename BroadcastFnTy, 
+           typename BitsetFnTy = Galois::InvalidBitsetFnTy>
+  void sync_on_demand(FieldFlags fieldFlags, std::string loopName) {
+    std::string timer_str("SYNC_ON_DEMAND" + loopName + "_" + get_run_identifier());
+    Galois::StatTimer StatTimer_sync(timer_str.c_str());
+    StatTimer_sync.start();
+
+    // FIXME/TODO can be a bit more precise with clearing flags, but this
+    // should be correct/sufficient for now
+    if (readLocation == readSource) {
+      if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
+        sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.src_to_src()) {
+        sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.dst_to_src()) {
+        sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } 
+
+      fieldFlags.clear_read_src();
+    } else if (readLocation == readDestination) {
+      if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
+        sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.src_to_dst()) {
+        sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.dst_to_dst()) {
+        sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } 
+
+      fieldFlags.clear_read_dst();
+    } else if (readLocation == readAny) {
+      bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
+      bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
+
+      if (!(src_write && dst_write)) {
+        // src or dst write flags aren't set (potentially both are not set),
+        // but it's NOT the case that both are set, meaning "any" isn't
+        // required in the "from"; can work at granularity of just src
+        // write or dst wrte
+
+        if (src_write) {
+          if (fieldFlags.src_to_src() && fieldFlags.src_to_dst()) {
+            sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (fieldFlags.src_to_src()) {
+            sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // src to dst is set
+            sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        } else if (dst_write) {
+          if (fieldFlags.dst_to_src() && fieldFlags.dst_to_dst()) {
+            sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (fieldFlags.dst_to_src()) {
+            sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // dst to dst is set
+            sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        }
+
+        // note the "no flags are set" case will enter into this block
+        // as well, and it is correctly handled by doing nothing since
+        // both src/dst_write will be false
+
+      } else {
+        // it is the case that both src/dst write flags are set, so "any"
+        // is required in the "from"; what remains to be determined is 
+        // the use of src, dst, or any for the destination of the sync
+        bool src_read = fieldFlags.src_to_src() || fieldFlags.dst_to_src();
+        bool dst_read = fieldFlags.src_to_dst() || fieldFlags.dst_to_dst();
+
+        if (src_read && dst_read) {
+          sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else if (src_read) {
+          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // dst_read
+          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
+      }
+
+      fieldFlags.clear_read_src();
+      fieldFlags.clear_read_dst();
+    } else {
+     GALOIS_DIE("Invalid readLocation in sync_on_demand");
+    }
+
+    StatTimer_sync.stop();
+  }
+
 
 
    // just like any other sync_*, this is expected to be a collective call
