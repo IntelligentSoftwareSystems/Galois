@@ -179,6 +179,7 @@ struct InitializeGraph {
   }
 
   void operator()(GNode src) const {
+    // not in edge loop = no write set
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : 
                                                                   local_infinity;
@@ -201,6 +202,12 @@ struct FirstItr_BFS{
       __begin = 0;
       __end = 0;
     }
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
+                          Broadcast_dist_current>(Flags_dist_current, "BFS");
+    #endif
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(_graph.get_run_identifier(
@@ -218,6 +225,10 @@ struct FirstItr_BFS{
                 Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
                 Galois::timeit());
     }
+
+    #if __OPT_VERSION__ == 5
+    Flags_dist_current.set_write_dst();
+    #endif
 
     #if __OPT_VERSION__ == 1
     // naive sync of everything after operator 
@@ -237,10 +248,6 @@ struct FirstItr_BFS{
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     #endif
 
-    // gold standard sync
-    //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-    //            Broadcast_dist_current, Bitset_dist_current>("BFS");
-    
     Galois::Runtime::reportStat("(NULL)", 
        _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
   }
@@ -283,6 +290,12 @@ struct BFS {
     do { 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
+
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
+                            Broadcast_dist_current>(Flags_dist_current, "BFS");
+      #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
@@ -304,6 +317,10 @@ struct BFS {
         Galois::timeit()
       );
       }
+
+      #if __OPT_VERSION__ == 5
+      Flags_dist_current.set_write_dst();
+      #endif
 
       #if __OPT_VERSION__ == 1
       // naive sync of everything after operator 
@@ -449,6 +466,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
@@ -542,12 +561,14 @@ int main(int argc, char** argv) {
         if (personality == GPU_CUDA) { 
           #if __OPT_VERSION__ >= 3
           bitset_dist_current_reset_cuda(cuda_ctx);
-          //bitset_dist_old_reset_cuda(cuda_ctx);
           #endif
         } else
       #endif
         #if __OPT_VERSION__ >= 3
         bitset_dist_current.reset();
+        #endif
+        #if __OPT_VERSION__ == 5
+        Flags_dist_current.clear_all();
         #endif
 
         //Galois::Runtime::getHostBarrier().wait();
