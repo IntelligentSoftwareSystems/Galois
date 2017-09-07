@@ -78,14 +78,21 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, float);
 ////////////////////////////////////////////////////////////////////////////////
 
 #if __OPT_VERSION__ >= 3
+GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 GALOIS_SYNC_STRUCTURE_BITSET(to_add);
 GALOIS_SYNC_STRUCTURE_BITSET(to_add_float);
-GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 GALOIS_SYNC_STRUCTURE_BITSET(num_successors);
 GALOIS_SYNC_STRUCTURE_BITSET(num_predecessors);
 GALOIS_SYNC_STRUCTURE_BITSET(trim);
 GALOIS_SYNC_STRUCTURE_BITSET(trim2);
-GALOIS_SYNC_STRUCTURE_BITSET(current_length);
-GALOIS_SYNC_STRUCTURE_BITSET(propogation_flag);
-GALOIS_SYNC_STRUCTURE_BITSET(dependency);
+#endif
+
+#if __OPT_VERSION__ == 5
+FieldFlags Flags_current_length;
+FieldFlags Flags_num_successors;
+FieldFlags Flags_num_predecessors;
+FieldFlags Flags_trim;
+FieldFlags Flags_trim2;
+FieldFlags Flags_to_add;
+FieldFlags Flags_to_add_float;
 #endif

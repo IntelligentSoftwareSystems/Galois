@@ -121,14 +121,11 @@ typedef typename Graph::GraphNode GNode;
 #if __OPT_VERSION__ >= 3
 Galois::DynamicBitSet bitset_to_add;
 Galois::DynamicBitSet bitset_to_add_float;
-Galois::DynamicBitSet bitset_num_shortest_paths;
 Galois::DynamicBitSet bitset_num_successors;
 Galois::DynamicBitSet bitset_num_predecessors;
 Galois::DynamicBitSet bitset_trim;
 Galois::DynamicBitSet bitset_trim2;
 Galois::DynamicBitSet bitset_current_length;
-Galois::DynamicBitSet bitset_propogation_flag;
-Galois::DynamicBitSet bitset_dependency;
 #endif
 
 // sync structures
@@ -242,6 +239,12 @@ struct SSSP {
       _graph.set_num_iter(iterations);
       dga.reset();
 
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readDestination, Reduce_min_current_length,
+                            Broadcast_current_length,
+                            Bitset_current_length>(Flags_current_length, "SSSP");
+      #endif
+
       Galois::do_all_local(
         nodesWithEdges,
         SSSP(&_graph, dga), 
@@ -250,6 +253,10 @@ struct SSSP {
         Galois::timeit(),
         Galois::no_stats()
       );
+
+      #if __OPT_VERSION__ == 5
+      Flags_current_length.set_write_src();
+      #endif
 
       iterations++;
 
@@ -305,6 +312,15 @@ struct PredAndSucc {
 
   void static go(Graph& _graph){
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_min_current_length,
+                          Broadcast_current_length,
+                          Bitset_current_length>(Flags_current_length, 
+                                                 "PredAndSucc");
+    #endif
+
+    //GALOIS_DIE("plz d8ie here");
     
     Galois::do_all_local(
       nodesWithEdges,
@@ -314,6 +330,11 @@ struct PredAndSucc {
       Galois::timeit(),
       Galois::no_stats()
     );
+
+    #if __OPT_VERSION__ == 5
+    Flags_num_predecessors.set_write_src();
+    Flags_num_successors.set_write_dst();
+    #endif
 
     #if __OPT_VERSION__ == 1
     _graph.sync<writeAny, readAny, Reduce_add_num_predecessors,
@@ -376,6 +397,11 @@ struct NSPTrim {
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_add_trim, Broadcast_trim,
+                          Bitset_trim>(Flags_trim, "NSPTrim");
+    #endif
+
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
       NSPTrim{&_graph}, 
@@ -402,6 +428,11 @@ struct NSPAdd {
 
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_add_to_add, Broadcast_to_add,
+                          Bitset_to_add>(Flags_to_add, "NSPAdd");
+    #endif
 
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
@@ -432,6 +463,21 @@ struct NumShortestPathsChanges {
 
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_min_current_length,
+                          Broadcast_current_length, 
+                          Bitset_current_length>(Flags_current_length,
+                                                 "NumShortestPathsChanges");
+    _graph.sync_on_demand<readAny, Reduce_add_num_predecessors,
+                          Broadcast_num_predecessors, 
+                          Bitset_num_predecessors>(Flags_num_predecessors,
+                                                   "NumShortestPathsChanges");
+    _graph.sync_on_demand<readAny, Reduce_add_num_successors,
+                          Broadcast_num_successors, 
+                          Bitset_num_successors>(Flags_num_successors,
+                                                 "NumShortestPathsChanges");
+    #endif
 
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
@@ -486,6 +532,17 @@ struct NumShortestPaths {
 
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_min_current_length,
+                          Broadcast_current_length, 
+                          Bitset_current_length>(Flags_current_length,
+                                                 "NumShortestPaths");
+    _graph.sync_on_demand<readSource, Reduce_add_num_predecessors,
+                          Broadcast_num_predecessors, 
+                          Bitset_num_predecessors>(Flags_num_predecessors,
+                                                   "NumShortestPaths");
+    #endif
+
     do {
       _graph.set_num_iter(iterations);
       dga.reset();
@@ -498,6 +555,11 @@ struct NumShortestPaths {
         Galois::timeit(),
         Galois::no_stats()
       );
+
+      #if __OPT_VERSION__ == 5
+      Flags_trim.set_write_src();
+      Flags_to_add.set_write_src();
+      #endif
 
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim,
@@ -584,6 +646,11 @@ struct DPTrim {
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_add_trim2, Broadcast_trim2,
+                          Bitset_trim2>(Flags_trim2, "DPTrim");
+    #endif
+
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
       DPTrim{&_graph}, 
@@ -610,6 +677,11 @@ struct DPAdd {
 
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_add_to_add_float, Broadcast_to_add_float,
+                          Bitset_to_add_float>(Flags_to_add_float, "DPAdd");
+    #endif
 
     Galois::do_all(
       allNodes.begin(), allNodes.end(), 
@@ -639,6 +711,17 @@ struct DependencyPropChanges {
 
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readSource, Reduce_min_current_length,
+                          Broadcast_current_length, 
+                          Bitset_current_length>(Flags_current_length,
+                                                 "DependencyPropChanges");
+    _graph.sync_on_demand<readSource, Reduce_add_num_successors,
+                          Broadcast_num_successors, 
+                          Bitset_num_successors>(Flags_num_successors,
+                                                 "DependencyPropChanges");
+    #endif
 
     Galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
@@ -688,6 +771,13 @@ struct DependencyPropogation {
 
       auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readAny, Reduce_min_current_length, 
+                            Broadcast_current_length, 
+                            Bitset_current_length>(Flags_current_length,
+                                                   "DependencyPropogation");
+      #endif 
+
       Galois::do_all_local(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
@@ -696,6 +786,11 @@ struct DependencyPropogation {
         Galois::timeit(),
         Galois::no_stats()
       );
+
+      #if __OPT_VERSION__ == 5
+      Flags_trim2.set_write_dst();
+      Flags_to_add_float.set_write_dst();
+      #endif
 
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim2,
@@ -747,7 +842,6 @@ struct DependencyPropogation {
     if (src_data.current_length != local_infinity) {
       if (src_data.propogation_flag) {
         if (src_data.num_successors != 0) {
-          printf("source is %lu\n", graph->L2G(src));
           assert(src_data.num_successors == 0);
         }
   
@@ -1008,6 +1102,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
 
@@ -1049,14 +1145,11 @@ int main(int argc, char** argv) {
     #if __OPT_VERSION__ >= 3
     bitset_to_add.resize(h_graph->get_local_total_nodes());
     bitset_to_add_float.resize(h_graph->get_local_total_nodes());
-    bitset_num_shortest_paths.resize(h_graph->get_local_total_nodes());
     bitset_num_successors.resize(h_graph->get_local_total_nodes());
     bitset_num_predecessors.resize(h_graph->get_local_total_nodes());
     bitset_trim.resize(h_graph->get_local_total_nodes());
     bitset_trim2.resize(h_graph->get_local_total_nodes());
     bitset_current_length.resize(h_graph->get_local_total_nodes());
-    bitset_propogation_flag.resize(h_graph->get_local_total_nodes());
-    bitset_dependency.resize(h_graph->get_local_total_nodes());
     #endif
 
     StatTimer_hg_init.stop();
@@ -1100,34 +1193,39 @@ int main(int argc, char** argv) {
         Galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run + 1);
       #if __OPT_VERSION__ >= 3
+      // TODO GPU code
       //#ifdef __GALOIS_HET_CUDA__
       //  if (personality == GPU_CUDA) { 
       //    bitset_to_add_reset_cuda(cuda_ctx);
       //    bitset_to_add_float_reset_cuda(cuda_ctx);
-      //    bitset_num_shortest_paths_reset_cuda(cuda_ctx);
       //    bitset_num_successors_reset_cuda(cuda_ctx);
       //    bitset_num_predecessors_reset_cuda(cuda_ctx);
       //    bitset_trim_reset_cuda(cuda_ctx);
+      //    bitset_trim2.reset();
       //    bitset_current_length_reset_cuda(cuda_ctx);
       //    bitset_old_length_reset_cuda(cuda_ctx);
-      //    bitset_propogation_flag_reset_cuda(cuda_ctx);
-      //    bitset_dependency_reset_cuda(cuda_ctx);
       //  } else
       //#endif
         {
         bitset_to_add.reset();
         bitset_to_add_float.reset();
-        bitset_num_shortest_paths.reset();
         bitset_num_successors.reset();
         bitset_num_predecessors.reset();
         bitset_trim.reset();
         bitset_trim2.reset();
         bitset_current_length.reset();
-        bitset_propogation_flag.reset();
-        bitset_dependency.reset();
         }
       #endif
 
+        #if __OPT_VERSION__ == 5
+        Flags_current_length.clear_all();
+        Flags_num_successors.clear_all();
+        Flags_num_predecessors.clear_all();
+        Flags_trim.clear_all();
+        Flags_trim2.clear_all();
+        Flags_to_add.clear_all();
+        Flags_to_add_float.clear_all();
+        #endif
 
         InitializeGraph::go((*h_graph));
       }
