@@ -183,8 +183,9 @@ struct FirstItr_ConnectedComp{
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
-                          Broadcast_comp_current>(Flags_comp_current, 
-                                                  "ConnectedComp");
+                          Broadcast_comp_current, 
+                          Bitset_comp_current>(Flags_comp_current, 
+                                               "ConnectedComp");
     #endif
 
 #ifdef __GALOIS_HET_CUDA__
@@ -276,8 +277,9 @@ struct ConnectedComp {
       dga.reset();
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
-                            Broadcast_comp_current>(Flags_comp_current, 
-                                                    "ConnectedComp");
+                            Broadcast_comp_current,
+                            Bitset_comp_current>(Flags_comp_current, 
+                                                 "ConnectedComp");
       // TODO would compiler insert a comp_old on demand sync here?
       #endif
     #ifdef __GALOIS_HET_CUDA__

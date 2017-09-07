@@ -191,8 +191,9 @@ struct ConnectedComp {
 
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readDestination, Reduce_min_comp_current, 
-                            Broadcast_comp_current>(Flags_comp_current, 
-                                                    "ConnectedComp");
+                            Broadcast_comp_current, 
+                            Bitset_comp_current>(Flags_comp_current, 
+                                                 "ConnectedComp");
       #endif
 
     #ifdef __GALOIS_HET_CUDA__

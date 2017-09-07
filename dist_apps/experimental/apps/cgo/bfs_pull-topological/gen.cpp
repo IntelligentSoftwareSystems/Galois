@@ -199,7 +199,8 @@ struct BFS {
 
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readDestination, Reduce_min_dist_current,
-                            Broadcast_dist_current>(Flags_dist_current, "BFS");
+                            Broadcast_dist_current, 
+                            Bitset_dist_current>(Flags_dist_current, "BFS");
       #endif
 
       #ifdef __GALOIS_HET_CUDA__
