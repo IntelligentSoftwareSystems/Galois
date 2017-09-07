@@ -53,14 +53,53 @@
 #define SYNC_STRUCT_MACROS
 
 ////////////////////////////////////////////////////////////////////////////////
-// Field flag structure
+// Field flag class
 ////////////////////////////////////////////////////////////////////////////////
 
 enum BITVECTOR_STATUS {
   NONE_INVALID,
   SRC_INVALID,
-  DST_INVALID
+  DST_INVALID,
+  BOTH_INVALID
 };
+
+bool src_invalid(BITVECTOR_STATUS* bv_flag) {
+  return (*bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
+          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+}
+
+bool dst_invalid(BITVECTOR_STATUS* bv_flag) {
+  return (*bv_flag == BITVECTOR_STATUS::DST_INVALID || 
+          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+}
+
+void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
+  switch(*bv_flag) {
+    case NONE_INVALID:
+      *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
+      break;
+    case DST_INVALID:
+      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+      break;
+    case SRC_INVALID:
+    case BOTH_INVALID:
+      break;
+  }
+}
+
+void make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
+  switch(*bv_flag) {
+    case NONE_INVALID:
+      *bv_flag = BITVECTOR_STATUS::DST_INVALID;
+      break;
+    case SRC_INVALID:
+      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+      break;
+    case DST_INVALID:
+    case BOTH_INVALID:
+      break;
+  }
+}
 
 class FieldFlags {
 private:
