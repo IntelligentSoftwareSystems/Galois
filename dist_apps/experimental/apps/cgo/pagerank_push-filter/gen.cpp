@@ -124,6 +124,8 @@ static const float alpha = (1.0 - 0.85);
 struct NodeData {
   float value;
   std::atomic<uint32_t> nout;
+  float delta;
+  std::atomic<float> residual;
 };
 
 
@@ -135,9 +137,6 @@ Galois::DynamicBitSet bitset_nout;
 typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 typedef GNode WorkItem;
-
-Galois::LargeArray<float> delta;
-Galois::LargeArray<std::atomic<float> > residual;
 
 #include "gen_sync.hh"
 
@@ -174,8 +173,8 @@ struct ResetGraph {
     NodeData& sdata = graph->getData(src);
     sdata.value = 0;
     sdata.nout = 0;
-    residual[src] = 0;
-    delta[src] = 0;
+    sdata.residual = 0;
+    sdata.delta = 0;
   }
 };
 
@@ -218,14 +217,20 @@ struct InitializeGraph {
       );
     }
 
+    #if __OPT_VERSION__ == 5
+    Flags_nout.set_write_src();
+    #endif
+
+    #if __OPT_VERSION__ <= 4
     // NOTE: Differs from optimized version as it does sync readAny
     _graph.sync<writeSource, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraphNout");
+    #endif
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    residual[src] = local_alpha;
+    sdata.residual = local_alpha;
     Galois::atomicAdd(sdata.nout, 
       (uint32_t) std::distance(graph->edge_begin(src), 
                                graph->edge_end(src)));
@@ -248,38 +253,63 @@ struct PageRank_delta {
     // NOTE: differs from optimized version as it does all nodes and not just 
     // nodes with edges (if you do only nodes with edges residual on mirrors
     // will never be reset
+
+    #if __OPT_VERSION__ <= 4
     auto& allNodes = _graph.allNodesRange();
+    #endif
+    #if __OPT_VERSION__ == 5
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    _graph.sync_on_demand<readSource, Reduce_add_nout, Broadcast_nout, 
+                          Bitset_nout>(Flags_nout, "PRdelta");
+    _graph.sync_on_demand<readSource, Reduce_add_residual, Broadcast_residual, 
+                          Bitset_residual>(Flags_residual, "PRdelta");
+    #endif
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
+      #if __OPT_VERSION__ <= 4
       PageRank_delta_cuda(*allNodes.begin(), *allNodes.end(),
                           alpha, tolerance, cuda_ctx);
+      #endif
+      #if __OPT_VERSION__ == 5
+      PageRank_delta_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+                          alpha, tolerance, cuda_ctx);
+      #endif
+
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
     {
       Galois::do_all(
+        #if __OPT_VERSION__ <= 4
         allNodes.begin(), allNodes.end(), // differs from optimized version
+        #endif
+        #if __OPT_VERSION__ == 5
+        nodesWithEdges.begin(), nodesWithEdges.end(),
+        #endif
         PageRank_delta{ alpha, tolerance, &_graph },
         Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
         Galois::do_all_steal<true>(),
         Galois::timeit()
       );
     }
+
+    // src write
   }
 
   void operator()(WorkItem src) const {
     NodeData& sdata = graph->getData(src);
 
-    if (residual[src] > this->local_tolerance) {
-      float residual_old = residual[src];
-      residual[src] = 0;
+    if (sdata.residual > this->local_tolerance) {
+      float residual_old = sdata.residual;
+      sdata.residual = 0;
       sdata.value += residual_old;
       if (sdata.nout > 0) {
-        delta[src] = residual_old * (1 - local_alpha) / sdata.nout;
+        sdata.delta = residual_old * (1 - local_alpha) / sdata.nout;
       }
     }
   }
@@ -300,6 +330,7 @@ struct PageRank {
       _graph.set_num_iter(_num_iterations);
       PageRank_delta::go(_graph);
       dga.reset();
+
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
@@ -321,6 +352,10 @@ struct PageRank {
           Galois::timeit()
         );
       }
+
+      #if __OPT_VERSION__ == 5
+      Flags_residual.set_write_dst();
+      #endif
 
       // residual
       #if __OPT_VERSION__ == 1
@@ -355,14 +390,16 @@ struct PageRank {
   }
 
   void operator()(WorkItem src) const {
-    if (delta[src] > 0) {
-      float _delta = delta[src];
-      delta[src] = 0;
+    NodeData& sdata = graph->getData(src);
+    if (sdata.delta > 0) {
+      float _delta = sdata.delta;
+      sdata.delta = 0;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
           nbr != ee; ++nbr) {
         GNode dst = graph->getEdgeDst(nbr);
+        NodeData& ddata = graph->getData(dst);
 
-        Galois::atomicAdd(residual[dst], _delta);
+        Galois::atomicAdd(ddata.residual, _delta);
 
         #if __OPT_VERSION__ >= 3
         bitset_residual.set(dst);
@@ -490,20 +527,20 @@ struct PageRankSanity {
         current_min = sdata.value;
       }
 
-      if (current_max_residual < residual[src]) {
-        current_max_residual = residual[src];
+      if (current_max_residual < sdata.residual) {
+        current_max_residual = sdata.residual;
       }
 
-      if (current_min_residual > residual[src]) {
-        current_min_residual = residual[src];
+      if (current_min_residual > sdata.residual) {
+        current_min_residual = sdata.residual;
       }
 
-      if (residual[src] > local_tolerance) {
+      if (sdata.residual > local_tolerance) {
         DGAccumulator_residual_over_tolerance += 1;
       }
 
       DGAccumulator_sum += sdata.value;
-      DGAccumulator_sum_residual += residual[src];
+      DGAccumulator_sum_residual += sdata.residual;
     }
   }
 };
@@ -537,6 +574,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
@@ -583,9 +622,6 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
     hg = constructGraph<NodeData, void>(scalefactor);
-
-    residual.allocateInterleaved(hg->size());
-    delta.allocateInterleaved(hg->size());
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -662,6 +698,11 @@ int main(int argc, char** argv) {
         bitset_residual.reset();
         #endif
         bitset_nout.reset(); }
+
+        #if __OPT_VERSION__ == 5
+        Flags_nout.clear_all();
+        Flags_residual.clear_all();
+        #endif
 
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go(*hg);
