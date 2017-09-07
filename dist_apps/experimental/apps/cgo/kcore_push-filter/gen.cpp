@@ -260,13 +260,11 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    auto& allNodes = _graph.allNodesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, Reduce_add_trim, Broadcast_trim, 
+    _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim, 
                           Bitset_trim>(Flags_trim, "KCoreStep2");
-    // flag not inserted because it is never written in an edge loop
-    // TODO will compiler know this?
     #endif
 
   #ifdef __GALOIS_HET_CUDA__
@@ -275,12 +273,12 @@ struct KCoreStep2 {
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      KCoreStep2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
      Galois::do_all(
-       allNodes.begin(), allNodes.end(),
+       nodesWithEdges.begin(), nodesWithEdges.end(),
        KCoreStep2{ &_graph },
        Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
        Galois::timeit()
@@ -321,14 +319,14 @@ struct KCoreStep1 {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto& allNodes = _graph.allNodesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
       dga.reset();
 
       #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readAny, Reduce_add_current_degree, 
+      _graph.sync_on_demand<readSource, Reduce_add_current_degree, 
                             Broadcast_current_degree, 
                             Bitset_current_degree>(Flags_current_degree,
                                                    "KCoreStep1");
@@ -343,14 +341,14 @@ struct KCoreStep1 {
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        KCoreStep1_cuda(*allNodes.begin(), *allNodes.end(),
+        KCoreStep1_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                         __retval, k_core_num, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       Galois::do_all_local(
-        allNodes,
+        nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
         Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
         Galois::do_all_steal<true>(),
