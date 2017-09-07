@@ -53,17 +53,24 @@ namespace Galois {
  */
 class DistMemSys {
   Runtime::DistStatCollector m_sc;
+  bool statsPrinted;
 
 public:
-  explicit DistMemSys(const std::string& outfile=""): m_sc(outfile) {
+  explicit DistMemSys(const std::string& outfile="", bool statsPrinted = false): m_sc(outfile), statsPrinted(statsPrinted) {
     Substrate::init();
     Runtime::init(&m_sc);
   }
 
   ~DistMemSys(void) {
-    m_sc.printStats();
+    if(!statsPrinted)
+      m_sc.printStats();
     Runtime::kill();
     Substrate::kill();
+  }
+
+  void printDistStats() {
+    m_sc.printStats();
+   statsPrinted = true; 
   }
 };
 
