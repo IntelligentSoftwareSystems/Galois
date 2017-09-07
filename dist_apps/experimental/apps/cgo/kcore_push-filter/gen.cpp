@@ -669,6 +669,9 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
+    G.printDistStats();
+    Galois::Runtime::getHostBarrier().wait();
+
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";
