@@ -155,7 +155,10 @@ private:
   }
 
   // called only for those hosts with which it shares nodes
-  bool isNotCommunicationPartner(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
+  bool isNotCommunicationPartner(unsigned host,
+                                 typename base_hGraph::SyncType syncType,
+                                 WriteLocation writeLocation,
+                                 ReadLocation readLocation) {
     if (syncType == base_hGraph::syncReduce) {
       switch(writeLocation) {
         case writeSource:
@@ -172,21 +175,17 @@ private:
       switch(readLocation) {
         case readSource:
           if (base_hGraph::currentBVFlag != nullptr) {
-            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::DST_INVALID;
+            make_dst_invalid(base_hGraph::currentBVFlag);
           }
 
           return (gridRowID() != gridRowID(host));
         case readDestination:
           if (base_hGraph::currentBVFlag != nullptr) {
-            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::SRC_INVALID;
+            make_src_invalid(base_hGraph::currentBVFlag);
           }
 
           return (gridColumnID() != gridColumnID(host));
         case readAny:
-          if (base_hGraph::currentBVFlag != nullptr) {
-            *(base_hGraph::currentBVFlag) = BITVECTOR_STATUS::NONE_INVALID;
-          }
-
           assert((gridRowID() == gridRowID(host)) || (gridColumnID() == gridColumnID(host)));
           return ((gridRowID() != gridRowID(host)) && (gridColumnID() != gridColumnID(host))); // false
         default:
@@ -256,7 +255,8 @@ public:
       if (columnBlocked) { // does not match processor grid
         return false;
       } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+        return isNotCommunicationPartner(host, syncType, writeLocation,
+                                         readLocation);
       }
     }
     return true;
@@ -267,7 +267,8 @@ public:
       if (columnBlocked) { // does not match processor grid
         return false;
       } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+        return isNotCommunicationPartner(host, syncType, writeLocation,
+                                         readLocation);
       }
     }
     return true;
@@ -352,7 +353,7 @@ public:
     if (!edgeNuma) {
       base_hGraph::graph.allocateFrom(numNodes, numEdges);
     } else {
-      printf("Edge based NUMA division on\n");
+      fprintf(stderr, "[%d] Edge based NUMA division on\n", base_hGraph::id);
       //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
       base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
                                             prefixSumOfEdges);
@@ -435,18 +436,21 @@ public:
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
     StatTimer_graph_construct_comm.stop();
-    //printf("[%d] all done\n", base_hGraph::id);
+    //fprintf(stderr, "[%d] Cartisian graph setup done\n", base_hGraph::id);
   }
 
   void loadStatistics(Galois::Graph::OfflineGraph& g, 
                       std::vector<Galois::Graph::FileGraph>& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = 0;
-    for(unsigned d = 0; d < DecomposeFactor; ++d)
-      base_hGraph::totalOwnedNodes += base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
+      base_hGraph::totalOwnedNodes += 
+        base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - 
+        base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
+    }
 
-    //printf("[%d] owns %lu nodes\n", base_hGraph::id, base_hGraph::totalOwnedNodes);
     std::vector<Galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
+
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t columnBlockSize = 0;
       //for (auto b = 0U; b < base_hGraph::numHosts; ++b) {
@@ -470,7 +474,8 @@ public:
 
     auto activeThreads = Galois::Runtime::activeThreads;
     Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
-    for(unsigned d = 0; d < DecomposeFactor; ++d){
+
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
       Galois::Timer timer;
       timer.start();
       fileGraph[d].reset_byte_counters();
@@ -478,34 +483,18 @@ public:
       uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
       auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first);
       auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second);
-      //Galois::Runtime::do_all_coupled(
-      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
-      //  [&] (auto src) {
-      //  auto ii = fileGraph[d].edge_begin(src);
-      //  auto ee = fileGraph[d].edge_end(src);
-      //  for (; ii < ee; ++ii) {
-      //  unsigned dst = fileGraph[d].getEdgeDst(ii);
-      //  auto h = this->getColumnHostID(dst);
-      //  hasIncomingEdge[h].set(this->getColumnIndex(dst));
-      //  numOutgoingEdges[d][h][src - rowOffset]++;
-      //  }
-      //  },
-      //  std::make_tuple(
-      //    Galois::loopname("EdgeInspection"),
-      //    Galois::timeit()
-      //  )
-      //);
+
       Galois::do_all(
         beginIter, endIter,
         [&] (auto src) {
-        auto ii = fileGraph[d].edge_begin(src);
-        auto ee = fileGraph[d].edge_end(src);
-        for (; ii < ee; ++ii) {
-        auto dst = fileGraph[d].getEdgeDst(ii);
-        auto h = this->getColumnHostID(dst);
-        hasIncomingEdge[h].set(this->getColumnIndex(dst));
-        numOutgoingEdges[d][h][src - rowOffset]++;
-        }
+          auto ii = fileGraph[d].edge_begin(src);
+          auto ee = fileGraph[d].edge_end(src);
+          for (; ii < ee; ++ii) {
+            auto dst = fileGraph[d].getEdgeDst(ii);
+            auto h = this->getColumnHostID(dst);
+            hasIncomingEdge[h].set(this->getColumnIndex(dst));
+            numOutgoingEdges[d][h][src - rowOffset]++;
+          }
         },
         Galois::loopname("EdgeInspection"),
         Galois::do_all_steal<true>(),
@@ -513,9 +502,13 @@ public:
       );
 
       timer.stop();
-      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
+      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu "
+                      "bytes (%f MBPS)\n", 
+              base_hGraph::id, timer.get_usec()/1000000.0f, 
+              fileGraph[d].num_bytes_read(), 
+              fileGraph[d].num_bytes_read()/(float)timer.get_usec());
     }
+
     Galois::setActiveThreads(activeThreads); // revert to prior active threads
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -596,8 +589,9 @@ public:
               ++dummyOutgoingNodes;
             } else {
               //std::cerr << leaderHostID <<  " : SOURCE : " <<  src << "\n";
+              fprintf(stderr, "WARNING: Partitioning of vertices resulted in "
+                              "some inconsistency");
               assert(false); // should be owned
-              fprintf(stderr, "WARNING: Partitioning of vertices resulted in some inconsistency");
             }
             createNode = true;
           }
@@ -661,7 +655,7 @@ public:
 
     Galois::Timer timer;
     timer.start();
-    for(unsigned d = 0; d < DecomposeFactor; ++d){
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
       fileGraph[d].reset_byte_counters();
     }
 
@@ -676,9 +670,12 @@ public:
     ++Galois::Runtime::evilPhase;
 
     timer.stop();
-    for(unsigned d = 0; d < DecomposeFactor; ++d){
-      fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph[d].num_bytes_read(), fileGraph[d].num_bytes_read()/(float)timer.get_usec());
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
+      fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes "
+                      "(%f MBPS)\n", 
+              base_hGraph::id, timer.get_usec()/1000000.0f,
+              fileGraph[d].num_bytes_read(),
+              fileGraph[d].num_bytes_read()/(float)timer.get_usec());
     }
   }
 
@@ -696,6 +693,7 @@ public:
       std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(numColumnHosts);
 
       auto ee = fileGraph[d].edge_begin(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first);
+
       for (auto n = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first; n < base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second; ++n) {
         uint32_t lsrc = 0;
         uint64_t cur = 0;

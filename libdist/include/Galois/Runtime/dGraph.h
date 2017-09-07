@@ -480,8 +480,10 @@ protected:
     }
 
     timer.stop();
-    fprintf(stderr, "[%u] Master distribution time : %f seconds to read %lu bytes in %lu seeks (%f MBPS)\n", 
-        id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks(), g.num_bytes_read()/(float)timer.get_usec());
+    fprintf(stderr, "[%u] Master distribution time : %f seconds to read %lu "
+                    "bytes in %lu seeks (%f MBPS)\n", 
+            id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks(),
+            g.num_bytes_read()/(float)timer.get_usec());
     return numNodes_to_divide;
   }
 
@@ -2162,55 +2164,16 @@ private:
      auto &sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
      for (unsigned h = 1; h < net.Num; ++h) {
         unsigned x = (id + h) % net.Num;
         if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
         Galois::Runtime::SendBuffer b;
+
         if (BitsetFnTy::is_valid()) {
-          if (syncType == syncBroadcast) {
-            if (currentBVFlag == nullptr) {
-              sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
-                                                           sharedNodes[x], b);
-            } else {
-              // called as part of sync_on_demand since flag isn't null; check
-              // bitvector validity
-              switch(*currentBVFlag) {
-                case BITVECTOR_STATUS::NONE_INVALID:
-                  sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
-                                                               sharedNodes[x], b);
-                  break;
-                case BITVECTOR_STATUS::SRC_INVALID:
-                  if (readLocation == readSource) {
-                    // bitset for source is invalid; do not use bitset
-                    sync_extract<syncType, SyncFnTy>(loopName, x, 
-                                                     sharedNodes[x], b);
-                    *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
-                  } else {
-                    sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
-                                                             sharedNodes[x], b);
-                  }
-                  break;
-                case BITVECTOR_STATUS::DST_INVALID:
-                  if (readLocation == readDestination) {
-                    // bitset for dest is invalid; do not use bitset
-                    sync_extract<syncType, SyncFnTy>(loopName, x, 
-                                                     sharedNodes[x], b);
-                    *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
-                  } else {
-                    sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
-                                                             sharedNodes[x], b);
-                  }
-                  break;
-                default:
-                  GALOIS_DIE("Invalid bitvector status in sync_send");
-                  break;
-              }
-            }
-          } else { // sync reduce
-            sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
-                                                         sharedNodes[x], b);
-          }
+          sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, 
+                                                       sharedNodes[x], b);
         } else {
           sync_extract<syncType, SyncFnTy>(loopName, x, sharedNodes[x], b);
         }
@@ -2489,11 +2452,39 @@ private:
       size_t block_size = buffSize;
       sync_sendrecv_exp<BroadcastFnTy, syncBroadcast>(loopName, block_size);
 #else
-      sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, BitsetFnTy>(loopName);
-                                                            
-      sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, BitsetFnTy>(loopName);
-#endif
+      bool use_bitset = true;
 
+      if (currentBVFlag != nullptr) {
+        if (readLocation == readSource && src_invalid(currentBVFlag)) {
+          use_bitset = false;
+          *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
+          currentBVFlag = nullptr;
+        } else if (readLocation == readDestination && 
+                   dst_invalid(currentBVFlag)) {
+          use_bitset = false;
+          *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
+          currentBVFlag = nullptr;
+        } else if (readLocation == readAny && 
+                   *currentBVFlag != BITVECTOR_STATUS::NONE_INVALID) {
+          // the bitvector flag being non-null means this call came from
+          // sync on demand; sync on demand will NEVER use readAny 
+          // if location is read Any + one of src or dst is invalid
+          GALOIS_DIE("readAny + use of bitvector flag without none_invalid "
+                     "should never happen");
+        }
+      }
+
+      if (use_bitset) {
+        sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, 
+                  BitsetFnTy>(loopName);
+      } else {
+        sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, 
+                  Galois::InvalidBitsetFnTy>(loopName);
+      }
+
+      sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy, 
+                BitsetFnTy>(loopName);
+#endif
       StatTimer_syncBroadcast.stop();
    }
 
@@ -2767,7 +2758,7 @@ public:
   template<ReadLocation readLocation, 
            typename ReduceFnTy, typename BroadcastFnTy, 
            typename BitsetFnTy = Galois::InvalidBitsetFnTy>
-  void sync_on_demand(FieldFlags fieldFlags, std::string loopName) {
+  void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
     std::string timer_str("SYNC_ON_DEMAND" + loopName + "_" + get_run_identifier());
     Galois::StatTimer StatTimer_sync(timer_str.c_str());
     StatTimer_sync.start();
@@ -2810,12 +2801,12 @@ public:
           if (fieldFlags.src_to_src() && fieldFlags.src_to_dst()) {
             if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
               sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (*currentBVFlag == BITVECTOR_STATUS::SRC_INVALID) {
+            } else if (src_invalid(currentBVFlag)) {
               // src invalid bitset; sync individually so it can be called
               // without bitset
               sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (*currentBVFlag == BITVECTOR_STATUS::DST_INVALID) {
+            } else if (dst_invalid(currentBVFlag)) {
               // dst invalid bitset; sync individually so it can be called
               // without bitset
               sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2832,10 +2823,10 @@ public:
           if (fieldFlags.dst_to_src() && fieldFlags.dst_to_dst()) {
             if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
               sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (*currentBVFlag == BITVECTOR_STATUS::SRC_INVALID) {
+            } else if (src_invalid(currentBVFlag)) {
               sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (*currentBVFlag == BITVECTOR_STATUS::DST_INVALID) {
+            } else if (dst_invalid(currentBVFlag)) {
               sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             } else {
@@ -2862,10 +2853,10 @@ public:
         if (src_read && dst_read) {
           if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
             sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (*currentBVFlag == BITVECTOR_STATUS::SRC_INVALID) {
+          } else if (src_invalid(currentBVFlag)) {
             sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (*currentBVFlag == BITVECTOR_STATUS::DST_INVALID) {
+          } else if (dst_invalid(currentBVFlag)) {
             sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
           } else {
@@ -2884,6 +2875,7 @@ public:
      GALOIS_DIE("Invalid readLocation in sync_on_demand");
     }
 
+    // set to null pointer if it didn't already happen elsewhere
     currentBVFlag = nullptr;
 
     StatTimer_sync.stop();
@@ -3571,7 +3563,8 @@ public:
       // quick safety check to make sure it doesn't go past the end of the
       // graph
       if (to_return > end()) {
-        printf("WARNING: local end iterator goes past the end of the graph\n");
+        fprintf(stderr, "WARNING: local end iterator goes past the end of the "
+                        "graph\n");
       }
 
       return to_return;
