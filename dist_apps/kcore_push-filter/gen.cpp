@@ -254,7 +254,7 @@ struct KCoreStep2 {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -265,7 +265,7 @@ struct KCoreStep2 {
      Galois::do_all(
        nodesWithEdges.begin(), nodesWithEdges.end(),
        KCoreStep2{ &_graph },
-       Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
+       Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
        Galois::timeit()
      );
   }
@@ -308,7 +308,7 @@ struct KCoreStep1 {
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
+        std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -322,7 +322,7 @@ struct KCoreStep1 {
       Galois::do_all_local(
         nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
-        Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+        Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
         Galois::timeit()
       );
@@ -332,7 +332,7 @@ struct KCoreStep1 {
       // source/dest nodes (which have degree 0, so they won't have a trim 
       // anyways)
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim, 
-                  Bitset_trim>("KCoreStep1");
+                  Bitset_trim>("KCore");
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);
