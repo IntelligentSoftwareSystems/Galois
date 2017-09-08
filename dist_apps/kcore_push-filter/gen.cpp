@@ -278,9 +278,10 @@ struct KCoreStep2 {
     if (src_data.flag) {
       if (src_data.trim > 0) {
         src_data.current_degree = src_data.current_degree - src_data.trim;
-        src_data.trim = 0;
       }
     }
+
+    src_data.trim = 0;
   }
 };
 
