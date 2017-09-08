@@ -1099,7 +1099,7 @@ int main(int argc, char** argv) {
     // random num generate for sources
     std::minstd_rand0 r_generator;
     r_generator.seed(100);
-    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->size() - 1);
+    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
 
     if (numberOfSources != 0) {
       random_sources.insert(startSource);
