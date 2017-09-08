@@ -1295,7 +1295,9 @@ int main(int argc, char** argv) {
     h_graph = constructGraph<NodeData, void>(scalefactor);
 
     // random num generate for sources
-    std::minstd_rand0 r_generator;
+    std::linear_congruential_engine<std::uint_fast32_t, 16807, 0, 
+                                    2147483647> r_generator;
+
     r_generator.seed(100);
     std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
 
