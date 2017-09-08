@@ -20,8 +20,7 @@
  *
  * @section Description
  *
- * Compute KCore on distributed Galois using top-filter. The degree used is
- * the in-degree.
+ * Compute KCore on distributed Galois using top-filter.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -252,19 +251,19 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
-    auto& allNodes = _graph.allNodesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
-      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      KCoreStep2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
      Galois::do_all(
-       allNodes.begin(), allNodes.end(),
+       nodesWithEdges.begin(), nodesWithEdges.end(),
        KCoreStep2{ &_graph },
        Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
        Galois::timeit()
@@ -301,7 +300,7 @@ struct KCoreStep1 {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto& allNodes = _graph.allNodesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
@@ -313,14 +312,14 @@ struct KCoreStep1 {
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        KCoreStep1_cuda(*allNodes.begin(), *allNodes.end(),
+        KCoreStep1_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                         __retval, k_core_num, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       Galois::do_all_local(
-        allNodes,
+        nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
         Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
         Galois::do_all_steal<true>(),
