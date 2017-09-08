@@ -364,9 +364,9 @@ struct SSSP {
           // necessary
           // TODO reason about if this still applies to pull style version;
           // I know it happened in push style....
-
-          _graph.sync<writeSource, readAny, Reduce_min_current_length, 
-          //             Broadcast_current_length>("SSSP_cur_len_any_v");
+          _graph.sync<writeSource, readDestination, Reduce_min_current_length, 
+                       Broadcast_current_length, Bitset_current_length>("SSSP");
+          _graph.sync<writeSource, readSource, Reduce_min_current_length, 
                        Broadcast_current_length>("SSSP");
         } else {
           _graph.sync<writeSource, readAny, Reduce_min_current_length, 
