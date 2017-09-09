@@ -213,6 +213,9 @@ struct InitializeGraph {
 
     #if __OPT_VERSION__ == 5
     Flags_nout.set_write_dst();
+    // technically supposed to be below but moved here for timers
+    _graph.sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout, 
+                          Bitset_nout>(Flags_nout, "InitializeGraph");
     #endif
 
     #if __OPT_VERSION__ <= 4
@@ -254,8 +257,9 @@ struct PageRank_delta {
     auto& allNodes = _graph.allNodesRange();
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout, 
-                          Bitset_nout>(Flags_nout, "PRdelta");
+    // moved to init although technically supposed to be here
+    //_graph.sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout, 
+    //                      Bitset_nout>(Flags_nout, "PRdelta");
     _graph.sync_on_demand<readAny, Reduce_add_residual, Broadcast_residual, 
                           Bitset_residual>(Flags_residual, "PRdelta");
     #endif
