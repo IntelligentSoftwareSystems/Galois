@@ -161,6 +161,7 @@ struct DegreeCounting {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
   #ifdef __GALOIS_HET_CUDA__
+    // TODO calls all wrong
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
                            (_graph.get_run_identifier()));
@@ -214,6 +215,7 @@ struct InitializeGraph {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
+      // TODO calls all wrong
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
@@ -364,6 +366,7 @@ struct KCore {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
+        // TODO calls wrong
         std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
