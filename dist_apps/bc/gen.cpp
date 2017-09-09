@@ -208,7 +208,8 @@ struct InitializeGraph {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+          "CUDA_DO_ALL_IMPL_InitializeGraph"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -263,7 +264,8 @@ struct InitializeIteration {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeIteration")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeIteration")
+          "CUDA_DO_ALL_IMPL_InitializeIteration"
         );
 
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
@@ -341,7 +343,8 @@ struct FirstIterationSSSP {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
+          "CUDA_DO_ALL_IMPL_FirstIterationSSSP"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -418,7 +421,8 @@ struct SSSP {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_0");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_SSSP")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_SSSP")
+          "CUDA_DO_ALL_IMPL_SSSP"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -521,7 +525,8 @@ struct PredAndSucc {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_PredAndSucc")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PredAndSucc")
+          "CUDA_DO_ALL_IMPL_PredAndSucc"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -608,7 +613,8 @@ struct NumShortestPathsChanges {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPathsChanges");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPathsChanges")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPathsChanges")
+          "CUDA_DO_ALL_IMPL_NumShortestPathsChanges"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -700,7 +706,8 @@ struct NumShortestPaths {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPaths")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPaths")
+          "CUDA_DO_ALL_IMPL_NumShortestPaths"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -825,7 +832,8 @@ struct DependencyPropChanges {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropChanges");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropChanges")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropChanges")
+          "CUDA_DO_ALL_IMPL_DependencyPropChanges"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -921,7 +929,8 @@ struct DependencyPropogation {
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
+          "CUDA_DO_ALL_IMPL_DependencyPropogation"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -1102,24 +1111,24 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      auto& allNodes = _graph.allNodesRange();
+      auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_BC");
-        std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
+        //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
+        std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        BC_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+        BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       // TODO all nodes here? 
       Galois::do_all(
-        allNodes.begin(), 
-        allNodes.end(), 
+        nodesWithEdges.begin(), nodesWithEdges.end(), 
         BC(&_graph), 
         Galois::loopname("BC"),
         //Galois::loopname(_graph.get_run_identifier("BC").c_str()),
