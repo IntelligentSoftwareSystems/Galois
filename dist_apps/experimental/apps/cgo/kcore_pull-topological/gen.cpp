@@ -464,7 +464,10 @@ struct KCore {
 
          if (dst_data.pull_flag) {
            Galois::add(src_data.trim, (uint32_t)1);
+ 
+           #if __OPT_VERSION__ >= 3
            bitset_trim.set(src);
+           #endif
          }
       }
     }
@@ -625,8 +628,8 @@ int main(int argc, char** argv) {
     }
   #endif
 
-    #if __OPT_VERSION__ >= 3
     bitset_current_degree.resize(h_graph->get_local_total_nodes());
+    #if __OPT_VERSION__ >= 3
     bitset_trim.resize(h_graph->get_local_total_nodes());
     #endif
 
@@ -659,16 +662,19 @@ int main(int argc, char** argv) {
         (*h_graph).reset_num_iter(run+1);
 
 
-        #if __OPT_VERSION__ >= 3
         #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
           bitset_current_degree_reset_cuda(cuda_ctx);
+          #if __OPT_VERSION__ >= 3
           bitset_trim_reset_cuda(cuda_ctx);
+          #endif
         } else
         #endif
         { bitset_current_degree.reset();
-        bitset_trim.reset(); }
+        #if __OPT_VERSION__ >= 3
+        bitset_trim.reset(); 
         #endif
+        }
 
         #if __OPT_VERSION__ == 5
         Flags_current_degree.clear_all();
