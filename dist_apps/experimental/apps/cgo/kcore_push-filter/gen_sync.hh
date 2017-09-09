@@ -24,11 +24,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(trim);
 #endif
 
 #if __OPT_VERSION__ == 5
-// dummy sync structs that won't even be used
-//GALOIS_SYNC_STRUCTURE_REDUCE_SET(flag, uint8_t);
-//GALOIS_SYNC_STRUCTURE_BROADCAST(flag, uint8_t);
-//FieldFlags Flags_flag;
-
 FieldFlags Flags_current_degree;
 FieldFlags Flags_trim;
 #endif

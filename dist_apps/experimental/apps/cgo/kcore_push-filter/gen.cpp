@@ -279,12 +279,12 @@ struct KCoreStep2 {
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim, 
-                          Bitset_trim>(Flags_trim, "KCoreStep2");
+                          Bitset_trim>(Flags_trim, "KCore");
     #endif
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -304,7 +304,7 @@ struct KCoreStep2 {
        allNodes.begin(), allNodes.end(),
        #endif
        KCoreStep2{ &_graph },
-       Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
+       Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
        Galois::timeit()
      );
   }
@@ -359,7 +359,7 @@ struct KCoreStep1 {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
+        std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -373,7 +373,7 @@ struct KCoreStep1 {
       Galois::do_all_local(
         nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
-        Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+        Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
         Galois::timeit()
       );
@@ -384,16 +384,16 @@ struct KCoreStep1 {
 
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
-                  Broadcast_trim>("KCoreStep1");
+                  Broadcast_trim>("KCore");
       #elif __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
-                  Broadcast_trim>("KCoreStep1");
+                  Broadcast_trim>("KCore");
       #elif __OPT_VERSION__ == 3
       _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
-                  Bitset_trim>("KCoreStep1");
+                  Bitset_trim>("KCore");
       #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
-                  Bitset_trim>("KCoreStep1");
+                  Bitset_trim>("KCore");
       #endif
 
       // gold standard sync
