@@ -738,8 +738,6 @@ struct NumShortestPaths {
 
       }
     } while (accum_result);
-
-    PropogationFlagUpdate::go(_graph);
   }
 
   /* If a source has no more predecessors, then its shortest path value is
@@ -806,8 +804,8 @@ struct PropogationFlagUpdate {
 
     Galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
-      NumShortestPaths(&_graph, dga), 
-      Galois::loopname("PropogationFlagSync"),
+      PropogationFlagUpdate(&_graph), 
+      Galois::loopname("PropogationFlagUpdate"),
       Galois::timeit()
     );
 
@@ -817,7 +815,7 @@ struct PropogationFlagUpdate {
     _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag, 
                 //Bitset_propogation_flag>("NumShortestPaths_prop_flag");
-                Bitset_propogation_flag>("PropogationFlagSync");
+                Bitset_propogation_flag>("PropogationFlagUpdate");
   }
 
   void operator()(GNode src) const {
@@ -1119,6 +1117,8 @@ struct BC {
       //Galois::gDebug("NumShortestPaths done");
 
       _graph.set_num_iter(0);
+
+      PropogationFlagUpdate::go(_graph);
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph, dga);
