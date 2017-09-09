@@ -638,7 +638,6 @@ int main(int argc, char** argv) {
           bitset_current_degree_reset_cuda(cuda_ctx);
           #if __OPT_VERSION__ >= 3
           bitset_trim_reset_cuda(cuda_ctx);
-          bitset_flag_reset_cuda(cuda_ctx);
           #endif
         } else
       #endif
