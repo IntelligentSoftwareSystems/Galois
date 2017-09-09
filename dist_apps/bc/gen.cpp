@@ -157,9 +157,6 @@ struct NodeData {
   std::atomic<uint32_t> trim;
   std::atomic<uint32_t> to_add;
 
-  // TODO use this for dep prop?
-  //uint32_t not_atomic_trim;
-
   float to_add_float;
   float dependency;
 
@@ -308,19 +305,13 @@ struct InitializeIteration {
       src_data.num_shortest_paths = 1;
       src_data.propogation_flag = true;
     }
-
-    // this is read on dst too, and since this operator loops over all
-    // nodes, we reset there as well
+    src_data.num_predecessors = 0;
+    src_data.num_successors = 0;
     src_data.dependency = 0;
 
-    // both of these end up being 0 on both source and dest over course
-    // of computation
-    assert(src_data.num_predecessors == 0);
-    assert(src_data.num_successors == 0);
-
-    if (!is_source) {
-      assert(!src_data.propogation_flag);
-    }
+    assert(src_data.trim.load() == 0);
+    assert(src_data.to_add.load() == 0);
+    assert(src_data.to_add_float == 0);
   }
 };
 
@@ -344,7 +335,7 @@ struct FirstIterationSSSP {
       if (personality == GPU_CUDA) {
         std::string impl_str(
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
-          "CUDA_DO_ALL_IMPL_FirstIterationSSSP"
+          "CUDA_DO_ALL_IMPL_SSSP"
         );
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -356,7 +347,7 @@ struct FirstIterationSSSP {
       boost::make_counting_iterator(__begin), 
       boost::make_counting_iterator(__end), 
       FirstIterationSSSP(&_graph),
-      Galois::loopname("FirstIterationSSSP"),
+      Galois::loopname("SSSP"),
       //Galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
       Galois::timeit()
     );
@@ -364,8 +355,7 @@ struct FirstIterationSSSP {
     // Next op will read src, current length
     _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
                 Broadcast_current_length, Bitset_current_length>(
-                //"FirstIterationSSSP_cur_len");
-                "FirstIterationSSSP");
+                "SSSP");
 
     // FIXME
     // if this is a cart vertex cut then it would reset the flag for broadcast
@@ -659,12 +649,6 @@ struct NumShortestPathsChanges {
         if (src_data.num_predecessors == 0) {
           assert(!src_data.propogation_flag);
           src_data.propogation_flag = true;
-
-          // if I have no successors, then my flag will stay true; this
-          // needs to be sync'd at destination
-          if (src_data.num_successors == 0) {
-            bitset_propogation_flag.set(src);
-          }
         }
       }
 
@@ -746,22 +730,16 @@ struct NumShortestPaths {
 
       // sync num_short_paths on dest (will be sync'd on source
       // already, i.e. all sources should already have the correct value)
-      // + sync prop flag if necessary
       if (!accum_result) {
         _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths, 
                     Broadcast_num_shortest_paths, 
                     //Bitset_num_shortest_paths>("NumShortestPaths_num_paths");
                     Bitset_num_shortest_paths>("NumShortestPaths");
 
-        // note that only nodes with succ == 0 will have their flags sync'd
-        // by this call (through bitset; only set for those cases); the others
-        // do not need to be sync'd as they will all be false already
-        _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
-                    Broadcast_propogation_flag, 
-                    //Bitset_propogation_flag>("NumShortestPaths_prop_flag");
-                    Bitset_propogation_flag>("NumShortestPaths");
       }
     } while (accum_result);
+
+    PropogationFlagUpdate::go(_graph);
   }
 
   /* If a source has no more predecessors, then its shortest path value is
@@ -812,6 +790,43 @@ struct NumShortestPaths {
         src_data.propogation_flag = false;
       }
     }
+  }
+};
+
+// make sure all flags are false except for nodes with 0 successors and sync flag
+struct PropogationFlagUpdate {
+  Graph* graph;
+
+  PropogationFlagUpdate(Graph* _graph) : graph(_graph) { }
+
+  void static go(Graph& _graph) {
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    // TODO gpu code
+
+    Galois::do_all(
+      nodesWithEdges.begin(), nodesWithEdges.end(),
+      NumShortestPaths(&_graph, dga), 
+      Galois::loopname("PropogationFlagSync"),
+      Galois::timeit()
+    );
+
+    // note that only nodes with succ == 0 will have their flags sync'd
+    // by this call (through bitset; only set for those cases); the others
+    // do not need to be sync'd as they will all be false already
+    _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
+                Broadcast_propogation_flag, 
+                //Bitset_propogation_flag>("NumShortestPaths_prop_flag");
+                Bitset_propogation_flag>("PropogationFlagSync");
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (src_data.num_successors == 0) {
+      src_data.propogation_flag = true;
+      bitset_propogation_flag.set(src);
+    } 
   }
 };
 
