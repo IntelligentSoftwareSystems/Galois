@@ -2759,7 +2759,7 @@ public:
            typename ReduceFnTy, typename BroadcastFnTy, 
            typename BitsetFnTy = Galois::InvalidBitsetFnTy>
   void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
-    std::string timer_str("SYNC_ON_DEMAND" + loopName + "_" + get_run_identifier());
+    std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
     Galois::StatTimer StatTimer_sync(timer_str.c_str());
     StatTimer_sync.start();
 
