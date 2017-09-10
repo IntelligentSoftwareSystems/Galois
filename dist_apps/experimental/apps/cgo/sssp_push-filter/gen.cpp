@@ -196,7 +196,8 @@ struct FirstItr_SSSP {
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
-                          Broadcast_dist_current>(Flags_dist_current, "SSSP");
+                          Broadcast_dist_current, 
+                          Bitset_dist_current>(Flags_dist_current, "SSSP");
     #endif
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -285,7 +286,8 @@ struct SSSP {
 
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
-                            Broadcast_dist_current>(Flags_dist_current, "SSSP");
+                            Broadcast_dist_current, 
+                            Bitset_dist_current>(Flags_dist_current, "SSSP");
       #endif
 
       #ifdef __GALOIS_HET_CUDA__

@@ -53,6 +53,7 @@ distApp(sssp_pull-topological)
 distApp(sssp_push-filter)
 
 distApp(kcore_push-filter)
+distAppNoGPU(kcore_pull-topological)
 
 distApp(bc)
 distAppNoGPU(bc_pull)

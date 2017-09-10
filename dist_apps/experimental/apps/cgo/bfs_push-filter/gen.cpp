@@ -205,7 +205,8 @@ struct FirstItr_BFS{
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
-                          Broadcast_dist_current>(Flags_dist_current, "BFS");
+                          Broadcast_dist_current, 
+                          Bitset_dist_current>(Flags_dist_current, "BFS");
     #endif
 
   #ifdef __GALOIS_HET_CUDA__
@@ -293,7 +294,8 @@ struct BFS {
 
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
-                            Broadcast_dist_current>(Flags_dist_current, "BFS");
+                            Broadcast_dist_current, 
+                            Bitset_dist_current>(Flags_dist_current, "BFS");
       // TODO would compiler insert dist_old on demand sync here?
       #endif
 

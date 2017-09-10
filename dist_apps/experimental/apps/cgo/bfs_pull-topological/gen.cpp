@@ -196,6 +196,13 @@ struct BFS {
     do {
       _graph.set_num_iter(_num_iterations);
       dga.reset();
+
+      #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readDestination, Reduce_min_dist_current,
+                            Broadcast_dist_current, 
+                            Bitset_dist_current>(Flags_dist_current, "BFS");
+      #endif
+
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
@@ -217,6 +224,10 @@ struct BFS {
         Galois::timeit()
       );
       }
+
+      #if __OPT_VERSION__ == 5
+      Flags_dist_current.set_write_src();
+      #endif
 
       #if __OPT_VERSION__ == 1
       // naive sync of everything after operator 
@@ -353,7 +364,7 @@ int main(int argc, char** argv) {
                                   (unsigned long)maxIterations, 0);
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
                                   (unsigned long long)src_node, 0);
-      #if __OPT_VERSION__ == 1
+      #if __OPT_VERSION__ == 2
       printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
       printf("Version 2 of optimization\n");
@@ -361,6 +372,8 @@ int main(int argc, char** argv) {
       printf("Version 3 of optimization\n");
       #elif __OPT_VERSION__ == 4
       printf("Version 4 of optimization\n");
+      #elif __OPT_VERSION__ == 5
+      printf("Version 5 of optimization\n");
       #endif
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
@@ -461,6 +474,10 @@ int main(int argc, char** argv) {
         bitset_dist_current.reset();
         #endif
 
+        #if __OPT_VERSION__ == 5
+        Flags_dist_current.clear_all();
+        #endif
+
         //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
@@ -491,6 +508,8 @@ int main(int argc, char** argv) {
     }
 
     }
+    Galois::Runtime::getHostBarrier().wait();
+    G.printDistStats();
     Galois::Runtime::getHostBarrier().wait();
 
     return 0;

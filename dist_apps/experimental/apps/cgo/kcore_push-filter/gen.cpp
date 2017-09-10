@@ -189,6 +189,15 @@ struct InitializeGraph2 {
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2");
     #endif
+
+    // technically wouldn't go here but for timer's sake it was moved here
+    #if __OPT_VERSION__ == 5
+    Flags_current_degree.set_write_dst();
+    _graph.sync_on_demand<readSource, Reduce_add_current_degree, 
+                          Broadcast_current_degree, 
+                          Bitset_current_degree>(Flags_current_degree,
+                                                 "InitializeGraph2");
+    #endif
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -260,29 +269,42 @@ struct KCoreStep2 {
   KCoreStep2(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph){
+    #if __OPT_VERSION__ == 5
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    #else
+    // all nodes required because versions 2->4 do a read all, meaning
+    // mirrors have it to and it may not get reset correctly
     auto& allNodes = _graph.allNodesRange();
+    #endif
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, Reduce_add_trim, Broadcast_trim, 
-                          Bitset_trim>(Flags_trim, "KCoreStep2");
-    // flag not inserted because it is never written in an edge loop
-    // TODO will compiler know this?
+    _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim, 
+                          Bitset_trim>(Flags_trim, "KCore");
     #endif
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                            (_graph.get_run_identifier()));
       Galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
+      #if __OPT_VERSION__ == 5
+      KCoreStep2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+      #else
       KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      #endif
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
      Galois::do_all(
+
+       #if __OPT_VERSION__ == 5
+       nodesWithEdges.begin(), nodesWithEdges.end(),
+       #else
        allNodes.begin(), allNodes.end(),
+       #endif
        KCoreStep2{ &_graph },
-       Galois::loopname(_graph.get_run_identifier("KCoreStep2").c_str()),
+       Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
        Galois::timeit()
      );
   }
@@ -321,38 +343,37 @@ struct KCoreStep1 {
   void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto& allNodes = _graph.allNodesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readAny, Reduce_add_current_degree, 
-                            Broadcast_current_degree, 
-                            Bitset_current_degree>(Flags_current_degree,
-                                                   "KCoreStep1");
-      // flag not inserted because it is never written in an edge loop
-      // TODO will compiler know this?
-      #endif
+      // moved to initialization for timer's sake
+      //#if __OPT_VERSION__ == 5
+      //_graph.sync_on_demand<readSource, Reduce_add_current_degree, 
+      //                      Broadcast_current_degree, 
+      //                      Bitset_current_degree>(Flags_current_degree,
+      //                                             "KCoreStep1");
+      //#endif
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
+        std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        KCoreStep1_cuda(*allNodes.begin(), *allNodes.end(),
+        KCoreStep1_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                         __retval, k_core_num, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       Galois::do_all_local(
-        allNodes,
+        nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
-        Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+        Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
         Galois::timeit()
       );
@@ -363,16 +384,16 @@ struct KCoreStep1 {
 
       #if __OPT_VERSION__ == 1
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
-                  Broadcast_trim>("KCoreStep1");
+                  Broadcast_trim>("KCore");
       #elif __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
-                  Broadcast_trim>("KCoreStep1");
+                  Broadcast_trim>("KCore");
       #elif __OPT_VERSION__ == 3
       _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
-                  Bitset_trim>("KCoreStep1");
+                  Bitset_trim>("KCore");
       #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
-                  Bitset_trim>("KCoreStep1");
+                  Bitset_trim>("KCore");
       #endif
 
       // gold standard sync
@@ -617,7 +638,6 @@ int main(int argc, char** argv) {
           bitset_current_degree_reset_cuda(cuda_ctx);
           #if __OPT_VERSION__ >= 3
           bitset_trim_reset_cuda(cuda_ctx);
-          bitset_flag_reset_cuda(cuda_ctx);
           #endif
         } else
       #endif

@@ -154,6 +154,7 @@ versionGen(pagerank_push-filter)
 ################################################################################
 
 versionGen(kcore_push-filter)
+versionGenNoGPU(kcore_pull-topological)
 
 ################################################################################
 # BC
