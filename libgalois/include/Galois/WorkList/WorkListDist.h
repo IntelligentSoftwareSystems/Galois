@@ -65,6 +65,15 @@ public:
 
   void sync(){
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    std::string statSendBytes_str("WL_SEND_BYTES_" + graph.get_run_identifier());
+    std::string timer_wl_send_recv_str("WL_SYNC_TIME_SEND_RECV_" + graph.get_run_identifier());
+    std::string timer_wl_total_str("WL_SYNC_TIME_TOTAL_" + graph.get_run_identifier());
+
+    Galois::StatTimer StatTimer_total_sync(timer_wl_total_str.c_str());
+    Galois::StatTimer StatTimer_send_recv(timer_wl_send_recv_str.c_str());
+    Galois::Statistic send_bytes(statSendBytes_str);
+
+    StatTimer_total_sync.start();
     //Did work in the previous round
     if(local_wl.size() > 0 )
       canTerminate = false;
@@ -82,7 +91,7 @@ public:
         }
         }, Galois::loopname("worklist bags"));
 
-
+    StatTimer_send_recv.start();
     for(auto h = 0; h < net.Num; ++h){
       if(canTerminate && (bag_vec[h].size() > 0)){
         canTerminate = false;
@@ -96,6 +105,7 @@ public:
       Galois::Runtime::SendBuffer b;
       Galois::Runtime::gSerialize(b, canTerminate);
       Galois::Runtime::gSerialize(b, bag_vec[h]);
+      send_bytes += b.size();
       //assert(b.size() == sizeof(uint64_t)*(bagSize + 2));
       //std::stringstream ss;
       //ss << net.ID << " ] : SENDING : " << bagSize << "\n";
@@ -126,13 +136,17 @@ public:
       //std::cerr << ss.str();
     }
     ++Galois::Runtime::evilPhase;
+    StatTimer_send_recv.stop();
 
     //Sort and remove duplicates from the worklist.
     std::sort(local_wl.begin(), local_wl.end());
     std::unique(local_wl.begin(), local_wl.end());
+    //TODO Check that duplicates are being removed
+    //assert(local_wl.size() <= graph.numOwned)
 
     //Convert Global to Local IDs
     convertGID2LID_localWL();
+    StatTimer_total_sync.stop();
 
   }
 
