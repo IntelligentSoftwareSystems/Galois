@@ -29,9 +29,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -74,13 +74,16 @@ static const char* const url = 0;
 /******************************************************************************/
 
 namespace cll = llvm::cl;
+
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
+
 static cll::opt<unsigned long long> src_node("srcNodeId", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
+
 static cll::opt<bool> verify("verify", 
                              cll::desc("Verify results by outputting results "
                                        "to file"), 
@@ -144,8 +147,7 @@ struct InitializeGraph {
 
   InitializeGraph(cll::opt<unsigned long long> &_src_node, 
                   const uint32_t &_infinity, Graph* _graph) : 
-                    local_infinity(_infinity), local_src_node(_src_node), 
-                    graph(_graph){}
+    local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph){
     auto& allNodes = _graph.allNodesRange();
@@ -163,13 +165,12 @@ struct InitializeGraph {
     #endif
     {
 
-    Galois::Runtime::do_all_coupled(
+    Galois::do_all_local(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
-      std::make_tuple(
-        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
-      )
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
     );
 
     }
@@ -186,7 +187,8 @@ struct InitializeGraph {
 
 struct FirstItr_BFS{
   Graph * graph;
-  FirstItr_BFS(Graph * _graph):graph(_graph){}
+
+  FirstItr_BFS(Graph * _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
     uint32_t __begin, __end;
@@ -213,23 +215,15 @@ struct FirstItr_BFS{
                 FirstItr_BFS{&_graph}, 
                 Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
                 Galois::timeit());
-    //Galois::do_all_choice(
-    //    Galois::Runtime::makeStandardRange(
-    //      _graph.begin() + __begin, 
-    //      _graph.begin() + __end
-    //    ), 
-    //    FirstItr_BFS{ &_graph }, 
-    //    std::make_tuple(Galois::loopname("BFS"), 
-    //      Galois::thread_range(_graph.get_thread_ranges()),
-    //      Galois::numrun(_graph.get_run_identifier())
-    //    ));
     }
+
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     
     Galois::Runtime::reportStat("(NULL)", 
        _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
   }
+
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
     snode.dist_old = snode.dist_current;
@@ -248,22 +242,23 @@ struct FirstItr_BFS{
 
 struct BFS {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
-  BFS(Graph* _graph) : graph(_graph){}
+  BFS(Graph* _graph, Galois::DGAccumulator<unsigned int>& _dga) : 
+    graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph){
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     using namespace Galois::WorkList;
     
     FirstItr_BFS::go(_graph);
-    
+
     unsigned _num_iterations = 1;
 
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
       _graph.set_num_iter(_num_iterations);
-      DGAccumulator_accum.reset();
+      dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
@@ -272,36 +267,27 @@ struct BFS {
         int __retval = 0;
         BFS_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
                  __retval, cuda_ctx);
-        DGAccumulator_accum += __retval;
+        dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
-      //Galois::do_all(_graph.begin(), _graph.end(), BFS (&_graph), 
-      //  Galois::loopname("BFS"),
-      //  Galois::numrun(_graph.get_run_identifier()));
-      Galois::Runtime::do_all_coupled(
+      Galois::do_all_local(
         nodesWithEdges,
-        BFS{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-          Galois::timeit()
-        )
+        BFS(&_graph, dga),
+        Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
-      //Galois::do_all_local(_graph,
-      //               BFS{ &_graph }, 
-      //               Galois::loopname("BFS"), 
-      //               Galois::numrun(_graph.get_run_identifier()));
-
     }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       Galois::Runtime::reportStat("(NULL)", 
         _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
-        (unsigned long)DGAccumulator_accum.read_local(), 0);
+        (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
+    } while ((_num_iterations < maxIterations) && dga.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
@@ -331,8 +317,6 @@ struct BFS {
   }
 };
 
-Galois::DGAccumulator<int> BFS::DGAccumulator_accum;
-
 /******************************************************************************/
 /* Sanity check operators */
 /******************************************************************************/
@@ -344,34 +328,35 @@ struct BFSSanityCheck {
 
   static uint32_t current_max;
 
-  static Galois::DGAccumulator<uint64_t> DGAccumulator_sum;
-  static Galois::DGAccumulator<uint32_t> DGAccumulator_max;
+  Galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
+  Galois::DGAccumulator<uint32_t>& DGAccumulator_max;
 
-  BFSSanityCheck(const uint32_t _infinity, Graph* _graph) : 
-    local_infinity(_infinity), graph(_graph){}
+  BFSSanityCheck(const uint32_t _infinity, Graph* _graph, 
+                 Galois::DGAccumulator<uint64_t>& dgas,
+                 Galois::DGAccumulator<uint32_t>& dgam) : 
+    local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
+    DGAccumulator_max(dgam) {}
 
-  void static go(Graph& _graph) {
+  void static go(Graph& _graph, Galois::DGAccumulator<uint64_t>& dgas,
+                 Galois::DGAccumulator<uint32_t>& dgam) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
-
-    DGAccumulator_sum.reset();
-    DGAccumulator_max.reset();
+    dgas.reset();
+    dgam.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   BFSSanityCheck(infinity, &_graph), 
-                   Galois::loopname("BFSSanityCheck"),
-                   Galois::timeit());
+                   BFSSanityCheck(infinity, &_graph, dgas, dgam), 
+                   Galois::loopname("BFSSanityCheck"));
 
+    uint64_t num_visited = dgas.reduce();
 
-    uint64_t num_visited = DGAccumulator_sum.reduce();
-
-    DGAccumulator_max = current_max;
-    uint32_t max_distance = DGAccumulator_max.reduce_max();
+    dgam = current_max;
+    uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
     if (_graph.id == 0) {
@@ -392,10 +377,7 @@ struct BFSSanityCheck {
       }
     }
   }
-
 };
-Galois::DGAccumulator<uint64_t> BFSSanityCheck::DGAccumulator_sum;
-Galois::DGAccumulator<uint32_t> BFSSanityCheck::DGAccumulator_max;
 uint32_t BFSSanityCheck::current_max = 0;
 
 /******************************************************************************/
@@ -404,8 +386,9 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager(statOutputFile);
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
+
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
@@ -480,6 +463,10 @@ int main(int argc, char** argv) {
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
+    // accumulators for use in operators
+    Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+    Galois::DGAccumulator<uint64_t> DGAccumulator_sum;
+    Galois::DGAccumulator<uint32_t> DGAccumulator_max;
 
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "[" << net.ID << "] BFS::go run " << run << " called\n";
@@ -487,12 +474,12 @@ int main(int argc, char** argv) {
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-        BFS::go((*hg));
+        BFS::go(*hg, DGAccumulator_accum);
       StatTimer_main.stop();
 
       // sanity check
       BFSSanityCheck::current_max = 0;
-      BFSSanityCheck::go(*hg);
+      BFSSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max);
 
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
@@ -534,7 +521,9 @@ int main(int argc, char** argv) {
     }
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+    G.printDistStats();
+    Galois::Runtime::getHostBarrier().wait();
+
 
     return 0;
   } catch(const char* c) {

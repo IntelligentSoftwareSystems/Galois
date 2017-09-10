@@ -29,9 +29,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -145,8 +145,7 @@ struct InitializeGraph {
 
   InitializeGraph(cll::opt<unsigned long long> &_src_node, 
                   const uint32_t &_infinity, Graph* _graph) : 
-                    local_infinity(_infinity), local_src_node(_src_node), 
-                    graph(_graph){}
+      local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
@@ -157,25 +156,18 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()),
+        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
-    Galois::Runtime::do_all_coupled(
-      allNodes,
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
-      std::make_tuple(
-        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
-      )
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+      Galois::timeit()
     );
-
-    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-      //InitializeGraph {src_node, infinity, &_graph}, 
-      //Galois::loopname("InitializeGraph"), 
-      //Galois::numrun(_graph.get_run_identifier()));
     }
   }
 
@@ -186,9 +178,9 @@ struct InitializeGraph {
   }
 };
 
-struct FirstItr_SSSP{
+struct FirstItr_SSSP {
   Graph * graph;
-  FirstItr_SSSP(Graph * _graph):graph(_graph){}
+  FirstItr_SSSP(Graph* _graph):graph(_graph){}
 
   void static go(Graph& _graph) {
     uint32_t __begin, __end;
@@ -209,26 +201,13 @@ struct FirstItr_SSSP{
     } else if (personality == CPU)
 #endif
     {
-    //Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end, 
-    //               FirstItr_SSSP{&_graph}, Galois::loopname("SSSP"), 
-    //               Galois::numrun(_graph.get_run_identifier()));
-    //Galois::do_all_choice(
-        //Galois::Runtime::makeStandardRange(
-          //_graph.begin() + __begin, 
-          //_graph.begin() + __end
-        //), 
-        //FirstItr_SSSP{ &_graph }, 
-        //std::make_tuple(Galois::loopname("SSSP"), 
-          //Galois::thread_range(_graph.get_thread_ranges()),
-          //Galois::numrun(_graph.get_run_identifier())
-        //)
-    //);
-   // one node, doesn't matter which do_all you use, so regular one suffices
+    // one node, doesn't matter which do_all you use, so regular one suffices
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
                 FirstItr_SSSP{&_graph}, 
                 Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
                 Galois::timeit());
     }
+
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("SSSP");
     
@@ -254,67 +233,53 @@ struct FirstItr_SSSP{
 
 struct SSSP {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
-  SSSP(Graph* _graph) : graph(_graph){}
+  SSSP(Graph* _graph, Galois::DGAccumulator<unsigned int>& _dga) : 
+      graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph){
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     using namespace Galois::WorkList;
     
     FirstItr_SSSP::go(_graph);
     
     unsigned _num_iterations = 1;
     
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
     do { 
       _graph.set_num_iter(_num_iterations);
-      DGAccumulator_accum.reset();
+      dga.reset();
       #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) {
-          std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-          Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-          StatTimer_cuda.start();
-          int __retval = 0;
-          SSSP_all_cuda(__retval, cuda_ctx);
-          DGAccumulator_accum += __retval;
-          StatTimer_cuda.stop();
-        } else if (personality == CPU)
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
+        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        StatTimer_cuda.start();
+        int __retval = 0;
+        SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+                  __retval, cuda_ctx);
+        dga += __retval;
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
       #endif
-        {
-          //Galois::do_all(_graph.begin(), _graph.end(), SSSP(&_graph), 
-          //  Galois::loopname("SSSP"), 
-          //  Galois::numrun(_graph.get_run_identifier()));
+      {
+        Galois::do_all_local(
+          nodesWithEdges,
+          SSSP{ &_graph, dga },
+          Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
+          Galois::do_all_steal<true>(),
+          Galois::timeit()
+        );
+      }
 
-          //Galois::do_all_choice(
-              //Galois::Runtime::makeStandardRange(
-                //_graph.begin(), 
-                //_graph.end()
-                //), 
-              //SSSP{ &_graph }, 
-              //std::make_tuple(Galois::loopname("SSSP"), 
-                //Galois::thread_range(_graph.get_thread_ranges()),
-                //Galois::numrun(_graph.get_run_identifier())
-                //));
-
-          Galois::Runtime::do_all_coupled(
-              nodesWithEdges,
-              SSSP{ &_graph },
-              std::make_tuple(
-                Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                Galois::timeit()
-                )
-              );
-
-
-        }
-        _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+      _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
+                Broadcast_dist_current, Bitset_dist_current>("SSSP");
     
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-        (unsigned long)DGAccumulator_accum.read_local(), 0);
+        (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
+    } while ((_num_iterations < maxIterations) && dga.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
@@ -343,7 +308,6 @@ struct SSSP {
     }
   }
 };
-Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Sanity check operators */
@@ -356,33 +320,35 @@ struct SSSPSanityCheck {
 
   static uint32_t current_max;
 
-  static Galois::DGAccumulator<uint64_t> DGAccumulator_sum;
-  static Galois::DGAccumulator<uint32_t> DGAccumulator_max;
+  Galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
+  Galois::DGAccumulator<uint32_t>& DGAccumulator_max;
 
-  SSSPSanityCheck(const uint32_t _infinity, Graph* _graph) : 
-    local_infinity(_infinity), graph(_graph){}
+  SSSPSanityCheck(const uint32_t _infinity, Graph* _graph,
+                  Galois::DGAccumulator<uint64_t>& dgas,
+                  Galois::DGAccumulator<uint32_t>& dgam) : 
+    local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
+    DGAccumulator_max(dgam) {}
 
-  void static go(Graph& _graph) {
+  void static go(Graph& _graph, Galois::DGAccumulator<uint64_t>& dgas,
+                 Galois::DGAccumulator<uint32_t>& dgam) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
-
-    DGAccumulator_sum.reset();
-    DGAccumulator_max.reset();
+    dgas.reset();
+    dgam.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   SSSPSanityCheck(infinity, &_graph), 
+                   SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
                    Galois::loopname("SSSPSanityCheck"));
 
+    uint64_t num_visited = dgas.reduce();
 
-    uint64_t num_visited = DGAccumulator_sum.reduce();
-
-    DGAccumulator_max = current_max;
-    uint32_t max_distance = DGAccumulator_max.reduce_max();
+    dgam = current_max;
+    uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
     if (_graph.id == 0) {
@@ -405,8 +371,6 @@ struct SSSPSanityCheck {
   }
 
 };
-Galois::DGAccumulator<uint64_t> SSSPSanityCheck::DGAccumulator_sum;
-Galois::DGAccumulator<uint32_t> SSSPSanityCheck::DGAccumulator_max;
 uint32_t SSSPSanityCheck::current_max = 0;
 
 /******************************************************************************/
@@ -415,8 +379,9 @@ uint32_t SSSPSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager(statOutputFile);
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
+
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -493,17 +458,22 @@ int main(int argc, char** argv) {
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
+    // accumulators for use in operators
+    Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+    Galois::DGAccumulator<uint64_t> DGAccumulator_sum;
+    Galois::DGAccumulator<uint32_t> DGAccumulator_max;
+
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-        SSSP::go((*hg));
+        SSSP::go(*hg, DGAccumulator_accum);
       StatTimer_main.stop();
 
       SSSPSanityCheck::current_max = 0;
-      SSSPSanityCheck::go(*hg);
+      SSSPSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max);
 
       if ((run + 1) != numRuns) {
       #ifdef __GALOIS_HET_CUDA__
@@ -515,7 +485,7 @@ int main(int argc, char** argv) {
 
         //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
-        InitializeGraph::go((*hg));
+        InitializeGraph::go(*hg);
       }
     }
 
@@ -544,7 +514,9 @@ int main(int argc, char** argv) {
 
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+    G.printDistStats();
+    Galois::Runtime::getHostBarrier().wait();
+
 
     return 0;
   } catch(const char* c) {

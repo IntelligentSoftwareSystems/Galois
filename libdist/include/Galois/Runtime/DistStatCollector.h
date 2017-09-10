@@ -27,92 +27,38 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
-#define GALOIS_RUNTIME_STATCOLLECTOR_H
+#ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
+#define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
-//TODO: remove dist stuff 
-#include "Galois/gdeque.h"
-#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/Network.h"
-
-#include <string>
-#include <set>
-#include <boost/uuid/uuid.hpp>            // uuid class
-#include <boost/uuid/uuid_generators.hpp> // generators
-#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace Galois {
 namespace Runtime {
 
 
-// TODO: Rename to DistStatCollector and inherit from Galois::Runtime::StatCollector
-// TODO: remove duplicated code copied over form StatCollector
+class DistStatCollector: public StatCollector {
+protected:
 
-class StatCollector {
+  using Base = StatCollector;
 
-  template<typename Ty>
-  using StringPair = std::pair<const std::string*, Ty>;
-
-  //////////////////////////////////////
-  //Symbol Table
-  //////////////////////////////////////
-  std::set<std::string> symbols;
-  const std::string* getSymbol(const std::string& str) const;
-  const std::string* getOrInsertSymbol(const std::string& str);
-
-  //////////////////////////////////////
-  //Loop instance counter
-  //////////////////////////////////////
-  std::vector<StringPair<unsigned> > loopInstances;
-
-  unsigned getInstanceNum(const std::string& str) const;
-  void addInstanceNum(const std::string& str);
-
-  //////////////////////////////////////
-  //Stat list
-  //////////////////////////////////////
-  struct RecordTy {
-    char mode; // 0 - int, 1 - double, 2 - string
-    union {
-      size_t valueInt;
-      double valueDouble;
-      std::string valueStr;
-    };
-    RecordTy(size_t value);
-    RecordTy(double value);
-    RecordTy(const std::string& value);
-    RecordTy(const RecordTy& r);
-    ~RecordTy();
-
-    void print(std::ostream& out) const;
-  };
-
-  //stats  HostID,ThreadID,loop,category,instance -> Record
-  
-  std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
-  Galois::Substrate::SimpleLock StatsLock;
+  using Base::RecordTy;
 
 public:
 
-  static boost::uuids::uuid UUID;
-  static boost::uuids::uuid getUUID();
+  void printStats(void);
 
-  void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
-  void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
-  void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
+  DistStatCollector(const std::string& outfile="");
 
-  void printStatsForR(std::ostream& out, bool json);
-  static void printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf);
+private:
 
-  //still assumes int values
-  void printStats(std::ostream& out);
-  void printDistStats(std::ostream& out);
+  void combineAtHost_0(void);
 
-  void beginLoopInstance(const std::string& str);
 };
 
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif
+#endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H

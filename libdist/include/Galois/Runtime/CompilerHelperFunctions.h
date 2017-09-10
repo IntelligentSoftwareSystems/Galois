@@ -102,6 +102,13 @@ namespace Galois {
     }
 
   template<typename Ty>
+    const Ty add(Ty& a, std::atomic<Ty>& b) {
+      Ty old_a = a;
+      a = a + b.load();
+      return old_a;
+    }
+
+  template<typename Ty>
     const Ty add(Ty& a, const Ty& b) {
       Ty old_a = a;
       a += b;
@@ -163,6 +170,16 @@ namespace Galois {
     return init_value;
   }
 
+  template<typename Ty>
+  void reset(Ty& var, Ty val) {
+    var = val;
+  }
+
+  template<typename Ty>
+  void reset(std::atomic<Ty>& var, Ty val) {
+    var = val;
+  }
+
   //like std::inner_product
     template<typename ItrTy, typename Ty >
     Ty innerProduct(ItrTy& a_arr, ItrTy& b_arr, Ty init_value) {
@@ -172,5 +189,17 @@ namespace Galois {
       }
       return init_value;
     }
+
+    template<typename... Args>
+      int read_set(Args... args) {
+        //Nothing for now.
+        return 0;
+      }
+
+    template<typename... Args>
+      int write_set(Args... args) {
+        // Nothing for now.
+        return 0;
+      }
 }//End namespace Galois
 #endif

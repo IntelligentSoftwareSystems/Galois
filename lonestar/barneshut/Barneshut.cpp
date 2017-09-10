@@ -567,7 +567,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 }
 
 int main(int argc, char** argv) {
-  Galois::System G;
+  Galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   std::cout << config << "\n";

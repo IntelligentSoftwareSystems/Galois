@@ -53,6 +53,179 @@
 #define SYNC_STRUCT_MACROS
 
 ////////////////////////////////////////////////////////////////////////////////
+// Field flag class
+////////////////////////////////////////////////////////////////////////////////
+
+enum BITVECTOR_STATUS {
+  NONE_INVALID,
+  SRC_INVALID,
+  DST_INVALID,
+  BOTH_INVALID
+};
+
+bool src_invalid(BITVECTOR_STATUS* bv_flag) {
+  return (*bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
+          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+}
+
+bool dst_invalid(BITVECTOR_STATUS* bv_flag) {
+  return (*bv_flag == BITVECTOR_STATUS::DST_INVALID || 
+          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+}
+
+void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
+  switch(*bv_flag) {
+    case NONE_INVALID:
+      *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
+      break;
+    case DST_INVALID:
+      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+      break;
+    case SRC_INVALID:
+    case BOTH_INVALID:
+      break;
+  }
+}
+
+void make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
+  switch(*bv_flag) {
+    case NONE_INVALID:
+      *bv_flag = BITVECTOR_STATUS::DST_INVALID;
+      break;
+    case SRC_INVALID:
+      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+      break;
+    case DST_INVALID:
+    case BOTH_INVALID:
+      break;
+  }
+}
+
+class FieldFlags {
+private:
+  uint8_t _s2s;
+  uint8_t _s2d;
+  uint8_t _d2s;
+  uint8_t _d2d;
+public:
+  BITVECTOR_STATUS bitvectorStatus;
+  /**
+   * Field Flags constructor. Sets all flags to false
+   */
+  FieldFlags() {
+    _s2s = false;
+    _s2d = false;
+    _d2s = false;
+    _d2d = false;
+    bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
+  }
+
+  bool src_to_src() {
+    return _s2s;
+  }
+
+  bool src_to_dst() {
+    return _s2d;
+  }
+
+  bool dst_to_src() {
+    return _d2s;
+  }
+
+  bool dst_to_dst() {
+    return _d2d;
+  }
+
+  void set_write_src() {
+    _s2s = true;
+    _s2d = true;
+  }
+
+  void set_write_dst() {
+    _d2s = true;
+    _d2d = true;
+  }
+
+  void set_write_any() {
+    _s2s = true;
+    _s2d = true;
+    _d2s = true;
+    _d2d = true;
+  }
+
+  void clear_read_src() {
+    _s2s = false;
+    _d2s = false;
+  }
+
+  void clear_read_dst() {
+    _s2d = false;
+    _d2d = false;
+  }
+  
+  void clear_all() {
+    _s2s = false;
+    _s2d = false;
+    _d2s = false;
+    _d2d = false;
+    bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
+  }
+};
+
+// Deprecated; use the class above with the sync on demand call that takes
+// flags as an argument
+#define GALOIS_SYNC_STRUCTURE_FLAGS(fieldname)\
+static uint8_t _##fieldname##_s2s = false;\
+static uint8_t _##fieldname##_s2d = false;\
+static uint8_t _##fieldname##_d2s = false;\
+static uint8_t _##fieldname##_d2d = false;\
+\
+struct Flags_##fieldname {\
+  static bool src_to_src() {\
+    return _##fieldname##_s2s;\
+  }\
+\
+  static bool src_to_dst() {\
+    return _##fieldname##_s2d;\
+  }\
+\
+  static bool dst_to_src() {\
+    return _##fieldname##_d2s;\
+  }\
+\
+  static bool dst_to_dst() {\
+    return _##fieldname##_d2d;\
+  }\
+\
+  static void set_write_src() {\
+    _##fieldname##_s2s = true;\
+    _##fieldname##_s2d = true;\
+  }\
+\
+  static void set_write_dst() {\
+    _##fieldname##_d2s = true;\
+    _##fieldname##_d2d = true;\
+  }\
+\
+  static void set_write_any() {\
+    _##fieldname##_s2s = true;\
+    _##fieldname##_s2d = true;\
+    _##fieldname##_d2s = true;\
+    _##fieldname##_d2d = true;\
+  }\
+\
+  static void clear_read_src() {\
+    _##fieldname##_s2s = false;\
+    _##fieldname##_d2s = false;\
+  }\
+\
+  static void clear_read_dst() {\
+    _##fieldname##_s2d = false;\
+    _##fieldname##_d2d = false;\
+  }\
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Reduce Add
 ////////////////////////////////////////////////////////////////////////////////
 

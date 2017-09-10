@@ -29,9 +29,9 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/gstl.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Runtime/dGraph_edgeCut.h"
@@ -121,9 +121,7 @@ static cll::opt<std::string> personality_set("pset",
 /******************************************************************************/
 
 struct NodeData {
-  // TODO should be uint64_t since component id is the lowest node id of the
-  // component
-  uint32_t comp_current;
+  unsigned long long comp_current;
 };
 
 Galois::DynamicBitSet bitset_comp_current;
@@ -151,26 +149,20 @@ struct InitializeGraph {
     		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		StatTimer_cuda.start();
 
-        InitializeGraph_cuda(*(_graph.begin()), *(_graph.ghost_end()), 
-                                 cuda_ctx);
+        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()), 
+                             cuda_ctx);
 
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
     {
-    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-                   //InitializeGraph {&_graph}, 
-                   //Galois::loopname("InitializeGraph"), 
-                   //Galois::numrun(_graph.get_run_identifier()));
-    Galois::Runtime::do_all_coupled(
+    Galois::do_all_local(
       allNodes,
       InitializeGraph{&_graph}, 
-      std::make_tuple(
-        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
-      )
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
     );
-
     }
   }
 
@@ -182,47 +174,36 @@ struct InitializeGraph {
 
 struct ConnectedComp {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
-  ConnectedComp(Graph* _graph) : graph(_graph){}
+  ConnectedComp(Graph* _graph, Galois::DGAccumulator<unsigned int>& _dga) : 
+    graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph){
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 1;
     
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do { 
       _graph.set_num_iter(_num_iterations);
-      DGAccumulator_accum.reset();
+      dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
-        ConnectedComp_all_cuda(__retval, cuda_ctx);
-        DGAccumulator_accum += __retval;
+        ConnectedComp_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
+                           __retval, cuda_ctx);
+        dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-        //Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp (&_graph), 
-        //               Galois::loopname("ConnectedComp"), 
-        //               Galois::numrun(_graph.get_run_identifier()));
-        //
-        //Galois::do_all_choice(
-          //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.end()), 
-          //ConnectedComp{&_graph}, 
-          //std::make_tuple(
-            //Galois::thread_range(_graph.get_thread_ranges()),
-            //Galois::loopname("ConnectedComp"), 
-            //Galois::numrun(_graph.get_run_identifier()))
-        //);
-      Galois::Runtime::do_all_coupled(
+      Galois::do_all_local(
         nodesWithEdges,
-        ConnectedComp{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
-          Galois::timeit()
-        )
+        ConnectedComp(&_graph, dga),
+        Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
 
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
@@ -230,9 +211,9 @@ struct ConnectedComp {
       
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-        (unsigned long)DGAccumulator_accum.read_local(), 0);
+        (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
-    } while((_num_iterations < maxIterations) && DGAccumulator_accum.reduce());
+    } while((_num_iterations < maxIterations) && dga.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
@@ -247,8 +228,8 @@ struct ConnectedComp {
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      uint32_t new_comp = dnode.comp_current;
-      uint32_t old_comp = Galois::min(snode.comp_current, new_comp);
+      unsigned long long new_comp = dnode.comp_current;
+      unsigned long long old_comp = Galois::min(snode.comp_current, new_comp);
       if (old_comp > new_comp){
         bitset_comp_current.set(src);
         DGAccumulator_accum += 1;
@@ -256,7 +237,6 @@ struct ConnectedComp {
     }
   }
 };
-Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Sanity check operators */
@@ -264,38 +244,39 @@ Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 
 /* Get/print the number of members in node 0's component */
 struct SourceComponentSize {
-  const uint64_t src_comp;
+  const unsigned long long src_comp;
   Graph* graph;
 
-  static Galois::DGAccumulator<uint64_t> DGAccumulator_accum;
+  Galois::DGAccumulator<unsigned long long>& DGAccumulator_accum;
 
-  SourceComponentSize(const uint64_t _src_comp, Graph* _graph) : 
-    src_comp(_src_comp), graph(_graph){}
+  SourceComponentSize(const unsigned long long _src_comp, Graph* _graph, 
+                      Galois::DGAccumulator<unsigned long long>& _dga) : 
+    src_comp(_src_comp), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph) {
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned long long>& dga) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
-      printf("Warning: No GPU support for sanity check; might get "
-             "wrong results.\n");
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
 
-    DGAccumulator_accum.reset();
+    dga.reset();
 
     if (_graph.isOwned(src_node)) {
-      DGAccumulator_accum += _graph.getData(_graph.getLID(src_node)).comp_current;
+      dga += _graph.getData(_graph.getLID(src_node)).comp_current;
     }
 
-    uint64_t src_comp = DGAccumulator_accum.reduce();
+    uint64_t src_comp = dga.reduce();
 
-    DGAccumulator_accum.reset();
+    dga.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   SourceComponentSize(src_comp, &_graph), 
+                   SourceComponentSize(src_comp, &_graph, dga), 
                    Galois::loopname("SourceComponentSize"));
 
-    uint64_t num_in_component = DGAccumulator_accum.reduce();
+    uint64_t num_in_component = dga.reduce();
 
     // Only node 0 will print the number visited
     if (_graph.id == 0) {
@@ -315,17 +296,16 @@ struct SourceComponentSize {
     }
   }
 };
-Galois::DGAccumulator<uint64_t> SourceComponentSize::DGAccumulator_accum;
 
 /******************************************************************************/
 /* Main */
 /******************************************************************************/
 
-
 int main(int argc, char** argv) {
   try {
-    LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager(statOutputFile);
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
+
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
@@ -404,16 +384,19 @@ int main(int argc, char** argv) {
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
+    Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+    Galois::DGAccumulator<unsigned long long> DGAccumulator_accum64;
+
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "[" << net.ID << "] ConnectedComp::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-        ConnectedComp::go((*hg));
+        ConnectedComp::go(*hg, DGAccumulator_accum);
       StatTimer_main.stop();
 
-      SourceComponentSize::go(*hg);
+      SourceComponentSize::go(*hg, DGAccumulator_accum64);
 
       if((run + 1) != numRuns){
       #ifdef __GALOIS_HET_CUDA__
@@ -455,7 +438,9 @@ int main(int argc, char** argv) {
 
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+    G.printDistStats();
+    Galois::Runtime::getHostBarrier().wait();
+
 
     return 0;
   } catch(const char* c) {

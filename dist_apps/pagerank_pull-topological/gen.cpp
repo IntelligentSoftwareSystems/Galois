@@ -31,9 +31,9 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/Galois.h"
+#include "Galois/DistGalois.h"
 #include "Galois/DoAllWrap.h"
-#include "Lonestar/BoilerPlate.h"
+#include "DistBenchStart.h"
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
@@ -87,7 +87,6 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<bool> verify("verify", 
                          cll::desc("Verify ranks by printing to file"), 
                          cll::init(false));
-
 
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", 
@@ -143,34 +142,32 @@ Galois::LargeArray<float> residual;
 /* Algorithm structures */
 /******************************************************************************/
 
+/* (Re)initialize all fields to 0 except for residual which needs to be 0.15
+ * everywhere */
 struct ResetGraph {
+  const float& local_alpha;
   Graph* graph;
 
-  ResetGraph(Graph* _graph) : graph(_graph){}
-  void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		ResetGraph_cuda(*_graph.begin(), *_graph.ghost_end(), cuda_ctx);
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
-    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-        //ResetGraph{ &_graph }, 
-        //Galois::loopname("ResetGraph"), 
-        //Galois::numrun(_graph.get_run_identifier()));
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
-        ResetGraph{ &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
-          Galois::timeit()
-        )
-      );
+  ResetGraph(const float& _local_alpha, Graph* _graph) : 
+      local_alpha(_local_alpha), graph(_graph) {}
 
+  void static go(Graph& _graph) {
+    auto& allNodes = _graph.allNodesRange();
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(),
+      ResetGraph{ alpha, &_graph },
+      Galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
+      Galois::timeit()
+    );
   }
 
   void operator()(GNode src) const {
@@ -178,56 +175,52 @@ struct ResetGraph {
     sdata.value = 0;
     sdata.nout = 0;
     delta[src] = 0;
-    residual[src] = 0;
+    residual[src] = local_alpha;
   }
 };
 
 struct InitializeGraph {
-  const float & local_alpha;
   Graph* graph;
 
-  InitializeGraph(const float & _local_alpha, Graph* _graph) : 
-    local_alpha(_local_alpha),
-    graph(_graph){}
-  void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
-          (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		InitializeGraph_all_cuda(alpha, cuda_ctx);
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
-    //Galois::do_all(_graph.begin(), _graph.end(), 
-        //InitializeGraph{ alpha, &_graph }, 
-        //Galois::loopname("InitializeGraph"), 
-        //Galois::numrun(_graph.get_run_identifier()));
+  InitializeGraph(Graph* _graph) : graph(_graph) {}
 
-     Galois::Runtime::do_all_coupled(
-        nodesWithEdges,
-        InitializeGraph{alpha, &_graph },
-        std::make_tuple(
-          Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-          Galois::timeit()
-        )
-      );
+  void static go(Graph& _graph) {
+    // init graph
+    ResetGraph::go(_graph);
+
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
+                           cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    // doing a local do all because we are looping over edges
+    Galois::do_all_local(
+      nodesWithEdges,
+      InitializeGraph{ &_graph },
+      Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
+    );
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph");
-    _graph.sync<writeSource, readAny, Reduce_set_residual, Broadcast_residual,
-                Bitset_residual>("PageRank");
   }
 
+  // Calculate "outgoing" edges for destination nodes (note we are using
+  // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
-    auto& sdata = graph->getData(src);
-    sdata.value = 0;
-    residual[src] = local_alpha;
-    bitset_residual.set(src);
-    delta[src] = 0;
-    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
+    for (auto nbr = graph->edge_begin(src), 
+              ee = graph->edge_end(src); 
+         nbr != ee; 
+         ++nbr) {
       GNode dst = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
       Galois::atomicAdd(ddata.nout, (uint32_t)1);
@@ -241,107 +234,89 @@ struct PageRank_delta {
   cll::opt<float> & local_tolerance;
   Graph* graph;
 
+  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+
   PageRank_delta(const float & _local_alpha, cll::opt<float> & _local_tolerance,
-      Graph* _graph) : 
-        local_alpha(_local_alpha),
-        local_tolerance(_local_tolerance),
-        graph(_graph){}
-  void static go(Graph& _graph) {
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
+                 Graph* _graph, Galois::DGAccumulator<unsigned int>& _dga) : 
+      local_alpha(_local_alpha),
+      local_tolerance(_local_tolerance),
+      graph(_graph),
+      DGAccumulator_accum(_dga) {}
+
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
+    auto& allNodes = _graph.allNodesRange();
+
     #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
-          (_graph.get_run_identifier()));
-    		Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-        int __retval = 0;
-    		PageRank_delta_cuda(*_graph.begin(), *_graph.ghost_end(), 
-            __retval, alpha, tolerance, cuda_ctx);
-        DGAccumulator_accum += __retval;
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
+        (_graph.get_run_identifier()));
+      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      int __retval = 0;
+      PageRank_delta_cuda(*allNodes.begin(), *allNodes.end(),
+                          __retval, alpha, tolerance, cuda_ctx);
+      dga += __retval;
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
     #endif
-    //Galois::do_all(_graph.begin(), _graph.ghost_end(), 
-    //    PageRank_delta { alpha, tolerance, &_graph }, 
-    //    Galois::loopname("PageRank"), 
-    //    Galois::numrun(_graph.get_run_identifier()));
-    //Galois::do_all_choice(
-      //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.ghost_end()), 
-      //PageRank_delta{ alpha, tolerance, &_graph }, 
-      //std::make_tuple(Galois::loopname("PageRank"), 
-        //Galois::thread_range(_graph.get_thread_ranges()),
-        //Galois::numrun(_graph.get_run_identifier())
-      //));
-      Galois::Runtime::do_all_coupled(
-          nodesWithEdges,
-          PageRank_delta{ alpha, tolerance, &_graph },
-          std::make_tuple(
-            Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-            Galois::timeit()
-            )
-      );
-
-
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(),
+      PageRank_delta{ alpha, tolerance, &_graph, dga },
+      Galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
+      Galois::do_all_steal<true>(),
+      Galois::timeit()
+    );
   }
 
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
-  void operator()(GNode src)const {
+  void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
     delta[src] = 0;
+
     if (residual[src] > this->local_tolerance) {
       sdata.value += residual[src];
       if (sdata.nout > 0) {
-        delta[src] = residual[src]*(1-local_alpha)/sdata.nout;
+        delta[src] = residual[src] * (1 - local_alpha) / sdata.nout;
         DGAccumulator_accum += 1;
       }
       residual[src] = 0;
     }
   }
 };
-Galois::DGAccumulator<int>  PageRank_delta::DGAccumulator_accum;
 
+// TODO: GPU code operator does not match CPU's operator (cpu accumulates sum 
+// and adds all at once, GPU adds each pulled value individually/atomically)
 struct PageRank {
   Graph* graph;
 
-  PageRank(Graph* _graph) : graph(_graph){}
-  void static go(Graph& _graph) {
+  PageRank(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
-    auto nodesWithEdges = _graph.allNodesWithEdgesRange();
-    do{
+    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    //unsigned int reduced = 0;
+
+    do {
       _graph.set_num_iter(_num_iterations);
-      PageRank_delta::DGAccumulator_accum.reset();
-      PageRank_delta::go(_graph);
+      dga.reset();
+      PageRank_delta::go(_graph, dga);
 
       #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) {
-          std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
-            (_graph.get_run_identifier()));
-          Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-          StatTimer_cuda.start();
-          PageRank_all_cuda(cuda_ctx);
-          StatTimer_cuda.stop();
-        } else if (personality == CPU)
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
+          (_graph.get_run_identifier()));
+        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        StatTimer_cuda.start();
+        PageRank_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
       #endif
-      //Galois::do_all(_graph.begin(), _graph.end(), 
-      //    PageRank { &_graph }, 
-      //    Galois::loopname("PageRank"), 
-      //    Galois::numrun(_graph.get_run_identifier()));
-
-      //Galois::do_all_choice(
-        //Galois::Runtime::makeStandardRange(_graph.begin(), _graph.ghost_end()), 
-        //PageRank{ &_graph }, 
-        //std::make_tuple(Galois::loopname("PageRank"), 
-          //Galois::thread_range(_graph.get_thread_ranges()),
-          //Galois::numrun(_graph.get_run_identifier())
-        //));
-
-      Galois::Runtime::do_all_coupled(
-          nodesWithEdges,
-          PageRank{ &_graph },
-          std::make_tuple(
-            Galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-            Galois::timeit()
-            )
+      Galois::do_all_local(
+        nodesWithEdges,
+        PageRank{ &_graph },
+        Galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
@@ -349,10 +324,13 @@ struct PageRank {
       
       Galois::Runtime::reportStat("(NULL)", 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-          (unsigned long)PageRank_delta::DGAccumulator_accum.read_local(), 0);
+          (unsigned long)dga.read_local(), 0);
 
+      //reduced = dga.reduce();
+      //printf("[%d] iter %u local is %u\n", _graph.id, _num_iterations, dga.read_local());
+      //printf("[%d] iter %u reduced is %u\n", _graph.id, _num_iterations, reduced);
       ++_num_iterations;
-    }while((_num_iterations < maxIterations) && PageRank_delta::DGAccumulator_accum.reduce());
+    } while ((_num_iterations < maxIterations) && dga.reduce());
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
@@ -361,14 +339,20 @@ struct PageRank {
     }
   }
 
+  // Pull deltas from neighbor nodes, then add to self-residual
   void operator()(GNode src)const {
     float sum = 0;
-    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
+
+    for(auto nbr = graph->edge_begin(src), 
+             ee = graph->edge_end(src); 
+        nbr != ee; 
+        ++nbr) {
       GNode dst = graph->getEdgeDst(nbr);
       if (delta[dst] > 0) {
         sum += delta[dst];
       }
     }
+
     if (sum > 0) {
       Galois::add(residual[src], sum);
       bitset_residual.set(src);
@@ -380,6 +364,7 @@ struct PageRank {
 /* Sanity check operators */
 /******************************************************************************/
 
+// Gets various values from the pageranks values/residuals of the graph
 struct PageRankSanity {
   cll::opt<float>& local_tolerance;
   Graph* graph;
@@ -389,53 +374,82 @@ struct PageRankSanity {
   static float current_max_residual;
   static float current_min_residual;
 
-  static Galois::DGAccumulator<float> DGAccumulator_max;
-  static Galois::DGAccumulator<float> DGAccumulator_min;
-  static Galois::DGAccumulator<float> DGAccumulator_sum;
-  static Galois::DGAccumulator<float> DGAccumulator_sum_residual;
-  static Galois::DGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance;
-  static Galois::DGAccumulator<float> DGAccumulator_max_residual;
-  static Galois::DGAccumulator<float> DGAccumulator_min_residual;
+  Galois::DGAccumulator<float>& DGAccumulator_max;
+  Galois::DGAccumulator<float>& DGAccumulator_min;
+  Galois::DGAccumulator<float>& DGAccumulator_sum;
+  Galois::DGAccumulator<float>& DGAccumulator_sum_residual;
+  Galois::DGAccumulator<uint64_t>& DGAccumulator_residual_over_tolerance;
+  Galois::DGAccumulator<float>& DGAccumulator_max_residual;
+  Galois::DGAccumulator<float>& DGAccumulator_min_residual;
 
-  PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph) : 
-    local_tolerance(_local_tolerance), graph(_graph) {}
+  PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph,
+      Galois::DGAccumulator<float>& _DGAccumulator_max,
+      Galois::DGAccumulator<float>& _DGAccumulator_min,
+      Galois::DGAccumulator<float>& _DGAccumulator_sum,
+      Galois::DGAccumulator<float>& _DGAccumulator_sum_residual,
+      Galois::DGAccumulator<uint64_t>& _DGAccumulator_residual_over_tolerance,
+      Galois::DGAccumulator<float>& _DGAccumulator_max_residual,
+      Galois::DGAccumulator<float>& _DGAccumulator_min_residual
+  ) : 
+    local_tolerance(_local_tolerance), graph(_graph),
+    DGAccumulator_max(_DGAccumulator_max),
+    DGAccumulator_min(_DGAccumulator_min),
+    DGAccumulator_sum(_DGAccumulator_sum),
+    DGAccumulator_sum_residual(_DGAccumulator_sum_residual),
+    DGAccumulator_residual_over_tolerance(_DGAccumulator_residual_over_tolerance),
+    DGAccumulator_max_residual(_DGAccumulator_max_residual),
+    DGAccumulator_min_residual(_DGAccumulator_min_residual) {}
 
-  void static go(Graph& _graph) {
+  void static go(Graph& _graph,
+    Galois::DGAccumulator<float>& DGA_max,
+    Galois::DGAccumulator<float>& DGA_min,
+    Galois::DGAccumulator<float>& DGA_sum,
+    Galois::DGAccumulator<float>& DGA_sum_residual,
+    Galois::DGAccumulator<uint64_t>& DGA_residual_over_tolerance,
+    Galois::DGAccumulator<float>& DGA_max_residual,
+    Galois::DGAccumulator<float>& DGA_min_residual
+  ) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // Only node 0 will print data
-      if (_graph.id == 0) {
-        // TODO currently no GPU support for sanity check operator
-        printf("Warning: No GPU support for sanity check; might get "
-               "wrong results.\n");
-      }
+      // TODO currently no GPU support for sanity check operator
+      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
+                      "wrong results.\n");
     }
   #endif
-
-    DGAccumulator_max.reset();
-    DGAccumulator_min.reset();
-    DGAccumulator_sum.reset();
-    DGAccumulator_sum_residual.reset();
-    DGAccumulator_residual_over_tolerance.reset();
-    DGAccumulator_max_residual.reset();
-    DGAccumulator_min_residual.reset();
+    DGA_max.reset();
+    DGA_min.reset();
+    DGA_sum.reset();
+    DGA_sum_residual.reset();
+    DGA_residual_over_tolerance.reset();
+    DGA_max_residual.reset();
+    DGA_min_residual.reset();
 
     Galois::do_all(_graph.begin(), _graph.end(), 
-                   PageRankSanity(tolerance, &_graph), 
+                   PageRankSanity(
+                     tolerance, 
+                     &_graph,
+                     DGA_max,
+                     DGA_min,
+                     DGA_sum,
+                     DGA_sum_residual,
+                     DGA_residual_over_tolerance,
+                     DGA_max_residual,
+                     DGA_min_residual
+                   ), 
                    Galois::loopname("PageRankSanity"));
 
-    DGAccumulator_max = current_max;
-    DGAccumulator_min = current_min;
-    DGAccumulator_max_residual = current_max_residual;
-    DGAccumulator_min_residual = current_min_residual;
+    DGA_max = current_max;
+    DGA_min = current_min;
+    DGA_max_residual = current_max_residual;
+    DGA_min_residual = current_min_residual;
 
-    float max_rank = DGAccumulator_max.reduce_max();
-    float min_rank = DGAccumulator_min.reduce_min();
-    float rank_sum = DGAccumulator_sum.reduce();
-    float residual_sum = DGAccumulator_sum_residual.reduce();
-    uint64_t over_tolerance = DGAccumulator_residual_over_tolerance.reduce();
-    float max_residual = DGAccumulator_max_residual.reduce_max();
-    float min_residual = DGAccumulator_min_residual.reduce_min();
+    float max_rank = DGA_max.reduce_max();
+    float min_rank = DGA_min.reduce_min();
+    float rank_sum = DGA_sum.reduce();
+    float residual_sum = DGA_sum_residual.reduce();
+    uint64_t over_tolerance = DGA_residual_over_tolerance.reduce();
+    float max_residual = DGA_max_residual.reduce_max();
+    float min_residual = DGA_min_residual.reduce_min();
 
     // Only node 0 will print data
     if (_graph.id == 0) {
@@ -480,21 +494,10 @@ struct PageRankSanity {
     }
   }
 };
-
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max;
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min;
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum;
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_sum_residual;
-Galois::DGAccumulator<uint64_t> PageRankSanity::DGAccumulator_residual_over_tolerance;
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_max_residual;
-Galois::DGAccumulator<float> PageRankSanity::DGAccumulator_min_residual;
-
 float PageRankSanity::current_max = 0;
 float PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
-
 float PageRankSanity::current_max_residual = 0;
 float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
-
 
 /******************************************************************************/
 /* Main */
@@ -502,9 +505,11 @@ float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() /
 
 int main(int argc, char** argv) {
   try {
-    LonestarStart(argc, argv, name, desc, url);
+    Galois::DistMemSys G(getStatsFile());
+    DistBenchStart(argc, argv, name, desc, url);
+
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::StatManager statManager(statOutputFile);
+
     {
     if (net.ID == 0) {
       Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
@@ -523,8 +528,8 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
-    //Parse arg string when running on multiple hosts and update/override personality
-    //with corresponding value.
+    // Parse arg string when running on multiple hosts and update/override personality
+    // with corresponding value.
     if (num_nodes == -1) num_nodes = net.Num;
     assert((net.Num % num_nodes) == 0);
     if (personality_set.length() == (net.Num / num_nodes)) {
@@ -579,9 +584,18 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-    InitializeGraph::go((*hg));
+    InitializeGraph::go(*hg);
     StatTimer_init.stop();
 
+    Galois::DGAccumulator<unsigned int> PageRank_accum;
+
+    Galois::DGAccumulator<float> DGA_max;
+    Galois::DGAccumulator<float> DGA_min;
+    Galois::DGAccumulator<float> DGA_sum;
+    Galois::DGAccumulator<float> DGA_sum_residual;
+    Galois::DGAccumulator<uint64_t> DGA_residual_over_tolerance;
+    Galois::DGAccumulator<float> DGA_max_residual;
+    Galois::DGAccumulator<float> DGA_min_residual;
 
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
@@ -589,17 +603,25 @@ int main(int argc, char** argv) {
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
-      PageRank::go((*hg));
+      PageRank::go(*hg, PageRank_accum);
       StatTimer_main.stop();
 
       // sanity check
       PageRankSanity::current_max = 0;
       PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
-
       PageRankSanity::current_max_residual = 0;
       PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
 
-      PageRankSanity::go(*hg);
+      PageRankSanity::go(
+        *hg,
+        DGA_max,
+        DGA_min,
+        DGA_sum,
+        DGA_sum_residual,
+        DGA_residual_over_tolerance,
+        DGA_max_residual,
+        DGA_min_residual
+      );
 
       if((run + 1) != numRuns){
         //Galois::Runtime::getHostBarrier().wait();
@@ -615,8 +637,7 @@ int main(int argc, char** argv) {
         }
 
         (*hg).reset_num_iter(run+1);
-        ResetGraph::go((*hg));
-        InitializeGraph::go((*hg));
+        InitializeGraph::go(*hg);
       }
     }
 
@@ -645,7 +666,9 @@ int main(int argc, char** argv) {
 
     }
     Galois::Runtime::getHostBarrier().wait();
-    statManager.reportStat();
+    G.printDistStats();
+    Galois::Runtime::getHostBarrier().wait();
+
 
     return 0;
   } catch (const char* c) {

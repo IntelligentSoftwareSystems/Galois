@@ -6,7 +6,7 @@ void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_CURRENT_DEGREE;
-bool * P_FLAG;
+uint8_t * P_FLAG;
 unsigned int * P_TRIM;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
@@ -210,12 +210,11 @@ __global__ void InitializeGraph2(CSRGraph graph,
   // FP: "94 -> 95;
 }
 __global__ void InitializeGraph1(CSRGraph graph, 
-                                 DynamicBitset* is_updated,
                                  unsigned int __nowned, 
                                  unsigned int __begin, 
                                  unsigned int __end, 
                                  uint32_t * p_current_degree, 
-                                 bool * p_flag, 
+                                 uint8_t * p_flag, 
                                  uint32_t * p_trim)
 {
   unsigned tid = TID_1D;
@@ -233,13 +232,12 @@ __global__ void InitializeGraph1(CSRGraph graph,
       p_flag[src] = true;
       p_trim[src] = 0;
       p_current_degree[src] = 0;
-      is_updated->set(src);
     }
   }
   // FP: "9 -> 10;
 }
 __global__ void KCoreStep2(CSRGraph graph,
-  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_degree, uint32_t * p_trim)
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_degree, uint32_t * p_trim, uint8_t * p_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -253,17 +251,22 @@ __global__ void KCoreStep2(CSRGraph graph,
     bool pop  = src < __end;
     if (pop)
     {
-      if (p_trim[src] > 0)
+      // manual addition to match current cpu code; gpu should have been able
+      // to generate it
+      if (p_flag[src]) 
       {
-        p_current_degree[src] = p_current_degree[src] - p_trim[src];
-        p_trim[src] = 0;
+        if (p_trim[src] > 0)
+        {
+          p_current_degree[src] = p_current_degree[src] - p_trim[src];
+          p_trim[src] = 0;
+        }
       }
     }
   }
   // FP: "10 -> 11;
 }
 __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
-    unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, bool * p_flag, uint32_t * p_trim, Sum ret_val)
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, Sum ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -467,7 +470,6 @@ void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph1 <<<blocks, threads>>>(ctx->gg, 
-    ctx->current_degree.is_updated.gpu_rd_ptr(),
     ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
     ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
@@ -491,7 +493,7 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "4 -> 5;
   KCoreStep2 <<<blocks, threads>>>(ctx->gg, 
     ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
-    ctx->trim.data.gpu_wr_ptr());
+    ctx->trim.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;

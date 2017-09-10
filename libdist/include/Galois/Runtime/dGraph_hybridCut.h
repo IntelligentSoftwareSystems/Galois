@@ -264,7 +264,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
                        boost::make_counting_iterator<uint64_t>(nodeEnd)),
-        std::make_pair(edgeBegin, edgeEnd));
+        std::make_pair(edgeBegin, edgeEnd),
+        true);
 
 #if 0
       else {
@@ -361,15 +362,24 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto beginIter = boost::make_counting_iterator((uint32_t)0);
       auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
-      Galois::Runtime::do_all_coupled(
-        Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //Galois::Runtime::do_all_coupled(
+      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //  [&] (auto n) {
+      //    base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
+      //  },
+      //  std::make_tuple(
+      //    Galois::loopname("EdgeLoading"),
+      //    Galois::timeit()
+      //  )
+      //);
+      Galois::do_all(
+        beginIter, endIter,
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        std::make_tuple(
-          Galois::loopname("EdgeLoading"),
-          Galois::timeit()
-        )
+        Galois::loopname("EdgeLoading"),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
 
       StatTimer_allocate_local_DS.stop();
@@ -495,6 +505,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
       }
 
+      auto activeThreads = Galois::Runtime::activeThreads;
+      Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+
       Galois::Timer timer;
       timer.start();
       fileGraph.reset_byte_counters();
@@ -505,13 +518,45 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
       auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
       auto& id = base_hGraph::id;
-      Galois::Runtime::do_all_coupled(
-        Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //Galois::Runtime::do_all_coupled(
+      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
+      //  [&] (auto src) {
+      //    auto ee = fileGraph.edge_begin(src);
+      //    auto ee_end = fileGraph.edge_end(src);
+      //    auto num_edges = std::distance(ee, ee_end);
+      //    if(num_edges > VCutThreshold){
+      //      //Assign edges for high degree nodes to the destination
+      //      for(; ee != ee_end; ++ee){
+      //        auto gdst = fileGraph.getEdgeDst(ee);
+      //        auto h = this->find_hostID(gdst);
+      //        numOutgoingEdges[h][src - globalOffset]++;
+      //        num_assigned_edges_perhost[h] += 1;
+      //      }
+      //    } else {
+      //      //keep all edges with the source node
+      //      for(; ee != ee_end; ++ee){
+      //        numOutgoingEdges[id][src - globalOffset]++;
+      //        num_assigned_edges_perhost[id] += 1;
+      //        auto gdst = fileGraph.getEdgeDst(ee);
+      //        if(!this->isOwned(gdst))
+      //          ghosts.set(gdst);
+      //      }
+      //    }
+      //  },
+
+      //  std::make_tuple(
+      //    Galois::loopname("EdgeInspection"),
+      //    Galois::timeit()
+      //  )
+      //);
+
+      Galois::do_all(
+        beginIter, endIter,
         [&] (auto src) {
           auto ee = fileGraph.edge_begin(src);
           auto ee_end = fileGraph.edge_end(src);
           auto num_edges = std::distance(ee, ee_end);
-          if(num_edges > VCutThreshold){
+          if (num_edges > VCutThreshold){
             //Assign edges for high degree nodes to the destination
             for(; ee != ee_end; ++ee){
               auto gdst = fileGraph.getEdgeDst(ee);
@@ -530,14 +575,16 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             }
           }
         },
-        std::make_tuple(
-          Galois::loopname("EdgeInspection"),
-          Galois::timeit()
-        )
+        Galois::loopname("EdgeInspection"),
+        Galois::do_all_steal<true>(),
+        Galois::timeit()
       );
+
       timer.stop();
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+
+      Galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
