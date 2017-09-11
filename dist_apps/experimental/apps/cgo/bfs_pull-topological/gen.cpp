@@ -364,7 +364,7 @@ int main(int argc, char** argv) {
                                   (unsigned long)maxIterations, 0);
       Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
                                   (unsigned long long)src_node, 0);
-      #if __OPT_VERSION__ == 2
+      #if __OPT_VERSION__ == 1
       printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
       printf("Version 2 of optimization\n");
