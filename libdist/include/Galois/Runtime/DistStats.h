@@ -44,6 +44,12 @@ class DistStatManager: public Galois::Runtime::StatManager {
   static constexpr bool PRINT_THREAD_VALS = false; // TODO: use env variable instead of this
 
   template <typename T>
+  using ThreadVals = Galois::gstl::Vector<T>;
+
+  template <typename T>
+  using HostStatVal = std::pair<unsigned, const ThreadVals<T>&>;
+
+  template <typename T>
   struct HostStat {
 
     using AggStat_ty = typename AggStat<T>::with_mem::with_sum::with_min::with_max;
@@ -52,16 +58,19 @@ class DistStatManager: public Galois::Runtime::StatManager {
     using InterHostStats = typename AggStat<T>::with_sum::with_min::with_max;
 
     PerHostThreadStats threadStats;
-    InterHostStats interStats;
+    InterHostStats hostStats;
 
-    void addToStat(unsigned hostID, const Galois::gstl::Vector<T>& threadVals) {
+    void add(const HostStatVal<T>& val) {
+
+      const auto& hostID = val.first;
+      const auto& threadVals = val.second;
 
       auto p = threadStats.emplace(hostID, AggStat_ty());
       auto& tstat = p.first->second;
 
       for (const auto& i: threadVals) {
         tstat.add(i);
-        interStats.add(i);
+        hostStats.add(i);
       }
 
     }
@@ -71,7 +80,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
       for (const auto& p: threadStats) {
         out << p->first << SEP;
 
-        out << interStats.sum() << SEP << interStats.avg() << SEP << interStats.min() << SEP << interStats.max() << SEP ;
+        out << hostStats.sum() << SEP << hostStats.avg() << SEP << hostStats.min() << SEP << hostStats.max() << SEP ;
         out << p->second.sum() << SEP << p->second.avg() << SEP << p->second.min() << SEP << p->second.max();
 
         if (PRINT_THREAD_VALS) {
@@ -86,48 +95,17 @@ class DistStatManager: public Galois::Runtime::StatManager {
   };
 
   template <typename T>
-  struct DistStatManagerImpl {
+  struct DistStatManagerImpl: public hidden::BasicStatMap<HostStatVal<T> > {
 
-    using StrSet = Galois::gstl::Set<Str>;
-    using HostStatMap = Galois::gstl::Map<std::tuple<const Str*, const Str*>, HostStat>;
-
-    StrSet symbols;
-    HostStatMap hostStatMap;
-    size_t maxThreads = 0;
-
-    const Str* getOrInsertSymbol(const Str& name) {
-      auto p = symbols.insert(name);
-      return &*(p.first);
-    }
-
-    HostStat& getOrInsertMapping(const Str& loopname, const Str& category) {
-      const Str* ln = getOrInsertSymbol(loopname);
-      const STr* cat = getOrInsertSymbol(category);
-
-      auto tpl = std::make_tuple(ln, cat);
-
-      auto p  = hostStatMap.emplace(tpl, HostStat());
-
-      return p.first->second;
-      
-    }
-
-    void addToStat(unsigned hostID, const Str& loopname, const Str& category, const Galois::gstl::Vector<T>& threadVals) {
-
-      auto& hstat = getOrInsertMapping(loopname, category);
-      hstat.addToStat(hostID, threadVals);
-
-      if (threadVals.size() > maxThreads) {
-        maxThreads = threadVals.size();
-      }
-    }
-
-
+    using Base = hidden::BasicStatMap<HostStatVal<T> >;
 
     void print(std::ostream& out) {
-      for (const auto& p: hostStatMap) {
-        out << *std::get<0>(p.first) << ", " << *std::get<1>(p.first) << ", ";
+
+      for (auto i = Base::cbegin(), end_i = cend(); i != end_i; ++i) {
+
+        out << Base::name(i) << SEP << Base::category(i) << SEP;
         p.print(out);
+        out << std::endl;
       }
     }
 
@@ -145,10 +123,12 @@ class DistStatManager: public Galois::Runtime::StatManager {
     if (PRINT_THREAD_VALS) {
       out << SEP << "THREAD_SUM" << SEP << "THREAD_AVG" << SEP << "THREAD_MIN" << SEP << "THREAD_MAX";
 
-      for (size_t i = 0; i < intDistStats.maxThreads; ++i) {
+      for (unsigned i = 0; i < Base::maxThreads(); ++i) {
         out << SEP << "T" << i;
       }
     }
+
+    out << std::endl;
   }
 
   virtual void print(std::ostream& out) {

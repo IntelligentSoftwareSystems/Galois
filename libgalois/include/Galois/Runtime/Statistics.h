@@ -1,12 +1,47 @@
+/** Statistics collection and management -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galois is a framework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
+
 #ifndef GALOIS_STAT_MANAGER_H
 #define GALOIS_STAT_MANAGER_H
 
 #include "Galois/gstl.h"
+#include "Galois/gIO.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/ThreadRWlock.h"
 
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 #include <limits>
+#include <string>
+#include <map>
 /**
  * TODO: 
  * Print intra host stats with per-thread details and inter-host stats with per-host details
@@ -17,6 +52,8 @@
 
 namespace Galois {
 namespace Runtime {
+
+boost::uuids::uuid getRandUUID();
 
 template <typename T>
 class RunningMin {
@@ -142,59 +179,113 @@ public:
 };
 
 
-#define STAT_MANAGER_IMPL 2// 0 or 1 or 2
+namespace hidden {
+
+template <typename Stat>
+struct BasicStatMap {
+
+  using Str = Galois::gstl::Str;
+  using StrSet = Galois::gstl::Set<Str>;
+  using StatMap = Galois::gstl::Map<std::tuple<const Str*, const Str*>, Stat>;
+  using const_iterator = typename StatMap::const_iterator;
+
+protected:
+
+  StrSet symbols;
+  StatMap statMap;
+
+  const Str* getOrInsertSymbol(const Str& s) {
+    auto p = symbols.insert(s);
+    return &*(p.first);
+  }
+
+  const Str* getSymbol(const Str& s) const {
+    auto i = symbols.find(s);
+
+    if (i == symbols.cend()) {
+      return nullptr;
+    } else {
+      return &(*i);
+    }
+  }
+
+public:
+
+  Stat& getOrInsertStat(const Str& loopname, const Str& category) {
+    
+    const Str* ln = getOrInsertSymbol(loopname);
+    const Str* cat = getOrInsertSymbol(category);
+
+    auto tpl = std::make_tpl(ln, cat);
+
+    auto p = statMap.emplace(tpl, Stat());
+
+    return p.first->second;
+  }
+
+  template <typename T>
+  void addToStat(const Str& loopname, const Str& category, const T& val) {
+    Stat& s = getOrInsertStat(loopname, category);
+    s.add(val);
+  }
+
+  const_iterator begin(void) const { return statMap.begin(); } 
+  const_iterator end(void) const { return statMap.end(); } 
+
+  const_iterator cbegin(void) const { return statMap.cbegin(); } 
+  const_iterator cend(void) const { return statMap.cend(); } 
+
+  const Str& name(const const_iterator& i) const { return *(std::get<0>(i->first)); }
+
+  const Str& category(const const_iterator& i) const { return *(std::get<1>(i->first)); }
+
+  const Stat& stat(const const_iterator& i) const { return i->second; }
+
+};
+
+template <typename T>
+using VecStat_with_MinMaxSum = typename AggStatistic<T>::with_mem::with_min::with_max::with_sum;
+
+
+template <typename T>
+using VecStatManager = BasicStatMap<VecStat_with_MinMaxSum<T> >;
+
+template <typename T>
+struct ScalarStat {
+  T m_val;
+
+  ScalarStat(void): m_val() {}
+
+  void add (const T& v) {
+    m_val += v;
+  }
+
+  operator const T& (void) const { return m_val; }
+
+};
+
+template <typename T>
+using ScalarStatManager = BasicStatMap<ScalarStat<T> >;
+
+
+} // end namespace hidden
+
+#define STAT_MANAGER_IMPL 0// 0 or 1 or 2
 
 #if STAT_MANAGER_IMPL == 0
 
 class StatManager {
 
   using Str = Galois::gstl::Str;
-  using StrSet = Galois::gstl::Set<Str>;
-  using StatMap = Galois::gstl::Map<std::tuple<const Str*, const Str*>, T>;
-
-
-  template <typename T>
-  struct ThreadStatManager {
-
-    StrSet symbols;
-    StatMap statMap;
-
-    const Str* getOrInsertSymbol(const Str& s) {
-      auto i = symbols.insert(s);
-      return &(i->first);
-    }
-
-    const Str* getSymbol(const Str& s) const {
-      auto i = symbols.find(s);
-
-      if (i == symbols.cend()) {
-        return nullptr;
-      } else {
-        return &(*i);
-      }
-    }
-
-    void addToStat(const Str& loopname, const Str& category, const T& val) {
-
-      const Str* ln = getOrInsertSymbol(loopname);
-      const Str* cat = getOrInsertSymbol(category);
-
-      auto tpl = std::make_tuple(ln, cat);
-
-      auto p = statMap.emplace(tpl, val);
-
-      if (!p.second) {
-        p.first.second += val;
-      }
-    }
-  };
-
 
   template <typename T>
   struct StatManagerImpl {
 
-    Substrate::PerThreadStorage<ThreadStatManager<T>> perThreadManagers;
-    ThreadStatManager result;
+    using MergedStats = hidden::VecStatManager<T>;
+    using const_iterator = typename MergedStats::const_iterator;
+
+    Substrate::PerThreadStorage<hidden::ScalarStatManager<T> > perThreadManagers;
+    MergedStats result;
     bool merged = false;
 
     
@@ -210,8 +301,8 @@ class StatManager {
 
         ThreadStatManager* manager = *perThreadManagers.getRemote(t);
 
-        for (auto p: manager->statMap) {
-          result.addToStat(*std::get<0>(p.first), *std::get<1>(p.first), p.second);
+        for (auto i = manager->cbegin(), end_i = manager.cend(); i != end_i; ++i) {
+          result.addToStat(manager->name(i), manager->category(i), T(manager->stat(i)));
         }
       }
 
@@ -219,17 +310,87 @@ class StatManager {
     }
 
 
+    const_iterator begin(void) const { return result.begin(); } 
+    const_iterator end(void) const { return result.end(); } 
+
+    const_iterator cbegin(void) const { return result.cbegin(); } 
+    const_iterator cend(void) const { return result.cend(); } 
+
+    const Str& name(const const_iterator& i) const { return result.name(i); }
+
+    const Str& category(const const_iterator& i) const { return result.category(i);  }
+
+    const Stat& stat(const const_iterator& i) const { return result.stat(i); }
+
+    template <typename S, typename V>
+    void readStat(const const_iterator& i, S& name, S& category, V& vec) const {
+      name = this->name(i);
+      category = this->category(i);
+
+      vec.clear();
+      vec = this->stat(i).values();
+    }
+
+    void print(std::ostream& out) const {
+      for (auto i = cbegin(), end_i = cend(); i != end_i; ++i) {
+        out << "STAT" << SEP << this->name(i) << SEP << this->category(i) << SEP;
+
+        const auto& s = this->stat(i);
+        out << s.sum() << SEP << s.avg() << SEP << s.min() << SEP << s.max();
+
+        for (const auto i: s.values()) {
+          out << SEP << i;
+        }
+
+        out << std::endl;
+      }
+    }
+
   };
 
+  using IntStats = StatManagerImpl<int64_t>;
+  using FPstats = StatManagerImpl<double>;
+  using int_iterator = typename IntStats::const_iterator;
+  using fp_iterator = typename FPstats::const_iterator;
 
-  StatManagerImpl<int64_t> intStats;
-  StatManagerImpl<double> fpStats;
+  static const char* const SEP = ", ";
+
+  Str m_outfile;
+  IntStats intStats;
+  FPstats fpStats;
 
 protected:
 
+  void mergeStats(void) {
+    intStats.mergeStats();
+    fpStats.mergeStats();
+  }
+
+  int_iterator intBegin(void) const;
+  int_iterator intEnd(void) const;
+
+  fp_iterator fpBegin(void) const;
+  fp_iterator fpEnd(void) const;
+
+  template <typename S, typename V>
+  void readIntStat(const typename IntStats::const_iterator& i, S& name, S& category, V& vec) const {
+    intStats.readStat(i, name, category, vec);
+  }
+
+  template <typename S, typename V>
+  void readFPstat(const typename IntStats::const_iterator& i, S& name, S& category, V& vec) const {
+    fpStats.readStat(i, name, category, vec);
+  }
+
+  virtual void printStats(std::ostream& out);
+
+  virtual void printHeader(std::ostream& out);
+
+  unsigned maxThreads(void) const;
 
 public:
 
+  explicit StatCollector(const Str& outfile="");
 
   void addToStat(const Str& loopname, const Str& category, int64_t val) {
     intStats.addToStat(loopname, category, val);
@@ -239,11 +400,7 @@ public:
     fpStats.addToStat(loopname, category, val);
   }
 
-  void print() {
-    printHeader();
-    intStats.print();
-    fpStats.print();
-  }
+  void print(void);
 
 };
 
@@ -414,6 +571,48 @@ protected:
 };
 
 #endif
+
+namespace internal {
+  void setSysStatManager(StatManager* sm);
+  StatManager* sysStatManager(void);
+}
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T> > >
+void reportStat(const char* loopname, const char* category, const T& value) {
+  sysStatManager()->addToStat(
+      gst::String(loopname? loopname: "(NULL)"),
+      gst::String(category? category: "(NULL)"),
+      int64_t(value));
+}
+
+template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T> > >
+void reportStat(const char* loopname, const char* category, const T& value) {
+  sysStatManager()->addToStat(
+      gst::String(loopname? loopname: "(NULL)"),
+      gst::String(category? category: "(NULL)"),
+      double(value));
+}
+
+
+//! Reports stats for a given thread
+void reportParam(const char* loopname, const char* category, const std::string& value);
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T> > >
+void reportStat(const gstl::String& loopname, const gstl::String& category, const T& value) {
+  sysStatManager()->addToStat(loopname, category, int64_t(value));
+}
+
+template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T> > >
+void reportStat(const gstl::String& loopname, const gstl::String& category, const T& value) {
+  sysStatManager()->addToStat(loopname, category, double(value));
+}
+
+void reportParam(const gstl::String& loopname, const gstl::String& category, const gstl::String& value);
+
+//! Reports Galois system memory stats for all threads
+void reportPageAlloc(const char* category);
+//! Reports NUMA memory stats for all NUMA nodes
+void reportNumaAlloc(const char* category);
 
 
 } // end namespace Runtime
