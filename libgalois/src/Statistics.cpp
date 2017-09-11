@@ -36,8 +36,21 @@ boost::uuids::uuid Galois::Runtime::getRandUUID(void) {
   return UUID;
 }
 
+using Str = typename StatManager::Str;
 
 StatManager(const Str& outfile): m_outfile(outfile) {}
+
+void StatManager::addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type) {
+  intStats.addToStat(region, category, val, type);
+}
+
+void StatManager::addToStat(const Str& region, const Str& category, double val, const StatTotal::Type& type) {
+  fpStats.addToStat(region, category, val, type);
+}
+
+void StatManager::addToParam(const Str& region, const Str& category, const Str& val) {
+  strStats.addToStat(region, category, val, StatTotal::SERIAL);
+}
 
 void StatManager::print(void) {
   if (m_outfile == "") {
@@ -58,22 +71,21 @@ void StatManager::printStats(std::ostream& out) {
   printHeader(out);
   intStats.print(out);
   fpStats.print(out);
+  strStats.print(out);
 }
 
 unsigned StatManager::maxThreads(void) const { 
-  return Substrate::getThreadPool().maxThreads();
+  return Galois::getActiveThreads();
 }
 
 void StatManager::printHeader(std::ostream& out) {
 
   // out << "RUN_UUID" << SEP;
-  out << "STAT_TYPE" << SEP << "LOOPNAME" << SEP << "CATEGORY" << SEP;
-  out << "THREAD_SUM" << SEP << "THREAD_AVG" << SEP << "THREAD_MIN" << SEP << "THREAD_MAX";
+  out << "STAT_TYPE" << SEP << "REGION" << SEP << "CATEGORY" << SEP;
+  out << "TOTAL_TYPE" << SEP << "TOTAL";
+  out << std::endl;
 
 
-  for (unsigned i = 0; i < StatManager::maxThreads(); ++i) {
-    out << SEP << "T" << i;
-  }
 }
 
 StatManager::int_iterator StatManager::intBegin(void) const { return intStats.cbegin(); }
@@ -94,15 +106,6 @@ StatManager* Galois::Runtime::internal::sysStatManager(void) {
   return SM;
 }
 
-
-void Galois::Runtime::reportParam(const char* loopname, const char* category, const std::string& value) {
-  std::abort();
-}
-
-
-void Galois::Runtime::reportParam(const gstl::String& loopname, const gstl::String& category, const gstl::String& value) {
-  std::abort();
-}
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
   Runtime::on_each_gen(

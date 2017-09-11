@@ -32,6 +32,7 @@
 
 #include "Galois/gstl.h"
 #include "Galois/gIO.h"
+#include "Galois/Threads.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/ThreadRWlock.h"
 
@@ -155,19 +156,19 @@ public:
 };
 
 template <typename T, typename... Bases>
-class AggStatistic: public Bases... {
+class AggregStat: public Bases... {
 
 public:
 
-  using with_min = AggStatistic<T, RunningMin<T>, Bases...>;
+  using with_min = AggregStat<T, RunningMin<T>, Bases...>;
 
-  using with_max = AggStatistic<T, RunningMax<T>, Bases...>;
+  using with_max = AggregStat<T, RunningMax<T>, Bases...>;
 
-  using with_sum = AggStatistic<T, RunningSum<T>, Bases...>;
+  using with_sum = AggregStat<T, RunningSum<T>, Bases...>;
 
-  using with_mem = AggStatistic<T, RunningVec<T>, Bases...>;
+  using with_mem = AggregStat<T, RunningVec<T>, Bases...>;
 
-  using with_name = AggStatistic<T, NamedStat<T>, Bases...>;
+  using with_name = AggregStat<T, NamedStat<T>, Bases...>;
 
 
   void add(const T& val) {
@@ -176,6 +177,29 @@ public:
     (void) Expander {0, ( (void) Base::add(val), 0)...};
   }
 
+};
+
+struct StatTotal {
+
+  enum Type {
+    SERIAL = 0,
+    TMIN,
+    TMAX,
+    TSUM,
+    TAVG
+  };
+
+  static const char* NAMES = {
+    "SERIAL",
+    "TMIN",
+    "TMAX",
+    "TSUM",
+    "TAVG"
+  };
+
+  static const char* str(const Type& t) {
+    return NAMES[t];
+  }
 };
 
 
@@ -211,21 +235,22 @@ protected:
 
 public:
 
-  Stat& getOrInsertStat(const Str& loopname, const Str& category) {
+  Stat& getOrInsertStat(const Str& region, const Str& category, const StatTotal::Type& type) {
     
-    const Str* ln = getOrInsertSymbol(loopname);
+    const Str* ln = getOrInsertSymbol(region);
     const Str* cat = getOrInsertSymbol(category);
 
     auto tpl = std::make_tpl(ln, cat);
 
-    auto p = statMap.emplace(tpl, Stat());
+    auto p = statMap.emplace(tpl, Stat(type));
 
     return p.first->second;
   }
 
   template <typename T>
-  void addToStat(const Str& loopname, const Str& category, const T& val) {
-    Stat& s = getOrInsertStat(loopname, category);
+  void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& type) {
+    Stat& s = getOrInsertStat(region, category, type);
+    assert(s.totalType() == type && "Can't change totalType after creation");
     s.add(val);
   }
 
@@ -235,7 +260,7 @@ public:
   const_iterator cbegin(void) const { return statMap.cbegin(); } 
   const_iterator cend(void) const { return statMap.cend(); } 
 
-  const Str& name(const const_iterator& i) const { return *(std::get<0>(i->first)); }
+  const Str& region(const const_iterator& i) const { return *(std::get<0>(i->first)); }
 
   const Str& category(const const_iterator& i) const { return *(std::get<1>(i->first)); }
 
@@ -244,17 +269,56 @@ public:
 };
 
 template <typename T>
-using VecStat_with_MinMaxSum = typename AggStatistic<T>::with_mem::with_min::with_max::with_sum;
+using VecStat_with_MinMaxSum = typename AggregStat<T>::with_mem::with_min::with_max::with_sum;
+
+template <typename T>
+struct VecStat: public VecStat_with_MinMaxSum<T> {
+
+  using Base = VecStat_with_MinMaxSum<T>;
+
+  StatTotal::Type m_totalTy;
+
+  explicit ScalarStat(const StatTotal::Type& type): Base(), m_totalTy(type) {}
+
+  const StatTotal::Type& totalType(void) const { return m_totalTy; }
+
+  T total(void) const {
+
+    switch(m_totalTy) {
+
+      case StatTotal::SERIAL:
+        assert(Base::values().size() > 0);
+        return Base::values()[0];
+
+      case StatTotal::TMIN:
+        return Base::min();
+
+      case StatTotal::TMAX:
+        return Base::max();
+
+      case StatTotal::TSUM:
+        return Base::sum();
+
+      case StatTotal::TAVG:
+        return Base::avg();
+
+      default:
+        GALOIS_DIE("Shouldn't reach this point");
+    }
+  }
+
+};
 
 
 template <typename T>
-using VecStatManager = BasicStatMap<VecStat_with_MinMaxSum<T> >;
+using VecStatManager = BasicStatMap<VecStat<T> >;
 
 template <typename T>
 struct ScalarStat {
   T m_val;
+  StatTotal::Type m_totalTy;
 
-  ScalarStat(void): m_val() {}
+  explicit ScalarStat(const StatTotal::Type& type): m_val(), m_totalTy(type) {}
 
   void add (const T& v) {
     m_val += v;
@@ -262,11 +326,12 @@ struct ScalarStat {
 
   operator const T& (void) const { return m_val; }
 
+  const StatTotal::Type& totalType(void) const { return m_totalTy; }
+
 };
 
 template <typename T>
 using ScalarStatManager = BasicStatMap<ScalarStat<T> >;
-
 
 } // end namespace hidden
 
@@ -276,7 +341,18 @@ using ScalarStatManager = BasicStatMap<ScalarStat<T> >;
 
 class StatManager {
 
+protected:
+
   using Str = Galois::gstl::Str;
+
+  static const char* const SEP = ", ";
+  static const char* const TVALSEP = "; ";
+
+  static bool printingThreadVals(void);
+
+  static unsigned maxThreads(void);
+
+private:
 
   template <typename T>
   struct StatManagerImpl {
@@ -284,13 +360,14 @@ class StatManager {
     using MergedStats = hidden::VecStatManager<T>;
     using const_iterator = typename MergedStats::const_iterator;
 
+
     Substrate::PerThreadStorage<hidden::ScalarStatManager<T> > perThreadManagers;
     MergedStats result;
     bool merged = false;
 
     
-    void addToStat(const Str& loopname, const Str& category, const T& val) {
-      perThreadManagers.getLocal()->addToStat(loopname, category, val);
+    void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& type) {
+      perThreadManagers.getLocal()->addToStat(region, category, val, type);
     }
 
     void mergeStats(void) {
@@ -299,14 +376,15 @@ class StatManager {
 
       for (unsigned t = 0; t < perThreadManagers.size(); ++t) {
 
-        ThreadStatManager* manager = *perThreadManagers.getRemote(t);
+        ThreadStatManager* manager = perThreadManagers.getRemote(t);
 
         for (auto i = manager->cbegin(), end_i = manager.cend(); i != end_i; ++i) {
-          result.addToStat(manager->name(i), manager->category(i), T(manager->stat(i)));
+          result.addToStat(manager->region(i), manager->category(i), T(manager->stat(i)), manager->stat(i).totalType());
         }
       }
 
       merged = true;
+
     }
 
 
@@ -316,33 +394,57 @@ class StatManager {
     const_iterator cbegin(void) const { return result.cbegin(); } 
     const_iterator cend(void) const { return result.cend(); } 
 
-    const Str& name(const const_iterator& i) const { return result.name(i); }
+    const Str& region(const const_iterator& i) const { return result.region(i); }
 
     const Str& category(const const_iterator& i) const { return result.category(i);  }
 
     const Stat& stat(const const_iterator& i) const { return result.stat(i); }
 
-    template <typename S, typename V>
-    void readStat(const const_iterator& i, S& name, S& category, V& vec) const {
-      name = this->name(i);
+    template <typename S, typename T, typename V>
+    void readStat(const const_iterator& i, S& region, S& category, T& total, StatTotal::Type& type, V& threadVals) const {
+      region = this->region(i);
       category = this->category(i);
 
-      vec.clear();
-      vec = this->stat(i).values();
+      total = this->stat(i).total();
+      type = this->stat(i).totalType();
+
+      threadVals.clear();
+      threadVals = this->stat(i).values();
     }
 
     void print(std::ostream& out) const {
+
+      const char* statOrParam = std::is_same_v<T, Str> ? "PARAM" : "STAT"
+
       for (auto i = cbegin(), end_i = cend(); i != end_i; ++i) {
-        out << "STAT" << SEP << this->name(i) << SEP << this->category(i) << SEP;
+        out << statOrParam << SEP << this->region(i) << SEP << this->category(i) << SEP;
 
         const auto& s = this->stat(i);
-        out << s.sum() << SEP << s.avg() << SEP << s.min() << SEP << s.max();
-
-        for (const auto i: s.values()) {
-          out << SEP << i;
-        }
+        out << StatTotal::str(s.totalType()) << SEP << s.total();
 
         out << std::endl;
+
+        if (StatManager::printingThreadVals()) {
+
+          out << statOrParam << SEP << this->region(i) << SEP << this->category(i) << SEP;
+          out << "ThreadValues" << SEP;
+
+          unsigned n = 0; 
+          for (const auto& v: s.values()) {
+            out << v;
+            ++n;
+
+            if (n < StatManager::maxThreads()) {
+              out << TVALSEP;
+            } else {
+              break;
+            }
+          }
+
+          out << std::endl;
+        }
+
+
       }
     }
 
@@ -350,20 +452,23 @@ class StatManager {
 
   using IntStats = StatManagerImpl<int64_t>;
   using FPstats = StatManagerImpl<double>;
+  using StrStats = StatManagerImpl<Str>;
   using int_iterator = typename IntStats::const_iterator;
   using fp_iterator = typename FPstats::const_iterator;
+  using str_iterator = typename StrStats::const_iterator;
 
-  static const char* const SEP = ", ";
 
   Str m_outfile;
   IntStats intStats;
   FPstats fpStats;
+  StrStats strStats;
 
 protected:
 
   void mergeStats(void) {
     intStats.mergeStats();
     fpStats.mergeStats();
+    strStats.mergeStats();
   }
 
   int_iterator intBegin(void) const;
@@ -372,33 +477,45 @@ protected:
   fp_iterator fpBegin(void) const;
   fp_iterator fpEnd(void) const;
 
+  str_iterator paramBegin(void) const;
+  str_iterator paramEnd(void) const;
+
+
   template <typename S, typename V>
-  void readIntStat(const typename IntStats::const_iterator& i, S& name, S& category, V& vec) const {
-    intStats.readStat(i, name, category, vec);
+  void readIntStat(const typename IntStats::const_iterator& i
+                    , S& region, S& category, int64_t& total, StatTotal::Type& type, V& vec) const {
+
+    intStats.readStat(i, region, category, total, type, vec);
   }
 
   template <typename S, typename V>
-  void readFPstat(const typename IntStats::const_iterator& i, S& name, S& category, V& vec) const {
-    fpStats.readStat(i, name, category, vec);
+  void readFPstat(const typename IntStats::const_iterator& i
+                    , S& region, S& category, double& total, StatTotal::Type& type, V& vec) const {
+
+    fpStats.readStat(i, region, category, total, type, vec);
+  }
+
+  template <typename S, typename V>
+  void readParam(const typename IntStats::const_iterator& i
+                  , S& region, S& category, Str& total, StatTotal::Type& type, V& vec) const {
+
+    strStats.readStat(i, region, category, total, type, vec);
   }
 
   virtual void printStats(std::ostream& out);
 
   virtual void printHeader(std::ostream& out);
 
-  unsigned maxThreads(void) const;
 
 public:
 
   explicit StatCollector(const Str& outfile="");
 
-  void addToStat(const Str& loopname, const Str& category, int64_t val) {
-    intStats.addToStat(loopname, category, val);
-  }
+  void addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type);
 
-  void addToStat(const Str& loopname, const Str& category, double val) {
-    fpStats.addToStat(loopname, category, val);
-  }
+  void addToStat(const Str& region, const Str& category, double val, const StatTotal::Type& type);
+
+  void addToParam(const Str& region, const Str& category, const Str& val);
 
   void print(void);
 
@@ -420,14 +537,14 @@ class StatManager {
 
 public:
 
-  void addToStat(const Str& loopname, const Str& category, int64_t val) {
+  void addToStat(const Str& region, const Str& category, int64_t val) {
 
-    auto* accum = getOrInsertMapping(loopname, category);
+    auto* accum = getOrInsertMapping(region, category);
 
     *accum += val;
 
 
-    Str* ln = symbols.getOrInsert(loopname);
+    Str* ln = symbols.getOrInsert(region);
     Str* cat = symbols.getOrInsert(category);
 
     auto tpl = std::make_tuple(ln, cat);
@@ -481,7 +598,7 @@ class StatManager {
       }
     }
 
-    Stat& getOrInsertMapping(const Str& loopname, const Str& category) {
+    Stat& getOrInsertMapping(const Str& region, const Str& category) {
 
       Stat* ret = nullptr;
 
@@ -490,7 +607,7 @@ class StatManager {
         const Str* ln = nullptr;
         const Str* cat = nullptr;
         
-        auto ia = symbols.find(loopname);
+        auto ia = symbols.find(region);
 
         if (ia == symbols.end()) {
           return false; // return early to save a check
@@ -520,7 +637,7 @@ class StatManager {
       };
 
       auto write = [&] (void) {
-        auto p1 = symbols.insert(loopname);
+        auto p1 = symbols.insert(region);
         const Str* ln = &(p->first);
 
         auto p2 = symbols.insert(category);
@@ -545,9 +662,9 @@ class StatManager {
 
     }
 
-    void addToStat(const Str& loopname, const Str& category, const T& val) {
+    void addToStat(const Str& region, const Str& category, const T& val) {
 
-      Stat& stat = getOrInserMapping(loopname, category);
+      Stat& stat = getOrInserMapping(region, category);
       stat += val;
 
     }
@@ -560,12 +677,12 @@ protected:
   StatManagerImpl<int64_t> intStats;
   StatManagerImpl<double> fpStats;
 
-  void addToStat(const Str& loopname, const Str& category, int64_t val) {
-    intStats.addToStat(loopname, category, val);
+  void addToStat(const Str& region, const Str& category, int64_t val) {
+    intStats.addToStat(region, category, val);
   }
 
-  void addToStat(const Str& loopname, const Str& category, double val) {
-    fpStats.addToStat(loopname, category, val);
+  void addToStat(const Str& region, const Str& category, double val) {
+    fpStats.addToStat(region, category, val);
   }
 
 };
@@ -577,43 +694,70 @@ namespace internal {
   StatManager* sysStatManager(void);
 }
 
-template <typename T, typename = std::enable_if_t<std::is_integral_v<T> > >
-void reportStat(const char* loopname, const char* category, const T& value) {
+
+
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+void reportStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& type) {
+
   sysStatManager()->addToStat(
-      gst::String(loopname? loopname: "(NULL)"),
-      gst::String(category? category: "(NULL)"),
-      int64_t(value));
+      gstl::String(region), gstl::String(category), 
+      std::is_floating_point_v<T> ? double(value) : int64_t(value), type);
+
+
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T> > >
-void reportStat(const char* loopname, const char* category, const T& value) {
-  sysStatManager()->addToStat(
-      gst::String(loopname? loopname: "(NULL)"),
-      gst::String(category? category: "(NULL)"),
-      double(value));
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+inline void reportStat_Serial(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::SERIAL);
+}
+         
+
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+inline void reportStat_Tmin(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::TMIN);
+}
+
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+inline void reportStat_Tmax(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::TMAX);
+}
+
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+inline void reportStat_Tsum(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::TSUM);
+}
+
+template <typename S1, typename S2, typename T
+          , typename = std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T> > >
+inline void reportStat_Tavg(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::TAVG);
 }
 
 
-//! Reports stats for a given thread
-void reportParam(const char* loopname, const char* category, const std::string& value);
 
-template <typename T, typename = std::enable_if_t<std::is_integral_v<T> > >
-void reportStat(const gstl::String& loopname, const gstl::String& category, const T& value) {
-  sysStatManager()->addToStat(loopname, category, int64_t(value));
+template <typename S1, typename S2, typename C, typename A>
+void reportParamStr(const S1& region, const S2& category, const std::basic_string<C, A>& value) {
+  sysStatManager()->addToParam(
+      gstl::String(region), gstl::String(category), gstl::String(value));
 }
 
-template <typename T, typename = std::enable_if_t<std::is_floating_point_v<T> > >
-void reportStat(const gstl::String& loopname, const gstl::String& category, const T& value) {
-  sysStatManager()->addToStat(loopname, category, double(value));
+template <typename S1, typename S2, typename V>
+void reportParam(const S1& region, const S2& category, const V& value) {
+  std::ostringstream os;
+  os << value;
+  reportParamStr(region, category, os.str());
 }
 
-void reportParam(const gstl::String& loopname, const gstl::String& category, const gstl::String& value);
-
+// TODO: switch to gstl::String in here
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
 void reportNumaAlloc(const char* category);
-
 
 } // end namespace Runtime
 } // end namespace Galois
