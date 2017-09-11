@@ -26,7 +26,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-// TODO rebuild gpu code with new gate ifs
+// TODO rebuild gpu code (new things added)
 
 /******************************************************************************/
 /* Sync code/calls was manually written, not compiler generated */
@@ -288,16 +288,12 @@ struct InitializeIteration {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // this assertion only for source nodes (dsts will not have it reset,
-    // which is fine, but we can't use this assert since this operator
-    // goes over dst nodes as well)
-    //assert(src_data.num_shortest_paths == 0);
-
     bool is_source = graph->getGID(src) == local_current_src_node;
 
     if (!is_source) {
       src_data.current_length = local_infinity;
       src_data.old_length = local_infinity;
+      src_data.num_shortest_paths = 0;
       src_data.propogation_flag = false;
     } else {
       src_data.current_length = 0;
@@ -356,10 +352,6 @@ struct FirstIterationSSSP {
     _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
                 Broadcast_current_length, Bitset_current_length>(
                 "SSSP");
-
-    // FIXME
-    // if this is a cart vertex cut then it would reset the flag for broadcast
-    // dest (this is bad)
   }
 
   /* Does SSSP, push/filter based (actually it does BFS...) */
@@ -439,7 +431,6 @@ struct SSSP {
 
       if (accum_result) {
         _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
-                    //Broadcast_current_length, Bitset_current_length>("SSSP_cur_len");
                     Broadcast_current_length, Bitset_current_length>("SSSP");
       } else {
         // write destination, read any, fails.....
@@ -449,23 +440,13 @@ struct SSSP {
           // syncs cause the bit to be reset prematurely, so using the bitset
           // will lead to incorrect results as it will not sync what is
           // necessary
-
-          //for (auto ii = _graph.begin(); ii != _graph.end(); ++ii) {
-          //  if (_graph.isOwned(_graph.getGID(*ii))) {
-          //    bitset_current_length.set(*ii);
-          //  }
-          //}
-
-          _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-          //             Broadcast_current_length, Bitset_current_length>("SSSP");
+          _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
+                       Broadcast_current_length, Bitset_current_length>("SSSP");
+          _graph.sync<writeDestination, readDestination, Reduce_min_current_length, 
                        Broadcast_current_length>("SSSP");
-          //_graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-          ////             Broadcast_current_length>("SSSP_cur_len_any_v");
-          //             Broadcast_current_length>("SSSP");
         } else {
           _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
                       Broadcast_current_length, 
-          //            Bitset_current_length>("SSSP_cur_len_any");
                       Bitset_current_length>("SSSP");
         }
       }
@@ -755,7 +736,9 @@ struct NumShortestPaths {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
-      if (src_data.propogation_flag && src_data.num_successors > 0) {
+      // can do a num succ check for optimization
+      //if (src_data.propogation_flag && src_data.num_successors > 0) {
+      if (src_data.propogation_flag) {
         for (auto current_edge = graph->edge_begin(src), 
                   end_edge = graph->edge_end(src); 
              current_edge != end_edge; 
@@ -791,7 +774,10 @@ struct NumShortestPaths {
   }
 };
 
-// make sure all flags are false except for nodes with 0 successors and sync flag
+/** 
+ * Make sure all flags are false except for nodes with 0 successors and sync 
+ * flag
+ */
 struct PropogationFlagUpdate {
   Graph* graph;
 
@@ -811,10 +797,9 @@ struct PropogationFlagUpdate {
 
     // note that only nodes with succ == 0 will have their flags sync'd
     // by this call (through bitset; only set for those cases); the others
-    // do not need to be sync'd as they will all be false already
+    // do not need to be sync'd as they will (or should) all be false already
     _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag, 
-                //Bitset_propogation_flag>("NumShortestPaths_prop_flag");
                 Bitset_propogation_flag>("PropogationFlagUpdate");
   }
 
@@ -824,7 +809,9 @@ struct PropogationFlagUpdate {
     if (src_data.num_successors == 0) {
       src_data.propogation_flag = true;
       bitset_propogation_flag.set(src);
-    } 
+    } else {
+      assert(src_data.propogation_flag == false);
+    }
   }
 };
 
@@ -891,9 +878,6 @@ struct DependencyPropChanges {
         assert(src_data.trim == 0);
         src_data.propogation_flag = false;
         bitset_propogation_flag.set(src);
-        // reset here so I don't have to do it later... (the sync will happen
-        // later if it needs to)
-        src_data.num_shortest_paths = 0;
       } else if (src_data.trim > 0) {
         // decrement successor by trim then reset
         assert(src_data.trim <= src_data.num_successors);
@@ -969,11 +953,9 @@ struct DependencyPropogation {
                     
 
       _graph.sync<writeSource, readSource, Reduce_add_trim, 
-                  //Broadcast_trim, Bitset_trim>("DependencyPropogation_trim");
                   Broadcast_trim, Bitset_trim>("DependencyPropogation");
       _graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
                   Broadcast_to_add_float, 
-                  //Bitset_to_add_float>("DependencyPropogation_to_add_float");
                   Bitset_to_add_float>("DependencyPropogation");
 
       // use trim + to add to do appropriate changes
@@ -982,11 +964,11 @@ struct DependencyPropogation {
       iterations++;
       accum_result = dga.reduce();
 
+      // while the loop still goes on...
       if (accum_result) {
         // sync dependency on dest; source should all have same dep
         _graph.sync<writeSource, readDestination, Reduce_set_dependency,
                     Broadcast_dependency, 
-                    //Bitset_dependency>("DependencyPropogation_dep");
                     Bitset_dependency>("DependencyPropogation");
       } 
     } while (accum_result);
@@ -1044,6 +1026,7 @@ struct DependencyPropogation {
           }
         } else {
           // this is source of this iteration's of sssp/bfs; reset num succ to 0
+          // so loop isn't entered again
           src_data.num_successors = 0;
         }
       }
@@ -1132,7 +1115,6 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
@@ -1141,7 +1123,6 @@ struct BC {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      // TODO all nodes here? 
       Galois::do_all(
         nodesWithEdges.begin(), nodesWithEdges.end(), 
         BC(&_graph), 
@@ -1159,7 +1140,6 @@ struct BC {
 
     if (src_data.dependency > 0) {
       Galois::add(src_data.betweeness_centrality, src_data.dependency);
-      src_data.dependency = 0;
     }
   }
 };
