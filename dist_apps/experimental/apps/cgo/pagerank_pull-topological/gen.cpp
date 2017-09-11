@@ -631,7 +631,8 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
-    InitializeGraph::go(*hg);
+      InitializeGraph::go(*hg);
+      Galois::Runtime::getHostBarrier().wait();
     StatTimer_init.stop();
 
     Galois::DGAccumulator<unsigned int> PageRank_accum;
@@ -671,7 +672,6 @@ int main(int argc, char** argv) {
       );
 
       if((run + 1) != numRuns){
-        //Galois::Runtime::getHostBarrier().wait();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
           #if __OPT_VERSION__ >= 3
@@ -693,6 +693,7 @@ int main(int argc, char** argv) {
 
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go(*hg);
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 

@@ -430,6 +430,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
       InitializeGraph::go((*hg));
+      Galois::Runtime::getHostBarrier().wait();
     StatTimer_init.stop();
 
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
@@ -463,9 +464,9 @@ int main(int argc, char** argv) {
         #endif
 
 
-        //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 

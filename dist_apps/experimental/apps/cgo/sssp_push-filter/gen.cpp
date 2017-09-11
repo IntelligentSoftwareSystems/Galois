@@ -537,6 +537,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
       InitializeGraph::go((*hg));
+      Galois::Runtime::getHostBarrier().wait();
     StatTimer_init.stop();
 
     // accumulators for use in operators
@@ -572,9 +573,9 @@ int main(int argc, char** argv) {
         Flags_dist_current.clear_all();
         #endif
 
-        //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go(*hg);
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 

@@ -638,6 +638,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
+      Galois::Runtime::getHostBarrier().wait();
     StatTimer_graph_init.stop();
 
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
@@ -658,9 +659,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        Galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
-
 
         #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
@@ -682,6 +681,7 @@ int main(int argc, char** argv) {
         #endif
 
         InitializeGraph::go((*h_graph));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 
