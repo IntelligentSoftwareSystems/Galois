@@ -638,8 +638,8 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
-      Galois::Runtime::getHostBarrier().wait();
     StatTimer_graph_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
     Galois::DGAccumulator<uint64_t> dga1;

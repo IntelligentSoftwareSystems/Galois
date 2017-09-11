@@ -442,8 +442,8 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     StatTimer_init.start();
       InitializeGraph::go((*hg));
-      Galois::Runtime::getHostBarrier().wait();
     StatTimer_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // accumulators for use in operators
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
