@@ -1377,6 +1377,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // shared DG accumulator among all steps
     Galois::DGAccumulator<uint32_t> dga;
@@ -1437,6 +1438,7 @@ int main(int argc, char** argv) {
         }
 
         InitializeGraph::go((*h_graph));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 
