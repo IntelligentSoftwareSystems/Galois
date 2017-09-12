@@ -167,7 +167,8 @@ struct InitializeGraph {
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
       Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+        Galois::no_stats()
     );
     }
   }
@@ -206,7 +207,8 @@ struct FirstItr_SSSP {
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
                 FirstItr_SSSP{&_graph}, 
                 Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                Galois::timeit());
+                Galois::timeit(),
+        Galois::no_stats());
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -276,7 +278,8 @@ struct SSSP {
             SSSP(&_graph, dga, dist_wl),
             Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
             Galois::do_all_steal<true>(),
-            Galois::timeit()
+            Galois::timeit(),
+        Galois::no_stats()
             );
 
         Galois::Runtime::reportStat("(NULL)", 
@@ -465,6 +468,7 @@ int main(int argc, char** argv) {
     StatTimer_init.start();
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // accumulators for use in operators
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
@@ -494,6 +498,7 @@ int main(int argc, char** argv) {
         //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go(*hg);
+	Galois::Runtime::getHostBarrier().wait();
       }
     }
 
