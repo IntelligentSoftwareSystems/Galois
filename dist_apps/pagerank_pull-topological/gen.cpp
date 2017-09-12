@@ -334,7 +334,7 @@ struct PageRank {
       //printf("[%d] iter %u local is %u\n", _graph.id, _num_iterations, dga.read_local());
       //printf("[%d] iter %u reduced is %u\n", _graph.id, _num_iterations, reduced);
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) && dga.reduce());
+    } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 

@@ -342,7 +342,7 @@ struct KCoreStep1 {
       KCoreStep2::go(_graph);
 
       iterations++;
-    } while ((iterations < maxIterations) && dga.reduce());
+    } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
       Galois::Runtime::reportStat("(NULL)", 
