@@ -1305,7 +1305,7 @@ int main(int argc, char** argv) {
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id]) {
+      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
         case 'g':
           personality = GPU_CUDA;
           break;
