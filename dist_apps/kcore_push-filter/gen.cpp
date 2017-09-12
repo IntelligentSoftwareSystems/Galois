@@ -175,7 +175,8 @@ struct InitializeGraph2 {
       InitializeGraph2{ &_graph },
       Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
@@ -225,7 +226,8 @@ struct InitializeGraph1 {
         allNodes.begin(), allNodes.end(),
         InitializeGraph1{ &_graph },
         Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
     // degree calculation
@@ -266,7 +268,8 @@ struct KCoreStep2 {
        nodesWithEdges.begin(), nodesWithEdges.end(),
        KCoreStep2{ &_graph },
        Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-       Galois::timeit()
+       Galois::timeit(),
+       Galois::no_stats()
      );
   }
 
@@ -324,7 +327,8 @@ struct KCoreStep1 {
         KCoreStep1{ k_core_num, &_graph, dga },
         Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       // do the trim sync; readSource because in symmetric graph 

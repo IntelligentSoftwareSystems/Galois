@@ -177,7 +177,8 @@ struct DegreeCounting {
       DegreeCounting{ &_graph },
       Galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     _graph.sync<writeSource, readAny, Reduce_add_current_degree, 
@@ -229,7 +230,8 @@ struct InitializeGraph {
         allNodes.begin(), allNodes.end(),
         InitializeGraph{ &_graph },
         Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
     // degree calculation
@@ -271,7 +273,8 @@ struct InitializeGraph {
 //       allNodes.begin(), allNodes.end(),
 //       DegreeUpdate{ &_graph },
 //       Galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
-//       Galois::timeit()
+//       Galois::timeit(),
+//       Galois::no_stats()
 //     );
 //  }
 //
@@ -311,7 +314,8 @@ struct LiveUpdate {
       allNodes.begin(), allNodes.end(),
       LiveUpdate{ k_core_num, &_graph, dga },
       Galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // TODO hand optimized can merge trim decrement into this operator.....
@@ -391,7 +395,8 @@ struct KCore {
         KCore{ &_graph },
         Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim, 
@@ -468,7 +473,8 @@ struct GetAliveDead {
     Galois::do_all(_graph.begin(), _graph.end(), 
                    GetAliveDead(&_graph, dga1, dga2), 
                    Galois::loopname("GetAliveDead"),
-                   Galois::numrun(_graph.get_run_identifier()));
+                   Galois::numrun(_graph.get_run_identifier()),
+                   Galois::no_stats());
 
     uint32_t num_alive = dga1.reduce();
     uint32_t num_dead = dga2.reduce();

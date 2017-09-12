@@ -219,7 +219,8 @@ struct InitializeGraph {
       InitializeGraph{&_graph}, 
       Galois::loopname("InitializeGraph"), 
       //Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
   }
 
@@ -279,7 +280,8 @@ struct InitializeIteration {
       InitializeIteration{infinity, current_src_node, &_graph},
       Galois::loopname("InitializeIteration"), 
       //Galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
   }
 
@@ -345,7 +347,8 @@ struct FirstIterationSSSP {
       FirstIterationSSSP(&_graph),
       Galois::loopname("SSSP"),
       //Galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // Next op will read src, current length
@@ -424,7 +427,8 @@ struct SSSP {
         Galois::loopname("SSSP"), 
         //Galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
       }
 
@@ -520,7 +524,8 @@ struct PredAndSucc {
       Galois::loopname("PredAndSucc"),
       //Galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
     }
 
@@ -618,7 +623,8 @@ struct NumShortestPathsChanges {
       NumShortestPathsChanges{infinity, &_graph}, 
       Galois::loopname("NumShortestPathsChanges"), 
       //Galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // predecessors does not require syncing as syncing trim accomplishes the
@@ -709,7 +715,8 @@ struct NumShortestPaths {
           Galois::loopname("NumShortestPaths"),
           //Galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
           Galois::do_all_steal<true>(),
-          Galois::timeit()
+          Galois::timeit(),
+          Galois::no_stats()
         );
       }
 
@@ -816,7 +823,8 @@ struct PropogationFlagUpdate {
       nodesWithEdges.begin(), nodesWithEdges.end(),
       PropogationFlagUpdate(&_graph), 
       Galois::loopname("PropogationFlagUpdate"),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // note that only nodes with succ == 0 will have their flags sync'd
@@ -874,7 +882,8 @@ struct DependencyPropChanges {
       DependencyPropChanges{infinity, &_graph}, 
       Galois::loopname("DependencyPropChanges"),
       //Galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // need reduce set for flag
@@ -971,7 +980,8 @@ struct DependencyPropogation {
         Galois::loopname("DependencyPropogation"),
         //Galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
     }
                     
@@ -1159,7 +1169,8 @@ struct BC {
         BC(&_graph), 
         Galois::loopname("BC"),
         //Galois::loopname(_graph.get_run_identifier("BC").c_str()),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
     }
   }
@@ -1294,7 +1305,7 @@ int main(int argc, char** argv) {
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id]) {
+      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
         case 'g':
           personality = GPU_CUDA;
           break;

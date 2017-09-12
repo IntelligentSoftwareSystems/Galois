@@ -166,7 +166,8 @@ struct InitializeGraph {
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
       Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
     }
   }
@@ -205,7 +206,9 @@ struct FirstItr_SSSP {
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
                 FirstItr_SSSP{&_graph}, 
                 Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                Galois::timeit());
+                Galois::timeit(),
+                Galois::no_stats()
+                );
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -268,7 +271,8 @@ struct SSSP {
           SSSP{ &_graph, dga },
           Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           Galois::do_all_steal<true>(),
-          Galois::timeit()
+          Galois::timeit(),
+          Galois::no_stats()
         );
       }
 
@@ -407,7 +411,7 @@ int main(int argc, char** argv) {
     if (num_nodes == -1) num_nodes = net.Num;
     assert((net.Num % num_nodes) == 0);
     if (personality_set.length() == (net.Num / num_nodes)) {
-      switch (personality_set.c_str()[my_host_id % num_nodes]) {
+      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
       case 'g':
         personality = GPU_CUDA;
         break;
