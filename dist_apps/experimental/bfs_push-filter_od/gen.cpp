@@ -422,7 +422,7 @@ int main(int argc, char** argv) {
     if (num_nodes == -1) num_nodes = net.Num;
     assert((net.Num % num_nodes) == 0);
     if (personality_set.length() == (net.Num / num_nodes)) {
-      switch (personality_set.c_str()[my_host_id % num_nodes]) {
+      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
       case 'g':
         personality = GPU_CUDA;
         break;
