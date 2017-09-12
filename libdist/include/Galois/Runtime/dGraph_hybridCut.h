@@ -362,16 +362,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto beginIter = boost::make_counting_iterator((uint32_t)0);
       auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
-      //Galois::Runtime::do_all_coupled(
-      //  Galois::Runtime::makeStandardRange(beginIter, endIter),
-      //  [&] (auto n) {
-      //    base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
-      //  },
-      //  std::make_tuple(
-      //    Galois::loopname("EdgeLoading"),
-      //    Galois::timeit()
-      //  )
-      //);
       Galois::do_all(
         beginIter, endIter,
         [&] (auto n) {
@@ -379,7 +369,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         },
         Galois::loopname("EdgeLoading"),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       StatTimer_allocate_local_DS.stop();
@@ -577,7 +568,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         },
         Galois::loopname("EdgeInspection"),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       timer.stop();
