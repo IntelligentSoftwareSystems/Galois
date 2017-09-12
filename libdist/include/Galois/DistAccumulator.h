@@ -154,6 +154,56 @@ public:
    *
    ************************************************************/
 
+  /**
+   * Reduce with a timer
+   */
+  Ty reduce(std::string runID) {
+    std::string timer_str("REDUCE_DGACCUM_" + runID); 
+    Galois::StatTimer reduceTimer(timer_str.c_str());
+    reduceTimer.start();
+
+    if (local_mdata == 0) local_mdata = mdata.reduce();
+    global_mdata = local_mdata;
+#ifdef __GALOIS_HET_OPENCL__
+    Ty tmp;
+    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, tmp);
+    Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    Galois::atomicAdd(mdata, tmp);
+#endif
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (net.ID + h) % net.Num;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, local_mdata);
+      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+    }
+    net.flush();
+
+    unsigned num_Hosts_recvd = 1;
+    while (num_Hosts_recvd < net.Num) {
+      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+      } while (!p);
+      Ty x_mdata;
+      gDeserialize(p->second, x_mdata);
+      global_mdata += x_mdata;
+      ++num_Hosts_recvd;
+    }
+    ++Galois::Runtime::evilPhase;
+
+    reduceTimer.stop();
+
+    return global_mdata;
+  }
+
+
+  /************************************************************
+   *
+   ************************************************************/
+
   /* Max reduction across DGAccumulators */
   Ty reduce_max() {
     if (local_mdata == 0) local_mdata = mdata.reduce();
