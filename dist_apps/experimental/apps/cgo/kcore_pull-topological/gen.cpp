@@ -179,7 +179,8 @@ struct DegreeCounting {
       DegreeCounting{ &_graph },
       Galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     #if __OPT_VERSION__ == 5
@@ -242,7 +243,8 @@ struct InitializeGraph {
         allNodes.begin(), allNodes.end(),
         InitializeGraph{ &_graph },
         Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
     // degree calculation
@@ -291,7 +293,8 @@ struct DegreeUpdate {
        allNodes.begin(), allNodes.end(),
        DegreeUpdate{ &_graph },
        Galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
-       Galois::timeit()
+       Galois::timeit(),
+       Galois::no_stats()
      );
   }
 
@@ -334,7 +337,8 @@ struct LiveUpdate {
       allNodes.begin(), allNodes.end(),
       LiveUpdate{ k_core_num, &_graph, dga },
       Galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     // TODO hand optimized can merge trim decrement into this operator.....
@@ -408,7 +412,8 @@ struct KCore {
         KCore{ &_graph },
         Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       #if __OPT_VERSION__ == 5

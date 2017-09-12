@@ -168,7 +168,8 @@ struct InitializeGraph {
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
       Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
     }
   }
@@ -213,7 +214,9 @@ struct FirstItr_SSSP {
     Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
                 FirstItr_SSSP{&_graph}, 
                 Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                Galois::timeit());
+                Galois::timeit(),
+                Galois::no_stats()
+                );
     }
 
     #if __OPT_VERSION__ == 5
@@ -308,7 +311,8 @@ struct SSSP {
           SSSP{ &_graph, dga },
           Galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           Galois::do_all_steal<true>(),
-          Galois::timeit()
+          Galois::timeit(),
+          Galois::no_stats()
         );
       }
 

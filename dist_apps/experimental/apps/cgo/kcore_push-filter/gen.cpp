@@ -178,7 +178,8 @@ struct InitializeGraph2 {
       InitializeGraph2{ &_graph },
       Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
 
     #if __OPT_VERSION__ == 5
@@ -243,7 +244,8 @@ struct InitializeGraph1 {
         allNodes.begin(), allNodes.end(),
         InitializeGraph1{ &_graph },
         Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
     // degree calculation
@@ -305,7 +307,8 @@ struct KCoreStep2 {
        #endif
        KCoreStep2{ &_graph },
        Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-       Galois::timeit()
+       Galois::timeit(),
+       Galois::no_stats()
      );
   }
 
@@ -375,7 +378,8 @@ struct KCoreStep1 {
         KCoreStep1{ k_core_num, &_graph, dga },
         Galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
 
       #if __OPT_VERSION__ == 5

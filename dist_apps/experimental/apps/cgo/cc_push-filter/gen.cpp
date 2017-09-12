@@ -162,7 +162,8 @@ struct InitializeGraph {
       InitializeGraph{&_graph}, 
       Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       Galois::do_all_steal<true>(),
-      Galois::timeit()
+      Galois::timeit(),
+      Galois::no_stats()
     );
     }
   }
@@ -205,7 +206,8 @@ struct FirstItr_ConnectedComp{
         FirstItr_ConnectedComp{ &_graph },
         Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
     }
 
@@ -301,7 +303,8 @@ struct ConnectedComp {
         ConnectedComp(&_graph, dga),
         Galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
         Galois::do_all_steal<true>(),
-        Galois::timeit()
+        Galois::timeit(),
+        Galois::no_stats()
       );
       }
 
