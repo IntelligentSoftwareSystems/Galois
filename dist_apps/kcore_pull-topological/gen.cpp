@@ -247,48 +247,48 @@ struct InitializeGraph {
 };
 
 
-/* Use the trim value (i.e. number of incident nodes that have been removed)
- * to update degrees.
- * Called by KCore */
-struct DegreeUpdate {
-  Graph* graph;
-
-  DegreeUpdate(Graph* _graph) : graph(_graph){}
-
-  void static go(Graph& _graph){
-    auto& allNodes = _graph.allNodesRange();
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
-                           (_graph.get_run_identifier()));
-      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-      StatTimer_cuda.start();
-      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-  #endif
-     Galois::do_all(
-       allNodes.begin(), allNodes.end(),
-       DegreeUpdate{ &_graph },
-       Galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
-       Galois::timeit()
-     );
-  }
-
-  void operator()(GNode src) const {
-    NodeData& src_data = graph->getData(src);
-
-    // we currently do not care about degree for dead nodes, 
-    // so we ignore those (i.e. if flag isn't set, do nothing)
-    if (src_data.flag) {
-      if (src_data.trim > 0) {
-        src_data.current_degree = src_data.current_degree - src_data.trim;
-      }
-    }
-
-    src_data.trim = 0;
-  }
-};
+///* Use the trim value (i.e. number of incident nodes that have been removed)
+// * to update degrees.
+// * Called by KCore */
+//struct DegreeUpdate {
+//  Graph* graph;
+//
+//  DegreeUpdate(Graph* _graph) : graph(_graph){}
+//
+//  void static go(Graph& _graph){
+//    auto& allNodes = _graph.allNodesRange();
+//  #ifdef __GALOIS_HET_CUDA__
+//    if (personality == GPU_CUDA) {
+//      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
+//                           (_graph.get_run_identifier()));
+//      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+//      StatTimer_cuda.start();
+//      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+//      StatTimer_cuda.stop();
+//    } else if (personality == CPU)
+//  #endif
+//     Galois::do_all(
+//       allNodes.begin(), allNodes.end(),
+//       DegreeUpdate{ &_graph },
+//       Galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
+//       Galois::timeit()
+//     );
+//  }
+//
+//  void operator()(GNode src) const {
+//    NodeData& src_data = graph->getData(src);
+//
+//    // we currently do not care about degree for dead nodes, 
+//    // so we ignore those (i.e. if flag isn't set, do nothing)
+//    if (src_data.flag) {
+//      if (src_data.trim > 0) {
+//        src_data.current_degree = src_data.current_degree - src_data.trim;
+//      }
+//    }
+//
+//    src_data.trim = 0;
+//  }
+//};
 
 /* Updates liveness of a node + updates flag that says if node has been pulled 
  * from */
@@ -330,7 +330,10 @@ struct LiveUpdate {
     NodeData& sdata = graph->getData(src);
 
     if (sdata.flag) {
-      // still alive
+      if (sdata.trim > 0) {
+        sdata.current_degree = sdata.current_degree - sdata.trim;
+      }
+
       if (sdata.current_degree < local_k_core_num) {
         sdata.flag = false;
         DGAccumulator_accum += 1;
@@ -346,6 +349,9 @@ struct LiveUpdate {
         sdata.pull_flag = false;
       }
     }
+
+    // always reset trim
+    sdata.trim = 0;
   }
 };
 
@@ -391,8 +397,8 @@ struct KCore {
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCore");
 
-      // handle trimming (locally on each node)
-      DegreeUpdate::go(_graph);
+      //// handle trimming (locally on each node)
+      //DegreeUpdate::go(_graph);
 
       // update live/deadness
       LiveUpdate::go(_graph, dga);
@@ -582,6 +588,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
     Galois::DGAccumulator<uint64_t> dga1;
@@ -601,7 +608,6 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        Galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
 
       #ifdef __GALOIS_HET_CUDA__
@@ -614,6 +620,7 @@ int main(int argc, char** argv) {
         bitset_trim.reset(); }
 
         InitializeGraph::go((*h_graph));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 

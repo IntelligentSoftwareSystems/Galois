@@ -462,6 +462,7 @@ int main(int argc, char** argv) {
     StatTimer_init.start();
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // accumulators for use in operators
     Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
@@ -489,9 +490,9 @@ int main(int argc, char** argv) {
       #endif
         bitset_dist_current.reset();
 
-        //Galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 
