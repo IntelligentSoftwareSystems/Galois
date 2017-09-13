@@ -1,40 +1,23 @@
 #include "Galois/gIO.h"
 #include "Galois/Substrate/Init.h"
-#include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/Termination.h"
 
 
 #include <memory>
 
+using namespace Galois::Substrate;
 
-
-void Galois::Substrate::init(void) {
-  internal::initThreadPool();
-  internal::initBarrier();
-  internal::initTermDetect();
+SharedMemSubstrate::SharedMemSubstrate(void) {
+  internal::setThreadPool(&m_tpool);
+  internal::setBarrierInstance(&m_barrier);
+  internal::setTermDetect(&m_term);
 }
 
-void Galois::Substrate::kill(void) {
-  internal::killTermDetect();
-  internal::killBarrier();
-  internal::killThreadPool();
-
+SharedMemSubstrate::~SharedMemSubstrate(void) {
+  internal::setTermDetect(nullptr);
+  internal::setBarrierInstance(nullptr);
+  internal::setThreadPool(nullptr);
 }
 
-static Galois::Substrate::internal::BarrierInstance* bPtr = nullptr;
-
-void Galois::Substrate::internal::initBarrier(void) {
-  GALOIS_ASSERT(!bPtr, "Double initialization of BarrierInstance");
-  bPtr = new BarrierInstance();
-}
-
-void Galois::Substrate::internal::killBarrier(void) {
-  delete bPtr;
-  bPtr = nullptr;
-}
-
-Galois::Substrate::Barrier& Galois::Substrate::getBarrier(unsigned numT) {
-  GALOIS_ASSERT(bPtr, "BarrierInstance not initialized");
-  return bPtr->get(numT);
-}

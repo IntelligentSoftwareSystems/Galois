@@ -30,12 +30,8 @@
 
 #include "Galois/Galois.h"
 
-Galois::SharedMemSys::SharedMemSys(const std::string& statFile): sm(statFile) {
-  Galois::Substrate::init();
-  Galois::Runtime::init(&sm);
-}
+Galois::SharedMemSys::SharedMemSys(const std::string& statFile)
+  : Galois::Runtime::SharedMemRuntime<Galois::Runtime::StatManager>(statFile)
+{ } 
 
-Galois::SharedMemSys::~SharedMemSys(void) {
-  Galois::Runtime::kill();
-  Galois::Substrate::kill();
-}
+Galois::SharedMemSys::~SharedMemSys(void) {}

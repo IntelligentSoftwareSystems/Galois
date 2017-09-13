@@ -40,26 +40,6 @@
 
 namespace Galois {
 namespace Substrate {
-
-/**
- * Create specific types of barriers.  For benchmarking only.  Use
- * getSystemBarrier() for all production code
- */
-std::unique_ptr<Barrier> createPthreadBarrier(unsigned);
-std::unique_ptr<Barrier> createMCSBarrier(unsigned);
-std::unique_ptr<Barrier> createTopoBarrier(unsigned);
-std::unique_ptr<Barrier> createCountingBarrier(unsigned);
-std::unique_ptr<Barrier> createDisseminationBarrier(unsigned);
-
-/**
- * Creates a new simple barrier. This barrier is not designed to be fast but
- * does gaurantee that all threads have left the barrier before returning
- * control. Useful when the number of active threads is modified to avoid a
- * race in {@link getSystemBarrier()}.  Client is reponsible for deallocating
- * returned barrier.
- */
-std::unique_ptr<Barrier> createSimpleBarrier(unsigned);
-
 } // end namespace Substrate
 } // end namespace Galois
 

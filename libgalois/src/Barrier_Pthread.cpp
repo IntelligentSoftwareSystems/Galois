@@ -31,7 +31,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/gIO.h"
 

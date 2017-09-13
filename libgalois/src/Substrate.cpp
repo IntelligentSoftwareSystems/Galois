@@ -32,7 +32,7 @@
  */
 
 #include "Galois/Runtime/Substrate.h"
-#include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/Init.h"
 
 Galois::Substrate::Barrier& Galois::Runtime::getBarrier(unsigned activeThreads) {

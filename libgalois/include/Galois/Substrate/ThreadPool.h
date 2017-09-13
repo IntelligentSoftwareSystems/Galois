@@ -65,14 +65,9 @@ struct ExecuteTupleImpl<tpl, s, 0> {
 
 }
 
-namespace internal {
-  void initThreadPool(void);
-  void killThreadPool(void);
-
-} // end namespace internal
 
 class ThreadPool {
-  friend void internal::initThreadPool(void);
+  friend class SharedMemSubstrate;
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
   struct fastmode_ty {bool mode;}; //! type for setting fastmode
@@ -210,6 +205,13 @@ public:
 
 };
 
+namespace internal {
+  void setThreadPool(ThreadPool* tp);
+}
+
+/**
+ * return a reference to system thread pool
+ */
 ThreadPool& getThreadPool(void);
 
 } //Substrate

@@ -31,7 +31,6 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/Substrate/Init.h"
 #include "Galois/Runtime/Init.h"
 #include "Galois/Runtime/Executor_Deterministic.h"
 #include "Galois/Runtime/Executor_DoAll.h"
@@ -59,8 +58,7 @@ namespace Galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class SharedMemSys {
-  Runtime::StatManager sm;
+class SharedMemSys: public Runtime::SharedMemRuntime<Runtime::StatManager> {
 
 public:
   explicit SharedMemSys(const std::string& statFile="");

@@ -35,65 +35,31 @@
 
 #include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/BarrierImpl.h"
-
+#include "Galois/Substrate/Barrier.h"
 
 namespace Galois {
 namespace Substrate {
 
+class SharedMemSubstrate {
 
-/**
- * Initializes the Substrate library components
- */
-void init(void);
+  // Order is critical here
+  ThreadPool m_tpool;
+  BarrierInstance<> m_barrier;
+  LocalTerminationDetection<> m_term;
 
-/**
- * Destroys the Substrate library components
- */
-void kill(void);
+public:
 
-/**
- * return a reference to system thread pool
- */
-ThreadPool& getThreadPool();
+  /**
+   * Initializes the Substrate library components
+   */
+  SharedMemSubstrate();
 
-/**
- * return a reference to system barrier 
- */
-Barrier& getBarrier(unsigned numT);
-
-
-namespace internal {
-
-void initBarrier();
-
-void killBarrier();
-
-struct BarrierInstance {
-  unsigned m_num_threads;
-  std::unique_ptr<Barrier> m_barrier;
-
-  BarrierInstance(void) {
-    m_num_threads = getThreadPool().getMaxThreads();
-    m_barrier = createTopoBarrier(m_num_threads);
-  }
-
-  Barrier& get(unsigned numT) {
-    GALOIS_ASSERT(numT > 0, "Substrate::getBarrier() number of threads must be > 0");
-
-    numT = std::min(numT, getThreadPool().getMaxUsableThreads());
-    numT = std::max(numT, 1u);
-
-    if (numT != m_num_threads) {
-      m_num_threads = numT;
-      m_barrier->reinit(numT);
-    }
-
-    return *m_barrier;
-  }
+  /**
+   * Destroys the Substrate library components
+   */
+  ~SharedMemSubstrate();
 
 };
-} // end namespace internal
 
 
 }

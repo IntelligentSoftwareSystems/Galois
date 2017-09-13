@@ -45,92 +45,13 @@
 #include <numeric>
 #include <deque>
 
-namespace {
-struct FreeNode {
-  FreeNode* next;
-};
- 
-typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
-typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
+using namespace Galois::Runtime;
 
-// Tracks pages allocated
-class PAState {  
-  std::deque<std::atomic<int>> counts;
-  std::vector<HeadPtrStorage> pool;
-  std::unordered_map<void*, int> ownerMap;
-  Galois::Substrate::SimpleLock mapLock;
+static Galois::Runtime::PageAllocState<>* PA;
 
-  void* allocFromOS() {
-    void* ptr = Galois::Substrate::allocPages(1, true);
-    assert(ptr);
-    auto tid = Galois::Substrate::ThreadPool::getTID();
-    counts[tid] += 1;
-    std::lock_guard<Galois::Substrate::SimpleLock> lg(mapLock);
-    ownerMap[ptr] = tid;
-    return ptr;
-  }
-
-public:
-  PAState() { 
-    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
-    counts.resize(num);
-    pool.resize(num);
-  }
-
-  int count(int tid) const {
-    return counts[tid];
-  }
-
-  int countAll() const {
-    return std::accumulate(counts.begin(), counts.end(), 0);
-  }
-
-  void* pageAlloc() {
-    auto tid = Galois::Substrate::ThreadPool::getTID();
-    HeadPtr& hp = pool[tid].data;
-    if (hp.getValue()) {
-      hp.lock();
-      FreeNode* h = hp.getValue(); 
-      if (h) {
-        hp.unlock_and_set(h->next);
-        return h;
-      }
-      hp.unlock();
-    }
-    return allocFromOS();
-  }
-
-  void pageFree(void* ptr) {
-    assert(ptr);
-    mapLock.lock();
-    assert(ownerMap.count(ptr));
-    int i = ownerMap[ptr];
-    mapLock.unlock();
-    HeadPtr& hp = pool[i].data;
-    hp.lock();
-    FreeNode* nh = reinterpret_cast<FreeNode*>(ptr);
-    nh->next = hp.getValue();
-    hp.unlock_and_set(nh);
-  }
-
-  void pagePreAlloc() {
-    pageFree(allocFromOS());
-  }
-};
-
-static PAState* PA;
-} //end namespace ""
-
-void Galois::Runtime::internal::initPagePool(void) {
-  GALOIS_ASSERT(!PA, "PagePool.cpp: Double Initialization of PAState");
-  PA = new PAState();
-}
-
-// TODO: make sure that all the allocated memory and pages are freed
-// There should be no memory leaks
-void Galois::Runtime::internal::killPagePool(void) {
-  delete PA;
-  PA = nullptr;
+void Galois::Runtime::internal::setPagePoolState(PageAllocState<>* pa) {
+  GALOIS_ASSERT(!(PA && pa), "PagePool.cpp: Double Initialization of PageAllocState");
+  PA = pa;
 }
 
 int Galois::Runtime::numPagePoolAllocTotal() {

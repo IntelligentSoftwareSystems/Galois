@@ -33,7 +33,7 @@
 
 
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>

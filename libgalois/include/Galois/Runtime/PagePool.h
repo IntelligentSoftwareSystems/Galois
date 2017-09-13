@@ -56,11 +56,83 @@ int numPagePoolAllocTotal();
 int numPagePoolAllocForThread(unsigned tid);
 
 namespace internal {
-  //! Initialize PagePool, used by Runtime::init();
-  void initPagePool(void);
 
-  //! Destroy  PagePool, used by Runtime::finish();
-  void killPagePool(void);
+struct FreeNode {
+  FreeNode* next;
+};
+ 
+typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
+typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
+
+// Tracks pages allocated
+template <typename _UNUSED=void>
+class PageAllocState {  
+  std::deque<std::atomic<int>> counts;
+  std::vector<HeadPtrStorage> pool;
+  std::unordered_map<void*, int> ownerMap;
+  Galois::Substrate::SimpleLock mapLock;
+
+  void* allocFromOS() {
+    void* ptr = Galois::Substrate::allocPages(1, true);
+    assert(ptr);
+    auto tid = Galois::Substrate::ThreadPool::getTID();
+    counts[tid] += 1;
+    std::lock_guard<Galois::Substrate::SimpleLock> lg(mapLock);
+    ownerMap[ptr] = tid;
+    return ptr;
+  }
+
+public:
+  PageAllocState() { 
+    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
+    counts.resize(num);
+    pool.resize(num);
+  }
+
+  int count(int tid) const {
+    return counts[tid];
+  }
+
+  int countAll() const {
+    return std::accumulate(counts.begin(), counts.end(), 0);
+  }
+
+  void* pageAlloc() {
+    auto tid = Galois::Substrate::ThreadPool::getTID();
+    HeadPtr& hp = pool[tid].data;
+    if (hp.getValue()) {
+      hp.lock();
+      FreeNode* h = hp.getValue(); 
+      if (h) {
+        hp.unlock_and_set(h->next);
+        return h;
+      }
+      hp.unlock();
+    }
+    return allocFromOS();
+  }
+
+  void pageFree(void* ptr) {
+    assert(ptr);
+    mapLock.lock();
+    assert(ownerMap.count(ptr));
+    int i = ownerMap[ptr];
+    mapLock.unlock();
+    HeadPtr& hp = pool[i].data;
+    hp.lock();
+    FreeNode* nh = reinterpret_cast<FreeNode*>(ptr);
+    nh->next = hp.getValue();
+    hp.unlock_and_set(nh);
+  }
+
+  void pagePreAlloc() {
+    pageFree(allocFromOS());
+  }
+};
+
+//! Initialize PagePool, used by Runtime::init();
+void setPagePoolState(PageAllocState<>* pa);
+
 } // end namespace internal
 
 } // end namespace Runtime
