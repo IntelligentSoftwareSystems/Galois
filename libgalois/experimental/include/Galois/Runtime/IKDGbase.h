@@ -196,19 +196,19 @@ protected:
   }
 
   void dumpStats (void) {
-    reportStat (Base::loopname, "rounds", rounds,0);
-    reportStat (Base::loopname, "committed", totalCommits,0);
-    reportStat (Base::loopname, "total", totalTasks,0);
+    reportStat_Serial (Base::loopname, "rounds", rounds);
+    reportStat_Serial (Base::loopname, "committed", totalCommits);
+    reportStat_Serial (Base::loopname, "total", totalTasks);
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 
-    reportStat ("(NULL)", "t_expandNhood",    t_expandNhood.get(),0);
-    reportStat ("(NULL)", "t_beginRound",     t_beginRound.get(),0);
-    reportStat ("(NULL)", "t_executeSources", t_executeSources.get(),0);
-    reportStat ("(NULL)", "t_applyOperator",  t_applyOperator.get(),0);
-    reportStat ("(NULL)", "t_serviceAborts",  t_serviceAborts.get(),0);
-    reportStat ("(NULL)", "t_performCommits", t_performCommits.get(),0);
-    reportStat ("(NULL)", "t_reclaimMemory",  t_reclaimMemory.get(),0);
+    reportStat_Serial (Base::loopname, "t_expandNhood",    t_expandNhood.get());
+    reportStat_Serial (Base::loopname, "t_beginRound",     t_beginRound.get());
+    reportStat_Serial (Base::loopname, "t_executeSources", t_executeSources.get());
+    reportStat_Serial (Base::loopname, "t_applyOperator",  t_applyOperator.get());
+    reportStat_Serial (Base::loopname, "t_serviceAborts",  t_serviceAborts.get());
+    reportStat_Serial (Base::loopname, "t_performCommits", t_performCommits.get());
+    reportStat_Serial (Base::loopname, "t_reclaimMemory",  t_reclaimMemory.get());
   }
 
   //  TODO: spill range 

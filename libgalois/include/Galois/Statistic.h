@@ -31,7 +31,7 @@
 #define GALOIS_STATISTIC_H
 
 #include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Timer.h"
 
@@ -42,6 +42,7 @@
 
 namespace Galois {
 
+#if 0 // Deprecated 
 /**
  * Basic per-thread statistics counter.
  */
@@ -82,7 +83,6 @@ public:
 };
 using Statistic = StatisticBase<unsigned long>;
 
-#if 0 // Deprecated 
 /**
  * Controls lifetime of stats. Users usually instantiate in main to print out
  * statistics at program exit.
@@ -156,7 +156,7 @@ public:
     if (valid)
       stop();
     if (TimeAccumulator::get()) // only report non-zero stat
-      Galois::Runtime::reportStat(loopname, name, get(), Substrate::ThreadPool::getTID());
+      Galois::Runtime::reportStat_Serial(loopname, name, get());
   }
 
   void start() {
@@ -217,25 +217,36 @@ protected:
 
     int64_t minTime = std::numeric_limits<int64_t>::max();
 
-    std::string timeCat = category + std::string("-per-thread-times(ns)");
 
     for (unsigned i = 0; i < timers.size(); ++i) {
 
       auto ns = timers.getRemote(i)->get_nsec();
-      Galois::Runtime::reportStat(loopname, timeCat.c_str(), ns, i);
 
       minTime = std::min(minTime, ns);
     }
 
+    std::string timeCat = category + std::string("-per-thread-times(ns)");
     std::string lagCat = category + std::string("-per-thread-lag(ns)");
-    for (unsigned i = 0; i < timers.size(); ++i) {
 
-      auto ns = timers.getRemote(i)->get_nsec();
-      auto lag = ns - minTime;
-      assert(lag > 0 && "negative time lag from min is impossible");
+    Galois::Substrate::getThreadPool(Galois::getActiveThreads(),
+        [&] (void) {
+          auto ns = timers.getLocal()->get_nsec();
+          auto lag = ns - minTime;
+          assert(lag > 0 && "negative time lag from min is impossible");
 
-      Galois::Runtime::reportStat(loopname, lagCat.c_str(), lag, i);
-    }
+          Galois::Runtime::reportStat_Tmax(loopname, timeCat.c_str(), ns);
+          Galois::Runtime::reportStat_Tmax(loopname, lagCat.c_str(), lag);
+        });
+
+    // for (unsigned i = 0; i < timers.size(); ++i) {
+// 
+      // auto ns = timers.getRemote(i)->get_nsec();
+      // auto lag = ns - minTime;
+      // assert(lag > 0 && "negative time lag from min is impossible");
+// 
+      // Galois::Runtime::reportStat(loopname, lagCat.c_str(), lag, i);
+      // Galois::Runtime::reportStat(loopname, timeCat.c_str(), ns, i);
+    // }
   }
 
 public:

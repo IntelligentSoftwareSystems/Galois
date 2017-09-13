@@ -43,7 +43,7 @@
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopStatistics.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
@@ -1453,8 +1453,8 @@ void Executor<OptionsTy>::go() {
   
   if (OptionsTy::needsStats) {
     if (Substrate::ThreadPool::getTID() == 0) {
-      reportStat(loopname, "RoundsExecuted", tld.rounds, 0);
-      reportStat(loopname, "OuterRoundsExecuted", tld.outerRounds, 0);
+      reportStat_Serial(loopname, "RoundsExecuted", tld.rounds);
+      reportStat_Serial(loopname, "OuterRoundsExecuted", tld.outerRounds);
     }
   }
 }

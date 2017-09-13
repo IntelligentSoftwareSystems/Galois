@@ -46,7 +46,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
@@ -191,11 +191,10 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        unsigned tid = Substrate::ThreadPool::getTID();
-        reportStat(loopname, "Conflicts", stat_conflicts, tid);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, tid);
-        reportStat(loopname, "Pushes", stat_pushes, tid);
-        reportStat(loopname, "Iterations", stat_iterations, tid);
+        reportStat_Tsum(loopname, "Conflicts", stat_conflicts);
+        reportStat_Tsum(loopname, "Commits", stat_iterations - stat_conflicts);
+        reportStat_Tsum(loopname, "Pushes", stat_pushes);
+        reportStat_Tsum(loopname, "Iterations", stat_iterations);
       }
     }
   };
@@ -375,7 +374,7 @@ protected:
     execTime(loopname, "Execute")
   {
     if (!combineStats) {
-      reportLoopInstance(loopname);
+      // reportLoopInstance(loopname);
     }
   }
 

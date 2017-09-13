@@ -60,10 +60,31 @@ namespace gstl {
   template<typename T, typename C=std::less<T> >
   using Set = std::set<T, C, FixedSizeAlloc<T> >; 
 
+  template<typename K, typename V, typename C=std::less<K> >
+  using Map = std::map<K, V, C, FixedSizeAlloc<std::pair<const K, V> > >; 
+
   template<typename T, typename C=std::less<T> >
   using PQ = MinHeap<T, C, Vector<T> >; 
 
   using Str = std::basic_string<char, std::char_traits<char>, Pow2Alloc<char> >;
+
+  template <typename T>
+  struct StrMaker {
+    Str operator () (const T& x) const {
+      return Str(x);
+    }
+  };
+
+  template <> struct StrMaker<std::string> {
+    Str operator () (const std::string& x) const {
+      return Str(x.begin(), x.end());
+    }
+  };
+
+  template <typename T>
+  Str makeStr(const T& x) {
+    return StrMaker<T>()(x);
+  }
 
 } // end namespace gstl
 

@@ -60,19 +60,12 @@ namespace Galois {
  * Runtime is destroyed when this object is destroyed
  */
 class SharedMemSys {
-  Runtime::StatCollector m_sc;
+  Runtime::StatManager sm;
 
 public:
-  explicit SharedMemSys(void) {
-    Substrate::init();
-    Runtime::init(&m_sc);
-  }
+  explicit SharedMemSys(const std::string& statFile="");
 
-  ~SharedMemSys(void) {
-    m_sc.printStats();
-    Runtime::kill();
-    Substrate::kill();
-  }
+  ~SharedMemSys(void);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

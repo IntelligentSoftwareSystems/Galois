@@ -780,9 +780,9 @@ protected:
 
   void dumpStats (void) {
 
-    reportStat (this->loopname, "retired", totalRetires.reduce(),0);
-    reportStat (this->loopname, "efficiency%", double (100 * totalRetires.reduce()) / this->totalTasks,0);
-    reportStat (this->loopname, "avg. parallelism", double (totalRetires.reduce()) / this->rounds, 0);
+    reportStat_Serial (this->loopname, "retired", totalRetires.reduce());
+    reportStat_Serial (this->loopname, "efficiency%", double (100 * totalRetires.reduce()) / this->totalTasks);
+    reportStat_Serial (this->loopname, "avg. parallelism", double (totalRetires.reduce()) / this->rounds);
 
     if (ThisClass::ENABLE_PARAMETER) {
       dumpParaMeterStats();

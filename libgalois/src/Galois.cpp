@@ -1,5 +1,7 @@
-/** Runtime Init -*- C++ -*-
+/** Galois user interface -*- C++ -*-
  * @file
+ * This is the only file to include for basic Galois functionality.
+ *
  * @section License
  *
  * This file is part of Galois.  Galoisis a framework to exploit
@@ -21,36 +23,19 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
- * @section Description
- * Initializes the components of Galois::Runtime library
- *
- * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
 
-#ifndef GALOIS_RUNTIME_INIT_H
-#define GALOIS_RUNTIME_INIT_H
+#include "Galois/Galois.h"
 
-#include "Galois/Runtime/Statistics.h"
-#include "Galois/Runtime/PagePool.h"
+Galois::SharedMemSys::SharedMemSys(const std::string& statFile): sm(statFile) {
+  Galois::Substrate::init();
+  Galois::Runtime::init(&sm);
+}
 
-namespace Galois {
-namespace Runtime {
-
-/**
- * Initialize Runtime components
- */
-void init(Galois::Runtime::StatManager* sm);
-
-/**
- * Destroy Runtime components
- */
-void kill(void);
-
-} // end namespace Runtime
-} // end namespace Galois
-
-
-#endif// GALOIS_RUNTIME_INIT_H
+Galois::SharedMemSys::~SharedMemSys(void) {
+  Galois::Runtime::kill();
+  Galois::Substrate::kill();
+}

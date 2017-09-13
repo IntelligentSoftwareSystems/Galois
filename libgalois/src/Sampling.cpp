@@ -28,7 +28,7 @@
  */
 
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Substrate/EnvCheck.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/gIO.h"
@@ -189,7 +189,8 @@ static void end(bool mainThread) {
     GALOIS_DIE(PAPI_strerror(rv));
 
   for (unsigned i = 0; i < sizeof(papiNames)/sizeof(*papiNames); ++i)
-    Galois::Runtime::reportStat(NULL, papiNames[i], papiResults[i]);
+    Galois::Runtime::reportStat_Tsum("PAPI-Prof", papiNames[i], papiResults[i]);
+
 }
 
 }

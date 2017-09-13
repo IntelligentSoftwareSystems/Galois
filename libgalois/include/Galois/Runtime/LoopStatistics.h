@@ -27,6 +27,7 @@
 namespace Galois {
 namespace Runtime {
 
+// Usually instantiated per thread 
 template<bool Enabled>
 class LoopStatistics {
   unsigned long conflicts;
@@ -36,8 +37,8 @@ class LoopStatistics {
 public:
   explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
   ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts, 0);
-    reportStat(loopname, "Iterations", iterations, 0);
+    reportStat_Tsum(loopname, "Conflicts", conflicts);
+    reportStat_Tsum(loopname, "Iterations", iterations);
   }
   inline void inc_iterations() {
     ++iterations;

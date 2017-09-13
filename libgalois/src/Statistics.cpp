@@ -28,17 +28,29 @@
  */
 
 #include "Galois/Runtime/Statistics.h"
+#include "Galois/Runtime/Executor_OnEach.h"
+
+#include <iostream>
+#include <fstream>
 
 using namespace Galois::Runtime;
 
 boost::uuids::uuid Galois::Runtime::getRandUUID(void) {
-  static boost::uuids::uuid UUID (boost::uuids::random_generator());
+  static boost::uuids::uuid UUID = boost::uuids::random_generator()();
   return UUID;
 }
 
-using Str = typename StatManager::Str;
+constexpr const char* StatTotal::NAMES[];
 
-StatManager(const Str& outfile): m_outfile(outfile) {}
+using Galois::gstl::Str;
+
+StatManager::StatManager(const std::string& outfile): m_outfile(outfile) {}
+
+StatManager::~StatManager(void) {}
+
+bool StatManager::printingThreadVals(void) {
+  return Galois::Substrate::EnvCheck(StatManager::TVAL_EVN_VAR);
+}
 
 void StatManager::addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type) {
   intStats.addToStat(region, category, val, type);
@@ -57,9 +69,9 @@ void StatManager::print(void) {
     printStats(std::cout);
 
   } else {
-    std::ofstream outf(m_outfile);
+    std::ofstream outf(m_outfile.c_str());
     if (outf.good()) {
-      printStatsForR(outf, false);
+      printStats(outf);
     } else {
       gWarn("Could not open stats file for writing, file provided:", m_outfile);
       printStats(std::cerr);
@@ -74,7 +86,7 @@ void StatManager::printStats(std::ostream& out) {
   strStats.print(out);
 }
 
-unsigned StatManager::maxThreads(void) const { 
+unsigned StatManager::maxThreads(void) { 
   return Galois::getActiveThreads();
 }
 
@@ -109,8 +121,8 @@ StatManager* Galois::Runtime::internal::sysStatManager(void) {
 
 void Galois::Runtime::reportPageAlloc(const char* category) {
   Runtime::on_each_gen(
-      [] (const unsigned tid, const unsigned numT) {
-        reportStat("(NULL)", category, numPagePoolAllocForThread(tid)); 
+      [category] (const unsigned tid, const unsigned numT) {
+        reportStat_Tsum("(NULL)", category, numPagePoolAllocForThread(tid)); 
       }
       , std::make_tuple(Galois::no_stats()));
 }

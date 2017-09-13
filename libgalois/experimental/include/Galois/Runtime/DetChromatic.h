@@ -471,8 +471,8 @@ public:
 
     // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
-    reportStat (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
-    reportStat (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
+    reportStat_Serial (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
+    reportStat_Serial (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
 
     t.stop ();
 

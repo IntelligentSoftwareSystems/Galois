@@ -1,15 +1,15 @@
 #include "Galois/Runtime/Init.h"
 
-void Galois::Runtime::init(Galois::Runtime::StatCollector* sc) {
+void Galois::Runtime::init(Galois::Runtime::StatManager* sm) {
   using namespace Galois::Runtime;
   internal::initPagePool();
-  internal::setStatCollector(sc);
+  internal::setSysStatManager(sm);
 }
 
 
 void Galois::Runtime::kill(void) {
   using namespace Galois::Runtime;
   internal::killPagePool();
-  internal::setStatCollector(nullptr);
+  internal::setSysStatManager(nullptr);
 }
 

@@ -38,6 +38,7 @@
 #include "Galois/Statistic.h"
 
 #include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/Statistics.h"
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/Termination.h"
@@ -516,9 +517,6 @@ public:
     for (unsigned i = 0; i < workers.size (); ++i) {
       auto& ctx = *(workers.getRemote (i));
       assert (!ctx.hasWork () &&  "Unprocessed work left");
-      if (NEEDS_STATS) {
-        Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, ctx.id);
-      }
     }
 
     // printStats ();
@@ -575,7 +573,9 @@ public:
     totalTime.stop ();
     assert (!ctx.hasWork ());
 
-    // Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, ctx.id);
+    if (NEEDS_STATS) {
+      Galois::Runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
+    }
   }
 
 
@@ -638,7 +638,7 @@ template <> struct ChooseDoAllImpl<false> {
         totalTime.stop();
 
         if (NEEDS_STATS) {
-          Galois::Runtime::reportStat (loopname, "Iterations", iter, tid);
+          Galois::Runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 
     }, std::make_tuple(no_stats(), loopname("DoAll-no-steal")));

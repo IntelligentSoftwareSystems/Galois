@@ -314,8 +314,8 @@ protected:
     {}
 
     void reportStats (void) {
-      reportStat(loopname, "Pushes", stat_pushes, 0);
-      reportStat(loopname, "Iterations", stat_iterations, 0);
+      reportStat_Tsum(loopname, "Pushes", stat_pushes);
+      reportStat_Tsum(loopname, "Iterations", stat_iterations);
     }
   };
 

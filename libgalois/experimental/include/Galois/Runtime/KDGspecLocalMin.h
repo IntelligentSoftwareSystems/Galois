@@ -54,8 +54,8 @@ public:
 
 protected:
   void dumpStats (void) {
-    reportStat (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks,0);
-    reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
+    reportStat_Serial (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks);
+    reportStat_Serial (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void abortCtxt (Ctxt* c) {

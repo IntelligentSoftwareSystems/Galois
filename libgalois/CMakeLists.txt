@@ -1,5 +1,6 @@
 set(sources
         src/Init.cpp
+        src/Galois.cpp
         src/Context.cpp
         src/PreAlloc.cpp
         src/Support.cpp
@@ -12,7 +13,8 @@ set(sources
         src/Substrate.cpp
         src/Version.cpp
         src/PagePool.cpp
-        src/StatCollector.cpp
+        #src/StatCollector.cpp
+        src/Statistics.cpp
         src/Barrier.cpp
         src/Barrier_Counting.cpp
         src/Barrier_Dissemination.cpp 

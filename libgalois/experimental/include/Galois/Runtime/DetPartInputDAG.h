@@ -507,9 +507,9 @@ struct InputGraphPartDAGexecutor {
             std::printf ("Partition %d performed %d rounds\n", (*i)->id, (*i)->flips);
           }
 
-          reportStat (loopname, "Inner Iterations", worker.innerIter);
-          reportStat (loopname, "Boundary Iterations", worker.boundaryIter);
-          reportStat (loopname, "Total Iterations", (worker.innerIter + worker.boundaryIter));
+          reportStat_Tsum (loopname, "Inner Iterations", worker.innerIter);
+          reportStat_Tsum (loopname, "Boundary Iterations", worker.boundaryIter);
+          reportStat_Tsum (loopname, "Total Iterations", (worker.innerIter + worker.boundaryIter));
 
 
         });
