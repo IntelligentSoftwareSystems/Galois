@@ -27,7 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
+// #ifndef GALOIS_RUNTIME_STATCOLLECTOR_H
+#if 0
 #define GALOIS_RUNTIME_STATCOLLECTOR_H
 
 #include "Galois/gdeque.h"
