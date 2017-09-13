@@ -365,13 +365,18 @@ struct FirstIterationSSSP {
          current_edge != end_edge; 
          ++current_edge) {
       GNode dst = graph->getEdgeDst(current_edge);
+
+      if (src == dst) {
+        continue;
+      }
+
       auto& dst_data = graph->getData(dst);
 
       #ifndef __USE_BFS__
       // For SSSP (uses the edge weight; you need to change the graph edge
       // type as well in the declaration above)
       uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                              src_data.current_length;
+                              src_data.current_length + 1;
       #else
       // BFS 
       uint32_t new_dist = 1 + src_data.current_length;
@@ -472,11 +477,16 @@ struct SSSP {
            current_edge != end_edge; 
            ++current_edge) {
         GNode dst = graph->getEdgeDst(current_edge);
+
+        if (src == dst) {
+          continue;
+        }
+
         auto& dst_data = graph->getData(dst);
 
         #ifndef __USE_BFS__
         uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                            src_data.current_length;
+                            src_data.current_length + 1;
         #else
         uint32_t new_dist = 1 + src_data.current_length;
         #endif
@@ -532,13 +542,11 @@ struct PredAndSucc {
     // sync for use in NumShortPath calculation
     _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors, 
                 Broadcast_num_predecessors, 
-                //Bitset_num_predecessors>("PredAndSucc_pred");
                 Bitset_num_predecessors>("PredAndSucc");
 
     // sync now for later DependencyPropogation use 
     _graph.sync<writeSource, readSource, Reduce_add_num_successors, 
                 Broadcast_num_successors, 
-                //Bitset_num_successors>("PredAndSucc_succ");
                 Bitset_num_successors>("PredAndSucc");
   }
 
@@ -565,7 +573,7 @@ struct PredAndSucc {
 
         #ifndef __USE_BFS__
         // SSSP
-        uint32_t edge_weight = graph->getEdgeData(current_edge);
+        uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
         #else
         // BFS
         uint32_t edge_weight = 1;
@@ -636,7 +644,7 @@ struct NumShortestPathsChanges {
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-
+    
     if (src_data.current_length != local_infinity) {
       // decrement predecessor by trim then reset
       if (src_data.trim > 0) {
@@ -675,12 +683,17 @@ struct NumShortestPathsChanges {
 /* Calculate the number of shortest paths for each node */
 struct NumShortestPaths {
   const uint32_t &local_infinity;
+  const uint64_t local_current_src_node;
+
   Graph* graph;
   Galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
   NumShortestPaths(const uint32_t &_local_infinity,
+                   const uint64_t &_local_current_src_node,
                    Graph* _graph, Galois::DGAccumulator<uint32_t>& dga) : 
-     local_infinity(_local_infinity), graph(_graph), DGAccumulator_accum(dga) {}
+     local_infinity(_local_infinity), 
+     local_current_src_node(_local_current_src_node), 
+     graph(_graph), DGAccumulator_accum(dga) {}
 
   void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
@@ -711,7 +724,7 @@ struct NumShortestPaths {
       { 
         Galois::do_all_local(
           nodesWithEdges,
-          NumShortestPaths(infinity, &_graph, dga), 
+          NumShortestPaths(infinity, current_src_node, &_graph, dga), 
           Galois::loopname("NumShortestPaths"),
           //Galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
           Galois::do_all_steal<true>(),
@@ -725,6 +738,7 @@ struct NumShortestPaths {
                   Broadcast_trim, Bitset_trim>("NumShortestPaths");
       _graph.sync<writeDestination, readSource, Reduce_add_to_add, 
                   Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
+
       // do predecessor decrementing using trim + dependency changes with
       // to_add
       NumShortestPathsChanges::go(_graph);
@@ -762,14 +776,19 @@ struct NumShortestPaths {
       // can do a num succ check for optimization
       //if (src_data.propogation_flag && src_data.num_successors > 0) {
       if (src_data.propogation_flag) {
-
         for (auto current_edge = graph->edge_begin(src), 
                   end_edge = graph->edge_end(src); 
              current_edge != end_edge; 
              ++current_edge) {
           GNode dst = graph->getEdgeDst(current_edge);
+
           // ignore self loops
           if (dst == src) {
+            continue;
+          }
+          
+          // ignore "shortest path" to source
+          if (graph->L2G(dst) == local_current_src_node) {
             continue;
           }
 
@@ -777,13 +796,15 @@ struct NumShortestPaths {
 
           #ifndef __USE_BFS__
           // SSSP
-          uint32_t edge_weight = graph->getEdgeData(current_edge);
+          uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
           #else
           // BFS
           uint32_t edge_weight = 1;
           #endif
 
           uint32_t paths_to_add = src_data.num_shortest_paths;
+
+          assert(paths_to_add >= 1);
 
           if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
@@ -810,9 +831,11 @@ struct NumShortestPaths {
  * flag
  */
 struct PropogationFlagUpdate {
+  const uint32_t &local_infinity;
   Graph* graph;
 
-  PropogationFlagUpdate(Graph* _graph) : graph(_graph) { }
+  PropogationFlagUpdate(const uint32_t &_local_infinity, Graph* _graph) : 
+    local_infinity(_local_infinity), graph(_graph) { }
 
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -821,7 +844,7 @@ struct PropogationFlagUpdate {
 
     Galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
-      PropogationFlagUpdate(&_graph), 
+      PropogationFlagUpdate(infinity, &_graph), 
       Galois::loopname("PropogationFlagUpdate"),
       Galois::timeit(),
       Galois::no_stats()
@@ -838,11 +861,21 @@ struct PropogationFlagUpdate {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (src_data.num_successors == 0) {
-      src_data.propogation_flag = true;
-      bitset_propogation_flag.set(src);
-    } else {
-      assert(src_data.propogation_flag == false);
+    // this shouldn't print 
+    if (src_data.num_predecessors != 0) {
+      printf("[%d] WARNING node %lu with length %u, short paths %u\n", graph->id,
+             graph->L2G(src), src_data.current_length.load(), src_data.num_shortest_paths);
+    }
+
+    assert(src_data.num_predecessors == 0);
+
+    if (src_data.current_length != local_infinity) {
+      if (src_data.num_successors == 0) {
+        src_data.propogation_flag = true;
+        bitset_propogation_flag.set(src);
+      } else {
+        assert(src_data.propogation_flag == false);
+      }
     }
   }
 };
@@ -1029,8 +1062,13 @@ struct DependencyPropogation {
                current_edge != end_edge; 
                ++current_edge) {
             GNode dst = graph->getEdgeDst(current_edge);
+
             // ignore self loops
             if (dst == src) {
+              continue;
+            }
+
+            if (graph->L2G(dst) == local_current_src_node) {
               continue;
             }
 
@@ -1038,7 +1076,7 @@ struct DependencyPropogation {
 
             #ifndef __USE_BFS__
             // SSSP
-            uint32_t edge_weight = graph->getEdgeData(current_edge);
+            uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
             #else
             // BFS
             uint32_t edge_weight = 1;
@@ -1051,6 +1089,9 @@ struct DependencyPropogation {
               if ((src_data.current_length + edge_weight) == dst_data.current_length) {
                 // increment my trim for later use to decrement successor
                 Galois::atomicAdd(src_data.trim, (unsigned int)1);
+
+                assert(src_data.num_shortest_paths != 0);
+                assert(dst_data.num_shortest_paths != 0);
 
                 // update my to_add_float (which is later used to update dependency)
                 Galois::add(src_data.to_add_float, 
@@ -1234,7 +1275,8 @@ struct Sanity {
                      DGA_min,
                      DGA_sum
                    ), 
-                   Galois::loopname("Sanity"));
+                   Galois::loopname("Sanity"),
+                   Galois::no_stats());
 
     DGA_max = current_max;
     DGA_min = current_min;
