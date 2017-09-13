@@ -469,27 +469,26 @@ int main(int argc, char** argv) {
 
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id]) {
-        case 'g':
-          personality = GPU_CUDA;
-          break;
-        case 'o':
-          assert(0); // o currently not supported (apparently)
-          personality = GPU_OPENCL;
-          break;
-        case 'c':
-        default:
-          personality = CPU;
-          break;
-      }
 
+    if (personality_set.length() == (net.Num / num_nodes)) {
+      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
+      case 'g':
+        personality = GPU_CUDA;
+        break;
+      case 'o':
+        assert(0);
+        personality = GPU_OPENCL;
+        break;
+      case 'c':
+      default:
+        personality = CPU;
+        break;
+      }
       if ((personality == GPU_CUDA) && (gpu_device == -1)) {
         gpu_device = get_gpu_device_id(personality_set, num_nodes);
       }
-
       if ((scalecpu > 1) || (scalegpu > 1)) {
-        for (unsigned i = 0; i < net.Num; ++i) {
+        for (unsigned i=0; i<net.Num; ++i) {
           if (personality_set.c_str()[i % num_nodes] == 'c') 
             scalefactor.push_back(scalecpu);
           else
