@@ -209,7 +209,7 @@ struct ConnectedComp {
       );
 
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
-                  Broadcast_comp_current, Bitset_comp_current>("BFS");
+                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
       
       Galois::Runtime::reportStat("(NULL)", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
