@@ -1394,12 +1394,21 @@ int main(int argc, char** argv) {
     std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
 
     if (numberOfSources != 0) {
-      random_sources.insert(startSource);
+      // uncomment this to have srcnodeid included as well
+      //random_sources.insert(startSource);
 
       while (random_sources.size() < numberOfSources) {
         random_sources.insert(r_dist(r_generator));
       }
     }
+
+    #ifndef NDEBUG
+    int counter = 0;
+    for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
+      printf("Source #%d: %lu\n", counter, *i);
+      counter++;
+    }
+    #endif
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
