@@ -163,13 +163,8 @@ struct NodeData {
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
-// no edge data = bfs not sssp
-typedef hGraph<NodeData, void> Graph;
+typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
-
-// second type (unsigned int) is for edge weights
-// uncomment this along with graph load below if you want to use sssp
-//typedef hGraph<NodeData, unsigned int> Graph;
 
 // bitsets for tracking updates
 Galois::DynamicBitSet bitset_to_add;
@@ -295,9 +290,8 @@ struct InitializeIteration {
     }
 
     src_data.num_successors = 0;
+    src_data.num_predecessors = 0;
 
-    assert(src_data.num_predecessors == 0);
-    assert(src_data.num_successors == 0);
     assert(src_data.trim == 0);
     assert(src_data.to_add == 0);
     assert(src_data.to_add_float.load() == 0);
@@ -389,7 +383,11 @@ struct SSSP {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
-      uint32_t new_dist = 1 + dst_data.current_length;
+      uint32_t new_dist = graph->getEdgeData(current_edge) + 
+                              dst_data.current_length + 1;
+
+      //uint32_t new_dist = 1 + dst_data.current_length;
+
       uint32_t old = Galois::min(src_data.current_length, new_dist);
 
       if (old > new_dist) {
@@ -454,7 +452,8 @@ struct PredAndSucc {
         GNode dst = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
-        uint32_t edge_weight = 1;
+        //uint32_t edge_weight = 1;
+        uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
 
         if ((dst_data.current_length + edge_weight) == src_data.current_length) {
           // dest on shortest path with this node as successor
@@ -513,13 +512,9 @@ struct NumShortestPathsChanges {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_predecessors == 0 && src_data.propogation_flag) {
-        if (src_data.num_successors != 0) {
-          // has had short path taken; reset the flag;
-          // ...unless you are a leaf node,then keep flag on for 
-          // next operator
-          assert(src_data.trim == 0);
-          src_data.propogation_flag = false;
-        }
+        // has had short path taken; reset the flag
+        assert(src_data.trim == 0);
+        src_data.propogation_flag = false;
       } else if (src_data.trim > 0) {
         // decrement predecessor by trim then reset
         if (src_data.trim > src_data.num_predecessors) {
@@ -626,7 +621,8 @@ struct NumShortestPaths {
           GNode dst = graph->getEdgeDst(current_edge);
           auto& dst_data = graph->getData(dst);
 
-          uint32_t edge_weight = 1;
+          //uint32_t edge_weight = 1;
+          uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
 
           // only operate if a dst flag is set (i.e. no more pred, finalized
           // short paths to take)
@@ -643,6 +639,38 @@ struct NumShortestPaths {
             }
           }
         }
+      }
+    }
+  }
+};
+
+struct FlagPrep {
+  const uint32_t &local_infinity;
+  Graph* graph;
+
+  FlagPrep(const uint32_t &_local_infinity, Graph* _graph) : 
+    local_infinity(_local_infinity), graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    auto& allNodes = _graph.allNodesRange();
+
+    Galois::do_all(
+      allNodes.begin(), allNodes.end(), 
+      FlagPrep{infinity, &_graph}, 
+      Galois::loopname("FlagPrep"), 
+      Galois::timeit(),
+      Galois::no_stats()
+    );
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    if (src_data.current_length != local_infinity) {
+      if (src_data.num_successors == 0) {
+        src_data.propogation_flag = true;
+      } else {
+        assert(src_data.propogation_flag == false);
       }
     }
   }
@@ -801,7 +829,8 @@ struct DependencyPropogation {
   
           auto& dst_data = graph->getData(dst);
 
-          uint32_t edge_weight = 1;
+          //uint32_t edge_weight = 1;
+          uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
           uint32_t dep = src_data.dependency;
 
           // I am successor to destination
@@ -893,6 +922,8 @@ struct BC {
       //Galois::gDebug("NumShortestPaths done");
 
       _graph.set_num_iter(0);
+
+      FlagPrep::go(_graph);
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph, dga);
@@ -1093,8 +1124,9 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
 
     Graph* h_graph = nullptr;
+    h_graph = constructGraph<NodeData, unsigned int, false>(scalefactor);
     // uses bfs
-    h_graph = constructGraph<NodeData, void, false>(scalefactor);
+    //h_graph = constructGraph<NodeData, void, false>(scalefactor);
 
     // random num generate for sources
     std::minstd_rand0 r_generator;
@@ -1102,8 +1134,7 @@ int main(int argc, char** argv) {
     std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
 
     if (numberOfSources != 0) {
-      random_sources.insert(startSource);
-
+      //random_sources.insert(startSource);
       while (random_sources.size() < numberOfSources) {
         random_sources.insert(r_dist(r_generator));
       }
@@ -1146,6 +1177,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // shared DG accumulator among all steps
     Galois::DGAccumulator<uint32_t> dga;
@@ -1206,6 +1238,7 @@ int main(int argc, char** argv) {
         }
 
         InitializeGraph::go((*h_graph));
+        Galois::Runtime::getHostBarrier().wait();
       }
     }
 
