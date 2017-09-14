@@ -32,22 +32,11 @@
 #define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
 
 #include "Galois/Runtime/PagePool.h"
-#include "Galois/gIO.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/PtrLock.h"
-#include "Galois/Substrate/CacheLineStorage.h"
-#include "Galois/Substrate/PageAlloc.h"
-#include "Galois/Substrate/ThreadPool.h"
 
-#include <unordered_map>
-#include <vector>
-#include <mutex>
-#include <numeric>
-#include <deque>
 
 using namespace Galois::Runtime;
 
-static Galois::Runtime::PageAllocState<>* PA;
+static Galois::Runtime::internal::PageAllocState<>* PA;
 
 void Galois::Runtime::internal::setPagePoolState(PageAllocState<>* pa) {
   GALOIS_ASSERT(!(PA && pa), "PagePool.cpp: Double Initialization of PageAllocState");

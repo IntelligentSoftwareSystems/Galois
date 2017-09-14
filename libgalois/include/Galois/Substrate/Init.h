@@ -36,6 +36,7 @@
 #include "Galois/gIO.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/Termination.h"
 
 namespace Galois {
 namespace Substrate {
@@ -44,8 +45,9 @@ class SharedMemSubstrate {
 
   // Order is critical here
   ThreadPool m_tpool;
-  BarrierInstance<> m_barrier;
-  LocalTerminationDetection<> m_term;
+
+  internal::LocalTerminationDetection<>*  m_termPtr;
+  internal::BarrierInstance<>*  m_biPtr;
 
 public:
 

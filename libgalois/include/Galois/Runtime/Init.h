@@ -47,8 +47,7 @@ class SharedMemRuntime: public Galois::Substrate::SharedMemSubstrate {
 
   using Base = Galois::Substrate::SharedMemSubstrate;
 
-
-  PageAllocState<> m_pa;
+  internal::PageAllocState<> m_pa;
   SM m_sm;
 
 public:
@@ -58,14 +57,14 @@ public:
       m_pa(),
       m_sm(statFile)
     {
-      setPagePoolState(&m_pa);
-      setSysStatManager(&m_sm);
+      internal::setPagePoolState(&m_pa);
+      internal::setSysStatManager(&m_sm);
     }
 
   ~SharedMemRuntime(void) {
     m_sm.print();
-    setSysStatManager(nullptr);
-    setPagePoolState(nullptr);
+    internal::setSysStatManager(nullptr);
+    internal::setPagePoolState(nullptr);
   }
 };
 

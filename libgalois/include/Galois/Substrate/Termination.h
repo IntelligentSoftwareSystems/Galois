@@ -42,9 +42,15 @@
 namespace Galois {
 namespace Substrate {
 
+class TerminationDetection;
+/*
+ * returns an object.  The object will be reused, but reinitialized to activeThreads
+ */
+TerminationDetection& getSystemTermination(unsigned activeThreads);
+
 class TerminationDetection {
 
-  friend class SharedMemSubstrate;
+  friend TerminationDetection& getSystemTermination(unsigned);
 
 protected:
   CacheLineStorage<std::atomic<int> > globalTerm;
@@ -80,6 +86,7 @@ public:
   }
 };
 
+namespace internal {
 //Dijkstra style 2-pass ring termination detection
 template <typename _UNUSED=void>
 class LocalTerminationDetection : public TerminationDetection {
@@ -274,14 +281,8 @@ public:
   }
 };
 
-namespace internal {
-  void setTermDetect(TerminationDetection* term);
-}
-
-/*
- * returns an object.  The object will be reused, but reinitialized to activeThreads
- */
-TerminationDetection& getSystemTermination(unsigned activeThreads);
+void setTermDetect(TerminationDetection* term);
+} // end namespace internal
 
 } // end namespace Runtime
 } // end namespace Galois

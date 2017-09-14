@@ -34,11 +34,14 @@
 #include "Galois/gIO.h"
 #include "Galois/Substrate/Termination.h"
 
+// vtable anchoring
+Galois::Substrate::TerminationDetection::~TerminationDetection(void) {}
+
 static Galois::Substrate::TerminationDetection* TERM = nullptr;
 
 void Galois::Substrate::internal::setTermDetect(Galois::Substrate::TerminationDetection* t) {
   GALOIS_ASSERT(!(TERM && t), "Double initialization of TerminationDetection");
-  TERM = ta;
+  TERM = t;
 }
 
 

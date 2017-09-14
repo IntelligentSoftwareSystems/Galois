@@ -36,6 +36,19 @@
 #ifndef GALOIS_RUNTIME_PAGEPOOL_H
 #define GALOIS_RUNTIME_PAGEPOOL_H
 
+#include "Galois/gIO.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/PtrLock.h"
+#include "Galois/Substrate/CacheLineStorage.h"
+#include "Galois/Substrate/PageAlloc.h"
+#include "Galois/Substrate/ThreadPool.h"
+
+#include <unordered_map>
+#include <vector>
+#include <mutex>
+#include <numeric>
+#include <deque>
+
 #include <cstddef>
 
 namespace Galois {

@@ -33,6 +33,12 @@
 #ifndef GALOIS_SUBSTRATE_BARRIER_H
 #define GALOIS_SUBSTRATE_BARRIER_H
 
+#include "Galois/Substrate/ThreadPool.h"
+#include "Galois/gIO.h"
+
+#include <memory>
+#include <functional>
+
 namespace Galois {
 namespace Substrate {
 
@@ -105,7 +111,7 @@ struct BarrierInstance {
 
 };
 
-void setBarrierInstance(BarrierInstance* bi);
+void setBarrierInstance(BarrierInstance<>* bi);
 
 } // end namespace internal
 
