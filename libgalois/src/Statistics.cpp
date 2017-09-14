@@ -80,6 +80,7 @@ void StatManager::print(void) {
 }
 
 void StatManager::printStats(std::ostream& out) {
+  mergeStats();
   printHeader(out);
   intStats.print(out);
   fpStats.print(out);
