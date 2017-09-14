@@ -20,8 +20,7 @@
  *
  * @section Description
  *
- * Compute Betweeness-Centrality on distributed Galois using, at the moment,
- * BFS (NOT SSSP) for distances
+ * Compute Betweeness-Centrality on distributed Galois using SSSP for distances
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -512,17 +511,19 @@ struct NumShortestPathsChanges {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_predecessors == 0 && src_data.propogation_flag) {
-        // has had short path taken; reset the flag
         assert(src_data.trim == 0);
         src_data.propogation_flag = false;
       } else if (src_data.trim > 0) {
         // decrement predecessor by trim then reset
-        if (src_data.trim > src_data.num_predecessors) {
-          uint64_t num_e = graph->edge_end(src) - graph->edge_begin(src);
-          printf("src %lu trim is %u, pred is %u e %lu\n", graph->L2G(src), 
-                 src_data.trim.load(), src_data.num_predecessors, num_e);
-          assert(src_data.trim <= src_data.num_predecessors); 
-        }
+
+        //if (src_data.trim > src_data.num_predecessors) {
+        //  uint64_t num_e = graph->edge_end(src) - graph->edge_begin(src);
+        //  printf("ERROR: src %lu trim is %u, pred is %u e %lu\n",
+        //         graph->L2G(src), src_data.trim.load(), src_data.num_predecessors,
+        //         num_e);
+        //}
+
+        assert(src_data.trim <= src_data.num_predecessors); 
 
         src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
         src_data.trim = 0;
@@ -629,7 +630,7 @@ struct NumShortestPaths {
           if (dst_data.propogation_flag) {
             // dest on shortest path with this node as successor
             if ((dst_data.current_length + edge_weight) == src_data.current_length) {
-              Galois::add(src_data.trim, (unsigned int)1);
+              Galois::add(src_data.trim, (uint32_t)1);
               Galois::add(src_data.to_add, dst_data.num_shortest_paths);
 
               bitset_trim.set(src);
@@ -835,7 +836,7 @@ struct DependencyPropogation {
 
           // I am successor to destination
           if ((dst_data.current_length + edge_weight) == src_data.current_length) {
-            Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+            Galois::atomicAdd(dst_data.trim, (uint32_t)1);
             Galois::atomicAdd(dst_data.to_add_float, 
                 (((float)dst_data.num_shortest_paths / 
                       (float)src_data.num_shortest_paths) * 
@@ -923,6 +924,7 @@ struct BC {
 
       _graph.set_num_iter(0);
 
+      // setup flags for dep prop round
       FlagPrep::go(_graph);
 
       // do between-cent calculations for this iteration 
@@ -931,7 +933,7 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      auto& allNodes = _graph.allNodesRange();
+      auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
@@ -941,16 +943,14 @@ struct BC {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
         Galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
-        BC_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+        BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      // TODO all nodes here? would remove unnecessary dep sync later, 
-      // but will cause destinations (which don't need to increment bc)
-      // to do extra work on each host
+      // nodes with edges because those include masters
       Galois::do_all(
-        allNodes.begin(), 
-        allNodes.end(), 
+        nodesWithEdges.begin(), 
+        nodesWithEdges.end(), 
         BC(&_graph), 
         Galois::loopname("BC"),
         //Galois::loopname(_graph.get_run_identifier("BC").c_str()),
