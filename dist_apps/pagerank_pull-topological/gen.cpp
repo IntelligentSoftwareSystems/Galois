@@ -125,6 +125,8 @@ static const float alpha = (1.0 - 0.85);
 struct NodeData {
   float value;
   std::atomic<uint32_t> nout;
+  float residual;
+  float delta;
 };
 
 Galois::DynamicBitSet bitset_residual;
@@ -132,9 +134,6 @@ Galois::DynamicBitSet bitset_nout;
 
 typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
-
-Galois::LargeArray<float> delta;
-Galois::LargeArray<float> residual;
 
 #include "gen_sync.hh"
 
@@ -175,8 +174,8 @@ struct ResetGraph {
     auto& sdata = graph->getData(src);
     sdata.value = 0;
     sdata.nout = 0;
-    delta[src] = 0;
-    residual[src] = local_alpha;
+    sdata.delta = 0;
+    sdata.residual = local_alpha;
   }
 };
 
@@ -273,15 +272,15 @@ struct PageRank_delta {
 
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
-    delta[src] = 0;
+    sdata.delta = 0;
 
-    if (residual[src] > this->local_tolerance) {
-      sdata.value += residual[src];
+    if (sdata.residual > this->local_tolerance) {
+      sdata.value += sdata.residual;
       if (sdata.nout > 0) {
-        delta[src] = residual[src] * (1 - local_alpha) / sdata.nout;
+        sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
         DGAccumulator_accum += 1;
       }
-      residual[src] = 0;
+      sdata.residual = 0;
     }
   }
 };
@@ -344,22 +343,21 @@ struct PageRank {
   }
 
   // Pull deltas from neighbor nodes, then add to self-residual
-  void operator()(GNode src)const {
-    float sum = 0;
+  void operator()(GNode src) const {
+    auto& sdata = graph->getData(src);
 
     for(auto nbr = graph->edge_begin(src), 
              ee = graph->edge_end(src); 
         nbr != ee; 
         ++nbr) {
       GNode dst = graph->getEdgeDst(nbr);
-      if (delta[dst] > 0) {
-        sum += delta[dst];
-      }
-    }
+      auto& ddata = graph->getData(dst);
 
-    if (sum > 0) {
-      Galois::add(residual[src], sum);
-      bitset_residual.set(src);
+      if (ddata.delta > 0) {
+        Galois::add(sdata.residual, ddata.delta);
+
+        bitset_residual.set(src);
+      }
     }
   }
 };
@@ -481,20 +479,20 @@ struct PageRankSanity {
         current_min = sdata.value;
       }
 
-      if (current_max_residual < residual[src]) {
-        current_max_residual = residual[src];
+      if (current_max_residual < sdata.residual) {
+        current_max_residual = sdata.residual;
       }
 
-      if (current_min_residual > residual[src]) {
-        current_min_residual = residual[src];
+      if (current_min_residual > sdata.residual) {
+        current_min_residual = sdata.residual;
       }
 
-      if (residual[src] > local_tolerance) {
+      if (sdata.residual > local_tolerance) {
         DGAccumulator_residual_over_tolerance += 1;
       }
 
       DGAccumulator_sum += sdata.value;
-      DGAccumulator_sum_residual += residual[src];
+      DGAccumulator_sum_residual += sdata.residual;
     }
   }
 };
@@ -567,9 +565,6 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
     hg = constructGraph<NodeData, void, false>(scalefactor);
-
-    residual.allocateInterleaved(hg->size());
-    delta.allocateInterleaved(hg->size());
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
