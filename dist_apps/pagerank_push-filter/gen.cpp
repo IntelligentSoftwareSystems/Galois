@@ -124,6 +124,8 @@ static const float alpha = (1.0 - 0.85);
 struct NodeData {
   float value;
   std::atomic<uint32_t> nout;
+  float delta;
+  std::atomic<float> residual;
 };
 
 Galois::DynamicBitSet bitset_residual;
@@ -132,9 +134,6 @@ Galois::DynamicBitSet bitset_nout;
 typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 typedef GNode WorkItem;
-
-Galois::LargeArray<float> delta;
-Galois::LargeArray<std::atomic<float> > residual;
 
 #include "gen_sync.hh"
 
@@ -172,8 +171,8 @@ struct ResetGraph {
     NodeData& sdata = graph->getData(src);
     sdata.value = 0;
     sdata.nout = 0;
-    residual[src] = 0;
-    delta[src] = 0;
+    sdata.residual = 0;
+    sdata.delta = 0;
   }
 };
 
@@ -223,7 +222,7 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    residual[src] = local_alpha;
+    sdata.residual = local_alpha;
     Galois::atomicAdd(sdata.nout, 
       (uint32_t) std::distance(graph->edge_begin(src), 
                                graph->edge_end(src)));
@@ -270,12 +269,12 @@ struct PageRank_delta {
   void operator()(WorkItem src) const {
     NodeData& sdata = graph->getData(src);
 
-    if (residual[src] > this->local_tolerance) {
-      float residual_old = residual[src];
-      residual[src] = 0;
+    if (sdata.residual > this->local_tolerance) {
+      float residual_old = sdata.residual;
+      sdata.residual = 0;
       sdata.value += residual_old;
       if (sdata.nout > 0) {
-        delta[src] = residual_old * (1 - local_alpha) / sdata.nout;
+        sdata.delta = residual_old * (1 - local_alpha) / sdata.nout;
       }
     }
   }
@@ -337,14 +336,17 @@ struct PageRank {
   }
 
   void operator()(WorkItem src) const {
-    if (delta[src] > 0) {
-      float _delta = delta[src];
-      delta[src] = 0;
+    NodeData& sdata = graph->getData(src);
+    if (sdata.delta > 0) {
+      float _delta = sdata.delta;
+      sdata.delta = 0;
       for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
           nbr != ee; ++nbr) {
         GNode dst = graph->getEdgeDst(nbr);
+        NodeData& ddata = graph->getData(dst);
 
-        Galois::atomicAdd(residual[dst], _delta);
+        Galois::atomicAdd(ddata.residual, _delta);
+
         bitset_residual.set(dst);
       }
       DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
@@ -469,20 +471,20 @@ struct PageRankSanity {
         current_min = sdata.value;
       }
 
-      if (current_max_residual < residual[src]) {
-        current_max_residual = residual[src];
+      if (current_max_residual < sdata.residual) {
+        current_max_residual = sdata.residual;
       }
 
-      if (current_min_residual > residual[src]) {
-        current_min_residual = residual[src];
+      if (current_min_residual > sdata.residual) {
+        current_min_residual = sdata.residual;
       }
 
-      if (residual[src] > local_tolerance) {
+      if (sdata.residual > local_tolerance) {
         DGAccumulator_residual_over_tolerance += 1;
       }
 
       DGAccumulator_sum += sdata.value;
-      DGAccumulator_sum_residual += residual[src];
+      DGAccumulator_sum_residual += sdata.residual;
     }
   }
 };
@@ -554,9 +556,6 @@ int main(int argc, char** argv) {
     StatTimer_hg_init.start();
     Graph* hg = nullptr;
     hg = constructGraph<NodeData, void>(scalefactor);
-
-    residual.allocateInterleaved(hg->size());
-    delta.allocateInterleaved(hg->size());
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
