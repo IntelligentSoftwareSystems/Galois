@@ -830,10 +830,10 @@ struct DependencyPropogation {
                   Broadcast_trim2>("DependencyPropogation");
       #elif __OPT_VERSION__ == 3
       _graph.sync<writeAny, readAny, Reduce_add_trim2,
-                  Broadcast_trim, Bitset_trim2>("DependencyPropogation");
+                  Broadcast_trim2, Bitset_trim2>("DependencyPropogation");
       #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_add_trim2,
-                  Broadcast_trim, Bitset_trim2>("DependencyPropogation");
+                  Broadcast_trim2, Bitset_trim2>("DependencyPropogation");
       #endif
 
       DPTrim::go(_graph);
