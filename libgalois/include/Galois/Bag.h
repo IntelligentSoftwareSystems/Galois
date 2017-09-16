@@ -244,8 +244,10 @@ public:
     size_t s = 0;
     for (unsigned x = 0; x < heads.size(); ++x) {
       header* h = heads.getRemote(x)->first;
-      if (h)
-        s += (h->dend - h->dbegin);
+      while(h){
+        s += std::distance(h->dbegin, h->dend);
+        h = h->next;
+      }
     }
     return s;
   }
@@ -258,8 +260,10 @@ public:
     std::vector<header*> hVec;
     for (unsigned x = 0; x < heads.size(); ++x) {
       header* h = heads.getRemote(x)->first;
-      if(h)
+      while(h){
         hVec.push_back(h);
+        h = h->next;
+      }
     }
     return hVec;
   }
