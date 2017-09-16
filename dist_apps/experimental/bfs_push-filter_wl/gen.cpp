@@ -125,7 +125,6 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
 
 struct NodeData {
   std::atomic<uint32_t> dist_current;
-  uint32_t dist_old;
 };
 
 Galois::DynamicBitSet bitset_dist_current;
@@ -181,64 +180,6 @@ struct InitializeGraph {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : 
                                                                   local_infinity;
-    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : 
-                                                              local_infinity;
-  }
-};
-
-struct FirstItr_BFS{
-  Graph * graph;
-
-  FirstItr_BFS(Graph * _graph) : graph(_graph) {}
-
-  void static go(Graph& _graph) {
-    uint32_t __begin, __end;
-    if (_graph.isLocal(src_node)) {
-      __begin = _graph.getLID(src_node);
-      __end = __begin + 1;
-    } else {
-      __begin = 0;
-      __end = 0;
-    }
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str(_graph.get_run_identifier(
-                             "CUDA_DO_ALL_IMPL_BFS_"));
-      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-      StatTimer_cuda.start();
-      FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-  #endif
-    {
-    // one node, doesn't matter which do_all you use, so regular one suffices
-    Galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
-                FirstItr_BFS{&_graph}, 
-                Galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-                Galois::timeit(),
-        Galois::no_stats());
-    }
-
-    _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                Broadcast_dist_current, Bitset_dist_current>("BFS");
-    
-    Galois::Runtime::reportStat("(NULL)", 
-       _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
-  }
-
-  void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
-    snode.dist_old = snode.dist_current;
-
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-         jj != ee; 
-         ++jj) {
-      GNode dst = graph->getEdgeDst(jj);
-      auto& dnode = graph->getData(dst);
-      uint32_t new_dist = 1 + snode.dist_current;
-      uint32_t old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
-      if (old_dist > new_dist) bitset_dist_current.set(dst);
-    }
   }
 };
 
