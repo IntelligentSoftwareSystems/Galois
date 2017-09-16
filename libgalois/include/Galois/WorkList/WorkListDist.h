@@ -25,20 +25,20 @@ class WLdistributed: public WL {
 
 public:
 
-  WLdistributed (GraphTy& _graph): workList(), graph(_graph), c(0) {
+  WLdistributed (GraphTy& _graph): workList(), graph(_graph) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     bag_vec.resize(net.Num);
   }
 
   void push (const typename WL::value_type& v) {
     workList.push(v);
-    c++;
+    //c++;
   }
 
   template <typename I>
   void push (I b, I e) {
     workList.push(b,e);
-    c++;
+    //c++;
   }
 
   /**
@@ -54,10 +54,6 @@ public:
         Galois::loopname("G2L_wl"),
         Galois::numrun(graph.get_run_identifier())
     );
-  }
-
-  void insertToLocalWL(std::vector<uint64_t>& bag){
-    
   }
 
 
