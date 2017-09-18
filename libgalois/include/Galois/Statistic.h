@@ -156,7 +156,7 @@ public:
     if (valid)
       stop();
     if (TimeAccumulator::get()) // only report non-zero stat
-      Galois::Runtime::reportStat_Serial(loopname, name, get());
+      Galois::Runtime::reportStat_Tmax(loopname, name, get());
   }
 
   void start() {

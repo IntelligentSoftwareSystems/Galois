@@ -27,9 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-// TODO: this file was copied over from libruntime/src/StatCollector.cpp. 
-// TODO: remove the duplicated code after inheriting from Galois::Runtime::StatCollector
 
+#if 0 // disabled
 #include "Galois/Runtime/DistStatCollector.h"
 
 #include <cmath>
@@ -119,3 +118,4 @@ void DistStatCollector::printStats(void) {
 
 }
 
+#endif

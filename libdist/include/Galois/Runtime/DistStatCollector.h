@@ -27,6 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#if 0// disabled
 #ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
@@ -62,3 +63,4 @@ private:
 } // end namespace Galois
 
 #endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
+#endif

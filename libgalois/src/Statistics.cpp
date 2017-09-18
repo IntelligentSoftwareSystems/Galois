@@ -49,7 +49,7 @@ StatManager::StatManager(const std::string& outfile): m_outfile(outfile) {}
 StatManager::~StatManager(void) {}
 
 bool StatManager::printingThreadVals(void) {
-  return Galois::Substrate::EnvCheck(StatManager::TVAL_EVN_VAR);
+  return Galois::Substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
 }
 
 void StatManager::addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type) {

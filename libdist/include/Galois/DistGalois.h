@@ -1,4 +1,4 @@
-/** Galois user interface -*- C++ -*-
+/** Distributed Galois System Interface -*- C++ -*-
  * @file
  * This is the only file to include for basic Galois functionality.
  *
@@ -34,9 +34,8 @@
 #ifndef GALOIS_DIST_GALOIS_H
 #define GALOIS_DIST_GALOIS_H
 
-#include "Galois/Runtime/DistStatCollector.h"
 #include "Galois/Runtime/Init.h"
-#include "Galois/Substrate/Init.h"
+#include "Galois/Runtime/DistStats.h"
 
 #include <string>
 #include <utility>
@@ -51,27 +50,12 @@ namespace Galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class DistMemSys {
-  Runtime::DistStatCollector m_sc;
-  bool statsPrinted;
+class DistMemSys: public Runtime::SharedMemRuntime<Runtime::DistStatManager> {
 
 public:
-  explicit DistMemSys(const std::string& outfile="", bool statsPrinted = false): m_sc(outfile), statsPrinted(statsPrinted) {
-    Substrate::init();
-    Runtime::init(&m_sc);
-  }
+  explicit DistMemSys(const std::string& outfile="");
 
-  ~DistMemSys(void) {
-    if(!statsPrinted)
-      m_sc.printStats();
-    Runtime::kill();
-    Substrate::kill();
-  }
-
-  void printDistStats() {
-    m_sc.printStats();
-   statsPrinted = true; 
-  }
+  ~DistMemSys(void);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

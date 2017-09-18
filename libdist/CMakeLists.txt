@@ -1,7 +1,8 @@
 set(sources
+        src/DistGalois.cpp
         src/cuda_device.cpp
         src/Tracer.cpp
-        src/DistStatCollector.cpp
+        src/DistStats.cpp
         src/buffered.cpp
         src/routed.cpp
         src/pkt_mpi.cpp

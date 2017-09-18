@@ -180,7 +180,8 @@ public:
 
 };
 
-struct StatTotal {
+template <typename _UNUSED=void>
+struct StatTotalImpl {
 
   enum Type {
     SERIAL = 0,
@@ -203,6 +204,7 @@ struct StatTotal {
   }
 };
 
+using StatTotal = StatTotalImpl<>;
 
 namespace hidden {
 
@@ -237,22 +239,40 @@ protected:
 
 public:
 
-  Stat& getOrInsertStat(const Str& region, const Str& category, const StatTotal::Type& type) {
+  template <typename... Args>
+  Stat& getOrInsertStat(const Str& region, const Str& category, Args&&... args) {
     
     const Str* ln = getOrInsertSymbol(region);
     const Str* cat = getOrInsertSymbol(category);
 
     auto tpl = std::make_tuple(ln, cat);
 
-    auto p = statMap.emplace(tpl, Stat(type));
+    auto p = statMap.emplace(tpl, Stat(std::forward<Args>(args)...));
 
     return p.first->second;
   }
 
-  template <typename T>
-  void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& type) {
-    Stat& s = getOrInsertStat(region, category, type);
-    assert(s.totalType() == type && "Can't change totalType after creation");
+  const_iterator findStat(const Str& region, const Str& category) const {
+
+    const Str* ln = getSymbol(region);
+    const Str* cat = getSymbol(category);
+    auto tpl = std::make_tuple(ln, cat);
+
+    auto i = statMap.find(tpl);
+
+    return i;
+  }
+
+  const Stat& getStat(const Str& region, const Str& category) const {
+    
+    assert (i != statMap.end());
+    return i->second;
+  }
+
+  template <typename T, typename... Args>
+  void addToStat(const Str& region, const Str& category, const T& val, Args&&... statArgs) {
+    Stat& s = getOrInsertStat(region, category, std::forward<Args>(statArgs)...);
+    assert(s.totalTy() == type && "Can't change totalTy after creation");
     s.add(val);
   }
 
@@ -282,7 +302,7 @@ struct VecStat: public VecStat_with_MinMaxSum<T> {
 
   explicit VecStat(const StatTotal::Type& type): Base(), m_totalTy(type) {}
 
-  const StatTotal::Type& totalType(void) const { return m_totalTy; }
+  const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 
   T total(void) const {
 
@@ -319,7 +339,7 @@ template <> struct VecStat<gstl::Str>: public AggregStat<gstl::Str>::with_mem {
 
   explicit VecStat(const StatTotal::Type& type): Base(), m_totalTy(type) {}
 
-  const StatTotal::Type& totalType(void) const { return m_totalTy; }
+  const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 
   const gstl::Str& total(void) const {
 
@@ -354,7 +374,7 @@ struct ScalarStat {
 
   operator const T& (void) const { return m_val; }
 
-  const StatTotal::Type& totalType(void) const { return m_totalTy; }
+  const StatTotal::Type& totalTy(void) const { return m_totalTy; }
 
 };
 
@@ -369,18 +389,21 @@ using ScalarStatManager = BasicStatMap<ScalarStat<T> >;
 
 class StatManager {
 
-protected:
+public:
 
   using Str = Galois::gstl::Str;
 
   static constexpr const char* const SEP = ", ";
-  static constexpr const char* const TVALSEP = "; ";
-  static constexpr const char* const TVAL_EVN_VAR = "PRINT_THREAD_VALS";
-
+  static constexpr const char* const TSTAT_SEP = "; ";
+  static constexpr const char* const TSTAT_NAME = "ThreadValues";
+  static constexpr const char* const TSTAT_ENV_VAR = "PRINT_PER_THREAD_STATS";
 
   static bool printingThreadVals(void);
 
-  static unsigned maxThreads(void);
+  template <typename T>
+  static constexpr const char* statKind(void) {
+    return std::is_same<T, Str>::value ? "PARAM" : "STAT";
+  }
 
 private:
 
@@ -410,7 +433,7 @@ private:
         const auto* manager = perThreadManagers.getRemote(t);
 
         for (auto i = manager->cbegin(), end_i = manager->cend(); i != end_i; ++i) {
-          result.addToStat(manager->region(i), manager->category(i), T(manager->stat(i)), manager->stat(i).totalType());
+          result.addToStat(manager->region(i), manager->category(i), T(manager->stat(i)), manager->stat(i).totalTy());
         }
       }
 
@@ -432,44 +455,37 @@ private:
     const Stat& stat(const const_iterator& i) const { return result.stat(i); }
 
     template <typename S, typename V>
-    void readStat(const const_iterator& i, S& region, S& category, T& total, StatTotal::Type& type, V& threadVals) const {
+    void readStat(const const_iterator& i, S& region, S& category, T& total, StatTotal::Type& type, V& thrdVals) const {
       region = this->region(i);
       category = this->category(i);
 
       total = this->stat(i).total();
-      type = this->stat(i).totalType();
+      type = this->stat(i).totalTy();
 
-      threadVals.clear();
-      threadVals = this->stat(i).values();
+      thrdVals.clear();
+      thrdVals = this->stat(i).values();
     }
 
     void print(std::ostream& out) const {
-
-      const char* statOrParam = std::is_same<T, Str>::value ? "PARAM" : "STAT";
+Serial
 
       for (auto i = cbegin(), end_i = cend(); i != end_i; ++i) {
-        out << statOrParam << SEP << this->region(i) << SEP << this->category(i) << SEP;
+        out << statKind<T>() << SEP << this->region(i) << SEP << this->category(i) << SEP;
 
         const auto& s = this->stat(i);
-        out << StatTotal::str(s.totalType()) << SEP << s.total();
+        out << StatTotal::str(s.totalTy()) << SEP << s.total();
 
         out << std::endl;
 
         if (StatManager::printingThreadVals()) {
 
           out << statOrParam << SEP << this->region(i) << SEP << this->category(i) << SEP;
-          out << "ThreadValues" << SEP;
+          out << TSTAT_NAME << SEP;
 
-          unsigned n = 0; 
+          const char* sep = "";
           for (const auto& v: s.values()) {
-            out << v;
-            ++n;
-
-            if (n < StatManager::maxThreads()) {
-              out << TVALSEP;
-            } else {
-              break;
-            }
+            out << sep << v;
+            sep = TSTAT_SEP;
           }
 
           out << std::endl;
@@ -535,8 +551,7 @@ protected:
 
   virtual void printStats(std::ostream& out);
 
-  virtual void printHeader(std::ostream& out);
-
+  void printHeader(std::ostream& out) const ;
 
 public:
 
@@ -582,7 +597,7 @@ public:
 
     auto tpl = std::make_tuple(ln, cat);
 
-    auto stat = statMap.getMapping(tpl);
+    auto stat = statMap.getStat(tpl);
 
     if (!stat) {
       Stat* stat = statAlloc.allocate(1);
