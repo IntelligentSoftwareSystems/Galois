@@ -374,10 +374,10 @@ namespace {
            ************************************/
           vector<Write_set> write_set_vec_PUSH_PULL;
 
-          for (auto i : write_set_vec_PUSH) {
+          for (auto& i : write_set_vec_PUSH) {
             bool found = false;
 
-            for (auto j : write_set_vec_PULL) {
+            for (auto& j : write_set_vec_PULL) {
               if (i.GRAPH_NAME == j.GRAPH_NAME && 
                   i.NODE_TYPE == j.NODE_TYPE && 
                   i.FIELD_TYPE == j.FIELD_TYPE && 
@@ -391,10 +391,10 @@ namespace {
             }
           }
 
-          for (auto i : write_set_vec_PULL) {
+          for (auto& i : write_set_vec_PULL) {
             bool found = false;
 
-            for (auto j : write_set_vec_PUSH) {
+            for (auto& j : write_set_vec_PUSH) {
               if (i.GRAPH_NAME == j.GRAPH_NAME && 
                   i.NODE_TYPE == j.NODE_TYPE && 
                   i.FIELD_TYPE == j.FIELD_TYPE && 
@@ -425,7 +425,7 @@ namespace {
           stringstream SSSyncer;
           std::map<std::string, std::vector<std::string>> syncCall_map;
 
-          for (auto i : write_set_vec_PUSH) {
+          for (auto& i : write_set_vec_PUSH) {
             SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
             SSSyncer.str(string());
@@ -434,7 +434,7 @@ namespace {
 
           // Addding macros for pull sync structures (includes bitset)
           stringstream SSSyncer_pull;
-          for (auto i : write_set_vec_PULL) {
+          for (auto& i : write_set_vec_PULL) {
             SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
             SSSyncer_pull.str(string());
@@ -443,7 +443,7 @@ namespace {
 
           // Addding additional structs for vertex cut
           stringstream SSSyncer_vertexCut;
-          for (auto i : write_set_vec_PUSH_PULL) {
+          for (auto& i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_push") {
               SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
@@ -479,10 +479,10 @@ namespace {
           // TODO need sync on demand, not regular sync
           // Adding sync calls for write set
           stringstream SSAfter;
-          for(auto i : syncCall_map){
+          for(auto& i : syncCall_map){
             SSAfter <<"\n\t" << "_graph.sync<";
             uint32_t c = 0;
-            for(auto j : i.second){
+            for(auto& j : i.second){
               if((c + 1) < i.second.size())
                 SSAfter << j << ",";
               else
@@ -511,7 +511,7 @@ namespace {
           std::string className = recordDecl->getNameAsString();
           
           std::string accumulator;
-          for (auto decl : recordDecl->decls()) {
+          for (auto& decl : recordDecl->decls()) {
             auto var = dyn_cast<VarDecl>(decl);
             if (var && var->isStaticDataMember()) {
               std::string type = var->getType().getAsString();
@@ -524,10 +524,10 @@ namespace {
           stringstream kernelBefore;
           kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
           kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-          kernelBefore << "\t\tauto __sync_functor = Get_info_functor<Graph>(_graph);\n";
+          kernelBefore << "\t\tauto& __sync_functor = Get_info_functor<Graph>(_graph);\n";
           kernelBefore << "\t\ttypedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
           kernelBefore << "\t\tDBag dbag(__sync_functor, \"" << className << "\");\n";
-          kernelBefore << "\t\tauto &local_wl = DBag::get();\n";
+          kernelBefore << "\t\tauto& &local_wl = DBag::get();\n";
           kernelBefore << "\t\tstd::string impl_str(\"CUDA_FOR_EACH_IMPL_" 
             << className << "_\" + (_graph.get_run_identifier()));\n";
           kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
@@ -829,10 +829,10 @@ namespace {
            ********************************************************************/
           vector<Write_set> write_set_vec_PUSH_PULL;
 
-          for (auto i : write_set_vec_PUSH) {
+          for (auto& i : write_set_vec_PUSH) {
             bool found = false;
 
-            for (auto j : write_set_vec_PULL) {
+            for (auto& j : write_set_vec_PULL) {
               if (i.GRAPH_NAME == j.GRAPH_NAME && 
                  i.NODE_TYPE == j.NODE_TYPE && 
                  i.FIELD_TYPE == j.FIELD_TYPE && 
@@ -844,10 +844,10 @@ namespace {
             if (!found) write_set_vec_PUSH_PULL.push_back(i);
           }
 
-          for (auto i : write_set_vec_PULL) {
+          for (auto& i : write_set_vec_PULL) {
             bool found = false;
 
-            for (auto j : write_set_vec_PUSH) {
+            for (auto& j : write_set_vec_PUSH) {
               if (i.GRAPH_NAME == j.GRAPH_NAME && 
                   i.NODE_TYPE == j.NODE_TYPE && 
                   i.FIELD_TYPE == j.FIELD_TYPE && 
@@ -881,7 +881,7 @@ namespace {
           // map from FIELD_NAME -> reduce, broadcast, bitset;
           std::map<std::string, std::vector<std::string>> syncCall_map;
 
-          for (auto i : write_set_vec_PUSH) {
+          for (auto& i : write_set_vec_PUSH) {
             SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
             SSSyncer.str(string());
@@ -890,7 +890,7 @@ namespace {
 
           // Addding additional structs for vertex cut
           stringstream SSSyncer_vertexCut;
-          for (auto i : write_set_vec_PUSH_PULL) {
+          for (auto& i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_pull") {
               SSSyncer_vertexCut << getSyncer(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
@@ -901,7 +901,7 @@ namespace {
 
           // Addding structure for pull sync
           stringstream SSSyncer_pull;
-          for(auto i : write_set_vec_PULL) {
+          for(auto& i : write_set_vec_PULL) {
             SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
             SSSyncer_pull.str(string());
@@ -910,7 +910,7 @@ namespace {
 
 
           // Addding additional structs for vertex cut
-          for (auto i : write_set_vec_PUSH_PULL) {
+          for (auto& i : write_set_vec_PUSH_PULL) {
             if(i.SYNC_TYPE == "sync_push"){
               SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
@@ -919,7 +919,7 @@ namespace {
             }
           }
 
-          for (auto i : syncCall_map) {
+          for (auto& i : syncCall_map) {
             llvm::outs() << "__________________> : "
                          << i.first << " ---- > " <<  i.second[0] << " , "
                          << i.second[1] << "\n";
@@ -938,7 +938,7 @@ namespace {
           kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           std::string accumulator;
-          for (auto decl : recordDecl->decls()) {
+          for (auto& decl : recordDecl->decls()) {
             auto var = dyn_cast<VarDecl>(decl);
             if (var && var->isStaticDataMember()) {
               std::string type = var->getType().getAsString();
@@ -963,7 +963,8 @@ namespace {
           for (auto field : recordDecl->fields()) {
             std::string name = field->getNameAsString();
             if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
-              kernelBefore << name.substr(std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
+              kernelBefore << name.substr(
+               std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
             }
           }
           kernelBefore << "cuda_ctx);\n";
@@ -990,7 +991,7 @@ namespace {
 
           // Adding sync calls for write set
           stringstream SSAfter;
-          for (auto i : syncCall_map) {
+          for (auto& i : syncCall_map) {
             SSAfter << "\n\t" << "_graph.sync_on_demand<";
 
             uint32_t c = 0;
@@ -1001,7 +1002,7 @@ namespace {
             // TODO verify read location is being added
             // TODO remove flags from this as they aren't a template argument
             // anymore
-            for (auto j : i.second) {
+            for (auto& j : i.second) {
               if((c + 1) < i.second.size())
                 SSAfter << j << ",";
               else
@@ -1024,7 +1025,7 @@ namespace {
 
           // TODO why is it only looping over push and pull and not
           // others?
-          for (auto i : write_set_vec_PUSH_PULL) {
+          for (auto& i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull") {
               if (i.WRITE_FLAG == "writeDestination") {
                 SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_dst();\n";
