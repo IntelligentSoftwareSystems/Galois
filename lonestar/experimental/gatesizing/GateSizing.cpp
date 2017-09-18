@@ -29,9 +29,6 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/TypeTraits.h"
-#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -63,8 +60,7 @@ void doGateSizing() {
 }
 
 int main(int argc, char** argv) {
-  Galois::System G;
-  Galois::StatManager statManager;
+  Galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   // do not call clear() unless you are constructing new instances

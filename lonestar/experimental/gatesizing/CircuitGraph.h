@@ -1,7 +1,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/FirstGraph.h"
 
 #include "Verilog.h"
 #include "Sdc.h"
