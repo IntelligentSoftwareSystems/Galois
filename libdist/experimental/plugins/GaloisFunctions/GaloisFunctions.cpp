@@ -127,8 +127,7 @@ namespace {
    * Creates the reduce sync structure macro given a write set containing the 
    * variable to create the sync structure for
    */
-  std::string getSyncer(unsigned counter, const Write_set& i,
-                        std::string struct_type="") {
+  std::string getSyncer(const Write_set& i) {
     std::stringstream s;
     s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << 
          "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
@@ -142,15 +141,14 @@ namespace {
    */
   typedef std::map<std::string, std::vector<std::string>> SyncCall_map;
           //std::map<std::string, std::vector<std::string>> syncCall_map;
-  std::string getSyncer(unsigned counter, const Write_set& i, 
-                        SyncCall_map& syncCall_map,
-                        std::string struct_type="") {
+  std::string getSyncer(const Write_set& i, SyncCall_map& syncCall_map) {
     std::stringstream s;
     s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << 
          "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
 
     std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
-    std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME + " ";
+    std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" + 
+                                  i.FIELD_NAME + " ";
     syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
     syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
 
@@ -164,10 +162,10 @@ namespace {
    * Construct the broadcast and bitset macros given writeset with field info
    * TODO getsyncerpull is misleading name since bitset is included
    */
-  std::string getSyncerPull(unsigned counter, const Write_set& i, 
-                            std::string struct_type="") {
+  std::string getSyncerPull(const Write_set& i) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME 
+      << " , " << i.VAL_TYPE << ");\n";
     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
 
     return s.str();
@@ -179,11 +177,10 @@ namespace {
    * save the structure names into map
    * TODO getsyncerpull is misleading name since bitset is included
    */
-  std::string getSyncerPull(unsigned counter, const Write_set& i, 
-                            SyncCall_map& syncCall_map, 
-                            std::string struct_type="") {
+  std::string getSyncerPull(const Write_set& i, SyncCall_map& syncCall_map) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " 
+      << i.VAL_TYPE << ");\n";
     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
 
     std::string str_broadcast_call = " Broadcast_" + i.FIELD_NAME + " ";
@@ -427,43 +424,36 @@ namespace {
           // Addding macros for push sync structures
           stringstream SSSyncer;
           std::map<std::string, std::vector<std::string>> syncCall_map;
-          unsigned counter = 0;
 
           for (auto i : write_set_vec_PUSH) {
-            SSSyncer << getSyncer(counter, i, syncCall_map);
+            SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
             SSSyncer.str(string());
             SSSyncer.clear();
-            ++counter;
           }
 
           // Addding macros for pull sync structures (includes bitset)
           stringstream SSSyncer_pull;
-          counter = 0;
-          for(auto i : write_set_vec_PULL) {
-            SSSyncer_pull << getSyncerPull(counter, i, syncCall_map);
+          for (auto i : write_set_vec_PULL) {
+            SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
             SSSyncer_pull.str(string());
             SSSyncer_pull.clear();
-            ++counter;
           }
 
           // Addding additional structs for vertex cut
           stringstream SSSyncer_vertexCut;
-          counter = 0;
-          for(auto i : write_set_vec_PUSH_PULL) {
-            if(i.SYNC_TYPE == "sync_push"){
-              SSSyncer_vertexCut << getSyncerPull(counter, i, syncCall_map, "vertexCut_");
+          for (auto i : write_set_vec_PUSH_PULL) {
+            if (i.SYNC_TYPE == "sync_push") {
+              SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
               SSSyncer_vertexCut.clear();
-              ++counter;
             } else if(i.SYNC_TYPE == "sync_pull"){
-              SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map ,"vertexCut_");
+              SSSyncer_vertexCut << getSyncer(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
               SSSyncer_vertexCut.clear();
-              ++counter;
             }
           }
 
@@ -887,56 +877,45 @@ namespace {
           // getSyncerPull
           // TODO reason about why this is the case
           stringstream SSSyncer;
-          // TODO kill counter
-          unsigned counter = 0;
 
           // map from FIELD_NAME -> reduce, broadcast, bitset;
           std::map<std::string, std::vector<std::string>> syncCall_map;
 
           for (auto i : write_set_vec_PUSH) {
-            SSSyncer << getSyncer(counter, i, syncCall_map);
+            SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
             SSSyncer.str(string());
             SSSyncer.clear();
-            ++counter;
           }
 
           // Addding additional structs for vertex cut
           stringstream SSSyncer_vertexCut;
-          // TODO: DO NOT NEED COUNTER.
-          counter = 0;
           for (auto i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_pull") {
-              SSSyncer_vertexCut << getSyncer(counter, i, syncCall_map, "vertexCut_");
+              SSSyncer_vertexCut << getSyncer(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
               SSSyncer_vertexCut.clear();
-              ++counter;
             }
           }
 
           // Addding structure for pull sync
           stringstream SSSyncer_pull;
-          counter = 0;
           for(auto i : write_set_vec_PULL) {
-            SSSyncer_pull << getSyncerPull(counter, i, syncCall_map);
+            SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
             SSSyncer_pull.str(string());
             SSSyncer_pull.clear();
-            ++counter;
           }
 
 
           // Addding additional structs for vertex cut
-          //TODO: DO NOT NEED COUNTER.
-          counter = 0;
           for (auto i : write_set_vec_PUSH_PULL) {
             if(i.SYNC_TYPE == "sync_push"){
-              SSSyncer_vertexCut << getSyncerPull(counter, i, syncCall_map, "vertexCut_");
+              SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
               SSSyncer_vertexCut.clear();
-              ++counter;
             }
           }
 
