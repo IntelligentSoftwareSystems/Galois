@@ -95,6 +95,7 @@ void DistBenchStart(int argc, char** argv,
     Galois::Runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
     Galois::Runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
     Galois::Runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
+    Galois::Runtime::reportParam("(NULL)", "Run_UUID", Galois::Runtime::getRandUUID());
   }
 
   char name[256];
