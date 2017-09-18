@@ -191,6 +191,24 @@ struct StatTotalImpl {
     TAVG
   };
 
+  // TODO: remove
+  // static constexpr bool isValidInt(int v) {
+    // return (v >= SERIAL && v <= TAVG);
+  // }
+// 
+  // static constexpr Type fromInt(int v) {
+    // assert(isValidInt(v) && "Invalid int value for enum Type");
+// 
+    // switch(v) {
+      // case 0: return SERIAL;
+      // case 1: return TMIN;
+      // case 2: return TMAX;
+      // case 3: return TSUM;
+      // case 4: return TAVG;
+      // default: std::abort(); return SERIAL;
+    // }
+  // }
+
   static constexpr const char* NAMES[] = {
     "SERIAL",
     "TMIN",
@@ -202,7 +220,11 @@ struct StatTotalImpl {
   static const char* str(const Type& t) {
     return NAMES[t];
   }
+
 };
+
+template <typename _UNUSED>
+constexpr const char* StatTotalImpl<_UNUSED>::NAMES[];
 
 using StatTotal = StatTotalImpl<>;
 
@@ -265,6 +287,7 @@ public:
 
   const Stat& getStat(const Str& region, const Str& category) const {
     
+    auto i = findStat(region, category);
     assert (i != statMap.end());
     return i->second;
   }
@@ -272,12 +295,8 @@ public:
   template <typename T, typename... Args>
   void addToStat(const Str& region, const Str& category, const T& val, Args&&... statArgs) {
     Stat& s = getOrInsertStat(region, category, std::forward<Args>(statArgs)...);
-    assert(s.totalTy() == type && "Can't change totalTy after creation");
     s.add(val);
   }
-
-  const_iterator begin(void) const { return statMap.begin(); } 
-  const_iterator end(void) const { return statMap.end(); } 
 
   const_iterator cbegin(void) const { return statMap.cbegin(); } 
   const_iterator cend(void) const { return statMap.cend(); } 
@@ -442,9 +461,6 @@ private:
     }
 
 
-    const_iterator begin(void) const { return result.begin(); } 
-    const_iterator end(void) const { return result.end(); } 
-
     const_iterator cbegin(void) const { return result.cbegin(); } 
     const_iterator cend(void) const { return result.cend(); } 
 
@@ -467,7 +483,6 @@ private:
     }
 
     void print(std::ostream& out) const {
-Serial
 
       for (auto i = cbegin(), end_i = cend(); i != end_i; ++i) {
         out << statKind<T>() << SEP << this->region(i) << SEP << this->category(i) << SEP;
@@ -479,7 +494,7 @@ Serial
 
         if (StatManager::printingThreadVals()) {
 
-          out << statOrParam << SEP << this->region(i) << SEP << this->category(i) << SEP;
+          out << statKind<T>() << SEP << this->region(i) << SEP << this->category(i) << SEP;
           out << TSTAT_NAME << SEP;
 
           const char* sep = "";
@@ -529,21 +544,21 @@ protected:
 
 
   template <typename S, typename V>
-  void readIntStat(const typename IntStats::const_iterator& i
+  void readIntStat(const int_iterator& i
                     , S& region, S& category, int64_t& total, StatTotal::Type& type, V& vec) const {
 
     intStats.readStat(i, region, category, total, type, vec);
   }
 
   template <typename S, typename V>
-  void readFPstat(const typename IntStats::const_iterator& i
+  void readFPstat(const fp_iterator& i
                     , S& region, S& category, double& total, StatTotal::Type& type, V& vec) const {
 
     fpStats.readStat(i, region, category, total, type, vec);
   }
 
   template <typename S, typename V>
-  void readParam(const typename IntStats::const_iterator& i
+  void readParam(const str_iterator& i
                   , S& region, S& category, Str& total, StatTotal::Type& type, V& vec) const {
 
     strStats.readStat(i, region, category, total, type, vec);

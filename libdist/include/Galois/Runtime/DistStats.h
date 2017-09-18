@@ -30,6 +30,12 @@
 #ifndef GALOIS_RUNTIME_DIST_STATS_H
 #define GALOIS_RUNTIME_DIST_STATS_H
 
+#include "Galois/gstl.h"
+#include "Galois/Runtime/Statistics.h"
+#include "Galois/Runtime/Network.h"
+
+#include <string>
+
 namespace Galois {
 namespace Runtime {
 
@@ -37,18 +43,17 @@ class StatRecvHelper;
 
 class DistStatManager: public Galois::Runtime::StatManager {
 
-  friend class Galois::Runtime::StatRecvHelper
+  friend class Galois::Runtime::StatRecvHelper;
 
   using Base = Galois::Runtime::StatManager;
 
-  using Str = Galois::gstl::String;
+  using Str = Galois::gstl::Str;
 
   using Base::SEP;
 
   static constexpr const char* const HSTAT_SEP = Base::TSTAT_SEP;
   static constexpr const char* const HSTAT_NAME = "HostValues";
   static constexpr const char* const HSTAT_ENV_VAR = "PRINT_PER_HOST_STATS";
-
 
   static bool printingHostVals(void);
 
@@ -63,7 +68,9 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
       template <typename _U>
       void add(const _U&) const {}
-    }
+
+      const StatTotal::Type& totalTy(void) const { return m_totalTy; }
+    };
 
     using TMap = hidden::BasicStatMap<DummyStat>;
 
@@ -79,14 +86,14 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
       GALOIS_ASSERT(perThrdMap.getLocal() == perThrdMap.getRemote(0), "Must call from Thread 0");
 
-      const auto* mergedMap = perThrdMap.getRemote(0);
+      auto* t0Map = perThrdMap.getRemote(0);
 
       for (unsigned t = 1; t < perThrdMap.size(); ++t) {
 
         const auto* manager = perThrdMap.getRemote(t);
 
         for (auto i = manager->cbegin(), end_i = manager->cend(); i != end_i; ++i) {
-          mergedMap.addToStat(manager->region(i), manager->category(i), 0, manager->stat(i).m_totalTy);
+          t0Map->addToStat(manager->region(i), manager->category(i), 0, manager->stat(i).totalTy());
         }
       }
 
@@ -111,7 +118,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
   struct HostStat: public hidden::VecStat<T> {
 
     using Base = hidden::VecStat<T>;
-    using ThrdStats = hidden::VecStat<T>
+    using ThrdStats = hidden::VecStat<T>;
     using PerHostThrdStats = Galois::gstl::Map<unsigned, ThrdStats>;
 
     PerHostThrdStats perHostThrdStats;
@@ -136,26 +143,25 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
     }
 
-    void printHostVals(std::ostream& out, const Str& region, const Str& category) {
+    void printHostVals(std::ostream& out, const Str& region, const Str& category) const {
 
-        out << StatManager::statKind<T>() << SEP << Galois::Runtime::getHostID() << SEP;
+      out << StatManager::statKind<T>() << SEP << Galois::Runtime::getHostID() << SEP;
 
-        out << region << SEP << category << SEP;
+      out << region << SEP << category << SEP;
 
-        out << HSTAT_NAME << SEP;
+      out << HSTAT_NAME << SEP;
 
-        const char* sep = "";
+      const char* sep = "";
 
-        for (const auto& v: Base::values()) {
-          out << sep << v;
-          sep = HSTAT_SEP;
-        }
-
-        out << std::endl;
+      for (const auto& v: Base::values()) {
+        out << sep << v;
+        sep = HSTAT_SEP;
       }
+
+      out << std::endl;
     }
 
-    void printThreadVals(std::ostream& out, const Str& region, const Str& category) {
+    void printThreadVals(std::ostream& out, const Str& region, const Str& category) const {
       for (const auto& p: perHostThrdStats) {
 
         out << StatManager::statKind<T>() << SEP << p.first << SEP;
@@ -185,7 +191,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
   template <typename T>
   struct DistStatCombiner: public hidden::BasicStatMap<HostStat<T> > {
 
-    using Base = hidden::BasicStatMap<HostStatVal<T> >;
+    using Base = hidden::BasicStatMap<HostStat<T> >;
 
     static constexpr const char* htotalName(const StatTotal::Type& type) {
       switch(type) {
@@ -200,7 +206,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
     void print(std::ostream& out) const {
 
-      for (auto i = Base::cbegin(), end_i = cend(); i != end_i; ++i) {
+      for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
 
         out << StatManager::statKind<T>() << SEP << Galois::Runtime::getHostID() << SEP;
 

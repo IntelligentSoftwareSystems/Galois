@@ -46,11 +46,10 @@ llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl
 llvm::cl::opt<int> numRuns("runs", llvm::cl::desc("Number of runs"), llvm::cl::init(3));
 
 llvm::cl::opt<bool> savegraph("savegraph", llvm::cl::desc("Bool flag to enable save graph"), llvm::cl::init(false));
-llvm::cl::opt<std::string> outputfile("outputfile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
-llvm::cl::opt<std::string> outputfolder("outputfolder", llvm::cl::desc("Output folder name to store the local graph structure"), llvm::cl::init("."));
+llvm::cl::opt<std::string> outputFile("outputFile", llvm::cl::desc("Output file name to store the local graph structure"), llvm::cl::init("local_graph"));
 
 llvm::cl::opt<bool> verifyMax("verifyMax", llvm::cl::desc("Just print the max value of nodes fields"), llvm::cl::init(false));
-llvm::cl::opt<std::string> statOutputFile("statOutputFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
+llvm::cl::opt<std::string> statFile("statFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
 llvm::cl::opt<unsigned int> enforce_metadata("metadata", llvm::cl::desc("Enforce communication metadata: 0 - auto (default), 1 - bitset, 2 - indices, 3 - no metadata"), llvm::cl::init(0));
 
 DataCommMode enforce_data_mode = noData;
@@ -59,8 +58,8 @@ static void PrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
 }
 
-const std::string& getStatsFile(void) {
-  return statOutputFile;
+const std::string& getStatFile(void) {
+  return statFile;
 }
 
 //! initialize lonestar benchmark
@@ -92,16 +91,16 @@ void DistBenchStart(int argc, char** argv,
       if (i != argc - 1)
         cmdout << " ";
     }
-    Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
-    Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
-    Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)net.Num, 0);
-    Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
+    Galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+    Galois::Runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
+    Galois::Runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
+    Galois::Runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
   }
 
   char name[256];
   gethostname(name, 256);
-  Galois::Runtime::reportStat("(NULL)", "Hostname", name, 0);
+  Galois::Runtime::reportParam("(NULL)", "Hostname", name);
 
   if(savegraph)
-    Galois::Runtime::reportStat("(NULL)", "Saving Graph structure to:", outputfile.c_str(), 0);
+    Galois::Runtime::reportParam("(NULL)", "outputFile", outputFile.c_str());
 }

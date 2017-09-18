@@ -42,14 +42,14 @@ extern llvm::cl::opt<bool> skipVerify;
 extern llvm::cl::opt<int> numThreads;
 extern llvm::cl::opt<int> numRuns;
 extern llvm::cl::opt<bool> savegraph;
-extern llvm::cl::opt<std::string> outputfile;
+extern llvm::cl::opt<std::string> outputFile;
 extern llvm::cl::opt<bool> verifyMax;
-extern llvm::cl::opt<std::string> statOutputFile;
+extern llvm::cl::opt<std::string> statFile;
 
 
 void DistBenchStart(int argc, char** argv, 
                    const char* app, const char* desc = nullptr, const char* url = nullptr);
 
-const std::string& getStatsFile(void);
+const std::string& getStatFile(void);
 
 #endif

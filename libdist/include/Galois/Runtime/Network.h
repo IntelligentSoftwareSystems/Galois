@@ -25,6 +25,7 @@
 #define GALOIS_RUNTIME_NETWORK_H
 
 #include "Galois/Runtime/Serialize.h"
+#include "Galois/Substrate/Barrier.h"
 
 #include <cstdint>
 /* Test for GCC >= 5.2.0 */
@@ -124,6 +125,8 @@ uint32_t getHostID();
 NetworkInterface& makeNetworkBuffered();
 NetworkInterface& makeNetworkRouted();
 
+//! Host Barrier
+Substrate::Barrier& getHostBarrier();
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////

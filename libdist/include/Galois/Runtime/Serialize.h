@@ -270,9 +270,11 @@ inline size_t gSizedObj(const Galois::gdeque<T,CS>& data) {
   return gSizedSeq(data);
 }
 
-inline size_t gSizedObj(const std::string& data) {
+template <typename A>
+inline size_t gSizedObj(const std::basic_string<char, std::char_traits<char>, A>& data) {
   return data.length() + 1;
 }
+
 
 inline size_t gSizedObj(const SerializeBuffer& data) {
   return data.size();
@@ -326,6 +328,12 @@ template<typename T>
 inline void gSerializeObj(SerializeBuffer& buf, const Galois::CopyableAtomic<T>& data){
   buf.insert((uint8_t*)data.load(), sizeof(T));
 }
+
+template <typename A>
+inline void gSerializeObj(SerializeBuffer& buf, const std::basic_string<char, std::char_traits<char>, A>& data) {
+  buf.insert((uint8_t*)data.data(), data.length()+1);
+}
+
 //Fixme: specialize for Sequences with consecutive PODS
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
@@ -367,10 +375,6 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data
 template<typename T, unsigned CS>
 inline void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
   gSerializeSeq(buf,data);
-}
-
-inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
-  buf.insert((uint8_t*)data.data(), data.length()+1);
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
@@ -499,6 +503,16 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
 }
 
 
+template <typename A>
+inline void gDeserializeObj(DeSerializeBuffer& buf, std::basic_string<char, std::char_traits<char>, A>& data) {
+  char c = buf.pop();
+  while(c != '\0') {
+    data.push_back(c);
+    c = buf.pop();
+  };
+}
+
+
 template<typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
   seq.clear();
@@ -526,14 +540,6 @@ void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
     seq.resize(size);
     buf.extract((uint8_t*)seq.data(), size * sizeof(T));
   }
-}
-
-inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
-  char c = buf.pop();
-  while(c != '\0') {
-    data.push_back(c);
-    c = buf.pop();
-  };
 }
 
 template<typename T, typename Alloc>

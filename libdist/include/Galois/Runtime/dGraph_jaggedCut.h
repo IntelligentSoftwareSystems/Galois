@@ -229,7 +229,6 @@ public:
       GALOIS_DIE("ERROR: transpose not supported for jagged vertex-cuts");
     }
 
-    Galois::Statistic statGhostNodes("TotalGhostNodes");
     Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
     StatTimer_graph_construct.start();
     Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");

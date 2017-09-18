@@ -141,7 +141,7 @@ public:
       loopname(get_by_supertype<loopname_tag>(args).getValue())
   {
     if (!combineStats) {
-      reportLoopInstance(loopname);
+      // reportLoopInstance(loopname);
     }
   }
 

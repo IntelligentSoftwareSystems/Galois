@@ -40,7 +40,6 @@ boost::uuids::uuid Galois::Runtime::getRandUUID(void) {
   return UUID;
 }
 
-constexpr const char* StatTotal::NAMES[];
 
 using Galois::gstl::Str;
 
@@ -87,11 +86,7 @@ void StatManager::printStats(std::ostream& out) {
   strStats.print(out);
 }
 
-unsigned StatManager::maxThreads(void) { 
-  return Galois::getActiveThreads();
-}
-
-void StatManager::printHeader(std::ostream& out) {
+void StatManager::printHeader(std::ostream& out) const {
 
   // out << "RUN_UUID" << SEP;
   out << "STAT_TYPE" << SEP << "REGION" << SEP << "CATEGORY" << SEP;
@@ -107,6 +102,8 @@ StatManager::int_iterator StatManager::intEnd(void) const { return intStats.cend
 StatManager::fp_iterator StatManager::fpBegin(void) const { return fpStats.cbegin(); }
 StatManager::fp_iterator StatManager::fpEnd(void) const { return fpStats.cend(); }
 
+StatManager::str_iterator StatManager::paramBegin(void) const { return strStats.cbegin(); }
+StatManager::str_iterator StatManager::paramEnd(void) const { return strStats.cend(); }
 
 static Galois::Runtime::StatManager* SM;
 

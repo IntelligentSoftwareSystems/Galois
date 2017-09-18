@@ -218,9 +218,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         scalefactor.clear();
       }
 
-      Galois::Runtime::reportStat("(NULL)", "ONLINE VERTEX CUT PL", 0, 0);
+      Galois::Runtime::reportParam("(NULL)", "ONLINE VERTEX CUT PL", "0");
 
-      Galois::Statistic statGhostNodes("TotalGhostNodes");
       Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       Galois::StatTimer StatTimer_local_distributed_edges("TIMER_LOCAL_DISTRIBUTE_EDGES");

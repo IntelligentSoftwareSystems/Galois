@@ -27,7 +27,8 @@
  * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
 
-#include "Galois/DistStats.h"
+#include "Galois/Runtime/DistStats.h"
+#include "Galois/Runtime/Serialize.h"
 
 using namespace Galois::Runtime;
 
@@ -50,36 +51,32 @@ inline static DistStatManager* dsm(void) {
 DistStatManager::DistStatManager(const std::string& outfile): StatManager(outfile) {}
 
 
-class StatRecvHelper {
+class Galois::Runtime::StatRecvHelper {
 
 public:
 
-    static void recvAtHost_0_hostTotalTy(uint32_t hostID, Galois::gstl::String region, Galois::gstl::String category
-        ,int totalTy) {
+    static void recvAtHost_0_hostTotalTy(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
+        , StatTotal::Type totalTy) {
 
-      assert(StatTotal::isValidInt(totalTy));
 
       dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
     }
 
-    static void recvAtHost_0_int(uint32_t hostID, Galois::gstl::String region, Galois::gstl::String category
-        , int64_t thrdTotal, int totalTy, const Galois::gstl::Vector<int64_t> thrdVals) {
+    static void recvAtHost_0_int(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
+        , int64_t thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<int64_t> thrdVals) {
 
-      assert(StatTotal::isValidInt(totalTy));
       dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
 
-    static void recvAtHost_0_fp(uint32_t hostID, Galois::gstl::String region, Galois::gstl::String category
-        , double thrdTotal, int totalTy, const Galois::gstl::Vector<double> thrdVals) {
+    static void recvAtHost_0_fp(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
+        , double thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<double> thrdVals) {
 
-      assert(StatTotal::isValidInt(totalTy));
       dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
 
-    static void recvAtHost_0_str(uint32_t hostID, Galois::gstl::String region, Galois::gstl::String category
-        , Str thrdTotal, int totalTy, const Galois::gstl::Vector<double> thrdVals) {
+    static void recvAtHost_0_str(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
+        , Galois::gstl::Str thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<Galois::gstl::Str> thrdVals) {
 
-      assert(StatTotal::isValidInt(totalTy));
       dsm()->addRecvdParam(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
 
@@ -97,7 +94,7 @@ void DistStatManager::mergeStats(void) {
 
 void DistStatManager::combineAtHost_0_helper(void) {
 
-    constexpr bool IS_HOST0 = getHostID() == 0;
+    const bool IS_HOST0 = getHostID() == 0;
 
     const auto& hTotalMap = hostTotalTypes.mergedMap();
 
@@ -105,7 +102,7 @@ void DistStatManager::combineAtHost_0_helper(void) {
       for (auto i = hTotalMap.cbegin(), end_i = hTotalMap.cend(); i != end_i; ++i) {
 
         getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_hostTotalTy
-            , hTotalMap.region(i), hTotalMap.category(i), hTotalMap.stat(i).m_totalTy);
+            , hTotalMap.region(i), hTotalMap.category(i), hTotalMap.stat(i).totalTy());
       }
     }
 
@@ -143,7 +140,7 @@ void DistStatManager::combineAtHost_0_helper(void) {
       }
     }
 
-    for (auto i = Base::strBegin(), end_i = Base::strEnd(); i != end_i; ++i) {
+    for (auto i = Base::paramBegin(), end_i = Base::paramEnd(); i != end_i; ++i) {
       Str ln;
       Str cat;
       Str thrdTotal;
@@ -184,7 +181,7 @@ void DistStatManager::combineAtHost_0(void) {
 
 }
 
-bool StatManager::printingThreadVals(void) {
+bool DistStatManager::printingHostVals(void) {
   return Galois::Substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
 }
 
@@ -192,22 +189,24 @@ StatTotal::Type DistStatManager::findHostTotalTy(const Str& region, const Str& c
 
   StatTotal::Type hostTotalTy = thrdTotalTy;
 
-  auto i = hostTotalTypes.findStat(region, category);
-  if (i != hostTotalTypes.cend()) { 
-    hostTotalTy = hostTotalTypes.stat(i).m_totalTy; 
+  auto& mrgMap = hostTotalTypes.mergedMap();
+
+  auto i = mrgMap.findStat(region, category);
+  if (i != mrgMap.cend()) { 
+    hostTotalTy = mrgMap.stat(i).totalTy(); 
   } 
 
   return hostTotalTy;
 }
 
 void DistStatManager::addRecvdHostTotalTy(unsigned hostID, const Str& region, const Str& category, const StatTotal::Type& totalTy) {
-  hostTotalTypes.addToStat(region, category, hostTotal);
+  hostTotalTypes.addToStat(region, category, totalTy);
 }
 
 void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str& category, int64_t thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<int64_t>& thrdVals) {
 
   intDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, totalTy, thrdVals)
+      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
       ,  findHostTotalTy(region, category, thrdTotalTy));
 
 }
@@ -215,7 +214,7 @@ void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str
 void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str& category, double thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<double>& thrdVals) {
 
   fpDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, totalTy, thrdVals)
+      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
       ,  findHostTotalTy(region, category, thrdTotalTy));
 
 }
@@ -223,12 +222,12 @@ void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str
 void DistStatManager::addRecvdParam(unsigned hostID, const Str& region, const Str& category, const Str& thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<Str>& thrdVals) {
 
   strDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, totalTy, thrdVals)
+      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
       ,  findHostTotalTy(region, category, thrdTotalTy));
 
 }
 
-void DistStatManager::printHeader(std::ostream& out) {
+void DistStatManager::printHeader(std::ostream& out) const {
   out << "STAT_TYPE" << SEP;
   out << "HOST_ID" << SEP;
   out << "REGION" << SEP << "CATEGORY" << SEP;
