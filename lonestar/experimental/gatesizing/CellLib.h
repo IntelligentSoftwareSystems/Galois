@@ -67,6 +67,7 @@ struct WireLoad {
   std::vector<size_t> fanout;
   std::vector<float> length;
 
+  float wireResistance(size_t deg);
   float wireCapacitance(size_t deg);
 };
 

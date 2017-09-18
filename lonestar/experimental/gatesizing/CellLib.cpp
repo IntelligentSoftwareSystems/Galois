@@ -26,6 +26,23 @@ static std::pair<size_t, size_t> findBound(T v, std::vector<T>& array) {
   return std::make_pair(lowerIndex, upperIndex);
 }
 
+float WireLoad::wireResistance(size_t deg) {
+  auto b = findBound(deg, fanout);
+  float len;
+  if (b.first != b.second) {
+    len = linearInterpolate((float)fanout[b.first], (float)deg, (float)fanout[b.second], length[b.first], length[b.second]);
+  }
+  // out of lower bound
+  else if (0 == b.second) {
+    len = 0.0;
+  }
+  // out of upper bound
+  else {
+    len = length[b.second] + (deg - fanout[b.second]) * slope;
+  }
+  return resistance * len;
+}
+
 float WireLoad::wireCapacitance(size_t deg) {
   auto b = findBound(deg, fanout);
   float len;

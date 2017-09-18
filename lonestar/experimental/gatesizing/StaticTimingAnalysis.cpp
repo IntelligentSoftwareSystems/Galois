@@ -173,12 +173,29 @@ struct ComputeArrivalTimeAndPower {
       // lock outgoing neighbors
       g.edges(n);
 
+      auto pin = data.pin;
+      auto pinC = pin->gate->cell->inPins.at(pin->name)->capacitance;
+
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
         data.rise.slew = inData.rise.slew;
         data.rise.arrivalTime = inData.rise.arrivalTime;
         data.fall.slew = inData.fall.slew;
         data.fall.arrivalTime = inData.fall.arrivalTime;
+
+        // consider wire delay if not connected to primary (input) port
+        if (!inData.isPrimary) {
+          auto wire = g.getEdgeData(ie).wire;
+          auto wireDeg = wire->leaves.size();
+
+          // for balanced-case RC tree
+          auto wireR = wire->wireLoad->wireResistance(wireDeg) / (float)(wireDeg);
+          auto wireC = wire->wireLoad->wireCapacitance(wireDeg) / (float)(wireDeg);
+          auto wireDelay = wireR * (wireC + pinC);
+
+          data.rise.arrivalTime += wireDelay;
+          data.fall.arrivalTime += wireDelay;
+        }
       }
 
       for (auto oe: g.edges(n)) {
