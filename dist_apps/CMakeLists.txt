@@ -58,4 +58,4 @@ distAppNoGPU(kcore_pull-topological)
 distApp(bc)
 distAppNoGPU(bc_pull)
 
-distAppNoGPU(sgd_pull-topological)
+#distAppNoGPU(sgd_pull-topological)
