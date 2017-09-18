@@ -184,10 +184,8 @@ static void printCircuitGraphEdge(CircuitGraph& cg, T e, std::string prompt) {
   if (wire) {
     std::cout << "    wire: " << wire->name << std::endl;
   }
-  else {
-    std::cout << "    riseDelay = " << eData.riseDelay << std::endl;
-    std::cout << "    fallDelay = " << eData.fallDelay << std::endl;
-  }
+  std::cout << "    riseDelay = " << eData.riseDelay << std::endl;
+  std::cout << "    fallDelay = " << eData.fallDelay << std::endl;
 }
 
 void CircuitGraph::print() {

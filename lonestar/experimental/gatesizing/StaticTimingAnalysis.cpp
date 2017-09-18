@@ -185,7 +185,8 @@ struct ComputeArrivalTimeAndPower {
 
         // consider wire delay if not connected to primary (input) port
         if (!inData.isPrimary) {
-          auto wire = g.getEdgeData(ie).wire;
+          auto& ieData = g.getEdgeData(ie);
+          auto wire = ieData.wire;
           auto wireDeg = wire->leaves.size();
 
           // for balanced-case RC tree
@@ -193,6 +194,8 @@ struct ComputeArrivalTimeAndPower {
           auto wireC = wire->wireLoad->wireCapacitance(wireDeg) / (float)(wireDeg);
           auto wireDelay = wireR * (wireC + pinC);
 
+          ieData.riseDelay = wireDelay;
+          ieData.fallDelay = wireDelay;
           data.rise.arrivalTime += wireDelay;
           data.fall.arrivalTime += wireDelay;
         }
