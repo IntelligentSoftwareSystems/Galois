@@ -51,11 +51,11 @@ class SharedMemRuntime: public Galois::Substrate::SharedMemSubstrate {
   SM m_sm;
 
 public:
-  explicit SharedMemRuntime(const std::string& statFile="")
+  explicit SharedMemRuntime(void)
     : 
       Base(), 
       m_pa(),
-      m_sm(statFile)
+      m_sm()
     {
       internal::setPagePoolState(&m_pa);
       internal::setSysStatManager(&m_sm);

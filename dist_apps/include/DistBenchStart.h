@@ -50,6 +50,5 @@ extern llvm::cl::opt<std::string> statFile;
 void DistBenchStart(int argc, char** argv, 
                    const char* app, const char* desc = nullptr, const char* url = nullptr);
 
-const std::string& getStatFile(void);
 
 #endif

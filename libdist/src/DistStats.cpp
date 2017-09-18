@@ -240,9 +240,11 @@ void DistStatManager::printStats(std::ostream& out) {
 
   mergeStats();
 
-  printHeader(out);
+  if (getHostID() == 0) {
+    printHeader(out);
 
-  intDistStats.print(out);
-  fpDistStats.print(out);
-  strDistStats.print(out);
+    intDistStats.print(out);
+    fpDistStats.print(out);
+    strDistStats.print(out);
+  }
 }

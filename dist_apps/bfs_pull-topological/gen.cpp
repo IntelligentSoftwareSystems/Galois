@@ -320,7 +320,7 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {

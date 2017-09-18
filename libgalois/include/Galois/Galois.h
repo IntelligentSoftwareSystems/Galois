@@ -61,7 +61,7 @@ namespace Galois {
 class SharedMemSys: public Runtime::SharedMemRuntime<Runtime::StatManager> {
 
 public:
-  explicit SharedMemSys(const std::string& statFile="");
+  explicit SharedMemSys(void);
 
   ~SharedMemSys(void);
 };

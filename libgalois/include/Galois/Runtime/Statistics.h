@@ -574,6 +574,8 @@ public:
   
   virtual ~StatManager();
 
+  void setStatFile(const std::string& outfile);
+
   void addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type);
 
   void addToStat(const Str& region, const Str& category, double val, const StatTotal::Type& type);
@@ -823,6 +825,8 @@ template <typename S1, typename S2>
 void reportParam(const S1& region, const S2& category, const std::string& value) {
   hidden::reportParamStr(region, category, value);
 }
+
+void setStatFile(const std::string& f);
 
 // TODO: switch to gstl::Str in here
 //! Reports Galois system memory stats for all threads

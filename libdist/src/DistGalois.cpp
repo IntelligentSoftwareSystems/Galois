@@ -30,8 +30,8 @@
 
 #include "Galois/DistGalois.h"
 
-Galois::DistMemSys::DistMemSys(const std::string& statFile)
-  : Galois::Runtime::SharedMemRuntime<Galois::Runtime::DistStatManager>(statFile)
+Galois::DistMemSys::DistMemSys(void)
+  : Galois::Runtime::SharedMemRuntime<Galois::Runtime::DistStatManager>()
 { } 
 
 Galois::DistMemSys::~DistMemSys(void) {}

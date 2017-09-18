@@ -34,6 +34,7 @@
 #include "DistBenchStart.h"
 #include "Galois/Version.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/DistStats.h"
 #include "Galois/Runtime/DataCommMode.h"
 
 #include <iostream>
@@ -58,10 +59,6 @@ static void PrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
 }
 
-const std::string& getStatFile(void) {
-  return statFile;
-}
-
 //! initialize lonestar benchmark
 void DistBenchStart(int argc, char** argv, 
                    const char* app, const char* desc, const char* url) {
@@ -69,6 +66,9 @@ void DistBenchStart(int argc, char** argv,
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
+  Galois::Runtime::setStatFile(statFile);
+
+
   assert(enforce_metadata <= 3);
   enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 

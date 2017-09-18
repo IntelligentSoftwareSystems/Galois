@@ -33,6 +33,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Version.h"
+#include "Galois/Runtime/Statistics.h"
 
 #include <iostream>
 #include <sstream>
@@ -40,6 +41,7 @@
 //! standard global options to the benchmarks
 llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
+llvm::cl::opt<std::string> statFile("statFile", llvm::cl::desc("ouput file to print stats to "), llvm::cl::init(""));
 
 
 static void LonestarPrintVersion() {
@@ -54,6 +56,8 @@ void LonestarStart(int argc, char** argv,
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
+
+  Galois::Runtime::setStatFile(statFile);
 
   LonestarPrintVersion();
   std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";

@@ -47,6 +47,14 @@ StatManager::StatManager(const std::string& outfile): m_outfile(outfile) {}
 
 StatManager::~StatManager(void) {}
 
+void StatManager::setStatFile(const std::string& outfile) {
+  m_outfile = outfile;
+}
+
+void Galois::Runtime::setStatFile(const std::string& f) {
+  internal::sysStatManager()->setStatFile(f);
+}
+
 bool StatManager::printingThreadVals(void) {
   return Galois::Substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
 }

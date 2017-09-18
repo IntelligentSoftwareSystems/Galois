@@ -53,7 +53,7 @@ namespace Galois {
 class DistMemSys: public Runtime::SharedMemRuntime<Runtime::DistStatManager> {
 
 public:
-  explicit DistMemSys(const std::string& outfile="");
+  explicit DistMemSys(void);
 
   ~DistMemSys(void);
 };
