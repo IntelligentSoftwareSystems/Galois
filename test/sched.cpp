@@ -24,7 +24,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 
 #include "Lonestar/BoilerPlate.h"

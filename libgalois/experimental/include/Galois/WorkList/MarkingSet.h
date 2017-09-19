@@ -33,7 +33,7 @@
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "Galois/WorkList/Separator.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 namespace Galois {
 namespace WorkList {

@@ -35,7 +35,7 @@
 #define GALOIS_RUNTIME_DOALLCOUPLED_H
 
 #include "Galois/gIO.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 #include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/Runtime/Statistics.h"

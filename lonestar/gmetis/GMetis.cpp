@@ -35,7 +35,7 @@
 
 #include "Metis.h"
 #include "Galois/Graphs/Util.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Graphs/FileGraph.h"

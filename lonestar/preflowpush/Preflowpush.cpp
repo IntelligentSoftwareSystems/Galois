@@ -22,7 +22,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Bag.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"

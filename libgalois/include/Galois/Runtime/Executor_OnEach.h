@@ -35,7 +35,7 @@
 
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Runtime/Statistics.h"
 #include "Galois/Threads.h"
 #include "Galois/gIO.h"

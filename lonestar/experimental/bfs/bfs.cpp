@@ -30,7 +30,7 @@
 #include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP

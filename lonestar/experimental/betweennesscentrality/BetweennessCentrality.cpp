@@ -23,7 +23,7 @@
 
 #define SHOULD_PRODUCE_CERTIFICATE 0
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graphs/LCGraph.h"

@@ -40,7 +40,7 @@
 
 #include "Galois/gtuple.h"
 #include "Galois/Mem.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Threads.h"
 #include "Galois/Traits.h"
 #include "Galois/Runtime/Substrate.h"

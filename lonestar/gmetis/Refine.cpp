@@ -24,7 +24,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Metis.h"
 #include <set>
 #include <iostream>

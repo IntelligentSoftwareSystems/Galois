@@ -1,5 +1,5 @@
 #include "Filter.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Bag.h"
 
 #include <regex>

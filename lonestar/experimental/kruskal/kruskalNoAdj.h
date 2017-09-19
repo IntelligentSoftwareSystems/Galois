@@ -35,7 +35,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Accumulator.h"
 #include "Galois/PerThreadContainer.h"
 #include "Galois/util/Markable.h"

@@ -37,7 +37,7 @@
 #include <queue>
 
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/Accumulator.h"

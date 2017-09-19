@@ -7,7 +7,7 @@
 #include <functional>
 #include "TaskDescription.h"
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Node.h"
 

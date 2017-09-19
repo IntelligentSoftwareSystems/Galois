@@ -31,7 +31,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Accumulator.h"

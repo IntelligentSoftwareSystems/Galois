@@ -9,7 +9,7 @@
 //#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 using namespace Galois::Runtime;
 

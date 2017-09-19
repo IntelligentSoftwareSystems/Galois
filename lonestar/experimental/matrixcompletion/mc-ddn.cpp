@@ -26,7 +26,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graph/Graph.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"

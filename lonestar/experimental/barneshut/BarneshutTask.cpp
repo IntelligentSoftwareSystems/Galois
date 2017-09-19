@@ -22,7 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/gdeque.h"
 #include "Galois/Bag.h" // XXX
 #include "Galois/Runtime/TaskWork.h"

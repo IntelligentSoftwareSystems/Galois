@@ -1,5 +1,5 @@
 #include "Galois/Galois.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graph/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

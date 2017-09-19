@@ -35,7 +35,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Atomic.h"
 #include "Galois/CilkInit.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Substrate/CompilerSpecific.h"

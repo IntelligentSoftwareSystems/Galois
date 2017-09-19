@@ -30,7 +30,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/UnionFind.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/OCGraph.h"

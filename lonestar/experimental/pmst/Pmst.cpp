@@ -23,7 +23,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Timer.h"
 #include "Galois/Queue.h"
 #include "Galois/UserContext.h"

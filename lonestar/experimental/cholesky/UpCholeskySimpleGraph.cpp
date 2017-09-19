@@ -14,7 +14,7 @@
 
 #include "Galois/Galois.h"      // STRANGE ERRORS IF EXCLUDED
 #include "Galois/Runtime/TreeExec.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 
 typedef struct nodedata {

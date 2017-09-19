@@ -1,6 +1,6 @@
 //Perform graph layout, Daniel Tunkelang style
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/Graphs/LCGraph.h"
 #include <iostream>

@@ -37,7 +37,7 @@
 #include "Galois/UnorderedSet.h"
 #include "Galois/TwoLevelSet.h"
 #include "Galois/WorkList/Separator.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 namespace Galois {
 namespace WorkList {

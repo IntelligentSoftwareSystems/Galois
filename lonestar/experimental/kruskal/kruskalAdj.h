@@ -33,7 +33,7 @@
 #include <fstream>
 
 #include "Galois/Atomic.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/util/Markable.h"
 #include "Galois/Accumulator.h"
 #include "Galois/PerThreadContainer.h"

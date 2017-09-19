@@ -5,7 +5,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/CilkInit.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Runtime/TreeExec.h"
 
 

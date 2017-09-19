@@ -1,5 +1,5 @@
 #include "Galois/Galois.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph3.h"
 
 #include <boost/iterator/counting_iterator.hpp>

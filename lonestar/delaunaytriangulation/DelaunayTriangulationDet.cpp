@@ -32,7 +32,7 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"

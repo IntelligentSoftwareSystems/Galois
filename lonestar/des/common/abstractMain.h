@@ -34,7 +34,7 @@
 
 #include <cstdio>
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Galois.h"

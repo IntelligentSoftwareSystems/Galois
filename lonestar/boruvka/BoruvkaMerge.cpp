@@ -22,7 +22,7 @@
  * @author Rashid Kaleem <rashid@cs.utexas.edu>
  */
 
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graphs/Graph.h"
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"

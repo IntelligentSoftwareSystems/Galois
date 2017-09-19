@@ -42,7 +42,7 @@
 #include "Galois/gstl.h"
 #include "Galois/gtuple.h"
 #include "Galois/Traits.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"

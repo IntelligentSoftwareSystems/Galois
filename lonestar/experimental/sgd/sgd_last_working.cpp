@@ -38,7 +38,7 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 //Distributed Galois
 #include "Galois/Graphs/Graph3.h"

@@ -28,7 +28,7 @@
 #include "sparselu.h"
 
 #include "Galois/Galois.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/KDGtwoPhase.h"

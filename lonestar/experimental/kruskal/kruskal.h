@@ -41,7 +41,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 #include "Galois/Timer.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Galois.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/LCGraph.h"

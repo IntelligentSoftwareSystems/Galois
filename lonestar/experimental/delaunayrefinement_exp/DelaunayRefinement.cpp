@@ -33,7 +33,7 @@
 #include "Galois/Galois.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Graphs/Bag.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

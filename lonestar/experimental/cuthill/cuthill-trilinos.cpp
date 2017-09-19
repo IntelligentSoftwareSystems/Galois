@@ -8,7 +8,7 @@
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_SerialComm.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 #include <iostream>
 

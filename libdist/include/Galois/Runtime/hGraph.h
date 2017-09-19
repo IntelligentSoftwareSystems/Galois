@@ -31,7 +31,7 @@
 
 //#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Serialize.h"
-#include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 
 #include "Galois/Runtime/GlobalObj.h"
 #include "Galois/Runtime/OfflineGraph.h"
