@@ -127,7 +127,7 @@ SDC::~SDC() {
   clear();
 }
 
-void SDC::printSdcDebug() {
+void SDC::printDebug() {
   std::cout << "targetDelay = " << targetDelay << std::endl;
   std::cout << "primary input rise slew = " << primaryInputRiseSlew << std::endl;
   std::cout << "primary input fall slew = " << primaryInputFallSlew << std::endl;

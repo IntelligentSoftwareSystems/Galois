@@ -96,7 +96,7 @@ struct CellLib {
 
   void read(std::string inName);
   void clear();
-  void printCellLibDebug();
+  void printDebug();
 };
 
 float extractMaxFromTableSet(CellPin::TableSet& tables);

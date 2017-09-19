@@ -188,7 +188,7 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
 VerilogModule::VerilogModule() {
 }
 
-void VerilogModule::printVerilogModuleDebug() {
+void VerilogModule::printDebug() {
   std::cout << "module " << name << std::endl;
   for (auto item: inputs) {
     auto i = item.second;
@@ -270,7 +270,7 @@ static void writeVerilogWires(std::ofstream& of, std::unordered_map<std::string,
   }
 }
 
-void VerilogModule::writeVerilogModule(std::string outName) {
+void VerilogModule::write(std::string outName) {
   std::ofstream of(outName);
   if (!of.is_open()) {
     std::cerr << "Cannot open " << outName << " to write." << std::endl;

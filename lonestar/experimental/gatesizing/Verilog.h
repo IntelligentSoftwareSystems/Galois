@@ -41,8 +41,8 @@ struct VerilogModule {
 
   void read(std::string inName, CellLib *lib);
   void clear();
-  void printVerilogModuleDebug();
-  void writeVerilogModule(std::string outName);
+  void printDebug();
+  void write(std::string outName);
 };
 
 #endif // GALOIS_VERILOG_H

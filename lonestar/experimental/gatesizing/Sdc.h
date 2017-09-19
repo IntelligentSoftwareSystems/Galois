@@ -17,7 +17,7 @@ struct SDC {
 
   void read(std::string inName, CellLib *lib);
   void clear();
-  void printSdcDebug();
+  void printDebug();
 };
 
 #endif // GALOIS_SYNOPSIS_DESIGN_CONSTRAINTS_H
