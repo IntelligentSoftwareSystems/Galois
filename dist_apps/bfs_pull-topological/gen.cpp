@@ -24,7 +24,7 @@
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
- * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #include <iostream>
@@ -220,14 +220,14 @@ struct BFS {
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      Galois::Runtime::reportStat_Tsum("(NULL)", 
-        "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+      Galois::Runtime::reportStat_Tsum("BFS", 
+        _graph.get_run_identifier("NUM_WORK_ITEMS"), 
         (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat_Tsum("(NULL)", 
+      Galois::Runtime::reportStat_Serial("BFS", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -284,7 +284,8 @@ struct BFSSanityCheck {
 
     Galois::do_all(_graph.begin(), _graph.end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
-                   Galois::loopname("BFSSanityCheck"));
+                   Galois::loopname("BFSSanityCheck"),
+                   Galois::no_stats());
 
     uint64_t num_visited = dgas.reduce();
 
@@ -326,9 +327,9 @@ int main(int argc, char** argv) {
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat_Tsum("(NULL)", "Max Iterations", 
+      Galois::Runtime::reportParam("BFS", "Max Iterations", 
                                   (unsigned long)maxIterations);
-      Galois::Runtime::reportStat_Serial("(NULL)", "Source Node ID", 
+      Galois::Runtime::reportParam("BFS", "Source Node ID", 
                                   (unsigned long long)src_node);
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
@@ -433,7 +434,7 @@ int main(int argc, char** argv) {
     StatTimer_total.stop();
 
     // Verify
-    if(verify){
+    if (verify) {
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
@@ -452,7 +453,6 @@ int main(int argc, char** argv) {
       }
 #endif
     }
-
     }
 
     return 0;

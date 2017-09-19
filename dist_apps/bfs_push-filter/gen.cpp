@@ -20,11 +20,11 @@
  *
  * @section Description
  *
- * Compute BFS on distributed Galois using worklist.
+ * Compute BFS push on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
- * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #include <iostream>
@@ -223,8 +223,8 @@ struct FirstItr_BFS{
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     
-    Galois::Runtime::reportStat("(NULL)", 
-       _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
+    Galois::Runtime::reportStat_Tsum("FirstItr_BFS", 
+       _graph.get_run_identifier("NUM_WORK_ITEMS"), __end - __begin);
   }
 
   void operator()(GNode src) const {
@@ -287,16 +287,16 @@ struct BFS {
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      Galois::Runtime::reportStat("(NULL)", 
-        _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
-        (unsigned long)dga.read_local(), 0);
+      Galois::Runtime::reportStat_Tsum("BFS", 
+        _graph.get_run_identifier("NUM_WORK_ITEMS"), 
+        (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Serial("BFS", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations, 0);
+        (unsigned long)_num_iterations);
     }
   }
 
@@ -355,7 +355,8 @@ struct BFSSanityCheck {
 
     Galois::do_all(_graph.begin(), _graph.end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
-                   Galois::loopname("BFSSanityCheck"));
+                   Galois::loopname("BFSSanityCheck"),
+                   Galois::no_stats());
 
     uint64_t num_visited = dgas.reduce();
 
@@ -390,16 +391,16 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
-      Galois::Runtime::reportStat("(NULL)", "Source Node ID", 
-                                  (unsigned long long)src_node, 0);
+      Galois::Runtime::reportParam("BFS", "Max Iterations", 
+                                  (unsigned long)maxIterations);
+      Galois::Runtime::reportParam("BFS", "Source Node ID", 
+                                  (unsigned long long)src_node);
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
                       StatTimer_total("TIMER_TOTAL"), 
@@ -525,10 +526,6 @@ int main(int argc, char** argv) {
 #endif
     }
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch(const char* c) {
