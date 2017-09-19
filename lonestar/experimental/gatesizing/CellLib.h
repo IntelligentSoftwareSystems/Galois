@@ -3,6 +3,9 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <utility>
+
+#include <boost/functional/hash.hpp>
 
 #ifndef GALOIS_CELLLIB_H
 #define GALOIS_CELLLIB_H
@@ -16,9 +19,9 @@ enum LutVar {
 };
 
 enum TimingSense {
+  TIMING_SENSE_NON_UNATE,
   TIMING_SENSE_POSITIVE_UNATE,
   TIMING_SENSE_NEGATIVE_UNATE,
-  TIMING_SENSE_NON_UNATE,
   TIMING_SENSE_UNDEFINED
 };
 
@@ -45,13 +48,19 @@ struct LUT {
 struct Cell;
 
 struct CellPin {
+  typedef std::pair<std::string, std::string> TSenseKey;
+  typedef std::pair<std::string, TimingSense> TableSetKey;
+  typedef std::unordered_map<std::string, LUT *> TableSet;
+
   std::string name;
   float capacitance;
   PinType pinType;
   Cell *cell;
-  std::unordered_map<std::string, TimingSense> tSense;
-  std::unordered_map<std::string, LUT *> cellRise, cellFall, riseTransition, fallTransition;
-  std::unordered_map<std::string, LUT *> risePower, fallPower;
+
+  std::unordered_map<TSenseKey, TimingSense, boost::hash<TSenseKey> > tSense; // timing sense
+  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > cellRise, cellFall; // cell delay
+  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > riseTransition, fallTransition; // slew
+  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > risePower, fallPower; // power
 };
 
 struct Cell {
@@ -90,5 +99,6 @@ struct CellLib {
   void printCellLibDebug();
 };
 
-#endif // GALOIS_CELLLIB_H
+float extractMaxFromTableSet(CellPin::TableSet& tables);
 
+#endif // GALOIS_CELLLIB_H

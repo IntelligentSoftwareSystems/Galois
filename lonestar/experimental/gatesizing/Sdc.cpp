@@ -86,8 +86,8 @@ void SDC::read(std::string inName, CellLib *lib)
 
   // default values
   targetDelay = std::numeric_limits<float>::infinity();
-  primaryInputRiseSlew = cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellRise.at("A")->index[0][3];
-  primaryInputFallSlew = cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellFall.at("A")->index[0][3];
+  primaryInputRiseSlew = cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellRise.at({"A", TIMING_SENSE_NEGATIVE_UNATE}).at("")->index[0][3];
+  primaryInputFallSlew = cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellFall.at({"A", TIMING_SENSE_NEGATIVE_UNATE}).at("")->index[0][3];
   primaryOutputTotalPinC = 2.0 * cellLib->cells.at("INV_X1")->inPins.at("A")->capacitance;
   primaryOutputTotalNetC = cellLib->defaultWireLoad->wireCapacitance(1);
 

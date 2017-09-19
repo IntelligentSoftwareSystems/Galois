@@ -159,12 +159,19 @@ static void readLutTemplate(FileReader& fRd, CellLib *cellLib) {
   } // end for token
 } // end readLutTemplate
 
+static void printTimingSense(TimingSense t) {
+  std::cout << ((t == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" :
+                (t == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" :
+                (t == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
+               );
+}
+
 static void readLutForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, CellPin *cellPin) {
   fRd.nextToken(); // get "("
   fRd.nextToken(); // get ")"
   fRd.nextToken(); // get "{"
 
-  std::string relatedPinName;
+  std::string relatedPinName, whenStr;
   for (std::string token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
     if (token == "related_pin") {
       fRd.nextToken(); // get ":"
@@ -174,21 +181,30 @@ static void readLutForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, Cel
       fRd.nextToken(); // get ";"
     }
 
+    else if (token == "when") {
+      fRd.nextToken(); // get ":"
+      fRd.nextToken(); // get "\""
+      whenStr = fRd.nextToken();
+      for (token = fRd.nextToken(); token != "\""; token = fRd.nextToken()) {
+        whenStr += " " + token;
+      }
+      fRd.nextToken(); // get ";"
+    }
+
     else if (token == "timing_sense") {
       fRd.nextToken(); // get ":"
 
       token = fRd.nextToken();
       auto& mapping = cellPin->tSense;
-      if (!mapping.count(relatedPinName)) {
-        if (token == "positive_unate") {
-          mapping.insert({relatedPinName, TIMING_SENSE_POSITIVE_UNATE});
-        }
-        else if (token == "negative_unate") {
-          mapping.insert({relatedPinName, TIMING_SENSE_NEGATIVE_UNATE});
-        }
-        else {
-          mapping.insert({relatedPinName, TIMING_SENSE_NON_UNATE});
-        }
+      if (token == "positive_unate") {
+        mapping.insert({{relatedPinName, whenStr}, TIMING_SENSE_POSITIVE_UNATE});
+      }
+      else if (token == "negative_unate") {
+        mapping.insert({{relatedPinName, whenStr}, TIMING_SENSE_NEGATIVE_UNATE});
+      }
+      else {
+        // not handling unateness other than positive/negative unate
+        mapping.insert({{relatedPinName, whenStr}, TIMING_SENSE_NON_UNATE});
       }
       fRd.nextToken(); // get ";"
     }
@@ -203,58 +219,52 @@ static void readLutForCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell, Cel
                       (token == "rise_transition") ? cellPin->riseTransition :
                       (token == "fall_power") ? cellPin->fallPower : cellPin->risePower;
 
-      // skip the mapping if it exists
-      if (mapping.count(relatedPinName)) {
-        do {
-          token = fRd.nextToken();
-        } while (token != "}");
-      }
+      auto tSense = cellPin->tSense[{relatedPinName, whenStr}];
+      auto& tables = mapping[{relatedPinName, tSense}];
 
-      // read in the table
-      else {
-        fRd.nextToken(); // get "("
+      // read in the new table
+      fRd.nextToken(); // get "("
 
-        LUT *lut = new LUT;
-        lut->lutTemplate = cellLib->lutTemplates.at(fRd.nextToken());
-        mapping.insert({relatedPinName, lut});
+      LUT *lut = new LUT;
+      lut->lutTemplate = cellLib->lutTemplates.at(fRd.nextToken());
+      tables.insert({whenStr, lut});
 
-        fRd.nextToken(); // get ")"
-        fRd.nextToken(); // get "{"
+      fRd.nextToken(); // get ")"
+      fRd.nextToken(); // get "{"
 
-        for (token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
-          if (token == "index_1" || token == "index_2") {
-            fRd.nextToken(); // get "("
-            fRd.nextToken(); // get "\""
+      for (token = fRd.nextToken(); token != "}"; token = fRd.nextToken()) {
+        if (token == "index_1" || token == "index_2") {
+          fRd.nextToken(); // get "("
+          fRd.nextToken(); // get "\""
 
-            std::vector<float> v;
-            for (token = fRd.nextToken(); token != "\""; token = fRd.nextToken()) {
+          std::vector<float> v;
+          for (token = fRd.nextToken(); token != "\""; token = fRd.nextToken()) {
+            v.push_back(stof(token));
+          }
+          lut->index.push_back(v);
+
+          fRd.nextToken(); // get ")"
+          fRd.nextToken(); // get ";"            
+        }
+        else if (token == "values") {
+          fRd.nextToken(); // get "("
+
+          std::vector<float> v;
+          for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
+           if (token == "\\") {
+              lut->value.push_back(v);
+              v.clear();
+            } else if (token == "\"") {
+              // skip
+            } else {
               v.push_back(stof(token));
             }
-            lut->index.push_back(v);
-
-            fRd.nextToken(); // get ")"
-            fRd.nextToken(); // get ";"            
           }
-          else if (token == "values") {
-            fRd.nextToken(); // get "("
-
-            std::vector<float> v;
-            for (token = fRd.nextToken(); token != ")"; token = fRd.nextToken()) {
-             if (token == "\\") {
-                lut->value.push_back(v);
-                v.clear();
-              } else if (token == "\"") {
-                // skip
-              } else {
-                v.push_back(stof(token));
-              }
-            }
-            lut->value.push_back(v);
-            v.clear();
-            fRd.nextToken(); // get ";"
-          }
-        } // end for token
-      }
+          lut->value.push_back(v);
+          v.clear();
+          fRd.nextToken(); // get ";"
+        }
+      } // end for token
     }
 
     else if (token == "fall_constraint" || token == "rise_constraint") {
@@ -476,8 +486,13 @@ static void printLutTemplate(LutTemplate *lutT) {
   std::cout << "}" << std::endl;
 }
 
-static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
-  std::cout << "      " << tableName << "(" << pinName << ", " << lut->lutTemplate->name << ") {" << std::endl;
+static void printLUT(LUT *lut, std::string tableName, CellPin::TableSetKey& key, std::string whenStr) {
+  std::string pinName = key.first;
+  TimingSense t = key.second;
+
+  std::cout << "      " << tableName << "(" << pinName << ", ";
+  printTimingSense(t);
+  std::cout << " when " << whenStr << ", " << lut->lutTemplate->name << ") {" << std::endl;
 
   for (size_t j = 0; j < lut->index.size(); j++) {
     std::cout << "        index_" << j << " (";
@@ -497,6 +512,12 @@ static void printLUT(LUT *lut, std::string tableName, std::string pinName) {
   }
   std::cout << "        )" << std::endl;
   std::cout << "      }" << std::endl;
+}
+
+static void printTableSet(CellPin::TableSet& tables, std::string tableName, CellPin::TableSetKey key) {
+  for (auto& i: tables) {
+    printLUT(i.second, tableName, key, i.first);
+  }
 }
 
 static void printCell(Cell *c) {
@@ -526,32 +547,31 @@ static void printCell(Cell *c) {
     std::cout << "      direction: output" << std::endl;
 
     for (auto i: pin->tSense) {
-      auto inPinName = i.first;
+      auto inPinName = i.first.first;
+      auto inPinWhen = i.first.second;
       auto inPinSense = i.second;
       std::cout << "      timing sense for input pin " << inPinName << ": ";
-      std::cout << ((inPinSense == TIMING_SENSE_POSITIVE_UNATE) ? "positive_unate" : 
-                    (inPinSense == TIMING_SENSE_NEGATIVE_UNATE) ? "negative_unate" : 
-                    (inPinSense == TIMING_SENSE_NON_UNATE) ? "non-unate" : "undefined"
-                   ) << std::endl;
+      printTimingSense(inPinSense);
+      std::cout << " when " << ((inPinWhen == "") ? "(null)" : inPinWhen) << std::endl;
     }
 
     for (auto i: pin->cellRise) {
-      printLUT(i.second, "cell_rise", i.first);
+      printTableSet(i.second, "cell_rise", i.first);
     }
     for (auto i: pin->cellFall) {
-      printLUT(i.second, "cell_fall", i.first);
+      printTableSet(i.second, "cell_fall", i.first);
     }
     for (auto i: pin->fallTransition) {
-      printLUT(i.second, "fall_transition", i.first);
+      printTableSet(i.second, "fall_transition", i.first);
     }
     for (auto i: pin->riseTransition) {
-      printLUT(i.second, "rise_transition", i.first);
+      printTableSet(i.second, "rise_transition", i.first);
     }
     for (auto i: pin->fallPower) {
-      printLUT(i.second, "fall_power", i.first);
+      printTableSet(i.second, "fall_power", i.first);
     }
     for (auto i: pin->risePower) {
-      printLUT(i.second, "rise_power", i.first);
+      printTableSet(i.second, "rise_power", i.first);
     }
     std::cout << "    }" << std::endl;
   }
@@ -599,22 +619,34 @@ void CellLib::clear() {
 
       // free LUTs
       for (auto j: pin->cellRise) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
       for (auto j: pin->cellFall) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
       for (auto j: pin->riseTransition) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
       for (auto j: pin->fallTransition) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
       for (auto j: pin->risePower) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
       for (auto j: pin->fallPower) {
-        delete j.second;
+        for (auto k: j.second) {
+          delete k.second;
+        }
       }
     }
 
@@ -627,4 +659,15 @@ CellLib::CellLib() {
 
 CellLib::~CellLib() {
   clear();
+}
+
+float extractMaxFromTableSet(CellPin::TableSet& tables, std::vector<float>& param) {
+  float r = -std::numeric_limits<float>::infinity();
+  for (auto& i: tables) {
+    float tmp = i.second->lookup(param);
+    if (tmp > r) {
+      r = tmp;
+    }
+  }
+  return r;
 }
