@@ -25,6 +25,8 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+// TODO GPU code needed
+
 /******************************************************************************/
 /* Sync code/calls was manually written, not compiler generated */
 /******************************************************************************/
@@ -242,7 +244,7 @@ struct InitializeIteration {
                        local_current_src_node(_local_current_src_node),
                        graph(_graph){}
 
-  /* Reset necessary graph metadata for next iteration of SSSP/BFS */
+  /* Reset necessary graph metadata for next iteration of SSSP */
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
@@ -371,7 +373,7 @@ struct SSSP {
     } while (accum_result);
   }
 
-  /* Does SSSP (actually BFS at the moment) */
+  /* Does SSSP */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
@@ -1065,14 +1067,14 @@ float Sanity::current_min = std::numeric_limits<float>::max() / 4;
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportParam("BC", "Max Iterations", 
+                                  (unsigned long)maxIterations);
     }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
@@ -1273,10 +1275,6 @@ int main(int argc, char** argv) {
       free(v_out);
     }
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-     
 
     return 0;
   } catch(const char* c) {
