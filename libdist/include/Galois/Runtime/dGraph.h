@@ -2238,7 +2238,7 @@ private:
      SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
    void sync_send(std::string loopName) {
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-     Galois::StatTimer StatTimer_SendTime(syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" +  loopName + "_" + get_run_identifier()).c_str());
      StatTimer_SendTime.start();
      auto &sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
@@ -2343,7 +2343,7 @@ private:
    void sync_recv(std::string loopName, unsigned int num_messages = 1) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-     Galois::StatTimer StatTimer_RecvTime(syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier());
+     Galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" +  loopName + "_" + get_run_identifier()).c_str());
      StatTimer_RecvTime.start();
      for (unsigned num = 0; num < num_messages; ++num) {
        for (unsigned x = 0; x < net.Num; ++x) {
