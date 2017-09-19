@@ -325,9 +325,9 @@ struct PageRank {
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
       
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Tsum("PageRank", 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-          (unsigned long)dga.read_local(), 0);
+          (unsigned long)dga.read_local());
 
       //reduced = dga.reduce();
       //printf("[%d] iter %u local is %u\n", _graph.id, _num_iterations, dga.read_local());
@@ -336,9 +336,9 @@ struct PageRank {
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Serial("PageRank", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations, 0);
+        (unsigned long)_num_iterations);
     }
   }
 
@@ -438,7 +438,8 @@ struct PageRankSanity {
                      DGA_max_residual,
                      DGA_min_residual
                    ), 
-                   Galois::loopname("PageRankSanity"));
+                   Galois::loopname("PageRankSanity"),
+                   Galois::no_stats());
 
     DGA_max = current_max;
     DGA_min = current_min;
@@ -507,18 +508,18 @@ float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() /
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
 
     {
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportParam("PageRank", "Max Iterations", 
+                                  (unsigned long)maxIterations);
       std::ostringstream ss;
       ss << tolerance;
-      Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
+      Galois::Runtime::reportParam("PageRank", "Tolerance", ss.str());
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
@@ -665,10 +666,6 @@ int main(int argc, char** argv) {
     }
 
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch (const char* c) {
