@@ -204,9 +204,9 @@ struct FirstItr_ConnectedComp{
     _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                 Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
   
-    Galois::Runtime::reportStat("(NULL)", 
+    Galois::Runtime::reportStat_Tsum("ConnectedComp", 
       "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-      _graph.end() - _graph.begin(), 0);
+      _graph.end() - _graph.begin());
   }
 
   void operator()(GNode src) const {
@@ -270,16 +270,16 @@ struct ConnectedComp {
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
       
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Tsum("ConnectedComp", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-        (unsigned long)dga.read_local(), 0);
+        (unsigned long)dga.read_local());
       ++_num_iterations;
     } while((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Serial("ConnectedComp", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations, 0);
+        (unsigned long)_num_iterations);
     }
   }
 
@@ -339,7 +339,8 @@ struct SourceComponentSize {
 
     Galois::do_all(_graph.begin(), _graph.end(), 
                    SourceComponentSize(src_comp, &_graph, dga), 
-                   Galois::loopname("SourceComponentSize"));
+                   Galois::loopname("SourceComponentSize"),
+                   Galois::no_stats());
 
     uint64_t num_in_component = dga.reduce();
 
@@ -369,14 +370,14 @@ struct SourceComponentSize {
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-        (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportParam("(NULL)", "Max Iterations", 
+        (unsigned long)maxIterations);
     }
     Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
@@ -502,12 +503,7 @@ int main(int argc, char** argv) {
       }
 #endif
     }
-
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch(const char* c) {
