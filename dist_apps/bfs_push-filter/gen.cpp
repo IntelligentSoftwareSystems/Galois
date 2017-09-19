@@ -223,7 +223,7 @@ struct FirstItr_BFS{
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     
-    Galois::Runtime::reportStat_Tsum("FirstItr_BFS", 
+    Galois::Runtime::reportStat_Tsum("BFS", 
        _graph.get_run_identifier("NUM_WORK_ITEMS"), __end - __begin);
   }
 

@@ -1067,16 +1067,15 @@ public:
     //print
     if (net.ID == 0) {
       float replication_factor = (float)(global_total_mirror_nodes + totalNodes)/(float)totalNodes;
-      Galois::Runtime::reportStat_Serial("(NULL)", "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
-
+      Galois::Runtime::reportStat_Serial("dGraph", "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
       float replication_factor_new = (float)(global_total_mirror_nodes + global_total_owned_nodes - total_isolatedNodes)/(float)(global_total_owned_nodes - total_isolatedNodes);
-      Galois::Runtime::reportStat_Serial("(NULL)", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), replication_factor_new);
+      Galois::Runtime::reportStat_Serial("dGraph", "REPLICATION_FACTOR_NEW_" + get_run_identifier(), replication_factor_new);
 
-      Galois::Runtime::reportStat_Serial("(NULL)", "TOTAL_NODES_" + get_run_identifier(), totalNodes);
-      Galois::Runtime::reportStat_Serial("(NULL)", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
-      Galois::Runtime::reportStat_Serial("(NULL)", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_mirror_nodes);
-      Galois::Runtime::reportStat_Serial("(NULL)", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
+      Galois::Runtime::reportStat_Serial("dGraph", "TOTAL_NODES_" + get_run_identifier(), totalNodes);
+      Galois::Runtime::reportStat_Serial("dGraph", "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
+      Galois::Runtime::reportStat_Serial("dGraph", "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), global_total_mirror_nodes);
+      Galois::Runtime::reportStat_Serial("dGraph", "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
     }
   }
 
@@ -3189,20 +3188,20 @@ public:
 #ifdef __TMPFS__
 #ifdef __CHECKPOINT_NO_FSYNC__
     std::string chkPt_fileName = "/dev/shm/CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    Galois::Runtime::reportParam("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    Galois::Runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
 #else
     std::string chkPt_fileName = "/dev/shm/CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    Galois::Runtime::reportParam("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    Galois::Runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
 #endif
-    Galois::Runtime::reportParam("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    Galois::Runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
 #else
 
 #ifdef __CHECKPOINT_NO_FSYNC__
     std::string chkPt_fileName = "CheckPointFiles_no_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    Galois::Runtime::reportParam("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    Galois::Runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
 #else
     std::string chkPt_fileName = "CheckPointFiles_fsync_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    Galois::Runtime::reportParam("(NULL)", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    Galois::Runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
 #endif
 #endif
 
