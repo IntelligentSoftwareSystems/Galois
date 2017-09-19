@@ -30,7 +30,12 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
+#include "Galois/Runtime/Statistics.h"
+
+#include "boost/utility.hpp"
+
 #include <chrono>
+#include <limits>
 
 #include <cstdio>
 #include <ctime>
@@ -108,6 +113,158 @@ public:
 };
 
 
+//! Galois Timer that automatically reports stats upon destruction
+//! Provides statistic interface around timer
+class StatTimer : public TimeAccumulator {
+  const char* name;
+  const char* region;
+  bool valid;
+
+protected:
+  void init(const char* const n, const char* const l, bool s) {
+    name = n ? n : "Time";
+    region = l? l : "(NULL)";
+    valid = false;
+    if (s)
+      start();
+  }
+
+public:
+  StatTimer(const char* const n) { init(n, nullptr, false); }
+  StatTimer(const char* const n, start_now_t t) { init(n, nullptr, true); }
+
+  StatTimer(const char* const n, const char* const l) { init(n, l, false); }
+  StatTimer(const char* const n, const char* const l, start_now_t t) { init(n, l, true); }
+
+  StatTimer() { init(nullptr, nullptr, false); }
+  StatTimer(start_now_t t) { init(nullptr, nullptr, true); }
+
+  ~StatTimer() {
+    if (valid)
+      stop();
+    if (TimeAccumulator::get()) // only report non-zero stat
+      Galois::Runtime::reportStat_Tmax(region, name, get());
+  }
+
+  void start() {
+    TimeAccumulator::start();
+    valid = true;
+  }
+
+  void stop() {
+    valid = false;
+    TimeAccumulator::stop();
+  }
+};
+
+template <bool Enable> 
+class CondStatTimer: public StatTimer {
+public:
+  CondStatTimer(const char* name): StatTimer("Time", name) {}
+};
+
+template <> class CondStatTimer<false> {
+public:
+
+  CondStatTimer(const char* name) {}
+
+  void start(void) const {}
+
+  void stop(void) const {}
+};
+
+template <typename F>
+void timeThis(F& f, const char* const name) {
+  StatTimer t("Time", name);
+
+  t.start();
+
+  f();
+
+  t.stop();
 }
+
+
+template <bool enabled>
+class PerThreadTimer {
+
+protected:
+
+  const char* const region;
+  const char* const category;
+
+  Substrate::PerThreadStorage<ThreadTimer<enabled> > timers;
+
+
+  void reportTimes(void) {
+
+    int64_t minTime = std::numeric_limits<int64_t>::max();
+
+
+    for (unsigned i = 0; i < timers.size(); ++i) {
+
+      auto ns = timers.getRemote(i)->get_nsec();
+
+      minTime = std::min(minTime, ns);
+    }
+
+    std::string timeCat = category + std::string("-per-thread-times(ns)");
+    std::string lagCat = category + std::string("-per-thread-lag(ns)");
+
+    Galois::Substrate::getThreadPool(Galois::getActiveThreads(),
+        [&] (void) {
+          auto ns = timers.getLocal()->get_nsec();
+          auto lag = ns - minTime;
+          assert(lag > 0 && "negative time lag from min is impossible");
+
+          Galois::Runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
+          Galois::Runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
+        });
+
+    // for (unsigned i = 0; i < timers.size(); ++i) {
+// 
+      // auto ns = timers.getRemote(i)->get_nsec();
+      // auto lag = ns - minTime;
+      // assert(lag > 0 && "negative time lag from min is impossible");
+// 
+      // Galois::Runtime::reportStat(region, lagCat.c_str(), lag, i);
+      // Galois::Runtime::reportStat(region, timeCat.c_str(), ns, i);
+    // }
+  }
+
+public:
+
+  explicit PerThreadTimer(const char* const _region, const char* const _category)
+    :
+      region(_region),
+      category(_category)
+  {}
+
+  ~PerThreadTimer(void) {
+    reportTimes();
+  }
+
+  void start(void) {
+    timers.getLocal()->start();
+  }
+
+  void stop(void) {
+    timers.getLocal()->stop();
+  }
+};
+
+template<> class PerThreadTimer<false> {
+
+public:
+  explicit PerThreadTimer(const char* const _region, const char* const _category)
+  {}
+
+  void start(void) const {}
+
+  void stop(void) const {}
+
+};
+
+} // end namespace Galois
 #endif
 
