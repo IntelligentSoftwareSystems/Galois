@@ -377,7 +377,12 @@ public:
    * Sorts all outgoing edges of all nodes in parallel. Comparison is over getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
+    Galois::do_all_local(*this, [=] 
+      (GraphNode N) {
+        this->sortEdgesByDst(N, mflag);
+      },
+      Galois::do_all_steal<true>(),
+      Galois::no_stats());
   }
 
 
@@ -1233,7 +1238,8 @@ public:
                      this->outOfLineConstructAt(x);
                    }, 
                    Galois::loopname("CONSTRUCT_NODES"), 
-                   Galois::numrun("0"));
+                   Galois::numrun("0"),
+                   Galois::no_stats());
 #endif
   }
 
@@ -1255,8 +1261,7 @@ public:
    * CSR to CSC
    */
   void transpose(bool reallocate = false) {
-    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE");
-    timer.start();
+    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE"); timer.start();
 
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;
@@ -1276,7 +1281,8 @@ public:
                      edgeIndData_temp[n] = 0;
                    }, 
                    Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
-                   Galois::numrun("0"));
+                   Galois::numrun("0"),
+                   Galois::no_stats());
 
     // parallelization makes this slower
     // get destination of edge, copy to array, and  
@@ -1318,7 +1324,8 @@ public:
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
                    Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
-                   Galois::numrun("0"));
+                   Galois::numrun("0"),
+                   Galois::no_stats());
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
     // before the ith node have
@@ -1330,7 +1337,8 @@ public:
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
                      Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
-                     Galois::numrun("0"));
+                     Galois::numrun("0"),
+                     Galois::no_stats());
     }
 
     // reallocate edgeDst
@@ -1377,7 +1385,8 @@ public:
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 
                      Galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
-                     Galois::numrun("0"));
+                     Galois::numrun("0"),
+                     Galois::no_stats());
     }
 
     timer.stop();
