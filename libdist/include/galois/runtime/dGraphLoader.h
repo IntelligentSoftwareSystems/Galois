@@ -39,7 +39,8 @@
  * Supported partitioning schemes
  ******************************************************************************/
 enum PARTITIONING_SCHEME {
-  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT, JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT
+  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT, 
+  JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT
 };
 
 /*******************************************************************************
@@ -54,8 +55,8 @@ static cll::opt<std::string> inputFileTranspose("graphTranspose",
                                        cll::desc("<input file, transposed>"), 
                                        cll::init(""));
 static cll::opt<bool> inputFileSymmetric("symmetricGraph",
-                                       cll::desc("Set this flag if graph is symmetric"), 
-                                       cll::init(false));
+                              cll::desc("Set this flag if graph is symmetric"), 
+                              cll::init(false));
 static cll::opt<std::string> partFolder("partFolder", 
                                         cll::desc("path to partitionFolder"), 
                                         cll::init(""));
@@ -180,7 +181,13 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 4> Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
-  
+
+  // 1 host = no concept of cut; just load from edgeCut, no transpose
+  if (net.Num == 1) {
+    return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
+                             scaleFactor, false);
+  }
+
   switch(partitionScheme) {
     case OEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
@@ -257,6 +264,22 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, false, 4> Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
 
   auto& net = galois::runtime::getSystemNetworkInterface();
+
+  // 1 host = no concept of cut; just load from edgeCut
+  if (net.Num == 1) {
+    if (inputFileTranspose.size()) {
+      return new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, net.Num, 
+                               scaleFactor, false);
+    } else {
+      fprintf(stderr, "WARNING: Loading transpose graph through in-memory "
+                      "transpose to iterate over in-edges: pass in transpose "
+                      "graph with -graphTranspose to avoid unnecessary "
+                      "overhead.\n");
+      return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
+                               scaleFactor, true);
+    }
+  }
+
 
   switch(partitionScheme) {
     case OEC:
