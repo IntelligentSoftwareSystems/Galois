@@ -345,9 +345,9 @@ struct KCoreStep1 {
     } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Serial("KCore", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)iterations, 0);
+        (unsigned long)iterations);
     }
 
   }
@@ -411,7 +411,8 @@ struct GetAliveDead {
     Galois::do_all(_graph.begin(), _graph.end(), 
                    GetAliveDead(&_graph, dga1, dga2), 
                    Galois::loopname("GetAliveDead"),
-                   Galois::numrun(_graph.get_run_identifier()));
+                   Galois::numrun(_graph.get_run_identifier()),
+                   Galois::no_stats());
 
     uint32_t num_alive = dga1.reduce();
     uint32_t num_dead = dga2.reduce();
@@ -443,14 +444,14 @@ struct GetAliveDead {
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportParam("KCore", "Max Iterations", 
+                                  (unsigned long)maxIterations);
     }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
@@ -598,10 +599,6 @@ int main(int argc, char** argv) {
     #endif
     }
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch(const char* c) {

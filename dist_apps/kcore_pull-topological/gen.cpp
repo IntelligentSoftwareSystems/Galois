@@ -249,50 +249,6 @@ struct InitializeGraph {
 };
 
 
-///* Use the trim value (i.e. number of incident nodes that have been removed)
-// * to update degrees.
-// * Called by KCore */
-//struct DegreeUpdate {
-//  Graph* graph;
-//
-//  DegreeUpdate(Graph* _graph) : graph(_graph){}
-//
-//  void static go(Graph& _graph){
-//    auto& allNodes = _graph.allNodesRange();
-//  #ifdef __GALOIS_HET_CUDA__
-//    if (personality == GPU_CUDA) {
-//      std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep2_" + 
-//                           (_graph.get_run_identifier()));
-//      Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-//      StatTimer_cuda.start();
-//      KCoreStep2_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
-//      StatTimer_cuda.stop();
-//    } else if (personality == CPU)
-//  #endif
-//     Galois::do_all(
-//       allNodes.begin(), allNodes.end(),
-//       DegreeUpdate{ &_graph },
-//       Galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
-//       Galois::timeit(),
-//       Galois::no_stats()
-//     );
-//  }
-//
-//  void operator()(GNode src) const {
-//    NodeData& src_data = graph->getData(src);
-//
-//    // we currently do not care about degree for dead nodes, 
-//    // so we ignore those (i.e. if flag isn't set, do nothing)
-//    if (src_data.flag) {
-//      if (src_data.trim > 0) {
-//        src_data.current_degree = src_data.current_degree - src_data.trim;
-//      }
-//    }
-//
-//    src_data.trim = 0;
-//  }
-//};
-
 /* Updates liveness of a node + updates flag that says if node has been pulled 
  * from */
 struct LiveUpdate {
@@ -317,8 +273,6 @@ struct LiveUpdate {
       Galois::timeit(),
       Galois::no_stats()
     );
-
-    // TODO hand optimized can merge trim decrement into this operator.....
 
     // no sync necessary as all nodes should have updated
   }
@@ -374,22 +328,6 @@ struct KCore {
     do {
       _graph.set_num_iter(iterations);
 
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        // TODO calls wrong
-        std::string impl_str("CUDA_DO_ALL_IMPL_KCoreStep1_" + 
-                             (_graph.get_run_identifier()));
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
-        StatTimer_cuda.start();
-        int __retval = 0;
-        // TODO kcore step 1 doesn't exist anymore
-        //KCoreStep1_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-        //                __retval, k_core_num, cuda_ctx);
-        dga += __retval;
-        StatTimer_cuda.stop();
-      } else if (personality == CPU)
-    #endif
-
       Galois::do_all_local(
         nodesWithEdges,
         KCore{ &_graph },
@@ -402,9 +340,6 @@ struct KCore {
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCore");
 
-      //// handle trimming (locally on each node)
-      //DegreeUpdate::go(_graph);
-
       // update live/deadness
       LiveUpdate::go(_graph, dga);
 
@@ -412,9 +347,9 @@ struct KCore {
     } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+      Galois::Runtime::reportStat_Serial("KCore", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)iterations, 0);
+        (unsigned long)iterations);
     }
   }
 
@@ -506,14 +441,14 @@ struct GetAliveDead {
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    Galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
+      Galois::Runtime::reportParam("KCore", "Max Iterations", 
+                                  (unsigned long)maxIterations);
     }
 
     Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
@@ -662,10 +597,6 @@ int main(int argc, char** argv) {
     #endif
     }
     }
-    Galois::Runtime::getHostBarrier().wait();
-    G.printDistStats();
-    Galois::Runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch(const char* c) {
