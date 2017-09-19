@@ -47,7 +47,7 @@ struct start_now_t {};
 constexpr start_now_t start_now = start_now_t();
 
 //! A simple timer
-class Timer {
+class Timer: private boost::noncopyable {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;
   std::chrono::time_point<clockTy> startT, stopT;
@@ -62,7 +62,7 @@ public:
 
 //! A multi-start time accumulator.
 //! Gives the final runtime for a series of intervals
-class TimeAccumulator {
+class TimeAccumulator: private boost::noncopyable {
   Timer ltimer;
   unsigned long acc;
 public:
@@ -76,7 +76,7 @@ public:
 };
 
 template <bool enabled> 
-class ThreadTimer {
+class ThreadTimer: private boost::noncopyable {
   timespec m_start;
   timespec m_stop;
   int64_t  m_nsec;
@@ -186,7 +186,7 @@ void timeThis(F& f, const char* const name) {
 
 
 template <bool enabled>
-class PerThreadTimer {
+class PerThreadTimer: private boost::noncopyable {
 
 protected:
 
