@@ -64,7 +64,7 @@ namespace {
           rewriter(rewriter), g_info(_g_info) {}
 
       virtual void run(const MatchFinder::MatchResult &Results) {
-        auto& global_var = Results.Nodes.getNodeAs<clang::VarDecl>("globalVar");
+        auto global_var = Results.Nodes.getNodeAs<clang::VarDecl>("globalVar");
         // get global var name + type and save it to GlobalInfo object
         // which is passed out of this matcher
         if (global_var) {
@@ -118,14 +118,14 @@ namespace {
           string str_global_constructor = "global_recordDecl_constructor_" + i.GLOBAL_NAME;
           string str_global_struct = "global_recordDecl_" + i.GLOBAL_NAME;
 
-          auto& global_decl = Results.Nodes.getNodeAs<clang::DeclRefExpr>(
+          auto global_decl = Results.Nodes.getNodeAs<clang::DeclRefExpr>(
                                 str_global_use
                               );
 
           if (global_decl) {
-            auto& global_use_struct = 
+            auto global_use_struct = 
               Results.Nodes.getNodeAs<clang::CXXRecordDecl>(str_global_struct);
-            auto& global_recordDecl_constructor = 
+            auto global_recordDecl_constructor = 
               Results.Nodes.getNodeAs<clang::CXXConstructorDecl>(
                 str_global_constructor
               );
@@ -182,19 +182,19 @@ namespace {
                                          j.first.GLOBAL_TYPE + 
                                          i;
 
-            auto& struct_constructor = 
+            auto struct_constructor = 
               Results.Nodes.getNodeAs<clang::CXXConstructorDecl>(
                 str_struct_constructor
               );
-            auto& struct_field = 
+            auto struct_field = 
               Results.Nodes.getNodeAs<clang::FieldDecl>(
                 str_struct_field_decl
               );
-            auto& struct_contr_parmVarDecl = 
+            auto struct_contr_parmVarDecl = 
               Results.Nodes.getNodeAs<clang::ParmVarDecl>(
                 str_struct_contr_parmVarDecl
               );
-            auto& struct_ctorInitializer = 
+            auto struct_ctorInitializer = 
               Results.Nodes.getNodeAs<clang::CXXCtorInitializer>(
                 str_ctorInitializer
               );
@@ -256,11 +256,11 @@ namespace {
               j.first.GLOBAL_TYPE + i;
 
 
-            auto& struct_constr_declRef = 
+            auto struct_constr_declRef = 
               Results.Nodes.getNodeAs<clang::DeclRefExpr>(
                 str_struct_constr_call
               );
-            auto& struct_constr_declRef_noUOp = 
+            auto struct_constr_declRef_noUOp = 
               Results.Nodes.getNodeAs<clang::DeclRefExpr>(
                 str_struct_constr_call_noUOp
               );
