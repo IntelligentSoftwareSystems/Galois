@@ -1,5 +1,29 @@
-/**
- * Author : Gurbinder Gill (gurbinder533@gmail.com)
+/** clang analysis plugin for Galois programs -*- C++ -*-
+ *
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @section Description
+ *
+ * TODO
+ *
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 #include <sstream>
 #include <climits>
@@ -156,7 +180,6 @@ namespace {
   }
 
   // TODO separate out bitset macro from syncer pull call
-  // TODO counter now completely unnecessary after sync call revisions
 
   /**
    * Construct the broadcast and bitset macros given writeset with field info
@@ -476,7 +499,6 @@ namespace {
           SSHelperStructFunctions.str(string());
           SSHelperStructFunctions.clear();
 
-          // TODO need sync on demand, not regular sync
           // Adding sync calls for write set
           stringstream SSAfter;
           for(auto& i : syncCall_map){
@@ -1073,8 +1095,10 @@ namespace {
             isExpansionInMainFile(), 
             callee(
               functionDecl(
-                anyOf(hasName("Galois::do_all"),
-                hasName("Galois::do_all_local"))
+                anyOf(
+                  hasName("Galois::do_all"),
+                  hasName("Galois::do_all_local")
+                )
               )
             ), 
             hasAncestor(recordDecl().bind("class"))
