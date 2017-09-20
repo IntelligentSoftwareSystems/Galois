@@ -45,7 +45,7 @@ extern "C" {
 #include <string>
 #include "galois/opencl/CL_Errors.h"
 #include "galois/opencl/CL_DeviceManager.h"
-#include "galois/opencl/Arrays/Arrays.h"
+#include "galois/opencl/arraysArrays.h"
 //////////////////////////////////////////
 #ifndef GOPT_CL_UTIL_H_
 #define GOPT_CL_UTIL_H_

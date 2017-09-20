@@ -72,9 +72,9 @@ DEBUG_CODE(
  *
  ********************************************************************************/
 }      //namespace galois
-#include "galois/opencl/Arrays/ArrayImpl.h"
-#include "galois/opencl/Arrays/MultiDeviceArray.h"
-#include "galois/opencl/Arrays/CPUArray.h"
-#include "galois/opencl/Arrays/GPUArray.h"
-#include "galois/opencl/Arrays/OnDemandArray.h"
+#include "galois/opencl/arraysArrayImpl.h"
+#include "galois/opencl/arraysMultiDeviceArray.h"
+#include "galois/opencl/arraysCPUArray.h"
+#include "galois/opencl/arraysGPUArray.h"
+#include "galois/opencl/arraysOnDemandArray.h"
 #endif /* ARRAY_WRAPPER_H_ */

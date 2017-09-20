@@ -46,7 +46,7 @@ extern "C" {
 #include "galois/opencl/CL_Util.h"
 #include "galois/opencl/CL_Context.h"
 #include "galois/opencl/CL_DeviceManager.h"
-#include "galois/opencl/Arrays/Arrays.h"
+#include "galois/opencl/arraysArrays.h"
 #include "galois/opencl/graphs/Graphs.h"
 //////////////////////////////////////////
 #ifndef GOPT_CL_HEADER_H_
