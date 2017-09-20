@@ -46,7 +46,7 @@
 #include <cstdlib>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 namespace detail {
 

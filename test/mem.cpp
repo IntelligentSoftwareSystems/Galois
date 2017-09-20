@@ -2,7 +2,7 @@
 #include "Galois/gIO.h"
 
 using namespace galois::Runtime;
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 struct element {
   unsigned val;

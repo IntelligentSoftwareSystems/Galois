@@ -37,11 +37,11 @@
 
 namespace {
 
-class CountingBarrier: public galois::Substrate::Barrier {
+class CountingBarrier: public galois::substrate::Barrier {
   std::atomic<unsigned> count;
   std::atomic<bool> sense;
   unsigned num;
-  std::vector<galois::Substrate::CacheLineStorage<bool> > local_sense;
+  std::vector<galois::substrate::CacheLineStorage<bool> > local_sense;
 
   void _reinit(unsigned val) {
     count = num = val;
@@ -61,13 +61,13 @@ public:
   virtual void reinit(unsigned val) { _reinit(val); }
 
   virtual void wait() {
-    bool& lsense = local_sense.at(galois::Substrate::ThreadPool::getTID()).get();
+    bool& lsense = local_sense.at(galois::substrate::ThreadPool::getTID()).get();
     lsense = !lsense;
     if (--count == 0) {
       count = num;
       sense = lsense;
     } else {
-      while (sense != lsense) { galois::Substrate::asmPause(); }
+      while (sense != lsense) { galois::substrate::asmPause(); }
     }
   }
 
@@ -76,7 +76,7 @@ public:
 
 }
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createCountingBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createCountingBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new CountingBarrier(activeThreads));
 }
 

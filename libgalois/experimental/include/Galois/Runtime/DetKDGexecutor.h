@@ -197,7 +197,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -205,7 +205,7 @@ void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoo
 
   executor.execute (initRange, kdgType);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 }
 
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
@@ -314,7 +314,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname) {
 
-  galois::Substrate::getThreadPool().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool().burnPower (galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -322,7 +322,7 @@ void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodF
 
   executor.execute (initRange);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 }
 
 } //end namespace runtime

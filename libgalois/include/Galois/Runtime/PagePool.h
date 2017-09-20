@@ -74,8 +74,8 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef galois::Substrate::PtrLock<FreeNode> HeadPtr;
-typedef galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
+typedef galois::substrate::PtrLock<FreeNode> HeadPtr;
+typedef galois::substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
 template <typename _UNUSED=void>
@@ -83,21 +83,21 @@ class PageAllocState {
   std::deque<std::atomic<int>> counts;
   std::vector<HeadPtrStorage> pool;
   std::unordered_map<void*, int> ownerMap;
-  galois::Substrate::SimpleLock mapLock;
+  galois::substrate::SimpleLock mapLock;
 
   void* allocFromOS() {
-    void* ptr = galois::Substrate::allocPages(1, true);
+    void* ptr = galois::substrate::allocPages(1, true);
     assert(ptr);
-    auto tid = galois::Substrate::ThreadPool::getTID();
+    auto tid = galois::substrate::ThreadPool::getTID();
     counts[tid] += 1;
-    std::lock_guard<galois::Substrate::SimpleLock> lg(mapLock);
+    std::lock_guard<galois::substrate::SimpleLock> lg(mapLock);
     ownerMap[ptr] = tid;
     return ptr;
   }
 
 public:
   PageAllocState() { 
-    auto num = galois::Substrate::getThreadPool().getMaxThreads();
+    auto num = galois::substrate::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
   }
@@ -111,7 +111,7 @@ public:
   }
 
   void* pageAlloc() {
-    auto tid = galois::Substrate::ThreadPool::getTID();
+    auto tid = galois::substrate::ThreadPool::getTID();
     HeadPtr& hp = pool[tid].data;
     if (hp.getValue()) {
       hp.lock();

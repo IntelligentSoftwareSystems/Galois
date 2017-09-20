@@ -67,7 +67,7 @@ struct Body : public Node {
  * A node in an octree is either an internal node or a leaf.
  */
 struct Octree : public Node {
-  std::array<galois::Substrate::PtrLock<Node>, 8> child;
+  std::array<galois::substrate::PtrLock<Node>, 8> child;
   char cLeafs;
   char nChildren;
 

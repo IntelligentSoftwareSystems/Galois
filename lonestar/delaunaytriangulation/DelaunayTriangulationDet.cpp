@@ -452,7 +452,7 @@ static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
 
 //! Streaming point distribution 
 struct GenerateRounds {
-  typedef galois::Substrate::PerThreadStorage<unsigned> CounterTy;
+  typedef galois::substrate::PerThreadStorage<unsigned> CounterTy;
 
   const PointList& points;
   size_t log2;
@@ -698,7 +698,7 @@ int main(int argc, char** argv) {
   case detDisjoint: name = "detDisjoint"; break;
   default: name = "unknown"; break;
   }
-  galois::Substrate::gInfo("Algorithm ", name);
+  galois::substrate::gInfo("Algorithm ", name);
   
   galois::StatTimer T;
   T.start();

@@ -3621,11 +3621,11 @@ public:
     const uint32_t* thread_ranges = graph.getThreadRanges();
 
     if (thread_ranges) {
-      uint32_t my_thread_id = galois::Substrate::ThreadPool::getTID();
+      uint32_t my_thread_id = galois::substrate::ThreadPool::getTID();
       return begin() + thread_ranges[my_thread_id];
     } else {
       return galois::block_range(begin(), end(),
-                                 galois::Substrate::ThreadPool::getTID(),
+                                 galois::substrate::ThreadPool::getTID(),
                                  galois::runtime::activeThreads).first;
     }
   }
@@ -3641,7 +3641,7 @@ public:
     const uint32_t* thread_ranges = graph.getThreadRanges();
 
     if (thread_ranges) {
-      uint32_t my_thread_id = galois::Substrate::ThreadPool::getTID();
+      uint32_t my_thread_id = galois::substrate::ThreadPool::getTID();
       local_iterator to_return = begin() +
                                  thread_ranges[my_thread_id + 1];
 
@@ -3655,7 +3655,7 @@ public:
       return to_return;
     } else {
       return galois::block_range(begin(), end(),
-                                 galois::Substrate::ThreadPool::getTID(),
+                                 galois::substrate::ThreadPool::getTID(),
                                  galois::runtime::activeThreads).second;
     }
   }

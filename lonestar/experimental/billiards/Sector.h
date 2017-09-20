@@ -41,7 +41,7 @@ class Sector: public CollidingObject {
 public: 
   using Ball_t = BallSectored;
 
-  using Lock_t = galois::Substrate::SimpleLock;
+  using Lock_t = galois::substrate::SimpleLock;
 
   Lock_t mutex;
 

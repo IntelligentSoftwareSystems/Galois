@@ -36,14 +36,14 @@
 
 static void endPeriod() {
   int val;
-  if (galois::Substrate::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
+  if (galois::substrate::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
     exit(val);
   }
 }
 
 static void beginPeriod() {
   int val;
-  if (galois::Substrate::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
+  if (galois::substrate::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
     exit(val);
   }
 }
@@ -54,14 +54,14 @@ static void beginPeriod() {
 namespace vtune {
 static bool isOn;
 static void begin() {
-  if (!isOn && galois::Substrate::ThreadPool::getTID() == 0)
+  if (!isOn && galois::substrate::ThreadPool::getTID() == 0)
     __itt_resume();
   isOn = true;
   galois::gDebug("vtune sampling started");
 }
 
 static void end() {
-  if (isOn && galois::Substrate::ThreadPool::getTID() == 0)
+  if (isOn && galois::substrate::ThreadPool::getTID() == 0)
     __itt_pause();
   isOn = false;
   galois::gDebug("vtune sampling stopped");
@@ -81,13 +81,13 @@ static void end() {}
 namespace hpctoolkit {
 static bool isOn;
 static void begin() {
-  if (!isOn && galois::Substrate::ThreadPool::getTID() == 0)
+  if (!isOn && galois::substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_start();
   isOn = true;
 }
 
 static void end() {
-  if (isOn && galois::Substrate::ThreadPool::getTID() == 0)
+  if (isOn && galois::substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_stop();
   isOn = false;
 }
@@ -124,7 +124,7 @@ static_assert(sizeof(papiEvents)/sizeof(*papiEvents) == sizeof(papiNames)/sizeof
     "PAPI Events != PAPI Names");
 
 static unsigned long galois_get_thread_id() {
-  return galois::Substrate::ThreadPool::getTID();
+  return galois::substrate::ThreadPool::getTID();
 }
 
 static void begin(bool mainThread) {

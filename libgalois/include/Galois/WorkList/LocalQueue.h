@@ -62,7 +62,7 @@ struct LocalQueue : private boost::noncopyable {
 
 private:
   typedef typename Local::template rethread<false> lWLTy;
-  Substrate::PerThreadStorage<lWLTy> local;
+  substrate::PerThreadStorage<lWLTy> local;
   Global global;
 
   template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>

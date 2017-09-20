@@ -37,7 +37,7 @@
 #include <cstddef>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 //size of pages
 size_t allocSize();
@@ -48,7 +48,7 @@ void* allocPages(unsigned num, bool preFault);
 //free page range
 void freePages(void* ptr, unsigned num);
 
-} // namespace Substrate
+} // namespace substrate
 } // namespace galois
 
 #endif //GALOIS_SUBSTRATE_PAGEALLOC_H

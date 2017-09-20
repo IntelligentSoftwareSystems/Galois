@@ -34,7 +34,7 @@
 
 #include "Galois/Substrate/SimpleLock.h"
 
-void galois::Substrate::SimpleLock::slow_lock() const {
+void galois::substrate::SimpleLock::slow_lock() const {
   int oldval = 0;
   do {
     while (_lock.load(std::memory_order_acquire) != 0) {

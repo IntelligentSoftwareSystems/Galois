@@ -241,7 +241,7 @@ struct OptimNItem: public OrdLocBase<OptimNItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
 
   using Factory = OrdLocFactoryBase<OptimNItem, Ctxt, CtxtCmp>;
   using HistList = galois::gstl::List<Ctxt*>;
-  using Lock_ty = galois::Substrate::SimpleLock;
+  using Lock_ty = galois::substrate::SimpleLock;
   using NF = OptimNItemFunctions<OptimNItem, Ctxt, CtxtCmp>;
 
 
@@ -839,7 +839,7 @@ protected:
 
     // t_computeGVT.start();
 
-    Substrate::PerThreadStorage<Ctxt*> perThrdMin;
+    substrate::PerThreadStorage<Ctxt*> perThrdMin;
 
     on_each_impl ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
           
@@ -906,7 +906,7 @@ protected:
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
   PerThreadBag<NItem*> abortLocations;
-  Substrate::PerThreadStorage<Ctxt*> currMinPending; // reset at the beginning of each round
+  substrate::PerThreadStorage<Ctxt*> currMinPending; // reset at the beginning of each round
 
   CtxtWL abortRoots;
   CtxtWL commitRoots;
@@ -1660,7 +1660,7 @@ protected:
   typename Base::template WindowWLwrapper<PessimOrdExecutor> winWL;
   galois::optional<T> minWinWL;
 
-  Substrate::PerThreadStorage<galois::optional<T> > currMinPending; // reset at the beginning of each round
+  substrate::PerThreadStorage<galois::optional<T> > currMinPending; // reset at the beginning of each round
   CtxtWL abortRoots;
   CtxtWL freeWL;
 
@@ -2145,12 +2145,12 @@ void for_each_ordered_spec_impl (const R& range, const Cmp& cmp, const NhFunc& n
   
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
-  Substrate::getThreadPool().burnPower (galois::getActiveThreads());
+  substrate::getThreadPool().burnPower (galois::getActiveThreads());
 
   e.push_initial (range);
   e.execute();
 
-  Substrate::getThreadPool().beKind();
+  substrate::getThreadPool().beKind();
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>

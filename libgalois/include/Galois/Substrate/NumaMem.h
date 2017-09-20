@@ -39,7 +39,7 @@
 #include <vector>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 namespace detail {
 struct largeFreer {
@@ -63,7 +63,7 @@ LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads,
                            RangeArrayTy& threadRanges, size_t elementSize);
 
 
-} // namespace Substrate
+} // namespace substrate
 } // namespace galois
 
 #endif //GALOIS_SUBSTRATE_NUMAMEM

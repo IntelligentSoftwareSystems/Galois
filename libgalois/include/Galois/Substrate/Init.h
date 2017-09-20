@@ -39,7 +39,7 @@
 #include "Galois/Substrate/Termination.h"
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 class SharedMemSubstrate {
 

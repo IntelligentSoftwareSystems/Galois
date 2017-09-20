@@ -41,7 +41,7 @@ private:
 
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef galois::Substrate::PerPackageStorage<MyMessages> Messages;
+  typedef galois::substrate::PerPackageStorage<MyMessages> Messages;
 
   galois::UserContext<WorkItem>* ctx;
   Graph* graph;
@@ -188,7 +188,7 @@ class SyncEngine {
   typedef galois::worklists::dChunkedFIFO<256> WL;
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef galois::Substrate::PerPackageStorage<MyMessages> Messages;
+  typedef galois::substrate::PerPackageStorage<MyMessages> Messages;
 
   Graph& graph;
   Operator origOp;
@@ -196,7 +196,7 @@ class SyncEngine {
   Messages messages;
   galois::LargeArray<int> scoreboard;
   galois::InsertBag<GNode> wls[2];
-  galois::Substrate::SimpleLock lock;
+  galois::substrate::SimpleLock lock;
 
   struct Gather {
     SyncEngine* self;
@@ -272,8 +272,8 @@ class SyncEngine {
     Initialize(SyncEngine* s): self(s) { }
 
     void allocateMessages() {
-      unsigned tid = galois::Substrate::ThreadPool::getTID();
-      if (!galois::Substrate::ThreadPool::isLeader() || tid == 0)
+      unsigned tid = galois::substrate::ThreadPool::getTID();
+      if (!galois::substrate::ThreadPool::isLeader() || tid == 0)
         return;
       MyMessages& m = *self->messages.getLocal();
       self->lock.lock();
@@ -284,7 +284,7 @@ class SyncEngine {
     message_type getMessage(size_t id) {
       message_type ret;
       if (NeedMessages) {
-        auto& tp = galois::Substrate::getThreadPool();
+        auto& tp = galois::substrate::getThreadPool();
         for (unsigned int i = 0; i < self->messages.size(); ++i) {
           if (!tp.isLeader(i))
             continue;

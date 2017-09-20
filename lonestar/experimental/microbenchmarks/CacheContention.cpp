@@ -64,9 +64,9 @@ static unsigned int globalAtomicCounter = 0;
 static volatile unsigned int globalCounter = 0;
 
 struct Contention {
-  galois::Substrate::Barrier& barrier;
+  galois::substrate::Barrier& barrier;
 
-  Contention(galois::Substrate::Barrier& b): barrier(b) {}
+  Contention(galois::substrate::Barrier& b): barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned int upper = timesAdd / numThreads;

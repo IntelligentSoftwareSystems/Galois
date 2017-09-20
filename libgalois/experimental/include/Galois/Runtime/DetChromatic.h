@@ -667,7 +667,7 @@ public:
       nd.priority = nd.id % MAX_LEVELS;
     };
 
-    galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
+    galois::substrate::PerThreadStorage<RNG>  perThrdRNG;
 
     // TODO: non-deterministic at the moment
     // can be fixed by making thread K call the generator
@@ -1163,7 +1163,7 @@ struct ChromaticExecutor {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
   G& graph;
   M& dagManager;
@@ -1328,14 +1328,14 @@ struct ChromaticExecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_chromatic (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
 
   ChromaticExecutor<G, M, F> executor {graph, dagManager, func, loopname};
 
   executor.execute (range);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1568,7 +1568,7 @@ struct InputGraphDAGexecutor {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
 
@@ -1772,13 +1772,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1816,7 +1816,7 @@ struct InputGraphDAGtopologyDriven {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
   G& graph;
@@ -1917,13 +1917,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphDAGtopologyDriven<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 
 }
 
@@ -2352,13 +2352,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_hybrid (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   HybridInputDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 
 }
 

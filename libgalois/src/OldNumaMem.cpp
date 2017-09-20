@@ -42,7 +42,7 @@
 static int isNumaAvailable;
 #endif
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace galois {
 namespace runtime {
@@ -119,7 +119,7 @@ int galois::runtime::numNumaAllocForNode(unsigned nodeid) {
 
 #ifdef GALOIS_USE_NUMA
 static void *allocInterleaved(size_t len, unsigned num) {
-  auto& tp = galois::Substrate::getThreadPool();
+  auto& tp = galois::substrate::getThreadPool();
   bitmask* nm = numa_allocate_nodemask();
   for (unsigned i = 0; i < num; ++i) {
     numa_bitmask_setbit(nm, tp.getOSNumaNode(i));
@@ -223,7 +223,7 @@ void* galois::runtime::largeInterleavedAlloc(size_t len, bool full) {
   bool inForEach = false;
 #else
   unsigned total = full ? getThreadPool().getMaxCores() : activeThreads;
-  bool inForEach = Substrate::getThreadPool().isRunning();
+  bool inForEach = substrate::getThreadPool().isRunning();
 #endif
   bool numaAlloc = false;
 
@@ -249,7 +249,7 @@ void* galois::runtime::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    Substrate::getThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    substrate::getThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
 #endif
   }
 

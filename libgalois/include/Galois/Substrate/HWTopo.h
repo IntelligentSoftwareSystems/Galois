@@ -36,7 +36,7 @@
 #include <vector>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 struct threadTopoInfo {
   unsigned tid; // this thread (galois id)
@@ -61,7 +61,7 @@ std::pair<machineTopoInfo,std::vector<threadTopoInfo>> getHWTopo();
 bool bindThreadSelf(unsigned osContext);
   
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif //_HWTOPO_H

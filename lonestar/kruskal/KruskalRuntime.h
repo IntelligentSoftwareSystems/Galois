@@ -74,7 +74,7 @@ struct KruskalRuntime: public Kruskal {
 
     timeInit.start ();
 
-    galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
+    galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
     galois::do_all_choice (
         galois::runtime::makeStandardRange(

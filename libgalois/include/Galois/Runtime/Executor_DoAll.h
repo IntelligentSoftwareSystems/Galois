@@ -68,7 +68,7 @@ class DoAllStealingExec {
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Substrate::SimpleLock work_mutex;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE substrate::SimpleLock work_mutex;
     unsigned id;
 
     Iter shared_beg;
@@ -81,7 +81,7 @@ class DoAllStealingExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (Substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -298,10 +298,10 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = substrate::getThreadPool();
 
     const unsigned maxT = galois::getActiveThreads ();
-    const unsigned my_pack = Substrate::ThreadPool::getPackage ();
+    const unsigned my_pack = substrate::ThreadPool::getPackage ();
     const unsigned per_pack = tp.getMaxThreads() / tp.getMaxPackages ();
 
     const unsigned pack_beg = my_pack * per_pack;
@@ -333,8 +333,8 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getThreadPool();
-    unsigned myPkg = Substrate::ThreadPool::getPackage();
+    auto& tp = substrate::getThreadPool();
+    unsigned myPkg = substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = galois::getActiveThreads ();
 
@@ -411,18 +411,18 @@ private:
 
     if (ret) { return true; }
 
-    Substrate::asmPause ();
+    substrate::asmPause ();
 
-    if (Substrate::getThreadPool().isLeader(poor.id)) {
+    if (substrate::getThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
-      Substrate::asmPause ();
+      substrate::asmPause ();
     }
 
     ret = stealOutsidePackage (poor, HALF);
     if (ret) { return true; } 
-    Substrate::asmPause ();
+    substrate::asmPause ();
 
 
     return ret;
@@ -459,9 +459,9 @@ private:
   F func;
   const char* loopname;
   Diff_ty chunk_size;
-  Substrate::PerThreadStorage<ThreadContext> workers;
+  substrate::PerThreadStorage<ThreadContext> workers;
 
-  Substrate::TerminationDetection& term;
+  substrate::TerminationDetection& term;
 
   // for stats
   PerThreadTimer<MORE_STATS> totalTime;
@@ -483,7 +483,7 @@ public:
       func (_func), 
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
       chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
-      term(Substrate::getSystemTermination(activeThreads)),
+      term(substrate::getSystemTermination(activeThreads)),
       totalTime(loopname, "Total"),
       initTime(loopname, "Init"),
       execTime(loopname, "Execute"),
@@ -502,7 +502,7 @@ public:
 
     term.initializeThread();
 
-    unsigned id = Substrate::ThreadPool::getTID();
+    unsigned id = substrate::ThreadPool::getTID();
 
     *workers.getLocal(id) = ThreadContext(id, range.local_begin(), range.local_end());
 
@@ -590,9 +590,9 @@ struct ChooseDoAllImpl {
 
     details::DoAllStealingExec<R, F, ArgsT> exec (range, func, argsTuple);
 
-    Substrate::Barrier& barrier = getBarrier(activeThreads);
+    substrate::Barrier& barrier = getBarrier(activeThreads);
 
-    Substrate::getThreadPool().run(activeThreads, 
+    substrate::getThreadPool().run(activeThreads, 
         [&exec] (void) { exec.initThread (); },
         std::ref(barrier),
         std::ref(exec));

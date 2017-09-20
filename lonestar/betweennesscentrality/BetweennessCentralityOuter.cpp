@@ -59,11 +59,11 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
-galois::Substrate::PerThreadStorage<double*> CB;
-galois::Substrate::PerThreadStorage<double*> perThreadSigma;
-galois::Substrate::PerThreadStorage<int*> perThreadD;
-galois::Substrate::PerThreadStorage<double*> perThreadDelta;
-galois::Substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
+galois::substrate::PerThreadStorage<double*> CB;
+galois::substrate::PerThreadStorage<double*> perThreadSigma;
+galois::substrate::PerThreadStorage<int*> perThreadD;
+galois::substrate::PerThreadStorage<double*> perThreadDelta;
+galois::substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
 
 struct Process {
   typedef int tt_does_not_need_aborts;

@@ -34,7 +34,7 @@
 #include <iostream>
 
 using namespace galois::Runtime;
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace {
 
@@ -391,12 +391,12 @@ public:
     sd.add(tag, buf.getVec());
   }
 
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<galois::Substrate::SimpleLock>* rlg) {
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<galois::substrate::SimpleLock>* rlg) {
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
       if (rq.hasData(tag)) {
         if (recvLock[h].try_lock()) {
-          std::unique_lock<galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
+          std::unique_lock<galois::substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
           auto buf = rq.popMsg(tag);
           if (buf) {
             ++statRecvNum;
@@ -413,7 +413,7 @@ public:
       else if (rq.getPresentTag() != ~0){
         galois::runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
         if (recvLock[h].try_lock()) {
-          std::unique_lock<galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
+          std::unique_lock<galois::substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
           auto buf = rq.popMsg(rq.getPresentTag());
           if (buf) {
             if (rlg)
@@ -475,11 +475,11 @@ public:
 
 NetworkInterface& galois::runtime::makeNetworkBuffered() {
   static std::atomic<NetworkInterfaceBuffered* > net;
-  static Substrate::SimpleLock m_mutex;
+  static substrate::SimpleLock m_mutex;
   
   auto* tmp = net.load();
   if (tmp == nullptr) {
-    std::lock_guard<Substrate::SimpleLock> lock(m_mutex);
+    std::lock_guard<substrate::SimpleLock> lock(m_mutex);
     tmp = net.load();
     if (tmp == nullptr) {
       tmp = new NetworkInterfaceBuffered();

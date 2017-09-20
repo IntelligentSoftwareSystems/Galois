@@ -65,7 +65,7 @@ class ApproxOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent> data[2048];
   
   Indexer I;
-  Substrate::PerThreadStorage<unsigned int> cursor;
+  substrate::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return 2048;
@@ -126,7 +126,7 @@ class LogOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
-  Substrate::PerThreadStorage<unsigned int> cursor;
+  substrate::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return sizeof(unsigned int)*8 + 1;
@@ -194,7 +194,7 @@ class LocalFilter {
     typename LocalTy::template rethread<false> Q;
     unsigned int current;
   };
-  Substrate::PerThreadStorage<p> localQs;
+  substrate::PerThreadStorage<p> localQs;
   Indexer I;
 
 public:
@@ -329,9 +329,9 @@ public:
   typedef T value_type;
 
 private:
-  Substrate::PerThreadStorage<typename LocalWL::template rethread<false> > localQueues;
-  Substrate::PerPackageStorage<GlobalWL> sharedQueues;
-  Substrate::PerPackageStorage<unsigned long> starvingFlags;
+  substrate::PerThreadStorage<typename LocalWL::template rethread<false> > localQueues;
+  substrate::PerPackageStorage<GlobalWL> sharedQueues;
+  substrate::PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
@@ -395,7 +395,7 @@ GALOIS_WLCOMPILECHECK(RequestHierarchy)
 
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
-  typedef Substrate::CacheLineStorage<LocalWL> paddedLocalWL;
+  typedef substrate::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
   GFIFO<T> backup;
@@ -1179,7 +1179,7 @@ template<typename Partitioner = DummyIndexer<int>, typename T = int, typename Ch
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;
-  Substrate::PerThreadStorage<ChildWLTy> Items;
+  substrate::PerThreadStorage<ChildWLTy> Items;
   int active;
 
 public:
@@ -1263,12 +1263,12 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class SetQueue : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {
+class SetQueue : private boost::noncopyable, private substrate::PaddedLock<concurrent> {
   std::set<T, Compare, runtime::FixedSizeAllocator<T> > wl;
 
-  using Substrate::PaddedLock<concurrent>::lock;
-  using Substrate::PaddedLock<concurrent>::try_lock;
-  using Substrate::PaddedLock<concurrent>::unlock;
+  using substrate::PaddedLock<concurrent>::lock;
+  using substrate::PaddedLock<concurrent>::try_lock;
+  using substrate::PaddedLock<concurrent>::unlock;
 
 public:
   template<bool newconcurrent>
@@ -1295,7 +1295,7 @@ public:
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
-    if (Substrate::ThreadPool::getTID() == 0)
+    if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 
@@ -1351,11 +1351,11 @@ GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
 template<class Indexer, typename ContainerTy = galois::worklists::GFIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois::Substrate::PaddedLock<concurrent> {
+class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois::substrate::PaddedLock<concurrent> {
 
-   using galois::Substrate::PaddedLock<concurrent>::lock;
-   using galois::Substrate::PaddedLock<concurrent>::try_lock;
-   using galois::Substrate::PaddedLock<concurrent>::unlock;
+   using galois::substrate::PaddedLock<concurrent>::lock;
+   using galois::substrate::PaddedLock<concurrent>::try_lock;
+   using galois::substrate::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -1460,7 +1460,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   int maxV;
 
   Indexer I;
-  Substrate::PerThreadStorage<perItem> current;
+  substrate::PerThreadStorage<perItem> current;
 
   CTy* getOrCreate(int index) {
     CTy* r = wl.get(index);
@@ -1531,7 +1531,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       return retval;
 
     //Failed, find minimum bin
-    bool localLeader = Substrate::ThreadPool::isLeader();
+    bool localLeader = substrate::ThreadPool::isLeader();
 
     unsigned msS = 0;
     if (BSP) {
@@ -1540,7 +1540,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 	for (int i = 0; i < (int) galois::getActiveThreads(); ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
-	msS = std::min(msS, current.getRemote(Substrate::ThreadPool::getLeader())->scanStart);
+	msS = std::min(msS, current.getRemote(substrate::ThreadPool::getLeader())->scanStart);
     }
 
     for (int i = msS; i <= maxV; ++i) {
@@ -1572,7 +1572,7 @@ class BarrierOBIM : private boost::noncopyable {
 
   Indexer I;
 
-  Substrate::TerminationDetection& term;
+  substrate::TerminationDetection& term;
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
@@ -1586,7 +1586,7 @@ class BarrierOBIM : private boost::noncopyable {
   typedef typename CTy::value_type value_type;
 
   BarrierOBIM(const Indexer& x = Indexer())
-    :current(0), pushmax(0), I(x), term(Substrate::getSystemTermination(galois::getActiveThreads()))
+    :current(0), pushmax(0), I(x), term(substrate::getSystemTermination(galois::getActiveThreads()))
   {
     B = new CTy[binmax];
     //std::cerr << "$"<<getThreadPool().getActiveThreads() <<"$";
@@ -1642,7 +1642,7 @@ class BarrierOBIM : private boost::noncopyable {
       
       pthread_barrier_wait(&barr1);
       term.initializeThread();
-      if (galois::Substrate::ThreadPool::getTID() == 0) {
+      if (galois::substrate::ThreadPool::getTID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
 	if (current <= pushmax)
 	  __sync_fetch_and_add(&current, 1);
@@ -1656,10 +1656,10 @@ class BarrierOBIM : private boost::noncopyable {
 
 template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {
-  typedef typename std::conditional<concurrent, Substrate::SimpleLock, Substrate::DummyLock>::type LockTy;
+  typedef typename std::conditional<concurrent, substrate::SimpleLock, substrate::DummyLock>::type LockTy;
   std::pair<LockTy, std::deque<T> > wl[128];
   struct rstate { unsigned short d[3]; };
-  Substrate::PerThreadStorage<rstate > seeds;
+  substrate::PerThreadStorage<rstate > seeds;
 
   unsigned int nextRand() {
     return nrand48(seeds.getLocal()->d);
@@ -1993,7 +1993,7 @@ public:
 };
 
 class LIFO_SB : private boost::noncopyable {
-  Substrate::PtrLock<ChunkHeader> head;
+  substrate::PtrLock<ChunkHeader> head;
 
 public:
 
@@ -2049,7 +2049,7 @@ public:
 };
 
 class LevelLocalAlt : private boost::noncopyable {
-  Substrate::PerPackageStorage<LIFO_SB> local;
+  substrate::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2066,7 +2066,7 @@ public:
 };
 
 class LevelStealingAlt : private boost::noncopyable {
-  Substrate::PerPackageStorage<LIFO_SB> local;
+  substrate::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2085,7 +2085,7 @@ public:
       return ret;
     
     //steal
-    int id = Substrate::ThreadPool::getPackage();
+    int id = substrate::ThreadPool::getPackage();
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
@@ -2131,7 +2131,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 
   runtime::FixedSizeHeap heap;
 
-  Substrate::PerThreadStorage<ChunkTy*> data;
+  substrate::PerThreadStorage<ChunkTy*> data;
 
   gWL worklist;
 

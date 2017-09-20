@@ -7,9 +7,9 @@
 
 #include <memory>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
-SharedMemSubstrate::SharedMemSubstrate(void) {
+SharedMemsubstrate::SharedMemSubstrate(void) {
   internal::setThreadPool(&m_tpool);
 
   // delayed initialization because both call getThreadPool in constructor
@@ -24,7 +24,7 @@ SharedMemSubstrate::SharedMemSubstrate(void) {
   internal::setTermDetect(m_termPtr);
 }
 
-SharedMemSubstrate::~SharedMemSubstrate(void) {
+SharedMemsubstrate::~SharedMemSubstrate(void) {
 
   internal::setTermDetect(nullptr);
   internal::setBarrierInstance(nullptr);

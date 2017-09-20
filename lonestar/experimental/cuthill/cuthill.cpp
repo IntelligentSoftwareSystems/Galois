@@ -712,7 +712,7 @@ struct CuthillUnordered {
         unsigned todo = counts[n];
         while (todo) {
           //spin
-          while (start == (cend = *endp)) { galois::Substrate::asmPause(); }
+          while (start == (cend = *endp)) { galois::substrate::asmPause(); }
           while (start != cend) {
             GNode next = perm[start];
             unsigned t_worig = t_wo;
@@ -730,7 +730,7 @@ struct CuthillUnordered {
             //sort to get cuthill ordering
             std::sort(&perm[t_worig], &perm[t_wo], sortDegFn());
             //output nodes
-            galois::Substrate::compilerBarrier();
+            galois::substrate::compilerBarrier();
             write_offset[n+1].data = t_wo;
             //  ++read_offset[n];
             //  --level_count[n];
@@ -751,7 +751,7 @@ struct CuthillUnordered {
   template<typename C>
   static void place_nodes(GNode source, C& counts) {
     std::deque<unsigned int> read_offset;
-    std::deque<galois::Substrate::CacheLineStorage<unsigned int> > write_offset;
+    std::deque<galois::substrate::CacheLineStorage<unsigned int> > write_offset;
 
     read_offset.push_back(0);
     std::partial_sum(counts.begin(), counts.end(), back_inserter(read_offset));
@@ -797,7 +797,7 @@ struct AnyBFSUnordered {
   template<typename C>
   static void place_nodes(GNode source, C& counts) {
     std::deque<unsigned int> read_offset;
-    std::deque<galois::Substrate::CacheLineStorage<unsigned int> > write_offset;
+    std::deque<galois::substrate::CacheLineStorage<unsigned int> > write_offset;
 
     read_offset.push_back(0);
     std::partial_sum(counts.begin(), counts.end(), back_inserter(read_offset));

@@ -87,7 +87,7 @@ namespace detail {
 template<bool Enable>
 class LocalIteratorFeature {
   typedef std::pair<uint64_t,uint64_t> Range;
-  Substrate::PerThreadStorage<Range> localIterators;
+  substrate::PerThreadStorage<Range> localIterators;
 public:
   uint64_t localBegin(uint64_t numNodes) const {
     return std::min(localIterators.getLocal()->first, numNodes);
@@ -107,14 +107,14 @@ public:
 template<>
 struct LocalIteratorFeature<false> {
   uint64_t localBegin(uint64_t numNodes) const {
-    unsigned int id = Substrate::ThreadPool::getTID();
+    unsigned int id = substrate::ThreadPool::getTID();
     unsigned int num = galois::getActiveThreads();
     uint64_t begin = (numNodes + num - 1) / num * id;
     return std::min(begin, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
-    unsigned int id = Substrate::ThreadPool::getTID();
+    unsigned int id = substrate::ThreadPool::getTID();
     unsigned int num = galois::getActiveThreads();
     uint64_t end = (numNodes + num - 1) / num * (id + 1);
     return std::min(end, numNodes);

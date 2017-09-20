@@ -97,7 +97,7 @@ public:
 //! Per-thread heaps using Galois thread aware construct
 template<class SourceHeap>
 class ThreadPrivateHeap {
-  Substrate::PerThreadStorage<SourceHeap> heaps;
+  substrate::PerThreadStorage<SourceHeap> heaps;
 
 public:
   enum { AllocSize = SourceHeap::AllocSize };
@@ -125,7 +125,7 @@ public:
 //! Apply a lock to a heap
 template<class SourceHeap>
 class LockedHeap : public SourceHeap {
-  Substrate::SimpleLock lock;
+  substrate::SimpleLock lock;
 
 public:
   enum { AllocSize = SourceHeap::AllocSize };
@@ -282,7 +282,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    static Substrate::SimpleLock lock;
+    static substrate::SimpleLock lock;
 
     lock.lock();
     FreeNode* OH = 0;
@@ -559,7 +559,7 @@ template <typename Derived>
 class StaticSingleInstance: private boost::noncopyable {
 
   // static std::unique_ptr<Derived> instance;
-  static Substrate::PtrLock<Derived> ptr;
+  static substrate::PtrLock<Derived> ptr;
 
 public:
   static Derived* getInstance (void) {
@@ -588,7 +588,7 @@ public:
 // std::unique_ptr<Derived> StaticSingleInstance<Derived>::instance = std::unique_ptr<Derived>();
 
 template <typename Derived>
-Substrate::PtrLock<Derived> StaticSingleInstance<Derived>::ptr = Substrate::PtrLock<Derived>();
+substrate::PtrLock<Derived> StaticSingleInstance<Derived>::ptr = substrate::PtrLock<Derived>();
 
 
 class PageHeap: public StaticSingleInstance<PageHeap> {
@@ -657,7 +657,7 @@ private:
   static __thread HeapMap* localHeaps;
   HeapMap heaps;
   std::list<HeapMap*> allLocalHeaps;
-  Substrate::SimpleLock lock;
+  substrate::SimpleLock lock;
 
   SizedHeapFactory();
 
@@ -706,20 +706,20 @@ public:
 };
 
 class SerialNumaHeap {
-  enum { offset = (sizeof(Substrate::LAptr) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
+  enum { offset = (sizeof(substrate::LAptr) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
 
 public:
   enum { AllocSize = 0 };
 
   void* allocate(size_t size) {
-    auto ptr = Substrate::largeMallocInterleaved(size+offset, activeThreads);
-    Substrate::LAptr* header = new ((char*)ptr.get()) Substrate::LAptr{std::move(ptr)};
+    auto ptr = substrate::largeMallocInterleaved(size+offset, activeThreads);
+    substrate::LAptr* header = new ((char*)ptr.get()) substrate::LAptr{std::move(ptr)};
     return (char*)(header->get()) + offset;
   }
 
   void deallocate(void* ptr) {
     char* realPtr = ((char*)ptr - offset);
-    Substrate::LAptr dptr{std::move(*(Substrate::LAptr*)realPtr)};
+    substrate::LAptr dptr{std::move(*(substrate::LAptr*)realPtr)};
   }
 };
 

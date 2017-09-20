@@ -94,7 +94,7 @@ struct SimObjInfo: public TypeHelper<> {
   };
 
 
-  typedef galois::Substrate::PaddedLock<true> Lock_ty;
+  typedef galois::substrate::PaddedLock<true> Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<MarkedEvent, Cmp_ty
     , galois::FixedSizeAllocator<MarkedEvent> > PQ;

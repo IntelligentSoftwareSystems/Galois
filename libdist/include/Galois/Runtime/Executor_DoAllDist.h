@@ -87,7 +87,7 @@ class DoAllExecutor {
     iterator b, e;
     msg* next;
   };
-  Substrate::PtrLock<msg> head;
+  substrate::PtrLock<msg> head;
   std::atomic<unsigned> waiting;
   
   //return true to continue, false to exit
@@ -107,10 +107,10 @@ class DoAllExecutor {
     //wait for signal
     while(!self.ready) {
       //      std::cerr << waiting << "\n";
-      Substrate::asmPause();
+      substrate::asmPause();
       if(waiting == activeThreads)
         return false;
-      Substrate::asmPause();
+      substrate::asmPause();
     }
 
     b = self.b;
@@ -196,15 +196,15 @@ public:
       } while (begin != end);
     } while (wait(begin, end));
 
-    reportStat(loopname, "Iterations", stat_iterations, Substrate::ThreadPool::getTID());
-    reportStat(loopname, "Donations", stat_donations, Substrate::ThreadPool::getTID());
+    reportStat(loopname, "Iterations", stat_iterations, substrate::ThreadPool::getTID());
+    reportStat(loopname, "Donations", stat_donations, substrate::ThreadPool::getTID());
   }
 
 
   template<typename RangeTy, typename FunctionTy, typename ArgsTy>
     void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
       DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-      Substrate::getThreadPool().run(activeThreads, std::ref(W));
+      substrate::getThreadPool().run(activeThreads, std::ref(W));
     }
 };
 
@@ -212,14 +212,14 @@ public:
 // void do_all_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
 // 
   // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  // Substrate::getThreadPool().run(activeThreads, std::ref(W));
+  // substrate::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    // Substrate::getThreadPool().run(activeThreads, std::ref(W));
+    // substrate::getThreadPool().run(activeThreads, std::ref(W));
   // } else {
     // FunctionTy f_cpy (f);
-    // Substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    // substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
         // auto begin = range.local_begin();
         // auto end = range.local_end();
         // while (begin != end)

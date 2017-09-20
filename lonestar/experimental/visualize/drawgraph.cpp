@@ -311,11 +311,11 @@ struct computeImpulse {
   Graph& g;
   int which;
   double stepSize;
-  galois::Substrate::PerThreadStorage<double>& maxForceSQ;
-  galois::Substrate::PerThreadStorage<Point<double> >& totalForce;
+  galois::substrate::PerThreadStorage<double>& maxForceSQ;
+  galois::substrate::PerThreadStorage<Point<double> >& totalForce;
 
-  computeImpulse(Graph& _g, int w, double ss, galois::Substrate::PerThreadStorage<double>& mf, 
-                 galois::Substrate::PerThreadStorage<Point<double>>& tf)
+  computeImpulse(Graph& _g, int w, double ss, galois::substrate::PerThreadStorage<double>& mf, 
+                 galois::substrate::PerThreadStorage<Point<double>>& tf)
                  :g(_g), which(w), stepSize(ss), maxForceSQ(mf), totalForce(tf) {}
 
   void operator()(GNode& n) const {
@@ -444,8 +444,8 @@ int main(int argc, char **argv) {
   double mf = 0.0;
   do {
     //Compute v's impulse
-    galois::Substrate::PerThreadStorage<double> maxForceSQ;
-    galois::Substrate::PerThreadStorage<Point<double>> totalForce;
+    galois::substrate::PerThreadStorage<double> maxForceSQ;
+    galois::substrate::PerThreadStorage<Point<double>> totalForce;
     double step = natStepSize;
     //Vertex& v = graph.getData(*graph.begin());
     //v.dump();

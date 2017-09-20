@@ -60,7 +60,7 @@ typedef galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
-  typedef galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::substrate::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
     , galois::FixedSizeAllocator<Event_ty> > PQ;

@@ -163,7 +163,7 @@ struct PerThread {
     }
   }
 };
-galois::Substrate::PerThreadStorage<PerThread> *pts = NULL;
+galois::substrate::PerThreadStorage<PerThread> *pts = NULL;
 ETree *etree = NULL;
 SelfEdges *selfedges = NULL;
 
@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  pts = new galois::Substrate::PerThreadStorage<PerThread>();
+  pts = new galois::substrate::PerThreadStorage<PerThread>();
   etree = new ETree();
   selfedges = new SelfEdges();
   selfedges->find();

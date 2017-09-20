@@ -83,7 +83,7 @@ protected:
   typedef galois::gdeque<Operation> LogTy;
   //typedef std::deque<Operation> LogTy;
   typedef galois::InsertBag<value_type> ValuesTy;
-  typedef Substrate::PaddedLock<true> LockTy;
+  typedef substrate::PaddedLock<true> LockTy;
 
   struct PerThread {
     LocalMapTy localMap;
@@ -100,7 +100,7 @@ protected:
   };
 
   key_compare comp;
-  Substrate::PerThreadStorage<PerThread> pts;
+  substrate::PerThreadStorage<PerThread> pts;
   ValuesTy values;
   LockTy logLock;
   LogTy log;

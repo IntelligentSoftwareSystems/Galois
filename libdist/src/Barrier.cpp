@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <cstdio>
 /*
-class StupidDistBarrier : public galois::Substrate::Barrier {
+class StupidDistBarrier : public galois::substrate::Barrier {
   Barrier& localBarrier;
 
   std::atomic<int> count;
@@ -84,7 +84,7 @@ public:
 #include <mpi.h>
 
 namespace {
-class HostBarrier : public galois::Substrate::Barrier {
+class HostBarrier : public galois::substrate::Barrier {
   std::atomic<int> count;
 
   static void barrierLandingPad(uint32_t) {
@@ -100,12 +100,12 @@ public:
 
   virtual void wait() {
 
-    if (galois::Substrate::ThreadPool::getTID() == 0) {
+    if (galois::substrate::ThreadPool::getTID() == 0) {
       count += galois::runtime::NetworkInterface::Num;
     }
 
     auto& net = galois::runtime::getSystemNetworkInterface();
-    if (galois::Substrate::ThreadPool::getTID() == 0) {
+    if (galois::substrate::ThreadPool::getTID() == 0) {
       //      std::cerr << "@";
       //notify global and wait on global
       net.broadcastSimple(barrierLandingPad);
@@ -121,7 +121,7 @@ public:
 };
 } // end namespace ""
 
-galois::Substrate::Barrier& galois::runtime::getHostBarrier() {
+galois::substrate::Barrier& galois::runtime::getHostBarrier() {
   static HostBarrier b;
   return b;
 }

@@ -182,7 +182,7 @@ void DistStatManager::combineAtHost_0(void) {
 }
 
 bool DistStatManager::printingHostVals(void) {
-  return galois::Substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
+  return galois::substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
 }
 
 StatTotal::Type DistStatManager::findHostTotalTy(const Str& region, const Str& category, const StatTotal::Type& thrdTotalTy) const {

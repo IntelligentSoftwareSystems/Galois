@@ -35,14 +35,14 @@ namespace galois {
 namespace worklists {
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class OrderedList : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {
+class OrderedList : private boost::noncopyable, private substrate::PaddedLock<concurrent> {
   typedef galois::flat_map<T, std::deque<T>, Compare> Map;
 
   Map map;
 
-  using Substrate::PaddedLock<concurrent>::lock;
-  using Substrate::PaddedLock<concurrent>::try_lock;
-  using Substrate::PaddedLock<concurrent>::unlock;
+  using substrate::PaddedLock<concurrent>::lock;
+  using substrate::PaddedLock<concurrent>::try_lock;
+  using substrate::PaddedLock<concurrent>::unlock;
 
 public:
   template<typename Tnew>
@@ -73,7 +73,7 @@ public:
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
-    if (Substrate::ThreadPool::getTID() == 0)
+    if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 

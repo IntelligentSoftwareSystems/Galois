@@ -59,7 +59,7 @@ public:
   typedef typename container_type::size_type size_type;
   typedef typename container_type::const_iterator iterator;
   typedef typename container_type::const_iterator const_iterator;
-  typedef galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::substrate::SimpleLock Lock_ty;
 
 private:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;

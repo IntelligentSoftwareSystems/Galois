@@ -71,7 +71,7 @@ struct find_if_helper {
   typedef int tt_needs_parallel_break;
 
   typedef galois::optional<InputIterator> ElementTy;
-  typedef Substrate::PerThreadStorage<ElementTy> AccumulatorTy;
+  typedef substrate::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;
   find_if_helper(AccumulatorTy& a, Predicate& p): accum(a), f(p) { }
@@ -171,7 +171,7 @@ struct partition_helper {
   struct partition_helper_state {
     RandomAccessIterator first, last;
     RandomAccessIterator rfirst, rlast;
-    Substrate::SimpleLock Lock;
+    substrate::SimpleLock Lock;
     Predicate pred;
     typename std::iterator_traits<RandomAccessIterator>::difference_type BlockSize() { return 1024; }
 
@@ -286,10 +286,10 @@ T accumulate(InputIterator first, InputIterator last, T init) {
 
 template<typename T, typename MapFn, typename ReduceFn>
 struct map_reduce_helper {
-  Substrate::PerThreadStorage<T>& init;
+  substrate::PerThreadStorage<T>& init;
   MapFn fn;
   ReduceFn reduce;
-  map_reduce_helper(galois::Substrate::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
+  map_reduce_helper(galois::substrate::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
     :init(i), fn(fn), reduce(reduce) {}
   template<typename U>
   void operator()(U&& v) const {
@@ -299,7 +299,7 @@ struct map_reduce_helper {
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  galois::Substrate::PerThreadStorage<T> reduced;
+  galois::substrate::PerThreadStorage<T> reduced;
   do_all(first, last,
          map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
   //         galois::loopname("map_reduce"));

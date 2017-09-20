@@ -56,7 +56,7 @@ class TwoPhaseBFS: public BFS {
         galois::runtime::signalConflict();
       }
 
-      if (galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
+      if (galois::substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
         globalLevel.updated = false;
       }
     }
@@ -74,7 +74,7 @@ class TwoPhaseBFS: public BFS {
 
     template <typename C>
     void operator () (const Update& up, C& ctx) {
-      if (galois::Substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
+      if (galois::substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
         globalLevel.updated = true;
         ++globalLevel.value;
       }

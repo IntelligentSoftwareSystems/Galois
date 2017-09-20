@@ -35,7 +35,7 @@
 
 #include <cassert>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 /* Access pages on each thread so each thread has some pages already loaded 
  * (preferably ones it will use) */
@@ -151,7 +151,7 @@ static void largeFree(void* ptr, size_t bytes) {
   freePages(ptr, bytes/allocSize());
 }
 
-void galois::Substrate::detail::largeFreer::operator()(void* ptr) const {
+void galois::substrate::detail::largeFreer::operator()(void* ptr) const {
   largeFree(ptr, bytes);
 }
 
@@ -164,7 +164,7 @@ static size_t roundup (size_t data, size_t mult) {
   return data + (mult - rem);
 }
 
-LAptr galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThreads) {
+LAptr galois::substrate::largeMallocInterleaved(size_t bytes, unsigned numThreads) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
 
@@ -185,21 +185,21 @@ LAptr galois::Substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
   return LAptr{data, detail::largeFreer{bytes}};
 }
 
-LAptr galois::Substrate::largeMallocLocal(size_t bytes) {
+LAptr galois::substrate::largeMallocLocal(size_t bytes) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
   // Get a prefaulted allocation
   return LAptr{allocPages(bytes/allocSize(), true), detail::largeFreer{bytes}};
 }
 
-LAptr galois::Substrate::largeMallocFloating(size_t bytes) {
+LAptr galois::substrate::largeMallocFloating(size_t bytes) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
   // Get a non-prefaulted allocation
   return LAptr{allocPages(bytes/allocSize(), false), detail::largeFreer{bytes}};
 }
 
-LAptr galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
+LAptr galois::substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
   // Get a non-prefaulted allocation
@@ -224,7 +224,7 @@ LAptr galois::Substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
  * @returns The allocated memory along with a freer object
  */
 template<typename RangeArrayTy>
-LAptr galois::Substrate::largeMallocSpecified(size_t bytes, 
+LAptr galois::substrate::largeMallocSpecified(size_t bytes, 
           uint32_t numThreads, RangeArrayTy& threadRanges, 
           size_t elementSize) {
   // ceiling to nearest page
@@ -242,10 +242,10 @@ LAptr galois::Substrate::largeMallocSpecified(size_t bytes,
 // Explicit template declarations since the template is defined in the .h
 // file
 template
-LAptr galois::Substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes, 
+LAptr galois::substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes, 
           uint32_t numThreads, std::vector<uint32_t>& threadRanges, 
           size_t elementSize);
 template
-LAptr galois::Substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes, 
+LAptr galois::substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes, 
           uint32_t numThreads, std::vector<uint64_t>& threadRanges, 
           size_t elementSize);

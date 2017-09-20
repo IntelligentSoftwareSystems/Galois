@@ -80,7 +80,7 @@ void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer
 }
 
 void NetworkInterface::handleReceives() {
-  std::unique_lock<Substrate::SimpleLock> lg;
+  std::unique_lock<substrate::SimpleLock> lg;
   auto opt = recieveTagged(0, &lg);
   while (opt) {
     uint32_t src = std::get<0>(*opt);
@@ -97,7 +97,7 @@ void NetworkInterface::handleReceives() {
 
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules
-  std::lock_guard<Substrate::SimpleLock> lg(flLock);
+  std::lock_guard<substrate::SimpleLock> lg(flLock);
   SendBlock* retval = nullptr;
   if (freelist.empty()) {
     unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());
@@ -112,7 +112,7 @@ NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
 }
 
 void NetworkBackend::freeSendBlock(SendBlock* sb) {
-  std::lock_guard<Substrate::SimpleLock> lg(flLock);
+  std::lock_guard<substrate::SimpleLock> lg(flLock);
   freelist.push_front(*sb);
 }
 

@@ -140,7 +140,7 @@ struct SNode {
 	unsigned int degree;
 	unsigned int status;
 	int prio;
-	galois::Substrate::SimpleLock mutex;
+	galois::substrate::SimpleLock mutex;
 	//galois::GAtomic<unsigned int>& status;
 	//unsigned int sum;
   //bool flag;

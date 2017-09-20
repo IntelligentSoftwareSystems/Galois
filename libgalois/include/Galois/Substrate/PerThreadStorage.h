@@ -46,7 +46,7 @@
 #include <utility>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
@@ -54,7 +54,7 @@ class PerBackend {
   // NB(ddn): llvm seems to assume this under some cases because
   // I've seen weird initialization crashes with MIN_SIZE = 3
   static const unsigned MIN_SIZE = 4;
-  typedef Substrate::SimpleLock Lock;
+  typedef substrate::SimpleLock Lock;
 
   unsigned int nextLoc;
   char** heads;

@@ -31,13 +31,13 @@
 
 #include <cstdlib>
 
-bool galois::Substrate::EnvCheck(const char* parm) {
+bool galois::substrate::EnvCheck(const char* parm) {
   if (getenv(parm))
     return true;
   return false;
 }
 
-bool galois::Substrate::EnvCheck(const char* parm, int& val) {
+bool galois::substrate::EnvCheck(const char* parm, int& val) {
   char* t = getenv(parm);
   if (t) {
     val = atoi(t);

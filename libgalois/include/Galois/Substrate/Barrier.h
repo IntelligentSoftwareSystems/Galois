@@ -40,7 +40,7 @@
 #include <functional>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 class Barrier {
 public:
@@ -96,7 +96,7 @@ struct BarrierInstance {
   }
 
   Barrier& get(unsigned numT) {
-    GALOIS_ASSERT(numT > 0, "Substrate::getBarrier() number of threads must be > 0");
+    GALOIS_ASSERT(numT > 0, "substrate::getBarrier() number of threads must be > 0");
 
     numT = std::min(numT, getThreadPool().getMaxUsableThreads());
     numT = std::max(numT, 1u);
@@ -117,7 +117,7 @@ void setBarrierInstance(BarrierInstance<>* bi);
 
 
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

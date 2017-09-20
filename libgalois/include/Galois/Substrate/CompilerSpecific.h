@@ -35,7 +35,7 @@
 #define GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 inline static void asmPause() {
 #if defined(__i386__) || defined(__amd64__)
@@ -89,7 +89,7 @@ inline static void flushInstructionPipeline() {
 #define GALOIS_ATTRIBUTE_PROF_NOINLINE inline
 #endif
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

@@ -50,7 +50,7 @@ class SortedRangeWindowWL: private boost::noncopyable {
 
   Cmp cmp;
   PerThrdWL m_wl;
-  Substrate::PerThreadStorage<Range> wlRange;
+  substrate::PerThreadStorage<Range> wlRange;
 
   size_t init_sz = 0;
 
@@ -295,7 +295,7 @@ public:
     // windowLim is calculated by computing the max of max element pushed by each
     // thread. In this case, the max element is the one pushed in last 
 
-    Substrate::PerThreadStorage<galois::optional<T> > perThrdLastPop;
+    substrate::PerThreadStorage<galois::optional<T> > perThrdLastPop;
 
     Derived* d = static_cast<Derived*> (this);
     assert(d);
@@ -483,7 +483,7 @@ public:
 template <typename T, typename Cmp> 
 class PartialPQbasedWindowWL {
 
-  using PerThrdWL = Substrate::PerThreadStorage<TreeBasedPartialPQ<T, Cmp> >;
+  using PerThrdWL = substrate::PerThreadStorage<TreeBasedPartialPQ<T, Cmp> >;
 
   Cmp cmp;
   PerThrdWL m_wl;

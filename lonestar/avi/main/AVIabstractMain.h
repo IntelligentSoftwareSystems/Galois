@@ -102,7 +102,7 @@ private:
 
 
 protected:
-  using PerThrdLocalVec = galois::Substrate::PerThreadStorage<LocalVec>;
+  using PerThrdLocalVec = galois::substrate::PerThreadStorage<LocalVec>;
   using AtomicInteger =  galois::GAtomic<int>;
   using IterCounter = galois::GAccumulator<size_t>;
 

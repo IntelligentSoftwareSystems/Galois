@@ -195,7 +195,7 @@ int node_gain(GGraph &graph, GNode node) {
 }
 
 typedef std::pair<int,std::pair<GNode,GNode> > PartMatch;
-typedef galois::Substrate::PerThreadStorage<PartMatch > PerThreadPartInfo;
+typedef galois::substrate::PerThreadStorage<PartMatch > PerThreadPartInfo;
 struct KLMatch {
   GGraph &graph;
   PerThreadPartInfo &threadInfo;

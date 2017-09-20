@@ -39,7 +39,7 @@
 #include <utility>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 // Store an item with padding
 template<typename T>
@@ -62,7 +62,7 @@ struct CacheLineStorage {
   CacheLineStorage& operator=(const V& v) { data = v; return *this; }
 };
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

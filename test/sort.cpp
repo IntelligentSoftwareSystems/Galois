@@ -17,7 +17,7 @@ int vectorSize = 1;
 
 int do_sort() {
 
-  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::substrate::getThreadPool().getMaxThreads();
   std::cout << "sort:\n";
 
   while (M) {
@@ -68,7 +68,7 @@ int do_sort() {
 
 int do_count_if() {
 
-  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::substrate::getThreadPool().getMaxThreads();
   std::cout << "count_if:\n";
 
   while (M) {
@@ -109,7 +109,7 @@ struct mymax : std:: binary_function<T,T,T> {
 
 int do_accumulate() {
 
-  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::substrate::getThreadPool().getMaxThreads();
   std::cout << "accumulate:\n";
 
   while (M) {

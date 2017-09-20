@@ -190,7 +190,7 @@ protected:
     };
 
 
-    galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
+    galois::substrate::PerThreadStorage<RNG>  perThrdRNG;
 
     auto randPri = [&] (GN node) {
       auto& rng = *(perThrdRNG.getLocal ());

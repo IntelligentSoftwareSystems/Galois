@@ -80,7 +80,7 @@ class OfflineGraph {
 
   void* file_buffer;
 
-  galois::Substrate::SimpleLock lock;
+  galois::substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);

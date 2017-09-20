@@ -121,7 +121,7 @@ unsigned galois::runtime::SimpleRuntimeContext::commitIteration() {
     Lockable* lockable = locks;
     locks = lockable->next;
     lockable->next = 0;
-    Substrate::compilerBarrier();
+    substrate::compilerBarrier();
     release(lockable);
     ++numLocks;
   }

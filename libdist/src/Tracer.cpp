@@ -34,7 +34,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 
 static bool doCerr = false;

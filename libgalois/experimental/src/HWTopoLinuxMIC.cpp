@@ -48,7 +48,7 @@
 
 #define GALOIS_USE_MIC_TOPO
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace {
 

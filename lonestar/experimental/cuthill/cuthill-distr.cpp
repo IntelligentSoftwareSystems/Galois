@@ -184,7 +184,7 @@ GNode source, report;
 //std::vector< std::vector<GNode> > bucket;
 //galois::gdeque<GNode> bucket;
 galois::InsertBag<GNode> bucket;
-galois::Substrate::SimpleLock dbglock;
+galois::substrate::SimpleLock dbglock;
 
 std::vector< std::map<GNode, unsigned int> > redbuck;
 
@@ -904,7 +904,7 @@ struct BarrierNoDup {
 		unsigned int thr = galois::getActiveThreads();
 		//galois::runtime::PthreadBarrier barrier(thr);
                 __attribute__((unused))
-		galois::Substrate::Barrier& barrier = galois::runtime::getBarrier(thr);
+		galois::substrate::Barrier& barrier = galois::runtime::getBarrier(thr);
 
 		while (true) {
 			unsigned next = (round + 1) & 1;

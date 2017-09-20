@@ -171,7 +171,7 @@ void printGraph() {
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 //! [define per thread storage]
-galois::Substrate::PerThreadStorage<long long> MSTWeight;
+galois::substrate::PerThreadStorage<long long> MSTWeight;
 //! [define per thread storage]
 struct process {
    template<typename ContextTy>

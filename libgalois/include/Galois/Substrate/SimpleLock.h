@@ -42,7 +42,7 @@
 #include <mutex>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 /// SimpleLock is a spinlock.
 /// Copying a lock is unsynchronized (relaxed ordering)
@@ -109,9 +109,9 @@ public:
 
 typedef std::lock_guard<SimpleLock> lock_guard_galois;
 
-#define MAKE_LOCK_GUARD(__x) galois::Substrate::lock_guard_galois locker##___COUNTER__(__x)
+#define MAKE_LOCK_GUARD(__x) galois::substrate::lock_guard_galois locker##___COUNTER__(__x)
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

@@ -329,7 +329,7 @@ struct Range {
   typedef typename std::iterator_traits<Iter>::difference_type difference_type;
   typedef typename std::iterator_traits<Iter>::value_type value_type;
 
-  typedef galois::Substrate::PerThreadStorage<Range> PTS;
+  typedef galois::substrate::PerThreadStorage<Range> PTS;
 
   Iter m_beg;
   Iter m_end;
@@ -611,7 +611,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   VecAtomicCtxPtr repOwnerCtxVec (numNodes);
 
  
-  galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
+  galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   fillUpTimer.start ();
   galois::do_all (
@@ -653,7 +653,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
   std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
-  galois::Substrate::getThreadPool().beKind();
+  galois::substrate::getThreadPool().beKind();
 }
 
 template <typename Iter>
@@ -804,7 +804,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   Accumulator findIter;
   Accumulator linkUpIter;
 
-  galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
+  galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
 
   VecRep_ty repVec (numNodes);
@@ -866,7 +866,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
   std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
 
-  galois::Substrate::getThreadPool().beKind();
+  galois::substrate::getThreadPool().beKind();
 }
 }// end namespace kruskal
 

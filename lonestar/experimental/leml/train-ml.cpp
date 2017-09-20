@@ -179,7 +179,7 @@ void run_multilabel_train(multilabel_parameter param, smat_t &Y, smat_t &X, smat
 
 #ifdef EXP_DOALL_GALOIS
         galois::setActiveThreads(param.threads);
-        galois::Substrate::getThreadPool().burnPower(param.threads);
+        galois::substrate::getThreadPool().burnPower(param.threads);
 #endif
 	std::vector<int> subset = subsample((int)(0.01*(double)Y.rows), (int)Y.rows);
 	smat_t subX = X.row_subset(subset);

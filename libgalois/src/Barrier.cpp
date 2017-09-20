@@ -34,20 +34,20 @@
 #include "Galois/Substrate/Barrier.h"
 
 //anchor vtable
-galois::Substrate::Barrier::~Barrier() {}
+galois::substrate::Barrier::~Barrier() {}
 
-//galois::Substrate::Barrier& galois::Substrate::getSystemBarrier(unsigned activeThreads) {
+//galois::substrate::Barrier& galois::substrate::getSystemBarrier(unsigned activeThreads) {
 //  return benchmarking::getTopoBarrier(activeThreads);
 //}
 
-static galois::Substrate::internal::BarrierInstance<>* BI = nullptr;
+static galois::substrate::internal::BarrierInstance<>* BI = nullptr;
 
-void galois::Substrate::internal::setBarrierInstance(internal::BarrierInstance<>* bi) {
+void galois::substrate::internal::setBarrierInstance(internal::BarrierInstance<>* bi) {
   GALOIS_ASSERT(!(bi && BI), "Double initialization of BarrierInstance");
   BI = bi;
 }
 
-galois::Substrate::Barrier& galois::Substrate::getBarrier(unsigned numT) {
+galois::substrate::Barrier& galois::substrate::getBarrier(unsigned numT) {
   GALOIS_ASSERT(BI, "BarrierInstance not initialized");
   return BI->get(numT);
 }

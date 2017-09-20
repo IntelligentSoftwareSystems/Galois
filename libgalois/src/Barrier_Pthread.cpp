@@ -47,7 +47,7 @@
 
 namespace {
 
-class PthreadBarrier: public galois::Substrate::Barrier {
+class PthreadBarrier: public galois::substrate::Barrier {
   pthread_barrier_t bar;
 
 public:
@@ -84,13 +84,13 @@ public:
 
 }
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createPthreadBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createPthreadBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new PthreadBarrier(activeThreads));
 }
 
 #else
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createPthreadBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createPthreadBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(nullptr);
 }
 

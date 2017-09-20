@@ -275,7 +275,7 @@ protected:
   using CtxtAdjAlloc = Pow_2_BlockAllocator<Ctxt*>;
   using CtxtWL = PerThreadBag<Ctxt*>;
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = substrate::PerThreadStorage<UserCtx>;
 
 
   struct ApplyOperator {

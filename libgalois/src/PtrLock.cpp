@@ -34,7 +34,7 @@
 
 #include "Galois/Substrate/PtrLock.h"
 
-void galois::Substrate::detail::ptr_slow_lock(std::atomic<uintptr_t>& _l) {
+void galois::substrate::detail::ptr_slow_lock(std::atomic<uintptr_t>& _l) {
   uintptr_t oldval;
   do {
     while ((_l.load(std::memory_order_acquire) & 1) != 0) {

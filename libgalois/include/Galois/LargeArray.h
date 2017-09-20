@@ -53,7 +53,7 @@ extern unsigned activeThreads;
  */
 template<typename T>
 class LargeArray {
-  Substrate::LAptr m_realdata;
+  substrate::LAptr m_realdata;
   T* m_data;
   size_t m_size;
 
@@ -83,19 +83,19 @@ protected:
     switch(t) {
     case Blocked:
       printf("Block-alloc'd\n");
-      m_realdata = Substrate::largeMallocBlocked(n*sizeof(T), runtime::activeThreads);
+      m_realdata = substrate::largeMallocBlocked(n*sizeof(T), runtime::activeThreads);
       break;
     case Interleaved:
       printf("Interleave-alloc'd\n");
-      m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), runtime::activeThreads);
+      m_realdata = substrate::largeMallocInterleaved(n*sizeof(T), runtime::activeThreads);
       break;
     case Local:
       printf("Local-allocd\n");
-      m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
+      m_realdata = substrate::largeMallocLocal(n*sizeof(T));
       break;
     case Floating:
       printf("Floating-alloc'd\n");
-      m_realdata = Substrate::largeMallocFloating(n*sizeof(T));
+      m_realdata = substrate::largeMallocFloating(n*sizeof(T));
       break;
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
@@ -191,7 +191,7 @@ public:
                          RangeArrayTy& threadRanges) {
     assert(!m_data);
 
-    m_realdata = Substrate::largeMallocSpecified(
+    m_realdata = substrate::largeMallocSpecified(
                    numberOfElements * sizeof(T),
                    runtime::activeThreads, threadRanges,
                    sizeof(T));

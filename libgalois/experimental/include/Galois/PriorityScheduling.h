@@ -44,7 +44,7 @@ __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::de
 
 //FIXME: using in a header
 using namespace galois::Runtime;
-using namespace galois::Substrate;
+using namespace galois::substrate;
 using namespace galois::worklists;
 
 template<int CS, bool LF>

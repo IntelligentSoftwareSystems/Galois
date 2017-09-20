@@ -283,7 +283,7 @@ class LCorderedExec {
   typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
   // typedef galois::runtime::PerThreadVector<T> AddWL;
   typedef UserContextAccess<T> UserCtx;
-  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   typedef galois::GAccumulator<size_t> Accumulator;

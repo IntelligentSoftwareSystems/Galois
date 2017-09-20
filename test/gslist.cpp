@@ -7,7 +7,7 @@
 int main(int argc, char** argv) {
   typedef galois::runtime::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
-  typedef galois::Substrate::PerThreadStorage<HeapPtr> Heaps;
+  typedef galois::substrate::PerThreadStorage<HeapPtr> Heaps;
   typedef galois::concurrent_gslist<int> Collection;
   int numThreads = 2;
   unsigned size = 100;

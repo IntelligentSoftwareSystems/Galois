@@ -58,7 +58,7 @@ public:
   /* const */ T& get_container() const { return *container; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return galois::block_range(begin(), end(), Substrate::ThreadPool::getTID(), activeThreads);
+    return galois::block_range(begin(), end(), substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -92,7 +92,7 @@ public:
   iterator end() const { return ei; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return galois::block_range(ii, ei, Substrate::ThreadPool::getTID(), activeThreads);
+    return galois::block_range(ii, ei, substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -142,7 +142,7 @@ public:
    * of the range for this particular thread.
    */
   std::pair<block_iterator, block_iterator> block_pair() const {
-    uint32_t my_thread_id = Substrate::ThreadPool::getTID();
+    uint32_t my_thread_id = substrate::ThreadPool::getTID();
     uint32_t total_threads = runtime::activeThreads;
 
     iterator local_begin = thread_beginnings[my_thread_id];

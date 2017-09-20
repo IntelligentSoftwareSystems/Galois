@@ -77,11 +77,11 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = Substrate::getThreadPool().getLeader(tid);
+    pid = substrate::getThreadPool().getLeader(tid);
   }
   WID() {
-    tid = Substrate::ThreadPool::getTID();
-    pid = Substrate::ThreadPool::getLeader();
+    tid = substrate::ThreadPool::getTID();
+    pid = substrate::ThreadPool::getLeader();
   }
 };
 
@@ -97,8 +97,8 @@ class dChunkedMaster : private boost::noncopyable {
 
   typedef OuterTy<Chunk, true> LevelItem;
 
-  Substrate::PerThreadStorage<p> data;
-  Substrate::PerPackageStorage<LevelItem> Q;
+  substrate::PerThreadStorage<p> data;
+  substrate::PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);
@@ -214,7 +214,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = Substrate::getThreadPool().getLeader(i);
+      id.pid = substrate::getThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }
@@ -288,8 +288,8 @@ class BSInlineExecutor {
   FunctionTy function;
   PreFunc preFunc;
   const char* loopname;
-  galois::Substrate::Barrier& barrier;
-  Substrate::CacheLineStorage<volatile long> done;
+  galois::substrate::Barrier& barrier;
+  substrate::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
     return wl->sempty();
@@ -390,7 +390,7 @@ class BSInlineExecutor {
   void go() {
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.ctx);
-    unsigned tid = Substrate::ThreadPool::getTID();
+    unsigned tid = substrate::ThreadPool::getTID();
     WID wid;
 
     WLTy* cur = &wls[0];
@@ -469,9 +469,9 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
   Executor e (opFunc, preFunc, loopname);
-  Substrate::Barrier& barrier = runtime::getBarrier (activeThreads);
+  substrate::Barrier& barrier = runtime::getBarrier (activeThreads);
 
-  Substrate::getThreadPool ().run (activeThreads, 
+  substrate::getThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));

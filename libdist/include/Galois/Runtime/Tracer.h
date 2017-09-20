@@ -105,7 +105,7 @@ static inline void trace(Args&& ...) {}
 template<typename... Args>
 static inline void trace(Args&&... args) {
   if (!detail::initTrace) {
-    detail::doTrace = Substrate::EnvCheck("GALOIS_DEBUG_TRACE");
+    detail::doTrace = substrate::EnvCheck("GALOIS_DEBUG_TRACE");
     detail::initTrace = true;
   }
   if (detail::doTrace) {

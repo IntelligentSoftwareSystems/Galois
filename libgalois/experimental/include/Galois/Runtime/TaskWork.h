@@ -419,8 +419,8 @@ class Executor {
   // XXX scheduling type (infer?)
   WorklistPipeline<PipelineTy> wls;
 
-  Substrate::TerminationDetection& term;
-  Substrate::Barrier& barrier;
+  substrate::TerminationDetection& term;
+  substrate::Barrier& barrier;
   IterTy initialBegin;
   IterTy initialEnd;
   const char* loopname;
@@ -507,7 +507,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(galois::getActiveThreads())), barrier(runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(substrate::getSystemTermination(galois::getActiveThreads())), barrier(runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
     barrier.reinit(galois::getActiveThreads());
   }
 
@@ -517,7 +517,7 @@ public:
 
   void operator()() {
     ThreadLocalData tld(loopname);
-    std::pair<IterTy,IterTy> range = galois::block_range(initialBegin, initialEnd, Substrate::ThreadPool::getTID(), galois::getActiveThreads());
+    std::pair<IterTy,IterTy> range = galois::block_range(initialBegin, initialEnd, substrate::ThreadPool::getTID(), galois::getActiveThreads());
     tld.facing.push_initial(range.first, range.second, wls.wl1);
 
     barrier.wait();
@@ -591,7 +591,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   WorkTy W(b, e, loopname);
   
   using namespace galois::Runtime;
-  Substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
+  substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }
 
 template<typename PipelineTy,typename TaskTy>

@@ -58,9 +58,9 @@ private:
   };
 
   CTy wls[2];
-  Substrate::PerThreadStorage<TLD> tlds;
-  Substrate::Barrier& barrier;
-  Substrate::CacheLineStorage<std::atomic<bool>> some;
+  substrate::PerThreadStorage<TLD> tlds;
+  substrate::Barrier& barrier;
+  substrate::CacheLineStorage<std::atomic<bool>> some;
   std::atomic<bool> isEmpty;
 
  public:
@@ -99,7 +99,7 @@ private:
         return r;
 
       barrier.wait();
-      if (Substrate::ThreadPool::getTID() == 0) {
+      if (substrate::ThreadPool::getTID() == 0) {
         if (!some.get())
           isEmpty = true;
         some.get() = false; 

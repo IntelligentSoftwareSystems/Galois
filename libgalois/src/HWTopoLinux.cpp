@@ -54,7 +54,7 @@
 
 #include <sched.h>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 
 namespace {
@@ -257,7 +257,7 @@ std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
 
 } //namespace ""
 
-std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::Substrate::getHWTopo() {
+std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getHWTopo() {
   machineTopoInfo retMTI;
 
   auto rawInfo = parseCPUInfo();
@@ -305,7 +305,7 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::Substrate::getH
 } 
 
 //! binds current thread to OS HW context "proc"
-bool galois::Substrate::bindThreadSelf(unsigned osContext) {
+bool galois::substrate::bindThreadSelf(unsigned osContext) {
 #ifndef __CYGWIN__
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */

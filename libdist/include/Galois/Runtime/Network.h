@@ -104,7 +104,7 @@ public:
   void handleReceives();
 
   //!receive tagged message
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<Substrate::SimpleLock>* rlg) = 0;
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg) = 0;
 
   //!move send buffers out to network
   virtual void flush() = 0;
@@ -126,7 +126,7 @@ NetworkInterface& makeNetworkBuffered();
 NetworkInterface& makeNetworkRouted();
 
 //! Host Barrier
-Substrate::Barrier& getHostBarrier();
+substrate::Barrier& getHostBarrier();
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////

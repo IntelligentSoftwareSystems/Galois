@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <iostream> 
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 int main() 
 { 

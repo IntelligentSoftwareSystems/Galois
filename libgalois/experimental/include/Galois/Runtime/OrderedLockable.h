@@ -40,7 +40,7 @@
 namespace galois {
 namespace runtime {
 
-using dbg = galois::Substrate::debug<1>;
+using dbg = galois::substrate::debug<1>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
@@ -351,7 +351,7 @@ public:
       MapAlloc
     > NhoodMap;
 
-  typedef galois::Substrate::ThreadRWlock Lock_ty;
+  typedef galois::substrate::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
 
 protected:
@@ -436,7 +436,7 @@ protected:
   using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtxt = UserContextAccess<T>;
-  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
+  using PerThreadUserCtxt = substrate::PerThreadStorage<UserCtxt>;
 
 
   Cmp cmp;

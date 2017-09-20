@@ -326,9 +326,9 @@ public:
  */
 template <typename T, bool CONCURRENT=true>
 class GAtomicPadded: 
-    public AtomicImpl::GAtomicBase<T, galois::Substrate::CacheLineStorage, CONCURRENT> {
+    public AtomicImpl::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> {
 
-  typedef AtomicImpl::GAtomicBase<T, galois::Substrate::CacheLineStorage, CONCURRENT> Super_ty;
+  typedef AtomicImpl::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

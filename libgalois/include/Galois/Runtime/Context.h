@@ -61,7 +61,7 @@ class LockManagerBase;
  * Lockable. 
  */
 class Lockable {
-  Substrate::PtrLock<LockManagerBase> owner;
+  substrate::PtrLock<LockManagerBase> owner;
   //! Use an intrusive list to track neighborhood of a context without allocation overhead.
   //! Works for cases where a Lockable needs to be only in one context's neighborhood list
   Lockable* next;

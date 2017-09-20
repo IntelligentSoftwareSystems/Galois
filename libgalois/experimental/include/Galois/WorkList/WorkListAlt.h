@@ -37,16 +37,16 @@ namespace worklists {
 
 template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>
-stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
-  unsigned id = Substrate::ThreadPool::getTID();
-  unsigned pkg = Substrate::ThreadPool::getPackage();
+stealHalfInPackage(substrate::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = substrate::ThreadPool::getTID();
+  unsigned pkg = substrate::ThreadPool::getPackage();
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
-  auto& tp = Substrate::getThreadPool();
+  auto& tp = substrate::getThreadPool();
   for (unsigned i = id + 1; i < num; ++i)
     if (tp.getPackage(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
@@ -60,8 +60,8 @@ stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
 
 template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>
-stealRemote(Substrate::PerThreadStorage<QueueTy>& queues) {
-  unsigned id = Substrate::ThreadPool::getTID();
+stealRemote(substrate::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = substrate::ThreadPool::getTID();
   //  unsigned pkg = runtime::LL::getPackageForThread(id);
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
@@ -84,7 +84,7 @@ public:
   typedef typename QueueTy::value_type value_type;
   
 private:
-  Substrate::PerThreadStorage<QueueTy> local;
+  substrate::PerThreadStorage<QueueTy> local;
 
   galois::optional<value_type> doSteal() {
     galois::optional<value_type> retval = stealHalfInPackage(local);
@@ -96,7 +96,7 @@ private:
   template<typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
     unsigned int a = galois::getActiveThreads();
-    unsigned int id = Substrate::ThreadPool::getTID();
+    unsigned int id = substrate::ThreadPool::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
     unsigned int A = std::min(num * id, dist);
@@ -182,7 +182,7 @@ public:
 template<typename WLTy = GFIFO<int>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
   typedef typename WLTy::template rethread<false> lWLTy;
-  Substrate::PerThreadStorage<lWLTy> local;
+  substrate::PerThreadStorage<lWLTy> local;
 
 public:
   template<bool newconcurrent>
@@ -227,8 +227,8 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
 
   typedef QT<Chunk, concurrent> LevelItem;
 
-  Substrate::PerThreadStorage<p> data;
-  detail::squeue<distributed, Substrate::PerPackageStorage, LevelItem> Q;
+  substrate::PerThreadStorage<p> data;
+  detail::squeue<distributed, substrate::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -240,13 +240,13 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   }
 
   void pushChunk(Chunk* C)  {
-    unsigned int tid = Substrate::ThreadPool::getTID();
+    unsigned int tid = substrate::ThreadPool::getTID();
     unsigned int index = isStack ? Fn(C->back()) : Fn(C->front());
     if (tid == index) {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = Substrate::getThreadPool().getPackage(index);
+      unsigned int mindex = substrate::getThreadPool().getPackage(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }

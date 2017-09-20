@@ -776,7 +776,7 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
   }
 }
 
-typedef galois::Substrate::PaddedLock<true> SpinLock;
+typedef galois::substrate::PaddedLock<true> SpinLock;
 
 struct sgd_march
 {

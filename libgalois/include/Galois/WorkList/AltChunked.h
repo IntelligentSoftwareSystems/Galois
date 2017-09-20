@@ -47,7 +47,7 @@ struct ChunkHeader {
 };
 
 class AltChunkedQueue {
-  Substrate::PtrLock<ChunkHeader> head;
+  substrate::PtrLock<ChunkHeader> head;
   ChunkHeader* tail;
 
   void prepend(ChunkHeader* C) {
@@ -152,7 +152,7 @@ public:
 };
 
 class AltChunkedStack {
-  Substrate::PtrLock<ChunkHeader> head;
+  substrate::PtrLock<ChunkHeader> head;
 
   void prepend(ChunkHeader* C) {
     //Find tail of stolen stuff
@@ -239,14 +239,14 @@ public:
 
 template<typename InnerWL>
 class StealingQueue : private boost::noncopyable {
-  Substrate::PerThreadStorage<std::pair<InnerWL, unsigned> > local;
+  substrate::PerThreadStorage<std::pair<InnerWL, unsigned> > local;
 
   GALOIS_ATTRIBUTE_NOINLINE
   ChunkHeader* doSteal() {
     std::pair<InnerWL, unsigned>& me = *local.getLocal();
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = substrate::getThreadPool();
     unsigned id = tp.getTID();
-    unsigned pkg = Substrate::ThreadPool::getPackage();
+    unsigned pkg = substrate::ThreadPool::getPackage();
     unsigned num = galois::getActiveThreads();
 
     //First steal from this package
@@ -266,7 +266,7 @@ class StealingQueue : private boost::noncopyable {
     }
 
     //Leaders can cross package
-    if (Substrate::ThreadPool::isLeader()) {
+    if (substrate::ThreadPool::isLeader()) {
       unsigned eid = (id + me.second) % num;
       ++me.second;
       if (id != eid && tp.isLeader(eid)) {
@@ -305,7 +305,7 @@ private:
   class Chunk : public ChunkHeader, public galois::FixedSizeRing<T, ChunkSize> {};
 
   runtime::FixedSizeAllocator<Chunk> alloc;
-  Substrate::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
+  substrate::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
   Container worklist;
 
   Chunk* mkChunk() {

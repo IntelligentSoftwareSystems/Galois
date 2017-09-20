@@ -49,7 +49,7 @@ struct squeue {
   PS<TQ> queues;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
-  int myEffectiveID() { return Substrate::ThreadPool::getTID(); }
+  int myEffectiveID() { return substrate::ThreadPool::getTID(); }
   int size() { return runtime::activeThreads; }
 };
 
@@ -87,8 +87,8 @@ private:
 
   typedef QT<Chunk, Concurrent> LevelItem;
 
-  squeue<Concurrent, Substrate::PerThreadStorage, p> data;
-  squeue<Distributed, Substrate::PerPackageStorage, LevelItem> Q;
+  squeue<Concurrent, substrate::PerThreadStorage, p> data;
+  squeue<Distributed, substrate::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);

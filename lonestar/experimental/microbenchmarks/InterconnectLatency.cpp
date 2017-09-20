@@ -45,9 +45,9 @@ static cll::opt<unsigned int> secondCore("secondCore", cll::desc("the index of t
 static volatile unsigned int globalAtomicCounter = 0;
 
 struct PingPong {
-  galois::Substrate::Barrier& barrier;
+  galois::substrate::Barrier& barrier;
 
-  PingPong(galois::Substrate::Barrier& b): barrier(b) {}
+  PingPong(galois::substrate::Barrier& b): barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned int inc = (firstCore == secondCore) ? 1 : 2;

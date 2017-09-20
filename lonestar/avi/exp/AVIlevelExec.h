@@ -121,14 +121,14 @@ protected:
 
     MeshInit& meshInit;
     GlobalVec& g;
-    galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec;
+    galois::substrate::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& niter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
+        galois::substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& niter)
       :
@@ -164,7 +164,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    galois::Substrate::PerThreadStorage<LocalVec> perIterLocalVec;
+    galois::substrate::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

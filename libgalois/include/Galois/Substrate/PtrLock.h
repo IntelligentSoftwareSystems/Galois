@@ -44,7 +44,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 namespace detail {
 void ptr_slow_lock(std::atomic<uintptr_t>& l);
@@ -167,7 +167,7 @@ public:
   }
 };
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

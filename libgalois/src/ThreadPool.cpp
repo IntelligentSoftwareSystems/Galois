@@ -38,7 +38,7 @@
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 extern void initPTS(unsigned);
 
@@ -46,7 +46,7 @@ extern void initPTS(unsigned);
 }
 
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
@@ -131,7 +131,7 @@ void ThreadPool::initThread(unsigned tid) {
   signals[tid] = &my_box;
   my_box.topo = getHWTopo().second[tid];
   // Initialize 
-  Substrate::initPTS(mi.maxThreads);
+  substrate::initPTS(mi.maxThreads);
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
@@ -256,14 +256,14 @@ void ThreadPool::runDedicated(std::function<void(void)>& f) {
 }
 
 
-static galois::Substrate::ThreadPool* TPOOL = nullptr;
+static galois::substrate::ThreadPool* TPOOL = nullptr;
 
-void galois::Substrate::internal::setThreadPool(ThreadPool* tp) {
+void galois::substrate::internal::setThreadPool(ThreadPool* tp) {
   GALOIS_ASSERT(!(TPOOL && tp), "Double initialization of ThreadPool");
   TPOOL = tp;
 }
 
-galois::Substrate::ThreadPool& galois::Substrate::getThreadPool(void) {
+galois::substrate::ThreadPool& galois::substrate::getThreadPool(void) {
   GALOIS_ASSERT(TPOOL, "ThreadPool not initialized");
   return *TPOOL;
 }

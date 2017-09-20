@@ -44,7 +44,7 @@ namespace {
 #define FAST_LOG2_UP(x) (((x) - (1 << FAST_LOG2(x))) ? FAST_LOG2(x) + 1 : FAST_LOG2(x))
 
 
-class DisseminationBarrier: public galois::Substrate::Barrier {
+class DisseminationBarrier: public galois::substrate::Barrier {
 
   struct node {
     std::atomic<int> flag[2];
@@ -63,7 +63,7 @@ class DisseminationBarrier: public galois::Substrate::Barrier {
     //std::array<node, 32> myflags;
   };
 
-  std::vector<galois::Substrate::CacheLineStorage<LocalData> > nodes;
+  std::vector<galois::substrate::CacheLineStorage<LocalData> > nodes;
   unsigned LogP;
 
 
@@ -97,12 +97,12 @@ public:
   }
 
   virtual void wait() {
-    auto& ld = nodes.at(galois::Substrate::ThreadPool::getTID()).get();
+    auto& ld = nodes.at(galois::substrate::ThreadPool::getTID()).get();
     auto& sense = ld.sense;
     auto& parity = ld.parity;
     for (unsigned r = 0; r < LogP; ++r) {
       ld.myflags[r].partner->flag[parity] = sense;
-      while (ld.myflags[r].flag[parity] != sense) { galois::Substrate::asmPause(); }
+      while (ld.myflags[r].flag[parity] != sense) { galois::substrate::asmPause(); }
     }
     if (parity == 1)
       sense = 1 - ld.sense;
@@ -114,6 +114,6 @@ public:
 
 }
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createDisseminationBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createDisseminationBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new DisseminationBarrier(activeThreads));
 }

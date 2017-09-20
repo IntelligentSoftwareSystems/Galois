@@ -51,7 +51,7 @@ namespace runtime {
  * barrier to the new number of active threads. If that may
  * happen, use {@link createSimpleBarrier()} instead. 
  */
-Substrate::Barrier& getBarrier(unsigned activeThreads);
+substrate::Barrier& getBarrier(unsigned activeThreads);
 
 
 } // end namespace runtime

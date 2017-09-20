@@ -39,7 +39,7 @@
 #include "CacheLineStorage.h"
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 /// PaddedLock is a spinlock.  If the second template parameter is
 /// false, the lock is a noop.
@@ -64,7 +64,7 @@ public:
   void unlock() const {}
 };
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

@@ -3,7 +3,7 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-  auto t = galois::Substrate::getHWTopo();
+  auto t = galois::substrate::getHWTopo();
   std::cout << "T,C,P,N: " << t.first.maxThreads << " " << t.first.maxCores << " " << t.first.maxPackages << " " << t.first.maxNumaNodes << "\n";
   for (unsigned i = 0; i < t.first.maxThreads; ++i) {
     auto& c = t.second[i];

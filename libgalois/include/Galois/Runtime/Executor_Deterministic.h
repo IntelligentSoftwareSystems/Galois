@@ -544,15 +544,15 @@ class DAGManagerBase<OptionsTy,true> {
     ThreadLocalData(): alloc(&heap), sortBuf(alloc) { }
   };
 
-  Substrate::PerThreadStorage<ThreadLocalData> data;
+  substrate::PerThreadStorage<ThreadLocalData> data;
   WL1 taskList;
   WL2 taskList2;
   WL3 sourceList;
-  Substrate::TerminationDetection& term;
-  Substrate::Barrier& barrier;
+  substrate::TerminationDetection& term;
+  substrate::Barrier& barrier;
 
 public:
-  DAGManagerBase(): term(Substrate::getSystemTermination(activeThreads)), barrier(getBarrier(activeThreads)) { }
+  DAGManagerBase(): term(substrate::getSystemTermination(activeThreads)), barrier(getBarrier(activeThreads)) { }
 
   void destroyDAGManager() {
     data.getLocal()->heap.clear();
@@ -633,7 +633,7 @@ public:
 
       term.localTermination(oldCommitted != committed);
       oldCommitted = committed;
-      Substrate::asmPause();
+      substrate::asmPause();
     } while (!term.globalTermination());
 
     if (OptionsTy::needsPia && OptionsTy::useLocalState)
@@ -734,8 +734,8 @@ template<typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
   typedef typename get_type_by_supertype<has_deterministic_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
   BreakFn breakFn;
-  Substrate::Barrier& barrier;
-  Substrate::CacheLineStorage<volatile long> done;
+  substrate::Barrier& barrier;
+  substrate::CacheLineStorage<volatile long> done;
 
 public:
   BreakManagerBase(const OptionsTy& o): 
@@ -743,7 +743,7 @@ public:
     barrier(getBarrier(activeThreads)) { }
 
   bool checkBreak() {
-    if (Substrate::ThreadPool::getTID() == 0)
+    if (substrate::ThreadPool::getTID() == 0)
       done.get() = breakFn();
     barrier.wait();
     return done.get();
@@ -766,8 +766,8 @@ template<typename OptionsTy>
 class IntentToReadManagerBase<OptionsTy, true> {
   typedef DeterministicContext<OptionsTy> Context;
   typedef galois::gdeque<Context*> WL;
-  Substrate::PerThreadStorage<WL> pending;
-  Substrate::Barrier& barrier;
+  substrate::PerThreadStorage<WL> pending;
+  substrate::Barrier& barrier;
 
 public:
   IntentToReadManagerBase(): barrier(getBarrier(activeThreads)) { }
@@ -817,7 +817,7 @@ public:
   };
 
 private:
-  Substrate::PerThreadStorage<ThreadLocalData> data;
+  substrate::PerThreadStorage<ThreadLocalData> data;
   unsigned numActive;
 
 public:
@@ -880,7 +880,7 @@ public:
 
     // Useful debugging info
     if (false) {
-      if (Substrate::ThreadPool::getTID() == 0) {
+      if (substrate::ThreadPool::getTID() == 0) {
         char buf[1024];
         snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
             inner, commitRatio, allcommitted, alliterations, local.window, local.delta);
@@ -980,11 +980,11 @@ class NewWorkManager: public IdManager<OptionsTy> {
 
   IterAllocBaseTy heap;
   PerIterAllocTy alloc;
-  Substrate::PerThreadStorage<ThreadLocalData> data;
+  substrate::PerThreadStorage<ThreadLocalData> data;
   NewWork new_;
   MergeBuf mergeBuf;
   DistributeBuf distributeBuf;
-  Substrate::Barrier& barrier;
+  substrate::Barrier& barrier;
   unsigned numActive;
 
   bool merge(int begin, int end) {
@@ -1249,16 +1249,16 @@ public:
       ThreadLocalData& local = *data.getLocal();
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta, local.minId);
       if (OptionsTy::hasFixedNeighborhood) {
-        copyMine(b, e, dist, wl, window, Substrate::ThreadPool::getTID());
+        copyMine(b, e, dist, wl, window, substrate::ThreadPool::getTID());
       } else {
         copyMine(
             boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
             boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
-            mergeBuf.size(), wl, window, Substrate::ThreadPool::getTID());
+            mergeBuf.size(), wl, window, substrate::ThreadPool::getTID());
       }
     } else {
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta);
-      copyMineAfterRedistribute(b, e, dist, wl, window, Substrate::ThreadPool::getTID());
+      copyMineAfterRedistribute(b, e, dist, wl, window, substrate::ThreadPool::getTID());
     }
   }
 
@@ -1278,7 +1278,7 @@ public:
 
   template<typename WL>
   void distributeNewWork(WindowManager<OptionsTy>& wm, WL* wl) {
-    parallelSort(wm, wl, Substrate::ThreadPool::getTID());
+    parallelSort(wm, wl, substrate::ThreadPool::getTID());
   }
 };
 
@@ -1317,13 +1317,13 @@ class Executor:
   };
 
   OptionsTy options;
-  Substrate::Barrier& barrier;
+  substrate::Barrier& barrier;
   WL worklists[2];
   PendingWork pending;
   const char* loopname;
-  Substrate::CacheLineStorage<volatile long> innerDone;
-  Substrate::CacheLineStorage<volatile long> outerDone;
-  Substrate::CacheLineStorage<volatile long> hasNewWork;
+  substrate::CacheLineStorage<volatile long> innerDone;
+  substrate::CacheLineStorage<volatile long> outerDone;
+  substrate::CacheLineStorage<volatile long> hasNewWork;
 
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
@@ -1452,7 +1452,7 @@ void Executor<OptionsTy>::go() {
   this->clearNewWork();
   
   if (OptionsTy::needsStats) {
-    if (Substrate::ThreadPool::getTID() == 0) {
+    if (substrate::ThreadPool::getTID() == 0) {
       reportStat_Serial(loopname, "RoundsExecuted", tld.rounds);
       reportStat_Serial(loopname, "OuterRoundsExecuted", tld.outerRounds);
     }

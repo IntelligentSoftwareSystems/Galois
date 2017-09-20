@@ -62,7 +62,7 @@ public:
   typedef typename container_type::const_iterator const_iterator;
   typedef typename container_type::const_reverse_iterator reverse_iterator;
   typedef typename container_type::const_reverse_iterator const_reverse_iterator;
-  typedef galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::substrate::SimpleLock Lock_ty;
 
 private:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
@@ -295,7 +295,7 @@ public:
   typedef typename container_type::const_reverse_iterator const_reverse_iterator;
 
 protected:
-  typedef galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::substrate::SimpleLock Lock_ty;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   container_type heap;

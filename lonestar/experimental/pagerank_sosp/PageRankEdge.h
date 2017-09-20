@@ -191,11 +191,11 @@ struct AsyncEdgePriSet {
     Graph& graph;
     PRTy tolerance;
     galois::InsertBag<GNode>& nextWL;
-    galois::Substrate::PerThreadStorage<galois::OnlineStat>& stats;
-    galois::Substrate::PerThreadStorage<int>& Pstats;
+    galois::substrate::PerThreadStorage<galois::OnlineStat>& stats;
+    galois::substrate::PerThreadStorage<int>& Pstats;
     PRTy limit;
 
-    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::Substrate::PerThreadStorage<galois::OnlineStat>& s, galois::Substrate::PerThreadStorage<int>& p, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), Pstats(p), limit(l) { }
+    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::substrate::PerThreadStorage<galois::OnlineStat>& s, galois::substrate::PerThreadStorage<int>& p, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), Pstats(p), limit(l) { }
 
     void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
@@ -273,8 +273,8 @@ struct AsyncEdgePriSet {
 
     galois::InsertBag<GNode> curWL;
     galois::InsertBag<GNode> nextWL;
-    galois::Substrate::PerThreadStorage<galois::OnlineStat> stats;
-    galois::Substrate::PerThreadStorage<int> Pstats;
+    galois::substrate::PerThreadStorage<galois::OnlineStat> stats;
+    galois::substrate::PerThreadStorage<int> Pstats;
     double oldlimit = 1000.0;
     int round = 0;
     unsigned long long totaldid = 0;

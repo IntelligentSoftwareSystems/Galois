@@ -707,7 +707,7 @@ PerCPU<int> fringeCnts;
 //std::vector<f2Item> *fringeBuffs;
 galois::InsertBag<ND*>* fringewl;
 //Galoisruntime::worklists::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, Galoisruntime::worklists::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
-galois::Substrate::CacheLineStorage<ND> *gnodes;
+galois::substrate::CacheLineStorage<ND> *gnodes;
 
 //void fringeFindOMP() {
 //  int gsize = graph->size();

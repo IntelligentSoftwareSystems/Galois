@@ -33,17 +33,17 @@
 #include "Galois/gIO.h"
 #include <mutex>
 
-__thread char* galois::Substrate::ptsBase;
+__thread char* galois::substrate::ptsBase;
 
-galois::Substrate::PerBackend& galois::Substrate::getPTSBackend() {
-  static galois::Substrate::PerBackend b;
+galois::substrate::PerBackend& galois::substrate::getPTSBackend() {
+  static galois::substrate::PerBackend b;
   return b;
 }
 
-__thread char* galois::Substrate::ppsBase;
+__thread char* galois::substrate::ppsBase;
 
-galois::Substrate::PerBackend& galois::Substrate::getPPSBackend() {
-  static galois::Substrate::PerBackend b;
+galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
+  static galois::substrate::PerBackend b;
   return b;
 }
 
@@ -57,12 +57,12 @@ inline void* alloc() {
 #else
 const size_t allocSize = galois::runtime::MM::hugePageSize;
 inline void* alloc() {
-  return galois::Substrate::MM::pageAlloc();
+  return galois::substrate::MM::pageAlloc();
 }
 #endif
 #undef MORE_MEM_HACK
 
-unsigned galois::Substrate::PerBackend::nextLog2(unsigned size) {
+unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
   while ((1U<<i) < size) {
     ++i;
@@ -73,7 +73,7 @@ unsigned galois::Substrate::PerBackend::nextLog2(unsigned size) {
   return i;
 }
 
-unsigned galois::Substrate::PerBackend::allocOffset(const unsigned sz) {
+unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
   unsigned retval = allocSize;
   unsigned ll = nextLog2(sz);
   unsigned size = (1 << ll);
@@ -119,7 +119,7 @@ unsigned galois::Substrate::PerBackend::allocOffset(const unsigned sz) {
   return retval;
 }
 
-void galois::Substrate::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
+void galois::substrate::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
   unsigned ll = nextLog2(sz);
   unsigned size = (1 << ll);
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
@@ -131,13 +131,13 @@ void galois::Substrate::PerBackend::deallocOffset(const unsigned offset, const u
   }
 }
 
-void* galois::Substrate::PerBackend::getRemote(unsigned thread, unsigned offset) {
+void* galois::substrate::PerBackend::getRemote(unsigned thread, unsigned offset) {
   char* rbase = heads[thread];
   assert(rbase);
   return &rbase[offset];
 }
 
-void galois::Substrate::PerBackend::initCommon(unsigned maxT) {
+void galois::substrate::PerBackend::initCommon(unsigned maxT) {
   if (!heads) {
     assert(ThreadPool::getTID() == 0);
     heads = new char*[maxT];
@@ -145,14 +145,14 @@ void galois::Substrate::PerBackend::initCommon(unsigned maxT) {
   }
 }
 
-char* galois::Substrate::PerBackend::initPerThread(unsigned maxT) {
+char* galois::substrate::PerBackend::initPerThread(unsigned maxT) {
   initCommon(maxT);
   char* b = heads[ThreadPool::getTID()] = (char*) alloc();
   memset(b, 0, allocSize);
   return b;
 }
 
-char* galois::Substrate::PerBackend::initPerPackage(unsigned maxT) {
+char* galois::substrate::PerBackend::initPerPackage(unsigned maxT) {
   initCommon(maxT);
   unsigned id = ThreadPool::getTID();
   unsigned leader = ThreadPool::getLeader();
@@ -162,13 +162,13 @@ char* galois::Substrate::PerBackend::initPerPackage(unsigned maxT) {
     return b;
   } else {
     //wait for leader to fix up package
-    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) { Substrate::asmPause(); }
+    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) { substrate::asmPause(); }
     heads[id] = heads[leader];
     return heads[id];
   }
 }
 
-void galois::Substrate::initPTS(unsigned maxT) {
+void galois::substrate::initPTS(unsigned maxT) {
   if (!ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated

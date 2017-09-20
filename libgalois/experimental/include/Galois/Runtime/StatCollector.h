@@ -101,7 +101,7 @@ protected:
   
   std::string m_outfile;
   std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
-  galois::Substrate::SimpleLock StatsLock;
+  galois::substrate::SimpleLock StatsLock;
 
 public:
 

@@ -25,7 +25,7 @@
 
 #include <iostream>
 
-galois::Substrate::SimpleLock l;
+galois::substrate::SimpleLock l;
 
 int main(int argc, char** argv) {
   galois::setActiveThreads(10000);

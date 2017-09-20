@@ -120,8 +120,8 @@ unsigned variableNodeToId(GNode variable_node) {
 
 template<typename T, UpdateType UT>
 class DiffractedCollection {
-  galois::Substrate::PerThreadStorage<T*> thread;
-  galois::Substrate::PerPackageStorage<T*> package;
+  galois::substrate::PerThreadStorage<T*> thread;
+  galois::substrate::PerPackageStorage<T*> package;
   galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
@@ -154,7 +154,7 @@ class DiffractedCollection {
             std::copy(local, local + size, *thread.getLocal());
           break;
         case UpdateType::ReplicateByPackage:
-          if (tid && galois::Substrate::getThreadPool().isLeader(tid))
+          if (tid && galois::substrate::getThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -165,7 +165,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n) {
     num_threads = galois::getActiveThreads();
-    num_packages = galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_packages = galois::substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
 
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -179,7 +179,7 @@ public:
         });
       case UpdateType::ReplicateByPackage:
         galois::on_each([n, this](unsigned tid, unsigned total) {
-            if (galois::Substrate::getThreadPool().isLeader(tid)) {
+            if (galois::substrate::getThreadPool().isLeader(tid)) {
             T *p = new T[n];
             *package.getLocal() = p;
             std::fill(p, p + n, 0);
@@ -224,8 +224,8 @@ public:
 
   Accessor get() {
     if (num_packages > 1 && UT == UpdateType::ReplicateByPackage) {
-      unsigned tid = galois::Substrate::ThreadPool::getTID();
-      unsigned my_package = galois::Substrate::ThreadPool::getPackage();
+      unsigned tid = galois::substrate::ThreadPool::getTID();
+      unsigned my_package = galois::substrate::ThreadPool::getPackage();
       unsigned next = (my_package + 1) % num_packages;
       return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
     }

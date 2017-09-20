@@ -43,9 +43,9 @@ namespace galois {
 namespace runtime {
 
 template <typename SM>
-class SharedMemRuntime: public galois::Substrate::SharedMemSubstrate {
+class SharedMemRuntime: public galois::substrate::SharedMemSubstrate {
 
-  using Base = galois::Substrate::SharedMemSubstrate;
+  using Base = galois::substrate::SharedMemSubstrate;
 
   internal::PageAllocState<> m_pa;
   SM m_sm;

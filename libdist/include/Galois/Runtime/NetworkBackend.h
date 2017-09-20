@@ -45,7 +45,7 @@ public:
 
 protected:
   uint32_t sz, _ID, _Num;
-  Substrate::SimpleLock flLock;
+  substrate::SimpleLock flLock;
   BlockList freelist;
 
   NetworkBackend(unsigned size);

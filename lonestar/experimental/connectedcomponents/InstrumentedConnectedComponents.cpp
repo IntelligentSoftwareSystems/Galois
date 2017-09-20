@@ -1388,7 +1388,7 @@ struct BlockedAsyncAlgo {
 
     void operator()(const GNode& src) const {
       Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-      if (galois::Substrate::ThreadPool::getPackage() == 0) {
+      if (galois::substrate::ThreadPool::getPackage() == 0) {
         process<true, 0>(src, start, items);
       } else {
         process<true, 1>(src, start, items);

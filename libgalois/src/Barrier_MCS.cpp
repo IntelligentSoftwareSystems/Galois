@@ -39,7 +39,7 @@
 
 namespace {
 
-class MCSBarrier: public galois::Substrate::Barrier {
+class MCSBarrier: public galois::substrate::Barrier {
   struct treenode {
     //vpid is galois::runtime::LL::getTID()
     std::atomic<bool>* parentpointer; //null for vpid == 0
@@ -63,7 +63,7 @@ class MCSBarrier: public galois::Substrate::Barrier {
     }
   };
 
-  std::vector<galois::Substrate::CacheLineStorage<treenode> > nodes;
+  std::vector<galois::substrate::CacheLineStorage<treenode> > nodes;
   
   void _reinit(unsigned P) {
     nodes.resize(P);
@@ -93,10 +93,10 @@ public:
   }
 
   virtual void wait() {
-    treenode& n = nodes.at(galois::Substrate::ThreadPool::getTID()).get();
+    treenode& n = nodes.at(galois::substrate::ThreadPool::getTID()).get();
     while (n.childnotready[0] || n.childnotready[1] || 
 	   n.childnotready[2] || n.childnotready[3]) {
-      galois::Substrate::asmPause();
+      galois::substrate::asmPause();
     }
     for (int i = 0; i < 4; ++i)
       n.childnotready[i] = n.havechild[i];
@@ -104,7 +104,7 @@ public:
       //FIXME: make sure the compiler doesn't do a RMW because of the as-if rule
       *n.parentpointer = false;
       while(n.parentsense != n.sense) {
-	galois::Substrate::asmPause();
+	galois::substrate::asmPause();
       }
     }
     //signal children in wakeup tree
@@ -120,6 +120,6 @@ public:
 
 }
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createMCSBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createMCSBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new MCSBarrier(activeThreads));
 }

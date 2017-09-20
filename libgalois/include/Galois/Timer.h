@@ -193,7 +193,7 @@ protected:
   const char* const region;
   const char* const category;
 
-  Substrate::PerThreadStorage<ThreadTimer<enabled> > timers;
+  substrate::PerThreadStorage<ThreadTimer<enabled> > timers;
 
 
   void reportTimes(void) {
@@ -211,7 +211,7 @@ protected:
     std::string timeCat = category + std::string("-per-thread-times(ns)");
     std::string lagCat = category + std::string("-per-thread-lag(ns)");
 
-    galois::Substrate::getThreadPool(galois::getActiveThreads(),
+    galois::substrate::getThreadPool(galois::getActiveThreads(),
         [&] (void) {
           auto ns = timers.getLocal()->get_nsec();
           auto lag = ns - minTime;

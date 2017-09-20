@@ -39,7 +39,7 @@
 
 namespace {
 
-class TopoBarrier : public galois::Substrate::Barrier {
+class TopoBarrier : public galois::substrate::Barrier {
   struct treenode {
     //vpid is galois::runtime::LL::getTID()
 
@@ -56,11 +56,11 @@ class TopoBarrier : public galois::Substrate::Barrier {
 
   };
 
-  galois::Substrate::PerPackageStorage<treenode> nodes;
-  galois::Substrate::PerThreadStorage<unsigned> sense;
+  galois::substrate::PerPackageStorage<treenode> nodes;
+  galois::substrate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
-    auto& tp = galois::Substrate::getThreadPool();
+    auto& tp = galois::substrate::getThreadPool();
     unsigned pkgs = tp.getCumulativeMaxPackage(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);
@@ -99,13 +99,13 @@ public:
   }
 
   virtual void wait() {
-    unsigned id = galois::Substrate::ThreadPool::getTID();
+    unsigned id = galois::substrate::ThreadPool::getTID();
     treenode& n = *nodes.getLocal();
     unsigned& s = *sense.getLocal();
-    bool leader = galois::Substrate::ThreadPool::isLeader();
+    bool leader = galois::substrate::ThreadPool::isLeader();
     //completion tree
     if (leader) {
-      while (n.childnotready) { galois::Substrate::asmPause(); }
+      while (n.childnotready) { galois::substrate::asmPause(); }
       n.childnotready = n.havechild;
       if (n.parentpointer) {
 	--n.parentpointer->childnotready;
@@ -117,7 +117,7 @@ public:
     //wait for signal
     if (id != 0) {
       while (n.parentsense != s) {
-	galois::Substrate::asmPause();
+	galois::substrate::asmPause();
       }
     }
     
@@ -139,7 +139,7 @@ public:
 
 }
 
-std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createTopoBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier> galois::substrate::createTopoBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new TopoBarrier(activeThreads));
 }
 

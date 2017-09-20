@@ -130,7 +130,7 @@ public:
 
 protected:
   Nodes nodes;
-  galois::Substrate::PerThreadStorage<EdgeHolder*> edgesL;
+  galois::substrate::PerThreadStorage<EdgeHolder*> edgesL;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {

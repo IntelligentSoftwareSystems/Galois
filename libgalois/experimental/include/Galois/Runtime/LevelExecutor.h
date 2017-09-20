@@ -69,11 +69,11 @@ public:
   using CachedLevel = galois::optional<Level>;
 
 private:
-  Substrate::ThreadRWlock rwmutex;
+  substrate::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;
-  Substrate::PerThreadStorage<CachedLevel> cachedLevels;
+  substrate::PerThreadStorage<CachedLevel> cachedLevels;
 
 public:
   LevelMap (const KeyCmp& kcmp): 
@@ -162,11 +162,11 @@ public:
   using CachedLevel = galois::optional<Level>;
 
 private:
-  Substrate::ThreadRWlock rwmutex;
+  substrate::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
   GarbageVec removedLevels;
-  Substrate::PerThreadStorage<CachedLevel> cachedLevels;
+  substrate::PerThreadStorage<CachedLevel> cachedLevels;
 
   unsigned begLevel = 0;
 
@@ -291,7 +291,7 @@ class LevelExecutor {
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = substrate::PerThreadStorage<UserCtx>;
 
   struct BodyWrapper;
   using ForEachExec_ty = galois::runtime::ForEachWork<worklists::ExternPtr<WL_ty>, T, BodyWrapper>;
@@ -399,7 +399,7 @@ public:
   }
 
   static bool isMasterThread (void) {
-    return Substrate::ThreadPool::getTID () == 0;
+    return substrate::ThreadPool::getTID () == 0;
   }
 
   // parallel

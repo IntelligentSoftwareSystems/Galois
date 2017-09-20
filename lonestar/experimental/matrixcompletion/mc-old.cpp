@@ -545,7 +545,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	}
 }
 
-typedef galois::Substrate::SimpleLock spinlock;
+typedef galois::substrate::SimpleLock spinlock;
 
 struct sgd_march
 {

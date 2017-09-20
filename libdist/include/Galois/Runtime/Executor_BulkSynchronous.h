@@ -58,11 +58,11 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = Substrate::getThreadPool().getLeader(tid);
+    pid = substrate::getThreadPool().getLeader(tid);
   }
   WID() {
-    tid = Substrate::ThreadPool::getTID();
-    pid = Substrate::ThreadPool::getLeader();
+    tid = substrate::ThreadPool::getTID();
+    pid = substrate::ThreadPool::getLeader();
   }
 };
 
@@ -78,8 +78,8 @@ class dChunkedMaster : private boost::noncopyable {
 
   typedef OuterTy<Chunk, true> LevelItem;
 
-  Substrate::PerThreadStorage<p> data;
-  Substrate::PerPackageStorage<LevelItem> Q;
+  substrate::PerThreadStorage<p> data;
+  substrate::PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);
@@ -182,7 +182,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = Substrate::getThreadPool().getLeader(i);
+      id.pid = substrate::getThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }
@@ -260,8 +260,8 @@ class Executor {
   WLTy wls[2];
   FunctionTy function;
   const char* loopname;
-  Substrate::Barrier& barrier;
-  Substrate::CacheLineStorage<volatile long> done;
+  substrate::Barrier& barrier;
+  substrate::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
     return wl->sempty();
@@ -325,7 +325,7 @@ class Executor {
   void go() {
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.ctx);
-    unsigned tid = Substrate::ThreadPool::getTID();
+    unsigned tid = substrate::ThreadPool::getTID();
     WID wid;
 
     WLTy* cur = &wls[0];

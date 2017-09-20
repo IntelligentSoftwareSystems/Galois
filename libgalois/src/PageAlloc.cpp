@@ -45,11 +45,11 @@
 //figure this out dynamically
 const size_t hugePageSize = 2*1024*1024;
 //protect mmap, munmap since linux has issues
-static galois::Substrate::SimpleLock allocLock;
+static galois::substrate::SimpleLock allocLock;
 
 
 static void* trymmap(size_t size, int flag) {
-  std::lock_guard<galois::Substrate::SimpleLock> lg(allocLock);
+  std::lock_guard<galois::substrate::SimpleLock> lg(allocLock);
   const int _PROT = PROT_READ | PROT_WRITE;
   void* ptr = mmap(0, size, _PROT, flag, -1, 0);
   if (ptr == MAP_FAILED)
@@ -82,11 +82,11 @@ static const int _MAP_HUGE = _MAP;
 #endif
 
 
-size_t galois::Substrate::allocSize() {
+size_t galois::substrate::allocSize() {
   return hugePageSize;
 }
 
-void* galois::Substrate::allocPages(unsigned num, bool preFault) {
+void* galois::substrate::allocPages(unsigned num, bool preFault) {
   if (num > 0) {
     void* ptr = trymmap(num * hugePageSize, 
                         preFault ? _MAP_HUGE_POP : _MAP_HUGE);
@@ -108,7 +108,7 @@ void* galois::Substrate::allocPages(unsigned num, bool preFault) {
   }
 }
 
-void galois::Substrate::freePages(void* ptr, unsigned num) {
+void galois::substrate::freePages(void* ptr, unsigned num) {
   std::lock_guard<SimpleLock> lg(allocLock);
   if (munmap(ptr, num*hugePageSize) != 0)
     GALOIS_SYS_DIE("Unmap failed");
@@ -134,11 +134,11 @@ class PageSizeConf {
       std::string kb;
       ss >> hugePageSizeKb >> kb;
       if (kb != "kB")
-        galois::Substrate::gWarn("error parsing meminfo");
+        galois::substrate::gWarn("error parsing meminfo");
       break;
     }
     if (hugePageSizeKb * 1024 != galois::runtime::hugePageSize)
-      galois::Substrate::gWarn("System HugePageSize does not match compiled HugePageSize");
+      galois::substrate::gWarn("System HugePageSize does not match compiled HugePageSize");
   }
 #else
   void checkHuge() { }

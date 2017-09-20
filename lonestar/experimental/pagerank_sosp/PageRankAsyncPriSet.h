@@ -57,10 +57,10 @@ struct AsyncPriSet{
     Graph& graph;
     PRTy tolerance;
     galois::InsertBag<GNode>& nextWL;
-    galois::Substrate::PerThreadStorage<galois::OnlineStat>& stats;
+    galois::substrate::PerThreadStorage<galois::OnlineStat>& stats;
     PRTy limit;
 
-    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::Substrate::PerThreadStorage<galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
+    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::substrate::PerThreadStorage<galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
 
     //    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
     void operator()(const GNode& src) const {
@@ -112,7 +112,7 @@ struct AsyncPriSet{
 
     galois::InsertBag<GNode> curWL;
     galois::InsertBag<GNode> nextWL;
-    galois::Substrate::PerThreadStorage<galois::OnlineStat> stats;
+    galois::substrate::PerThreadStorage<galois::OnlineStat> stats;
 
     //First do all the nodes once
     galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, 0.0), galois::do_all_steal<true>());

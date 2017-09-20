@@ -67,7 +67,7 @@ public:
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
+    galois::substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
     unsigned int thr;
     header* p;
     U* v;
@@ -121,7 +121,7 @@ public:
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
 
-    Iterator(galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
+    Iterator(galois::substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
       hd(h), thr(t), p(0), v(0)
     {
       // find first valid item
@@ -132,7 +132,7 @@ public:
 
 private:
   galois::runtime::FixedSizeHeap heap;
-  galois::Substrate::PerThreadStorage<PerThread> heads;
+  galois::substrate::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
     PerThread& hpair = *heads.getLocal();
@@ -228,8 +228,8 @@ public:
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
   
-  local_iterator local_begin() { return local_iterator(&heads, galois::Substrate::ThreadPool::getTID()); }
-  local_iterator local_end() { return local_iterator(&heads, galois::Substrate::ThreadPool::getTID() + 1); }
+  local_iterator local_begin() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID()); }
+  local_iterator local_end() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1); }
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {

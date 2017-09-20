@@ -43,7 +43,7 @@ namespace worklists {
 //! Simple Container Wrapper worklist (not scalable).
 template<typename T, typename container = std::deque<T>, bool popBack = true>
 class Wrapper : private boost::noncopyable {
-  Substrate::PaddedLock<true> lock;
+  substrate::PaddedLock<true> lock;
   container wl;
 
 public:
@@ -56,25 +56,25 @@ public:
   typedef T value_type;
   
   void push(const value_type& val) {
-    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
+    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
     wl.push_back(val);
   }
   
   template<typename Iter>
   void push(Iter b, Iter e) {
-    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
+    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
     wl.insert(wl.end(),b,e);
   }
 
   template<typename RangeTy>
   void push_initial(const RangeTy& range) {
-    if (Substrate::ThreadPool::getTID() == 0)
+    if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 
   galois::optional<value_type> pop() {
     galois::optional<value_type> retval;
-    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
+    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
     if (!wl.empty()) {
       if (popBack) {
         retval = wl.back();

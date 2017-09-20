@@ -12,7 +12,7 @@ unsigned numThreads = 2;
 char bname[100];
 
 struct emp {
-  galois::Substrate::Barrier& b;
+  galois::substrate::Barrier& b;
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
@@ -34,7 +34,7 @@ struct emp {
   }
 };
 
-void test(std::unique_ptr<galois::Substrate::Barrier> b) {
+void test(std::unique_ptr<galois::substrate::Barrier> b) {
   unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
@@ -55,10 +55,10 @@ int main(int argc, char** argv) {
   if (!iter)
     iter = 16*1024;
   if (argc > 2)
-    numThreads = galois::Substrate::getThreadPool().getMaxThreads();
+    numThreads = galois::substrate::getThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));
-  using namespace galois::Substrate;
+  using namespace galois::substrate;
   test(createPthreadBarrier(1));
   test(createCountingBarrier(1));
   test(createMCSBarrier(1));

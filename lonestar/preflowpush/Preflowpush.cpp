@@ -574,7 +574,7 @@ bool discharge(const GNode& src, galois::UserContext<GNode>& ctx) {
 
 struct Counter {
   galois::GAccumulator<int> accum;
-  galois::Substrate::PerThreadStorage<int> local;
+  galois::substrate::PerThreadStorage<int> local;
 };
 
 template<DetAlgo version>

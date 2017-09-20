@@ -46,7 +46,7 @@
 #include <sys/processor.h>
 #include <sys/thread.h>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace {
 

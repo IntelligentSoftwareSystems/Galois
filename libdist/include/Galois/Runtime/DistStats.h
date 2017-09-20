@@ -75,7 +75,7 @@ class DistStatManager: public galois::runtime::StatManager {
     using TMap = hidden::BasicStatMap<DummyStat>;
 
     bool merged = false;
-    Substrate::PerThreadStorage<TMap> perThrdMap;
+    substrate::PerThreadStorage<TMap> perThrdMap;
 
     void addToStat(const Str& region, const Str& category, const StatTotal::Type& hostTotal) {
       perThrdMap.getLocal()->addToStat(region, category, 0, hostTotal);

@@ -130,7 +130,7 @@ struct GraphLabDiameter {
     size_t hash_value() const {
       if (!gen) {
         gen = std::mt19937();
-        gen->seed(galois::Substrate::ThreadPool::getTID());
+        gen->seed(galois::substrate::ThreadPool::getTID());
       }
       size_t ret = 0;
       while (dist(*gen) < 0.5) {

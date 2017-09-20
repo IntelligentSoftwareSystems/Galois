@@ -178,7 +178,7 @@ public:
     galois::StatTimer t_verify ("Verification time: ");
 
     t_verify.start ();
-    galois::Substrate::PerThreadStorage<bool> result;
+    galois::substrate::PerThreadStorage<bool> result;
     for (unsigned i = 0; i < result.size (); ++i) {
       *result.getRemote(i) = true;
     }

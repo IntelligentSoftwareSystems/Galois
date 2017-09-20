@@ -132,7 +132,7 @@ public:
       executor (e), 
       lostConflict (false),
       executed (false),
-      owner (Substrate::ThreadPool::getTID ())
+      owner (substrate::ThreadPool::getTID ())
 
   {}
 
@@ -205,7 +205,7 @@ public:
     executor.push (userHandle.getPushBuffer ().begin (), userHandle.getPushBuffer ().end ());
     userHandle.reset ();
 
-    Substrate::compilerBarrier ();
+    substrate::compilerBarrier ();
 
     setState (State::COMMIT_DONE);
   }
@@ -221,7 +221,7 @@ public:
     executor.push_abort (Base::getActive (), owner);
     userHandle.reset ();
 
-    Substrate::compilerBarrier ();
+    substrate::compilerBarrier ();
 
     setState (State::ABORT_DONE);
 
@@ -278,7 +278,7 @@ private:
                 
           }
 
-          Substrate::asmPause ();
+          substrate::asmPause ();
         }
 
       } else if (that->casState (State::READY_TO_COMMIT, State::ABORT_HELP)) {
@@ -316,7 +316,7 @@ class ROBexecutor: private boost::noncopyable {
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
   using ROB = galois::MinHeap<Ctxt*, CtxtCmp>;
 
-  using Lock_ty = galois::Substrate::SimpleLock;
+  using Lock_ty = galois::substrate::SimpleLock;
   // using Lock_ty = galois::runtime::LL::PthreadLock<true>;
 
 
@@ -327,7 +327,7 @@ class ROBexecutor: private boost::noncopyable {
 
   PerThrdPendingQ pending;
   ROB rob;
-  Substrate::TerminationDetection& term;
+  substrate::TerminationDetection& term;
 
 
   CtxtAlloc ctxtAlloc;
@@ -335,7 +335,7 @@ class ROBexecutor: private boost::noncopyable {
   CtxtDeq freeList;
 
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty pendingMutex;
-  Substrate::PerThreadStorage<Lock_ty> pendingMutex;
+  substrate::PerThreadStorage<Lock_ty> pendingMutex;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty robMutex;
 
@@ -364,7 +364,7 @@ public:
       ctxtCmp (itemCmp),
       pending (itemCmp),
       rob (ctxtCmp), 
-      term (Substrate::getSystemTermination (activeThreads))
+      term (substrate::getSystemTermination (activeThreads))
   {}
 
   const Cmp& getItemCmp () const { return itemCmp; }
@@ -477,7 +477,7 @@ public:
 
           ctx->executed = true;
 
-          Substrate::compilerBarrier ();
+          substrate::compilerBarrier ();
 
         }
 
@@ -593,7 +593,7 @@ private:
               new (ctx) Ctxt (pending[minTID].pop (), *this);
 
               ctx->setState (Ctxt::State::SCHEDULED);
-              ctx->owner = Substrate::ThreadPool::getTID ();
+              ctx->owner = substrate::ThreadPool::getTID ();
               rob.push (ctx);
               numTotal += 1;
             }
@@ -620,7 +620,7 @@ private:
       robMutex.lock (); {
 
         if (!freeList.get ().empty ()) {
-          unsigned beg = Substrate::ThreadPool::getTID ();
+          unsigned beg = substrate::ThreadPool::getTID ();
           unsigned end = beg + getActiveThreads ();
 
           for (unsigned i = beg; i < end; ++i) {
@@ -637,7 +637,7 @@ private:
                 new (ctx) Ctxt (pending[tid].pop (), *this);
 
                 ctx->setState (Ctxt::State::SCHEDULED);
-                ctx->owner = Substrate::ThreadPool::getTID ();
+                ctx->owner = substrate::ThreadPool::getTID ();
                 rob.push (ctx);
                 numTotal += 1;
               }

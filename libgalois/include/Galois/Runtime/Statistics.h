@@ -434,7 +434,7 @@ private:
     using Stat = typename MergedStats::Stat;
 
 
-    Substrate::PerThreadStorage<hidden::ScalarStatManager<T> > perThreadManagers;
+    substrate::PerThreadStorage<hidden::ScalarStatManager<T> > perThreadManagers;
     MergedStats result;
     bool merged = false;
 
@@ -653,7 +653,7 @@ class StatManager {
     StrSet symbols;
     StatMap statMap;
     StatAlloc statAlloc;
-    Substrate::ThreadRWlock rwmutex;
+    substrate::ThreadRWlock rwmutex;
 
     ~StatManagerImpl(void) {
 
@@ -719,7 +719,7 @@ class StatManager {
         ret = s;
       };
 
-      galois::Substrate::readUpdateProtected(rwmutex, readAndCheck, write);
+      galois::substrate::readUpdateProtected(rwmutex, readAndCheck, write);
 
       assert(ret, "readUpdateProtected shouldn't fail");
 

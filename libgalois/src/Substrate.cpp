@@ -35,6 +35,6 @@
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/Init.h"
 
-galois::Substrate::Barrier& galois::runtime::getBarrier(unsigned activeThreads) {
-  return galois::Substrate::getBarrier(activeThreads);
+galois::substrate::Barrier& galois::runtime::getBarrier(unsigned activeThreads) {
+  return galois::substrate::getBarrier(activeThreads);
 }

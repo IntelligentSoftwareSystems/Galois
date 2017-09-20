@@ -342,7 +342,7 @@ void FileGraph::fromFile(const std::string& filename) {
 template<typename Mappings>
 static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
   // mmap needs page-aligned offsets
-  offset_t aligned = offset & ~static_cast<offset_t>(galois::Substrate::allocSize() - 1);
+  offset_t aligned = offset & ~static_cast<offset_t>(galois::substrate::allocSize() - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
   void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
@@ -354,9 +354,9 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
 
 static void pageInterleaved(void* ptr, uint64_t length, uint32_t hugePageSize,
                             unsigned int numThreads) {
-  galois::Substrate::getThreadPool().run(numThreads, 
+  galois::substrate::getThreadPool().run(numThreads, 
    [ptr, length, hugePageSize, numThreads] () {
-      auto myID = galois::Substrate::ThreadPool::getTID();
+      auto myID = galois::substrate::ThreadPool::getTID();
 
       volatile char* cptr = reinterpret_cast<volatile char*>(ptr);
 
@@ -501,7 +501,7 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
   //  ea = *edge_end(eb-1);
   //}
   //if (false) {
-  //  Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+  //  substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
   //}
   //return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }

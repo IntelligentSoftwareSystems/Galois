@@ -33,7 +33,7 @@
 #include <string>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
@@ -43,7 +43,7 @@ bool EnvCheck(const std::string& parm);
 bool EnvCheck(const std::string&, int& val);
 bool EnvCheck(const std::string&, std::string& val);
 
-} // end namespace Substrate
+} // end namespace substrate
 } // end namespace galois
 
 #endif

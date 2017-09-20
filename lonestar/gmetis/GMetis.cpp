@@ -166,7 +166,7 @@ struct order_by_degree {
     return wa < wb;
   }
 };
-typedef galois::Substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
+typedef galois::substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
 struct OrderGraph {
   GGraph &graph;
   PerThreadDegInfo &threadDegInfo;

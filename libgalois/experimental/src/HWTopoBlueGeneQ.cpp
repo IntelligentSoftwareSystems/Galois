@@ -36,7 +36,7 @@
 #include <vector>
 #include <sched.h>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace {
 

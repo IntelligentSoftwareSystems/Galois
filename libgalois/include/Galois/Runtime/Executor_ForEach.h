@@ -70,14 +70,14 @@ class AbortHandler {
   struct Item { value_type val;  int retries; };
 
   typedef worklists::GFIFO<Item> AbortedList;
-  Substrate::PerThreadStorage<AbortedList> queues;
+  substrate::PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
   
   /**
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = substrate::getThreadPool();
     unsigned package = tp.getPackage();
     queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
   }
@@ -93,10 +93,10 @@ class AbortHandler {
       return;
     } 
     
-    unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getThreadPool();
-    unsigned package = Substrate::ThreadPool::getPackage();
-    unsigned leader = Substrate::ThreadPool::getLeader();
+    unsigned tid = substrate::ThreadPool::getTID();
+    auto& tp = substrate::getThreadPool();
+    unsigned package = substrate::ThreadPool::getPackage();
+    unsigned leader = substrate::ThreadPool::getLeader();
     if (tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
       queues.getRemote(next)->push(item);
@@ -116,9 +116,9 @@ class AbortHandler {
       return;
     } 
     
-    unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getThreadPool();
-    unsigned package = Substrate::ThreadPool::getPackage();
+    unsigned tid = substrate::ThreadPool::getTID();
+    auto& tp = substrate::getThreadPool();
+    unsigned package = substrate::ThreadPool::getPackage();
     unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
@@ -138,7 +138,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = Substrate::getThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = substrate::getThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -203,8 +203,8 @@ protected:
   // members to give higher likelihood of reclaiming PerThreadStorage
 
   AbortHandler<value_type> aborted; 
-  Substrate::TerminationDetection& term;
-  Substrate::Barrier& barrier;
+  substrate::TerminationDetection& term;
+  substrate::Barrier& barrier;
 
   WorkListTy wl;
   FunctionTy origFunction;
@@ -339,7 +339,7 @@ protected:
 
         // Update node color and prop token
         term.localTermination(didWork);
-        Substrate::asmPause(); // Let token propagate
+        substrate::asmPause(); // Let token propagate
       } while (!term.globalTermination() && (!needsBreak || !broke));
 
       if (checkEmpty(wl, tld, 0)) {
@@ -364,7 +364,7 @@ protected:
 
   template<typename... WArgsTy>
   ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
-    term(Substrate::getSystemTermination(activeThreads)),
+    term(substrate::getSystemTermination(activeThreads)),
     barrier(getBarrier(activeThreads)),
     wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
@@ -409,7 +409,7 @@ public:
   }
 
   void operator()() {
-    bool isLeader = Substrate::ThreadPool::isLeader();
+    bool isLeader = substrate::ThreadPool::isLeader();
     bool couldAbort = needsAborts && activeThreads > 1;
     if (couldAbort && isLeader)
       go<true, true>();
@@ -525,7 +525,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
-  Substrate::getThreadPool().run(activeThreads,
+  substrate::getThreadPool().run(activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));

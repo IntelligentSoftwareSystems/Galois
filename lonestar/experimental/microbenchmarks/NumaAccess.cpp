@@ -73,8 +73,8 @@ static volatile Element globalCounter = 0;
 
 struct StarGraphRead {
   Array& array;
-  galois::Substrate::Barrier& barrier;
-  StarGraphRead(Array& _a, galois::Substrate::Barrier& b): array(_a), barrier(b) {}
+  galois::substrate::Barrier& barrier;
+  StarGraphRead(Array& _a, galois::substrate::Barrier& b): array(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() + (unsigned)tid;
@@ -109,8 +109,8 @@ struct StarGraphRead {
 
 struct GlobalAccess {
   Array& array;
-  galois::Substrate::Barrier& barrier;
-  GlobalAccess(Array& _a, galois::Substrate::Barrier& b): array(_a), barrier(b) {}
+  galois::substrate::Barrier& barrier;
+  GlobalAccess(Array& _a, galois::substrate::Barrier& b): array(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() + (unsigned)tid;
@@ -166,12 +166,12 @@ struct LocalArray {
   }
 };
 
-typedef galois::Substrate::PerPackageStorage<LocalArray> PerPackageArray;
+typedef galois::substrate::PerPackageStorage<LocalArray> PerPackageArray;
 
 struct LocalAccess {
   PerPackageArray& pArray;
-  galois::Substrate::Barrier& barrier;
-  LocalAccess(PerPackageArray& _a, galois::Substrate::Barrier& b): pArray(_a), barrier(b) {}
+  galois::substrate::Barrier& barrier;
+  LocalAccess(PerPackageArray& _a, galois::substrate::Barrier& b): pArray(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned numEntry = pArray.getLocal()->numEntry;
@@ -220,7 +220,7 @@ struct LocalMalloc {
   LocalMalloc(PerPackageArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
-    if(galois::Substrate::ThreadPool::isLeader()) {
+    if(galois::substrate::ThreadPool::isLeader()) {
       pArray.getLocal()->alloc();
     }
   }
@@ -231,7 +231,7 @@ struct LocalFree {
   LocalFree(PerPackageArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
-    if(galois::Substrate::ThreadPool::isLeader()) {
+    if(galois::substrate::ThreadPool::isLeader()) {
       pArray.getLocal()->dealloc();
     }
   }
@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
   
   totalTime.start();
   Array array;
-  unsigned numPackageUsed = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::runtime::activeThreads)+1;
+  unsigned numPackageUsed = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::runtime::activeThreads)+1;
   PerPackageArray perPackageArray(numArrayEntry/numPackageUsed);
 
   if(algo == Algo::local) {

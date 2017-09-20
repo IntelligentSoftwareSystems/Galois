@@ -124,7 +124,7 @@ struct TempState  {
   }
 };
 
-galois::Substrate::PerThreadStorage<TempState*> state;
+galois::substrate::PerThreadStorage<TempState*> state;
 
 void computeSucSize() {
   sucSize.resize(NumNodes);

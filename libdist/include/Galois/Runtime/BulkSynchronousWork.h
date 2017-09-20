@@ -161,7 +161,7 @@ struct WIDb {
   unsigned tid;
   unsigned pid;
   explicit WIDb(unsigned t): tid(t) {
-    pid = Substrate::getThreadPool().getLeader(tid);
+    pid = substrate::getThreadPool().getLeader(tid);
   }
 };
 
@@ -169,7 +169,7 @@ template<typename T, unsigned ChunkSize>
 struct BagMaster: boost::noncopyable {
   typedef Bag<T,ChunkSize> local_type;
 
-  Substrate::PerThreadStorage<local_type> bags;
+  substrate::PerThreadStorage<local_type> bags;
 
   local_type& get(unsigned mytid) {
     return *bags.getLocal(mytid);
@@ -190,7 +190,7 @@ struct BagMaster: boost::noncopyable {
   GALOIS_ATTRIBUTE_NOINLINE
   size_t mapSlow(const WIDb& id, FnTy fn, int mark) { 
     size_t iterations = 0;
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = substrate::getThreadPool();
     while (true) {
       unsigned failures = 0;
 
@@ -306,8 +306,8 @@ class Executor {
   FirstWL first;
   InitialWorkTy init;
   const char* loopname;
-  Substrate::Barrier& barrier;
-  Substrate::CacheLineStorage<volatile long> done;
+  substrate::Barrier& barrier;
+  substrate::CacheLineStorage<volatile long> done;
 
   struct ExecuteFn {
     Executor* self;
@@ -463,7 +463,7 @@ public:
   { }
 
   void operator()() {
-    ThreadLocalData tld(Substrate::ThreadPool::getTID());
+    ThreadLocalData tld(substrate::ThreadPool::getTID());
 
     FirstWL* cur = &first;
     FirstWL* next = &boost::fusion::at<boost::mpl::int_<0> >(wls);
@@ -522,7 +522,7 @@ static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFn
   typedef Executor<FilteredItemsVector, FnsTy, InitialWork> Work;
 
   Work W(fns, InitialWork(range, initFn), loopname);
-  Substrate::getThreadPool().run(activeThreads, std::ref(W));
+  substrate::getThreadPool().run(activeThreads, std::ref(W));
 }
 
 } // end Anonymous

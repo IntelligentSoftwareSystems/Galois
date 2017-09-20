@@ -351,7 +351,7 @@ protected:
 #ifndef NDEBUG
   const Ctxt* getMinCurrWL (void) const {
 
-    Substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMin;
+    substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMin;
 
     galois::do_all_choice (makeLocalRange (*currWL),
         [this, &perThrdMin] (const Ctxt* c) {
@@ -383,7 +383,7 @@ protected:
 
   const Ctxt* getMaxCurrWL (void) const {
 
-    Substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMax;
+    substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMax;
 
     galois::do_all_choice (makeLocalRange (*currWL),
         [this, &perThrdMax] (const Ctxt* c) {

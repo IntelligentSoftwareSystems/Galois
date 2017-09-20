@@ -293,7 +293,7 @@ private:
   };
 #endif
   // typedef FakePTS PerThrdCont_ty;
-  typedef galois::Substrate::PerThreadStorage<container_type*> PerThrdCont_ty;
+  typedef galois::substrate::PerThreadStorage<container_type*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
   void destroy() {

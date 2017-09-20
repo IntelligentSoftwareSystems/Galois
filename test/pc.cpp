@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iostream>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 int num = 1;
 
@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   if (num <= 0)
     num = 1024 * 1024 * 1024;
 
-  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::substrate::getThreadPool().getMaxThreads();
 
   while (M) {
     galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());

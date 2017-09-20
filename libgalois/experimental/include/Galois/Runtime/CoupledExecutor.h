@@ -73,7 +73,7 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();
 
-  Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   galois::on_each(
       [&initRange, &next] (const unsigned tid, const unsigned numT) {
@@ -105,7 +105,7 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
         galois::do_all_steal<DO_STEAL>());
   }
 
-  Substrate::getThreadPool ().beKind ();
+  substrate::getThreadPool ().beKind ();
 
   delete curr;
   delete next;
@@ -158,7 +158,7 @@ void for_each_coupled_wake (const R& initRange, const F& func, const char* loopn
 
   F func_cpy (func);
 
-  Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   galois::on_each(
       [&next, &initRange] (const unsigned tid, const unsigned numT) {
@@ -179,7 +179,7 @@ void for_each_coupled_wake (const R& initRange, const F& func, const char* loopn
         galois::wl<WL>(curr));
   }
 
-  Substrate::getThreadPool ().beKind ();
+  substrate::getThreadPool ().beKind ();
 
   delete curr; 
   delete next;
@@ -204,7 +204,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   ForEachExec_ty exec (curr, FWrap (func_cpy, next), loopname);
 
-  galois::Substrate::Barrier& barrier = galois::Substrate::getSystemBarrier ();
+  galois::substrate::Barrier& barrier = galois::substrate::getSystemBarrier ();
 
   std::atomic<bool> done(false);
 
@@ -241,7 +241,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
   };
 
   exec.init();
-  galois::Substrate::getThreadPool ().run (galois::getActiveThreads (), loop);
+  galois::substrate::getThreadPool ().run (galois::getActiveThreads (), loop);
   
   delete curr;
   delete next;

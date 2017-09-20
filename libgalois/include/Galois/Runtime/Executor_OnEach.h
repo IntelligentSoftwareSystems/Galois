@@ -61,13 +61,13 @@ void on_each_impl(const FunctionTy& fn, const ArgsTy& argsTuple) {
 
     execTime.start();
 
-    fn(Substrate::ThreadPool::getTID(), numT);
+    fn(substrate::ThreadPool::getTID(), numT);
 
     execTime.stop();
 
   };
 
-  Substrate::getThreadPool().run(numT, runFun);
+  substrate::getThreadPool().run(numT, runFun);
 }
 
 template<typename FunctionTy, typename TupleTy>

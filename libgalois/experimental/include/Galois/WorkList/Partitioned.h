@@ -74,8 +74,8 @@ private:
   //runtime::PerThreadStorage<unsigned> numPops;
   std::deque<CTy> items;
   Indexer indexer;
-  Substrate::CacheLineStorage<std::atomic_int> current;
-  Substrate::CacheLineStorage<std::atomic_bool> empty;
+  substrate::CacheLineStorage<std::atomic_int> current;
+  substrate::CacheLineStorage<std::atomic_bool> empty;
 
   //XXX
   //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
@@ -172,10 +172,10 @@ private:
     Item(): empty(true) { }
   };
 
-  Substrate::PerThreadStorage<Item> items;
+  substrate::PerThreadStorage<Item> items;
   std::deque<unsigned> mapping;
   Indexer indexer;
-  Substrate::CacheLineStorage<std::atomic_bool> empty;
+  substrate::CacheLineStorage<std::atomic_bool> empty;
   unsigned mask;
 
   //XXX

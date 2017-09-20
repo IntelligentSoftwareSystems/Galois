@@ -322,7 +322,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * Seed for simple random number generator. Not volatile since it doesn't
    * matter too much if different threads don't see updates.
    */
-  galois::Substrate::PerThreadStorage<int> randomSeed;
+  galois::substrate::PerThreadStorage<int> randomSeed;
   Compare comp;
 
   galois::runtime::FixedSizeHeap node_heap;
@@ -1644,9 +1644,9 @@ class FCPairingHeap: private boost::noncopyable {
     Slot(): req(NULL), next(NULL), prev(NULL) { }
   };
 
-  galois::Substrate::PerThreadStorage<Slot*> localSlots;
-  galois::Substrate::PerThreadStorage<std::vector<Op*> > ops;
-  galois::Substrate::PaddedLock<Concurrent> lock;
+  galois::substrate::PerThreadStorage<Slot*> localSlots;
+  galois::substrate::PerThreadStorage<std::vector<Op*> > ops;
+  galois::substrate::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
   std::atomic<Slot*> slots;
   const int maxTries;
@@ -1774,7 +1774,7 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  galois::Substrate::asmPause();
+	  galois::substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
@@ -1808,7 +1808,7 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  galois::Substrate::asmPause();
+	  galois::substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
 	galois::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;

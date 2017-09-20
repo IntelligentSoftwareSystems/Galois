@@ -55,7 +55,7 @@ struct PerThread {
     memset(etree_mark, 0, graph->nodecount*sizeof(char));
   }
 };
-typedef galois::Substrate::PerThreadStorage<PerThread<CRSGraph> > GPTS;
+typedef galois::substrate::PerThreadStorage<PerThread<CRSGraph> > GPTS;
 
 node_t *etree = NULL;           // FIXME: ugly hack
 CRSGraph *outgraph = NULL;      // not perthread

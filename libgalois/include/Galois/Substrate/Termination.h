@@ -40,7 +40,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Substrate {
+namespace substrate {
 
 class TerminationDetection;
 /*
@@ -99,7 +99,7 @@ class LocalTerminationDetection : public TerminationDetection {
     bool lastWasWhite; // only used by the master
   };
 
-  galois::Substrate::PerThreadStorage<TokenHolder> data;
+  galois::substrate::PerThreadStorage<TokenHolder> data;
 
   unsigned activeThreads;
 

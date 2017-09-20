@@ -93,7 +93,7 @@ protected:
   typedef galois::worklists::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
   typedef FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
-  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
   // template <typename C>
   // class CtxWrapper: boost::noncopyable {
@@ -362,15 +362,15 @@ protected:
   }
 
   const char* loopname;
-  Substrate::PerThreadStorage<PerThreadData> perThreadData;
-  Substrate::TerminationDetection& term;
+  substrate::PerThreadStorage<PerThreadData> perThreadData;
+  substrate::TerminationDetection& term;
   WL_ty workList;
 
 public:
   TreeExecStack (const char* loopname):
     loopname (loopname),
     perThreadData (loopname),
-    term (Substrate::getSystemTermination (activeThreads))
+    term (substrate::getSystemTermination (activeThreads))
   {}
 
   void initThread (void) {
@@ -389,7 +389,7 @@ public:
       applyOperatorRecursive ();
 
       term.localTermination (ptd.didWork);
-      Substrate::asmPause (); // Take a breath, let the token propagate
+      substrate::asmPause (); // Take a breath, let the token propagate
     } while (!term.globalTermination ());
 
     ptd.reportStats ();
@@ -405,7 +405,7 @@ void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
 
   e.initWork (initTask);
 
-  Substrate::getThreadPool().run (galois::getActiveThreads(),
+  substrate::getThreadPool().run (galois::getActiveThreads(),
       [&e] () { e.initThread(); },
       std::ref (e));
 }

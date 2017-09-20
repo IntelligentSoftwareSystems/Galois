@@ -56,7 +56,7 @@ void galois::runtime::setStatFile(const std::string& f) {
 }
 
 bool StatManager::printingThreadVals(void) {
-  return galois::Substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
+  return galois::substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
 }
 
 void StatManager::addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type) {
@@ -135,10 +135,10 @@ void galois::runtime::reportPageAlloc(const char* category) {
 
 void galois::runtime::reportNumaAlloc(const char* category) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
-  int nodes = Substrate::getThreadPool().getMaxNumaNodes();
+  int nodes = substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {
     //auto rStat = Stats.getRemote(x);
-    //std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
+    //std::lock_guard<substrate::SimpleLock> lg(rStat->first);
     //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
   }
   //  SC->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));

@@ -65,6 +65,6 @@ void galois::runtime::pagePoolFree(void* ptr) {
 }
 
 size_t galois::runtime::pagePoolSize() {
-  return Substrate::allocSize();
+  return substrate::allocSize();
 }
 

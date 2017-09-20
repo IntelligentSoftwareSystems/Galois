@@ -32,7 +32,7 @@
  */
 
 namespace galois {
-  namespace Substrate {
+  namespace substrate {
 
     template<class T, T... I>
     struct integer_sequence

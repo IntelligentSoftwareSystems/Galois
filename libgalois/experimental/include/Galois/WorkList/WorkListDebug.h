@@ -47,11 +47,11 @@ class WorkListTracker {
   };
 
   //online collection of stats
-  Substrate::PerThreadStorage<p> tracking;
+  substrate::PerThreadStorage<p> tracking;
   //global clock
-  Substrate::CacheLineStorage<unsigned int> clock;
+  substrate::CacheLineStorage<unsigned int> clock;
   //master thread counting towards a tick
-  Substrate::CacheLineStorage<unsigned int> thread_clock;
+  substrate::CacheLineStorage<unsigned int> thread_clock;
 
   realWL wl;
   Indexer I;
@@ -128,7 +128,7 @@ public:
     }
     auto index = I(*ret);
     P.stat.insert(index);
-    if (Substrate::ThreadPool::getTID() == 0) {
+    if (substrate::ThreadPool::getTID() == 0) {
       ++thread_clock.data;
       if (thread_clock.data == 1024*10) {
 	thread_clock.data = 0;
@@ -150,7 +150,7 @@ class LoadBalanceTracker {
   };
 
   //online collection of stats
-  Substrate::PerThreadStorage<p> tracking;
+  substrate::PerThreadStorage<p> tracking;
 
   realWL wl;
   unsigned Pr;
@@ -166,7 +166,7 @@ class LoadBalanceTracker {
     unsigned multiple = 2;
     P.epoch = P.newEpoch;
     P.values.resize(P.epoch+1);
-    unsigned tid = Substrate::ThreadPool::getTID();
+    unsigned tid = substrate::ThreadPool::getTID();
     for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
       if (n < Pr)

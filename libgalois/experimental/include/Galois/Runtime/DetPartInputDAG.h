@@ -74,7 +74,7 @@ struct InputGraphPartDAGexecutor {
     IncomingBoundaryWLmap incomingWLs;
 
     std::vector<PartMetaData*> neighbors;
-    Substrate::SimpleLock mutex;
+    substrate::SimpleLock mutex;
 
     LocalWL* currInnerWL = new LocalWL ();
     LocalWL* nextInnerWL = new LocalWL ();
@@ -129,7 +129,7 @@ struct InputGraphPartDAGexecutor {
 
   struct ThreadWorker {
 
-    Substrate::SimpleLock stealLock;
+    substrate::SimpleLock stealLock;
     galois::gdeque<PartMetaData*> myPartitions;
 
     size_t innerIter = 0;
@@ -179,7 +179,7 @@ struct InputGraphPartDAGexecutor {
   F func;
   M& dagManager;
   const char* loopname;
-  Substrate::TerminationDetection& term;
+  substrate::TerminationDetection& term;
 
   unsigned numPart;
   // std::vector<PartMetaData> partitions;
@@ -192,7 +192,7 @@ struct InputGraphPartDAGexecutor {
       func (func),
       dagManager (dagManager),
       loopname (loopname),
-      term(Substrate::getSystemTermination(galois::getActiveThreads())), 
+      term(substrate::getSystemTermination(galois::getActiveThreads())), 
       numPart (PARTITION_MULT_FACTOR * galois::getActiveThreads ())
   {
 
@@ -422,7 +422,7 @@ struct InputGraphPartDAGexecutor {
     texec.start ();
     fill_initial (range);
 
-    galois::Substrate::PerThreadStorage<ThreadWorker> workers;
+    galois::substrate::PerThreadStorage<ThreadWorker> workers;
 
     galois::runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
@@ -524,13 +524,13 @@ struct InputGraphPartDAGexecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_part (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphPartDAGexecutor<G, F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  galois::Substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool ().beKind ();
 
 }
 

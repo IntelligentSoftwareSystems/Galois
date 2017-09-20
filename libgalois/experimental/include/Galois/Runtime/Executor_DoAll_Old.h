@@ -67,7 +67,7 @@ class DoAllExecutor {
   struct state {
     iterator stealBegin;
     iterator stealEnd;
-    Substrate::SimpleLock stealLock;
+    substrate::SimpleLock stealLock;
     std::atomic<bool> avail;
 
     state(): avail(false) { stealLock.lock(); }
@@ -83,7 +83,7 @@ class DoAllExecutor {
 
     bool doSteal(iterator& begin, iterator& end, int minSteal) {
       if (avail) {
-        std::lock_guard<Substrate::SimpleLock> lg(stealLock);
+        std::lock_guard<substrate::SimpleLock> lg(stealLock);
         if (!avail)
           return false;
 
@@ -102,7 +102,7 @@ class DoAllExecutor {
     }
   };
 
-  Substrate::PerThreadStorage<state> TLDS;
+  substrate::PerThreadStorage<state> TLDS;
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool trySteal(state& local, iterator& begin, iterator& end, int minSteal) {
@@ -110,9 +110,9 @@ class DoAllExecutor {
     if (local.doSteal(begin, end, minSteal))
       return true;
     //Then try stealing from neighbors
-    unsigned myID = Substrate::ThreadPool::getTID();
-    unsigned myPkg = Substrate::ThreadPool::getPackage();
-    auto& tp = Substrate::getThreadPool();
+    unsigned myID = substrate::ThreadPool::getTID();
+    unsigned myPkg = substrate::ThreadPool::getPackage();
+    auto& tp = substrate::getThreadPool();
     //try package neighbors
     for (unsigned x = 0; x < activeThreads; ++x) {
       if (x != myID && tp.getPackage(x) == myPkg) {
@@ -172,21 +172,21 @@ public:
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  Substrate::getThreadPool().run(activeThreads, std::ref(W));
+  substrate::getThreadPool().run(activeThreads, std::ref(W));
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 // void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
 // 
   // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  // Substrate::getThreadPool().run(activeThreads, std::ref(W));
+  // substrate::getThreadPool().run(activeThreads, std::ref(W));
 
   // if (steal) {
     // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    // Substrate::getThreadPool().run(activeThreads, std::ref(W));
+    // substrate::getThreadPool().run(activeThreads, std::ref(W));
   // } else {
     // FunctionTy f_cpy (f);
-    // Substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    // substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
         // auto begin = range.local_begin();
         // auto end = range.local_end();
         // while (begin != end)

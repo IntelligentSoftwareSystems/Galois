@@ -35,7 +35,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
-using namespace galois::Substrate;
+using namespace galois::substrate;
 
 namespace {
 

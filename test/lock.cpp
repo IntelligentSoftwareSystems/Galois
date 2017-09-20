@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
     M = atoi(argv[1]);
   if (!M)
     M = 1000000000;
-  galois::Substrate::SimpleLock L;
+  galois::substrate::SimpleLock L;
   for (unsigned x = 0; x < M; ++x) {
     V = 0;
     L.lock();

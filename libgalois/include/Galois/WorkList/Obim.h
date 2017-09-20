@@ -62,7 +62,7 @@ protected:
     std::deque<std::pair<Index,T>> stored;
   };
 
-  Substrate::Barrier& barrier;
+  substrate::Barrier& barrier;
 
   OrderedByIntegerMetricData(): barrier(runtime::getBarrier(runtime::activeThreads)) { }
 
@@ -216,8 +216,8 @@ private:
 
   // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
-  Substrate::PerThreadStorage<ThreadData> data;
-  Substrate::PaddedLock<Concurrent> masterLock;
+  substrate::PerThreadStorage<ThreadData> data;
+  substrate::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
   std::atomic<unsigned int> masterVersion;
@@ -243,7 +243,7 @@ private:
 
   GALOIS_ATTRIBUTE_NOINLINE
   galois::optional<T> slowPop(ThreadData& p) {
-    bool localLeader = Substrate::ThreadPool::isLeader();
+    bool localLeader = substrate::ThreadPool::isLeader();
     Index msS = this->identity;
     
     updateLocal(p);
@@ -257,7 +257,7 @@ private:
             msS = o;
         }
       } else {
-        Index o = data.getRemote(Substrate::ThreadPool::getLeader())->scanStart;
+        Index o = data.getRemote(substrate::ThreadPool::getLeader())->scanStart;
         if (this->compare(o, msS))
           msS = o;
       }

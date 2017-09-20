@@ -292,7 +292,7 @@ protected:
             edgeSet.insert (edgeSet.erase (res.first), ke);
           }
         } else {
-	  galois::Substrate::gDebug("Warning: Ignoring self edge (",
+	  galois::substrate::gDebug("Warning: Ignoring self edge (",
 				      src, ",", dst, ",", ingraph.getEdgeData (*e), ")");
         }
       }

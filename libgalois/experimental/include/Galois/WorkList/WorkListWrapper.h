@@ -35,7 +35,7 @@ namespace worklists {
 template <typename WL>
 class WLsizeWrapper: public WL {
 
-  Substrate::PerThreadStorage<size_t> size_cntr;
+  substrate::PerThreadStorage<size_t> size_cntr;
 
 public:
 
