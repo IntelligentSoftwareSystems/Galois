@@ -638,8 +638,8 @@ static void writeMesh(const std::string& filename) {
 }
 
 static void generateMesh() {
-  typedef galois::WorkList::AltChunkedLIFO<32> Chunked;
-  typedef galois::WorkList::Deterministic<> DWL;
+  typedef galois::worklists::AltChunkedLIFO<32> Chunked;
+  typedef galois::worklists::Deterministic<> DWL;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
     galois::StatTimer BT("buildtree");

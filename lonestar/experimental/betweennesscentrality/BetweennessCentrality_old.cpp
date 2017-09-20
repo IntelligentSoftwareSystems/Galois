@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef galois::WorkList::StableIterator<true> WLL;
+  typedef galois::worklists::StableIterator<true> WLL;
   galois::StatTimer T;
   T.start();
   galois::for_each<WLL>(v.begin(), v.end(), process());

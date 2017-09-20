@@ -156,7 +156,7 @@ struct ConnectedComp {
 
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
 
       #ifdef __GALOIS_HET_CUDA__

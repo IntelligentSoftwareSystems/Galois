@@ -15,7 +15,7 @@
 #include "papi.h"
 #endif
 
-typedef galois::WorkList::dChunkedLIFO<1> WL;
+typedef galois::worklists::dChunkedLIFO<1> WL;
 
 struct ProductionProcess {
 public:

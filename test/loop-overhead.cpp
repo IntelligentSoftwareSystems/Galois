@@ -77,7 +77,7 @@ unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned t
   galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    galois::for_each(V.begin(), V.begin() + num, emp(), galois::wl<galois::WorkList::StableIterator<>>());
+    galois::for_each(V.begin(), V.begin() + num, emp(), galois::wl<galois::worklists::StableIterator<>>());
   t.stop();
   return t.get();
 }

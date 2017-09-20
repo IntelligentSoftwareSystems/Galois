@@ -54,10 +54,10 @@ namespace galois {
  * {@link for_each()}. For example,
  *
  * \code
- * galois::for_each(begin, end, fn, galois::wl<galois::WorkList::dChunkedFIFO<32>>());
+ * galois::for_each(begin, end, fn, galois::wl<galois::worklists::dChunkedFIFO<32>>());
  * \endcode
  */
-namespace WorkList {
+namespace worklists {
 namespace { // don't pollute the symbol table with the example
 
 // Worklists may not be copied.
@@ -107,7 +107,7 @@ public:
 };
 
 } // end namespace anonymous
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

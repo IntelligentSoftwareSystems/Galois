@@ -94,7 +94,7 @@ void closeStatsFile (void);
 template<class T, class FunctionTy, class ArgsTy>
 class ParaMeterExecutor {
   typedef T value_type;
-  typedef typename WorkList::GFIFO<int>::template retype<value_type>::type WorkListTy;
+  typedef typename worklists::GFIFO<int>::template retype<value_type>::type WorkListTy;
 
   static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
   static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
@@ -372,7 +372,7 @@ void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) 
 } // end namespace ParaMeter
 } // end namespace runtime
 
-namespace WorkList {
+namespace worklists {
 
 template<class T=int>
 class ParaMeter {
@@ -391,7 +391,7 @@ public:
 namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
-class ForEachExecutor<galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
+class ForEachExecutor<galois::worklists::ParaMeter<T>, FunctionTy, ArgsTy>:
   public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> 
 {
   typedef ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> SuperTy;

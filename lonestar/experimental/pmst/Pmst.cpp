@@ -302,7 +302,7 @@ struct Boruvka {
       g.getData(*ii) = std::distance(g.edge_begin(*ii), g.edge_end(*ii));
     }
 
-    typedef galois::WorkList::dChunkedFIFO<16> IChunk;
+    typedef galois::worklists::dChunkedFIFO<16> IChunk;
 
     galois::for_each<IChunk>(g.begin(), g.end(), Process(*this, g, w));
   }
@@ -547,7 +547,7 @@ struct BoruvkaUnionFind {
       g.getData(nodes[i]).parent = i;
     }
 
-    typedef galois::WorkList::dChunkedFIFO<16> IChunk;
+    typedef galois::worklists::dChunkedFIFO<16> IChunk;
 
     galois::for_each<IChunk>(nodes.begin(), nodes.end(), Process(*this, g, w, nodes));
   }

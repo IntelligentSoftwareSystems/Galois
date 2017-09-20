@@ -454,7 +454,7 @@ private:
     // while (x) {}
 
     std::cout << "MakeGraph\n";
-    //galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),galois::loopname("create"), galois::wl<galois::WorkList::StableIterator<>>());
+    //galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),galois::loopname("create"), galois::wl<galois::worklists::StableIterator<>>());
     create_nodes::go(mesh, elements);
     std::cout << "... now adding edges\n";
 

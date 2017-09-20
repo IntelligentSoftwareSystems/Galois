@@ -509,7 +509,7 @@ void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSampl
     auto ts_begin = trainingSamples.begin();
     auto ts_end = trainingSamples.end();
     auto ln = galois::loopname("LinearSVM");
-    auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+    auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
     galois::GAccumulator<size_t> bigUpdates;
 
     galois::Timer flopTimer;

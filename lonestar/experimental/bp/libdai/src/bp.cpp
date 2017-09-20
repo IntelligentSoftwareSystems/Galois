@@ -692,7 +692,7 @@ Real BP::run() {
               //}
           }
 
-          using namespace galois::WorkList;
+          using namespace galois::worklists;
           typedef dChunkedFIFO<64> dChunk;
           typedef ChunkedFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;

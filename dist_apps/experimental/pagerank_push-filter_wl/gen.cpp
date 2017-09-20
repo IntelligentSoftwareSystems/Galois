@@ -279,7 +279,7 @@ struct PageRank_delta {
   }
 };
 
-using namespace galois::WorkList;
+using namespace galois::worklists;
 typedef dChunkedFIFO<64> dChunk;
 typedef WLdistributed<dChunk, Graph> DIST_WL;
 struct PageRank {

@@ -732,7 +732,7 @@ struct PrtRsd {
     galois::do_all_local(graph, Process1(this, graph), galois::loopname("P1"));
     galois::do_all_local(graph, Process2(this, graph), galois::loopname("P2")); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>::with_block_period<4>::type OBIM;
 #ifdef GALOIS_USE_EXP
@@ -860,7 +860,7 @@ struct Async {
 
   void operator()(Graph& graph) {
     //    skip = 0;
-    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    typedef galois::worklists::dChunkedFIFO<16> WL;
     galois::for_each_local(graph, Process(graph), galois::wl<WL>());
   }
 };

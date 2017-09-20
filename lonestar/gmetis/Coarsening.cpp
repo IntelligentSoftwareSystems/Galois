@@ -320,25 +320,25 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
    * Different worklist versions tried, dChunkedFIFO 256 works best with LC_MORPH_graph.
    * Another good type would be Lazy Iter.
    */
-  //typedef galois::WorkList::ChunkedLIFO<64, GNode> WL;
-  //typedef galois::WorkList::LazyIter<decltype(fineGGraph->local_begin()),false> WL;
+  //typedef galois::worklists::ChunkedLIFO<64, GNode> WL;
+  //typedef galois::worklists::LazyIter<decltype(fineGGraph->local_begin()),false> WL;
 
   NodeBag bagOfLoners;
   Pcounter pc;
 
   bool useOBIM = true;
 
-  typedef galois::WorkList::StableIterator<true> WL;
-  //typedef galois::WorkList::Random<> WL;
+  typedef galois::worklists::StableIterator<true> WL;
+  //typedef galois::worklists::Random<> WL;
   if(useRM) {
     parallelMatchAndCreateNodes<RMmatch> pRM(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
     galois::for_each_local(*fineMetisGraph->getGraph(), pRM, galois::loopname("match"), galois::wl<WL>());
   } else {
     //FIXME: use obim for SHEM matching
-    typedef galois::WorkList::dChunkedLIFO<16> Chunk;
-    typedef galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
-    typedef galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
-    typedef galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
+    typedef galois::worklists::dChunkedLIFO<16> Chunk;
+    typedef galois::worklists::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
+    typedef galois::worklists::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
+    typedef galois::worklists::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
 
     HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
@@ -351,10 +351,10 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
   if (verbose && c)
     std::cout << "\n\tLone Matches " << c;
   if (use2Hop) {
-    typedef galois::WorkList::dChunkedLIFO<16> Chunk;
-    typedef galois::WorkList::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
-    typedef galois::WorkList::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
-    typedef galois::WorkList::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
+    typedef galois::worklists::dChunkedLIFO<16> Chunk;
+    typedef galois::worklists::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
+    typedef galois::worklists::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
+    typedef galois::worklists::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
 
     HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     Pcounter pc2;
@@ -371,7 +371,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
 void createCoarseEdges(MetisGraph *coarseMetisGraph) {
   //MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
   //GGraph* fineGGraph = fineMetisGraph->getGraph();
-  typedef galois::WorkList::StableIterator<true> WL;
+  typedef galois::worklists::StableIterator<true> WL;
   parallelPopulateEdges pPE(coarseMetisGraph);
   galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, galois::loopname("popedge"), galois::wl<WL>());
 }

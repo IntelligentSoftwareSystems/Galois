@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;

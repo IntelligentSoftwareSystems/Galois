@@ -30,7 +30,7 @@
 #include <atomic>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 /**
  * Bulk-synchronous scheduling. Work is processed in rounds, and all newly
@@ -117,7 +117,7 @@ private:
 };
 GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

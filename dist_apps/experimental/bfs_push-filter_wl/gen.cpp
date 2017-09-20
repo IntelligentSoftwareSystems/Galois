@@ -183,7 +183,7 @@ struct InitializeGraph {
   }
 };
 
-using namespace galois::WorkList;
+using namespace galois::worklists;
 typedef dChunkedFIFO<64> dChunk;
 typedef WLdistributed<dChunk, Graph> DIST_WL;
 struct BFS {
@@ -196,7 +196,7 @@ struct BFS {
     graph(_graph), DGAccumulator_accum(_dga), wl(_wl) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
 
     DIST_WL dist_wl(_graph);
     if(_graph.isOwned(src_node))

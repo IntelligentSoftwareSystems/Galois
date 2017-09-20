@@ -362,7 +362,7 @@ struct LabelPropAlgo {
   };
 
   void operator()(Graph& graph) {
-    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::worklists::dChunkedFIFO<256> WL;
 
     galois::do_all_local(graph, Initialize(graph));
     if (symmetricGraph) {
@@ -533,7 +533,7 @@ struct BlockedAsyncAlgo {
     Merge merge = { graph, items };
     galois::do_all_local(graph, merge, galois::loopname("Initialize"));
     galois::for_each_local(items, merge,
-        galois::loopname("Merge"), galois::wl<galois::WorkList::dChunkedFIFO<128> >());
+        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
   }
 };
 

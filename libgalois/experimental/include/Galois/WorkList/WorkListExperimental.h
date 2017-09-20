@@ -58,7 +58,7 @@
 #include <set>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
@@ -1350,7 +1350,7 @@ public:
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
-template<class Indexer, typename ContainerTy = galois::WorkList::GFIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer, typename ContainerTy = galois::worklists::GFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois::Substrate::PaddedLock<concurrent> {
 
    using galois::Substrate::PaddedLock<concurrent>::lock;
@@ -1437,7 +1437,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois:
   }
 };
 
-template<class Indexer, typename ContainerTy = galois::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
+template<class Indexer, typename ContainerTy = galois::worklists::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 

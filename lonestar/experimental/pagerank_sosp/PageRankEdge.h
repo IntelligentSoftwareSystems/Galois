@@ -135,13 +135,13 @@ struct AsyncEdge {
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
     if (!edgePri) {
-      typedef galois::WorkList::dChunkedFIFO<256> WL;
+      typedef galois::worklists::dChunkedFIFO<256> WL;
       galois::for_each_local(graph, Process(graph, tolerance, amp), galois::wl<WL>());
     } else {
-      typedef galois::WorkList::dChunkedFIFO<32> WL;
-      //typedef galois::WorkList::AltChunkedFIFO<32> WL;
-      typedef galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
-      //typedef galois::WorkList::WorkListTracker<sndPri,OBIM> DOBIM;
+      typedef galois::worklists::dChunkedFIFO<32> WL;
+      //typedef galois::worklists::AltChunkedFIFO<32> WL;
+      typedef galois::worklists::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
+      //typedef galois::worklists::WorkListTracker<sndPri,OBIM> DOBIM;
       auto fn = [&graph, amp, tolerance] (const GNode& node) {
         int out = nout(graph, node, galois::MethodFlag::UNPROTECTED) + 1;
         return std::make_pair(node, pri(graph.getData(node, galois::MethodFlag::UNPROTECTED).residual, out,amp, tolerance));

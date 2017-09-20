@@ -1019,7 +1019,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 		auto ts_begin = trainingSamples.begin();
 		auto ts_end = trainingSamples.end();
 		auto ln = galois::loopname("LinearSVM");
-		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+		auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
 		galois::GAccumulator<size_t> bigUpdates;
 
 
@@ -1126,7 +1126,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     auto ts_begin = trainingSamples.begin();
     auto ts_end = trainingSamples.end();
     auto ln = galois::loopname("LinearSVM");
-    auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+    auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
     galois::GAccumulator<size_t> bigUpdates;
 
     galois::Timer flopTimer;
@@ -1290,7 +1290,7 @@ void runCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>&
 		}
 
 		auto ln = galois::loopname("PrimalCD");
-		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+		auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
 
 		if (useshrink) {
 			cur_bag.clear();
@@ -1563,7 +1563,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 
 		// Compute Newton direction -- Hessian and Gradient
 		auto ln = galois::loopname("GLMENT-QPconstruction");
-		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+		auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
 		galois::for_each(active_set.begin(), active_set.end(), glmnet_qp_construct(g_train, params, cur_bag, nr_samples), ln, wl);
 		/*
 		galois::do_all(active_set.begin(), active_set.end(),
@@ -1643,7 +1643,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			//if(shuffleSamples)
 			//	std::shuffle(active_set.begin(), active_set.end(), gen);
 			auto ln = galois::loopname("GLMENT-CDiteration");
-			auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+			auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
 			//galois::for_each(active_set.begin(), active_set.end(), glmnet_cd(g_train, params, cd_bag, nr_samples), ln, wl);
 			galois::for_each_local(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
 

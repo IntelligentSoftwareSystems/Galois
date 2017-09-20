@@ -286,15 +286,15 @@ class LevelExecutor {
   static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
 
   // hack to get ChunkedMaster base class
-  using BaseWL = typename galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
-  using WL_ty = galois::WorkList::WLsizeWrapper<BaseWL>;
+  using BaseWL = typename galois::worklists::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
+  using WL_ty = galois::worklists::WLsizeWrapper<BaseWL>;
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
   struct BodyWrapper;
-  using ForEachExec_ty = galois::runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
+  using ForEachExec_ty = galois::runtime::ForEachWork<worklists::ExternPtr<WL_ty>, T, BodyWrapper>;
 
   struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
     KeyFn& keyFn;
@@ -372,7 +372,7 @@ public:
       level_map (kcmp),
       dummy (new WL_ty ()),
       for_each_exec (
-          galois::WorkList::ExternPtr<WL_ty> (dummy),
+          galois::worklists::ExternPtr<WL_ty> (dummy),
           BodyWrapper ( keyFn, nhVisit, opFunc, level_map, userHandles),
           loopname),
       barrier (getSystemBarrier ())
@@ -421,7 +421,7 @@ public:
           ++steps;
           totalWork += currLevel.second->size ();
 
-          for_each_exec.reinit (typename galois::WorkList::ExternPtr<WL_ty> (currLevel.second));
+          for_each_exec.reinit (typename galois::worklists::ExternPtr<WL_ty> (currLevel.second));
         }
       }
 
@@ -505,8 +505,8 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
   static_assert((is_less || is_greater) && !(is_less && is_greater), "Arbitrary key comparisons not yet supported");
   constexpr unsigned chunk_size = OpFn::CHUNK_SIZE;
 
-  typedef typename WorkList::OrderedByIntegerMetric<>
-    ::template with_container<WorkList::dChunkedFIFO<chunk_size>>::type
+  typedef typename worklists::OrderedByIntegerMetric<>
+    ::template with_container<worklists::dChunkedFIFO<chunk_size>>::type
     ::template with_indexer<KeyFn>::type
     ::template with_barrier<true>::type 
     ::template with_descending<is_greater>::type

@@ -67,7 +67,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
  * range and T is the type of item.
  *
- * @tparam WLTy Worklist policy {@see galois::WorkList}
+ * @tparam WLTy Worklist policy {@see galois::worklists}
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
@@ -84,7 +84,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::worklists}
  * @param i initial item
  * @param fn operator
  * @param args optional arguments to loop

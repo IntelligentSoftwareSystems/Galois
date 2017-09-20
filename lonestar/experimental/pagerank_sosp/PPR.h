@@ -176,7 +176,7 @@ struct PPRAsyncRsd {
     graph.getData(seed).seedset = true;
     graph.getData(seed).value = 1 - alpha;
 
-    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    typedef galois::worklists::dChunkedFIFO<16> WL;
     galois::for_each_local(graph, Process2(graph), galois::wl<WL>());
   }
 };

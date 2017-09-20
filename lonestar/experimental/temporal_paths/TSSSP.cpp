@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<GNIndexer,dChunk> OBIM;
   galois::for_each(source, EarlyArivalTime{graph}, galois::wl<OBIM>(GNIndexer{graph}), galois::does_not_need_aborts<>());

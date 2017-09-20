@@ -120,13 +120,13 @@ public:
       std::cout << galois::runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
 
       T.start();
-      galois::runtime::for_each_impl<galois::WorkList::StableIterator<> >(galois::runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
+      galois::runtime::for_each_impl<galois::worklists::StableIterator<> >(galois::runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
       T.stop();
       tFind += T.get();
       std::cout << galois::runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
 
       T.start();
-      galois::runtime::for_each_impl<galois::WorkList::StableIterator<> >(
+      galois::runtime::for_each_impl<galois::worklists::StableIterator<> >(
         galois::runtime::makeStandardRange(items.begin(), items.end()),
         f, "BlockedExecutor::do");
       T.stop();

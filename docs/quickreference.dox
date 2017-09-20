@@ -30,11 +30,11 @@
 \subsection worklist WorkList Types
 Specified as a template argument to {@link galois::wl}
 
-- galois::WorkList::dChunkedFIFO<CHUNK_SIZE>
+- galois::worklists::dChunkedFIFO<CHUNK_SIZE>
 
-- galois::WorkList::dChunkedLIFO<CHUNK_SIZE>
+- galois::worklists::dChunkedLIFO<CHUNK_SIZE>
 
-- galois::WorkList::OBIM<WorkListType>
+- galois::worklists::OBIM<WorkListType>
 
 \section graph Graph
 

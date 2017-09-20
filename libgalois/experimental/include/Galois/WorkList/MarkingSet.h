@@ -36,7 +36,7 @@
 #include "Galois/Timer.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 namespace detail {
 
@@ -116,7 +116,7 @@ template<typename Marker, int ChunkSize=64, typename T=int, bool Concurrent=true
 using dChunkedMarkingSetFIFO = detail::MarkingWorkSetMaster<T, Marker, dChunkedFIFO<ChunkSize,T,Concurrent> >;
 GALOIS_WLCOMPILECHECK(dChunkedMarkingSetFIFO);
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

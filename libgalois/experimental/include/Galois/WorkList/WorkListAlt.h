@@ -33,7 +33,7 @@
 #include "Galois/Substrate/CompilerSpecific.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>

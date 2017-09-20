@@ -74,13 +74,13 @@ namespace galois {
 namespace runtime {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+typedef worklists::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template<typename value_type>
 class AbortHandler {
   struct Item { value_type val;  int retries; };
 
-  typedef WorkList::GFIFO<Item> AbortedList;
+  typedef worklists::GFIFO<Item> AbortedList;
   Substrate::PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
   
@@ -616,7 +616,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     typedef galois::InsertBag<value_type> Bag;
     Bag bag;
     auto ytpl = get_tuple_without(wl_tag{}, tpl);
-    auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
+    auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<galois::worklists::WLdistributed<WorkListTy>>(&bag)));
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
     std::string loopName(get_by_supertype<loopname_tag>(tpl).value);

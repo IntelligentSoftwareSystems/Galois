@@ -303,7 +303,7 @@ struct AsyncAlgo {
   std::string name() const { return "Parallel (Async)"; }
 
   void operator()(const GNode& source) const {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
@@ -493,11 +493,11 @@ struct DetBarrierAlgo {
   > function_traits;
 
   void operator()(const GNode& source) const {
-    typedef galois::WorkList::Deterministic<> DWL;
+    typedef galois::worklists::Deterministic<> DWL;
     //#ifdef GALOIS_USE_EXP
-    //    typedef galois::WorkList::BulkSynchronousInline<> WL;
+    //    typedef galois::worklists::BulkSynchronousInline<> WL;
     //#else
-  typedef galois::WorkList::BulkSynchronous<galois::WorkList::dChunkedLIFO<256> > WL;
+  typedef galois::worklists::BulkSynchronous<galois::worklists::dChunkedLIFO<256> > WL;
   //#endif
     std::deque<ItemTy> initial;
 
@@ -764,7 +764,7 @@ int main(int argc, char **argv) {
   galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
   //#ifdef GALOIS_USE_EXP

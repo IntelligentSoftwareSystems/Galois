@@ -245,10 +245,10 @@ struct DefaultAlgo {
   typedef typename Process<>::Graph Graph;
 
   void operator()(Graph& graph) {
-    typedef galois::WorkList::Deterministic<> DWL;
+    typedef galois::worklists::Deterministic<> DWL;
 
-    typedef galois::WorkList::BulkSynchronous<> WL;
-    //    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::worklists::BulkSynchronous<> WL;
+    //    typedef galois::worklists::dChunkedFIFO<256> WL;
 
     switch (algo) {
       case nondet: 
@@ -365,7 +365,7 @@ struct PullAlgo {
       numProcessed.reset();
 
       if (!cur->empty()) {
-        typedef galois::WorkList::StableIterator<> WL;
+        typedef galois::worklists::StableIterator<> WL;
         //galois::for_each_local(*cur, pull, galois::wl<WL>());
         galois::do_all_local(*cur, pull);
       }

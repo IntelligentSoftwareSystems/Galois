@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
   galois::StatTimer T;
   T.start();
   galois::GAccumulator<size_t> weight;
-  galois::for_each(edges.begin(), edges.end(), Process(graph, weight), galois::wl<galois::WorkList::Deterministic<>>());
+  galois::for_each(edges.begin(), edges.end(), Process(graph, weight), galois::wl<galois::worklists::Deterministic<>>());
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
 

@@ -185,7 +185,7 @@ struct PageRank {
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g):local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
 
     //galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), galois::workList_version());

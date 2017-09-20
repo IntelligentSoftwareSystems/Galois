@@ -268,8 +268,8 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
 }
 
 template<typename T,int ChunkSize>
-// class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
-class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
+// class Worklist: public dChunkedMaster<T, worklists::ConExtLinkedStack, true, ChunkSize> { };
+class Worklist: public dChunkedMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
 
 template<class T, class FunctionTy, typename PreFunc=FunctionTy>
 class BSInlineExecutor {

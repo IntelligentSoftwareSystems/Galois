@@ -278,8 +278,8 @@ protected:
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
-  // typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  typedef galois::worklists::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  // typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
   // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;

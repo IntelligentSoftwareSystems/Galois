@@ -436,7 +436,7 @@ struct FindWork {
 
 template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef galois::WorkList::Deterministic<> DWL;
+  typedef galois::worklists::Deterministic<> DWL;
 
   galois::StatTimer T1("ResetHeightsTime");
   T1.start();
@@ -448,7 +448,7 @@ void globalRelabel(IncomingWL& incoming) {
 
   switch (detAlgo) {
     case nondet:
-      galois::for_each(app.sink, UpdateHeights<nondet>(), galois::loopname("UpdateHeights"), galois::wl<galois::WorkList::BulkSynchronous<>>());
+      galois::for_each(app.sink, UpdateHeights<nondet>(), galois::loopname("UpdateHeights"), galois::wl<galois::worklists::BulkSynchronous<>>());
       //      galois::for_each(app.sink, UpdateHeights<nondet>(), galois::loopname("UpdateHeights"));
       break;
     case detBase:
@@ -825,9 +825,9 @@ void checkSorting (void) {
 
 
 void run() {
-  typedef galois::WorkList::Deterministic<> DWL;
-  typedef galois::WorkList::dChunkedFIFO<16> Chunk;
-  typedef galois::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
+  typedef galois::worklists::Deterministic<> DWL;
+  typedef galois::worklists::dChunkedFIFO<16> Chunk;
+  typedef galois::worklists::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
   galois::InsertBag<GNode> initial;
   initializePreflow(initial);

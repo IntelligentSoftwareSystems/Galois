@@ -52,8 +52,8 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
-    typedef galois::WorkList::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
+    typedef galois::worklists::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
+    typedef galois::worklists::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
 
     galois::runtime::for_each_ordered_level (
         galois::runtime::makeStandardRange (wl.begin (), wl.end ()), 

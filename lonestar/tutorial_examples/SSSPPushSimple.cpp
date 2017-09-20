@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
   //! Use a lambda as the operator
   galois::do_all(graph.begin(), graph.end(), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPPushSimple]

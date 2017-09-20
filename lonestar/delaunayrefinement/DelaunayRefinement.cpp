@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
   
   galois::StatTimer Trefine("refine");
   Trefine.start();
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
   //! [for_each_local example]

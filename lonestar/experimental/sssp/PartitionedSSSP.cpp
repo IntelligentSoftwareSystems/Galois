@@ -408,7 +408,7 @@ struct AsyncAlgo {
   typedef typename boost::mpl::if_c<WithPartitioning,ProcessWithPartitioning,ProcessWithoutPartitioning>::type Process;
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     //typedef AltChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
@@ -558,7 +558,7 @@ struct Algo2 {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     //typedef AltChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
@@ -689,7 +689,7 @@ struct Algo3 {
 
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     //const int blockPeriod = 10;
     const int maxValue = 128;
     typedef dChunkedFIFO<128> Chunk;
@@ -848,7 +848,7 @@ struct Algo4 {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     const int blockPeriod = 10;
     const int maxValue = 8;
     typedef dChunkedFIFO<128> Chunk;
@@ -993,7 +993,7 @@ struct Algo5 {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     //const int blockPeriod = 10;
     //const int maxValue = 8;
     typedef dChunkedFIFO<128> Chunk;
@@ -1159,7 +1159,7 @@ struct Algo6 {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
@@ -1395,7 +1395,7 @@ struct Algo7 {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 

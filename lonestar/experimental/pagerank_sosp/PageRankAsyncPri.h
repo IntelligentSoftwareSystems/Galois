@@ -114,8 +114,8 @@ struct AsyncPri{
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    typedef galois::WorkList::dChunkedFIFO<32> WL;
-    typedef galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
+    typedef galois::worklists::dChunkedFIFO<32> WL;
+    typedef galois::worklists::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
     galois::InsertBag<std::pair<GNode, int> > bag;
     PRPri pri(graph, tolerance);
     // galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {

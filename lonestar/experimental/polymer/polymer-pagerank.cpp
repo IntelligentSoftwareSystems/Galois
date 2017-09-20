@@ -269,7 +269,7 @@ struct PullAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::WorkList::dChunkedFIFO<256> >());
+      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::worklists::dChunkedFIFO<256> >());
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -3080,7 +3080,7 @@ struct PushAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::WorkList::dChunkedFIFO<256> >());
+      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::worklists::dChunkedFIFO<256> >());
       galois::do_all_local(graph, Reset(graph, iteration));
       iteration += 1;
 
@@ -3396,7 +3396,7 @@ struct PrtRsd {
     galois::for_each_local(graph, Process1(this, graph));
     galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp2: "<<amp2<<"\n";
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<4> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 #ifdef GALOIS_USE_EXP
@@ -3561,7 +3561,7 @@ struct PrtDeg {
     galois::for_each_local(graph, Process1(this, graph));
     galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
      galois::InsertBag<UpdateRequest> initialWL;

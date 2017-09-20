@@ -283,7 +283,7 @@ struct BFS {
     graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     
     FirstItr_BFS::go(_graph);
 

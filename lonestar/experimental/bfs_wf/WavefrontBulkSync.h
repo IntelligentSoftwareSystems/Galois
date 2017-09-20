@@ -100,7 +100,7 @@ protected:
 
   virtual size_t runBFS (Graph& graph, GNode& startNode) {
 
-    // typedef galois::WorkList::BulkSynchronousInline<> WL_ty;
+    // typedef galois::worklists::BulkSynchronousInline<> WL_ty;
 
     ParCounter numAdds;
     graph.getData (startNode, galois::MethodFlag::UNPROTECTED) = 0;

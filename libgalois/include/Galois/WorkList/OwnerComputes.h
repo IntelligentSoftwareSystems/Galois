@@ -32,7 +32,7 @@
 #include "WLCompileCheck.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
 struct OwnerComputes : private boost::noncopyable {
@@ -100,7 +100,7 @@ public:
 GALOIS_WLCOMPILECHECK(OwnerComputes)
 
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

@@ -40,7 +40,7 @@ namespace galois {
 namespace runtime {
 extern unsigned activeThreads;
 }
-namespace WorkList {
+namespace worklists {
 
 namespace detail {
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
@@ -314,7 +314,7 @@ using dChunkedBag = detail::ChunkedMaster<T, ConExtLinkedQueue, true, true, Chun
 GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

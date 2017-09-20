@@ -381,7 +381,7 @@ struct AsyncALSalgo {
 
       switch (algo) {
         case syncALS: 
-          typedef galois::WorkList::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
+          typedef galois::worklists::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
           galois::for_each(
               boost::counting_iterator<size_t>(0),
               boost::counting_iterator<size_t>(NUM_ITEM_NODES),
@@ -402,7 +402,7 @@ struct AsyncALSalgo {
               boost::counting_iterator<size_t>(0),
               boost::counting_iterator<size_t>(g.size()),
               Process(*this, g, WT, HT, xtxs, rhs),
-              galois::wl<galois::WorkList::Deterministic<>>());
+              galois::wl<galois::worklists::Deterministic<>>());
           break;
 
         case asyncALSreuse:

@@ -38,7 +38,7 @@
 #include <deque>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
   int BlockPeriod=0,

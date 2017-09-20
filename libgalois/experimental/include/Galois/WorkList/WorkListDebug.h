@@ -36,7 +36,7 @@
 #include <map>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename Indexer, typename realWL, typename T = int>
 class WorkListTracker {

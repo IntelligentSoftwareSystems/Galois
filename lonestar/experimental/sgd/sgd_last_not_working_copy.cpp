@@ -659,8 +659,8 @@ int main(int argc, char** argv)
 	//Graphp::iterator ii = g.begin();
 	//std::advance(ii,num_movie_nodes); //advance moves passed in iterator
     galois::for_each(g.begin(), ii, sgd(g),
-                         galois::wl<galois::WorkList::OrderedByIntegerMetric
-                         <projCount, galois::WorkList::dChunkedLIFO<32>>>());
+                         galois::wl<galois::worklists::OrderedByIntegerMetric
+                         <projCount, galois::worklists::dChunkedLIFO<32>>>());
 
 	timer.stop();
 	

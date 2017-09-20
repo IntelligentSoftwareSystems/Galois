@@ -83,7 +83,7 @@ struct AsyncRsd {
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    typedef galois::worklists::dChunkedFIFO<16> WL;
     galois::for_each_local(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 

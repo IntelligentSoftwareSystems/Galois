@@ -218,8 +218,8 @@ struct FibHandOp {
 
 unsigned fibHand (unsigned n) {
 
-  typedef galois::WorkList::AltChunkedFIFO<64> Chunked;
-  // typedef galois::WorkList::AltChunkedLIFO<4> Chunked;
+  typedef galois::worklists::AltChunkedFIFO<64> Chunked;
+  // typedef galois::worklists::AltChunkedLIFO<4> Chunked;
 
   FibHandFrame init;
   init.sum = 0;

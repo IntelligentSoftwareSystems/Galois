@@ -706,7 +706,7 @@ PerCPU<int> fringeCnts;
 
 //std::vector<f2Item> *fringeBuffs;
 galois::InsertBag<ND*>* fringewl;
-//Galoisruntime::WorkList::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, Galoisruntime::WorkList::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
+//Galoisruntime::worklists::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, Galoisruntime::worklists::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
 galois::Substrate::CacheLineStorage<ND> *gnodes;
 
 //void fringeFindOMP() {
@@ -972,7 +972,7 @@ int main(int argc, char** argv) {
 #endif
 
 #if CONCURRENT
-  //Galoisruntime::WorkList::OrderByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::WorkList::ChunkedFIFO<ED*, 16, true>, true> wl2;
+  //Galoisruntime::worklists::OrderByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::worklists::ChunkedFIFO<ED*, 16, true>, true> wl2;
   
   // FOR RMAT25, RAND26 55
 #if USE_NODE_BASED
@@ -981,25 +981,25 @@ int main(int argc, char** argv) {
   // new regime: rand26 dcl4, dcl16, ///better dcl32, dcl16
   const int chunksize = 8;
   std::cerr << "Using chunk size : " << chunksize << std::endl;
-  typedef galois::WorkList::OrderedByIntegerMetric<NodeIndexer, galois::WorkList::dChunkedLIFO<chunksize> > wl2ty;
-  //typedef Galoisruntime::WorkList::ChunkedFIFO<chunksize, ND*, true> wl2ty;
+  typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
+  //typedef Galoisruntime::worklists::ChunkedFIFO<chunksize, ND*, true> wl2ty;
   galois::InsertBag<ND*> wl2;
 #else
 //  const int chunksize = 64;
 //  std::cerr << "Using chunk size : " << chunksize << std::endl;
-//  typedef Galoisruntime::WorkList::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::WorkList::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
+//  typedef Galoisruntime::worklists::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::worklists::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
 //  Galoisruntime::galois_insert_bag<ED*> wl2;
 #endif
-  //Galoisruntime::WorkList::OrderedByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::WorkList::dChunkedFIFO<ED*, 64, true>, true> wl2;
-  typedef galois::WorkList::dChunkedLIFO<16> wl4ty;  
-  //typedef Galoisruntime::WorkList::dChunkedLIFO<16, ND*,  true> wl4ty;  
-  //typedef Galoisruntime::WorkList::OrderedByIntegerMetric<f2ItemIndexer, Galoisruntime::WorkList::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
+  //Galoisruntime::worklists::OrderedByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::worklists::dChunkedFIFO<ED*, 64, true>, true> wl2;
+  typedef galois::worklists::dChunkedLIFO<16> wl4ty;  
+  //typedef Galoisruntime::worklists::dChunkedLIFO<16, ND*,  true> wl4ty;  
+  //typedef Galoisruntime::worklists::OrderedByIntegerMetric<f2ItemIndexer, Galoisruntime::worklists::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
   galois::InsertBag<ND*> wl4;
 	fringewl = &wl4;
-//  Galoisruntime::WorkList::FIFO<int,  true> wl5;
+//  Galoisruntime::worklists::FIFO<int,  true> wl5;
 #else
-  galois::WorkList::GFIFO<ED*, false> wl2;
-  galois::WorkList::GFIFO<ND*, false> wl4;
+  galois::worklists::GFIFO<ED*, false> wl2;
+  galois::worklists::GFIFO<ND*, false> wl4;
 #endif
 
 //  for (int kk=0; kk<numThreads; ++kk) {

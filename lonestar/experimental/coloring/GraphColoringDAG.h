@@ -121,7 +121,7 @@ protected:
     initDAG (initWork);
     t_dag_init.stop ();
 
-    typedef galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
+    typedef galois::worklists::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
     std::printf ("Number of initial sources: %zd\n", 
         std::distance (initWork.begin (), initWork.end ()));

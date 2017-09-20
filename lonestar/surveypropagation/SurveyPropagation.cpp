@@ -39,7 +39,7 @@
 #include <math.h>
 
 using namespace std;
-using namespace galois::WorkList;
+using namespace galois::worklists;
 
 namespace cll = llvm::cl;
 

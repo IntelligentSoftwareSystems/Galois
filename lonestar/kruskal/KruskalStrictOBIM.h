@@ -159,13 +159,13 @@ class KruskalStrictOBIM: public Kruskal {
     galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    typedef galois::WorkList::OrderedByIntegerMetric<GetWeight, galois::WorkList::ChunkedFIFO<128>>::with_barrier<true>::type WL;
+    typedef galois::worklists::OrderedByIntegerMetric<GetWeight, galois::worklists::ChunkedFIFO<128>>::with_barrier<true>::type WL;
     galois::for_each(edges.begin(), edges.end(),
         [&](const Edge& e, galois::UserContext<Edge>& ctx) {
           findLoop(e, ctx);
           linkUpLoop(e, ctx);
     }, galois::wl<WL>());
-    //}, galois::wl<galois::WorkList::StableIterator<>>());
+    //}, galois::wl<galois::worklists::StableIterator<>>());
     //galois::runtime::for_each_ordered_level (
     //    galois::runtime::makeStandardRange (edges.begin (), edges.end ()),
     //    GetWeight (), std::less<Weight_ty> (), findLoop, linkUpLoop);

@@ -76,7 +76,7 @@ optimized execution:
 \subsection scheduling Scheduling Policies
 
 The scheduling policy for {@link galois::for_each} can be specified by choosing
-one of the types in {@link galois::WorkList} namespace and providing the type-name
+one of the types in {@link galois::worklists} namespace and providing the type-name
 as an argument to {@link galois::wl} parameter of the for_each. 
 The scheduling policies are listed as follows:
 

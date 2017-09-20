@@ -329,8 +329,8 @@ struct BFSpartitioner {
   template <typename I>
   void bfsTraversal (I beg, I end) {
 
-    using WL = galois::WorkList::dChunkedFIFO<32>;
-    // using WL = galois::WorkList::AltChunkedFIFO<8>;
+    using WL = galois::worklists::dChunkedFIFO<32>;
+    // using WL = galois::worklists::AltChunkedFIFO<8>;
 
     galois::for_each (beg, end,
         [this] (GNode src, galois::UserContext<GNode>& ctxt) {
@@ -459,7 +459,7 @@ struct BFSpartitioner {
 
           },
           galois::loopname ("find_component_bfs"),
-          galois::wl<galois::WorkList::dChunkedFIFO<32> > ());
+          galois::wl<galois::worklists::dChunkedFIFO<32> > ());
       
 
       // find next Source

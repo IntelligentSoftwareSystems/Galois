@@ -237,7 +237,7 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
 
 // TODO: Switch to thread-local worklists
 template<typename T,int ChunkSize>
-class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
+class Worklist: public dChunkedMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
 
 template<class T, class FunctionTy, class ArgsTy>
 class Executor {
@@ -384,7 +384,7 @@ public:
 }
 }
 
-namespace WorkList {
+namespace worklists {
 
 template<typename T=int>
 struct BulkSynchronousInline {
@@ -402,7 +402,7 @@ struct BulkSynchronousInline {
 namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
-struct ForEachExecutor<WorkList::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:
+struct ForEachExecutor<worklists::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:
   public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> 
 {
   typedef BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> SuperTy;

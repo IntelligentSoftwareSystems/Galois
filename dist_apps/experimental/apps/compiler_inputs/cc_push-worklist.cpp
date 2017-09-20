@@ -117,7 +117,7 @@ struct ConnectedComp {
 
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
     galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("ConnectedComp"));
   }

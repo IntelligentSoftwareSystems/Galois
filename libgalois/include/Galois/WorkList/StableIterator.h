@@ -38,7 +38,7 @@
 #include "Galois/WorkList/Chunked.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 /**
  * Low-overhead worklist when initial range is not invalidated by the

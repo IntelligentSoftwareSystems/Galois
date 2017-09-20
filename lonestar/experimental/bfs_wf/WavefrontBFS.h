@@ -204,7 +204,7 @@ class BFSwavefrontNolock;
 
 class BFSwavefrontLock: public AbstractWavefrontBFS {
 protected:
-  typedef GaloisWLwrapper< galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
+  typedef GaloisWLwrapper< galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
 
   typedef AbstractWavefrontBFS::Super_ty BaseBFS;
 
@@ -215,7 +215,7 @@ private:
   struct ParallelInnerLoop {
     GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
       typedef typename GaloisWL::value_type value_type;
-      typedef galois::WorkList::ExternalReference<GaloisWL> WL;
+      typedef galois::worklists::ExternalReference<GaloisWL> WL;
 
       value_type *it = nullptr;
 

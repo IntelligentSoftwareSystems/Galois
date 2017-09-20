@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 
   galois::StatTimer T2("T2");
   T2.start();
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   galois::for_each(v.begin(), v.end(), process(), galois::wl<dChunkedLIFO<64>>());
   T2.stop();
 }

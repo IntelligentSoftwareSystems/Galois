@@ -32,7 +32,7 @@
 #include "Galois/FlatMap.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class OrderedList : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {

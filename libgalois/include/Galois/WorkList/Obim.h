@@ -42,7 +42,7 @@
 #include <type_traits>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 namespace detail {
 
@@ -130,7 +130,7 @@ struct OrderedByIntegerMetricComparator<Index, true> {
  *   int operator()(Item i) const { return i.index; }
  * };
  *
- * typedef galois::WorkList::OrderedByIntegerMetric<Indexer> WL;
+ * typedef galois::worklists::OrderedByIntegerMetric<Indexer> WL;
  * galois::for_each<WL>(items.begin(), items.end(), Fn);
  * \endcode
  *
@@ -422,7 +422,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

@@ -1110,7 +1110,7 @@ protected:
           galois::loopname ("handle-aborts"),
           galois::does_not_need_aborts<>(),
           galois::combine_stats_by_name<>(),
-          galois::wl<galois::WorkList::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
 
 
     galois::runtime::on_each_impl(
@@ -1165,7 +1165,7 @@ protected:
         std::make_tuple (
           galois::loopname ("handle-aborts"),
           galois::does_not_need_aborts_tag(),
-          galois::wl<galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
     
 
 
@@ -1260,7 +1260,7 @@ protected:
           galois::loopname ("retire"),
           galois::does_not_need_aborts<>(),
           galois::combine_stats_by_name<>(),
-          galois::wl<galois::WorkList::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
 
     commitRoots.clear_all_parallel();
   }

@@ -253,7 +253,7 @@ private:
   };
 
   static Result unorderedAlgo(GNode source, bool reset) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;

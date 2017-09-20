@@ -37,7 +37,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename T>
 class ConExtListNode {

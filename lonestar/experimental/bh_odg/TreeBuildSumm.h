@@ -292,7 +292,7 @@ struct BuildTreeLockFree {
     treeAlloc.construct (root, box.center ());
     internalNodes.push_back (root);
 
-    typedef galois::WorkList::dChunkedFIFO<64> WL_ty;
+    typedef galois::worklists::dChunkedFIFO<64> WL_ty;
       
     galois::do_all (beg, end, 
         BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
@@ -441,7 +441,7 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
   typedef galois::GAtomic<unsigned> UnsignedAtomic;
   static const unsigned CHUNK_SIZE = 64;
-  typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WL_ty;
+  typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE, unsigned> WL_ty;
 
   struct ODGnode {
     UnsignedAtomic numChild;
@@ -554,7 +554,7 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
     WL_ty wl;
-    typedef galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef galois::worklists::ExternalReference<WL_ty> WL;
     typedef typename WL_ty::value_type value_type;
     value_type* it = nullptr;
     std::vector<ODGnode> odgNodes;
@@ -570,7 +570,7 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
     galois::runtime::beginSampling ();
     t_feach.start ();
 
-    // galois::for_each_wl<galois::runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
+    // galois::for_each_wl<galois::runtime::worklists::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
     galois::for_each(it, it, SummarizeOp (odgNodes), galois::loopname("tree_summ"), galois::wl<WL>(&wl));
     t_feach.stop ();
     galois::runtime::endSampling ();
@@ -887,8 +887,8 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     static const unsigned CHUNK_SIZE = 2;
-    // typedef galois::WorkList::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
-    typedef galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    // typedef galois::worklists::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    typedef galois::worklists::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
       std::cout << "KDG hand checking the tree. Timing may be off" << std::endl;

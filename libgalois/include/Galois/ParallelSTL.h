@@ -88,7 +88,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
 {
   typedef find_if_helper<InputIterator,Predicate> HelperTy;
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
-  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  typedef galois::worklists::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
   for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, galois::wl<WL>());
@@ -254,7 +254,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     std::sort(first, last, comp);
     return;
   }
-  typedef galois::WorkList::dChunkedFIFO<1> WL;
+  typedef galois::worklists::dChunkedFIFO<1> WL;
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   

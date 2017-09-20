@@ -90,7 +90,7 @@ protected:
   };
 
   static const unsigned CHUNK_SIZE = 2;
-  typedef galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
+  typedef galois::worklists::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
   typedef FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
   typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
@@ -226,7 +226,7 @@ public:
           galois::loopname("create_initial_tasks"),
           galois::chunk_size<4>()));
 
-    typedef WorkList::ExternalReference<WL_ty> WL;
+    typedef worklists::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = nullptr;
 
     galois::for_each (it, it,
@@ -270,8 +270,8 @@ protected:
 
   typedef std::pair<Task*, F*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
-  typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
-  // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  typedef worklists::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  // typedef worklists::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
 public:
 

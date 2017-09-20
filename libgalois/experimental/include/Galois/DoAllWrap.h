@@ -127,7 +127,7 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     const unsigned CHUNK_SIZE = 128;
     //const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
 
-    using WL_ty =  galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
+    using WL_ty =  galois::worklists::AltChunkedLIFO<CHUNK_SIZE, T>;
 
     galois::runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::tuple_cat(

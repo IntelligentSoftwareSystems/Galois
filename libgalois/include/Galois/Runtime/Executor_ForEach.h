@@ -63,13 +63,13 @@ namespace galois {
 namespace runtime {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+typedef worklists::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template<typename value_type>
 class AbortHandler {
   struct Item { value_type val;  int retries; };
 
-  typedef WorkList::GFIFO<Item> AbortedList;
+  typedef worklists::GFIFO<Item> AbortedList;
   Substrate::PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
   

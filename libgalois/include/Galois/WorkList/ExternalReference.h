@@ -34,7 +34,7 @@
 #define GALOIS_WORKLIST_EXTERNALREFERENCE_H
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename Container, bool IgnorePushInitial = false>
 class ExternalReference {

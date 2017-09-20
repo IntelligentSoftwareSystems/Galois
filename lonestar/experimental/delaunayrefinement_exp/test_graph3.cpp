@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
  // for (auto ii : vec_items) {
    // std::cout << ii.data << "\n";
  // }
-  // galois::for_each(vec_items.begin(), vec_items.end(),initialize(g), galois::loopname("initializing"));//, galois::wl<galois::WorkList::StableIterator<>>());
+  // galois::for_each(vec_items.begin(), vec_items.end(),initialize(g), galois::loopname("initializing"));//, galois::wl<galois::worklists::StableIterator<>>());
 
 
 

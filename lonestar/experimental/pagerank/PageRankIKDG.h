@@ -118,7 +118,7 @@ protected:
       galois::for_each(graph.begin(), graph.end(),
           ApplyOperator(*this, bags[1]),
           galois::loopname("page-rank-ikdg"),
-          galois::wl<galois::WorkList::Deterministic<>>());
+          galois::wl<galois::worklists::Deterministic<>>());
       bags[0].clear();
       galois::do_all_local(bags[1], AddToNewBag { bags[0], graph });
     }

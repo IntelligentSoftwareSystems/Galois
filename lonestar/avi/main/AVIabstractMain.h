@@ -107,7 +107,7 @@ protected:
   using IterCounter = galois::GAccumulator<size_t>;
 
   static const int DEFAULT_CHUNK_SIZE = 16;
-  using AVIWorkList =  galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE>;
+  using AVIWorkList =  galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE>;
 
 
   std::string wltype;

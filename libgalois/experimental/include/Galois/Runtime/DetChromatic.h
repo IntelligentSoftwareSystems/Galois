@@ -443,7 +443,7 @@ public:
   template <typename R, typename F, typename U, typename CS = galois::chunk_size<DEFAULT_CHUNK_SIZE>>
   void runActiveDAGcomp (const R& range, F func, U& userCtx, const char* loopname, const CS& cs = CS ()) {
 
-    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::worklists::AltChunkedFIFO<CS::value>;
 
     GALOIS_ASSERT (initialized);
 
@@ -462,7 +462,7 @@ public:
     galois::GAccumulator<size_t> edgesFlipped;
 
 
-    typedef galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef galois::worklists::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = 0;
     galois::for_each(it, it,
         ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
@@ -558,7 +558,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    using WL_ty = galois::WorkList::ExternalReference<W>;
+    using WL_ty = galois::worklists::ExternalReference<W>;
     typename WL_ty::value_type* it = nullptr;
 
     galois::for_each (it, it, 
@@ -575,7 +575,7 @@ public:
 
     t.start ();
 
-    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::worklists::AltChunkedFIFO<CS::value>;
 
     WL_ty initWL;
 
@@ -598,7 +598,7 @@ public:
     galois::StatTimer t (loopname);
 
     t.start ();
-    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::worklists::AltChunkedFIFO<CS::value>;
 
     WL_ty sources;
 
@@ -1161,8 +1161,8 @@ struct ChromaticExecutor {
   typedef typename G::GraphNode GNode;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
   G& graph;
@@ -1308,7 +1308,7 @@ struct ChromaticExecutor {
       ++rounds;
 
       // run for_each
-      typedef galois::WorkList::ExternalReference<WL_ty> WL;
+      typedef galois::worklists::ExternalReference<WL_ty> WL;
       GNode* it = 0;
 
       for_each(it, it,
@@ -1358,7 +1358,7 @@ struct ChromaticReuseExecutor {
   typedef typename G::GraphNode GNode;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+  typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
   typedef galois::PerThreadBag<GNode> Bag_ty;
   
   G& graph;
@@ -1472,7 +1472,7 @@ struct InputGraphDAGreuseExecutor {
   typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+  typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
 
 
   G& graph;
@@ -1566,8 +1566,8 @@ struct InputGraphDAGexecutor {
   typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
@@ -1713,7 +1713,7 @@ public:
       // ++rounds;
 // 
       // t_dag_exec.start ();
-      // typedef galois::WorkList::ExternalReference<WL_ty> WL;
+      // typedef galois::worklists::ExternalReference<WL_ty> WL;
       // typename WL::value_type* it = 0;
       // galois::for_each(it, it,
           // ApplyOperator {*this},
@@ -1814,8 +1814,8 @@ struct InputGraphDAGtopologyDriven {
   typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
@@ -1943,8 +1943,8 @@ struct HybridInputDAGexecutor {
   typedef typename G::GraphNode GNode;
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
 
-  // typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  // typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  // typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  // typedef galois::worklists::WLsizeWrapper<Inner_WL_ty> WL_ty;
 
   typedef galois::PerThreadBag<GNode> Bag_ty;
 

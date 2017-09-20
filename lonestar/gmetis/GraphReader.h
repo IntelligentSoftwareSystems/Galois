@@ -122,7 +122,7 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
     }*/
 
 
-  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  typedef galois::worklists::dChunkedFIFO<256> WL;
   galois::GAccumulator<int> pnumNodes;
   galois::GAccumulator<int> pnumEdges;
 

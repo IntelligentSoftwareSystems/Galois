@@ -411,11 +411,11 @@ void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   cur += d;
 }
 
-//! Wrapper around WorkList::ChunkedFIFO to allow peek() and empty() and still have FIFO order
+//! Wrapper around worklists::ChunkedFIFO to allow peek() and empty() and still have FIFO order
 template<int ChunkSize,typename T>
 struct FIFO {
-  WorkList::ChunkedFIFO<ChunkSize,T,false> m_data;
-  WorkList::ChunkedLIFO<16,T,false> m_buffer;
+  worklists::ChunkedFIFO<ChunkSize,T,false> m_data;
+  worklists::ChunkedLIFO<16,T,false> m_buffer;
   size_t m_size;
 
   FIFO(): m_size(0) { }
@@ -532,9 +532,9 @@ public:
 template<typename OptionsTy>
 class DAGManagerBase<OptionsTy,true> {
   typedef DeterministicContext<OptionsTy> Context;
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
-  typedef WorkList::AltChunkedLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
-  typedef WorkList::dChunkedFIFO<32,Context*> WL3;
+  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
+  typedef worklists::AltChunkedLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
+  typedef worklists::dChunkedFIFO<32,Context*> WL3;
 
   struct ThreadLocalData: private boost::noncopyable {
     typedef std::vector<Context*, typename PerIterAllocTy::rebind<Context*>::other> SortBuf;
@@ -954,7 +954,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
   typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
   typedef FIFO<1024,Item> ReserveTy;
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
+  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
 
   struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
     NewWorkManager* self;
@@ -1295,9 +1295,9 @@ class Executor:
   typedef DItem<OptionsTy> Item;
   typedef DeterministicContext<OptionsTy> Context;
 
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context> PendingWork;
-  typedef WorkList::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
+  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
+  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,Context> PendingWork;
+  typedef worklists::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
@@ -1605,7 +1605,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 } 
 }
 
-namespace WorkList {
+namespace worklists {
 
 /**
  * Deterministic execution. Operator should be cautious.
@@ -1626,7 +1626,7 @@ struct Deterministic {
 namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
-struct ForEachExecutor<WorkList::Deterministic<T>, FunctionTy, ArgsTy>:
+struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>:
   public DeterministicImpl::Executor<DeterministicImpl::Options<T, FunctionTy, ArgsTy>>
 {
   typedef DeterministicImpl::Options<T, FunctionTy, ArgsTy> OptionsTy;

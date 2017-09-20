@@ -175,7 +175,7 @@ struct PageRank {
 
 
   void static go(Graph& _graph) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
 
     galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());

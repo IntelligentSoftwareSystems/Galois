@@ -91,7 +91,7 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   }
 
   void operator()(Graph& graph) {
-    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::worklists::dChunkedFIFO<256> WL;
     typedef galois::graphsNodeBagPair<> BagPair;
     BagPair bags(graph.size());
 

@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
   std::cout << "tolerance: " << tolerance << "\n";
   galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   initResidual(graph);
-  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  typedef galois::worklists::dChunkedFIFO<256> WL;
   PageRank pr(graph, tolerance);
 
   galois::StatTimer Tmain;

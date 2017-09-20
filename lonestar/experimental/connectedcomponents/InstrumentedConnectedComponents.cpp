@@ -553,7 +553,7 @@ struct LabelPropNoCasAlgo {
   };
 
   void operator()(Graph& graph) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<256> WL;
     typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
     typedef dChunkedTwoLevelSetFIFO<256> OSet;
@@ -799,7 +799,7 @@ struct LabelPropAlgo {
   };
 
   void operator()(Graph& graph) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<256> WL;
     typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
     typedef dChunkedTwoLevelSetFIFO<256> OSet;
@@ -1047,7 +1047,7 @@ struct PullLPAlgo {
   };
 
   void operator()(Graph& graph) {
-    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::worklists::dChunkedFIFO<256> WL;
 
     galois::do_all_local(graph, Initialize(graph));
     galois::for_each_local(graph, Process(graph), galois::wl<WL>());
@@ -1136,7 +1136,7 @@ struct PullLPCASAlgo {
   };
 
   void operator()(Graph& graph) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<256> WL;
     typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
     typedef dChunkedTwoLevelSetFIFO<256> OSet;
@@ -1323,9 +1323,9 @@ struct AsyncAlgo {
     galois::Statistic emptyMerges("EmptyMerges");
 #ifdef GALOIS_USE_EXP
     if(algo == Algo::asyncOSet) {
-      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::WorkList::dChunkedTwoLevelSetFIFO<32> >());
+      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelSetFIFO<32> >());
     } else if(algo == Algo::asyncHSet) {
-      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::WorkList::dChunkedTwoLevelHashFIFO<32> >());
+      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelHashFIFO<32> >());
     } else {
 #endif
       galois::for_each_local(graph, Merge(graph, emptyMerges));
@@ -1405,7 +1405,7 @@ struct BlockedAsyncAlgo {
     Merge merge = { graph, items };
     galois::do_all_local(graph, merge, galois::loopname("Initialize"));
     galois::for_each_local(items, merge,
-        galois::loopname("Merge"), galois::wl<galois::WorkList::dChunkedFIFO<128> >());
+        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
   }
 };
 

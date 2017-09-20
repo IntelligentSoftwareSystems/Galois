@@ -139,7 +139,7 @@ struct HybridBFS {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<256> WL;
     typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 

@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
       return val.first >> stepShift;
     }
   };
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPsimple]

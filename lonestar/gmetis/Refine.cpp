@@ -170,8 +170,8 @@ struct refine_BKL2 {
   }
 
   static void go(unsigned mins, unsigned maxs, GGraph& cg, GGraph* fg,  std::vector<partInfo>& p) {
-    typedef galois::WorkList::dChunkedFIFO<8> Chunk;
-    typedef galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
+    typedef galois::worklists::dChunkedFIFO<8> Chunk;
+    typedef galois::worklists::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
     gainIndexer::g = &cg;
     galois::InsertBag<GNode> boundary;
     if (fg)

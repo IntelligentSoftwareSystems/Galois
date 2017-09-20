@@ -7,7 +7,7 @@
 
 //TODO: move to libdist or delete
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 
 template <typename WL, typename GraphTy>
@@ -227,6 +227,6 @@ public:
 };
 
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 

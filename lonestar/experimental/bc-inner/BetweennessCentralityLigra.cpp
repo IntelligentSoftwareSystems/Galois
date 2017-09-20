@@ -200,7 +200,7 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph, GNode source) {
-    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::worklists::dChunkedFIFO<256> WL;
     std::deque<Bag*> levels;
 
     graph.getData(source).visited = true;

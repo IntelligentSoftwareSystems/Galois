@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, galois::wl<OBIM>(), galois::does_not_need_aborts<>(), galois::loopname("SSSP"));

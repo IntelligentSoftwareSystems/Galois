@@ -213,7 +213,7 @@ struct BlockedAsyncAlgo {
     Merge merge = { items };
     galois::do_all_local(graph, merge, galois::loopname("Initialize"));
     galois::for_each_local(items, merge,
-        galois::loopname("Merge"), galois::wl<galois::WorkList::dChunkedFIFO<128> >());
+        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
     galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
   }
 };

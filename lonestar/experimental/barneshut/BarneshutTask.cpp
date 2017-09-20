@@ -1670,13 +1670,13 @@ void sort(Bodies& bodies) {
   octreeInternalAlloc.construct(top, OctreeInternal(box.center(), static_cast<Octree*>(0)));
 
   // XXX
-  typedef galois::Pipeline<galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+  typedef galois::Pipeline<galois::worklists::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
   galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, 
         ptrs.begin(), ptrs.end(), top, box.radius(), 0), "Sort1");
 
   if (false) {
     typedef galois::InsertBag<Body> Bag;
-    typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>, Sort<Bag> > P2;
+    typedef galois::Pipeline<galois::worklists::dChunkedFIFO<>, Sort<Bag> > P2;
     Bag bag;
     galois::for_each_task<P2>(Sort<Bag>(top, bag), "Sort2");
     //delete top;
@@ -1719,17 +1719,17 @@ void run(Bodies& bodies) {
       BuildOctreeCilk c(bodyPtrsAlloc, octreeInternalAlloc);
       c.buildOctree(ptrs.begin(), ptrs.end(), top, box.radius());
     } else if (allocateFIFO) {
-      typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+      typedef galois::Pipeline<galois::worklists::dChunkedFIFO<>,BuildOctree,ComputeCenterOfMass> P1;
       galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
     } else {
-      typedef galois::Pipeline<galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+      typedef galois::Pipeline<galois::worklists::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
       galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
     }
     Toctree.stop();
 
-    typedef galois::WorkList::dChunkedFIFO<> FIFO;
-    typedef galois::WorkList::dChunkedLIFO<> LIFO;
-    typedef galois::WorkList::LocalWorklist<galois::WorkList::GFIFO<> > LocalFIFO;
+    typedef galois::worklists::dChunkedFIFO<> FIFO;
+    typedef galois::worklists::dChunkedLIFO<> LIFO;
+    typedef galois::worklists::LocalWorklist<galois::worklists::GFIFO<> > LocalFIFO;
 
     galois::StatTimer T("ComputeForceTime");
     T.start();
@@ -1753,7 +1753,7 @@ void run(Bodies& bodies) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
 
-    typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>,AdvanceBody> P3;
+    typedef galois::Pipeline<galois::worklists::dChunkedFIFO<>,AdvanceBody> P3;
     galois::for_each_task<P3>(
         boost::make_transform_iterator(ptrs.begin(), MakeAdvanceBody(&new_bodies)),
         boost::make_transform_iterator(ptrs.end(), MakeAdvanceBody(&new_bodies)),

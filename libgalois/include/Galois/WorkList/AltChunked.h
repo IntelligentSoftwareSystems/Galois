@@ -39,7 +39,7 @@
 #include "WLCompileCheck.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 struct ChunkHeader {
   ChunkHeader* next;

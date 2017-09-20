@@ -35,7 +35,7 @@
 #include <type_traits>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 template<typename T = int>
 struct NoGlobalQueue {
@@ -112,7 +112,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(LocalQueue)
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

@@ -317,7 +317,7 @@ struct AsyncAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) const {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
     //typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
@@ -440,7 +440,7 @@ struct HighCentralityAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<256> WL;
     int next = 0;
     Dist newDist = 1;
@@ -622,11 +622,11 @@ struct DeterministicAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef galois::WorkList::BulkSynchronousInline<> WL;
+    typedef galois::worklists::BulkSynchronousInline<> WL;
 #else
-    typedef galois::WorkList::BulkSynchronous<galois::WorkList::dChunkedLIFO<256> > WL;
+    typedef galois::worklists::BulkSynchronous<galois::worklists::dChunkedLIFO<256> > WL;
 #endif
-    typedef galois::WorkList::Deterministic<> DWL;
+    typedef galois::worklists::Deterministic<> DWL;
     graph.getData(source).dist = 0;
 
     switch (Version) {
@@ -694,7 +694,7 @@ int main(int argc, char **argv) {
   galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP

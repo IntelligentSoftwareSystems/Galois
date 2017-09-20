@@ -231,7 +231,7 @@ void edgeMap(Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Ba
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward) {
-  using namespace galois::WorkList;
+  using namespace galois::worklists;
   size_t count = input.getCount();
 
   if (!denseForward && count > graph.sizeEdges() / 20) {

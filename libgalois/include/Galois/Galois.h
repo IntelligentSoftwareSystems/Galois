@@ -75,7 +75,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
  * range and T is the type of item.
  *
- * @tparam WLTy Worklist policy {@see galois::WorkList}
+ * @tparam WLTy Worklist policy {@see galois::worklists}
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
@@ -91,7 +91,7 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::worklists}
  * @param i initial item
  * @param fn operator
  * @param args optional arguments to loop
@@ -107,7 +107,7 @@ void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::worklists}
  * @param c locality-aware container
  * @param fn operator
  * @param args optional arguments to loop

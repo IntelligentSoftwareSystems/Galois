@@ -92,7 +92,7 @@ struct UpdateRequestIndexer
 
 //typedef std::pair<GNode,GNode> Edge;
 typedef std::vector<UpdateRequest> WorkList;
-typedef galois::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, galois::WorkList::dChunkedFIFO<1024> > OBIM;
+typedef galois::worklists::OrderedByIntegerMetric<UpdateRequestIndexer, galois::worklists::dChunkedFIFO<1024> > OBIM;
 
 class PtsToCons {
 public:
@@ -156,7 +156,7 @@ public:
 		visited[ii] = false;
 	}
 	unsigned cyclenode = numNodes;	// set to invalid id.
-	for (WorkList::iterator ii = worklist.begin(); ii != worklist.end(); ++ii) {
+	for (worklists::iterator ii = worklist.begin(); ii != worklist.end(); ++ii) {
 		Node &nn = graph.getData(ii->n, galois::MethodFlag::UNPROTECTED);
 		unsigned nodeid = nn.id;
 		//std::cout << "debug: cycle process " << nodeid << std::endl;
@@ -418,7 +418,7 @@ struct Process {
 	/*if (wl.size() > THRESHOLD_OCD) {
 		ocd.process(wl);
 	}*/
-	for (WorkList::iterator ii = wl.begin(); ii != wl.end(); ++ii) {
+	for (worklists::iterator ii = wl.begin(); ii != wl.end(); ++ii) {
 		ctx.push(*ii);
 	}
    }

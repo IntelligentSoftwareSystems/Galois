@@ -471,7 +471,7 @@ public:
     StatTimer t_exec ("Time to execute the DAG: ");
 
     const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
-    typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
 

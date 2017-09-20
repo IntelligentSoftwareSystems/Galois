@@ -202,7 +202,7 @@ NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy
 
 //  galois::StatTimer Tmain;
 //  Tmain.start();  
-  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  typedef galois::worklists::dChunkedFIFO<256> WL;
   galois::for_each_local(*g, PageRank{*g, tolerance}, galois::wl<WL>());
 //  Tmain.stop();
   

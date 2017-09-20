@@ -136,7 +136,7 @@ struct SSSP {
 
   SSSP(Graph* _g):graph(_g){}
   void static go(Graph& _graph){
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
 
     //XXX: Need a better way to fix this!!

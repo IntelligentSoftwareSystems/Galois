@@ -283,8 +283,8 @@ int main(int argc, char** argv) {
 
   galois::on_each(popstate());
 
-  typedef galois::WorkList::dChunkedLIFO<8> WL;
-  //typedef galois::WorkList::AltChunkedLIFO<32> CA;
+  typedef galois::worklists::dChunkedLIFO<8> WL;
+  //typedef galois::worklists::AltChunkedLIFO<32> CA;
   galois::StatTimer T;
   T.start();
   galois::for_each(tmp.begin(), tmp.end(), process(), galois::wl<WL>());

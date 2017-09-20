@@ -365,7 +365,7 @@ public:
     typedef std::vector<Point*> PointsBufTy;
     typedef WorkItem<PointsBufTy::iterator> WIT;
     typedef std::vector<WIT> WorkTy;
-    typedef galois::WorkList::dChunkedLIFO<1> WL;
+    typedef galois::worklists::dChunkedLIFO<1> WL;
     PointsBufTy points;
     std::copy(begin, end, std::back_inserter(points));
 

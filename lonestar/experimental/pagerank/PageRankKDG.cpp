@@ -154,7 +154,7 @@ protected:
               applyOperator<galois::UserContext<GNode>, true, true> (src, ctx);
             },
             galois::loopname ("page-rank-unordered"),
-            galois::wl<galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> > ());
+            galois::wl<galois::worklists::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> > ());
         break;
 
       default:

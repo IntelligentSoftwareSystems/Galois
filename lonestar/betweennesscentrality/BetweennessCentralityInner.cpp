@@ -137,7 +137,7 @@ struct AsyncAlgo {
       }
     };
 
-    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<bfsChunkSize> > OBIM;
+    typedef galois::worklists::OrderedByIntegerMetric<Indexer,galois::worklists::dChunkedFIFO<bfsChunkSize> > OBIM;
 
     Graph& g;
     BFS(Graph& g) :g(g) {}
@@ -181,7 +181,7 @@ struct AsyncAlgo {
       }
     };
 
-    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
+    typedef galois::worklists::OrderedByIntegerMetric<Indexer,galois::worklists::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     CountPaths(Graph& g) :g(g) { Indexer::g = &g; }
@@ -226,7 +226,7 @@ struct AsyncAlgo {
       }
     };
 
-    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
+    typedef galois::worklists::OrderedByIntegerMetric<Indexer,galois::worklists::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     ComputeDep(Graph& g) :g(g) { Indexer::g = &g; }

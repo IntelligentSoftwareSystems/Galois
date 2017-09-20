@@ -691,7 +691,7 @@ struct PrtRsd {
     galois::for_each_local(graph, Process1(this, graph));
     galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp2: "<<amp2<<"\n";
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<4> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 #ifdef GALOIS_USE_EXP
@@ -856,7 +856,7 @@ struct PrtDeg {
     galois::for_each_local(graph, Process1(this, graph));
     galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
      galois::InsertBag<UpdateRequest> initialWL;

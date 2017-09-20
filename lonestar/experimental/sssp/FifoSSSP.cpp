@@ -396,7 +396,7 @@ struct AsyncAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
@@ -524,7 +524,7 @@ struct AsyncSetAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<NodeIndexer<Graph>, Chunk, 10, false> OBIM;
     typedef dChunkedMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
@@ -677,7 +677,7 @@ struct AsyncAlgoPP {
   };
 
   void operator()(Graph& graph, GNode source) {
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 

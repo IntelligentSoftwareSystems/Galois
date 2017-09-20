@@ -40,7 +40,7 @@
 #include "Galois/Timer.h"
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 namespace detail {
 
@@ -61,7 +61,7 @@ public:
   WorkSetMaster() { duplicate = new galois::Statistic("SchedulerDuplicates"); }
 
   template<typename... Args>
-  WorkSetMaster(galois::WorkList::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
+  WorkSetMaster(galois::worklists::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
   {
     duplicate = new galois::Statistic("SchedulerDuplicates");
   }
@@ -118,7 +118,7 @@ template<int ChunkSize=64, typename T=int, bool Concurrent=true>
 using dChunkedTwoLevelSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedTwoLevelSetFIFO);
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif

@@ -295,7 +295,7 @@ struct ConnectedComp {
 
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    using namespace galois::WorkList;
+    using namespace galois::worklists;
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		auto __sync_functor = Get_info_functor<Graph>(_graph);

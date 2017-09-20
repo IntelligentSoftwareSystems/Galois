@@ -38,7 +38,7 @@
 #include <mutex>
 
 namespace galois {
-namespace WorkList {
+namespace worklists {
 
 //! Simple Container Wrapper worklist (not scalable).
 template<typename T, typename container = std::deque<T>, bool popBack = true>
@@ -107,7 +107,7 @@ GALOIS_WLCOMPILECHECK(LIFO)
 GALOIS_WLCOMPILECHECK(GLIFO)
 
 
-} // end namespace WorkList
+} // end namespace worklists
 } // end namespace galois
 
 #endif
