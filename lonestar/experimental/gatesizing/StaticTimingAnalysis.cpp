@@ -62,15 +62,16 @@ struct ComputeRequiredTime {
       bool changed = false;
       for (auto oe: g.edges(n)) {
         auto& outData = g.getData(g.getEdgeDst(oe));
+        auto& oeData = g.getEdgeData(oe);
 
-        auto riseRequiredTime = outData.rise.requiredTime;
+        auto riseRequiredTime = outData.rise.requiredTime - oeData.riseDelay;
         if (data.rise.requiredTime > riseRequiredTime) {
           data.rise.requiredTime = riseRequiredTime;
           data.rise.slack = riseRequiredTime - data.rise.arrivalTime;
           changed = true;
         }
 
-        auto fallRequiredTime = outData.fall.requiredTime;
+        auto fallRequiredTime = outData.fall.requiredTime - oeData.fallDelay;
         if (data.fall.requiredTime > fallRequiredTime) {
           data.fall.requiredTime = fallRequiredTime;
           data.fall.slack = fallRequiredTime - data.fall.arrivalTime;
@@ -92,25 +93,44 @@ struct ComputeRequiredTime {
 
       bool changed = false;
       for (auto oe: g.edges(n)) {
-        auto& outData = g.getData(g.getEdgeDst(oe));
         auto& oeData= g.getEdgeData(oe);
+        auto& outData = g.getData(g.getEdgeDst(oe));
+        auto cellOutPin = outData.pin->gate->cell->outPins.at(outData.pin->name);
 
-        auto outRiseRequiredTime = outData.rise.requiredTime - oeData.riseDelay;
-        auto outFallRequiredTime = outData.fall.requiredTime - oeData.fallDelay;
-        auto tSense = outData.pin->gate->cell->outPins.at(outData.pin->name)->tSense.at(data.pin->name);
-
-        auto riseRequiredTime = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? outRiseRequiredTime : outFallRequiredTime;
-        if (data.rise.requiredTime > riseRequiredTime) {
-          data.rise.requiredTime = riseRequiredTime;
-          data.rise.slack = riseRequiredTime - data.rise.arrivalTime;
-          changed = true;
+        auto requiredTimeForOutRise = outData.rise.requiredTime - oeData.riseDelay;
+        // positive unate for outgoing rising edge
+        if (cellOutPin->cellRise.count({data.pin->name, TIMING_SENSE_POSITIVE_UNATE})) {
+          if (data.rise.requiredTime > requiredTimeForOutRise) {
+            data.rise.requiredTime = requiredTimeForOutRise;
+            data.rise.slack = requiredTimeForOutRise - data.rise.arrivalTime;
+            changed = true;
+          }
+        }
+        // negative unate for outgoing rising edge
+        if (cellOutPin->cellRise.count({data.pin->name, TIMING_SENSE_NEGATIVE_UNATE})) {
+          if (data.fall.requiredTime > requiredTimeForOutRise) {
+            data.fall.requiredTime = requiredTimeForOutRise;
+            data.fall.slack = requiredTimeForOutRise - data.fall.arrivalTime;
+            changed = true;
+          }
         }
 
-        auto fallRequiredTime = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? outFallRequiredTime : outRiseRequiredTime;
-        if (data.fall.requiredTime > fallRequiredTime) {
-          data.fall.requiredTime = fallRequiredTime;
-          data.fall.slack = fallRequiredTime - data.fall.arrivalTime;
-          changed = true;
+        auto requiredTimeForOutFall = outData.fall.requiredTime - oeData.fallDelay;
+        // positive unate for outgoing falling edge
+        if (cellOutPin->cellFall.count({data.pin->name, TIMING_SENSE_POSITIVE_UNATE})) {
+          if (data.fall.requiredTime > requiredTimeForOutFall) {
+            data.fall.requiredTime = requiredTimeForOutFall;
+            data.fall.slack = requiredTimeForOutFall - data.fall.arrivalTime;
+            changed = true;
+          }
+        }
+        // negative unate for outgoing falling edge
+        if (cellOutPin->cellFall.count({data.pin->name, TIMING_SENSE_NEGATIVE_UNATE})) {
+          if (data.rise.requiredTime > requiredTimeForOutFall) {
+            data.rise.requiredTime = requiredTimeForOutFall;
+            data.rise.slack = requiredTimeForOutFall - data.rise.arrivalTime;
+            changed = true;
+          }
         }
       }
 
@@ -136,7 +156,48 @@ struct ComputeArrivalTimeAndPower {
   Graph& g;
   ComputeArrivalTimeAndPower(Graph& g): g(g) {}
 
-  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
+  void updateGateOutput(TimingPowerInfo& info, float pinC, float netC, float& edgeDelay,
+    std::string inPinName, TimingPowerInfo& inPosInfo, TimingPowerInfo& inNegInfo,
+    CellPin::MapOfTableSet& delayTables,
+    CellPin::MapOfTableSet& transitionTables,
+    CellPin::MapOfTableSet& powerTables)
+  {
+    auto posTablesI = delayTables.find({inPinName, TIMING_SENSE_POSITIVE_UNATE});
+    std::vector<float> posVTotalC = {inPosInfo.slew, pinC + netC};
+    std::pair<float, std::string> pos = {-std::numeric_limits<float>::infinity(), ""};
+    if (posTablesI != delayTables.end()) {
+      pos = extractMaxFromTableSet(posTablesI->second, posVTotalC);
+    }
+
+    auto negTablesI = delayTables.find({inPinName, TIMING_SENSE_NEGATIVE_UNATE});
+    std::vector<float> negVTotalC = {inNegInfo.slew, pinC + netC};
+    std::pair<float, std::string> neg = {-std::numeric_limits<float>::infinity(), ""};
+    if (negTablesI != delayTables.end()) {
+      neg = extractMaxFromTableSet(negTablesI->second, negVTotalC);
+    }
+
+    bool isPos = (pos.first >= neg.first);
+    edgeDelay = (isPos) ? pos.first : neg.first;
+    auto when = (isPos) ? pos.second : neg.second;
+    auto t = (isPos) ? TIMING_SENSE_POSITIVE_UNATE : TIMING_SENSE_NEGATIVE_UNATE;
+    auto& inInfo = (isPos) ? inPosInfo : inNegInfo;
+    auto& vTotalC = (isPos) ? posVTotalC : negVTotalC;
+
+    auto arrivalTime = inInfo.arrivalTime + edgeDelay;
+    if (info.arrivalTime < arrivalTime) {
+      // update critical path
+      info.arrivalTime = arrivalTime;
+      info.slew = transitionTables.at({inPinName, t}).at(when)->lookup(vTotalC);
+
+      // power follows critical path
+      auto power = powerTables.at({inPinName, t}).at(when);
+      std::vector<float> vPinC = {inInfo.slew, pinC};
+      info.internalPower = power->lookup(vPinC);
+      info.netPower = power->lookup(vTotalC) - info.internalPower;
+    }
+  }
+
+  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
     auto& data = g.getData(n);
 
     if (data.isDummy) {
@@ -175,7 +236,6 @@ struct ComputeArrivalTimeAndPower {
 
       auto pin = data.pin;
       auto pinC = pin->gate->cell->inPins.at(pin->name)->capacitance;
-
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
         data.rise.slew = inData.rise.slew;
@@ -234,47 +294,16 @@ struct ComputeArrivalTimeAndPower {
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
         auto& ieData = g.getEdgeData(ie);
-        auto tSense = cellOutPin->tSense.at(inData.pin->name);
 
         // rising edge
-        auto cellRise = cellOutPin->cellRise.at(inData.pin->name);
-        TimingPowerInfo *infoForRise = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? &(inData.rise) : &(inData.fall);
-        std::vector<float> riseVTotalC = {infoForRise->slew, data.totalPinC + data.totalNetC};
-        ieData.riseDelay = cellRise->lookup(riseVTotalC);
-
-        auto newRiseArrivalTime = infoForRise->arrivalTime + ieData.riseDelay;
-        if (data.rise.arrivalTime < newRiseArrivalTime) {
-          // update critical path
-          data.rise.arrivalTime = newRiseArrivalTime;
-          auto riseTransition = cellOutPin->riseTransition.at(inData.pin->name);
-          data.rise.slew = riseTransition->lookup(riseVTotalC);
-
-          // power follows critical path
-          auto risePower = cellOutPin->risePower.at(inData.pin->name);
-          std::vector<float> riseVPinC = {infoForRise->slew, data.totalPinC};
-          data.rise.internalPower = risePower->lookup(riseVPinC);
-          data.rise.netPower = risePower->lookup(riseVTotalC) - data.rise.internalPower;
-        }
+        updateGateOutput(data.rise, data.totalPinC, data.totalNetC, ieData.riseDelay,
+          inData.pin->name, inData.rise, inData.fall,
+          cellOutPin->cellRise, cellOutPin->riseTransition, cellOutPin->risePower);
 
         // falling edge
-        auto cellFall = cellOutPin->cellFall.at(inData.pin->name);
-        TimingPowerInfo *infoForFall = (TIMING_SENSE_POSITIVE_UNATE == tSense) ? &(inData.fall) : &(inData.rise);
-        std::vector<float> fallVTotalC = {infoForFall->slew, data.totalPinC + data.totalNetC};
-        ieData.fallDelay = cellFall->lookup(fallVTotalC);
-
-        auto newFallArrivalTime = infoForFall->arrivalTime + ieData.fallDelay;
-        if (data.fall.arrivalTime < newFallArrivalTime) {
-          // update critical path
-          data.fall.arrivalTime = newFallArrivalTime;
-          auto fallTransition = cellOutPin->fallTransition.at(inData.pin->name);
-          data.fall.slew = fallTransition->lookup(fallVTotalC);
-
-          // power follows critical path
-          auto fallPower = cellOutPin->fallPower.at(inData.pin->name);
-          std::vector<float> fallVPinC = {infoForFall->slew, data.totalPinC};
-          data.fall.internalPower = fallPower->lookup(fallVPinC);
-          data.fall.netPower = fallPower->lookup(fallVTotalC) - data.fall.internalPower;
-        }
+        updateGateOutput(data.fall, data.totalPinC, data.totalNetC, ieData.fallDelay,
+          inData.pin->name, inData.fall, inData.rise,
+          cellOutPin->cellFall, cellOutPin->fallTransition, cellOutPin->fallPower);
       } // end for ie
 
       for (auto oe: g.edges(n)) {

@@ -49,18 +49,21 @@ struct Cell;
 
 struct CellPin {
   typedef std::pair<std::string, std::string> TSenseKey;
+  typedef std::unordered_map<TSenseKey, TimingSense, boost::hash<TSenseKey> > MapOfTimingSense;
+
   typedef std::pair<std::string, TimingSense> TableSetKey;
   typedef std::unordered_map<std::string, LUT *> TableSet;
+  typedef std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > MapOfTableSet;
 
   std::string name;
   float capacitance;
   PinType pinType;
   Cell *cell;
 
-  std::unordered_map<TSenseKey, TimingSense, boost::hash<TSenseKey> > tSense; // timing sense
-  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > cellRise, cellFall; // cell delay
-  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > riseTransition, fallTransition; // slew
-  std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > risePower, fallPower; // power
+  MapOfTimingSense tSense; // timing sense
+  MapOfTableSet cellRise, cellFall; // cell delay
+  MapOfTableSet riseTransition, fallTransition; // slew
+  MapOfTableSet risePower, fallPower; // power
 };
 
 struct Cell {
@@ -99,6 +102,6 @@ struct CellLib {
   void printDebug();
 };
 
-float extractMaxFromTableSet(CellPin::TableSet& tables);
+std::pair<float, std::string> extractMaxFromTableSet(CellPin::TableSet& tables, std::vector<float>& param);
 
 #endif // GALOIS_CELLLIB_H

@@ -661,13 +661,15 @@ CellLib::~CellLib() {
   clear();
 }
 
-float extractMaxFromTableSet(CellPin::TableSet& tables, std::vector<float>& param) {
+std::pair<float, std::string> extractMaxFromTableSet(CellPin::TableSet& tables, std::vector<float>& param) {
   float r = -std::numeric_limits<float>::infinity();
+  std::string whenStr;
   for (auto& i: tables) {
     float tmp = i.second->lookup(param);
     if (tmp > r) {
       r = tmp;
+      whenStr = i.first;
     }
   }
-  return r;
+  return {r, whenStr};
 }
