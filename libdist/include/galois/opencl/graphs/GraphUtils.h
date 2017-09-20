@@ -40,7 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/types.h>
 #include <fcntl.h>
 
-#include "galois/OpenCL/CL_Util.h"
+#include "galois/opencl/CL_Util.h"
 
 #ifndef GRAPHUTILS_H_
 #define GRAPHUTILS_H_

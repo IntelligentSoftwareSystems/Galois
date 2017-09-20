@@ -29,8 +29,8 @@
 #include "galois/graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
-#include "OpenCL/LC_LinearArray_Graph.h"
-#include "OpenCL/CLWrapper.h"
+#include "opencl/LC_LinearArray_Graph.h"
+#include "opencl/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -99,7 +99,7 @@ bool hasChanged = false;
 
 //////////////////////////////////////////////////////////////////////////////////////
 //struct CUDA_Context *cuda_ctx;
-typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
+typedef galois::opencl::LC_LinearArray_Graph<galois::opencl::Array, NodeData, unsigned int> DeviceGraph;
 struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
@@ -343,7 +343,7 @@ void inner_main() {
 //      if (!init_CUDA_context(cuda_ctx, gpudevice))
 //         return;
    } else if (personality == GPU_OPENCL) {
-      galois::OpenCL::cl_env.init(cldevice.Value);
+      galois::opencl::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
@@ -480,7 +480,7 @@ void inner_main() {
  ********************************************************************************************/
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+   galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
    auto& net = galois::runtime::getSystemNetworkInterface();
    inner_main();
    return 0;

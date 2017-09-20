@@ -58,7 +58,7 @@
 #endif
 
 #ifdef __GALOIS_HET_OPENCL__
-#include "galois/OpenCL/CL_Header.h"
+#include "galois/opencl/CL_Header.h"
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
@@ -3526,7 +3526,7 @@ public:
 
 #ifdef __GALOIS_HET_OPENCL__
 public:
-   typedef galois::OpenCL::Graphs::CL_LC_Graph<NodeTy, EdgeTy> CLGraphType;
+   typedef galois::opencl::Graphs::CL_LC_Graph<NodeTy, EdgeTy> CLGraphType;
    typedef typename CLGraphType::NodeDataWrapper CLNodeDataWrapper;
    typedef typename CLGraphType::NodeIterator CLNodeIterator;
    CLGraphType clGraph;

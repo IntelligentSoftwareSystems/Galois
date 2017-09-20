@@ -33,7 +33,7 @@
 
 
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 /*******************************************************************************
  *
  ********************************************************************************/
@@ -153,7 +153,7 @@ struct OnDemandArray {
    int err;
 protected:
 };
-}//end namespace OpenCL
+}//end namespace opencl
 }//end namespace galois
 
 

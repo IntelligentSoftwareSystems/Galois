@@ -1158,7 +1158,7 @@ int main(int argc, char** argv) {
       MarshalGraph m = (*h_graph).getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m, net.Num);
     } else if (personality == GPU_OPENCL) {
-      //galois::OpenCL::cl_env.init(cldevice.Value);
+      //galois::opencl::cl_env.init(cldevice.Value);
     }
   #endif
 

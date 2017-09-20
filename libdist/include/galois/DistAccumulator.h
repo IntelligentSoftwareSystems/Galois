@@ -35,7 +35,7 @@
 #include "galois/Accumulator.h"
 
 #ifdef __GALOIS_HET_OPENCL__
-#include "galois/OpenCL/CL_Header.h"
+#include "galois/opencl/CL_Header.h"
 #endif
 
 namespace galois {
@@ -54,14 +54,14 @@ public:
   // Default constructor
   DGAccumulator() {
 #ifdef __GALOIS_HET_OPENCL__
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_int err;
     dev_data= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(Ty) , nullptr, &err);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error allocating DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error allocating DGAccumulator!\n");
     Ty val = 0;
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
 #endif
   }
   DGAccumulator& operator+=(const Ty& rhs) {
@@ -77,11 +77,11 @@ public:
     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
     int err;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     Ty val = mdata.load();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
 #endif
   }
 
@@ -94,10 +94,10 @@ public:
     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
     int err;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &mdata.load(), 0, NULL, NULL);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
 #endif
   }
    
@@ -119,10 +119,10 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
 //    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
@@ -166,10 +166,10 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
 //    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
@@ -210,10 +210,10 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
 //    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     // TODO change to atomic max?
     galois::atomicAdd(mdata, tmp);
 #endif
@@ -253,10 +253,10 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
 //    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     // TODO change to atomic min?
     galois::atomicAdd(mdata, tmp);
 #endif
@@ -306,10 +306,10 @@ public:
 #ifdef __GALOIS_HET_OPENCL__
     int err;
     Ty val = mdata.load();
-    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::OpenCL::CHECK_CL_ERROR(err, "Error writing (reset) DGAccumulator!\n");
+    galois::opencl::CHECK_CL_ERROR(err, "Error writing (reset) DGAccumulator!\n");
 //    fprintf(stderr, "RESET-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, val);
 #endif
     return retval;

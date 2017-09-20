@@ -33,7 +33,7 @@
 #ifndef GALOISGPU_OCL_CL_PLATFORM_H_
 #define GALOISGPU_OCL_CL_PLATFORM_H_
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 
 struct CL_Platform {
    cl_platform_id id;
@@ -103,7 +103,7 @@ struct CL_Platform {
       return "";
    }
 };
-}//namespace OpenCL
+}//namespace opencl
 } // namespace galois
 
 

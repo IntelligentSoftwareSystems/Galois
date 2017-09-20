@@ -29,7 +29,7 @@
  * @author Rashid Kaleem<rashid.kaleem@gmail.com>
  */
 #ifdef __APPLE__
-#include <OpenCL/opencl.h>
+#include <opencl/opencl.h>
 #else
 extern "C" {
 #include "CL/cl.h"
@@ -42,17 +42,17 @@ extern "C" {
 #include <iostream>
 #include <sys/stat.h>
 #include <assert.h>
-#include "galois/OpenCL/CL_Errors.h"
-#include "galois/OpenCL/CL_Util.h"
-#include "galois/OpenCL/CL_Context.h"
-#include "galois/OpenCL/CL_DeviceManager.h"
-#include "galois/OpenCL/Arrays/Arrays.h"
-#include "galois/OpenCL/graphs/Graphs.h"
+#include "galois/opencl/CL_Errors.h"
+#include "galois/opencl/CL_Util.h"
+#include "galois/opencl/CL_Context.h"
+#include "galois/opencl/CL_DeviceManager.h"
+#include "galois/opencl/Arrays/Arrays.h"
+#include "galois/opencl/graphs/Graphs.h"
 //////////////////////////////////////////
 #ifndef GOPT_CL_HEADER_H_
 #define GOPT_CL_HEADER_H_
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 CLContext * getCLContext(){
    static CLContext ctx;
    return &ctx;

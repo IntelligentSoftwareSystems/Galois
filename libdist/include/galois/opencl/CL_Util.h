@@ -29,7 +29,7 @@
  * @author Rashid Kaleem<rashid.kaleem@gmail.com>
  */
 #ifdef __APPLE__
-#include <OpenCL/opencl.h>
+#include <opencl/opencl.h>
 #else
 extern "C" {
 #include "CL/cl.h"
@@ -43,14 +43,14 @@ extern "C" {
 #include <sys/stat.h>
 #include <assert.h>
 #include <string>
-#include "galois/OpenCL/CL_Errors.h"
-#include "galois/OpenCL/CL_DeviceManager.h"
-#include "galois/OpenCL/Arrays/Arrays.h"
+#include "galois/opencl/CL_Errors.h"
+#include "galois/opencl/CL_DeviceManager.h"
+#include "galois/opencl/Arrays/Arrays.h"
 //////////////////////////////////////////
 #ifndef GOPT_CL_UTIL_H_
 #define GOPT_CL_UTIL_H_
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 
 
 ///////////////////////////////////////////////////////////////////////////////////

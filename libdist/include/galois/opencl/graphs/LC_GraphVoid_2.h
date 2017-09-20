@@ -9,7 +9,7 @@
 #define GDIST_EXP_INCLUDE_OPENCL_LC_GRAPHVOID_2_H_
 
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 namespace graphs{
 static const char * cl_wrapper_str_LC_GraphVoid_2 =
       "\

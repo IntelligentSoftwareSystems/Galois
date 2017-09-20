@@ -29,10 +29,10 @@
 #include "galois/graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
-#include "OpenCL/LC_LinearArray_Graph.h"
+#include "opencl/LC_LinearArray_Graph.h"
 #include "cuda/hsssp_cuda.h"
 #include "cuda/cuda_mtypes.h"
-#include "OpenCL/CLWrapper.h"
+#include "opencl/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -97,7 +97,7 @@ bool hasChanged = false;
 
 //////////////////////////////////////////////////////////////////////////////////////
 struct CUDA_Context *cuda_ctx;
-typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
+typedef galois::opencl::LC_LinearArray_Graph<galois::opencl::Array, NodeData, unsigned int> DeviceGraph;
 struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          exit(-1);
    } else if (personality == GPU_OPENCL) {
-      galois::OpenCL::cl_env.init(cldevice.Value);
+      galois::opencl::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);

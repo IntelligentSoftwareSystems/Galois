@@ -22,8 +22,8 @@ SET (OPENCL_VERSION_PATCH 0)
 IF (APPLE)
 
   FIND_LIBRARY(OPENCL_LIBRARIES OpenCL DOC "OpenCL lib for OSX")
-  FIND_PATH(OPENCL_INCLUDE_DIRS OpenCL/cl.h DOC "Include for OpenCL on OSX")
-  FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS OpenCL/cl.hpp DOC "Include for OpenCL CPP bindings on OSX")
+  FIND_PATH(OPENCL_INCLUDE_DIRS opencl/cl.h DOC "Include for OpenCL on OSX")
+  FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS opencl/cl.hpp DOC "Include for OpenCL CPP bindings on OSX")
 
 ELSE (APPLE)
 

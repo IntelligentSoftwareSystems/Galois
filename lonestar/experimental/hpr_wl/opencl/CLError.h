@@ -16,7 +16,7 @@
  *      Author: rashid
  */
 #ifdef __APPLE__
-#include <OpenCL/opencl.h>
+#include <opencl/opencl.h>
 #else
 extern "C" {
 #include "CL/cl.h"
@@ -33,7 +33,7 @@ extern "C" {
 #ifndef CL_ERROR_HANDLER_H_
 #define CL_ERROR_HANDLER_H_
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 /////////////////////////////////////////////////////////////////
 inline const char* ocl_error_to_string(cl_int error) {
    switch (error) {

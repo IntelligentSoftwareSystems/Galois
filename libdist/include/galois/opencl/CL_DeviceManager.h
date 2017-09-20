@@ -30,7 +30,7 @@
  */
 
 #ifdef __APPLE__
-#include <OpenCL/opencl.h>
+#include <opencl/opencl.h>
 #else
 extern "C" {
 #include "CL/cl.h"
@@ -54,7 +54,7 @@ extern "C" {
  #define ACTIVE_OCL_COMPILE_OPTIONS AMD_OCL_COMPILE_OPTIONS
  */
 namespace galois{
-namespace OpenCL{
+namespace opencl{
    struct CL_Platform;
    struct OpenCL_Setup;
 }
@@ -81,18 +81,18 @@ namespace OpenCL{
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename T>
 void CL_Device::init_on_device(cl_mem arr, size_t sz, const T & val) {
 #if _GALOIS_BUILD_INITIALIZER_KERNEL_
-   galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 0, sizeof(cl_mem), &arr), "Arg, compact is NOT set!");
-   galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 1, sizeof(int), (void*) &sz), "Arg, compact is NOT set!");
-   galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 2, sizeof(int), (void*) &val), "Arg, compact is NOT set!");
-   size_t local = galois::OpenCL::OpenCL_Setup::workgroup_size(init_kernel, this);
+   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 0, sizeof(cl_mem), &arr), "Arg, compact is NOT set!");
+   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 1, sizeof(int), (void*) &sz), "Arg, compact is NOT set!");
+   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 2, sizeof(int), (void*) &val), "Arg, compact is NOT set!");
+   size_t local = galois::opencl::OpenCL_Setup::workgroup_size(init_kernel, this);
    size_t global = (size_t) (ceil(sz / ((double) local)) * local);
-   galois::OpenCL::CHECK_CL_ERROR(clEnqueueNDRangeKernel(this->command_queue(), init_kernel, 1, NULL, &global, &local, 0, NULL, NULL), "Failed init");
+   galois::opencl::CHECK_CL_ERROR(clEnqueueNDRangeKernel(this->command_queue(), init_kernel, 1, NULL, &global, &local, 0, NULL, NULL), "Failed init");
 #endif
 }//End CL_Device::init_on_device
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,14 +8,14 @@
 #ifndef GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 #define GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 
-#include <OpenCL/CLWrapper.h>
+#include <opencl/CLWrapper.h>
 
 template<typename GraphType>
 struct OPENCL_Context {
    typedef typename GraphType::NodeDataType NodeDataType;
    GraphType m_graph;
-   galois::OpenCL::CL_Kernel kernel;
-   galois::OpenCL::CL_Kernel wb_kernel;
+   galois::opencl::CL_Kernel kernel;
+   galois::opencl::CL_Kernel wb_kernel;
    OPENCL_Context() {
    }
 
@@ -41,7 +41,7 @@ struct OPENCL_Context {
       return std::string(buffer);
    }
    void init(int num_items, int num_inits) {
-      galois::OpenCL::CL_Kernel init_all, init_nout;
+      galois::opencl::CL_Kernel init_all, init_nout;
       kernel.init("pagerank_kernel.cl", "pagerank");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
       init_nout.init("pagerank_kernel.cl", "initialize_nout");

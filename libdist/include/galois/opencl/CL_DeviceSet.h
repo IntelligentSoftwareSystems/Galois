@@ -33,7 +33,7 @@
 #define GALOISGPU_OCL_DEVICESET_H_
 
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 struct DeviceSet {
    std::vector<std::string> names;
    std::vector<CL_Device *> devices;
@@ -80,7 +80,7 @@ struct DeviceSet {
       assert(ratios[ratios.size() - 1] == 1.0 && "Work distribution between devices must sum to 1.0!");
    }
 };
-}//namespace OpenCL
+}//namespace opencl
 } // namespace galois
 
 

@@ -4,15 +4,15 @@
  *  Created on: Nov 19, 2015
  *      Author: Rashid Kaleem (rashid.kaleem@gmail.com)
  */
-#include "galois/OpenCL/CL_Header.h"
-#include "galois/OpenCL/CL_Kernel.h"
+#include "galois/opencl/CL_Header.h"
+#include "galois/opencl/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
 //#include "galois/runtime/hGraph.h"
 #ifndef _GDIST_CL_LC_VOID_Graph_H_
 #define _GDIST_CL_LC_VOID_Graph_H_
 
 namespace galois {
-   namespace OpenCL {
+   namespace opencl {
       namespace graphs {
 #if 0
          /*####################################################################################################################################################*/
@@ -35,7 +35,7 @@ namespace galois {
             }
 
             void allocate() {
-               auto * ctx = galois::OpenCL::getCLContext();
+               auto * ctx = galois::opencl::getCLContext();
                cl_int err;
                gpu_impl.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
                gpu_impl.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
@@ -76,7 +76,7 @@ namespace galois {
             template<typename GraphType>
             void prepRecv(GraphType & g, galois::runtime::RecvBuffer& buffer) {
                CL_Kernel applyKernel;
-               auto * ctx = galois::OpenCL::getCLContext();
+               auto * ctx = galois::opencl::getCLContext();
                auto & net = galois::runtime::getSystemNetworkInterface();
                cl_command_queue queue = ctx->get_default_device()->command_queue();
                unsigned sender=0;
@@ -204,7 +204,7 @@ namespace galois {
 
             typedef NodeDataWrapper UserNodeDataType;
          protected:
-            galois::OpenCL::CLContext * ctx = getCLContext();
+            galois::opencl::CLContext * ctx = getCLContext();
             //CPU Data
             size_t _num_nodes;
             size_t _num_edges;

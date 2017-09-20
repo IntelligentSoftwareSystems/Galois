@@ -8,7 +8,7 @@
 #ifndef GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 #define GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 
-#include "OpenCL/CLWrapper.h"
+#include "opencl/CLWrapper.h"
 /************************************************************************************
  * OpenCL PageRank operator implementation.
  * Uses two kernels for the updates and one kernel for initialization.
@@ -21,9 +21,9 @@ template<typename GraphType>
 struct OPENCL_Context {
    typedef typename GraphType::NodeDataType NodeDataType;
    GraphType m_graph;
-   galois::OpenCL::CL_Kernel kernel;
-   galois::OpenCL::CL_Kernel wb_kernel;
-   galois::OpenCL::Array<int> *meta_array;
+   galois::opencl::CL_Kernel kernel;
+   galois::opencl::CL_Kernel wb_kernel;
+   galois::opencl::Array<int> *meta_array;
    OPENCL_Context() :
          meta_array(nullptr) {
    }
@@ -40,9 +40,9 @@ struct OPENCL_Context {
       m_graph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
    }
    void init(int num_items, int num_inits) {
-      galois::OpenCL::CL_Kernel init_nodes;
+      galois::opencl::CL_Kernel init_nodes;
       init_nodes.init("sssp_kernel.cl", "initialize_nodes");
-      meta_array = new galois::OpenCL::Array<int>(16);
+      meta_array = new galois::opencl::Array<int>(16);
       kernel.init("sssp_kernel.cl", "sssp");
       wb_kernel.init("sssp_kernel.cl", "writeback");
       m_graph.copy_to_device();

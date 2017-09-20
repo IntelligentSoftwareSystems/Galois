@@ -28,13 +28,13 @@
  *
  * @author Rashid Kaleem<rashid.kaleem@gmail.com>
  */
-#include "galois/OpenCL/CL_DeviceSet.h"
+#include "galois/opencl/CL_DeviceSet.h"
 #ifndef GALOISGPU_OCL_MULTIDEVICEARRAY_H_
 #define GALOISGPU_OCL_MULTIDEVICEARRAY_H_
 
 
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 /*******************************************************************************
  *
  ********************************************************************************/
@@ -50,7 +50,7 @@ struct MultiDeviceArray {
    std::vector<ArrayType *> data;
 
 
-   explicit MultiDeviceArray(galois::OpenCL::DeviceSet * ds, unsigned long sz) :
+   explicit MultiDeviceArray(galois::opencl::DeviceSet * ds, unsigned long sz) :
            num_elements(sz) {
         host_data = new T[num_elements];
            for (auto d : ds->devices) {
@@ -129,7 +129,7 @@ struct MultiDeviceArray {
 protected:
 };
 
-}//end namespace OpenCL
+}//end namespace opencl
 }//end namespace galois
 
 

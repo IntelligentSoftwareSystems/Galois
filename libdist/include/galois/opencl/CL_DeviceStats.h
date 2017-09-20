@@ -33,7 +33,7 @@
 
 
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 struct DeviceStats {
    long copied_to_device;
    long copied_to_host;
@@ -69,7 +69,7 @@ struct DeviceStats {
                toMB(copied_to_device));
       }
 };
-}//namespace OpenCL
+}//namespace opencl
 }//namespace galois
 
 #endif /* GALOISGPU_OCL_DEVICESTATS_H_ */

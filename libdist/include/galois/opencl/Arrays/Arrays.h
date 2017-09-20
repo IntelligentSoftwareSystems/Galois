@@ -32,7 +32,7 @@
 #define ARRAY_WRAPPER_H_
 
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 
 /////////////////////////////////////////////////////////////////
 /*******************************************************************************
@@ -66,15 +66,15 @@ DEBUG_CODE(
 )
 }
 
-}      //namespace OpenCL
+}      //namespace opencl
 
 /*******************************************************************************
  *
  ********************************************************************************/
 }      //namespace galois
-#include "galois/OpenCL/Arrays/ArrayImpl.h"
-#include "galois/OpenCL/Arrays/MultiDeviceArray.h"
-#include "galois/OpenCL/Arrays/CPUArray.h"
-#include "galois/OpenCL/Arrays/GPUArray.h"
-#include "galois/OpenCL/Arrays/OnDemandArray.h"
+#include "galois/opencl/Arrays/ArrayImpl.h"
+#include "galois/opencl/Arrays/MultiDeviceArray.h"
+#include "galois/opencl/Arrays/CPUArray.h"
+#include "galois/opencl/Arrays/GPUArray.h"
+#include "galois/opencl/Arrays/OnDemandArray.h"
 #endif /* ARRAY_WRAPPER_H_ */

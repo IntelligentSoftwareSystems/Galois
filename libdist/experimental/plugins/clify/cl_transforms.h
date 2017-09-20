@@ -33,7 +33,7 @@ public:
             decl->dump(llvm::outs());
             llvm::outs() << " =================\n";
             llvm::outs() << decl->getUnderlyingType().getAsString()<<"\n";
-            string s = "#include \"galois/OpenCL/CL_Header.h\"\nusing namespace galois::OpenCL;\n";
+            string s = "#include \"galois/opencl/CL_Header.h\"\nusing namespace galois::opencl;\n";
             {
                //TODO - RK - A hack. Since the begin/end location of the decl are not returning
                // the entire decl (terminating at 'G' instead of at 'Graph', we try to hack around

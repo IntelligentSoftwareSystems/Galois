@@ -39,7 +39,7 @@ template<typename T>
 struct CPUArray {
    typedef cl_mem DevicePtrType;
    typedef T * HostPtrType;
-   explicit CPUArray(size_t sz, galois::OpenCL::CL_Device * d=nullptr) :
+   explicit CPUArray(size_t sz, galois::opencl::CL_Device * d=nullptr) :
             num_elements(sz) {
       (void)d;
          host_data = new T[num_elements];

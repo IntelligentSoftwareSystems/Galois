@@ -15,19 +15,19 @@ template<typename GraphType>
 struct OPENCL_Context {
     typedef typename GraphType::NodeDataType NodeDataType;
     GraphType m_graph;
-    galois::OpenCL::CL_Kernel kernel;
-    galois::OpenCL::CL_Kernel wb_kernel;
-    galois::OpenCL::Array<float> *aux_array;
+    galois::opencl::CL_Kernel kernel;
+    galois::opencl::CL_Kernel wb_kernel;
+    galois::opencl::Array<float> *aux_array;
 
     //this one will have a different scheme than the c++ and the cuda.
     //since here we have an array. Instead of swapping lists I'll have an array with the same size as the number of nodes. 
     //Then all nodes that haven't converged yet, are marked as one. 
     //Basically, 1 marks the nodes that still have to be processed and work size will count the amount of work left
-    galois::OpenCL::Array<int> *wl;
-    //galois::OpenCL::Array<int> *work_size;
+    galois::opencl::Array<int> *wl;
+    //galois::opencl::Array<int> *work_size;
     // a simple int wasn't working, so i changed it to a vector of size 1
     //int size_work; //stores the amount of work at each iteration
-    //galois::OpenCL::Array<int> *wl2;
+    //galois::opencl::Array<int> *wl2;
     OPENCL_Context() :
         aux_array(nullptr) {
         //not sure what this does, should wl be added here?
@@ -46,13 +46,13 @@ struct OPENCL_Context {
        }
     
     void init(int num_items, int num_inits) {
-        galois::OpenCL::CL_Kernel init_all, init_nout;
+        galois::opencl::CL_Kernel init_all, init_nout;
         
-        aux_array = new galois::OpenCL::Array<float>(m_graph.num_nodes());
+        aux_array = new galois::opencl::Array<float>(m_graph.num_nodes());
         //initialize work list and work size
-        wl = new galois::OpenCL::Array<int>(m_graph.num_nodes());
+        wl = new galois::opencl::Array<int>(m_graph.num_nodes());
         
-        //work_size = new galois::OpenCL::Array<int>(1);
+        //work_size = new galois::opencl::Array<int>(1);
         //not quite the  best solution but at least definying a array of ints with a single position seems to work
         
         kernel.init("pagerank_kernel.cl", "pagerank");

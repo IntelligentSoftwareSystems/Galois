@@ -72,7 +72,7 @@ typedef galois::graphs::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
 bool hasChanged = false;
-using namespace galois::OpenCL;
+using namespace galois::opencl;
 
 template<typename ItTy, typename OpType>
 void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f);

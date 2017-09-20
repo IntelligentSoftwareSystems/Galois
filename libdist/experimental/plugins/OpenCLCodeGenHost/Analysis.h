@@ -199,7 +199,7 @@ public:
 //               llvm::outs() << " REDECLS:: " << t->getNameAsString() << "\n";
 //            }
 //            decl->getSourceRange()
-            string s = "#include \"CL_Header.h\"\nusing namespace galois::OpenCL;\n";
+            string s = "#include \"CL_Header.h\"\nusing namespace galois::opencl;\n";
             s+=ast_utility.get_string(decl->getSourceRange().getBegin(), decl->getSourceRange().getEnd());
 //            llvm::outs() << "Decl String :: " << s << "\n";
             string old_name =decl->getUnderlyingType().getAsString();
@@ -209,7 +209,7 @@ public:
             s.replace(s.find(old_name), old_name.length(), "Graphs::CL_LC_Graph");
 //            llvm::outs() << "New name:: " << s<< "\n";
             rewriter.ReplaceText(SourceRange(decl->getLocStart(),decl->getLocEnd()), s);
-//            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace galois::OpenCL;\n");
+//            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace galois::opencl;\n");
 
          }
    }

@@ -33,11 +33,11 @@
 #define GALOISGPU_OCL_CL_DEVICE_H_
 
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 
 struct CL_Device {
 protected:
-   friend struct galois::OpenCL::CL_Platform;
+   friend struct galois::opencl::CL_Platform;
    cl_device_id _id;
    cl_command_queue _queue;
    cl_context _context;

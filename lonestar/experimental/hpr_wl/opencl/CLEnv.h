@@ -17,7 +17,7 @@ extern "C"{
 //#define DEFAULT_CL_PLATFORM_ID 0
 //#define DEFAULT_CL_DEVICE_ID 0
 namespace galois{
-namespace OpenCL{
+namespace opencl{
 struct CLEnvironment{
    std::string vendor_name;
    cl_platform_id m_platform_id;
@@ -69,7 +69,7 @@ struct CLEnvironment{
 //      clReleaseDevice(m_device_id);
    }
 } cl_env;//CLEnvironment
-} // namespace OpenCL
+} // namespace opencl
 } // namespace galois
 
 

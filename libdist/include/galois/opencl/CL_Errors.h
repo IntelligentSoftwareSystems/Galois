@@ -29,7 +29,7 @@
  * @author Rashid Kaleem<rashid.kaleem@gmail.com>
  */
 #ifdef __APPLE__
-#include <OpenCL/opencl.h>
+#include <opencl/opencl.h>
 #else
 extern "C" {
 #include "CL/cl.h"
@@ -46,7 +46,7 @@ extern "C" {
 #ifndef CL_ERROR_HANDLER_H_
 #define CL_ERROR_HANDLER_H_
 namespace galois {
-namespace OpenCL {
+namespace opencl {
 
 
 #ifdef _GOPT_DEBUG
@@ -218,15 +218,15 @@ inline float toMB(long long b){
 }
 inline void check_context(cl_context & ctx) {
    cl_uint ref_count;
-   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_REFERENCE_COUNT, sizeof(cl_uint), &ref_count, 0), "Ref count failed");
+   galois::opencl::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_REFERENCE_COUNT, sizeof(cl_uint), &ref_count, 0), "Ref count failed");
    std::cout << "CheckCtx : RefCount[" << ref_count << "]";
    cl_device_id devices[10];
    size_t num_devs;
-   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sizeof(cl_device_id) * 10, devices, &num_devs), "Dev count failed");
+   galois::opencl::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sizeof(cl_device_id) * 10, devices, &num_devs), "Dev count failed");
    std::cout << ", NumDev[" << num_devs << "]";
    cl_context_properties properties[10];
    size_t num_props;
-   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_PROPERTIES, sizeof(cl_context_properties) * 10, properties, &num_props), "Ref count failed");
+   galois::opencl::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_PROPERTIES, sizeof(cl_context_properties) * 10, properties, &num_props), "Ref count failed");
    std::cout << ", NumProps[" << num_props << "], ";
 }
 /**********************************************************************

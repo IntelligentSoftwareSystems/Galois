@@ -4,15 +4,15 @@
  *  Created on: Nov 19, 2015
  *      Author: Rashid Kaleem (rashid.kaleem@gmail.com)
  */
-#include "galois/OpenCL/CL_Header.h"
-#include "galois/OpenCL/CL_Kernel.h"
+#include "galois/opencl/CL_Header.h"
+#include "galois/opencl/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
 //#include "galois/runtime/hGraph.h"
 #ifndef _GDIST_CL_LC_Graph_H_
 #define _GDIST_CL_LC_Graph_H_
 
 namespace galois {
-   namespace OpenCL {
+   namespace opencl {
       namespace graphs {
 
       /*####################################################################################################################################################*/
@@ -40,7 +40,7 @@ namespace galois {
          BufferWrapperGPU inMessages, outMessages;
          CL_Kernel inMsgApply, outMsgGen;
          BufferWrapperImpl():num_hosts(0){
-            auto * ctx = galois::OpenCL::getCLContext();
+            auto * ctx = galois::opencl::getCLContext();
             inMsgApply.init(ctx->get_default_device(), "buffer_wrapper.cl", "recvApply");
             outMsgGen.init(ctx->get_default_device(), "buffer_wrapper.cl", "prepSend");
          }
@@ -84,7 +84,7 @@ namespace galois {
          void sync_incoming(GraphType & g, std::vector<std::vector<unsigned int>> & incomingMessages){
             auto& net = galois::runtime::getSystemNetworkInterface();
             cl_int err;
-            auto * ctx = galois::OpenCL::getCLContext();
+            auto * ctx = galois::opencl::getCLContext();
             cl_command_queue queue = ctx->get_default_device()->command_queue();
             //
             for(size_t h = 0 ; h < num_hosts; ++h){
@@ -99,7 +99,7 @@ namespace galois {
          }
 
          void allocate(){
-            auto * ctx = galois::OpenCL::getCLContext();
+            auto * ctx = galois::opencl::getCLContext();
             cl_command_queue queue = ctx->get_default_device()->command_queue();
 
             assert(ctx!=nullptr && "CL Context should be non-null");
@@ -116,7 +116,7 @@ namespace galois {
                initBuffer.set_arg_raw(2, inMessages.messages);
                initBuffer.set_arg_raw(3, inMessages.localIDs);
 //               initBuffer.set_arg(4, num_hosts);
-//               galois::OpenCL::CHECK_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(cl_mem), &val), "Arg-1, is NOT set!");
+//               galois::opencl::CHECK_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(cl_mem), &val), "Arg-1, is NOT set!");
                clSetKernelArg(initBuffer.kernel, 4, sizeof(cl_int), &num_hosts);
                initBuffer.run_task();
 
@@ -215,7 +215,7 @@ template<typename FnTy>
          template<typename GraphType>
          void prepSend(GraphType & g){
             CL_Kernel pushKernel;
-            auto * ctx = galois::OpenCL::getCLContext();
+            auto * ctx = galois::opencl::getCLContext();
             auto & net = galois::runtime::getSystemNetworkInterface();
             pushKernel.init("buffer_wrapper.cl", "syncPush");
             pushKernel.set_arg(0, g);
@@ -266,7 +266,7 @@ template<typename FnTy>
          template<typename GraphType>
          void prepRecv(GraphType & g, galois::runtime::RecvBuffer& buffer){
             CL_Kernel applyKernel;
-            auto * ctx = galois::OpenCL::getCLContext();
+            auto * ctx = galois::opencl::getCLContext();
             auto & net = galois::runtime::getSystemNetworkInterface();
             cl_command_queue queue = ctx->get_default_device()->command_queue();
             unsigned sender=0;
@@ -396,7 +396,7 @@ template<typename FnTy>
 
             typedef NodeDataWrapper UserNodeDataType;
          protected:
-            galois::OpenCL::CLContext * ctx = getCLContext();
+            galois::opencl::CLContext * ctx = getCLContext();
             //CPU Data
             size_t _num_nodes;
             size_t _num_edges;

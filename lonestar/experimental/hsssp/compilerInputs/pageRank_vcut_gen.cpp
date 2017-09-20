@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m);
     } else if (personality == GPU_OPENCL) {
-      //galois::OpenCL::cl_env.init(cldevice.Value);
+      //galois::opencl::cl_env.init(cldevice.Value);
     }
 #endif
     T_vGraph_init.stop();

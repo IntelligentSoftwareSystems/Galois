@@ -32,7 +32,7 @@
 #include <typeinfo>
 #include <algorithm>
 
-#include "galois/OpenCL/CL_Header.h"
+#include "galois/opencl/CL_Header.h"
 
 #define _HETERO_DEBUG_ 0
 
@@ -62,9 +62,9 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 ////////////////////////////////////////////
 typedef galois::graphs::LC_CSR_Graph<unsigned int, unsigned int> Graph;
-typedef galois::OpenCL::Graphs::CL_LC_Graph<unsigned int, unsigned int> DevGraph;
+typedef galois::opencl::Graphs::CL_LC_Graph<unsigned int, unsigned int> DevGraph;
 typedef typename Graph::GraphNode GNode;
-using namespace galois::OpenCL;
+using namespace galois::opencl;
 
 //template<typename ItTy, typename OpType, typename ... Args>
 //void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f, const Args & ... args);
@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
    } while (term.host_ptr()[0] != 0);
    fprintf(stderr, "Finishing\n");
    {
-     cl_graph.copy_to_host(galois::OpenCL::Graphs::GRAPH_FIELD_FLAGS::NODE_DATA);
+     cl_graph.copy_to_host(galois::opencl::Graphs::GRAPH_FIELD_FLAGS::NODE_DATA);
       fprintf(stderr, "Post operator ::[");
       for (auto i = cl_graph.begin(); i != cl_graph.end(); ++i)
          fprintf(stderr, "%d, ", cl_graph.getData(i));

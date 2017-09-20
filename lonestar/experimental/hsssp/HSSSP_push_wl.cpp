@@ -121,7 +121,7 @@ struct BSPWorklist {
 
 //////////////////////////////////////////////////////////////////////////////////////
 struct CUDA_Context *cuda_ctx;
-typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
+typedef galois::opencl::LC_LinearArray_Graph<galois::opencl::Array, NodeData, unsigned int> DeviceGraph;
 struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
@@ -528,7 +528,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          exit(-1);
    } else if (personality == GPU_OPENCL) {
-      galois::OpenCL::cl_env.init();
+      galois::opencl::cl_env.init();
    }
    if (personality != CPU)
       loadGraphNonCPU(g);

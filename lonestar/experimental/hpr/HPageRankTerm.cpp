@@ -35,7 +35,7 @@
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "hpr.h"
-#include "OpenCL/CLWrapper.h"
+#include "opencl/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -144,19 +144,19 @@ struct InitializeGraph {
  * be used to buffer the writes in 'kernel'. These updates will be
  * written to the node-data in the 'writeback' kernel.
  *************************************************************************************/
-typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, LNode, void> DeviceGraph;
+typedef galois::opencl::LC_LinearArray_Graph<galois::opencl::Array, LNode, void> DeviceGraph;
 DeviceGraph dGraph;
 struct dPageRank {
-   galois::OpenCL::CL_Kernel kernel;
-   galois::OpenCL::CL_Kernel wb_kernel;
-//   galois::OpenCL::Array<float> *aux_array;
-   galois::OpenCL::Array<float> *meta_array;
+   galois::opencl::CL_Kernel kernel;
+   galois::opencl::CL_Kernel wb_kernel;
+//   galois::opencl::Array<float> *aux_array;
+   galois::opencl::Array<float> *meta_array;
    dPageRank() :
          meta_array(nullptr) {
    }
    void init(int num_items, int num_inits) {
-      galois::OpenCL::CL_Kernel init_all, init_nout;
-      meta_array = new galois::OpenCL::Array<float>(16);
+      galois::opencl::CL_Kernel init_all, init_nout;
+      meta_array = new galois::opencl::Array<float>(16);
       kernel.init("pagerank_kernel.cl", "pagerank_term");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
       init_nout.init("pagerank_kernel.cl", "initialize_nout");
@@ -498,7 +498,7 @@ void inner_main() {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return ;
    } else if (personality == GPU_OPENCL) {
-      galois::OpenCL::cl_env.init(cldevice);
+      galois::opencl::cl_env.init(cldevice);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);

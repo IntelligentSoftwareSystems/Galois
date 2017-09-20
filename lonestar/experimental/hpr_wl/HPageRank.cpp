@@ -99,7 +99,7 @@ std::map<GNode, float> buffered_updates;
 WorkManager MWork;
 
 //////////////////////////////////////////////////////////////////////////////////////
-typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, LNode, void> DeviceGraph;
+typedef galois::opencl::LC_LinearArray_Graph<galois::opencl::Array, LNode, void> DeviceGraph;
 
 struct CUDA_Context *cuda_ctx;
 struct OPENCL_Context<DeviceGraph> cl_ctx;
@@ -512,7 +512,7 @@ void inner_main() {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return;
    } else if (personality == GPU_OPENCL) {
-      galois::OpenCL::cl_env.init(cldevice);
+      galois::opencl::cl_env.init(cldevice);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
