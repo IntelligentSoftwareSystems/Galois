@@ -446,8 +446,8 @@ struct KCore {
       iterations++;
     } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
-    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      galois::Runtime::reportStat("(NULL)", 
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations, 0);
     }
@@ -547,9 +547,9 @@ int main(int argc, char** argv) {
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
       #if __OPT_VERSION__ == 1
       printf("Version 1 of optimization\n");
@@ -572,7 +572,7 @@ int main(int argc, char** argv) {
 
     std::vector<unsigned> scalefactor;
   #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
 
     if (num_nodes == -1) num_nodes = net.Num;
@@ -580,7 +580,7 @@ int main(int argc, char** argv) {
 
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
-    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
         case 'g':
           personality = GPU_CUDA;
@@ -644,7 +644,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     galois::DGAccumulator<unsigned int> DGAccumulator_accum;
     galois::DGAccumulator<uint64_t> dga1;
@@ -686,7 +686,7 @@ int main(int argc, char** argv) {
         #endif
 
         InitializeGraph::go((*h_graph));
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
       }
     }
 
@@ -700,7 +700,7 @@ int main(int argc, char** argv) {
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
             // prints the flag (alive/dead)
-            galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
                                          (bool)(*h_graph).getData(*ii).flag);
 
 
@@ -714,7 +714,7 @@ int main(int argc, char** argv) {
       } else if (personality == GPU_CUDA) {
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
                                        (bool)get_node_flag_cuda(cuda_ctx, *ii));
                                      
         }
@@ -722,9 +722,9 @@ int main(int argc, char** argv) {
     #endif
     }
     }
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     G.printDistStats();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
 
     return 0;

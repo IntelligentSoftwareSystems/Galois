@@ -38,7 +38,7 @@
 #include "Galois/Runtime/DAGexecAlt.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 enum KDGexecType {
   KDG_R_ALT,
@@ -51,7 +51,7 @@ template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 struct DetKDGexecutorAddRem {
 
   typedef galois::PerThreadBag<T> Bag_ty;
-  // typedef galois::Runtime::PerThreadVector<T> Bag_ty;
+  // typedef galois::runtime::PerThreadVector<T> Bag_ty;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -138,7 +138,7 @@ struct DetKDGexecutorAddRem {
       switch (kdgType) {
         case KDG_R_ALT:
           for_each_ordered_dag_alt (
-              galois::Runtime::makeLocalRange (*currWL),
+              galois::runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -147,7 +147,7 @@ struct DetKDGexecutorAddRem {
 
         case KDG_R:
           for_each_ordered_dag (
-              galois::Runtime::makeLocalRange (*currWL),
+              galois::runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -156,7 +156,7 @@ struct DetKDGexecutorAddRem {
 
         case KDG_AR:
           for_each_ordered_lc (
-              galois::Runtime::makeLocalRange (*currWL),
+              galois::runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -165,7 +165,7 @@ struct DetKDGexecutorAddRem {
 
         case IKDG:
           for_each_ordered_2p_win (
-              galois::Runtime::makeLocalRange (*currWL),
+              galois::runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -212,7 +212,7 @@ template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 struct DetKDG_AddRem_reuseDAG {
 
   typedef galois::PerThreadBag<T> Bag_ty;
-  // typedef galois::Runtime::PerThreadVector<T> Bag_ty;
+  // typedef galois::runtime::PerThreadVector<T> Bag_ty;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -325,7 +325,7 @@ void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodF
   galois::Substrate::getThreadPool ().beKind ();
 }
 
-} //end namespace Runtime
+} //end namespace runtime
 } // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_KDG_EXECUTOR_H

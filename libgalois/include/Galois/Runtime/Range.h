@@ -32,7 +32,7 @@
 #include <iterator>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 extern unsigned int activeThreads;
 
@@ -143,7 +143,7 @@ public:
    */
   std::pair<block_iterator, block_iterator> block_pair() const {
     uint32_t my_thread_id = Substrate::ThreadPool::getTID();
-    uint32_t total_threads = Runtime::activeThreads;
+    uint32_t total_threads = runtime::activeThreads;
 
     iterator local_begin = thread_beginnings[my_thread_id];
     iterator local_end = thread_beginnings[my_thread_id + 1];

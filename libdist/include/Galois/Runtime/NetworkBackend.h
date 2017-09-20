@@ -31,7 +31,7 @@
 #include <boost/intrusive/list.hpp>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 class NetworkBackend {
 public:

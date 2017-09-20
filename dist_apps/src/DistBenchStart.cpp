@@ -66,13 +66,13 @@ void DistBenchStart(int argc, char** argv,
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads); 
-  galois::Runtime::setStatFile(statFile);
+  galois::runtime::setStatFile(statFile);
 
 
   assert(enforce_metadata <= 3);
   enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   
   if (net.ID == 0) {
     PrintVersion();
@@ -91,17 +91,17 @@ void DistBenchStart(int argc, char** argv,
       if (i != argc - 1)
         cmdout << " ";
     }
-    galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
-    galois::Runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
-    galois::Runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
-    galois::Runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
-    galois::Runtime::reportParam("(NULL)", "Run_UUID", galois::Runtime::getRandUUID());
+    galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+    galois::runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
+    galois::runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
+    galois::runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
+    galois::runtime::reportParam("(NULL)", "Run_UUID", galois::runtime::getRandUUID());
   }
 
   char name[256];
   gethostname(name, 256);
-  galois::Runtime::reportParam("(NULL)", "Hostname", name);
+  galois::runtime::reportParam("(NULL)", "Hostname", name);
 
   if(savegraph)
-    galois::Runtime::reportParam("(NULL)", "outputFile", outputFile.c_str());
+    galois::runtime::reportParam("(NULL)", "outputFile", outputFile.c_str());
 }

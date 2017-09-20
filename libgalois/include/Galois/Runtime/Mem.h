@@ -54,7 +54,7 @@
 #include <cstdio>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 extern unsigned activeThreads;
 
@@ -1071,7 +1071,7 @@ public:
   SerialNumaAllocator(): Super(&heap) {}
 };
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

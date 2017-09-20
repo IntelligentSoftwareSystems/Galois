@@ -60,7 +60,7 @@
 
 namespace galois {
 //! Internal Galois functionality - Use at your own risk.
-namespace Runtime {
+namespace runtime {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
@@ -544,11 +544,11 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
 
   static constexpr bool forceNew = true;
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
     // TODO: not needed any more? Remove once sure
     auto ftpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
@@ -563,7 +563,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
     timer.start();
 
-    Runtime::for_each_impl(r, fn, xtpl);
+    runtime::for_each_impl(r, fn, xtpl);
 
     timer.stop();
 
@@ -584,12 +584,12 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
     timer.start();
 
-    Runtime::for_each_impl(r, fn, xtpl);
+    runtime::for_each_impl(r, fn, xtpl);
 
     timer.stop();
   }
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 #endif

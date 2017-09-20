@@ -254,7 +254,7 @@ void setNodeAttr2(pGraph<Graph> *p, unsigned GID, unsigned nout) {
 /*********************************************************************************
  *
  **********************************************************************************/
-void sendGhostCellAttrs2(galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void sendGhostCellAttrs2(galois::runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
       auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
       auto x = g.getHost(g.L2G[l2g_ndx]);
@@ -280,7 +280,7 @@ void sendGhostCellAttrs2(galois::Runtime::NetworkInterface& net, pGraph<Graph>& 
  *
  **********************************************************************************/
 
-void sendGhostCellAttrs(galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void sendGhostCellAttrs(galois::runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          /* no per-personality needed but until nout is
@@ -309,7 +309,7 @@ void sendGhostCellAttrs(galois::Runtime::NetworkInterface& net, pGraph<Graph>& g
  * Note that we use the magicPointer array to obtain the reference of the graph object
  * where the node data is to be set.
  **********************************************************************************/
-void sendGhostCells(galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void sendGhostCells(galois::runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -392,16 +392,16 @@ void loadGraphNonCPU(pGraph<Graph> &g) {
  *
  **********************************************************************************/
 void inner_main() {
-   auto& net = galois::Runtime::getSystemNetworkInterface();
+   auto& net = galois::runtime::getSystemNetworkInterface();
    galois::StatManager statManager;
-   auto& barrier = galois::Runtime::getSystemBarrier();
-   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
+   auto& barrier = galois::runtime::getSystemBarrier();
+   const unsigned my_host_id = galois::runtime::NetworkInterface::ID;
    galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init, T_postSyncKernel;
    T_total.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
-   if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[galois::Runtime::NetworkInterface::ID]) {
+   if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
+      switch (personality_set.c_str()[galois::runtime::NetworkInterface::ID]) {
       case 'g':
          personality = GPU_CUDA;
          break;
@@ -414,16 +414,16 @@ void inner_main() {
          break;
       }
    }
-   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",galois::runtime::NetworkInterface::ID ,personality_str(personality).c_str());
    barrier.wait();
-   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",galois::runtime::NetworkInterface::ID ,personality_str(personality).c_str());
 //   Graph rg;
    T_graph_load.start();
    pGraph<Graph> g;
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(galois::Runtime::NetworkInterface::ID);
+      cuda_ctx = get_CUDA_context(galois::runtime::NetworkInterface::ID);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return ;
    } else if (personality == GPU_OPENCL) {
@@ -457,12 +457,12 @@ void inner_main() {
 
 
    //send pGraph pointers
-   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
-      net.sendAlt(x, setRemotePtr, galois::Runtime::NetworkInterface::ID, &g);
+   for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; ++x)
+      net.sendAlt(x, setRemotePtr, galois::runtime::NetworkInterface::ID, &g);
 
    //Ask for cells
    for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::Runtime::NetworkInterface::ID);
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::runtime::NetworkInterface::ID);
 #if _HETERO_DEBUG_
    std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
 #endif
@@ -520,7 +520,7 @@ void inner_main() {
 
    if (verify) {
       std::stringstream ss;
-      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::Runtime::NetworkInterface::Num << "_page_ranks.csv";
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::runtime::NetworkInterface::Num << "_page_ranks.csv";
       std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {
@@ -544,7 +544,7 @@ void inner_main() {
       out_file.close();
    }
    T_total.stop();
-   std::cout << "[" << galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
+   std::cout << "[" << galois::runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
 //   if(my_host_id == 0)
    {
       fprintf(stderr, "HEADER2,filename,TotalTime,Loadtime,InitTime,KernelTime, KernelPostSyncTime\n");
@@ -558,7 +558,7 @@ void inner_main() {
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   //auto& net = galois::Runtime::getSystemNetworkInterface();
+   //auto& net = galois::runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }

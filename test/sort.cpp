@@ -22,7 +22,7 @@ int do_sort() {
 
   while (M) {
     
-    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);
@@ -73,7 +73,7 @@ int do_count_if() {
 
   while (M) {
     
-    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);
@@ -113,7 +113,7 @@ int do_accumulate() {
   std::cout << "accumulate:\n";
 
   while (M) {
-    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);

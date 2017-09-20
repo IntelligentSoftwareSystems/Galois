@@ -21,7 +21,7 @@ protected:
 // summarization are only the internal nodes and not the leaves. 
 // 
 
-struct SpecNodeBase: public galois::Runtime::Lockable {
+struct SpecNodeBase: public galois::runtime::Lockable {
   unsigned level;
 
   SpecNodeBase (): level (0) {}
@@ -288,7 +288,7 @@ template <typename B>
 struct BuildOctreeTopDown {
 
   typedef galois::gdeque<B*,4096> PartList;
-  typedef galois::Runtime::MM::FSBGaloisAllocator<PartList> PartListAlloc;
+  typedef galois::runtime::MM::FSBGaloisAllocator<PartList> PartListAlloc;
 
   template <typename I>
   struct WorkItem {

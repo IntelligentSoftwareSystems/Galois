@@ -48,8 +48,8 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    galois::Runtime::for_each_ordered_kdg_spec_local_min (
-        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::runtime::for_each_ordered_kdg_spec_local_min (
+        galois::runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFuncLocalMin (graph, numIter),

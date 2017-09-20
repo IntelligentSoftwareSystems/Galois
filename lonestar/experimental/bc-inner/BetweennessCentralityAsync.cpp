@@ -706,7 +706,7 @@ PerCPU<int> fringeCnts;
 
 //std::vector<f2Item> *fringeBuffs;
 galois::InsertBag<ND*>* fringewl;
-//GaloisRuntime::WorkList::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, GaloisRuntime::WorkList::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
+//Galoisruntime::WorkList::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, Galoisruntime::WorkList::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
 galois::Substrate::CacheLineStorage<ND> *gnodes;
 
 //void fringeFindOMP() {
@@ -953,7 +953,7 @@ int main(int argc, char** argv) {
 	galois::TimeAccumulator intCapTimer;	
   intCapTimer.start();
 	//#if CONCURRENT
-	//	GaloisRuntime::for_all_parallel(setPredCapacitiesloop);
+	//	Galoisruntime::for_all_parallel(setPredCapacitiesloop);
 	//#else
 	graph->fixNodePredsCapacities();
 	//#endif	
@@ -972,7 +972,7 @@ int main(int argc, char** argv) {
 #endif
 
 #if CONCURRENT
-  //GaloisRuntime::WorkList::OrderByIntegerMetric<ED*, EdgeIndexer, GaloisRuntime::WorkList::ChunkedFIFO<ED*, 16, true>, true> wl2;
+  //Galoisruntime::WorkList::OrderByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::WorkList::ChunkedFIFO<ED*, 16, true>, true> wl2;
   
   // FOR RMAT25, RAND26 55
 #if USE_NODE_BASED
@@ -982,21 +982,21 @@ int main(int argc, char** argv) {
   const int chunksize = 8;
   std::cerr << "Using chunk size : " << chunksize << std::endl;
   typedef galois::WorkList::OrderedByIntegerMetric<NodeIndexer, galois::WorkList::dChunkedLIFO<chunksize> > wl2ty;
-  //typedef GaloisRuntime::WorkList::ChunkedFIFO<chunksize, ND*, true> wl2ty;
+  //typedef Galoisruntime::WorkList::ChunkedFIFO<chunksize, ND*, true> wl2ty;
   galois::InsertBag<ND*> wl2;
 #else
 //  const int chunksize = 64;
 //  std::cerr << "Using chunk size : " << chunksize << std::endl;
-//  typedef GaloisRuntime::WorkList::SimpleOrderedByIntegerMetric<EdgeIndexer, GaloisRuntime::WorkList::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
-//  GaloisRuntime::galois_insert_bag<ED*> wl2;
+//  typedef Galoisruntime::WorkList::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::WorkList::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
+//  Galoisruntime::galois_insert_bag<ED*> wl2;
 #endif
-  //GaloisRuntime::WorkList::OrderedByIntegerMetric<ED*, EdgeIndexer, GaloisRuntime::WorkList::dChunkedFIFO<ED*, 64, true>, true> wl2;
+  //Galoisruntime::WorkList::OrderedByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::WorkList::dChunkedFIFO<ED*, 64, true>, true> wl2;
   typedef galois::WorkList::dChunkedLIFO<16> wl4ty;  
-  //typedef GaloisRuntime::WorkList::dChunkedLIFO<16, ND*,  true> wl4ty;  
-  //typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<f2ItemIndexer, GaloisRuntime::WorkList::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
+  //typedef Galoisruntime::WorkList::dChunkedLIFO<16, ND*,  true> wl4ty;  
+  //typedef Galoisruntime::WorkList::OrderedByIntegerMetric<f2ItemIndexer, Galoisruntime::WorkList::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
   galois::InsertBag<ND*> wl4;
 	fringewl = &wl4;
-//  GaloisRuntime::WorkList::FIFO<int,  true> wl5;
+//  Galoisruntime::WorkList::FIFO<int,  true> wl5;
 #else
   galois::WorkList::GFIFO<ED*, false> wl2;
   galois::WorkList::GFIFO<ND*, false> wl4;
@@ -1006,15 +1006,15 @@ int main(int argc, char** argv) {
 //    std::vector<f2Item> & abuff = fringeBuffs.get(kk);
 //    abuff.reserve(nnodes);
 //  }
-//  galois::Statistic("Mem1", GaloisRuntime::MM::pageAllocInfo());
+//  galois::Statistic("Mem1", Galoisruntime::MM::pageAllocInfo());
 //  galois::preAlloc(6000);
-//  galois::Statistic("Mem2", GaloisRuntime::MM::pageAllocInfo());
+//  galois::Statistic("Mem2", Galoisruntime::MM::pageAllocInfo());
 	//cerr << "OMP Threads: " << omp_get_num_threads() << endl;
   galois::StatTimer T;
   T.start();
   totalTimer.start();
 	for (int i=startNode; i<nnodes; ++i) {
-//    galois::Statistic("Mem3", GaloisRuntime::MM::pageAllocInfo());
+//    galois::Statistic("Mem3", Galoisruntime::MM::pageAllocInfo());
   
 		ND * active = &(gnodes[i].data);
     currSrcNode = active;
@@ -1101,7 +1101,7 @@ int main(int argc, char** argv) {
 		fringeCnts.get(kk) = 0;
 	}
 #endif
-	//GaloisRuntime::for_all_parallel(findFringe);
+	//Galoisruntime::for_all_parallel(findFringe);
 //  fringeFindOMP();
 //  galois::on_each(findFringe);
 //__itt_resume();
@@ -1167,7 +1167,7 @@ int main(int argc, char** argv) {
 #if MERGE_LOOPS
 #else
 //    galois::on_each(cleanupGloop);
-	//	GaloisRuntime::for_all_parallel(cleanupGloop);
+	//	Galoisruntime::for_all_parallel(cleanupGloop);
 #endif
 		//graph->cleanupDataOMP();
 #else
@@ -1177,7 +1177,7 @@ int main(int argc, char** argv) {
 	}
   totalTimer.stop();
   T.stop();
-//  galois::Statistic("Mem4", GaloisRuntime::MM::pageAllocInfo());
+//  galois::Statistic("Mem4", Galoisruntime::MM::pageAllocInfo());
   std::cout << "Total Time " << totalTimer.get() << std::endl;
   std::cout<< "First Loop: " << firstLoopTimer.get() << std::endl;
   std::cout<< "Second Loop: " << secondLoopTimer.get() << std::endl;

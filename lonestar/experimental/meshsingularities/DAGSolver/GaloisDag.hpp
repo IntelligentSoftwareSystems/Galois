@@ -12,16 +12,16 @@
 #include "Node.hpp"
 #include "EquationSystem.h"
 
-struct GaloisElimination: public galois::Runtime::TreeTaskBase
+struct GaloisElimination: public galois::runtime::TreeTaskBase
 {
     Node *node;
 
     GaloisElimination (Node *_node):
-        galois::Runtime::TreeTaskBase (),
+        galois::runtime::TreeTaskBase (),
         node (_node)
     {}
 
-    virtual void operator () (galois::Runtime::TreeTaskContext& ctx)
+    virtual void operator () (galois::runtime::TreeTaskContext& ctx)
     {
         if (node->getLeft() != NULL && node->getRight() != NULL) {
             GaloisElimination left {node->getLeft()};
@@ -37,16 +37,16 @@ struct GaloisElimination: public galois::Runtime::TreeTaskBase
     }
 };
 
-struct GaloisBackwardSubstitution: public galois::Runtime::TreeTaskBase
+struct GaloisBackwardSubstitution: public galois::runtime::TreeTaskBase
 {
     Node *node;
 
     GaloisBackwardSubstitution (Node *_node):
-        galois::Runtime::TreeTaskBase(),
+        galois::runtime::TreeTaskBase(),
         node(_node)
     {}
 
-    virtual void operator () (galois::Runtime::TreeTaskContext &ctx)
+    virtual void operator () (galois::runtime::TreeTaskContext &ctx)
     {
         node->bs();
         if (node->getLeft() != NULL && node->getRight() != NULL) {
@@ -61,16 +61,16 @@ struct GaloisBackwardSubstitution: public galois::Runtime::TreeTaskBase
     }
 };
 
-struct GaloisAllocation: public galois::Runtime::TreeTaskBase
+struct GaloisAllocation: public galois::runtime::TreeTaskBase
 {
     Node *node;
     SolverMode mode;
     GaloisAllocation (Node *_node, SolverMode _mode):
-        galois::Runtime::TreeTaskBase(),
+        galois::runtime::TreeTaskBase(),
         node(_node), mode(mode)
     {}
 
-    virtual void operator () (galois::Runtime::TreeTaskContext &ctx)
+    virtual void operator () (galois::runtime::TreeTaskContext &ctx)
     {
         node->allocateSystem(mode);
         if (node->getLeft() != NULL && node->getRight() != NULL) {

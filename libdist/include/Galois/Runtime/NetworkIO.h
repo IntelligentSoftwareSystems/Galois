@@ -30,7 +30,7 @@
 #include <memory>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 class NetworkIO {
 public:
@@ -67,7 +67,7 @@ std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI();
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI();
 #endif
 
-} //namespace Runtime
+} //namespace runtime
 } //namespace galois
 
 #endif

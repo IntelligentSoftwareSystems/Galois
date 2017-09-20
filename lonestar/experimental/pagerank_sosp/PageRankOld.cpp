@@ -961,7 +961,7 @@ void run() {
 
   algo.readGraph(graph);
 
-  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;

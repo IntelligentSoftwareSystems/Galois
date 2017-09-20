@@ -37,15 +37,15 @@
 #include <string>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 class StatRecvHelper;
 
-class DistStatManager: public galois::Runtime::StatManager {
+class DistStatManager: public galois::runtime::StatManager {
 
-  friend class galois::Runtime::StatRecvHelper;
+  friend class galois::runtime::StatRecvHelper;
 
-  using Base = galois::Runtime::StatManager;
+  using Base = galois::runtime::StatManager;
 
   using Str = galois::gstl::Str;
 
@@ -145,7 +145,7 @@ class DistStatManager: public galois::Runtime::StatManager {
 
     void printHostVals(std::ostream& out, const Str& region, const Str& category) const {
 
-      out << StatManager::statKind<T>() << SEP << galois::Runtime::getHostID() << SEP;
+      out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID() << SEP;
 
       out << region << SEP << category << SEP;
 
@@ -208,7 +208,7 @@ class DistStatManager: public galois::Runtime::StatManager {
 
       for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
 
-        out << StatManager::statKind<T>() << SEP << galois::Runtime::getHostID() << SEP;
+        out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID() << SEP;
 
         out << Base::region(i) << SEP << Base::category(i) << SEP;
 
@@ -283,7 +283,7 @@ inline void reportDistStat(const S1& region, const S2& category, const T& value,
 }
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

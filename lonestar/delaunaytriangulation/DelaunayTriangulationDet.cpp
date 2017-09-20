@@ -569,13 +569,13 @@ static void readInput(const std::string& filename, bool addBoundary) {
 #if 1
   galois::preAlloc(
       32 * points.size() * sizeof(Element) * 1.5 // mesh is about 2x number of points (for random points)
-      / (galois::Runtime::pagePoolSize()) // in pages
+      / (galois::runtime::pagePoolSize()) // in pages
       );
 #else
   galois::preAlloc(1 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
-      / (galois::Runtime::hugePageSize) // in pages
+      / (galois::runtime::hugePageSize) // in pages
       );
 #endif
   galois::reportPageAlloc("MeminfoPre");

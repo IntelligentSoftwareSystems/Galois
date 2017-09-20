@@ -49,18 +49,18 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
   if (pthread_cond_init(&cond, NULL))
     GALOIS_DIE("PTHREAD");
 
-  unsigned maxPackages = Runtime::LL::getMaxPackages();
+  unsigned maxPackages = runtime::LL::getMaxPackages();
   unsigned count = maxPackages;
 
   // Interleave across all NUMA nodes
   // FileGraphAllocator fn { lock, cond, this, sizeofEdgeData, maxPackages, count };
-  galois::Runtime::getThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
-    unsigned tid = galois::Runtime::LL::getTID();
+  galois::runtime::getThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
+    unsigned tid = galois::runtime::LL::getTID();
     if (pthread_mutex_lock(&lock))
       GALOIS_DIE("PTHREAD");
 
-    if (galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageInByNode(galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
+    if (galois::runtime::LL::isPackageLeaderForSelf(tid)) {
+      pageInByNode(galois::runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
       if (--count == 0) {
         if (pthread_cond_broadcast(&cond))
           GALOIS_DIE("PTHREAD");

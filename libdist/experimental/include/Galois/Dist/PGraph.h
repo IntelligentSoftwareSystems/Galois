@@ -95,8 +95,8 @@ struct pGraph {
    void loadGraph(std::string file) {
       galois::Graph::FileGraph fg;
       fg.fromFile(file);
-      unsigned hostID = galois::Runtime::NetworkInterface::ID;
-      unsigned numHosts = galois::Runtime::NetworkInterface::Num;
+      unsigned hostID = galois::runtime::NetworkInterface::ID;
+      unsigned numHosts = galois::runtime::NetworkInterface::Num;
       auto p = galois::block_range(0UL, fg.size(), hostID, numHosts);
       this->g_offset = p.first;
       this->numOwned = p.second - p.first;

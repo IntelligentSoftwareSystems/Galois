@@ -44,12 +44,12 @@
 #include <functional>
 #include <mutex>
 
-namespace galois { namespace Runtime {
+namespace galois { namespace runtime {
 
 template<typename Graph, bool UseExp = false>
 class Fixed2DGraphTiledExecutor {
   static constexpr int numDims = 2;
-  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::iterator iterator;
   typedef typename Graph::edge_iterator edge_iterator;
@@ -90,7 +90,7 @@ class Fixed2DGraphTiledExecutor {
 
   Graph& g;
   int cutoff; // XXX: UseExp
-  galois::Runtime::Barrier& barrier; // XXX: UseExp
+  galois::runtime::Barrier& barrier; // XXX: UseExp
   //std::array<galois::LargeArray<SpinLock>, numDims> locks;
   //galois::LargeArray<Task> tasks;
   galois::Statistic failures;
@@ -443,7 +443,7 @@ class Fixed2DGraphTiledExecutor {
 
 public:
   Fixed2DGraphTiledExecutor(Graph& g, int cutoff = 0):
-    g(g), cutoff(cutoff), barrier(galois::Runtime::getSystemBarrier()), failures("PopFailures") { }
+    g(g), cutoff(cutoff), barrier(galois::runtime::getSystemBarrier()), failures("PopFailures") { }
 
   template<typename Function>
   void execute(
@@ -459,7 +459,7 @@ public:
     galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      galois::Runtime::LL::gWarn("Missing tasks");
+      galois::runtime::LL::gWarn("Missing tasks");
   }
 
   template<typename Function>
@@ -476,7 +476,7 @@ public:
     galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      galois::Runtime::LL::gWarn("Missing tasks");
+      galois::runtime::LL::gWarn("Missing tasks");
   }
 };
 

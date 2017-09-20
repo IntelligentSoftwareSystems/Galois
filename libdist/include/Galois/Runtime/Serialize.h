@@ -59,7 +59,7 @@ using is_trivially_copyable = is_trivial<T>;
 //#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 //Objects with this tag have a member function which serializes them.
 //Objects with this tag have a member function which replaces an

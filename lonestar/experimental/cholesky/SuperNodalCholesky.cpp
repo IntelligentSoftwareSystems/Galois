@@ -724,7 +724,7 @@ struct PerThread
     }
 };
 
-typedef galois::Runtime::PerThreadStorage<PerThread> PTS;
+typedef galois::runtime::PerThreadStorage<PerThread> PTS;
 
 template<typename Graph>
 struct TreeExecModel
@@ -792,7 +792,7 @@ struct TreeExecModel
   };
 
   void run() {
-    galois::Runtime::for_each_ordered_tree(*(rootnodes.begin()),
+    galois::runtime::for_each_ordered_tree(*(rootnodes.begin()),
                     GaloisDivide(this),
                     GaloisConquer(this),
                     "SuperNodalCholesky");

@@ -58,7 +58,7 @@ namespace galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class SharedMemSys: public Runtime::SharedMemRuntime<Runtime::StatManager> {
+class SharedMemSys: public runtime::SharedMemRuntime<runtime::StatManager> {
 
 public:
   explicit SharedMemSys(void);
@@ -83,7 +83,7 @@ public:
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
 void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  Runtime::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
+  runtime::for_each_gen(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
 }
 
 /**
@@ -99,7 +99,7 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
-  Runtime::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+  runtime::for_each_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
 }
 
 /**
@@ -114,7 +114,7 @@ void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  */
 template<typename ConTy, typename FunctionTy, typename... Args>
 void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
-  Runtime::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
+  runtime::for_each_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
 
 /**
@@ -129,7 +129,7 @@ void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
 void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  Runtime::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
+  runtime::do_all_gen(runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
 }
 
 /**
@@ -144,7 +144,7 @@ void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&.
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
-  Runtime::do_all_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
+  runtime::do_all_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
                       std::make_tuple(args...));
 }
 
@@ -160,7 +160,7 @@ void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
 void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
-  Runtime::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
+  runtime::do_all_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
 
 /**
@@ -174,13 +174,13 @@ void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
  */
 template<typename FunctionTy, typename... Args>
 void on_each(const FunctionTy& fn, const Args&... args) {
-  Runtime::on_each_gen(fn, std::make_tuple(args...));
+  runtime::on_each_gen(fn, std::make_tuple(args...));
 }
 
 /**
  * Preallocates hugepages on each thread.
  *
- * @param num number of pages to allocate of size {@link galois::Runtime::MM::hugePageSize}
+ * @param num number of pages to allocate of size {@link galois::runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
   static const bool DISABLE_PREALLOC = false;
@@ -188,7 +188,7 @@ static inline void preAlloc(int num) {
     galois::gWarn("preAlloc disabled");
 
   } else {
-    Runtime::preAlloc_impl(num);
+    runtime::preAlloc_impl(num);
   }
 }
 
@@ -199,7 +199,7 @@ static inline void preAlloc(int num) {
  * @param label Label to associated with report at this program point
  */
 static inline void reportPageAlloc(const char* label) {
-  Runtime::reportPageAlloc(label);
+  runtime::reportPageAlloc(label);
 }
 
 /**
@@ -219,7 +219,7 @@ static inline void reportPageAlloc(const char* label) {
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
 void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const char* loopname=0) {
-  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
+  runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
 /**
@@ -242,7 +242,7 @@ void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, cons
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
 void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
-  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
+  runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
 } //namespace galois

@@ -30,4 +30,4 @@
  */
 #include "Galois/Runtime/Executor_Deterministic.h"
 
-__thread galois::Runtime::SizedHeapFactory::SizedHeap* galois::Runtime::DeterministicImpl::dagListHeap;
+__thread galois::runtime::SizedHeapFactory::SizedHeap* galois::runtime::DeterministicImpl::dagListHeap;

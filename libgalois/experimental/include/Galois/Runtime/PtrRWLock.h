@@ -44,7 +44,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace LL {
 
 /// PtrLock is a spinlock and a pointer. 

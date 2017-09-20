@@ -203,7 +203,7 @@ double sumSquaredError(Graph& g) {
     }
   });
 #else
-  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
@@ -220,7 +220,7 @@ template<typename Graph>
 size_t countEdges(Graph& g) {
   typedef typename Graph::GraphNode GNode;
   galois::GAccumulator<size_t> edges;
-  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
@@ -385,7 +385,7 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
 template<bool WithServer>
 class BlockedEdgeAlgo {
   static const bool makeSerializable = false;
-  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
 
   struct BasicNode {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
@@ -672,7 +672,7 @@ private:
         Task* t = &tasks[start];
         if (t == &tasks[numBlocks])
           break;
-        //galois::Runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
+        //galois::runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
         updateBlock(*t);
 
         xLocks[t->x].unlock();
@@ -904,7 +904,7 @@ private:
       if (errorAccum)
         GALOIS_DIE("not yet implemented");
 
-      galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
       executor.execute(
           g.begin(), g.begin() + NUM_ITEM_NODES,
           g.begin() + NUM_ITEM_NODES, g.end(),
@@ -967,7 +967,7 @@ template<typename Graph>
 size_t initializeGraphData(Graph& g) {
   double top = 1.0/std::sqrt(LATENT_VECTOR_SIZE);
 
-  galois::Runtime::PerThreadStorage<std::mt19937> gen;
+  galois::runtime::PerThreadStorage<std::mt19937> gen;
 
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_real_distribution<LatentValue> dist(0, top);
@@ -1038,7 +1038,7 @@ void run() {
   typename Algo::Graph g;
   Algo algo;
 
-  galois::Runtime::reportNumaAlloc("NumaAlloc0");
+  galois::runtime::reportNumaAlloc("NumaAlloc0");
 
   // Represent bipartite graph in general graph data structure:
   //  * items are the first m nodes
@@ -1046,11 +1046,11 @@ void run() {
   //  * only items have outedges
   algo.readGraph(g);
 
-  galois::Runtime::reportNumaAlloc("NumaAlloc1");
+  galois::runtime::reportNumaAlloc("NumaAlloc1");
 
   NUM_ITEM_NODES = initializeGraphData(g);
 
-  galois::Runtime::reportNumaAlloc("NumaAlloc2");
+  galois::runtime::reportNumaAlloc("NumaAlloc2");
 
   std::cout 
     << "num users: " << g.size() - NUM_ITEM_NODES 
@@ -1099,7 +1099,7 @@ void run() {
     startServer(algo, g, serverPort, std::cerr);
   }
 
-  galois::Runtime::reportNumaAlloc("NumaAlloc");
+  galois::runtime::reportNumaAlloc("NumaAlloc");
 }
 
 int main(int argc, char** argv) {

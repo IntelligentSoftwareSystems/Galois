@@ -51,7 +51,7 @@ protected:
     NodeDataComparator cmp;
 
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [&] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
@@ -174,8 +174,8 @@ protected:
     };
 
 
-    galois::Runtime::for_each_ordered_2p_param (
-        galois::Runtime::makeLocalRange (graph),
+    galois::runtime::for_each_ordered_2p_param (
+        galois::runtime::makeLocalRange (graph),
         NodeComparator {graph},
         VisitNhood {*this},
         ApplyOperator {*this},

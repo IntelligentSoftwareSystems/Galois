@@ -33,7 +33,7 @@
 using namespace galois::Runtime;
 
 DistStatManager* internal::distSysStatManager(void) {
-  galois::Runtime::StatManager* sm = internal::sysStatManager();
+  galois::runtime::StatManager* sm = internal::sysStatManager();
 
   assert(sm && "StatManager not initialized");
 
@@ -51,7 +51,7 @@ inline static DistStatManager* dsm(void) {
 DistStatManager::DistStatManager(const std::string& outfile): StatManager(outfile) {}
 
 
-class galois::Runtime::StatRecvHelper {
+class galois::runtime::StatRecvHelper {
 
 public:
 
@@ -170,13 +170,13 @@ void DistStatManager::combineAtHost_0(void) {
     combineAtHost_0_helper();
   }
 
-  galois::Runtime::getHostBarrier().wait();
+  galois::runtime::getHostBarrier().wait();
 
   if (getHostID() != 0) {
     combineAtHost_0_helper();
   }
 
-  galois::Runtime::getHostBarrier().wait();
+  galois::runtime::getHostBarrier().wait();
 
 
 }

@@ -108,7 +108,7 @@ protected:
     Update init[] = { Update (startNode, 0) };
 
     // galois::for_each (startNode, OpFunc (graph), galois::wl<WL_ty> ());
-    galois::Runtime::for_each_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), PftchFunc (graph));
+    galois::runtime::for_each_bs (galois::runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), PftchFunc (graph));
 
     return numAdds.reduce ();
   }

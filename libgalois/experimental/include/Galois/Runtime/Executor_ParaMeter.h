@@ -54,7 +54,7 @@
 #include "llvm/Support/CommandLine.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
   extern llvm::cl::opt<bool> useParaMeterOpt;
 
@@ -103,7 +103,7 @@ class ParaMeterExecutor {
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct IterationContext {
-    galois::Runtime::UserContextAccess<value_type> facing;
+    galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
 
     void resetUserCtx() {
@@ -206,11 +206,11 @@ class ParaMeterExecutor {
         } catch (ConflictFlag flag) {
           clearConflictLock();
           switch (flag) {
-            case galois::Runtime::CONFLICT:
+            case galois::runtime::CONFLICT:
               doabort = true;
               break;
 
-            case galois::Runtime::BREAK:
+            case galois::runtime::BREAK:
               GALOIS_DIE("can't handle breaks yet");
               break;
 
@@ -370,7 +370,7 @@ void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) 
 
 
 } // end namespace ParaMeter
-} // end namespace Runtime
+} // end namespace runtime
 
 namespace WorkList {
 
@@ -388,7 +388,7 @@ public:
 
 } // end WorkList
 
-namespace Runtime {
+namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 class ForEachExecutor<galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
@@ -407,13 +407,13 @@ class ForEachExecutor<galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
 template <typename I, typename F, typename... Args> 
 void for_each_exp (const I& beg, const I& end, const F& func, const Args&... args) {
 
-  auto range = Runtime::makeStandardRange (beg, end);
+  auto range = runtime::makeStandardRange (beg, end);
   auto tpl = std::make_tuple (args...);
 
-  if (Runtime::useParaMeterOpt) {
-    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  if (runtime::useParaMeterOpt) {
+    runtime::ParaMeter::for_each_param (range, func, tpl);
   } else {
-    Runtime::for_each_gen (range, func, tpl);
+    runtime::for_each_gen (range, func, tpl);
   }
 }
 
@@ -421,13 +421,13 @@ void for_each_exp (const I& beg, const I& end, const F& func, const Args&... arg
 template <typename C, typename F, typename... Args> 
 void for_each_local_exp (C& cont, const F& func, const Args&... args) {
 
-  auto range = Runtime::makeLocalRange(cont);
+  auto range = runtime::makeLocalRange(cont);
   auto tpl = std::make_tuple (args...);
 
-  if (Runtime::useParaMeterOpt) {
-    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  if (runtime::useParaMeterOpt) {
+    runtime::ParaMeter::for_each_param (range, func, tpl);
   } else {
-    Runtime::for_each_gen (range, func, tpl);
+    runtime::for_each_gen (range, func, tpl);
   }
 }
 

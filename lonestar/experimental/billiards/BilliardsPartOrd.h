@@ -83,7 +83,7 @@ public:
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
     galois::do_all_choice (
-        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
@@ -105,8 +105,8 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  galois::Runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
-  // galois::Runtime::do_all_coupled (
+  galois::runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
+  // galois::runtime::do_all_coupled (
       // boost::counting_iterator<unsigned> (0),
       // boost::counting_iterator<unsigned> (workList.numRows ()), 
       // _CleanupFunc (workList, currStep),
@@ -139,7 +139,7 @@ static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, b
       // printf ("currStep = %d, workList.size () = %zd\n", currStep, workList.size_all ());
 
       findTimer.start ();
-      galois::do_all_choice (galois::Runtime::makeLocalRange (workList),
+      galois::do_all_choice (galois::runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
           std::make_tuple(
             galois::loopname("find_indep_events"), 
@@ -157,8 +157,8 @@ static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, b
       simTimer.stop ();
 
       addTimer.start ();
-      // galois::Runtime::do_all_coupled (indepList, 
-      galois::do_all_choice (galois::Runtime::makeLocalRange (indepList), 
+      // galois::runtime::do_all_coupled (indepList, 
+      galois::do_all_choice (galois::runtime::makeLocalRange (indepList), 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), 
           std::make_tuple(
             galois::loopname("add_next_events"), 
@@ -386,7 +386,7 @@ public:
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
     galois::do_all_choice (
-        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },

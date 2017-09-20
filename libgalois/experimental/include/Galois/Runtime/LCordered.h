@@ -57,7 +57,7 @@
 #include <unordered_map>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 static const bool debug = false;
 
@@ -281,7 +281,7 @@ class LCorderedExec {
   typedef PerThreadVector<Ctxt*> CtxtWL;
   typedef PerThreadDeque<Ctxt*> CtxtDelQ;
   typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
-  // typedef galois::Runtime::PerThreadVector<T> AddWL;
+  // typedef galois::runtime::PerThreadVector<T> AddWL;
   typedef UserContextAccess<T> UserCtx;
   typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
@@ -315,12 +315,12 @@ class LCorderedExec {
 
       ctxtWL.get ().push_back (ctxt);
 
-      galois::Runtime::setThreadContext (ctxt);
+      galois::runtime::setThreadContext (ctxt);
       int tmp=0;
       // TODO: nhoodVisitor should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
       nhoodVisitor (ctxt->active, tmp); 
-      galois::Runtime::setThreadContext (NULL);
+      galois::runtime::setThreadContext (NULL);
     }
 
   };
@@ -537,14 +537,14 @@ public:
     galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    galois::Runtime::do_all_impl(
+    galois::runtime::do_all_impl(
         range, 
 				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
     //        "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    galois::Runtime::do_all_impl(makeLocalRange(initCtxt),
+    galois::runtime::do_all_impl(makeLocalRange(initCtxt),
 				 FindInitSources (sourceTest, initSrc, nInitSrc));
     //       "find_initial_sources");
     t_find.stop ();
@@ -579,7 +579,7 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    galois::Runtime::do_all_impl(makeLocalRange(ctxtDelQ),
+    galois::runtime::do_all_impl(makeLocalRange(ctxtDelQ),
 				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
@@ -625,7 +625,7 @@ void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhood
   for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

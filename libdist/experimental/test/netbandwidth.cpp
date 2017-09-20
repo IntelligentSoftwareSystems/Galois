@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
 
   for (int num = 0; num < 20; num += 2) {  
     num_recv = 0;
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     std::vector<uint32_t> payload(num);
 
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     T3.stop();
     while (num_recv < trials * (net.Num - 1)) { net.handleReceives(); }
     T2.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     T.stop();
     std::stringstream os;
     auto t = T.get();
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
 
   for (int num = 0; num < 20; num += 2) {  
     num_recv = 0;
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     tnum = num * 1024;
     std::vector<uint32_t> payload(tnum, 1);
 
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
       }
     }
     T2.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     T.stop();
     std::stringstream os;
     tnum *= (net.Num - 1);
@@ -149,10 +149,10 @@ int main(int argc, char** argv) {
 
 
 
-  galois::Runtime::reportStat(nullptr, "NetSB", net.reportSendBytes(),0);
-  galois::Runtime::reportStat(nullptr, "NetSM", net.reportSendMsgs(),0);
-  galois::Runtime::reportStat(nullptr, "NetRB", net.reportRecvBytes(),0);
-  galois::Runtime::reportStat(nullptr, "NetRM", net.reportRecvMsgs(),0);
-  galois::Runtime::getHostBarrier().wait();
+  galois::runtime::reportStat(nullptr, "NetSB", net.reportSendBytes(),0);
+  galois::runtime::reportStat(nullptr, "NetSM", net.reportSendMsgs(),0);
+  galois::runtime::reportStat(nullptr, "NetRB", net.reportRecvBytes(),0);
+  galois::runtime::reportStat(nullptr, "NetRM", net.reportRecvMsgs(),0);
+  galois::runtime::getHostBarrier().wait();
   return 0;
 }

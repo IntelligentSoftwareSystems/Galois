@@ -218,13 +218,13 @@ std::vector<PGraph*> magicPointer;
 
 //An active work just ended its work
 void decreaseActiveWorkers(uint32_t hostID) {
-   //std::cout <<  galois::Runtime::NetworkInterface::ID << " received a notice that " << hostID << " stopped working, alive workers: " << MWork.active_workers << "\n";
+   //std::cout <<  galois::runtime::NetworkInterface::ID << " received a notice that " << hostID << " stopped working, alive workers: " << MWork.active_workers << "\n";
    MWork.active_workers--;
 }
 
 void decreaseBarrier(uint32_t hostID) { //creating my own barrier
    MWork.barrier_counter--;
-   std::cout << galois::Runtime::NetworkInterface::ID << " received a notice that " << hostID << " reached barrier " << MWork.barrier_counter << "\n";
+   std::cout << galois::runtime::NetworkInterface::ID << " received a notice that " << hostID << " reached barrier " << MWork.barrier_counter << "\n";
 }
 
 void setRemotePtr(uint32_t hostID, PGraph* p) {
@@ -306,7 +306,7 @@ void setNodeAttr2(PGraph *p, unsigned GID, unsigned nout) {
 /*********************************************************************************
  *
  **********************************************************************************/
-void sendGhostCellAttrs2(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCellAttrs2(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
       auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
       auto x = g.getHost(g.L2G[l2g_ndx]);
@@ -335,7 +335,7 @@ void sendGhostCellAttrs2(galois::Runtime::NetworkInterface& net, PGraph& g) {
  * 
  **********************************************************************************/
 
-void sendGhostCellAttrs(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCellAttrs(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          /* no per-personality needed but until nout is
@@ -365,7 +365,7 @@ void sendGhostCellAttrs(galois::Runtime::NetworkInterface& net, PGraph& g) {
  * Note that we use the magicPointer array to obtain the reference of the graph object
  * where the node data is to be set.
  **********************************************************************************/
-void sendGhostCells(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCells(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -458,20 +458,20 @@ void loadGraphNonCPU(PGraph &g) {
 void myBarrier(int myID) { //very lazy implementation of a barrier just to compare against the one that is cause massive negative impact on parallel performance
    //Sending messages is the problem, this barrier didn't improve nothing at all!!
    /*MWork.barrier_counter--; //decrease own
-    for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x) { //Notify everyone that it has reached the barrier
+    for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; ++x) { //Notify everyone that it has reached the barrier
     if (x==myID){ //avoid sending to itself
     continue;
     }
-    std::cout << myID << " - " << galois::Runtime::NetworkInterface::Num << " - " <<
-    galois::Runtime::NetworkInterface::ID << " - " << x << "\n";
-    net.sendAlt(x, decreaseBarrier, galois::Runtime::NetworkInterface::ID);
+    std::cout << myID << " - " << galois::runtime::NetworkInterface::Num << " - " <<
+    galois::runtime::NetworkInterface::ID << " - " << x << "\n";
+    net.sendAlt(x, decreaseBarrier, galois::runtime::NetworkInterface::ID);
     }
     //std::cout << myID << "reached barrier after decreasing its own " << MWork.barrier_counter << "\n";
     while (MWork.barrier_counter > 0) { //while others don't reach the barrie
     * //should change this to a fast sleep or something
     myID = myID;
     }
-    MWork.barrier_counter = galois::Runtime::NetworkInterface::Num; //setup barrier for the next time*/
+    MWork.barrier_counter = galois::runtime::NetworkInterface::Num; //setup barrier for the next time*/
    return;
 }
 
@@ -479,14 +479,14 @@ void myBarrier(int myID) { //very lazy implementation of a barrier just to compa
  *
  **********************************************************************************/
 void inner_main() {
-   auto& net = galois::Runtime::getSystemNetworkInterface();
+   auto& net = galois::runtime::getSystemNetworkInterface();
    galois::StatManager statManager;
-   auto& barrier = galois::Runtime::getSystemBarrier();
-   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
+   auto& barrier = galois::runtime::getSystemBarrier();
+   const unsigned my_host_id = galois::runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
-   if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[galois::Runtime::NetworkInterface::ID]) {
+   if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
+      switch (personality_set.c_str()[galois::runtime::NetworkInterface::ID]) {
       case 'g':
          personality = GPU_CUDA;
          break;
@@ -500,15 +500,15 @@ void inner_main() {
       }
    }
 
-   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n", galois::Runtime::NetworkInterface::ID, personality_str(personality).c_str());
+   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n", galois::runtime::NetworkInterface::ID, personality_str(personality).c_str());
    barrier.wait();
-   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n", galois::Runtime::NetworkInterface::ID, personality_str(personality).c_str());
+   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n", galois::runtime::NetworkInterface::ID, personality_str(personality).c_str());
 
    PGraph g;
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(galois::Runtime::NetworkInterface::ID);
+      cuda_ctx = get_CUDA_context(galois::runtime::NetworkInterface::ID);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return;
    } else if (personality == GPU_OPENCL) {
@@ -533,11 +533,11 @@ void inner_main() {
 #endif
    barrier.wait();
    //send pGraph pointers
-   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
-      net.sendAlt(x, setRemotePtr, galois::Runtime::NetworkInterface::ID, &g);
+   for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; ++x)
+      net.sendAlt(x, setRemotePtr, galois::runtime::NetworkInterface::ID, &g);
    //Ask for cells
    for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::Runtime::NetworkInterface::ID);
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::runtime::NetworkInterface::ID);
 #if _HETERO_DEBUG_
    std::cout << "[" << my_host_id << "]:ask for remote replicas\n";
 #endif
@@ -548,8 +548,8 @@ void inner_main() {
    barrier.wait();
 
    //initialize active workers
-   MWork.active_workers = galois::Runtime::NetworkInterface::Num;
-   MWork.barrier_counter = galois::Runtime::NetworkInterface::Num;
+   MWork.active_workers = galois::runtime::NetworkInterface::Num;
+   MWork.barrier_counter = galois::runtime::NetworkInterface::Num;
    MWork.first_time = true;
 
    //initialize work list in case its a CPU
@@ -618,7 +618,7 @@ void inner_main() {
       if (MWork.my_amount_of_work == 0 && MWork.first_time) { //Check if node ran out of work. Need the first_time otherwise at a certain point we are always decreasing the number of workrers
          MWork.first_time = false;
          MWork.active_workers--;
-         for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; x++) { //Notify everyone that this device work has ended
+         for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; x++) { //Notify everyone that this device work has ended
             if (x == g.id) { //this must be added otherwise some processes will be stuck because of the barrier and the net.sendAlt to itself
                continue;
             }
@@ -643,7 +643,7 @@ void inner_main() {
        std::cout << "NODE " << *i + g.g_offset << " has PR: " << g.g.getData(*i).value << "\n";
        }*/
       std::stringstream ss;
-      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::Runtime::NetworkInterface::Num << "_page_ranks.csv";
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::runtime::NetworkInterface::Num << "_page_ranks.csv";
       std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {
@@ -672,7 +672,7 @@ void inner_main() {
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   auto& net = galois::Runtime::getSystemNetworkInterface();
+   auto& net = galois::runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }

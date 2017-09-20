@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
@@ -275,7 +275,7 @@ int main(int argc, char** argv) {
     InitializeGraph::go(hg);
     InitializeGraph_residual::go(hg);
     T_init.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     // Verify
 #if 0
@@ -295,7 +295,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph_residual::go(hg);
 
     std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph_residual::go(hg);
 
     std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
         //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
       }
     }

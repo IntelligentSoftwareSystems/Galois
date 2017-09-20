@@ -44,7 +44,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template <typename T, typename DivFunc, typename ConqFunc, bool NEEDS_CHILDREN>
 class TreeExecutorTwoFunc {
@@ -245,7 +245,7 @@ void for_each_ordered_tree (I beg, I end, const DivFunc& divFunc, const ConqFunc
   typedef typename std::iterator_traits<I>::value_type T;
 
   TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor {divFunc, conqFunc, loopname};
-  executor.execute (galois::Runtime::makeStandardRange (beg, end));
+  executor.execute (galois::runtime::makeStandardRange (beg, end));
 }
 
 template <typename T, typename DivFunc, typename ConqFunc>
@@ -424,7 +424,7 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
 }
 
 void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

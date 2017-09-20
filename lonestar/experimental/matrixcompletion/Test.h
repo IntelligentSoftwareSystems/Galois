@@ -34,7 +34,7 @@ struct DotProductFixedTilingAlgo {
     constexpr bool useExp = true;
     constexpr bool useDot = false;
     galois::Timer timer;
-    galois::Runtime::Fixed2DGraphTiledExecutor<Graph, useExp> executor(g, cutoff);
+    galois::runtime::Fixed2DGraphTiledExecutor<Graph, useExp> executor(g, cutoff);
     timer.start();
     executor.execute(
         g.begin(), g.begin() + NUM_ITEM_NODES,
@@ -81,11 +81,11 @@ struct AsyncALSalgo {
   struct EmptyBase {};
 
   typedef typename std::conditional<algo == asyncALSreuse,
-          galois::Runtime::InputDAGdata,
+          galois::runtime::InputDAGdata,
           EmptyBase>::type NodeBase;
 
   // TODO: fix compilation when inheriting from NodeBase
-  struct Node: public galois::Runtime::InputDAGdata { 
+  struct Node: public galois::runtime::InputDAGdata { 
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
@@ -103,8 +103,8 @@ struct AsyncALSalgo {
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
 
-  typedef galois::Runtime::PerThreadStorage<XTX> PerThrdXTX;
-  typedef galois::Runtime::PerThreadStorage<V> PerThrdV;
+  typedef galois::runtime::PerThreadStorage<XTX> PerThrdXTX;
+  typedef galois::runtime::PerThreadStorage<V> PerThrdV;
 
   Sp A;
   Sp AT;
@@ -296,7 +296,7 @@ struct AsyncALSalgo {
       }
     };
 
-    typedef galois::Runtime::DAGmanager<Graph, VisitAdjacent> Base_ty;
+    typedef galois::runtime::DAGmanager<Graph, VisitAdjacent> Base_ty;
 
     struct Manager: public Base_ty {
       Manager (Graph& g, Sp& A, Sp& AT): 
@@ -341,7 +341,7 @@ struct AsyncALSalgo {
 
   void operator()(Graph& g, const StepFunction&) {
     if (!useSameLatentVector && algo != syncALS) {
-      galois::Runtime::LL::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
+      galois::runtime::LL::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
     }
     galois::TimeAccumulator elapsed;
     elapsed.start();
@@ -364,15 +364,15 @@ struct AsyncALSalgo {
 
     typename EigenGraphVisitor::Manager dagManager {g, A, AT}; 
 
-    auto* reuseExec = galois::Runtime::make_reusable_dag_exec (
-        galois::Runtime::makeLocalRange (g),
+    auto* reuseExec = galois::runtime::make_reusable_dag_exec (
+        galois::runtime::makeLocalRange (g),
         g, dagManager, 
         ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
         VisitNhood {*this, g}, std::less<GNode> (),
         "als-async-reuse");
 
     if (algo == asyncALSreuse) {
-      reuseExec->initialize (galois::Runtime::makeLocalRange (g));
+      reuseExec->initialize (galois::runtime::makeLocalRange (g));
     }
 
     for (int round = 1; ; ++round) {
@@ -518,7 +518,7 @@ struct SimpleALSalgo {
     MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
-    typedef galois::Runtime::PerThreadStorage<XTX> PerThrdXTX;
+    typedef galois::runtime::PerThreadStorage<XTX> PerThrdXTX;
 
     initializeA(g);
     copyFromGraph(g, WT, HT);
@@ -599,7 +599,7 @@ struct SimpleALSalgo {
 
 template<typename Graph, bool UseLocks>
 class Recursive2DExecutor {
-  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::iterator iterator;
   typedef typename Graph::edge_iterator edge_iterator;
@@ -1096,7 +1096,7 @@ struct DotProductRecursiveTilingAlgo {
 
 struct BlockJumpAlgo {
   bool isSgd() const { return true; }
-  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
   static const bool precomputeOffsets = false;
 
   std::string name() const { return "BlockAlgo"; }

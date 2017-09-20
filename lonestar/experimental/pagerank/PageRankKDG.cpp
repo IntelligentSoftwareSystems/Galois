@@ -25,14 +25,14 @@ static cll::opt<ExecType> execType (
     cll::init (KDG_R));
 
 
-struct NodeData: public galois::Runtime::TaskDAGdata, PData {
+struct NodeData: public galois::runtime::TaskDAGdata, PData {
 
   NodeData (void)
-    : galois::Runtime::TaskDAGdata (0), PData ()
+    : galois::runtime::TaskDAGdata (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : galois::Runtime::TaskDAGdata (id), PData (outdegree)
+    : galois::runtime::TaskDAGdata (id), PData (outdegree)
   {}
 
 
@@ -46,7 +46,7 @@ class PageRankChromatic: public PageRankBase<InnerGraph> {
 protected:
 
   struct NodeComparator {
-    typedef galois::Runtime::DAGdataComparator<NodeData> DataCmp;
+    typedef galois::runtime::DAGdataComparator<NodeData> DataCmp;
 
     Graph& graph;
 
@@ -86,15 +86,15 @@ protected:
 
   virtual void runPageRank (void) {
     
-    typedef typename galois::Runtime::DAGmanagerInOut<Graph>::Manager Manager;
+    typedef typename galois::runtime::DAGmanagerInOut<Graph>::Manager Manager;
     Manager m {graph};
     m.assignPriority ();
 
 
     switch (execType) {
       case KDG_REUSE:
-        galois::Runtime::for_each_det_kdg_ar_reuse (
-            galois::Runtime::makeLocalRange (graph),
+        galois::runtime::for_each_det_kdg_ar_reuse (
+            galois::runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
@@ -103,47 +103,47 @@ protected:
         break;
 
       case KDG_R_ALT:
-        galois::Runtime::for_each_det_kdg (
-            galois::Runtime::makeLocalRange (graph),
+        galois::runtime::for_each_det_kdg (
+            galois::runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r-alt",
-            galois::Runtime::KDG_R_ALT);
+            galois::runtime::KDG_R_ALT);
         break;
 
       case KDG_R:
-        galois::Runtime::for_each_det_kdg (
-            galois::Runtime::makeLocalRange (graph),
+        galois::runtime::for_each_det_kdg (
+            galois::runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r",
-            galois::Runtime::KDG_R);
+            galois::runtime::KDG_R);
         break;
 
       case KDG_AR:
-        galois::Runtime::for_each_det_kdg (
-            galois::Runtime::makeLocalRange (graph),
+        galois::runtime::for_each_det_kdg (
+            galois::runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ar",
-            galois::Runtime::KDG_AR);
+            galois::runtime::KDG_AR);
         break;
 
       case IKDG:
-        galois::Runtime::for_each_det_kdg (
-            galois::Runtime::makeLocalRange (graph),
+        galois::runtime::for_each_det_kdg (
+            galois::runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ikdg",
-            galois::Runtime::IKDG);
+            galois::runtime::IKDG);
         break;
 
       case UNORD:

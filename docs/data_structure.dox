@@ -310,23 +310,23 @@ There are several built-in special reducers.
 
 @subsection perthreadstorage PerThreadStorage
 
-{@link galois::Runtime::PerThreadStorage} provides the ability to store data per thread. 
+{@link galois::runtime::PerThreadStorage} provides the ability to store data per thread. 
 
- - Defining {@link galois::Runtime::PerThreadStorage}
+ - Defining {@link galois::runtime::PerThreadStorage}
 
-   The template parameter of {@link galois::Runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link galois::Runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
+   The template parameter of {@link galois::runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link galois::runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
 
-   An example to define a {@link galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to define a {@link galois::runtime::PerThreadStorage} can be seen as follows:
 
    In {@link apps/boruvka/BoruvkaMerge.cpp}
  
    @snippet apps/boruvka/BoruvkaMerge.cpp define per thread storage
 
- - Accessing {@link galois::Runtime::PerThreadStorage}
+ - Accessing {@link galois::runtime::PerThreadStorage}
 
-   {@link galois::Runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link galois::Runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
+   {@link galois::runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link galois::runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
 
-   An example to access a {@link galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to access a {@link galois::runtime::PerThreadStorage} can be seen as follows:
 
    In {@link apps/boruvka/BoruvkaMerge.cpp}
  

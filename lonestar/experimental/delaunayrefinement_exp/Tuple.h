@@ -29,7 +29,7 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Serialize.h"
 
-class Tuple : public galois::Runtime::Lockable {
+class Tuple : public galois::runtime::Lockable {
   double _t[2];
 public:
   Tuple(double a, double b) noexcept {
@@ -41,11 +41,11 @@ public:
   
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,_t[0]);
     gSerialize(s,_t[1]);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,_t[0]);
     gDeserialize(s,_t[1]);
   }

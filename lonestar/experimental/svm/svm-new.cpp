@@ -1372,7 +1372,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 			bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
 			double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
 			unsigned num_threads = galois::getActiveThreads();
-			unsigned num_packages = galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+			unsigned num_packages = galois::runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
 			galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
 					unsigned n = byThread ? num_threads : num_packages;
 					for (unsigned j = 1; j < n; j++) {
@@ -1395,7 +1395,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 					std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
 					break;
 					case UpdateType::ReplicateByPackage:
-					if (tid && galois::Runtime::LL::isPackageLeader(tid))
+					if (tid && galois::runtime::LL::isPackageLeader(tid))
 					std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
 					break;
 					default: abort();
@@ -1782,7 +1782,7 @@ template<UpdateType UT>
 void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) { // {{{
 	galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	//galois::Runtime::getThreadPool().burnPower(numThreads);
+	//galois::runtime::getThreadPool().burnPower(numThreads);
 
 	DiffractedCollection<double, UT> dstate(NUM_SAMPLES);
 
@@ -2082,7 +2082,7 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 		printf("\n");
 		accumTimer.start();
 	}
-	//galois::Runtime::getThreadPool().beKind();
+	//galois::runtime::getThreadPool().beKind();
 } // }}}
 
 void runGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {

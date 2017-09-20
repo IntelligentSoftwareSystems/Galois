@@ -35,7 +35,7 @@
 #include <tuple>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace DEPRECATED {
 
 template<typename FunctionTy>

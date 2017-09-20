@@ -29,7 +29,7 @@
 #include "Galois/Runtime/RemotePointer.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 
 SimpleRuntimeContext& getTransCnx();
@@ -125,7 +125,7 @@ void transientRelease(const gptr<T>& p) {
 
 #endif
 
-} //namespace Runtime
+} //namespace runtime
 } //namespace galois
 
 #endif //DISTSUPPORT

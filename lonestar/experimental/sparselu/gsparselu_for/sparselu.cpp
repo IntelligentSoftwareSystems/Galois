@@ -304,7 +304,7 @@ void fwd(float *diag, float *col)
             col[i*bots_arg_size_1+j] = col[i*bots_arg_size_1+j] - diag[i*bots_arg_size_1+k]*col[k*bots_arg_size_1+j];
 }
 
-static galois::LargeArray<galois::Runtime::Lockable> locks;
+static galois::LargeArray<galois::runtime::Lockable> locks;
 
 void sparselu_init (float ***pBENCH, char *pass)
 {
@@ -479,7 +479,7 @@ struct FwdBdivBmod {
     typedef int tt_does_not_need_push;
 
     void acquire(int ii, int jj) {
-      galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], galois::MethodFlag::WRITE);
+      galois::runtime::acquire(&locks[ii*bots_arg_size+jj], galois::MethodFlag::WRITE);
     }
 
     void operator()(const Task& t, galois::UserContext<Task>&) {
@@ -608,8 +608,8 @@ static void ikdg_algo(float **BENCH)
   galois::setDoAllImpl (galois::DOALL_COUPLED);
   if (galois::getDoAllImpl () != galois::DOALL_COUPLED) { std::abort (); }
 
-  galois::Runtime::for_each_ordered_ikdg(
-      galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
+  galois::runtime::for_each_ordered_ikdg(
+      galois::runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
       FwdBdivBmod::Comparator { },
       FwdBdivBmod::NeighborhoodVisitor { BENCH },
       FwdBdivBmod::Process { BENCH },

@@ -54,7 +54,7 @@ static const char* url = "delaunay_mesh_refinement";
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /*
-struct Process : public galois::Runtime::Lockable {
+struct Process : public galois::runtime::Lockable {
   Graphp   graph;
 
   typedef int tt_needs_per_iter_alloc;
@@ -75,15 +75,15 @@ struct Process : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Preprocess : public galois::Runtime::Lockable {
+struct Preprocess : public galois::runtime::Lockable {
   Graphp   graph;
   galois::Graph::Bag<GNode>::pointer wl;
 
@@ -97,15 +97,15 @@ struct Preprocess : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph,wl);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph,wl);
   }
 };
 
-struct Verification : public galois::Runtime::Lockable {
+struct Verification : public galois::runtime::Lockable {
   Graphp   graph;
 
   Verification(Graphp g): graph(g) {}
@@ -119,15 +119,15 @@ struct Verification : public galois::Runtime::Lockable {
 
   //serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Prefetch : public galois::Runtime::Lockable {
+struct Prefetch : public galois::runtime::Lockable {
   Graphp   graph;
 
   Prefetch(Graphp g): graph(g) {}
@@ -139,10 +139,10 @@ struct Prefetch : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
@@ -154,8 +154,8 @@ int main(int argc, char** argv) {
   galois::StatManager statManager;
 
   //check the host id and initialise the network
-  galois::Runtime::getSystemNetworkInterface().start();
-  //galois::Runtime::setTrace(false);
+  galois::runtime::getSystemNetworkInterface().start();
+  //galois::runtime::setTrace(false);
   Graphp g;
   g = Graph::allocate();
   {
@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
   //ThirdGraphSize(graph);
 
   // master_terminate();
-  galois::Runtime::getSystemNetworkInterface().terminate();
+  galois::runtime::getSystemNetworkInterface().terminate();
 
   return 0;
 }

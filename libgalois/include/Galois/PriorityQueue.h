@@ -156,10 +156,10 @@ public:
   const_iterator end() const { return orderedSet.end(); }
 };
 
-template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T, Runtime::Pow_2_BlockAllocator<T> > >
+template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T, runtime::Pow_2_BlockAllocator<T> > >
 class MinHeap {
 public:
-  typedef Runtime::Pow_2_BlockAllocator<T> alloc_type;
+  typedef runtime::Pow_2_BlockAllocator<T> alloc_type;
   typedef Cont container_type;
 
   typedef typename container_type::value_type value_type;

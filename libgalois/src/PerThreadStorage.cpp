@@ -49,13 +49,13 @@ galois::Substrate::PerBackend& galois::Substrate::getPPSBackend() {
 
 #define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = 16*(2<<20); //galois::Runtime::MM::hugePageSize * 16;
+const size_t allocSize = 16*(2<<20); //galois::runtime::MM::hugePageSize * 16;
 inline void* alloc() {
   return malloc(allocSize);
 }
 
 #else
-const size_t allocSize = galois::Runtime::MM::hugePageSize;
+const size_t allocSize = galois::runtime::MM::hugePageSize;
 inline void* alloc() {
   return galois::Substrate::MM::pageAlloc();
 }

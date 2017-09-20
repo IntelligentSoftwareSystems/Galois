@@ -139,14 +139,14 @@ public:
   //! Push new work 
   template<typename... Args>
   void push(Args&&... args) {
-    // galois::Runtime::checkWrite(MethodFlag::WRITE, true);
+    // galois::runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
     if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);
   }
 
   //! Force the abort of this iteration
-  void abort() { galois::Runtime::signalConflict(); }
+  void abort() { galois::runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
   void* getLocalState(void) { return localState; }
@@ -173,7 +173,7 @@ public:
   //! acquired.
   void cautiousPoint() {
     if (isFirstPass()) {
-      galois::Runtime::signalFailSafe();
+      galois::runtime::signalFailSafe();
     }
   }
 

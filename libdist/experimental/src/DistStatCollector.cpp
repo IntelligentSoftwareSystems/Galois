@@ -62,7 +62,7 @@ static void recvAtHost_0_str(uint32_t HostID, const std::string loopname, const 
 }
 
 void DistStatCollector::combineAtHost_0(void) {
-  galois::Runtime::getHostBarrier().wait();
+  galois::runtime::getHostBarrier().wait();
 
   if (getHostID() != 0) {
     for (auto& p : Stats) {
@@ -101,7 +101,7 @@ void DistStatCollector::combineAtHost_0(void) {
     }
   }
 
-  galois::Runtime::getHostBarrier().wait();
+  galois::runtime::getHostBarrier().wait();
 }
 
 

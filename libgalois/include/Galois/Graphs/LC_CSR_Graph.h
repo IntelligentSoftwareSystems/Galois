@@ -168,7 +168,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    galois::Runtime::acquire(&nodeData[N], mflag);
+    galois::runtime::acquire(&nodeData[N], mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -269,7 +269,7 @@ public:
   
   node_data_reference getData(GraphNode N, 
                               MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
@@ -277,7 +277,7 @@ public:
 
   edge_data_reference getEdgeData(edge_iterator ni, 
                                   MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -309,7 +309,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (galois::Runtime::shouldLock(mflag)) {
+    if (galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
         acquireNode(edgeDst[*ii], mflag);
       }
@@ -331,12 +331,12 @@ public:
     return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, 
+  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, 
       MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, 
+  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, 
       MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
@@ -448,7 +448,7 @@ public:
   //    return;
   //  }
 
-  //  uint32_t num_threads = galois::Runtime::activeThreads;
+  //  uint32_t num_threads = galois::runtime::activeThreads;
   //  uint32_t total_nodes = end() - begin();
   //  //printf("nodes is %u\n", total_nodes);
 
@@ -599,7 +599,7 @@ public:
   void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
                              std::vector<uint32_t>& returnRanges, 
                              uint32_t nodeAlpha=0) {
-    uint32_t num_threads = galois::Runtime::activeThreads;
+    uint32_t num_threads = galois::runtime::activeThreads;
     uint32_t total_nodes = endNode - beginNode;
 
     returnRanges.resize(num_threads + 1);
@@ -730,7 +730,7 @@ public:
     }
 
     assert(edgePrefixSum.size() == totalNodes);
-    uint32_t num_threads = galois::Runtime::activeThreads;
+    uint32_t num_threads = galois::runtime::activeThreads;
 
     threadRanges.resize(num_threads + 1);
 
@@ -889,7 +889,7 @@ public:
    */
   template <typename VectorTy>
   void determineThreadRangesByNode(VectorTy& edgePrefixSum) {
-    uint32_t numThreads = galois::Runtime::activeThreads;
+    uint32_t numThreads = galois::runtime::activeThreads;
     assert(numThreads > 0);
 
     if (threadRanges.size() != 0) {
@@ -951,7 +951,7 @@ public:
   template <typename VectorTy>
   void determineThreadRangesEdge(VectorTy& edgePrefixSum) {
     if (threadRanges.size() > 0) {
-      uint32_t totalThreads = galois::Runtime::activeThreads;
+      uint32_t totalThreads = galois::runtime::activeThreads;
 
       threadRangesEdge.resize(totalThreads + 1);
       threadRangesEdge[0] = 0;
@@ -1122,7 +1122,7 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
-    uint32_t numThreads = galois::Runtime::activeThreads;
+    uint32_t numThreads = galois::runtime::activeThreads;
     assert(numThreads > 0);
 
     threadRanges.resize(numThreads + 1);

@@ -155,8 +155,8 @@ protected:
     Accumulator_ty nevents;
 
     // galois::for_each_ordered (
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeStandardRange (simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeStandardRange (simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         GetRecvTime (), std::less<des::SimTime> (), 
         NhoodVisitor (graph, nodes),
         OpFunc (graph, nodes, newEvents, nevents));

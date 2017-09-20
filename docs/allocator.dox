@@ -60,7 +60,7 @@ include/Galois/gdeque.h} is shown below:
 
 \subsection plugin-other-alloc Plugging in 3rd Party Allocators
 
-{@link galois::Runtime::MM::ExternRefGaloisAllocator} is a wrapper class that can
+{@link galois::runtime::MM::ExternRefGaloisAllocator} is a wrapper class that can
 be used to wrap any third-party heap implementation, and make it use-able by Galois
 and STL data structures. It takes the type-name of the heap implementation as a
 template parameter and a reference to it for instantiating the allocator object.  
@@ -81,23 +81,23 @@ Several heap implementations are just wrappers around another heap implementatio
 to modify its interface in some way. In the following we list a few of them and
 show an example:
 
-- {@link galois::Runtime::MM::SystemBaseAlloc} defines the basic heap
+- {@link galois::runtime::MM::SystemBaseAlloc} defines the basic heap
   implementation used by Galois allocators, and is the source of all heap memory.
   It is implemented as a list of pages stored by each thread. 
 
-- {@link galois::Runtime::MM::FreeListHeap} maintains a linked list of blocks of
+- {@link galois::runtime::MM::FreeListHeap} maintains a linked list of blocks of
   size *B*, where *B* is the size of the objects being allocated. This is a fixed
   size heap, and is a wrapper around a source heap implementation that is passed
   as a template argument.
 
-- {@link galois::Runtime::MM::SimpleBumpPtr} allows allocating different size
+- {@link galois::runtime::MM::SimpleBumpPtr} allows allocating different size
   objects within a block of memory by simply moving a pointer within the block. The
   size of the block is determined by the source heap implementation provided as a
   template argument. The memory within a block cannot be freed, however, blocks are 
   freed only at the end of the program when the SimpleBumpPtr's destructor is
   called.
 
-- {@link galois::Runtime::MM::ThreadAwarePrivateHeap} creates a per-thread instance
+- {@link galois::runtime::MM::ThreadAwarePrivateHeap} creates a per-thread instance
   of a source heap provided as a template argument. This is used for defining some
   of the parallel allocators. 
 

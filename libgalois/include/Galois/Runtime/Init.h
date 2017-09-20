@@ -40,7 +40,7 @@
 #include <string>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template <typename SM>
 class SharedMemRuntime: public galois::Substrate::SharedMemSubstrate {
@@ -68,7 +68,7 @@ public:
   }
 };
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

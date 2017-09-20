@@ -68,7 +68,7 @@ struct Pipeline {
 }
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace Task {
 
 //! User visible portion of task
@@ -233,7 +233,7 @@ protected:
   
   galois::IterAllocBaseTy IterationAllocatorBase;
   galois::PerIterAllocTy PerIterationAllocator;
-  galois::Runtime::FixedSizeHeap heap;
+  galois::runtime::FixedSizeHeap heap;
 
   UserTaskContext():
     PerIterationAllocator(&IterationAllocatorBase), 
@@ -280,11 +280,11 @@ public:
 // Export user visible types
 namespace galois {
 template<typename PipelineTy>
-struct TaskContext: public galois::Runtime::Task::UserTaskContext<PipelineTy> { };
+struct TaskContext: public galois::runtime::Task::UserTaskContext<PipelineTy> { };
 }
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace Task {
 
 template<typename PipelineTy>
@@ -370,11 +370,11 @@ public:
 
 // Export user visible types
 namespace galois {
-typedef galois::Runtime::Task::UserTask* Task;
+typedef galois::runtime::Task::UserTask* Task;
 }
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace Task {
 
 struct TaskRuntimeContext { }; // XXX
@@ -460,7 +460,7 @@ class Executor {
     //FIXME:    clearReleasable(); 
     switch (result) {
       case 0: break;
-      case galois::Runtime::CONFLICT:
+      case galois::runtime::CONFLICT:
         tld.facing.abort();
         tld.facing.reset();
         tld.stat.inc_conflicts();
@@ -507,7 +507,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(galois::getActiveThreads())), barrier(Runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(galois::getActiveThreads())), barrier(runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
     barrier.reinit(galois::getActiveThreads());
   }
 
@@ -586,7 +586,7 @@ namespace galois {
 //! Task executor
 template<typename PipelineTy,typename IterTy>
 static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
-  typedef galois::Runtime::Task::Executor<PipelineTy,IterTy> WorkTy;
+  typedef galois::runtime::Task::Executor<PipelineTy,IterTy> WorkTy;
 
   WorkTy W(b, e, loopname);
   

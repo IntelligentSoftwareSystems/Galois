@@ -177,8 +177,8 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               string iteration_inc = "\n++_num_iterations;\n";
               iteration_inc += "_num_work_items += " + galois_distributed_accumulator_name + ".read();\n";
               string while_conditional = "}while("+ galois_distributed_accumulator_name + ".reduce());\n";
-              string report_iteration = "galois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
-              report_iteration += "galois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
+              string report_iteration = "galois::runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
+              report_iteration += "galois::runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
               rewriter.InsertText(for_each_loc_end, iteration_inc + while_conditional + report_iteration, true, true);
 
 #if 0

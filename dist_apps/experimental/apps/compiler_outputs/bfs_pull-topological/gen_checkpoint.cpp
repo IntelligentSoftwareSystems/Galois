@@ -301,7 +301,7 @@ struct BFS {
       _graph.checkpoint<Reduce_0>("BFS");
       StatTimer_checkpoint.stop();
 
-      if(galois::Runtime::getSystemNetworkInterface().ID == 0){
+      if(galois::runtime::getSystemNetworkInterface().ID == 0){
         if(recovery && iteration == 2){
           std::cerr << "xxxxxxxxxxxxxxxxxxx CRASHED xxxxxxxxxxxxxxxxxxxxx\n";
           _graph.recovery_send_help<Reduce_0>("BFS");
@@ -312,7 +312,7 @@ struct BFS {
      ++iteration;
 
      if(recovery)
-       galois::Runtime::getHostBarrier().wait();
+       galois::runtime::getHostBarrier().wait();
 #if 0
      // fail after 15 iterations
      if(iteration == 15){
@@ -349,21 +349,21 @@ galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
-    galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
+    galois::runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    galois::runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     galois::StatManager statManager;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
       case 'g':
         personality = GPU_CUDA;
@@ -436,14 +436,14 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       galois::StatTimer StatTimer_main(timer_str.c_str());
 
-      galois::Runtime::getHostBarrier().wait();
+      galois::runtime::getHostBarrier().wait();
       (*hg).reset_num_iter(run);
 
-      galois::Runtime::beginSampling();
+      galois::runtime::beginSampling();
       StatTimer_main.start();
     BFS::go((*hg), run);
       StatTimer_main.stop();
-      galois::Runtime::endSampling();
+      galois::runtime::endSampling();
 
       if((run + 1) != numRuns){
         (*hg).reset_num_iter(run);
@@ -459,12 +459,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
+          galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
+          galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif

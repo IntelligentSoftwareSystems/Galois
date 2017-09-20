@@ -70,7 +70,7 @@ public:
 
     t_init.start();
 
-    galois::do_all_choice(galois::Runtime::makeLocalRange(graph),
+    galois::do_all_choice(galois::runtime::makeLocalRange(graph),
         [&] (GNode n) {
               unsigned out_deg = 0;
               for (auto j = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED)
@@ -182,7 +182,7 @@ public:
 
       galois::GReduceLogicalAND allConverged;
 
-      galois::do_all_choice(galois::Runtime::makeLocalRange(graph),
+      galois::do_all_choice(galois::runtime::makeLocalRange(graph),
           PageRankOp(graph, round, allConverged), 
           std::make_tuple(
             galois::loopname("page_rank_inner"), 

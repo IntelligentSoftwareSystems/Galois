@@ -192,16 +192,16 @@ public:
 
     switch (execType) {
       case useAddRem:
-        galois::Runtime::for_each_ordered_ar (
-            galois::Runtime::makeStandardRange (
+        galois::runtime::for_each_ordered_ar (
+            galois::runtime::makeStandardRange (
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
               Comparator(), nhVisitor, p,
               std::make_tuple (galois::loopname ("avi-kdg-ar")));
         break;
       case useTwoPhase:
-        galois::Runtime::for_each_ordered_ikdg (
-            galois::Runtime::makeStandardRange (
+        galois::runtime::for_each_ordered_ikdg (
+            galois::runtime::makeStandardRange (
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
               Comparator(), nhVisitor, p,

@@ -6,7 +6,7 @@
 #include "Galois/Runtime/Executor_ParaMeter.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
 class KDGspecLocalMinExecutor: public IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> >{

@@ -46,7 +46,7 @@
 #include <type_traits>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 enum class InputDAG_ExecTy {
   CHROMATIC,
@@ -285,7 +285,7 @@ public:
     assignPriority ();
 
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [this, &postInit] (GNode src) {
           
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -484,7 +484,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    galois::do_all_choice ( galois::Runtime::makeLocalRange (graph), 
+    galois::do_all_choice ( galois::runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           sd.indegree = sd.indeg_backup;
@@ -512,7 +512,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    galois::do_all_choice ( galois::Runtime::makeLocalRange (graph), 
+    galois::do_all_choice ( galois::runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           // assert (sd.indegree == sd.indeg_backup);
@@ -636,7 +636,7 @@ public:
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [&] (GNode node) {
           nodeFunc (node);
         },
@@ -775,7 +775,7 @@ public:
     galois::GReduceLogicalOR foundError;
 
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [&] (GNode src) {
 
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -1030,7 +1030,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   using GNode = typename G::GraphNode;
   using ND = typename G::node_data_type;
 
-  galois::Runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
+  galois::runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
 
   DAGmanagerDefault (G& graph, const A& visitAdj)
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 
@@ -1075,7 +1075,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   }
 
   void freeDAGdata (void) {
-    galois::do_all_choice ( galois::Runtime::makeLocalRange (Base::graph), 
+    galois::do_all_choice ( galois::runtime::makeLocalRange (Base::graph), 
         [this] (GNode src) {
           auto& sd = Base::graph.getData (src, galois::MethodFlag::UNPROTECTED);
           dagSuccAlloc.deallocate (sd.dagSucc, sd.numSucc);
@@ -1129,7 +1129,7 @@ struct DAGvisitorUndirected {
   // void addPredecessors (void) {
 // 
     // galois::do_all_choice (
-        // galois::Runtime::makeLocalRange (graph),
+        // galois::runtime::makeLocalRange (graph),
         // [this] (GNode src) {
         // 
           // auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -1701,7 +1701,7 @@ public:
       // assert (sources.size () == 0);
 // 
       // t_dag_init.start ();
-      // dagManager.reinitActiveDAG (galois::Runtime::makeLocalRange (nextWork), sources);
+      // dagManager.reinitActiveDAG (galois::runtime::makeLocalRange (nextWork), sources);
       // nextWork.clear_all_parallel ();
       // t_dag_init.stop ();
 // 
@@ -2415,7 +2415,7 @@ struct ForEachDet_InputDAG<InputDAG_ExecTy::HYBRID> {
   }
 };
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_CHROMATIC_H

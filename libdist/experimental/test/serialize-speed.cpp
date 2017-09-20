@@ -9,9 +9,9 @@ int main() {
 
   std::map<int, double> compare;
   
-  std::cout << galois::Runtime::gSized(std::vector<int>(100)) << "\n";
+  std::cout << galois::runtime::gSized(std::vector<int>(100)) << "\n";
   //check by hand that gSized reduces this to a constant
-  std::cout << galois::Runtime::gSized(1.2, 3.4, '1') << "\n";
+  std::cout << galois::runtime::gSized(1.2, 3.4, '1') << "\n";
 
   std::cout << "Ser\n\n";
   
@@ -21,7 +21,7 @@ int main() {
     T.start();
     for (int i = 0; i < 1000; ++i) {
       SendBuffer b;
-      galois::Runtime::gSerialize(b, input);
+      galois::runtime::gSerialize(b, input);
     }
     T.stop();
     auto bytes = sizeof(double) * 1024*num * 1000;
@@ -42,9 +42,9 @@ int main() {
     T.start();
     for (int i = 0; i < 1000; ++i) {
       SendBuffer b;
-      galois::Runtime::gSerialize(b, input);
+      galois::runtime::gSerialize(b, input);
       RecvBuffer r(std::move(b));
-      galois::Runtime::gDeserialize(r, input);
+      galois::runtime::gDeserialize(r, input);
     }
     T.stop();
     auto bytes = sizeof(double) * 1024*num * 1000;

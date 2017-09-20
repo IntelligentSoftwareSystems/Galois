@@ -66,7 +66,7 @@ private:
  public:
   typedef T value_type;
 
-  BulkSynchronous(): barrier(Runtime::getBarrier(Runtime::activeThreads)), some(false), isEmpty(false) { }
+  BulkSynchronous(): barrier(runtime::getBarrier(runtime::activeThreads)), some(false), isEmpty(false) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);

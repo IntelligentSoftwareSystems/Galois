@@ -216,8 +216,8 @@ public:
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     // galois::for_each_ordered (
-    galois::Runtime::for_each_ordered_spec (
-        galois::Runtime::makeStandardRange (
+    galois::runtime::for_each_ordered_spec (
+        galois::runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         Comparator(), nhVisitor, p,

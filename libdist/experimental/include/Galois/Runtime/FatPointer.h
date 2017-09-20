@@ -32,7 +32,7 @@
 #include <ostream>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace detail {
 
@@ -145,13 +145,13 @@ size_t hash_value(const fatPointerImpl<T>& v) {
 typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
 //typedef detail::fatPointerImpl<detail::simpleFatPointer> fatPointer;
 
-} // namespace Runtime
+} // namespace runtime
 } // namespace galois
 
 namespace std {
 template<>
-struct hash<galois::Runtime::fatPointer> {
-  size_t operator()(const galois::Runtime::fatPointer& ptr) const {
+struct hash<galois::runtime::fatPointer> {
+  size_t operator()(const galois::runtime::fatPointer& ptr) const {
     return ptr.hash_value();
   }
 };

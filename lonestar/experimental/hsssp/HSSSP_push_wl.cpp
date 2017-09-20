@@ -195,7 +195,7 @@ void setNodeValue(PGraph* p, unsigned GID, int v) {
  * where the node data is to be set.
  **********************************************************************************/
 
-void sync_distances(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sync_distances(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          auto lid = g.G2L(n);
@@ -252,7 +252,7 @@ void setNextDistance(PGraph* p, unsigned GID, int v) {
 /****************************************************************************************
  *
  ****************************************************************************************/
-void sendNextDistances(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendNextDistances(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -279,7 +279,7 @@ void sendNextDistances(galois::Runtime::NetworkInterface& net, PGraph& g) {
 /****************************************************************************************
  * Send ghost-cells to owner nodes.
  ****************************************************************************************/
-void sendGhostCellDistances(galois::Runtime::NetworkInterface& net, PGraph & g) {
+void sendGhostCellDistances(galois::runtime::NetworkInterface& net, PGraph & g) {
    for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
       auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
       auto x = g.getHost(g.L2G[l2g_ndx]);
@@ -330,14 +330,14 @@ void remote_wl_push_global(BSPWorklist * wl, PGraph * g, GNode n){
 struct SSSP {
    Graph* g;
    void static go(PGraph& _g, unsigned num) {
-      auto my_id = galois::Runtime::NetworkInterface::ID;
-      auto & net = galois::Runtime::getSystemNetworkInterface();
+      auto my_id = galois::runtime::NetworkInterface::ID;
+      auto & net = galois::runtime::getSystemNetworkInterface();
       //Perform computation
 //      galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, SSSP { &_g.g }, galois::loopname("SSSP"));
       galois::do_all(worklist.current().begin(), worklist.current().end(), SSSP { &_g.g }, galois::loopname("SSSP"));
       worklist.current().clear();
       /////////////////////////////
-      galois::Runtime::getSystemBarrier()();
+      galois::runtime::getSystemBarrier()();
       {
 //         worklist.current().clear();
          for(auto i : worklist.next()){
@@ -352,9 +352,9 @@ struct SSSP {
          }
          worklist.next().clear();
       }
-      sendGhostCellDistances(galois::Runtime::getSystemNetworkInterface(), _g);
-      sync_distances(galois::Runtime::getSystemNetworkInterface(), _g);
-      galois::Runtime::getSystemBarrier()();
+      sendGhostCellDistances(galois::runtime::getSystemNetworkInterface(), _g);
+      sync_distances(galois::runtime::getSystemNetworkInterface(), _g);
+      galois::runtime::getSystemBarrier()();
       hasChanged |=!worklist.current().empty();
       galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, SSSP_PUSH_Commit { &_g.g }, galois::loopname("SSSP-Commit"));
    }
@@ -461,8 +461,8 @@ void loadGraphNonCPU(PGraph &g) {
 void recvChangeFlag(bool otherFlag) {
    hasChanged |= otherFlag;
 }
-void sendChangeFlag(galois::Runtime::NetworkInterface & net) {
-   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
+void sendChangeFlag(galois::runtime::NetworkInterface & net) {
+   for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, recvChangeFlag, hasChanged);
 }
 /*********************************************************************************
@@ -472,7 +472,7 @@ void sendChangeFlag(galois::Runtime::NetworkInterface & net) {
  * where the node data is to be set.
  **********************************************************************************/
 
-void sendGhostCells(galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCells(galois::runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -499,14 +499,14 @@ void sendGhostCells(galois::Runtime::NetworkInterface& net, PGraph& g) {
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
 
-   auto& net = galois::Runtime::getSystemNetworkInterface();
+   auto& net = galois::runtime::getSystemNetworkInterface();
    galois::StatManager statManager;
-   auto& barrier = galois::Runtime::getSystemBarrier();
-   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
+   auto& barrier = galois::runtime::getSystemBarrier();
+   const unsigned my_host_id = galois::runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
-   if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[galois::Runtime::NetworkInterface::ID]) {
+   if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
+      switch (personality_set.c_str()[galois::runtime::NetworkInterface::ID]) {
       case 'g':
          personality = GPU_CUDA;
          break;
@@ -524,7 +524,7 @@ int main(int argc, char** argv) {
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(galois::Runtime::NetworkInterface::ID);
+      cuda_ctx = get_CUDA_context(galois::runtime::NetworkInterface::ID);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          exit(-1);
    } else if (personality == GPU_OPENCL) {
@@ -538,8 +538,8 @@ int main(int argc, char** argv) {
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g.g, g.numNodes);
-      if (g.getHost((src_node.Value)) == galois::Runtime::NetworkInterface::ID) {
-         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::Runtime::NetworkInterface::ID);
+      if (g.getHost((src_node.Value)) == galois::runtime::NetworkInterface::ID) {
+         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::runtime::NetworkInterface::ID);
          NodeData & ndata = g.g.getData(src_node.Value);
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
@@ -549,8 +549,8 @@ int main(int argc, char** argv) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
       dOp.init(g.numOwned, g.numNodes);
-      if (g.getHost((src_node.Value)) == galois::Runtime::NetworkInterface::ID) {
-         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::Runtime::NetworkInterface::ID);
+      if (g.getHost((src_node.Value)) == galois::runtime::NetworkInterface::ID) {
+         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::runtime::NetworkInterface::ID);
          dOp.getData(src_node).dist[dOp.getData(src_node).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
       }
    }
@@ -560,12 +560,12 @@ int main(int argc, char** argv) {
 //   barrier.wait();
 
    //send pGraph pointers
-   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x) {
-      net.sendAlt(x, setRemotePtr, galois::Runtime::NetworkInterface::ID, &g, &worklist);
+   for (uint32_t x = 0; x < galois::runtime::NetworkInterface::Num; ++x) {
+      net.sendAlt(x, setRemotePtr, galois::runtime::NetworkInterface::ID, &g, &worklist);
    }
    //Ask for cells
    for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::Runtime::NetworkInterface::ID);
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::runtime::NetworkInterface::ID);
 
 #if _HETERO_DEBUG_
    std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
@@ -610,7 +610,7 @@ int main(int argc, char** argv) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
    if (verify) {
       std::stringstream ss;
-      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::Runtime::NetworkInterface::Num << "_distances.csv";
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::runtime::NetworkInterface::Num << "_distances.csv";
       std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {

@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
   
   totalTime.start();
   Array array;
-  unsigned numPackageUsed = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::Runtime::activeThreads)+1;
+  unsigned numPackageUsed = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::runtime::activeThreads)+1;
   PerPackageArray perPackageArray(numArrayEntry/numPackageUsed);
 
   if(algo == Algo::local) {
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
   }
 
   T.start();
-  auto& barrier = galois::Runtime::getBarrier(galois::Runtime::activeThreads);
+  auto& barrier = galois::runtime::getBarrier(galois::runtime::activeThreads);
   if(algo == Algo::starInterleavedGraphRead || algo == Algo::starLargeGraphRead) {
     galois::on_each(StarGraphRead(array, barrier), galois::loopname("StarGraphRead"));
   } else if(algo == Algo::local) {

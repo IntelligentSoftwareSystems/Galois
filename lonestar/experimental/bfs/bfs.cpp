@@ -736,7 +736,7 @@ void run() {
   AlgoTy algo;
   GNode source, report;
   readGraph(source, report);
-  galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / galois::Runtime::pagePoolSize())*8);
+  galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / galois::runtime::pagePoolSize())*8);
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;

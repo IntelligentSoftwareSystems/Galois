@@ -43,7 +43,7 @@
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 class StatCollector {
 
@@ -150,7 +150,7 @@ namespace internal {
   void setStatCollector(StatCollector* sc);
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

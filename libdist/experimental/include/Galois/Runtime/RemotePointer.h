@@ -30,7 +30,7 @@
 #include "Galois/Runtime/Context.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template<typename T>
 class gptr {
@@ -132,7 +132,7 @@ public:
 // }
 
 
-} //namespace Runtime
+} //namespace runtime
 } //namespace galois
 
 #endif //DISTSUPPORT

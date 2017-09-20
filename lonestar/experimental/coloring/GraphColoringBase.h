@@ -158,7 +158,7 @@ protected:
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [&] (GN node) {
           nodeFunc (node);
         },
@@ -257,7 +257,7 @@ protected:
     galois::GReduceMax<unsigned> maxColor;
 
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange (graph),
+        galois::runtime::makeLocalRange (graph),
         [&] (GN src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           if (sd.color == 0) {
@@ -304,7 +304,7 @@ public:
 
     readGraph ();
 
-    galois::preAlloc (galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/galois::Runtime::pagePoolSize());
+    galois::preAlloc (galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/galois::runtime::pagePoolSize());
     galois::reportPageAlloc("MeminfoPre");
 
     galois::StatTimer t;

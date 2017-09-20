@@ -153,8 +153,8 @@ public:
 
     createLocks (table, graph, nodes);
 
-    galois::Runtime::for_each_ordered_rob (
-        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::runtime::for_each_ordered_rob (
+        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         BilliardsLevelExec::VisitNhood (graph, nodes),
         OpFunc (table, endtime, iter));

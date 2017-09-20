@@ -35,7 +35,7 @@ class LC_Dist {
 
   struct EdgeImplTy;
 
-  struct NodeImplTy :public Runtime::Lockable {
+  struct NodeImplTy :public runtime::Lockable {
     NodeTy data;
     EdgeImplTy* b;
     EdgeImplTy* e;
@@ -51,18 +51,18 @@ class LC_Dist {
 
     //Serialization support
     typedef int tt_has_serialize;
-    NodeImplTy(Runtime::DeSerializeBuffer& buf) :remote(true) {
+    NodeImplTy(runtime::DeSerializeBuffer& buf) :remote(true) {
       ptrdiff_t diff;
       gDeserialize(buf, data, len, diff);
       b = e = len ? (new EdgeImplTy[len]) : nullptr;
       while (diff--) {
-        Runtime::gptr<NodeImplTy> ptr;
+        runtime::gptr<NodeImplTy> ptr;
         EdgeTy tmp;
         gDeserialize(buf, ptr, tmp);
         append(ptr, tmp);
       }
     }
-    void serialize(Runtime::SerializeBuffer& buf) const {
+    void serialize(runtime::SerializeBuffer& buf) const {
       EdgeImplTy* begin = b;
       EdgeImplTy* end = e;
       ptrdiff_t diff = end - begin;
@@ -72,7 +72,7 @@ class LC_Dist {
         ++begin;
       }
     }
-    void deserialize(Runtime::DeSerializeBuffer& buf) {
+    void deserialize(runtime::DeSerializeBuffer& buf) {
       assert(!remote);
       ptrdiff_t diff;
       unsigned _len;
@@ -87,13 +87,13 @@ class LC_Dist {
       e = begin;
     }
 
-    EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
+    EdgeImplTy* append(runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
       e->dst = dst;
       e->data = data;
       return e++;
     }
 
-    EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst) {
+    EdgeImplTy* append(runtime::gptr<NodeImplTy> dst) {
       e->dst = dst;
       return e++;
     }
@@ -103,12 +103,12 @@ class LC_Dist {
   };
 
   struct EdgeImplTy {
-    Runtime::gptr<NodeImplTy> dst;
+    runtime::gptr<NodeImplTy> dst;
     EdgeTy data;
   };
 
  public:
-  typedef Runtime::gptr<NodeImplTy> GraphNode;
+  typedef runtime::gptr<NodeImplTy> GraphNode;
 
  private:
   std::vector<NodeImplTy> Nodes;
@@ -118,22 +118,22 @@ class LC_Dist {
   std::vector<unsigned> Num;
   std::vector<unsigned> PrefixNum;
 
-  Runtime::PerHost<LC_Dist> self;
+  runtime::PerHost<LC_Dist> self;
 
-  friend class Runtime::PerHost<LC_Dist>;
+  friend class runtime::PerHost<LC_Dist>;
 
-  LC_Dist(Runtime::PerHost<LC_Dist> _self, std::vector<unsigned>& edges) 
-    :Starts(Runtime::NetworkInterface::Num),
-     Num(Runtime::NetworkInterface::Num),
-     PrefixNum(Runtime::NetworkInterface::Num),
+  LC_Dist(runtime::PerHost<LC_Dist> _self, std::vector<unsigned>& edges) 
+    :Starts(runtime::NetworkInterface::Num),
+     Num(runtime::NetworkInterface::Num),
+     PrefixNum(runtime::NetworkInterface::Num),
      self(_self)
   {
-    //std::cerr << Runtime::NetworkInterface::ID << " Construct\n";
-    Runtime::trace("LC_Dist with % nodes total\n", edges.size());
+    //std::cerr << runtime::NetworkInterface::ID << " Construct\n";
+    runtime::trace("LC_Dist with % nodes total\n", edges.size());
     //Fill up metadata vectors
-    for (unsigned h = 0; h < Runtime::NetworkInterface::Num; ++h) {
+    for (unsigned h = 0; h < runtime::NetworkInterface::Num; ++h) {
       auto p = block_range(edges.begin(), edges.end(), h,
-                           Runtime::NetworkInterface::Num);
+                           runtime::NetworkInterface::Num);
       Num[h] = std::distance(p.first, p.second);
     }
     std::partial_sum(Num.begin(), Num.end(), PrefixNum.begin());
@@ -145,8 +145,8 @@ class LC_Dist {
 
     //Block nodes
     auto p = block_range(edges.begin(), edges.end(), 
-                         Runtime::NetworkInterface::ID,
-                         Runtime::NetworkInterface::Num);
+                         runtime::NetworkInterface::ID,
+                         runtime::NetworkInterface::Num);
     //Allocate Edges
     unsigned sum = std::accumulate(p.first, p.second, 0);
     Edges.resize(sum);
@@ -157,17 +157,17 @@ class LC_Dist {
       Nodes.emplace_back(cur, *ii);
       cur += *ii;
     }
-    Starts[Runtime::NetworkInterface::ID].first = GraphNode(&Nodes[0]);
-    Starts[Runtime::NetworkInterface::ID].second = 2;
+    Starts[runtime::NetworkInterface::ID].first = GraphNode(&Nodes[0]);
+    Starts[runtime::NetworkInterface::ID].second = 2;
   }
 
-  static void getStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom) {
-    //std::cerr << Runtime::NetworkInterface::ID << " getStart " << whom << "\n";
-    Runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, Runtime::NetworkInterface::ID, graph->Starts[Runtime::NetworkInterface::ID].first);
+  static void getStart(runtime::PerHost<LC_Dist> graph, uint32_t whom) {
+    //std::cerr << runtime::NetworkInterface::ID << " getStart " << whom << "\n";
+    runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, runtime::NetworkInterface::ID, graph->Starts[runtime::NetworkInterface::ID].first);
   }
 
-  static void putStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom, GraphNode start) {
-    //std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
+  static void putStart(runtime::PerHost<LC_Dist> graph, uint32_t whom, GraphNode start) {
+    //std::cerr << runtime::NetworkInterface::ID << " putStart " << whom << "\n";
     graph->Starts[whom].first = start;
     graph->Starts[whom].second = 2;
   }
@@ -178,8 +178,8 @@ class LC_Dist {
       int ex = 0;
       bool swap = Starts[host].second.compare_exchange_strong(ex,1);
       if (swap)
-        Runtime::getSystemNetworkInterface().sendAlt(host, getStart, self, Runtime::NetworkInterface::ID);
-      while (Starts[host].second != 2) { Runtime::doNetworkWork(); }
+        runtime::getSystemNetworkInterface().sendAlt(host, getStart, self, runtime::NetworkInterface::ID);
+      while (Starts[host].second != 2) { runtime::doNetworkWork(); }
     }
     assert(Starts[host].first);
   }
@@ -193,7 +193,7 @@ class LC_Dist {
     return Starts[host].first + offset;
   }
 
-  void acquireNode(Runtime::gptr<NodeImplTy> node, galois::MethodFlag mflag) {
+  void acquireNode(runtime::gptr<NodeImplTy> node, galois::MethodFlag mflag) {
     acquire(node, mflag);
   }
 
@@ -238,7 +238,7 @@ public:
   typedef EdgeImplTy* edge_iterator;
 
   //! Creation and destruction
-  typedef Runtime::PerHost<LC_Dist> pointer;
+  typedef runtime::PerHost<LC_Dist> pointer;
   static pointer allocate(std::vector<unsigned>& edges) {
     return pointer::allocate(edges);
   }
@@ -282,15 +282,15 @@ public:
   //! Iterators
 
   iterator begin() { return iterator(this, 0); }
-  iterator end  () { return iterator(this, PrefixNum[Runtime::NetworkInterface::Num - 1]); }
+  iterator end  () { return iterator(this, PrefixNum[runtime::NetworkInterface::Num - 1]); }
   
   local_iterator local_begin() {
-    if (Runtime::LL::getTID() == 0)
-      return iterator(this, Runtime::NetworkInterface::ID == 0 ? 0 : PrefixNum[Runtime::NetworkInterface::ID - 1] );
+    if (runtime::LL::getTID() == 0)
+      return iterator(this, runtime::NetworkInterface::ID == 0 ? 0 : PrefixNum[runtime::NetworkInterface::ID - 1] );
     else
       return local_end();
   }
-  local_iterator local_end() { return iterator(this, PrefixNum[Runtime::NetworkInterface::ID]); }
+  local_iterator local_end() { return iterator(this, PrefixNum[runtime::NetworkInterface::ID]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquire(N, mflag);

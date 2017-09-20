@@ -40,7 +40,7 @@
 
 
 namespace galois {
-namespace Runtime { 
+namespace runtime { 
 
 template <typename T, typename Cmp>
 class SortedRangeWindowWL: private boost::noncopyable {
@@ -76,7 +76,7 @@ public:
 
     init_sz = count.reduce ();
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           std::sort (m_wl[tid].begin (), m_wl[tid].end (), cmp);
         }
@@ -170,7 +170,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      galois::Runtime::on_each_impl (
+      galois::runtime::on_each_impl (
           [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal ());
 
@@ -300,7 +300,7 @@ public:
     Derived* d = static_cast<Derived*> (this);
     assert(d);
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, d, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
 
           galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
@@ -362,7 +362,7 @@ public:
       Derived* d = static_cast<Derived*> (this);
       assert(d);
 
-      galois::Runtime::on_each_impl (
+      galois::runtime::on_each_impl (
           [this, d, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
             while (!m_wl.get ().empty ()) {
@@ -495,7 +495,7 @@ public:
 
   template <typename R>
   void initfill (const R& range) {
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, range] (const unsigned tid, const unsigned numT) {
           m_wl.getLocal ()->initfill (range.local_begin (), range.local_end ());
         }, "initfill");
@@ -504,7 +504,7 @@ public:
   template <typename WL>
   void poll (WL& workList, const size_t numElems) {
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, &workList, numElems] (const unsigned tid, const unsigned numT) {
           const size_t numPerThrd = numElems / numT;
           m_wl.getLocal ()->poll (workList, numPerThrd);
@@ -527,7 +527,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      galois::Runtime::on_each_impl (
+      galois::runtime::on_each_impl (
           [this, &workList, windowLim] (const unsigned tid, const unsigned numT) {
             m_wl.getLocal ()->partition (workList, *windowLim);
           }, "poll_part_2");
@@ -550,7 +550,7 @@ public:
 };
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

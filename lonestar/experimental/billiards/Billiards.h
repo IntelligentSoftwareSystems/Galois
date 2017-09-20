@@ -199,15 +199,15 @@ private:
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
-    galois::preAlloc ((galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/galois::Runtime::pagePoolSize());
+    galois::preAlloc ((galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/galois::runtime::pagePoolSize());
     galois::reportPageAlloc("MeminfoPre");
 
     galois::StatTimer timer;
 
     timer.start ();
-    galois::Runtime::beginSampling ();
+    galois::runtime::beginSampling ();
     size_t numEvents = static_cast<Derived*> (this)->runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
-    galois::Runtime::endSampling ();
+    galois::runtime::endSampling ();
     timer.stop ();
     galois::reportPageAlloc("MeminfoPost");
 

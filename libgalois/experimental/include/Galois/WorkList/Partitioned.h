@@ -71,7 +71,7 @@ struct Partitioned : private boost::noncopyable {
 private:
   typedef typename Container::template rethread<Concurrent> CTy;
 
-  //Runtime::PerThreadStorage<unsigned> numPops;
+  //runtime::PerThreadStorage<unsigned> numPops;
   std::deque<CTy> items;
   Indexer indexer;
   Substrate::CacheLineStorage<std::atomic_int> current;

@@ -59,7 +59,7 @@ struct Heap { };
 
 template<typename C>
 struct Heap<C, true> {
-  galois::Runtime::FixedSizeHeap heap;
+  galois::runtime::FixedSizeHeap heap;
   Heap(): heap(sizeof(typename C::block_type)) { }
 };
 

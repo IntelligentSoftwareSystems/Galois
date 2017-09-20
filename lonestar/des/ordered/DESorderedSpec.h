@@ -120,7 +120,7 @@ class DESorderedSpec:
 
       size_t stateSize = recvObj->getStateSize ();
 
-      galois::Runtime::FixedSizeHeap heap (stateSize);
+      galois::runtime::FixedSizeHeap heap (stateSize);
       void* const p = heap.allocate (stateSize);
 
       recvObj->copyState (p, stateSize);
@@ -175,8 +175,8 @@ protected:
     Accumulator_ty nevents;
 
     // galois::for_each_ordered (
-    galois::Runtime::for_each_ordered_spec (
-        galois::Runtime::makeStandardRange(
+    galois::runtime::for_each_ordered_spec (
+        galois::runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, nodes),

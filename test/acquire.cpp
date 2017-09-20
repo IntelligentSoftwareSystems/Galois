@@ -5,8 +5,8 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-  galois::Runtime::SimpleRuntimeContext S;
-  galois::Runtime::Lockable L;
+  galois::runtime::SimpleRuntimeContext S;
+  galois::runtime::Lockable L;
 
   int numAcquires = 1;
   if (argc > 1)
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   t.start();
  
   for (int x = 0; x < numAcquires; ++x)
-    galois::Runtime::acquire(&L, galois::MethodFlag::WRITE);
+    galois::runtime::acquire(&L, galois::MethodFlag::WRITE);
   
   t.stop();
   std::cout << "Locking time: " << t.get() << " ms after " << numAcquires << "\n";

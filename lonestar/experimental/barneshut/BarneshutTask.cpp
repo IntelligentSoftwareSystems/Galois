@@ -92,10 +92,10 @@ struct FixThreads: public tbb::task_scheduler_observer {
     observe(true);
   }
   virtual void on_scheduler_entry(bool is_worker) {
-    galois::Runtime::LL::initTID();
-    unsigned id = galois::Runtime::LL::getTID();
-    galois::Runtime::initPTS();
-    galois::Runtime::LL::bindThreadToProcessor(id);
+    galois::runtime::LL::initTID();
+    unsigned id = galois::runtime::LL::getTID();
+    galois::runtime::initPTS();
+    galois::runtime::LL::bindThreadToProcessor(id);
   }
 };
 #else
@@ -205,7 +205,7 @@ struct OctreeInternal: public Octree {
   }
 };
 
-struct Body: public Octree, public galois::Runtime::Lockable {
+struct Body: public Octree, public galois::runtime::Lockable {
   Point vel;
   Point acc;
   Point oldacc;
@@ -926,7 +926,7 @@ struct ComputeForceTree {
       return;
     }
 
-    galois::Runtime::Task::GTask<FinishForceTree>* after = NULL;
+    galois::runtime::Task::GTask<FinishForceTree>* after = NULL;
 
     double new_dsq = dsq * 0.25;
     
@@ -1020,7 +1020,7 @@ struct ComputeForceUnroll {
 
   template<typename PipelineTy>
   void operator()(galois::TaskContext<PipelineTy>& ctx) {
-    galois::Runtime::acquire(body, galois::MethodFlag::WRITE);
+    galois::runtime::acquire(body, galois::MethodFlag::WRITE);
     recurse(ctx, node, dsq, 4);
   }
 };
@@ -1039,7 +1039,7 @@ struct ComputeForceBase {
   template<typename PipelineTy>
   void operator()(galois::TaskContext<PipelineTy>& ctx) {
     Point delta;
-    galois::Runtime::acquire(body, galois::MethodFlag::WRITE);
+    galois::runtime::acquire(body, galois::MethodFlag::WRITE);
     computeDelta(delta, body, node);
 
     double psq = delta.dist2();
@@ -1499,8 +1499,8 @@ struct Refine {
   void operator()(const IterTy& cur, galois::UserContext<IterTy>&) {
     IterTy next = skip(cur, dist);
     if (improvement(cur, next)) {
-      galois::Runtime::acquire((*cur).body, galois::MethodFlag::WRITE);
-      galois::Runtime::acquire((*next).body, galois::MethodFlag::WRITE);
+      galois::runtime::acquire((*cur).body, galois::MethodFlag::WRITE);
+      galois::runtime::acquire((*next).body, galois::MethodFlag::WRITE);
       std::swap(*cur, *next);
     }
   }

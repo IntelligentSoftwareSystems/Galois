@@ -134,7 +134,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    galois::Runtime::acquire(N, mflag);
+    galois::runtime::acquire(N, mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -184,19 +184,19 @@ public:
   }
 
   node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     acquireNode(ni->dst, mflag);
     return ni->get();
   }
 
   GraphNode getEdgeDst(edge_iterator ni) {
-    //galois::Runtime::checkWrite(mflag, false);
+    //galois::runtime::checkWrite(mflag, false);
     //acquireNode(ni->dst, mflag);
     return GraphNode(ni->dst);
   }
@@ -223,7 +223,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (galois::Runtime::shouldLock(mflag)) {
+    if (galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
         acquireNode(ii->dst, mflag);
       }
@@ -235,7 +235,7 @@ public:
     return N->edgeEnd;
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
@@ -249,14 +249,14 @@ public:
   
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
-    // galois::Runtime::checkWrite(MethodFlag::WRITE, true);
+    // galois::runtime::checkWrite(MethodFlag::WRITE, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
     acquireNode(N, MethodFlag::WRITE);
     EdgeHolder*& local_edges = *edgesL.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
       //FIXME: this seems to leak
-      char* newblock = (char*)Runtime::pagePoolAlloc();
+      char* newblock = (char*)runtime::pagePoolAlloc();
       local_edges = (EdgeHolder*)newblock;
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
@@ -268,7 +268,7 @@ public:
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
-      char* eend = newblock + Runtime::pagePoolSize();
+      char* eend = newblock + runtime::pagePoolSize();
       eend -= (uintptr_t)eend % sizeof(EdgeInfo);
       local_edges->end = (EdgeInfo*)eend;
     }
@@ -282,7 +282,7 @@ public:
 
   template<typename... Args>
   edge_iterator addEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
-    // galois::Runtime::checkWrite(mflag, true);
+    // galois::runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst));
     if (it == src->edgeEnd) {
@@ -296,7 +296,7 @@ public:
 
   template<typename... Args>
   edge_iterator addMultiEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
-    // galois::Runtime::checkWrite(mflag, true);
+    // galois::runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = src->edgeEnd;
     it->dst = dst;
@@ -312,7 +312,7 @@ public:
    * Invalidates edge iterator.
    */
   void removeEdge(GraphNode src, edge_iterator dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, true);
+    // galois::runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     src->edgeEnd--;
     assert(src->edgeBegin <= src->edgeEnd);
@@ -321,7 +321,7 @@ public:
   }
   
   edge_iterator findEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
+    // galois::runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }

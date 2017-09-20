@@ -41,7 +41,7 @@ namespace {
 
 class TopoBarrier : public galois::Substrate::Barrier {
   struct treenode {
-    //vpid is galois::Runtime::LL::getTID()
+    //vpid is galois::runtime::LL::getTID()
 
     //package binary tree
     treenode* parentpointer; //null of vpid == 0

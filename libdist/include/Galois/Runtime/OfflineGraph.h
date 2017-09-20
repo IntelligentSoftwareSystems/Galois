@@ -297,7 +297,7 @@ public:
     return outEdges(*ni);
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
+  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
     return detail::make_no_deref_range(edge_begin(N), edge_end(N));
   }
 

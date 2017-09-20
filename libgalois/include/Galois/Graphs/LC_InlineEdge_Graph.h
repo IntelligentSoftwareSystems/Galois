@@ -150,7 +150,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    galois::Runtime::acquire(N, mflag);
+    galois::runtime::acquire(N, mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -202,13 +202,13 @@ public:
   }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     return ni->get();
    }
 
@@ -231,7 +231,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (galois::Runtime::shouldLock(mflag)) {
+    if (galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
         acquireNode(getDst(ii), mflag);
       }
@@ -244,11 +244,11 @@ public:
     return N->edgeEnd();
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
@@ -258,7 +258,7 @@ public:
    */
   template<typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE) {
-    galois::Runtime::acquire(N, mflag);
+    galois::runtime::acquire(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
@@ -267,7 +267,7 @@ public:
    */
   template<typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE) {
-    galois::Runtime::acquire(N, mflag);
+    galois::runtime::acquire(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }
 #endif

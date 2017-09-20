@@ -23,9 +23,9 @@ static cll::opt<bool> useCustomLocking (
 
 struct KruskalRuntime: public Kruskal {
 
-  using VecRep =  galois::LazyDynamicArray<int, galois::Runtime::SerialNumaAllocator<int> >;
-  using Lock = galois::Runtime::Lockable;
-  using VecLock =  galois::LazyDynamicArray<Lock, galois::Runtime::SerialNumaAllocator<Lock> >;
+  using VecRep =  galois::LazyDynamicArray<int, galois::runtime::SerialNumaAllocator<int> >;
+  using Lock = galois::runtime::Lockable;
+  using VecLock =  galois::LazyDynamicArray<Lock, galois::runtime::SerialNumaAllocator<Lock> >;
 
   struct EdgeCtxt: public Edge {
     int repSrc;
@@ -54,8 +54,8 @@ struct KruskalRuntime: public Kruskal {
       
 
       if (e.repSrc != e.repDst) {
-        galois::Runtime::acquire (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
-        galois::Runtime::acquire (&lockVec[e.repDst], galois::MethodFlag::WRITE);
+        galois::runtime::acquire (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
+        galois::runtime::acquire (&lockVec[e.repDst], galois::MethodFlag::WRITE);
       }
 
       findIter += 1;
@@ -77,7 +77,7 @@ struct KruskalRuntime: public Kruskal {
     galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
     galois::do_all_choice (
-        galois::Runtime::makeStandardRange(
+        galois::runtime::makeStandardRange(
           boost::counting_iterator<size_t>(0),
           boost::counting_iterator<size_t>(numNodes)),
         [&lockVec, &repVec] (size_t i) {
@@ -112,7 +112,7 @@ struct KruskalRuntime: public Kruskal {
 
     runningTime.start ();
     orderedLoop (
-        galois::Runtime::makeStandardRange (edge_beg, edge_end),
+        galois::runtime::makeStandardRange (edge_beg, edge_end),
         lockVec,
         repVec,
         mstSum, 

@@ -53,7 +53,7 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-struct Process : public galois::Runtime::Lockable {
+struct Process : public galois::runtime::Lockable {
   Graphp   graph;
 
   typedef int tt_needs_per_iter_alloc;
@@ -74,15 +74,15 @@ struct Process : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Preprocess : public galois::Runtime::Lockable {
+struct Preprocess : public galois::runtime::Lockable {
   Graphp   graph;
   galois::Graph::Bag<GNode>::pointer wl;
 
@@ -96,15 +96,15 @@ struct Preprocess : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph,wl);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph,wl);
   }
 };
 
-struct Verification : public galois::Runtime::Lockable {
+struct Verification : public galois::runtime::Lockable {
   Graphp   graph;
 
   Verification(Graphp g): graph(g) {}
@@ -118,15 +118,15 @@ struct Verification : public galois::Runtime::Lockable {
 
   //serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Prefetch : public galois::Runtime::Lockable {
+struct Prefetch : public galois::runtime::Lockable {
   Graphp   graph;
 
   Prefetch(Graphp g): graph(g) {}
@@ -138,10 +138,10 @@ struct Prefetch : public galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
@@ -151,8 +151,8 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   // check the host id and initialise the network
-  galois::Runtime::NetworkInterface::start();
-  //galois::Runtime::setTrace(false);
+  galois::runtime::NetworkInterface::start();
+  //galois::runtime::setTrace(false);
 
   Graphp graph = Graph::allocate();
   {
@@ -175,21 +175,21 @@ int main(int argc, char** argv) {
   std::cout << "beginning prefetch\n";
   galois::for_each_local(graph, Prefetch(graph), 
       galois::loopname("prefetch"), galois::wl<galois::WorkList::AltChunkedLIFO<32>>());
-  //galois::Runtime::setTrace(true);
+  //galois::runtime::setTrace(true);
   Tprefetch.stop();
 
   galois::StatTimer Tprealloc;
   Tprealloc.start();
   std::cout << "beginning prealloc\n";
   galois::reportPageAlloc("MeminfoPre1");
-  // galois::preAlloc(galois::Runtime::MM::numPageAllocTotal() * 10);
+  // galois::preAlloc(galois::runtime::MM::numPageAllocTotal() * 10);
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t nodeSize = sizeof(**graph->begin());
   auto graphSize = galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
-  galois::preAlloc(5 * galois::getActiveThreads() + nodeSize * 8 * graphSize / galois::Runtime::MM::hugePageSize);
+  galois::preAlloc(5 * galois::getActiveThreads() + nodeSize * 8 * graphSize / galois::runtime::MM::hugePageSize);
   // Relaxed upper bound
-  // galois::preAlloc(15 * numThreads + galois::Runtime::MM::numPageAllocTotal() * 10);
+  // galois::preAlloc(15 * numThreads + galois::runtime::MM::numPageAllocTotal() * 10);
   galois::reportPageAlloc("MeminfoPre2");
   Tprealloc.stop();
 
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
   }
 
   // master_terminate();
-  galois::Runtime::NetworkInterface::terminate();
+  galois::runtime::NetworkInterface::terminate();
 
   return 0;
 }

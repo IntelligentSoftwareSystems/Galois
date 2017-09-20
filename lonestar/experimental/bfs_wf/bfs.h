@@ -85,8 +85,8 @@ struct NodeData {
 
 };
 
-struct NodeDataCacheLine: public galois::Runtime::LL::CacheLineStorage<unsigned> {
-  typedef galois::Runtime::LL::CacheLineStorage<unsigned> Super_ty;
+struct NodeDataCacheLine: public galois::runtime::LL::CacheLineStorage<unsigned> {
+  typedef galois::runtime::LL::CacheLineStorage<unsigned> Super_ty;
 
   NodeDataCacheLine (): Super_ty (0) {}
   NodeDataCacheLine (unsigned _data): Super_ty (_data) {}
@@ -131,7 +131,7 @@ public:
     unsigned numNodes = graph.size ();
     ParCounter numEdges;
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange(graph),
+    galois::do_all_choice (galois::runtime::makeLocalRange(graph),
         [&numEdges,&graph] (GNode n) {
           graph.getData (n, galois::MethodFlag::UNPROTECTED) = ND (BFS_LEVEL_INFINITY);
           numEdges += std::distance (graph.edge_begin (n, galois::MethodFlag::UNPROTECTED),  graph.edge_end (n, galois::MethodFlag::UNPROTECTED));
@@ -186,7 +186,7 @@ public:
     ParCounter numUnreachable;
 
     galois::do_all_choice (
-        galois::Runtime::makeLocalRange(graph),
+        galois::runtime::makeLocalRange(graph),
         [&graph, &numUnreachable, &result, &startNode] (GNode n) {
           const ND srcLevel = graph.getData (n, galois::MethodFlag::UNPROTECTED);
           if (srcLevel >= BFS_LEVEL_INFINITY) { 
@@ -250,15 +250,15 @@ public:
 
 
     // for node based versions
-    // galois::preAlloc (galois::getActiveThreads () + 8*graph.size ()/galois::Runtime::MM::hugePageSize);
+    // galois::preAlloc (galois::getActiveThreads () + 8*graph.size ()/galois::runtime::MM::hugePageSize);
     // // for edge based versions
-    galois::preAlloc ((galois::getActiveThreads () * 10 * graph.sizeEdges ())/galois::Runtime::pagePoolSize());
+    galois::preAlloc ((galois::getActiveThreads () * 10 * graph.sizeEdges ())/galois::runtime::pagePoolSize());
     galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();
-    galois::Runtime::beginSampling ();
+    galois::runtime::beginSampling ();
     size_t numIter = runBFS (graph, startNode);
-    galois::Runtime::endSampling ();
+    galois::runtime::endSampling ();
     timer.stop ();
     galois::reportPageAlloc("MeminfoPost");
 

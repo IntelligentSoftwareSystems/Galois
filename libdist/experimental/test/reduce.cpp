@@ -107,7 +107,7 @@ void check2() {
   }
 
   distWait();
-  //  galois::Runtime::deallocatePerHost(p);
+  //  galois::runtime::deallocatePerHost(p);
   delete &*p;
 }
 

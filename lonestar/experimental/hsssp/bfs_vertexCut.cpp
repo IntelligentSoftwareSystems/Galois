@@ -201,7 +201,7 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     galois::StatManager statManager;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
 
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
         InitializeGraph::go(hg);
       }
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

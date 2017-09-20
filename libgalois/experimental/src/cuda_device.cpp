@@ -3,7 +3,7 @@
 #include <algorithm>
 
 int get_gpu_device_id(std::string personality_set, int num_nodes){
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   unsigned host_id = net.ID;
   unsigned num_hosts = net.Num;
   unsigned num_hosts_per_node = num_hosts / num_nodes;

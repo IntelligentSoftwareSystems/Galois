@@ -161,14 +161,14 @@ struct PageRankMsg {
     sdata.value = sdata.value + oldResidual;
     float delta = oldResidual*alpha/sdata.nout;
     // for each out-going neighbors
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
       GNode dst = g->dst(jj);
       if (dst.isLocal()) {
         LNode& ddata = g->at(dst, lockflag);
         atomicAdd(ddata.residual, delta);
       } else {
-        net.sendAlt(((galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+        net.sendAlt(((galois::runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
       }
     }
   }
@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
       int nodes_check = 0;
       for (auto N = g->begin(); N != g->end(); ++N) {
         ++nodes_check;
-        galois::Runtime::prefetch(*N);
+        galois::runtime::prefetch(*N);
       }
       std::cout<<"Nodes_check = " << nodes_check << "\n";
 
@@ -280,12 +280,12 @@ int main(int argc, char** argv) {
     int nodes_check = 0;
     for (auto N = g->begin(); N != g->end(); ++N) {
       ++nodes_check;
-      galois::Runtime::prefetch(*N);
+      galois::runtime::prefetch(*N);
     }
     std::cout<<"Nodes_check = " << nodes_check << "\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
-    galois::Runtime::getSystemNetworkInterface().terminate();
+    galois::runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
 

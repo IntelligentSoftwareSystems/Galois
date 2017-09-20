@@ -37,7 +37,7 @@ void runDoAll(size_t num) {
 }
 
 void runExplicitThread(size_t num) {
-  galois::Substrate::Barrier& barrier = galois::Runtime::getBarrier(galois::Runtime::activeThreads);
+  galois::Substrate::Barrier& barrier = galois::runtime::getBarrier(galois::runtime::activeThreads);
   
   galois::on_each([&](unsigned tid, unsigned total) {
       auto range = galois::block_range(

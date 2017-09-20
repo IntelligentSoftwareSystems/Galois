@@ -91,7 +91,7 @@ struct DoAllImpl<DO_ALL_OLD> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, 
                          const ArgsTuple& argsTuple) {
-    galois::Runtime::do_all_gen_old(range, func, 
+    galois::runtime::do_all_gen_old(range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<false> ()), argsTuple));
   }
 };
@@ -101,7 +101,7 @@ struct DoAllImpl<DO_ALL_OLD_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go(const R& range, const F& func, 
                         const ArgsTuple& argsTuple) {
-    galois::Runtime::do_all_gen_old (range, func, 
+    galois::runtime::do_all_gen_old (range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<true>()), argsTuple));
   }
 };
@@ -129,7 +129,7 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 
     using WL_ty =  galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
 
-    galois::Runtime::for_each_gen(range, FuncWrap<T, F> {func},
+    galois::runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::tuple_cat(
           std::make_tuple(galois::wl<WL_ty>(), 
              does_not_need_push(),
@@ -142,7 +142,7 @@ template <>
 struct DoAllImpl<DO_ALL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    galois::Runtime::do_all_gen(range, func, argsTuple);
+    galois::runtime::do_all_gen(range, func, argsTuple);
   }
 };
 
@@ -167,7 +167,7 @@ struct DoAllImpl<DO_ALL_RANGE> {
 
     assert(thread_ranges != nullptr);
 
-    galois::Runtime::do_all_gen(Runtime::makeSpecificRange(range.begin(),
+    galois::runtime::do_all_gen(runtime::makeSpecificRange(range.begin(),
                                     range.end(), thread_ranges),
                                     func, argsTuple);
   }
@@ -239,8 +239,8 @@ struct DoAllImpl<DOALL_RANGE> {
       get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
     assert(thread_ranges != nullptr);
 
-    galois::Runtime::do_all_gen(
-      Runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
+    galois::runtime::do_all_gen(
+      runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
       func, 
       std::tuple_cat(std::make_tuple(do_all_steal<false>()), argsTuple)
     );

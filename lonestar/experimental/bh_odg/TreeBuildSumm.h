@@ -98,7 +98,7 @@ struct DestroyTree {
     galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
 
     t_destroy.start ();
-    galois::Runtime::for_each_ordered_tree (
+    galois::runtime::for_each_ordered_tree (
         root,
         TopDown (),
         BottomUp {treeAlloc},
@@ -374,7 +374,7 @@ private:
 #ifdef HAVE_CILK
 struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
   TreeSummarizeCilk() {
-    if (!galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+    if (!galois::runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
       GALOIS_DIE("set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD");
     }
   }
@@ -567,13 +567,13 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
     galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    galois::Runtime::beginSampling ();
+    galois::runtime::beginSampling ();
     t_feach.start ();
 
-    // galois::for_each_wl<galois::Runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
+    // galois::for_each_wl<galois::runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
     galois::for_each(it, it, SummarizeOp (odgNodes), galois::loopname("tree_summ"), galois::wl<WL>(&wl));
     t_feach.stop ();
-    galois::Runtime::endSampling ();
+    galois::runtime::endSampling ();
 
   }
 
@@ -651,15 +651,15 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 
     galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    galois::Runtime::beginSampling ();
+    galois::runtime::beginSampling ();
     t_feach.start ();
     for (unsigned i = levelWL.size (); i > 0;) {
       
       --i; // size - 1
 
       if (!levelWL[i].empty ()) {
-        galois::Runtime::do_all_coupled (
-            galois::Runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
+        galois::runtime::do_all_coupled (
+            galois::runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
             SummarizeOp (), 
             std::make_tuple (
               galois::loopname("level-hand"), 
@@ -678,7 +678,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 
     }
     t_feach.stop ();
-    galois::Runtime::endSampling ();
+    galois::runtime::endSampling ();
 
     std::cout << "TreeSummarizeLevelByLevel: iterations = " << iter << std::endl;
 
@@ -698,7 +698,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
     static const unsigned CHUNK_SIZE = 32;
 
     void acquire (TreeNode* n, galois::MethodFlag f) {
-      galois::Runtime::acquire (n, f);
+      galois::runtime::acquire (n, f);
     }
 
     template <typename C>
@@ -746,8 +746,8 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    // galois::Runtime::for_each_ordered_spec (
-        // galois::Runtime::makeLocalRange (internalNodes),
+    // galois::runtime::for_each_ordered_spec (
+        // galois::runtime::makeLocalRange (internalNodes),
         // LevelComparator<TreeNode> (), 
         // VisitNhood (), 
         // OpFunc<true> (),
@@ -766,8 +766,8 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    galois::Runtime::for_each_ordered_ikdg (
-        galois::Runtime::makeLocalRange (internalNodes),
+    galois::runtime::for_each_ordered_ikdg (
+        galois::runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), 
         Base::VisitNhood (), 
         Base::OpFunc<false> (),
@@ -783,11 +783,11 @@ struct TreeSummarizeDataDAG: public TreeSummarizeTwoPhase {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    galois::Runtime::for_each_ordered_dag (
-        galois::Runtime::makeLocalRange (internalNodes), 
+    galois::runtime::for_each_ordered_dag (
+        galois::runtime::makeLocalRange (internalNodes), 
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
-    // galois::Runtime::for_each_ordered_dag_alt (
-        // galois::Runtime::makeLocalRange (internalNodes), 
+    // galois::runtime::for_each_ordered_dag_alt (
+        // galois::runtime::makeLocalRange (internalNodes), 
         // LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
 
   }
@@ -826,8 +826,8 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
     galois::StatTimer tt;
     tt.start();
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeLocalRange (internalNodes),
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeLocalRange (internalNodes),
         GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
     tt.stop();
 
@@ -1180,7 +1180,7 @@ namespace recursive {
     template <typename WorkItem, typename TreeAlloc, typename Partitioner>
     void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
 
-      galois::Runtime::for_each_ordered_tree (
+      galois::runtime::for_each_ordered_tree (
           initial,
           GaloisBuild<WorkItem, TreeAlloc, Partitioner> {treeAlloc, partitioner},
           GaloisSummarize<WorkItem> (),
@@ -1191,7 +1191,7 @@ namespace recursive {
 
     template <typename B>
     void operator () (OctreeInternal<B>* root) {
-      galois::Runtime::for_each_ordered_tree (
+      galois::runtime::for_each_ordered_tree (
           root,
           GaloisPassTopDown<B> (),
           &summarizeNode<B>,
@@ -1260,12 +1260,12 @@ struct BuildLockFreeSummarizeRecursive {
 
     galois::StatTimer t_summ ("Time taken by tree summarization: ");
 
-    galois::Runtime::beginSampling();
+    galois::runtime::beginSampling();
     t_summ.start ();
     recursive::ChooseExecutor<EXEC_TYPE> f;
     f (root);
     t_summ.stop ();
-    galois::Runtime::endSampling();
+    galois::runtime::endSampling();
 
     return root;
   }

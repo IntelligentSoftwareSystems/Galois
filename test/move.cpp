@@ -43,7 +43,7 @@ void testContainerA(T&& x, U&& y) {
 
 template<typename T, typename U>
 void testContainerAA(T&& x, U&& y) {
-  galois::Runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
+  galois::runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
 
   T a = std::move(x);
   T b;

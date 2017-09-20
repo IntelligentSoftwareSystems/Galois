@@ -64,7 +64,7 @@ class MemScalGraph : private boost::noncopyable {
     bool operator()(const T2& ii) const { return !ii.first();}
   };
 
-  struct gNode: public galois::Runtime::Lockable {
+  struct gNode: public galois::runtime::Lockable {
     //! The storage type for an edge
     typedef GraphImpl::EdgeItem<gNode, EdgeTy, Directional> EITy;
 
@@ -156,14 +156,14 @@ private:
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    // galois::Runtime::checkWrite(mflag, true);
-    galois::Runtime::acquire(src, mflag);
+    // galois::runtime::checkWrite(mflag, true);
+    galois::runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
       if (Directional) {
 	ii = src->createEdgeWithReuse(dst, 0, std::forward<Args>(args)...);
       } else {
-	galois::Runtime::acquire(dst, mflag);
+	galois::runtime::acquire(dst, mflag);
 	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdgeWithReuse(src, e, std::forward<Args>(args)...);
 	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
@@ -177,14 +177,14 @@ private:
   edge_iterator createEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    // galois::Runtime::checkWrite(mflag, true);
-    galois::Runtime::acquire(src, mflag);
+    // galois::runtime::checkWrite(mflag, true);
+    galois::runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
       if (Directional) {
 	ii = src->createEdge(dst, 0, std::forward<Args>(args)...);
       } else {
-	galois::Runtime::acquire(dst, mflag);
+	galois::runtime::acquire(dst, mflag);
 	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdge(src, e, std::forward<Args>(args)...);
 	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
@@ -208,22 +208,22 @@ public:
    * Adds a node to the graph.
    */
   void addNode(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) {
-    // galois::Runtime::checkWrite(mflag, true);
-    galois::Runtime::acquire(n, mflag);
+    // galois::runtime::checkWrite(mflag, true);
+    galois::runtime::acquire(n, mflag);
   }
 
   //! Gets the node data for a node.
   NodeTy& getData(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
-    // galois::Runtime::checkWrite(mflag, false);
-    galois::Runtime::acquire(n, mflag);
+    // galois::runtime::checkWrite(mflag, false);
+    galois::runtime::acquire(n, mflag);
     return n->data;
   }
 
   //! Checks if a node is in the graph
   bool containsNode(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
-    galois::Runtime::acquire(n, mflag);
+    galois::runtime::acquire(n, mflag);
   }
 
 
@@ -250,7 +250,7 @@ public:
   edge_iterator findEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
-    galois::Runtime::acquire(src, mflag);
+    galois::runtime::acquire(src, mflag);
     /*return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());*/
     return src->find(dst);
   }
@@ -264,8 +264,8 @@ public:
    */
   edge_data_reference getEdgeData(edge_iterator ii, galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
 
-    // galois::Runtime::checkWrite(mflag, false);
-    galois::Runtime::acquire(ii->first(), mflag);
+    // galois::runtime::checkWrite(mflag, false);
+    galois::runtime::acquire(ii->first(), mflag);
     return *ii->second();
   }
 
@@ -280,12 +280,12 @@ public:
   //! Returns an iterator to the neighbors of a node
   edge_iterator edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
-    galois::Runtime::acquire(N, mflag);
+    galois::runtime::acquire(N, mflag);
 
-    if (galois::Runtime::shouldLock(mflag)) {
+    if (galois::runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 
-	  galois::Runtime::acquire(ii->first(), mflag);
+	  galois::runtime::acquire(ii->first(), mflag);
       }
     }
     return N->begin();

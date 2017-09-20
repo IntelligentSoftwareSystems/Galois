@@ -31,7 +31,7 @@ struct AuxData {
 
   void initialize() {
     updateMargins();
-    galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
+    galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     executor.execute(
         graph.begin(), graph.begin() + numItems,
         graph.begin() + numItems, graph.end(),
@@ -52,7 +52,7 @@ struct AuxData {
     galois::Timer elapsed;
 
     elapsed.start();
-    galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
+    galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     double norm1 = 1.0 / (graph.size() - numItems);
     double norm2 = 1.0 / (numItems);
     executor.executeDense(
@@ -99,9 +99,9 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   AuxData<Graph>& auxData;
   std::ostream& out;
 
-  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor;
+  galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor;
   boost::asio::streambuf request;
-  galois::Runtime::PerThreadStorage<std::stringstream> response;
+  galois::runtime::PerThreadStorage<std::stringstream> response;
   std::stringstream sumResponse;
     
   std::string kind;

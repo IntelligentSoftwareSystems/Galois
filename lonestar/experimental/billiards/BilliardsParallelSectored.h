@@ -94,7 +94,7 @@ struct ThreadLocalTest {
     Bag_ty localSafeEvents;
 
     // TODO: try do-all with fine grained work items. 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [&] (const unsigned tid, const unsigned numT) {
 
           DepTestUtils::selfTestRange (crange.begin_local (), crange.end_local (), cmp, localSafeEvents);
@@ -103,7 +103,7 @@ struct ThreadLocalTest {
         , "thread-local-safety-test");
 
 
-    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (localSafeEvents), cmp, "thread-local-round-2");
+    DepTestUtils::testOnRange (galois::runtime::makeLocalRange (localSafeEvents), cmp, "thread-local-round-2");
 
   }
 };
@@ -134,7 +134,7 @@ struct SectorLocalTest {
         "bin-by-sector",
         galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    auto secRange = galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+    auto secRange = galois::runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
         boost::counting_iterator<size_t> (numSectors));
 
     Bag_ty perSectorSafeEvents;
@@ -151,7 +151,7 @@ struct SectorLocalTest {
         galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
 
-    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
+    DepTestUtils::testOnRange (galois::runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
 
 
   }
@@ -185,7 +185,7 @@ struct SectorLocalThreadLocalTest {
         "bin-by-sector",
         galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    auto secRange = galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+    auto secRange = galois::runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
         boost::counting_iterator<size_t> (numSectors));
 
     
@@ -202,7 +202,7 @@ struct SectorLocalThreadLocalTest {
     }
 
 
-    galois::do_all_choice (galois::Runtime::makeStandardRange (thrdSecPairs.begin (), thrdSecPairs.end ()),
+    galois::do_all_choice (galois::runtime::makeStandardRange (thrdSecPairs.begin (), thrdSecPairs.end ()),
         [&] (const ThrdSecPair& p) {
           const size_t secID = p.first;
           const size_t tid = p.second;
@@ -233,7 +233,7 @@ struct SectorLocalThreadLocalTest {
         "per-sector-test",
         galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
+    DepTestUtils::testOnRange (galois::runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
 
   }
 

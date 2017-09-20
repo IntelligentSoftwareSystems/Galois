@@ -189,7 +189,7 @@ static void end(bool mainThread) {
     GALOIS_DIE(PAPI_strerror(rv));
 
   for (unsigned i = 0; i < sizeof(papiNames)/sizeof(*papiNames); ++i)
-    galois::Runtime::reportStat_Tsum("PAPI-Prof", papiNames[i], papiResults[i]);
+    galois::runtime::reportStat_Tsum("PAPI-Prof", papiNames[i], papiResults[i]);
 
 }
 
@@ -201,22 +201,22 @@ static void end(bool) {}
 }
 #endif
 
-void galois::Runtime::beginThreadSampling() {
+void galois::runtime::beginThreadSampling() {
   papi::begin(false);
 }
 
-void galois::Runtime::endThreadSampling() {
+void galois::runtime::endThreadSampling() {
   papi::end(false);
 }
 
-void galois::Runtime::beginSampling() {
+void galois::runtime::beginSampling() {
   beginPeriod();
   papi::begin(true);
   vtune::begin();
   hpctoolkit::begin();
 }
 
-void galois::Runtime::endSampling() {
+void galois::runtime::endSampling() {
   hpctoolkit::end();
   vtune::end();
   papi::end(true);

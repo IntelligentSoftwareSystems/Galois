@@ -30,7 +30,7 @@
 #define GALOIS_RUNTIME_DET_PARTITIONERS_H
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template <typename G, typename M>
 struct GreedyPartitioner {
@@ -366,7 +366,7 @@ struct BFSpartitioner {
   void filterUnpartitioned (const R& range, W& unpartitioned) {
 
     assert (unpartitioned.empty_all ());
-    galois::Runtime::do_all_coupled (range,
+    galois::runtime::do_all_coupled (range,
         [this, &unpartitioned] (GNode n) {
           auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
           if (nd.partition == -1) {
@@ -517,7 +517,7 @@ struct CyclicPartitioner: public GreedyPartitioner<G, M> {
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

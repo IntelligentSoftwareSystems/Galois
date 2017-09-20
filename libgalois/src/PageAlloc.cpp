@@ -137,7 +137,7 @@ class PageSizeConf {
         galois::Substrate::gWarn("error parsing meminfo");
       break;
     }
-    if (hugePageSizeKb * 1024 != galois::Runtime::hugePageSize)
+    if (hugePageSizeKb * 1024 != galois::runtime::hugePageSize)
       galois::Substrate::gWarn("System HugePageSize does not match compiled HugePageSize");
   }
 #else
@@ -147,9 +147,9 @@ class PageSizeConf {
 public:
   PageSizeConf() {
 #ifdef _POSIX_PAGESIZE
-    galois::Runtime::pageSize = _POSIX_PAGESIZE;
+    galois::runtime::pageSize = _POSIX_PAGESIZE;
 #else
-    galois::Runtime::pageSize = sysconf(_SC_PAGESIZE);
+    galois::runtime::pageSize = sysconf(_SC_PAGESIZE);
 #endif
     checkHuge();
   }

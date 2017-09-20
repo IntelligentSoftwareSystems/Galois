@@ -85,10 +85,10 @@ typedef struct Node
 	return (ID < other.ID);
     }
 typedef int tt_has_serialize;
-    void serialize(galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::runtime::SerializeBuffer& s) const {
 	gSerialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
     }
-    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::runtime::DeSerializeBuffer& s) {
 	gDeserialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
     } 
 
@@ -136,7 +136,7 @@ volatile unsigned prog_barrier = 0;
 unsigned int num_movie_nodes = 0;
 
 using namespace galois::Runtime;
-typedef galois::Runtime::LL::SimpleLock<true> SLock;
+typedef galois::runtime::LL::SimpleLock<true> SLock;
 SLock slock;
 SLock pblock;
 
@@ -287,7 +287,7 @@ unsigned count_done=0;
 struct sgd_algo {
    //unsigned int num_movie_nodes;
 
-struct Process : public galois::Runtime::Lockable {
+struct Process : public galois::runtime::Lockable {
     Graphp g;
     sgd_algo* self;
     Process(){ }
@@ -322,10 +322,10 @@ struct Process : public galois::Runtime::Lockable {
 
 
 typedef int tt_has_serialize;
-void serialize(galois::Runtime::SerializeBuffer& s) const {
+void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
 }
-void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
 } 
 
@@ -545,7 +545,7 @@ int main(int argc, char** argv)
 //	std::cout << "num_movie_nodes = " << num_movie_nodes <<"\n";
 //	cout<<"Number of ratings = "<<NUM_RATINGS<<endl;	
 	galois::StatManager statManager;
-	galois::Runtime::networkStart();
+	galois::runtime::networkStart();
 	
 	Graphp dgraph = DGraph::allocate();
 
@@ -573,7 +573,7 @@ int main(int argc, char** argv)
 	verify(dgraph);
 	T2.stop();
 	printf("NUMBER OF MOVIE NODES = %d\n", num_movie_nodes);
-	galois::Runtime::networkTerminate();
+	galois::runtime::networkTerminate();
 	return 0;
 
 }

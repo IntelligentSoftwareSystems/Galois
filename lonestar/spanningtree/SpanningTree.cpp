@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 
-  //galois::preAlloc(numThreads + graph.size() / galois::Runtime::MM::hugePageSize * 60);
+  //galois::preAlloc(numThreads + graph.size() / galois::runtime::MM::hugePageSize * 60);
   galois::reportPageAlloc("MeminfoPre");
   switch (algo) {
     case demo: run<DemoAlgo>(); break;

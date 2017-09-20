@@ -44,7 +44,7 @@
 #include <tuple>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template <typename FunctionTy, typename ArgsTy> 
 void on_each_impl(const FunctionTy& fn, const ArgsTy& argsTuple) {
@@ -90,7 +90,7 @@ void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
   timer.stop();
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

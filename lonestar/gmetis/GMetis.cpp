@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
   //printGraphBeg(*graph);
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::preAlloc(galois::Runtime::numPagePoolAllocTotal() * 5);
+  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   Partition(&metisGraph, numPartitions);
   galois::reportPageAlloc("MeminfoPost");
 

@@ -192,7 +192,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
 
-      auto activeThreads = galois::Runtime::activeThreads;
+      auto activeThreads = galois::runtime::activeThreads;
       galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
       galois::Timer timer;

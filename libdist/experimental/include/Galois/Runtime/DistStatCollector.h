@@ -37,7 +37,7 @@
 #include "Galois/Runtime/Network.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 
 class DistStatCollector: public StatCollector {
@@ -59,7 +59,7 @@ private:
 
 };
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H

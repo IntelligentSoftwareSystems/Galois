@@ -70,7 +70,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if((net.ID == 0) && (src == src_node)){
       sdata.dist_current = 0;
     }
@@ -115,7 +115,7 @@ galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
 
     T_total.start();
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "SSSP::go run2 called  on " << net.ID << "\n";
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "SSSP::go run3 called  on " << net.ID << "\n";
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

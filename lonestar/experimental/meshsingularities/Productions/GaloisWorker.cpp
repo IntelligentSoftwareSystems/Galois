@@ -14,7 +14,7 @@
 
 #include "Node.h"
 
-//galois::Runtime::LL::SimpleLock<true> foo;
+//galois::runtime::LL::SimpleLock<true> foo;
 
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)

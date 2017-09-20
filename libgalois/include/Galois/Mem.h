@@ -35,21 +35,21 @@ namespace galois {
 
 //! [PerIterAllocTy example]
 //! Base allocator for per-iteration allocator
-typedef galois::Runtime::BumpWithMallocHeap<galois::Runtime::FreeListHeap<galois::Runtime::SystemHeap> > IterAllocBaseTy;
+typedef galois::runtime::BumpWithMallocHeap<galois::runtime::FreeListHeap<galois::runtime::SystemHeap> > IterAllocBaseTy;
 
 //! Per-iteration allocator that conforms to STL allocator interface
-typedef galois::Runtime::ExternalHeapAllocator<char, IterAllocBaseTy> PerIterAllocTy;
+typedef galois::runtime::ExternalHeapAllocator<char, IterAllocBaseTy> PerIterAllocTy;
 //! [PerIterAllocTy example]
 
 //! Scalable fixed-sized allocator for T that conforms to STL allocator interface but
 //! does not support variable sized allocations
 template<typename Ty>
-using FixedSizeAllocator = galois::Runtime::FixedSizeAllocator<Ty>;
+using FixedSizeAllocator = galois::runtime::FixedSizeAllocator<Ty>;
 
 //! Scalable variable-sized allocator for T that allocates blocks of sizes in powers of 2
 //! Useful for small and medium sized allocations, e.g. small or medium vectors, strings, deques
 template<typename T>
-using Pow_2_VarSizeAlloc = typename Runtime::Pow_2_BlockAllocator<T>; 
+using Pow_2_VarSizeAlloc = typename runtime::Pow_2_BlockAllocator<T>; 
 
 }
 #endif

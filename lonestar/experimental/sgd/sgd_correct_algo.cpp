@@ -103,7 +103,7 @@ volatile unsigned prog_barrier = 0;
 unsigned int num_movie_nodes = 0;
 
 using namespace galois::Runtime;
-typedef galois::Runtime::LL::SimpleLock<true> SLock;
+typedef galois::runtime::LL::SimpleLock<true> SLock;
 SLock slock;
 SLock pblock;
 
@@ -271,7 +271,7 @@ struct shared_sgd_algo {
    galois::GAccumulator<size_t> numNodes; 
    //unsigned int num_movie_nodes;
 
-struct Process : public galois::Runtime::Lockable {
+struct Process : public galois::runtime::Lockable {
     shared_sgd_algo* self;
     Process(){ }
     // sgd(Graphp _g) : g(_g) {}
@@ -389,7 +389,7 @@ struct sgd_algo {
    galois::GAccumulator<size_t> numNodes; 
    //unsigned int num_movie_nodes;
 
-struct Process : public galois::Runtime::Lockable {
+struct Process : public galois::runtime::Lockable {
     Graphp g;
     sgd_algo* self;
     Process(){ }
@@ -456,10 +456,10 @@ struct Process : public galois::Runtime::Lockable {
 
 
 typedef int tt_has_serialize;
-void serialize(galois::Runtime::SerializeBuffer& s) const {
+void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
 }
-void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
 } 
 
@@ -777,7 +777,7 @@ void readGraph(Graphp dgraph, std::string inputFile) {
 int main(int argc, char** argv)
 {	
 	galois::StatManager statManager;
-	galois::Runtime::networkStart();
+	galois::runtime::networkStart();
 	
 	if(argc < 3)
 	{
@@ -876,7 +876,7 @@ int main(int argc, char** argv)
 
 */
 	printf("Reached here, before terminate..\n");
-	galois::Runtime::networkTerminate();
+	galois::runtime::networkTerminate();
 	printf("Reached here, after terminate..\n");
 	return 0;
 }

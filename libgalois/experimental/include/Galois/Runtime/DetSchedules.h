@@ -38,7 +38,7 @@
 
 namespace galois {
 
-namespace Runtime {
+namespace runtime {
 
 enum DetExecType {
   non_det,
@@ -74,16 +74,16 @@ void for_each_det_choice (const R& range, const F& func, const char* loopname, c
       {
         const unsigned CHUNK_SIZE = 32;
         typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, typename R::value_type> WL_ty;
-        galois::Runtime::for_each_impl<WL_ty> (range, func, loopname);
+        galois::runtime::for_each_impl<WL_ty> (range, func, loopname);
         break;
       }
 
     case det_i:
-      galois::Runtime::for_each_det_impl (range, func, loopname);
+      galois::runtime::for_each_det_impl (range, func, loopname);
       break;
 
     case det_ar:
-      galois::Runtime::for_each_det_impl (range, func, loopname);
+      galois::runtime::for_each_det_impl (range, func, loopname);
       break;
 
     default:
@@ -98,7 +98,7 @@ void for_each_det_choice (const R&  range, const C& cmp, const N& nhoodVisitor, 
 
   switch (detExec) {
     case kdg_i: 
-      galois::Runtime::for_each_ordered_2p_win (range, cmp, nhoodVisitor, func, loopname);
+      galois::runtime::for_each_ordered_2p_win (range, cmp, nhoodVisitor, func, loopname);
       break;
 
     case kdg_ar:
@@ -118,15 +118,15 @@ void for_each_det_choice (const R& range, const F& func, G& graph, const char* l
 
   switch (detExec) {
     case chromatic:
-      galois::Runtime::for_each_det_chromatic (range, func, graph, loopname);
+      galois::runtime::for_each_det_chromatic (range, func, graph, loopname);
       break;
 
     case edge_flip:
-      galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, loopname);
+      galois::runtime::for_each_det_edge_flip_ar (range, func, graph, loopname);
       break;
 
     case topo:
-      galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, loopname);
+      galois::runtime::for_each_det_edge_flip_topo (range, func, graph, loopname);
       break;
 
     default:
@@ -140,15 +140,15 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
 
   switch (detExec) {
     case chromatic:
-      galois::Runtime::for_each_det_chromatic (range, func, graph, dagManager, loopname);
+      galois::runtime::for_each_det_chromatic (range, func, graph, dagManager, loopname);
       break;
 
     case edge_flip:
-      galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
+      galois::runtime::for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
       break;
 
     case topo:
-      galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
+      galois::runtime::for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
       break;
 
     default:
@@ -163,9 +163,9 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
 template <typename T, typename G, typename M, typename F, typename N, typename C> 
 struct ReuseableExecutorWrapper {
 
-  typedef galois::Runtime::ChromaticReuseExecutor<G, M, F> Chrom;
-  typedef galois::Runtime::InputGraphDAGreuseExecutor<G, M, F> InputDAG;
-  typedef galois::Runtime::DAGexecutorRW<T, C, F, N> TaskDAG;
+  typedef galois::runtime::ChromaticReuseExecutor<G, M, F> Chrom;
+  typedef galois::runtime::InputGraphDAGreuseExecutor<G, M, F> InputDAG;
+  typedef galois::runtime::DAGexecutorRW<T, C, F, N> TaskDAG;
 
 
   DetExecType detExec;
@@ -278,7 +278,7 @@ ReuseableExecutorWrapper<typename R::value_type, G, M, F, N, C>* make_reusable_d
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 
 
 } // end namespace galois

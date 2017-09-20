@@ -9,7 +9,7 @@ using namespace galois::Runtime;
 
 int main() {
 
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
 
   std::vector<std::vector<std::pair<uint64_t, uint64_t>>> assigned_edges_perhost;
   std::vector<std::vector<uint64_t>> assigned_edges_perhost_linear;
@@ -36,11 +36,11 @@ int main() {
   for (unsigned x = 0; x < net.Num; ++x) {
     if(x == net.ID) continue;
 
-    galois::Runtime::SendBuffer b;
+    galois::runtime::SendBuffer b;
     std::cerr << "[" << net.ID<<"]" << " serialize start : " << x << "\n";
     gSerialize(b, assigned_edges_perhost_linear[x]);
     std::cerr << "[" << net.ID<<"]" << " serialize done : " << x << "\n";
-    net.sendTagged(x, galois::Runtime::evilPhase, b);
+    net.sendTagged(x, galois::runtime::evilPhase, b);
     assigned_edges_perhost_linear[x].clear();
     std::stringstream ss;
     ss <<" sending from : " <<  net.ID << " to : " << x << " Size should b4 ZERO : " << assigned_edges_perhost_linear[x].size()<< "\n";
@@ -51,18 +51,18 @@ int main() {
   for (unsigned x = 0; x < net.Num; ++x) {
     if(x == net.ID) continue;
 
-    decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
+    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
     do {
       net.handleReceives();
-      p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
+      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
     } while(!p);
 
-    galois::Runtime::gDeserialize(p->second, assigned_edges_perhost_linear[p->first]);
+    galois::runtime::gDeserialize(p->second, assigned_edges_perhost_linear[p->first]);
     std::stringstream ss;
     ss <<" received on : " <<  net.ID << " from : " << x << " Size : " << assigned_edges_perhost_linear[p->first].size()<< "\n";
     std::cout << ss.str();
   }
-  ++galois::Runtime::evilPhase;
+  ++galois::runtime::evilPhase;
 
 }
 

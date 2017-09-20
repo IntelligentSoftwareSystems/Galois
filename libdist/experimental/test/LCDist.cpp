@@ -18,7 +18,7 @@ struct AddSelfLoop {
 
   template<typename T, typename Context>
   void operator()(const T& n, const Context&) {
-    galois::Runtime::acquire(n, galois::MethodFlag::ALL);
+    galois::runtime::acquire(n, galois::MethodFlag::ALL);
     graph->addEdge(n, n, graph->at(n).first);
   }
 };
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
     N = atoi(argv[2]);
   
   galois::setActiveThreads(threads);
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   net.start();
 
   testSerialAdd(N);

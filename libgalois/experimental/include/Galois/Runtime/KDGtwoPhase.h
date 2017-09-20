@@ -66,7 +66,7 @@
 
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 
 namespace {
@@ -410,7 +410,7 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
   for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif //  GALOIS_RUNTIME_KDG_TWO_PHASE_H

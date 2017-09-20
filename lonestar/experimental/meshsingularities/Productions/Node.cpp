@@ -22,12 +22,12 @@ void Node::execute()
 
 	//gettimeofday(&t1, NULL);
 
-	//int tid = galois::Runtime::LL::getTID();
+	//int tid = galois::runtime::LL::getTID();
 
 	//gettimeofday(&t2, NULL);
 
 	//printf("Production: %d executed on [%d / %d] in: %f [s]\n",
-	//		productionToExecute, tid, galois::Runtime::LL::getPackageForSelf(tid),
+	//		productionToExecute, tid, galois::runtime::LL::getPackageForSelf(tid),
 	//		((t2.tv_sec-t1.tv_sec) * 1e6 + (t2.tv_usec-t1.tv_usec))/1e6
 	//		);
 

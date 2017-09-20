@@ -33,7 +33,7 @@
 #include <set>
 #include <iostream>
 
-class Verifier : public galois::Runtime::Lockable {
+class Verifier : public galois::runtime::Lockable {
   struct inconsistent: public std::unary_function<GNode,bool> {
     Graphp graph;
     inconsistent() { }
@@ -61,15 +61,15 @@ class Verifier : public galois::Runtime::Lockable {
     }
     // // serialization functions
     // typedef int tt_has_serialize;
-    // void serialize(galois::Runtime::SerializeBuffer& s) const {
+    // void serialize(galois::runtime::SerializeBuffer& s) const {
     //   gSerialize(s,graph);
     // }
-    // void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+    // void deserialize(galois::runtime::DeSerializeBuffer& s) {
     //   gDeserialize(s,graph);
     // }
   };
 
-  struct not_delaunay: public std::unary_function<GNode,bool>, public galois::Runtime::Lockable {
+  struct not_delaunay: public std::unary_function<GNode,bool>, public galois::runtime::Lockable {
     Graphp graph;
     not_delaunay() { }
     not_delaunay(Graphp g): graph(g) { }
@@ -125,10 +125,10 @@ class Verifier : public galois::Runtime::Lockable {
     }
     // serialization functions
     typedef int tt_has_serialize;
-    void serialize(galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::runtime::SerializeBuffer& s) const {
       gSerialize(s,graph);
     }
-    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::runtime::DeSerializeBuffer& s) {
       gDeserialize(s,graph);
     }
   };

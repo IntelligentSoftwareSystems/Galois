@@ -41,7 +41,7 @@
 #include <cstdlib>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 enum ConflictFlag {
   CONFLICT = -1,

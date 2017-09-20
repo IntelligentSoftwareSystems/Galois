@@ -140,7 +140,7 @@ struct SSSP {
     typedef dChunkedFIFO<64> dChunk;
 
     //XXX: Need a better way to fix this!!
-    if(galois::Runtime::getSystemNetworkInterface().ID == 0)
+    if(galois::runtime::getSystemNetworkInterface().ID == 0)
       _graph.getData(src_node).dist_current = 0;
     else
       _graph.getData(src_node).dist_current = std::numeric_limits<int>::max()/4;
@@ -151,7 +151,7 @@ struct SSSP {
   void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {
     //GNode src = item.first;
     NodeData& snode = graph->getData(src);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     auto& sdist = snode.dist_current;
 
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
@@ -174,7 +174,7 @@ struct SSSP {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
     T_total.start();

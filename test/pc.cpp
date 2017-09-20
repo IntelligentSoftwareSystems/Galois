@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
   unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
 
   while (M) {
-    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
 
     testf<int>("int");

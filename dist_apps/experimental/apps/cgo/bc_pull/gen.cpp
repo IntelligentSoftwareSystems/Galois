@@ -1119,9 +1119,9 @@ int main(int argc, char** argv) {
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
       #if __OPT_VERSION__ == 1
       printf("Version 1 of optimization\n");
@@ -1188,7 +1188,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     // shared DG accumulator among all steps
     galois::DGAccumulator<uint32_t> dga;
@@ -1220,7 +1220,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run + 1);
       #if __OPT_VERSION__ >= 3
       // TODO GPU code
@@ -1258,7 +1258,7 @@ int main(int argc, char** argv) {
         #endif
 
         InitializeGraph::go((*h_graph));
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
       }
     }
 
@@ -1272,13 +1272,13 @@ int main(int argc, char** argv) {
             // outputs betweenness centrality
             sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     (*h_graph).getData(*ii).betweeness_centrality);
-            galois::Runtime::printOutput(v_out);
+            galois::runtime::printOutput(v_out);
           }
         }
       free(v_out);
     }
     }
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

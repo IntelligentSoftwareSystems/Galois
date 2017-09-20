@@ -55,7 +55,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
   typedef boost::intrusive::list<rmessage> msgListTy;
 
   struct dataBuffer {
-    galois::Runtime::LL::SimpleLock lock;
+    galois::runtime::LL::SimpleLock lock;
     msgListTy pending;
     unsigned bytes;
     std::atomic<int> urgent;
@@ -285,7 +285,7 @@ public:
 } //namespace ""
 
 #ifdef USE_ROUTED_MPI
-NetworkInterface& galois::Runtime::getSystemNetworkInterface() {
+NetworkInterface& galois::runtime::getSystemNetworkInterface() {
   static NetworkInterfaceRouted<NetworkIOMPI> net;
   net.go();
   //FIXME: Hack, run the router

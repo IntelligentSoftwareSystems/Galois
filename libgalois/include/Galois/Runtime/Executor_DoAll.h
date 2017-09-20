@@ -48,7 +48,7 @@
 
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace details {
 
@@ -574,7 +574,7 @@ public:
     assert (!ctx.hasWork ());
 
     if (NEEDS_STATS) {
-      galois::Runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
+      galois::runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
     }
   }
 
@@ -604,7 +604,7 @@ template <> struct ChooseDoAllImpl<false> {
   template <typename R, typename F, typename ArgsT>
   static void call(const R& range, const F& func, const ArgsT& argsTuple) {
 
-    Runtime::on_each_impl([&] (const unsigned tid, const unsigned numT) {
+    runtime::on_each_impl([&] (const unsigned tid, const unsigned numT) {
 
         static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsT>::value;
         static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsT>::value;
@@ -638,7 +638,7 @@ template <> struct ChooseDoAllImpl<false> {
         totalTime.stop();
 
         if (NEEDS_STATS) {
-          galois::Runtime::reportStat_Tsum(loopname, "Iterations", iter);
+          galois::runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 
     }, std::make_tuple(no_stats(), loopname("DoAll-no-steal")));
@@ -677,7 +677,7 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 }
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif //  GALOIS_RUNTIME_DO_ALL_COUPLED_H_

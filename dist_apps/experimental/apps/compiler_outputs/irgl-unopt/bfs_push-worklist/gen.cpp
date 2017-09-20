@@ -321,11 +321,11 @@ struct BFS {
     		if (cuda_wl.num_in_items > 0)
     			BFS_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
-    		galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
+    		galois::runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
     		#ifdef __GALOIS_DEBUG_WORKLIST__
-    		std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
+    		std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
     		unsigned _num_iterations = 1;
@@ -334,25 +334,25 @@ struct BFS {
     		StatTimer_cuda.start();
     		cuda_wl.num_in_items = local_wl.size();
     		if (cuda_wl.num_in_items > cuda_wl.max_size) {
-    			std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] ERROR - worklist size insufficient; size : " << cuda_wl.max_size << " , expected : " << cuda_wl.num_in_items << "\n";
+    			std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] ERROR - worklist size insufficient; size : " << cuda_wl.max_size << " , expected : " << cuda_wl.num_in_items << "\n";
     			exit(1);
     		}
-    		//std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
+    		//std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
     		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			BFS_cuda(cuda_ctx);
     		StatTimer_cuda.stop();
-    		galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
+    		galois::runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), cuda_wl.num_in_items, 0);
     		__sync_functor.sync_graph();
     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
     		#ifdef __GALOIS_DEBUG_WORKLIST__
-    		std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
+    		std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] worklist size : " << cuda_wl.num_out_items << " duplication factor : " << (double)cuda_wl.num_out_items/_graph.size() << "\n";
     		#endif
     		dbag.sync();
     		++_num_iterations;
     		}
-    		galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
+    		galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
     	{
@@ -386,21 +386,21 @@ struct BFS {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
-    galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
+    galois::runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    galois::runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     galois::StatManager statManager;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
       case 'g':
         personality = GPU_CUDA;
@@ -465,7 +465,7 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
       }
@@ -480,12 +480,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
+          if ((*hg).isOwned((*hg).getGID(*ii))) galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
+          if ((*hg).isOwned((*hg).getGID(*ii))) galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif

@@ -306,13 +306,13 @@ struct TreeExecModel {
     /*
     for ( unsigned i = 0; i < rootnodes.size(); i++ ) {
       // Get pointer to given node
-      galois::Runtime::for_each_ordered_tree(rootnodes[i],
+      galois::runtime::for_each_ordered_tree(rootnodes[i],
                                              GaloisDivide(this),
                                              GaloisConquer(),
                                              "UpCholeskyTree");
     }
     */
-    galois::Runtime::for_each_ordered_tree(rootnodes[0],
+    galois::runtime::for_each_ordered_tree(rootnodes[0],
                                            GaloisDivide(this, &rootnodes),
                                            GaloisConquer(),
                                            "UpCholeskyTree");

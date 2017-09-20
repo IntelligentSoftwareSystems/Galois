@@ -131,7 +131,7 @@ public:
   };
 
 private:
-  galois::Runtime::FixedSizeHeap heap;
+  galois::runtime::FixedSizeHeap heap;
   galois::Substrate::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
@@ -161,7 +161,7 @@ private:
     if (BlockSize) {
       return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromHeap(galois::Runtime::pagePoolAlloc(), galois::Runtime::pagePoolSize());
+      return newHeaderFromHeap(galois::runtime::pagePoolAlloc(), galois::runtime::pagePoolSize());
     }
   }
 
@@ -176,7 +176,7 @@ private:
         if (BlockSize)
           heap.deallocate(h2);
         else
-          galois::Runtime::pagePoolFree(h2);
+          galois::runtime::pagePoolFree(h2);
       }
       hpair.second = 0;
     }

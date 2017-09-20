@@ -133,7 +133,7 @@ struct SNode {
 	GNode parent;
 	//std::vector<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 	//galois::gdeque<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
-	//galois::Runtime::LL::SimpleLock mutex;
+	//galois::runtime::LL::SimpleLock mutex;
 };
 
 typedef DummyGraph::with_node_data<SNode>::type Graph;
@@ -413,9 +413,9 @@ struct TotalPrefix {
 
 	unsigned int round; 
 	unsigned int chunk; 
-	galois::Runtime::PthreadBarrier barrier;
+	galois::runtime::PthreadBarrier barrier;
 
-	TotalPrefix(unsigned int r, unsigned int c, galois::Runtime::PthreadBarrier b) : round(r), chunk(c), barrier(b) {}
+	TotalPrefix(unsigned int r, unsigned int c, galois::runtime::PthreadBarrier b) : round(r), chunk(c), barrier(b) {}
 
 	void operator()(unsigned int me, unsigned int tot) {
 
@@ -902,9 +902,9 @@ struct BarrierNoDup {
 
 		//unsigned int depth = 0;
 		unsigned int thr = galois::getActiveThreads();
-		//galois::Runtime::PthreadBarrier barrier(thr);
+		//galois::runtime::PthreadBarrier barrier(thr);
                 __attribute__((unused))
-		galois::Substrate::Barrier& barrier = galois::Runtime::getBarrier(thr);
+		galois::Substrate::Barrier& barrier = galois::runtime::getBarrier(thr);
 
 		while (true) {
 			unsigned next = (round + 1) & 1;

@@ -323,7 +323,7 @@ struct PageRank {
           galois::timeit()
         );
 
-        galois::Runtime::reportStat("(NULL)", 
+        galois::runtime::reportStat("(NULL)", 
             _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
             (unsigned long)dist_wl.size(), 0);
 
@@ -336,8 +336,8 @@ struct PageRank {
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && !dist_wl.can_terminate());
 
-    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      galois::Runtime::reportStat("(NULL)", 
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations, 0);
     }
@@ -507,15 +507,15 @@ int main(int argc, char** argv) {
     galois::DistMemSys G(getStatsFile());
     DistBenchStart(argc, argv, name, desc, url);
 
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
 
     {
     if (net.ID == 0) {
-      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
       std::ostringstream ss;
       ss << tolerance;
-      galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
+      galois::runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
     }
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
@@ -525,7 +525,7 @@ int main(int argc, char** argv) {
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
@@ -623,7 +623,7 @@ int main(int argc, char** argv) {
       );
 
       if((run + 1) != numRuns){
-        //galois::Runtime::getHostBarrier().wait();
+        //galois::runtime::getHostBarrier().wait();
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) { 
           bitset_residual_reset_cuda(cuda_ctx);
@@ -647,14 +647,14 @@ int main(int argc, char** argv) {
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           if ((*hg).isOwned((*hg).getGID(*ii)))
-            galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
               (*hg).getData(*ii).value);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if (personality == GPU_CUDA)  {
         for (auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           if ((*hg).isOwned((*hg).getGID(*ii))) 
-            galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
               get_node_value_cuda(cuda_ctx, *ii));
         }
       }
@@ -662,9 +662,9 @@ int main(int argc, char** argv) {
     }
 
     }
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     G.printDistStats();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
 
     return 0;

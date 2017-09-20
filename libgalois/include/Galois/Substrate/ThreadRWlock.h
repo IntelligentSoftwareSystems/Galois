@@ -43,7 +43,7 @@ namespace Substrate {
 class ThreadRWlock {
 
   typedef Substrate::PaddedLock<true> Lock_ty;
-  // typedef galois::Runtime::LL::SimpleLock<true> Lock_ty;
+  // typedef galois::runtime::LL::SimpleLock<true> Lock_ty;
   typedef Substrate::PerThreadStorage<Lock_ty> PerThreadLock;
 
   PerThreadLock locks;

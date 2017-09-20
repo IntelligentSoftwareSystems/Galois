@@ -59,7 +59,7 @@
 #include <unordered_map>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace cll = llvm::cl;
 
@@ -493,7 +493,7 @@ public:
           galois::loopname ("delete_all_ctxt"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
-    Runtime::on_each_impl (
+    runtime::on_each_impl (
         [this, &sources] (const unsigned tid, const unsigned numT) {
           sources.get ().clear ();
           ctxtDelQ.get ().clear ();
@@ -686,7 +686,7 @@ void for_each_ordered_ar (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
   }
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif //  GALOIS_RUNTIME_KDG_ADD_REM_H

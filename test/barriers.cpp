@@ -16,11 +16,11 @@ struct emp {
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
-      // if (galois::Runtime::LL::getTID() == 0)
+      // if (galois::runtime::LL::getTID() == 0)
       //   usleep(100);
       b.wait();
     }
-    // std::cout << galois::Runtime::LL::getTID() << " ";
+    // std::cout << galois::runtime::LL::getTID() << " ";
   }
 
   template<typename T>
@@ -38,7 +38,7 @@ void test(std::unique_ptr<galois::Substrate::Barrier> b) {
   unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
-    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
     b->reinit(M);
     galois::Timer t;
     t.start();

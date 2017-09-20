@@ -26,7 +26,7 @@
 #define GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 // TODO(ddn): Pull in and integrate in executors from exp
 
@@ -72,7 +72,7 @@ void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhF
 #endif
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

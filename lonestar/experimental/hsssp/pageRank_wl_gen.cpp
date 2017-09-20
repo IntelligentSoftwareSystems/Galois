@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
     T_total.start();

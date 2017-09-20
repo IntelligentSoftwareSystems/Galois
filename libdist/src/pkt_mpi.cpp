@@ -37,7 +37,7 @@
 #include <vector>
 
 
-class NetworkIOMPI : public galois::Runtime::NetworkIO {
+class NetworkIOMPI : public galois::runtime::NetworkIO {
 
   static void handleError(int rc) {
     if (rc != MPI_SUCCESS) {
@@ -103,7 +103,7 @@ class NetworkIOMPI : public galois::Runtime::NetworkIO {
       //MPI_Request req;
       inflight.emplace_back(m.host, m.tag, std::move(m.data));
       auto& f = inflight.back();
-      galois::Runtime::trace("MPI SEND", f.host, f.tag, f.data.size(), galois::Runtime::printVec(f.data));
+      galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(), galois::runtime::printVec(f.data));
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag, MPI_COMM_WORLD, &f.req);
       handleError(rv);
     }
@@ -128,7 +128,7 @@ class NetworkIOMPI : public galois::Runtime::NetworkIO {
         auto& m = inflight.back();
         rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &m.req);
         handleError(rv);
-        galois::Runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
+        galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
       }
       //complete messages
       if (!inflight.empty()) {
@@ -181,9 +181,9 @@ public:
 
 };
 
-std::tuple<std::unique_ptr<galois::Runtime::NetworkIO>,uint32_t,uint32_t> galois::Runtime::makeNetworkIOMPI() {
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,uint32_t,uint32_t> galois::runtime::makeNetworkIOMPI() {
   uint32_t ID, NUM;
-  std::unique_ptr<galois::Runtime::NetworkIO> n{new NetworkIOMPI(ID, NUM)};
+  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOMPI(ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 

@@ -47,7 +47,7 @@
 #include <vector>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace {
 
 #define USE_DENSE_LEVELS 1
@@ -294,7 +294,7 @@ class LevelExecutor {
   using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
   struct BodyWrapper;
-  using ForEachExec_ty = galois::Runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
+  using ForEachExec_ty = galois::runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
 
   struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
     KeyFn& keyFn;
@@ -469,7 +469,7 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
     std::ref (exec));
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #else
@@ -480,7 +480,7 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
 #include "Galois/WorkList/Obim.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
 auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
@@ -512,7 +512,7 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
     ::template with_descending<is_greater>::type
     ::template with_monotonic<true>::type WL;
   auto args = std::tuple_cat(
-      typename galois::Runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
+      typename galois::runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
       std::make_tuple(
               galois::loopname(ln),
               galois::wl<WL>(keyFn)));

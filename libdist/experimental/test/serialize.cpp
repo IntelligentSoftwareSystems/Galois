@@ -20,15 +20,15 @@ struct DistObj : public Lockable {
 };
 
 int main() {
-  static_assert(galois::Runtime::is_serializable<DistObj>::value, "DistObj not serializable");
+  static_assert(galois::runtime::is_serializable<DistObj>::value, "DistObj not serializable");
 
   unsigned i1 {0XDEADBEEF}, i2;
   gptr<DistObj> ptr1, ptr2;
   SendBuffer sbuf;
-  galois::Runtime::gSerialize(sbuf, ptr1, i1);
+  galois::runtime::gSerialize(sbuf, ptr1, i1);
 
   RecvBuffer rbuf(std::move(sbuf));
-  galois::Runtime::gDeserialize(rbuf, ptr2, i2);
+  galois::runtime::gDeserialize(rbuf, ptr2, i2);
 
   GALOIS_ASSERT(i1 == i2);
 
@@ -39,9 +39,9 @@ int main() {
     T.start();
     for (int i = 0; i < 100; ++i) {
       SendBuffer b;
-      galois::Runtime::gSerialize(b, input);
+      galois::runtime::gSerialize(b, input);
       RecvBuffer r(std::move(b));
-      galois::Runtime::gDeserialize(r, output);
+      galois::runtime::gDeserialize(r, output);
     }
     T.stop();
     std::cout << "Time: " << T.get() << "\n";

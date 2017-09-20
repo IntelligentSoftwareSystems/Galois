@@ -43,7 +43,7 @@ using namespace galois::Runtime;
 
 //Anchor the class
 SystemHeap::SystemHeap() {
-  assert(AllocSize == Runtime::pagePoolSize());
+  assert(AllocSize == runtime::pagePoolSize());
 }
 
 SystemHeap::~SystemHeap() {}

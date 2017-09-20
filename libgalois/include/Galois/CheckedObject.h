@@ -33,7 +33,7 @@ namespace galois {
  * Galois runtime.
  */
 template<typename T>
-class GChecked : public galois::Runtime::Lockable {
+class GChecked : public galois::runtime::Lockable {
   T val;
 
 public:
@@ -41,21 +41,21 @@ public:
   GChecked(Args&&... args): val(std::forward<Args>(args)...) { }
 
   T& get(galois::MethodFlag m = MethodFlag::WRITE) {
-    galois::Runtime::acquire(this, m);
+    galois::runtime::acquire(this, m);
     return val;
   }
 
   const T& get(galois::MethodFlag m = MethodFlag::WRITE) const {
-    galois::Runtime::acquire(const_cast<GChecked*>(this), m);
+    galois::runtime::acquire(const_cast<GChecked*>(this), m);
     return val;
   }
 };
 
 template<>
-class GChecked<void>: public galois::Runtime::Lockable {
+class GChecked<void>: public galois::runtime::Lockable {
 public:
   void get(galois::MethodFlag m = MethodFlag::WRITE) const {
-    galois::Runtime::acquire(const_cast<GChecked*>(this), m);
+    galois::runtime::acquire(const_cast<GChecked*>(this), m);
   }
 };
 

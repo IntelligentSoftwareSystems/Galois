@@ -200,7 +200,7 @@ int main(int argc, char **argv) {
 
   std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
 
-  galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   std::cout << "Running Edge Async version\n";

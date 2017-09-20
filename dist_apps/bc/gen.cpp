@@ -1323,9 +1323,9 @@ int main(int argc, char** argv) {
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::Runtime::reportParam("BC", "Max Iterations", 
+      galois::runtime::reportParam("BC", "Max Iterations", 
                                   (unsigned long)maxIterations);
     }
 
@@ -1337,7 +1337,7 @@ int main(int argc, char** argv) {
 
     std::vector<unsigned> scalefactor;
   #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
 
     if (num_nodes == -1) num_nodes = net.Num;
@@ -1345,7 +1345,7 @@ int main(int argc, char** argv) {
 
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
-    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
         case 'g':
           personality = GPU_CUDA;
@@ -1438,7 +1438,7 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     // shared DG accumulator among all steps
     galois::DGAccumulator<uint32_t> dga;
@@ -1469,7 +1469,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run + 1);
 
       #ifdef __GALOIS_HET_CUDA__
@@ -1499,7 +1499,7 @@ int main(int argc, char** argv) {
         }
 
         InitializeGraph::go((*h_graph));
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
       }
     }
 
@@ -1516,7 +1516,7 @@ int main(int argc, char** argv) {
             // outputs betweenness centrality
             sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     (*h_graph).getData(*ii).betweeness_centrality);
-            galois::Runtime::printOutput(v_out);
+            galois::runtime::printOutput(v_out);
           }
         }
 #ifdef __GALOIS_HET_CUDA__
@@ -1526,7 +1526,7 @@ int main(int argc, char** argv) {
             sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
 
-            galois::Runtime::printOutput(v_out);
+            galois::runtime::printOutput(v_out);
             memset(v_out, '\0', 40);
         }
       }

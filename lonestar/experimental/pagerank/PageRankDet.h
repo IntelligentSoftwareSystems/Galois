@@ -69,7 +69,7 @@ protected:
   void readGraph (void) {
     galois::Graph::readGraph (graph, inputFile, transposeFile);
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (graph),
+    galois::do_all_choice (galois::runtime::makeLocalRange (graph),
         [&] (GNode n) {
           auto& pdata = graph.getData (n, galois::MethodFlag::UNPROTECTED);
           pdata.outdegree = std::distance (
@@ -155,7 +155,7 @@ protected:
   bool checkConvergence (void) {
     galois::GReduceLogicalAND allConverged;
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (graph),
+    galois::do_all_choice (galois::runtime::makeLocalRange (graph),
         [&] (GNode src) {
           double sum = 0;
 
@@ -214,7 +214,7 @@ public:
 
     readGraph ();
 
-    galois::preAlloc (galois::getActiveThreads () + (4*sizeof(NodeData)*graph.size () + 2*graph.sizeEdges ())/galois::Runtime::pagePoolSize());
+    galois::preAlloc (galois::getActiveThreads () + (4*sizeof(NodeData)*graph.size () + 2*graph.sizeEdges ())/galois::runtime::pagePoolSize());
     galois::reportPageAlloc("MeminfoPre");
 
     galois::StatTimer t;

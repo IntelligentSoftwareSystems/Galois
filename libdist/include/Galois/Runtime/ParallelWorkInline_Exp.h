@@ -40,7 +40,7 @@
 #include <xmmintrin.h>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace Exp {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
@@ -278,9 +278,9 @@ class BSInlineExecutor {
   typedef Worklist<value_type,CHUNK_SIZE> WLTy;
 
   struct ThreadLocalData {
-    galois::Runtime::UserContextAccess<value_type> facing;
+    galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
-    LoopStatistics<Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
@@ -299,7 +299,7 @@ class BSInlineExecutor {
   void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
-    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush) {
+    if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush) {
       tld.facing.resetPushBuffer();
     }
     value_type& val = cur->cur(wid);
@@ -323,10 +323,10 @@ class BSInlineExecutor {
     //FIXME: clearReleasable(); 
     switch (result) {
     case 0: break;
-    case galois::Runtime::CONFLICT:
+    case galois::runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case galois::Runtime::BREAK:
+    case galois::runtime::BREAK:
     default:
       abort();
     }
@@ -380,7 +380,7 @@ class BSInlineExecutor {
       // }
 // #endif
 
-      if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts)
+      if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts)
         tld.ctx.commitIteration();
 
 
@@ -398,12 +398,12 @@ class BSInlineExecutor {
 
     while (true) {
       while (!cur->empty(wid)) {
-        if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts) {
+        if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts) {
           processWithAborts(tld, wid, cur, next);
         } else {
           process(tld, wid, cur, next);
         }
-        if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA)
+        if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA)
           tld.facing.resetAlloc();
       }
 
@@ -426,8 +426,8 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Runtime::getBarrier(activeThreads)) {
-    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(runtime::getBarrier(activeThreads)) {
+    if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
@@ -438,10 +438,10 @@ public:
       function(f), 
       preFunc (preFunc),
       loopname(ln), 
-      barrier(Runtime::getBarrier (activeThreads)),
+      barrier(runtime::getBarrier (activeThreads)),
       done (false)
   { 
-    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
+    if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
@@ -469,7 +469,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
   Executor e (opFunc, preFunc, loopname);
-  Substrate::Barrier& barrier = Runtime::getBarrier (activeThreads);
+  Substrate::Barrier& barrier = runtime::getBarrier (activeThreads);
 
   Substrate::getThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),

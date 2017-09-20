@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
 
   galois::StatTimer T;
   T.start();
-  galois::on_each(Contention(galois::Runtime::getBarrier(galois::Runtime::activeThreads)), galois::loopname("Contention"));
+  galois::on_each(Contention(galois::runtime::getBarrier(galois::runtime::activeThreads)), galois::loopname("Contention"));
   T.stop();
 
   if(algo == Algo::nonAtomicRMW || algo == Algo::writeGlobal) {

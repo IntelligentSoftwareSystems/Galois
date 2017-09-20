@@ -31,7 +31,7 @@
 #include <vector>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace detail {
 
@@ -128,7 +128,7 @@ static inline void print_send(std::vector<uint8_t> vec, size_t len, unsigned hos
   detail::print_send_impl(vec, len, host);
 }
 
-} // namespace Runtime
+} // namespace runtime
 } // namespace galois
 
 #endif

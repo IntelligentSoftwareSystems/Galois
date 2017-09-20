@@ -123,7 +123,7 @@ struct CLContext {
       }
       GOPT_CL_DEFAULT_PLATFORM_ID=0;
       GOPT_CL_DEFAULT_DEVICE_ID=0;
-      GOPT_CL_DEFAULT_DEVICE_ID=galois::Runtime::NetworkInterface::ID;
+      GOPT_CL_DEFAULT_DEVICE_ID=galois::runtime::NetworkInterface::ID;
       setenv("CUDA_CACHE_DISABLE", "1", 1);
       {
          std::ifstream file("device_default.config");

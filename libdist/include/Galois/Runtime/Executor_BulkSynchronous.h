@@ -34,7 +34,7 @@
 #include "Galois/Runtime/LoopStatistics.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 namespace BulkSynchronousImpl {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
@@ -251,7 +251,7 @@ class Executor {
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct ThreadLocalData {
-    galois::Runtime::UserContextAccess<value_type> facing;
+    galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<needsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
@@ -295,10 +295,10 @@ class Executor {
     //FIXME:    clearReleasable(); 
     switch (result) {
     case 0: break;
-    case galois::Runtime::CONFLICT:
+    case galois::runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case galois::Runtime::BREAK:
+    case galois::runtime::BREAK:
     default:
       abort();
     }
@@ -399,7 +399,7 @@ struct BulkSynchronousInline {
 
 }
 
-namespace Runtime {
+namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 struct ForEachExecutor<WorkList::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:

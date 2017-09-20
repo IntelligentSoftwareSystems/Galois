@@ -55,8 +55,8 @@ class SerialBag {
 
   using dbg = galois::debug<0>;
 
-  using PageHeap = Runtime::PageHeap;
-  using FSheap = Runtime::FixedSizeHeap;
+  using PageHeap = runtime::PageHeap;
+  using FSheap = runtime::FixedSizeHeap;
 
   struct Block {
     Block* next;
@@ -466,8 +466,8 @@ public:
 // template <typename T, const size_t SZ=0>
 // class SerialBag {
 // 
-//   using PageHeap = Runtime::MM::SystemHeap;
-//   using FSheap = Runtime::MM::FixedSizeHeap;
+//   using PageHeap = runtime::MM::SystemHeap;
+//   using FSheap = runtime::MM::FixedSizeHeap;
 // 
 //   struct Block {
 //     Block* next;

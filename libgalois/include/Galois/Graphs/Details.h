@@ -244,7 +244,7 @@ struct NodeInfoBaseTypes<void, HasLockable> {
 //! Specializations for void node data
 template<typename NodeTy, bool HasLockable>
 class NodeInfoBase:
-  public boost::mpl::if_c<HasLockable,galois::Runtime::Lockable,NoLockable>::type,
+  public boost::mpl::if_c<HasLockable,galois::runtime::Lockable,NoLockable>::type,
   public NodeInfoBaseTypes<NodeTy, HasLockable> 
 {
   NodeTy data;
@@ -257,7 +257,7 @@ public:
 
 template<bool HasLockable>
 struct NodeInfoBase<void, HasLockable>:
-  public boost::mpl::if_c<HasLockable,galois::Runtime::Lockable,NoLockable>::type,
+  public boost::mpl::if_c<HasLockable,galois::runtime::Lockable,NoLockable>::type,
   public NodeInfoBaseTypes<void, HasLockable> 
 {
   typename NodeInfoBase::reference getData() { return 0; }
@@ -273,7 +273,7 @@ public:
   };
 
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
-    galois::Runtime::acquire(&outOfLineLocks[n], mflag);
+    galois::runtime::acquire(&outOfLineLocks[n], mflag);
   }
   void outOfLineAllocateLocal(size_t numNodes) {
     outOfLineLocks.allocateLocal(numNodes);
@@ -343,8 +343,8 @@ public:
 };
 
 template<typename ItTy>
-Runtime::iterable<NoDerefIterator<ItTy>> make_no_deref_range(ItTy ii, ItTy ee) {
-  return Runtime::make_iterable(make_no_deref_iterator(ii), make_no_deref_iterator(ee));
+runtime::iterable<NoDerefIterator<ItTy>> make_no_deref_range(ItTy ii, ItTy ee) {
+  return runtime::make_iterable(make_no_deref_iterator(ii), make_no_deref_iterator(ee));
 }
 
 /**

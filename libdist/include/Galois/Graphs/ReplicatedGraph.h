@@ -33,7 +33,7 @@
 namespace galois {
 namespace Graph {
 
-using namespace galois::Runtime::Distributed;
+using namespace galois::runtime::Distributed;
 
 template<typename NodeTy, typename EdgeTy>
 class ReplicatedGraph {
@@ -87,7 +87,7 @@ public:
 
   ReplicatedGraph(): pGraph(0) { 
     graph = gptr<Inner>(new Inner);
-    //Runtime::allocatePerHost(this);
+    //runtime::allocatePerHost(this);
   }
 
   ReplicatedGraph(DeSerializeBuffer& s) {
@@ -96,7 +96,7 @@ public:
 
   ~ReplicatedGraph() {
     // XXX cannot deallocate
-    //Runtime::deallocatePerHost(graph);
+    //runtime::deallocatePerHost(graph);
   }
 
   void serialize(SerializeBuffer& s) const { gSerialize(s, graph); }

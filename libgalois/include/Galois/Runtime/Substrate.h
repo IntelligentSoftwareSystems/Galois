@@ -37,7 +37,7 @@
 #include "Galois/Substrate/Barrier.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 /**
  * Have a pre-instantiated barrier available for use.
@@ -54,7 +54,7 @@ namespace Runtime {
 Substrate::Barrier& getBarrier(unsigned activeThreads);
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

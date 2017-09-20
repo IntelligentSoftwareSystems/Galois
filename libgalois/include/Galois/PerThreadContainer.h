@@ -280,7 +280,7 @@ private:
     }
 
     container_type** getLocal () const {
-      return getRemote (galois::Runtime::LL::getTID ());
+      return getRemote (galois::runtime::LL::getTID ());
     }
 
     container_type** getRemote (size_t i) const {
@@ -288,7 +288,7 @@ private:
       return const_cast<container_type**> (&v[i]);
     }
 
-    size_t size () const { return galois::Runtime::LL::getMaxThreads(); }
+    size_t size () const { return galois::runtime::LL::getMaxThreads(); }
 
   };
 #endif
@@ -442,7 +442,7 @@ public:
 
   void clear_all_parallel (void) {
 
-    Runtime::on_each_impl(
+    runtime::on_each_impl(
         [this] (const unsigned tid, const unsigned numT) {
           get ().clear ();
         });
@@ -450,11 +450,11 @@ public:
 
     // XXX: following implementation causes problems with allocators
     // that allocate per thread separately
-    // auto r = galois::Runtime::makeStandardRange (
+    // auto r = galois::runtime::makeStandardRange (
         // boost::counting_iterator<unsigned> (0),
         // boost::counting_iterator<unsigned> (perThrdCont.size ()));
 // 
-    // galois::Runtime:: do_all_impl (
+    // galois::runtime:: do_all_impl (
         // r, 
         // [this] (unsigned i) {
           // get (i).clear ();
@@ -475,7 +475,7 @@ public:
 
   template <typename Range, typename Ret>
   void fill_parallel (const Range& range, Ret (container_type::*pushFn) (const value_type&) = &container_type::push_back) {
-    galois::Runtime::do_all_impl (
+    galois::runtime::do_all_impl (
         range,
         [this, pushFn] (const typename Range::value_type& v) {
           container_type& my = get ();

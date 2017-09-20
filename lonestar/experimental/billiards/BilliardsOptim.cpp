@@ -135,8 +135,8 @@ public:
 
     createLocks (table, graph, nodes);
 
-    galois::Runtime::for_each_ordered_spec (
-        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::runtime::for_each_ordered_spec (
+        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
         ExecSourcesOptim {table, enablePrints, logEvents},

@@ -74,10 +74,10 @@ namespace galois {
             }
 
             template<typename GraphType>
-            void prepRecv(GraphType & g, galois::Runtime::RecvBuffer& buffer) {
+            void prepRecv(GraphType & g, galois::runtime::RecvBuffer& buffer) {
                CL_Kernel applyKernel;
                auto * ctx = galois::OpenCL::getCLContext();
-               auto & net = galois::Runtime::getSystemNetworkInterface();
+               auto & net = galois::runtime::getSystemNetworkInterface();
                cl_command_queue queue = ctx->get_default_device()->command_queue();
                unsigned sender=0;
                const uint32_t counter = 0; // get counters from buffers.

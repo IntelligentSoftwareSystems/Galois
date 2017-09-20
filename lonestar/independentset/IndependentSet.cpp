@@ -456,12 +456,12 @@ void run() {
   Graph graph;
   galois::Graph::readGraph(graph, filename);
 
-  // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / galois::Runtime::MM::hugePageSize);
+  // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / galois::runtime::MM::hugePageSize);
   // Tighter upper bound
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    galois::preAlloc(numThreads + 8*graph.size()/galois::Runtime::pagePoolSize());
+    galois::preAlloc(numThreads + 8*graph.size()/galois::runtime::pagePoolSize());
   } else {
-    galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/galois::Runtime::pagePoolSize());
+    galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/galois::runtime::pagePoolSize());
   }
 
   galois::reportPageAlloc("MeminfoPre");

@@ -19,7 +19,7 @@
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Timer.h"
 
-static galois::Runtime::PerThreadStorage<int> counters;
+static galois::runtime::PerThreadStorage<int> counters;
 extern long GlobalTime;
 
 namespace dai {

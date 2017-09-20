@@ -84,7 +84,7 @@ Specified as a template argument to {@link galois::wl}
   - {@link galois::setActiveThreads} sets the number of running threads. Should only be
     called at the beginning of the `main` function.
 
-  - {@link galois::Runtime::LL::getMaxThreads()} returns the maximum number of
+  - {@link galois::runtime::LL::getMaxThreads()} returns the maximum number of
     threads (usually number of cores or number of hyper-threads) supported by hardware 
 
 \section allocators Allocators

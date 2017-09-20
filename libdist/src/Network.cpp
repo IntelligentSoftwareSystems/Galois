@@ -35,14 +35,14 @@
 
 using namespace galois::Runtime;
 
-uint32_t galois::Runtime::evilPhase = 1;
+uint32_t galois::runtime::evilPhase = 1;
 
-uint32_t galois::Runtime::NetworkInterface::ID = 0;
-uint32_t galois::Runtime::NetworkInterface::Num = 1;
+uint32_t galois::runtime::NetworkInterface::ID = 0;
+uint32_t galois::runtime::NetworkInterface::Num = 1;
 
-uint32_t galois::Runtime::getHostID() { return NetworkInterface::ID; }
+uint32_t galois::runtime::getHostID() { return NetworkInterface::ID; }
 
-galois::Runtime::NetworkIO::~NetworkIO() {}
+galois::runtime::NetworkIO::~NetworkIO() {}
 
 //anchor vtable
 NetworkInterface::~NetworkInterface() {}
@@ -127,7 +127,7 @@ NetworkBackend::~NetworkBackend() {
 
 NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
-NetworkInterface& galois::Runtime::getSystemNetworkInterface() {
+NetworkInterface& galois::runtime::getSystemNetworkInterface() {
   //return makeNetworkRouted();
   return makeNetworkBuffered();
 }

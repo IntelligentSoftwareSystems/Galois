@@ -58,13 +58,13 @@ int main(int argc, char** argv) {
 
   // galois::StatTimer T0("T0");
   // T0.start();
-  // using namespace galois::Runtime::WorkList;
+  // using namespace galois::runtime::WorkList;
   // galois::for_each<ChunkedLIFO<64> >(v.begin(), v.end(), process());
   // T0.stop();
 
   // galois::StatTimer T1("T1");
   // T1.start();
-  // using namespace galois::Runtime::WorkList;
+  // using namespace galois::runtime::WorkList;
   // galois::for_each<Alt::ChunkedAdaptor<LIFO<>, 64, true > >(v.begin(), v.end(), process());
   // T1.stop();
 

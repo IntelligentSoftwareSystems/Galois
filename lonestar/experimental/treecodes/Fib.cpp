@@ -94,7 +94,7 @@ unsigned galoisFib (unsigned n) {
 
   FibRecord init { n, &result, 0, 0};
 
-  galois::Runtime::for_each_ordered_tree (
+  galois::runtime::for_each_ordered_tree (
       init,
       GaloisDivide (),
       GaloisConquer (),
@@ -131,22 +131,22 @@ struct GaloisFibStack {
 unsigned galoisFibStack (unsigned n) {
   GaloisFibStack init {n, 0};
 
-  galois::Runtime::for_each_ordered_tree (init, "fib");
+  galois::runtime::for_each_ordered_tree (init, "fib");
 
   return init.result;
 }
 
-struct GaloisFibGeneric: public galois::Runtime::TreeTaskBase {
+struct GaloisFibGeneric: public galois::runtime::TreeTaskBase {
   unsigned n;
   unsigned result;
 
   GaloisFibGeneric (unsigned _n, unsigned _result): 
-    galois::Runtime::TreeTaskBase (),
+    galois::runtime::TreeTaskBase (),
     n (_n),
     result (_result)
   {}
 
-  virtual void operator () (galois::Runtime::TreeTaskContext& ctx) {
+  virtual void operator () (galois::runtime::TreeTaskContext& ctx) {
     if (n <= 2) {
       result = n;
       return;
@@ -167,7 +167,7 @@ struct GaloisFibGeneric: public galois::Runtime::TreeTaskBase {
 unsigned galoisFibGeneric (unsigned n) {
   GaloisFibGeneric init {n, 0};
 
-  galois::Runtime::for_each_ordered_tree_generic (init, "fib-gen");
+  galois::runtime::for_each_ordered_tree_generic (init, "fib-gen");
   return init.result;
 }
 

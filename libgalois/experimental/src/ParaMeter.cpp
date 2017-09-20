@@ -30,7 +30,7 @@
 #include "Galois/gIO.h"
 
 namespace galois {
-  namespace Runtime {
+  namespace runtime {
 
 namespace cll = llvm::cl;
 cll::opt<std::string> paraMeterOutFileOpt ("ParaMeterOut", cll::desc ("output csv stats file for ParaMeter"), cll::init("ParaMeter_Stats.csv"));
@@ -56,7 +56,7 @@ struct StatsFileManager {
     if (!init) {
       init = true;
 
-      statsFileName = galois::Runtime::paraMeterOutFileOpt;
+      statsFileName = galois::runtime::paraMeterOutFileOpt;
       // time_t rawtime;
       // struct tm* timeinfo;
 // 
@@ -68,7 +68,7 @@ struct StatsFileManager {
       statsFH = fopen(statsFileName.c_str(), "w");
       GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
 
-      galois::Runtime::ParaMeter::StepStats::printHeader(statsFH);
+      galois::runtime::ParaMeter::StepStats::printHeader(statsFH);
 
       fclose(statsFH);
 
@@ -100,11 +100,11 @@ static StatsFileManager& getStatsFileManager (void) {
   return s;
 }
 
-FILE* galois::Runtime::ParaMeter::getStatsFile (void) {
+FILE* galois::runtime::ParaMeter::getStatsFile (void) {
   return getStatsFileManager ().get ();
 }
 
-void galois::Runtime::ParaMeter::closeStatsFile (void) {
+void galois::runtime::ParaMeter::closeStatsFile (void) {
   getStatsFileManager ().close ();
 }
 

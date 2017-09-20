@@ -143,7 +143,7 @@ public:
     if (valid)
       stop();
     if (TimeAccumulator::get()) // only report non-zero stat
-      galois::Runtime::reportStat_Tmax(region, name, get());
+      galois::runtime::reportStat_Tmax(region, name, get());
   }
 
   void start() {
@@ -217,8 +217,8 @@ protected:
           auto lag = ns - minTime;
           assert(lag > 0 && "negative time lag from min is impossible");
 
-          galois::Runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
-          galois::Runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
+          galois::runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
+          galois::runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
         });
 
     // for (unsigned i = 0; i < timers.size(); ++i) {
@@ -227,8 +227,8 @@ protected:
       // auto lag = ns - minTime;
       // assert(lag > 0 && "negative time lag from min is impossible");
 // 
-      // galois::Runtime::reportStat(region, lagCat.c_str(), lag, i);
-      // galois::Runtime::reportStat(region, timeCat.c_str(), ns, i);
+      // galois::runtime::reportStat(region, lagCat.c_str(), lag, i);
+      // galois::runtime::reportStat(region, timeCat.c_str(), ns, i);
     // }
   }
 

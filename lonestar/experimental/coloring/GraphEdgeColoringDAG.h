@@ -41,7 +41,7 @@ typedef Graph::GraphNode GNode;
 class GraphEdgeColoringDAG: public GraphColoringBase<Graph> {
    static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-   typedef galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
+   typedef galois::runtime::PerThreadVector<unsigned> PerThrdColorVec;
    typedef typename Graph::GraphNode GN;
    typedef typename Graph::node_data_type NodeData;
    typedef typename Graph::edge_data_type EdgeData;
@@ -247,7 +247,7 @@ public:
       galois::GReduceLogicalOR foundError;
       galois::GReduceMax<unsigned> maxColor;
 
-      galois::do_all_choice(galois::Runtime::makeLocalRange(graph), [&] (GN src) {
+      galois::do_all_choice(galois::runtime::makeLocalRange(graph), [&] (GN src) {
          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
          for (auto e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
                e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
@@ -323,7 +323,7 @@ protected:
    void initDAG(W& initWork) {
       NodeDataComparator cmp;
 
-      galois::do_all_choice(galois::Runtime::makeLocalRange(graph), [&] (GNode src) {
+      galois::do_all_choice(galois::runtime::makeLocalRange(graph), [&] (GNode src) {
          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
          // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
@@ -442,7 +442,7 @@ protected:
       };
 
       ////////////////////////////////////////////////////////////
-      galois::Runtime::for_each_ordered_2p_param(galois::Runtime::makeLocalRange(graph), NodeComparator { graph }, VisitNhood { *this }, ApplyOperator { *this },
+      galois::runtime::for_each_ordered_2p_param(galois::runtime::makeLocalRange(graph), NodeComparator { graph }, VisitNhood { *this }, ApplyOperator { *this },
             "coloring-ordered-param");
    }
 
@@ -465,7 +465,7 @@ public:
 
          readGraph();
 
-         galois::preAlloc(galois::getActiveThreads() + 2 * sizeof(NodeData) * graph.size() / galois::Runtime::MM::hugePageSize);
+         galois::preAlloc(galois::getActiveThreads() + 2 * sizeof(NodeData) * graph.size() / galois::runtime::MM::hugePageSize);
          galois::reportPageAlloc("MeminfoPre");
 
          galois::StatTimer t;

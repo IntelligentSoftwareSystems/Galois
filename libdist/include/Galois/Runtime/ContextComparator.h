@@ -32,12 +32,12 @@
 #define GALOIS_RUNTIME_CONTEXT_COMPARATOR_H
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

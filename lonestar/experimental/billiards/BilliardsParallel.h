@@ -30,7 +30,7 @@ struct VisitNhoodSafetyTest {
     }
 
     if (!indep) {
-      galois::Runtime::signalConflict ();
+      galois::runtime::signalConflict ();
     }
   }
 };

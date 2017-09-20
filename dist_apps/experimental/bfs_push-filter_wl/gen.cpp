@@ -232,7 +232,7 @@ struct BFS {
         galois::no_stats()
             );
 
-        galois::Runtime::reportStat("(NULL)", 
+        galois::runtime::reportStat("(NULL)", 
             _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
             (unsigned long)dist_wl.size(), 0);
 
@@ -244,8 +244,8 @@ struct BFS {
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && !dist_wl.can_terminate());
 
-    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      galois::Runtime::reportStat("(NULL)", 
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations, 0);
     }
@@ -343,11 +343,11 @@ int main(int argc, char** argv) {
     galois::DistMemSys G(getStatsFile());
     DistBenchStart(argc, argv, name, desc, url);
     {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
-      galois::Runtime::reportStat("(NULL)", "Source Node ID", 
+      galois::runtime::reportStat("(NULL)", "Source Node ID", 
                                   (unsigned long long)src_node, 0);
     }
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
@@ -358,7 +358,7 @@ int main(int argc, char** argv) {
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
@@ -415,7 +415,7 @@ int main(int argc, char** argv) {
     StatTimer_init.start();
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     // accumulators for use in operators
     galois::DGAccumulator<unsigned int> DGAccumulator_accum;
@@ -443,10 +443,10 @@ int main(int argc, char** argv) {
       #endif
         bitset_dist_current.reset();
 
-        //galois::Runtime::getHostBarrier().wait();
+        //galois::runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
       }
     }
 
@@ -460,7 +460,7 @@ int main(int argc, char** argv) {
         for (auto ii = (*hg).masterNodesRange().begin(); 
                   ii != (*hg).masterNodesRange().end(); 
                   ++ii) {
-            galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                          (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
@@ -468,16 +468,16 @@ int main(int argc, char** argv) {
         for (auto ii = (*hg).masterNodesRange().begin(); 
                   ii != (*hg).masterNodesRange().end(); 
                   ++ii) {
-            galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                      get_node_dist_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif
     }
     }
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     G.printDistStats();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

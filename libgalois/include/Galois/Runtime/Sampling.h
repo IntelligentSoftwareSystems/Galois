@@ -24,7 +24,7 @@
 #define GALOIS_RUNTIME_SAMPLING_H
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 void beginSampling();
 void endSampling();

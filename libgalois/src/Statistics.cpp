@@ -35,7 +35,7 @@
 
 using namespace galois::Runtime;
 
-boost::uuids::uuid galois::Runtime::getRandUUID(void) {
+boost::uuids::uuid galois::runtime::getRandUUID(void) {
   static boost::uuids::uuid UUID = boost::uuids::random_generator()();
   return UUID;
 }
@@ -51,7 +51,7 @@ void StatManager::setStatFile(const std::string& outfile) {
   m_outfile = outfile;
 }
 
-void galois::Runtime::setStatFile(const std::string& f) {
+void galois::runtime::setStatFile(const std::string& f) {
   internal::sysStatManager()->setStatFile(f);
 }
 
@@ -113,27 +113,27 @@ StatManager::fp_iterator StatManager::fpEnd(void) const { return fpStats.cend();
 StatManager::str_iterator StatManager::paramBegin(void) const { return strStats.cbegin(); }
 StatManager::str_iterator StatManager::paramEnd(void) const { return strStats.cend(); }
 
-static galois::Runtime::StatManager* SM;
+static galois::runtime::StatManager* SM;
 
-void galois::Runtime::internal::setSysStatManager(galois::Runtime::StatManager* sm) {
+void galois::runtime::internal::setSysStatManager(galois::runtime::StatManager* sm) {
   GALOIS_ASSERT(!(SM && sm), "StatManager.cpp: Double Initialization of SM");
   SM = sm;
 }
 
-StatManager* galois::Runtime::internal::sysStatManager(void) {
+StatManager* galois::runtime::internal::sysStatManager(void) {
   return SM;
 }
 
 
-void galois::Runtime::reportPageAlloc(const char* category) {
-  Runtime::on_each_gen(
+void galois::runtime::reportPageAlloc(const char* category) {
+  runtime::on_each_gen(
       [category] (const unsigned tid, const unsigned numT) {
         reportStat_Tsum("(NULL)", category, numPagePoolAllocForThread(tid)); 
       }
       , std::make_tuple(galois::no_stats()));
 }
 
-void galois::Runtime::reportNumaAlloc(const char* category) {
+void galois::runtime::reportNumaAlloc(const char* category) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
   int nodes = Substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {

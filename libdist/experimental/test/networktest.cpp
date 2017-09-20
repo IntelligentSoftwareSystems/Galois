@@ -9,10 +9,10 @@ using namespace galois::Runtime;
 
 bool didbcast = false;
 
-struct sayHi : public galois::Runtime::Lockable {
+struct sayHi : public galois::runtime::Lockable {
   sayHi() = default;
-  sayHi(galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
-  sayHi(galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
+  sayHi(galois::runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
+  sayHi(galois::runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }
   void getInitData(SerializeBuffer& b) {}
 };
@@ -54,9 +54,9 @@ int main(int argc, char** argv) {
     getSystemNetworkInterface().start();
   } else {
     net.sendAlt(1, lp3, 4U, 5U);
-    galois::Runtime::PerHost<sayHi> p = galois::Runtime::PerHost<sayHi>::allocate();
+    galois::runtime::PerHost<sayHi> p = galois::runtime::PerHost<sayHi>::allocate();
     std::cout << p.remote(1) << "\n";
-    galois::Runtime::PerHost<sayHi>::deallocate(p);
+    galois::runtime::PerHost<sayHi>::deallocate(p);
 
     std::cout << "Begin loop classic\n";
 

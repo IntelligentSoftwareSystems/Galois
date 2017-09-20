@@ -590,7 +590,7 @@ namespace {
           cudaKernelCall << "\t\t__sync_functor.sync_graph();\n";
           cudaKernelCall << "\t\tdbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);\n";
           cudaKernelCall << "\t\t#ifdef __GALOIS_DEBUG_WORKLIST__\n";
-          cudaKernelCall << "\t\tstd::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
+          cudaKernelCall << "\t\tstd::cout << \"[\" << galois::runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
           cudaKernelCall << "\t\t#endif\n";
           cudaKernelCall << "\t\tdbag.sync();\n";
 
@@ -601,17 +601,17 @@ namespace {
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
           kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
-          kernelBefore << "\t\t\tstd::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
+          kernelBefore << "\t\t\tstd::cout << \"[\" << galois::runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
           kernelBefore << "\t\t\texit(1);\n";
           kernelBefore << "\t\t}\n";
-          kernelBefore << "\t\t//std::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
+          kernelBefore << "\t\t//std::cout << \"[\" << galois::runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
           kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
           kernelBefore << "\t\tstd::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);\n";
           kernelBefore << cudaKernelCall.str();
           kernelBefore << "\t\t++_num_iterations;\n";
           kernelBefore << "\t\t}\n";
-          kernelBefore << "\t\tgalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);\n";
-          kernelBefore << "\t\tgalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + (_graph.get_run_identifier()), _num_work_items, 0);\n";
+          kernelBefore << "\t\tgalois::runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);\n";
+          kernelBefore << "\t\tgalois::runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + (_graph.get_run_identifier()), _num_work_items, 0);\n";
           kernelBefore << "\t} else if (personality == CPU)\n";
           kernelBefore << "#endif\n";
 

@@ -43,8 +43,8 @@ public:
     AddListTy addList;
     Accumulator iter;
 
-    galois::Runtime::for_each_ordered_ikdg (
-        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::runtime::for_each_ordered_ikdg (
+        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodSafetyTest (),
         ExecSources (),

@@ -42,7 +42,7 @@ unsigned t_stl(std::vector<unsigned>& V, unsigned num) {
 }
 
 unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
-  omp_set_num_threads(th); //galois::Runtime::LL::getMaxThreads());
+  omp_set_num_threads(th); //galois::runtime::LL::getMaxThreads());
    
   galois::Timer t;
   t.start();
@@ -57,7 +57,7 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
 }
 
 unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, unsigned th) {
-  galois::setActiveThreads(th); //galois::Runtime::LL::getMaxThreads());
+  galois::setActiveThreads(th); //galois::runtime::LL::getMaxThreads());
   if (burn)
     galois::Substrate::getThreadPool().burnPower(th);
    

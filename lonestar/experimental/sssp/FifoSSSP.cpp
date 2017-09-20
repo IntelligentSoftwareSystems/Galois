@@ -717,7 +717,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    galois::preAlloc(numThreads + approxNodeData / galois::Runtime::pagePoolSize());
+    galois::preAlloc(numThreads + approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;
@@ -728,7 +728,7 @@ void run(bool prealloc = true) {
   T.stop();
   
   galois::reportPageAlloc("MeminfoPost");
-  galois::Runtime::reportNumaAlloc("NumaPost");
+  galois::runtime::reportNumaAlloc("NumaPost");
 
   std::cout << "Node " << reportNode << " has distance " << graph.getData(report).dist << "\n";
 

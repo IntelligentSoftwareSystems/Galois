@@ -18,11 +18,11 @@ class KruskalIKDG: public KruskalRuntime {
 
       if (e.repSrc != e.repDst) {
 
-        bool srcFail = !galois::Runtime::owns (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
-        bool dstFail = !galois::Runtime::owns (&lockVec[e.repDst], galois::MethodFlag::WRITE);
+        bool srcFail = !galois::runtime::owns (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
+        bool dstFail = !galois::runtime::owns (&lockVec[e.repDst], galois::MethodFlag::WRITE);
 
         if (srcFail && dstFail) {
-          galois::Runtime::signalConflict();
+          galois::runtime::signalConflict();
 
         } else { 
 
@@ -78,7 +78,7 @@ class KruskalIKDG: public KruskalRuntime {
       FindLoopRuntime findLoop {lockVec, repVec, findIter};
       LinkUpLoopIKDG linkUpLoop {lockVec, repVec, mstSum, linkUpIter};
 
-      galois::Runtime::for_each_ordered_ikdg (
+      galois::runtime::for_each_ordered_ikdg (
           edgeRange,
           Edge::Comparator (), findLoop, linkUpLoop,
           std::make_tuple (
@@ -102,7 +102,7 @@ class KruskalIKDG: public KruskalRuntime {
       FindLoopRuntime findLoop {lockVec, repVec, findIter};
       UnionByRankIKDG linkUpLoop {lockVec, repVec, mstSum, linkUpIter};
 
-      galois::Runtime::for_each_ordered_ikdg (
+      galois::runtime::for_each_ordered_ikdg (
           edgeRange,
           Edge::Comparator (), findLoop, linkUpLoop,
           std::make_tuple (

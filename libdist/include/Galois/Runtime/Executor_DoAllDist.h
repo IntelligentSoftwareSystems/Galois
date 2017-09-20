@@ -52,7 +52,7 @@
 #include <tuple>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
@@ -270,7 +270,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
   }
 }
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

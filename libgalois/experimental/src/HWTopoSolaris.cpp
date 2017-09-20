@@ -41,7 +41,7 @@
 #include <sys/processor.h>
 #include <sys/procset.h>
 
-using namespace galois::Runtime::LL;
+using namespace galois::runtime::LL;
 
 namespace {
 
@@ -82,36 +82,36 @@ static Policy& getPolicy() {
 
 } //namespace
 
-bool galois::Runtime::LL::bindThreadToProcessor(int id) {
+bool galois::runtime::LL::bindThreadToProcessor(int id) {
   assert(size_t(id) < procmap.size ());
   return sunBindToProcessor(getPolicy().procmap[id]);
 }
 
-unsigned galois::Runtime::LL::getProcessorForThread(int id) {
+unsigned galois::runtime::LL::getProcessorForThread(int id) {
   assert(size_t(id) < procmap.size ());
   return getPolicy().procmap[id];
 }
 
-unsigned galois::Runtime::LL::getMaxThreads() {
+unsigned galois::runtime::LL::getMaxThreads() {
   return getPolicy().numThreads;
 }
 
-unsigned galois::Runtime::LL::getMaxCores() {
+unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::Runtime::LL::getMaxPackages() {
+unsigned galois::runtime::LL::getMaxPackages() {
   return getPolicy().numPackages;
 }
 
-unsigned galois::Runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
   return getPolicy().numPackages - 1;
 }
 
-unsigned galois::Runtime::LL::getPackageForThread(int id) {
+unsigned galois::runtime::LL::getPackageForThread(int id) {
   return 0;
 }
 
-bool galois::Runtime::LL::isPackageLeader(int id) {
+bool galois::runtime::LL::isPackageLeader(int id) {
   return id == 0;
 }

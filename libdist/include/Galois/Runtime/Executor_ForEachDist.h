@@ -71,7 +71,7 @@
 
 namespace galois {
 //! Internal Galois functionality - Use at your own risk.
-namespace Runtime {
+namespace runtime {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
@@ -551,14 +551,14 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
 
   static const bool forceNew = false;
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
     auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
+    runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl, 
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -569,7 +569,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
+    runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -598,11 +598,11 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto helper_fn = get_by_supertype<op_tag>(tpl);
 
     static const bool forceNew = false;
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+    static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+    static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
 
      typedef typename get_type_by_supertype<wl_tag, TupleTy>::type::type BaseWorkListTy;
     typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type;
@@ -626,13 +626,13 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
     helper_fn.set_num_iter(0);
     Timer_for_each_impl.start();
-    Runtime::for_each_impl_dist(r, fn,
+    runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(ztpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
     Timer_for_each_impl.stop();
-    galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
+    galois::runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
 
     typedef galois::DGBag<value_type, decltype(helper_fn)> DBag;
     DBag dbag(helper_fn, loopName);
@@ -643,7 +643,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
     dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
-    std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+    std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
     dbag.sync();
 
@@ -653,33 +653,33 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     while(!dbag.canTerminate()) {
       helper_fn.set_num_iter(num_iterations);
 
-      //std::cout << "["<< galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
+      //std::cout << "["<< galois::runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 
       // call for_each again.
       Timer_for_each_impl.start();
       bag.clear();
       if(!local_wl.empty()){
-        Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
+        runtime::for_each_impl_dist(runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
       }
       Timer_for_each_impl.stop();
-      galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), local_wl.end() - local_wl.begin(), 0);
+      galois::runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), local_wl.end() - local_wl.begin(), 0);
 
       // Sync
       helper_fn.sync_graph();
 
       dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
-      std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+      std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
       dbag.sync();
 
       ++num_iterations;
     }
-    galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
+    galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 
@@ -687,14 +687,14 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
   else{
     /**CHECK with exist with exist_by_supertype to call special gen_dist . which will extract from tupe OP. get_by_super<foo_tag> **/
     static const bool forceNew = false;
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+    static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+    static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+    static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
     if (forceNew) {
       auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
-      Runtime::for_each_impl(r, fn,
+      runtime::for_each_impl(r, fn,
           std::tuple_cat(xtpl,
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -705,7 +705,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
+    runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -720,14 +720,14 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::false_type) {
   static const bool forceNew = false;
 
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
     auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
+    runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -738,7 +738,7 @@ void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleT
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
-    Runtime::for_each_impl(r, fn,
+    runtime::for_each_impl(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -749,6 +749,6 @@ void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleT
 }
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 #endif

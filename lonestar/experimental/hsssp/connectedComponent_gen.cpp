@@ -81,7 +81,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     CC_NodeData& sdata = graph->getData(src);
     sdata.id = graph->getGID(src);
-    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID <<"] sdata.id : " << sdata.id << "\n";
+    //std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID <<"] sdata.id : " << sdata.id << "\n";
     sdata.comp = sdata.id.load();
   }
 };
@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_labelProp;
 
     T_total.start();

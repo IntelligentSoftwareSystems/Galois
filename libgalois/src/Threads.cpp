@@ -26,7 +26,7 @@
 
 #include <algorithm>
 namespace galois {
-namespace Runtime {
+namespace runtime {
 unsigned int activeThreads = 1;
 }
 }
@@ -34,10 +34,10 @@ unsigned int activeThreads = 1;
 unsigned int galois::setActiveThreads(unsigned int num) noexcept {
   num = std::min(num, galois::Substrate::getThreadPool().getMaxUsableThreads());
   num = std::max(num, 1U);
-  galois::Runtime::activeThreads = num;
+  galois::runtime::activeThreads = num;
   return num;
 }
 
 unsigned int galois::getActiveThreads() noexcept {
-  return galois::Runtime::activeThreads;
+  return galois::runtime::activeThreads;
 }

@@ -201,10 +201,10 @@ struct ConnectedComp {
       		dbag.sync();
       		cuda_wl.num_out_items = 0;
       		T_comm_bag.stop();
-      		//std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
+      		//std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
       		while (!dbag.canTerminate()) {
       		++num_iter;
-      		//std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
+      		//std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
       		T_compute.start();
       		cuda_wl.num_in_items = local_wl.size();
       		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
@@ -219,7 +219,7 @@ struct ConnectedComp {
       		dbag.sync();
       		cuda_wl.num_out_items = 0;
       		T_comm_bag.stop();
-      		//std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
+      		//std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
       		}
       	} else if (personality == CPU)
       #endif
@@ -245,7 +245,7 @@ struct ConnectedComp {
 
 /********Set source Node ************/
 void setSource(Graph& _graph){
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   if(net.ID == 0){
     auto& nd = _graph.getData(src_node);
     nd.comp_current = 0;
@@ -255,7 +255,7 @@ void setSource(Graph& _graph){
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_ConnectedComp1, T_ConnectedComp2, T_ConnectedComp3;
 
     T_total.start();
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "ConnectedComp::go run2 called  on " << net.ID << "\n";
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " (msec)\n\n";
 
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "ConnectedComp::go run3 called  on " << net.ID << "\n";
@@ -317,7 +317,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).comp_current);
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).comp_current);
       }
     }
     return 0;

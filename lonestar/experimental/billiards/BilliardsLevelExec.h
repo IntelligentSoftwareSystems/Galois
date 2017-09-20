@@ -104,8 +104,8 @@ public:
 
     createLocks (table, graph, nodes);
 
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
         GetEventTime (), std::less<FP> (),
         VisitNhood<Graph, VecNodes> (graph, nodes),
         OpFunc (table, endtime, addList, iter));

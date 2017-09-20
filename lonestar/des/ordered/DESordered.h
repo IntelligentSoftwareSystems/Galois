@@ -256,8 +256,8 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    galois::Runtime::for_each_ordered_ar (
-        galois::Runtime::makeStandardRange(
+    galois::runtime::for_each_ordered_ar (
+        galois::runtime::makeStandardRange(
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),

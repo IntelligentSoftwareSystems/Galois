@@ -8,7 +8,7 @@ using namespace galois::Runtime;
 
 typedef std::vector<int>::iterator IterTy;
 
-struct Counter : public galois::Runtime::Lockable {
+struct Counter : public galois::runtime::Lockable {
   int i;
 
   Counter(): i(0) {}
@@ -70,7 +70,7 @@ void testAdder(int N) {
   Counter c;
   Adder adder(&c);
   
-  static_assert(galois::Runtime::is_serializable<Counter>::value, "Counter not serializable");
+  static_assert(galois::runtime::is_serializable<Counter>::value, "Counter not serializable");
 
   galois::for_each(begin, end, adder);
 
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     N = atoi(argv[2]);
 
   galois::setActiveThreads(threads);
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   net.start();
   
   testSimple(N);

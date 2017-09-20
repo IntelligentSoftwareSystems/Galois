@@ -62,7 +62,7 @@ template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>
 stealRemote(Substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Substrate::ThreadPool::getTID();
-  //  unsigned pkg = Runtime::LL::getPackageForThread(id);
+  //  unsigned pkg = runtime::LL::getPackageForThread(id);
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
@@ -106,7 +106,7 @@ private:
     std::advance(e, B);
   }
 
-  // Runtime::LL::SimpleLock<true> L;
+  // runtime::LL::SimpleLock<true> L;
   // std::vector<unsigned> sum;
 
   template<typename Iter>
@@ -115,7 +115,7 @@ private:
     Iter e2 = e;
     fill_work_l2(b2, e2);
     unsigned int a = galois::getActiveThreads();
-    //    unsigned int id = Runtime::LL::getTID();
+    //    unsigned int id = runtime::LL::getTID();
     std::vector<std::vector<value_type> > ranges;
     ranges.resize(a);
     while (b2 != e2) {
@@ -217,7 +217,7 @@ template<typename T, typename OwnerFn, template<typename, bool> class QT, bool d
 class OwnerComputeChunkedMaster : private boost::noncopyable {
   class Chunk : public galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
-  Runtime::FixedSizeHeap heap;
+  runtime::FixedSizeHeap heap;
   OwnerFn Fn;
 
   struct p {

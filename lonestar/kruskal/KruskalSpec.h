@@ -159,9 +159,9 @@ class KruskalSpec: public Kruskal {
     galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    // galois::Runtime::for_each_ordered_optim (
-    galois::Runtime::for_each_ordered_pessim (
-        galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
+    // galois::runtime::for_each_ordered_optim (
+    galois::runtime::for_each_ordered_pessim (
+        galois::runtime::makeStandardRange(edges.begin (), edges.end ()),
         Edge::Comparator (), findLoop, linkUpLoop,
         std::make_tuple (galois::loopname ("kruskal-speculative"), galois::enable_parameter<false> {}));
 

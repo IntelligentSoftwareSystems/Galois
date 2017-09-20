@@ -53,7 +53,7 @@
 
 namespace galois {
 
-namespace Runtime {
+namespace runtime {
 
 enum class SpecMode {
   OPTIM, PESSIM
@@ -1092,7 +1092,7 @@ protected:
           galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
 
 
-    galois::Runtime::for_each_gen (
+    galois::runtime::for_each_gen (
         makeLocalRange (abortRoots),
         [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1113,7 +1113,7 @@ protected:
           galois::wl<galois::WorkList::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
 
 
-    galois::Runtime::on_each_impl(
+    galois::runtime::on_each_impl(
         [this] (const unsigned tid, const unsigned numT) {
           abortRoots.get().clear();
           abortLocations.get().clear();
@@ -1148,7 +1148,7 @@ protected:
           galois::chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
 
 
-    galois::Runtime::for_each_gen (
+    galois::runtime::for_each_gen (
         makeLocalRange (abortRoots),
         [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1230,7 +1230,7 @@ protected:
           galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
         
 
-    galois::Runtime::for_each_gen (
+    galois::runtime::for_each_gen (
         makeLocalRange (commitRoots),
         [this, gvt] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1278,7 +1278,7 @@ protected:
     // among all threads
 
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           
           auto& localQ = this->commitQ.get();
@@ -1991,7 +1991,7 @@ protected:
     };
 
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, &ptest] (const unsigned tid, const unsigned numT) {
           auto& localQ = this->commitQ.get();
 
@@ -2006,7 +2006,7 @@ protected:
 // 
     // auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
 // 
-    // galois::Runtime::on_each_impl (
+    // galois::runtime::on_each_impl (
         // [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
           // auto& localQ = Base::commitQ.get();
           // auto new_end = std::partition (localQ.begin(), 
@@ -2216,7 +2216,7 @@ void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

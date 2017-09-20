@@ -99,7 +99,7 @@ void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
   }
 }
 
-galois::Runtime::PerBackend_v2& galois::Runtime::getPerHostBackend() {
+galois::runtime::PerBackend_v2& galois::runtime::getPerHostBackend() {
   static PerBackend_v2 be;
   return be;
 }
@@ -189,7 +189,7 @@ void PerBackend_v3::addRemote(void* ptr, uint32_t srcID, uint64_t off, uint32_t 
 
 __thread void* PerBackend_v3::space[dynSlots];
 
-PerBackend_v3& galois::Runtime::getPerThreadDistBackend() {
+PerBackend_v3& galois::runtime::getPerThreadDistBackend() {
   static PerBackend_v3 be;
   return be;
 };

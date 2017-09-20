@@ -198,7 +198,7 @@ public:
 }
 
 #ifdef USE_BUF
-NetworkInterface& galois::Runtime::getSystemNetworkInterface() {
+NetworkInterface& galois::runtime::getSystemNetworkInterface() {
   static NetworkInterfaceBuffer net;
   return net;
 }

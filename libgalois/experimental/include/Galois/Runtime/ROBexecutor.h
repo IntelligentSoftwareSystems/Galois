@@ -57,7 +57,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
   // race conditions
   // 1. two iterations trying to abort the same iteration
@@ -317,7 +317,7 @@ class ROBexecutor: private boost::noncopyable {
   using ROB = galois::MinHeap<Ctxt*, CtxtCmp>;
 
   using Lock_ty = galois::Substrate::SimpleLock;
-  // using Lock_ty = galois::Runtime::LL::PthreadLock<true>;
+  // using Lock_ty = galois::runtime::LL::PthreadLock<true>;
 
 
   Cmp itemCmp;
@@ -388,7 +388,7 @@ public:
 
     assert (range.begin () != range.end ());
 
-    galois::Runtime::do_all_impl (range,
+    galois::runtime::do_all_impl (range,
         [this] (const T& x) {
         pending.get ().push (x);
         });
@@ -397,7 +397,7 @@ public:
 
     const T& dummy = *pending[0].begin ();
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [&dummy,this] (const unsigned tid, const unsigned numT) {
           for (unsigned j = 0; j < WINDOW_SIZE_PER_THREAD; ++j) {
             Ctxt* ctx = ctxtAlloc.allocate (1);
@@ -542,13 +542,13 @@ private:
 
     assert (ctx != nullptr);
 
-    galois::Runtime::setThreadContext (ctx);
+    galois::runtime::setThreadContext (ctx);
     nhFunc (ctx->getActive (), ctx->userHandle);
 
     if (ctx->hasState (Ctxt::State::SCHEDULED)) {
       opFunc (ctx->getActive (), ctx->userHandle);
     }
-    galois::Runtime::setThreadContext (nullptr);
+    galois::runtime::setThreadContext (nullptr);
 
   }
 
@@ -962,13 +962,13 @@ public:
 
         ++totalIter;
 
-        galois::Runtime::setThreadContext (ctx);
+        galois::runtime::setThreadContext (ctx);
         nhFunc (ctx->getActive (), ctx->userHandle);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           opFunc (ctx->getActive (), ctx->userHandle);
         }
-        galois::Runtime::setThreadContext (nullptr);
+        galois::runtime::setThreadContext (nullptr);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           ctx->setState (Ctxt::State::READY_TO_COMMIT);
@@ -1159,7 +1159,7 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
   exec.push_initial (range);
   exec.execute ();
 
-  // galois::Runtime::beginSampling ();
+  // galois::runtime::beginSampling ();
 // 
   // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
 // 
@@ -1169,14 +1169,14 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 // 
     // getThreadPool ().run (activeThreads, std::ref(exec));
 // 
-    // galois::Runtime::endSampling ();
+    // galois::runtime::endSampling ();
 // 
     // exec.printStats ();
   // }
 }
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif //  GALOIS_RUNTIME_ROB_EXECUTOR_H

@@ -56,22 +56,22 @@ public:
   }
 
   virtual void wait() {
-    if (galois::Runtime::LL::getTID() == 0) {
-      count += galois::Runtime::NetworkInterface::Num;
+    if (galois::runtime::LL::getTID() == 0) {
+      count += galois::runtime::NetworkInterface::Num;
     }
 
     //wait at local barrier
     localBarrier.wait();
 
-    auto& net = galois::Runtime::getSystemNetworkInterface();
-    if (galois::Runtime::LL::getTID() == 0) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    if (galois::runtime::LL::getTID() == 0) {
       //notify global and wait on global
       net.broadcastAlt(barrierLandingPad);
       --count;
     }
 
     while (count > 0) {
-      galois::Runtime::doNetworkWork();
+      galois::runtime::doNetworkWork();
     }
 
     //wait at local barrier
@@ -88,7 +88,7 @@ class HostBarrier : public galois::Substrate::Barrier {
   std::atomic<int> count;
 
   static void barrierLandingPad(uint32_t) {
-    --static_cast<HostBarrier&>(galois::Runtime::getHostBarrier()).count;
+    --static_cast<HostBarrier&>(galois::runtime::getHostBarrier()).count;
   }
 
 public:
@@ -101,10 +101,10 @@ public:
   virtual void wait() {
 
     if (galois::Substrate::ThreadPool::getTID() == 0) {
-      count += galois::Runtime::NetworkInterface::Num;
+      count += galois::runtime::NetworkInterface::Num;
     }
 
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (galois::Substrate::ThreadPool::getTID() == 0) {
       //      std::cerr << "@";
       //notify global and wait on global
@@ -121,7 +121,7 @@ public:
 };
 } // end namespace ""
 
-galois::Substrate::Barrier& galois::Runtime::getHostBarrier() {
+galois::Substrate::Barrier& galois::runtime::getHostBarrier() {
   static HostBarrier b;
   return b;
 }

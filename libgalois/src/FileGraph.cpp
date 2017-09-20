@@ -430,7 +430,7 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
 
   // do interleaved numa allocation with current number of threads
   if (numaMap) {
-    unsigned int numThreads = galois::Runtime::activeThreads;
+    unsigned int numThreads = galois::runtime::activeThreads;
     const size_t hugePageSize = 2 * 1024 * 1024; // 2MB
 
     void* ptr;
@@ -622,22 +622,22 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
 
   pageInReadOnly(outIdx + *r.first, 
                  std::distance(r.first, r.second) * sizeof(*outIdx), 
-                 Runtime::pagePoolSize());
+                 runtime::pagePoolSize());
 
   // TODO verify
   if (graphVersion == 1) {
     pageInReadOnly((uint32_t*)outs + ebegin, 
                    (eend - ebegin) * sizeof(uint32_t), 
-                   Runtime::pagePoolSize());
+                   runtime::pagePoolSize());
   } else {
     pageInReadOnly((uint64_t*)outs + ebegin, 
                    (eend - ebegin) * sizeof(uint64_t), 
-                   Runtime::pagePoolSize());
+                   runtime::pagePoolSize());
   }
 
   pageInReadOnly(edgeData + ebegin * sizeofEdgeData, 
                  (eend - ebegin) * sizeofEdgeData, 
-                 Runtime::pagePoolSize());
+                 runtime::pagePoolSize());
 }
 
 // TODO verify

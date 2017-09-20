@@ -4,16 +4,16 @@
 
 int main() {
   uint32_t ID, Num;
-  std::unique_ptr<galois::Runtime::NetworkIO> net;
+  std::unique_ptr<galois::runtime::NetworkIO> net;
 
-  std::tie(net,ID,Num) = galois::Runtime::makeNetworkIOMPI();
+  std::tie(net,ID,Num) = galois::runtime::makeNetworkIOMPI();
 
   std::cout << ID << " " << Num << "\n";
   
   for (int x = 1; x <= 100; ++x) {
 
     for (int i = 0; i < Num; ++i) {
-      galois::Runtime::NetworkIO::message m;
+      galois::runtime::NetworkIO::message m;
       m.len = x;
       m.data.reset(new uint8_t[x]);
       m.host = i;
@@ -23,7 +23,7 @@ int main() {
     }
     
     for (int i = 0; i < Num; ++i) {
-      galois::Runtime::NetworkIO::message m;
+      galois::runtime::NetworkIO::message m;
       do {
         m = net->dequeue();
       } while (!m.len);

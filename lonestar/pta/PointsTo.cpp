@@ -471,7 +471,7 @@ void runParallel(PointsToConstraints &addrcopyconstraints, PointsToConstraints &
 	processAddressOfCopy(addrcopyconstraints, worklist);
 	processLoadStore(loadstoreconstraints, worklist, galois::MethodFlag::UNPROTECTED);
 
-		//using namespace galois::Runtime::WorkList;
+		//using namespace galois::runtime::WorkList;
 	  	//galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(worklist.begin(), worklist.end(), Process());
 	  	//galois::for_each<FIFO<> >(worklist.begin(), worklist.end(), Process());
 	  	//galois::for_each<ChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());

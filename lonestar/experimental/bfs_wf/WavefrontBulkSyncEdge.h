@@ -85,8 +85,8 @@ protected:
 
       Update init[1] = { Update (startNode, 0) };
       // galois::for_each ( &init[0], &init[1], OpFunc (graph), galois::wl<galois::WorkList::BulkSynchronousInline <> > ());
-      galois::Runtime::do_all_coupled_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
-      // galois::Runtime::for_each_coupled_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
+      galois::runtime::do_all_coupled_bs (galois::runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
+      // galois::runtime::for_each_coupled_bs (galois::runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
 
 #else
 

@@ -68,8 +68,8 @@ namespace galois {
          }
          template<typename GraphType, typename Fn>
          void sync_outgoing(GraphType & g){
-            //void (hGraph::*fn)(galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvApply<FnTy>;
-            auto& net = galois::Runtime::getSystemNetworkInterface();
+            //void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncPullRecvApply<FnTy>;
+            auto& net = galois::runtime::getSystemNetworkInterface();
 
             for(size_t h = 0 ; h < num_hosts; ++h){
                for(size_t i=0; i< outMessageIDs[h].size(); ++i){
@@ -82,7 +82,7 @@ namespace galois {
 
          template<typename GraphType, typename Fn>
          void sync_incoming(GraphType & g, std::vector<std::vector<unsigned int>> & incomingMessages){
-            auto& net = galois::Runtime::getSystemNetworkInterface();
+            auto& net = galois::runtime::getSystemNetworkInterface();
             cl_int err;
             auto * ctx = galois::OpenCL::getCLContext();
             cl_command_queue queue = ctx->get_default_device()->command_queue();
@@ -185,14 +185,14 @@ namespace galois {
          /*
 template<typename FnTy>
   void sync_push() {
-    void (hGraph::*fn)(galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
       uint32_t start, end;
       std::tie(start, end) = nodes_by_host(x);
       if (start == end) continue;
-      galois::Runtime::SendBuffer b;
+      galois::runtime::SendBuffer b;
       gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
@@ -206,7 +206,7 @@ template<typename FnTy>
     }
     //Will force all messages to be processed before continuing
     net.flush();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
   }
 
@@ -216,7 +216,7 @@ template<typename FnTy>
          void prepSend(GraphType & g){
             CL_Kernel pushKernel;
             auto * ctx = galois::OpenCL::getCLContext();
-            auto & net = galois::Runtime::getSystemNetworkInterface();
+            auto & net = galois::runtime::getSystemNetworkInterface();
             pushKernel.init("buffer_wrapper.cl", "syncPush");
             pushKernel.set_arg(0, g);
             pushKernel.set_arg(1, gpu_impl.buffer_ptr);
@@ -225,7 +225,7 @@ template<typename FnTy>
             const unsigned selfID=net.ID;
             for(int i=0; i<net.Num; ++i){
                if(i==selfID)continue;
-               galois::Runtime::SendBuffer buffer;
+               galois::runtime::SendBuffer buffer;
                const uint32_t counter =  0; // get counters from buffers.
                gSerialize(buffer, selfID, uint32_t(counter));
                cl_command_queue queue = ctx->get_default_device()->command_queue();
@@ -240,22 +240,22 @@ template<typename FnTy>
          }//End prepSend
 #endif // Finish implementation TODO
          /*
-            static void syncRecv(galois::Runtime::RecvBuffer& buf) {
+            static void syncRecv(galois::runtime::RecvBuffer& buf) {
     uint32_t oid;
-    void (hGraph::*fn)(galois::Runtime::RecvBuffer&);
-    galois::Runtime::gDeserialize(buf, oid, fn);
+    void (hGraph::*fn)(galois::runtime::RecvBuffer&);
+    galois::runtime::gDeserialize(buf, oid, fn);
     hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
     (obj->*fn)(buf);
   }
 
   template<typename FnTy>
-  void syncRecvApply(galois::Runtime::RecvBuffer& buf) {
+  void syncRecvApply(galois::runtime::RecvBuffer& buf) {
     uint32_t num;
-    galois::Runtime::gDeserialize(buf, num);
+    galois::runtime::gDeserialize(buf, num);
     for(; num ; --num) {
       uint64_t gid;
       typename FnTy::ValTy val;
-      galois::Runtime::gDeserialize(buf, gid, val);
+      galois::runtime::gDeserialize(buf, gid, val);
       assert(isOwned(gid));
       FnTy::reduce(getData(gid - globalOffset), val);
     }
@@ -264,10 +264,10 @@ template<typename FnTy>
           */
 /*
          template<typename GraphType>
-         void prepRecv(GraphType & g, galois::Runtime::RecvBuffer& buffer){
+         void prepRecv(GraphType & g, galois::runtime::RecvBuffer& buffer){
             CL_Kernel applyKernel;
             auto * ctx = galois::OpenCL::getCLContext();
-            auto & net = galois::Runtime::getSystemNetworkInterface();
+            auto & net = galois::runtime::getSystemNetworkInterface();
             cl_command_queue queue = ctx->get_default_device()->command_queue();
             unsigned sender=0;
             const uint32_t counter =  0; // get counters from buffers.
@@ -553,7 +553,7 @@ template<typename FnTy>
             }
             template<typename HGraph>
             void initialize_sync_buffers(HGraph & hgraph){
-               //bufferWrapper.init(galois::Runtime::NetworkInterface::Num, hgraph.masterNodes, hgraph.slaveNodes);
+               //bufferWrapper.init(galois::runtime::NetworkInterface::Num, hgraph.masterNodes, hgraph.slaveNodes);
             }
             /*
              * */

@@ -35,7 +35,7 @@
 #include <tuple>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 enum ExecType {
   DOALL_WAKEUP=0,
@@ -200,7 +200,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   typedef impl::FunctorWrapper<F, WL_ty> FWrap;
 
-  typedef galois::Runtime::ForEachWork<WorkList::ExternalReference<WL_ty>, T, FWrap> ForEachExec_ty;
+  typedef galois::runtime::ForEachWork<WorkList::ExternalReference<WL_ty>, T, FWrap> ForEachExec_ty;
 
   ForEachExec_ty exec (curr, FWrap (func_cpy, next), loopname);
 
@@ -267,7 +267,7 @@ void for_each_coupled_bs (const R& initRange, const F& func, const char* loopnam
 }
 #endif
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

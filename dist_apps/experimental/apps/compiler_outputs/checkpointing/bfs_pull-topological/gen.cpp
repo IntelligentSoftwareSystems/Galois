@@ -299,7 +299,7 @@ struct BFS {
       StatTimer_checkpoint.stop();
 
 #if 0
-      if(galois::Runtime::getSystemNetworkInterface().ID == 0){
+      if(galois::runtime::getSystemNetworkInterface().ID == 0){
         //if(recovery && iteration == 2){
           std::cerr << "xxxxxxxxxxxxxxxxxxx CRASHED xxxxxxxxxxxxxxxxxxxxx\n";
           _graph.checkpoint_apply<Reduce_0>("BFS");
@@ -310,11 +310,11 @@ struct BFS {
 
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
-    galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
+    galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
 #ifdef __CHECKPOINT_NO_FSYNC__
-    galois::Runtime::reportStat("(NULL)", "CHECKPOINT_NO_FSYNC",0,0);
+    galois::runtime::reportStat("(NULL)", "CHECKPOINT_NO_FSYNC",0,0);
 #else
-    galois::Runtime::reportStat("(NULL)", "CHECKPOINT_WITH_FSYNC",0,0);
+    galois::runtime::reportStat("(NULL)", "CHECKPOINT_WITH_FSYNC",0,0);
 #endif
 	
   }
@@ -339,21 +339,21 @@ galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    galois::Runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
-    galois::Runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
+    galois::runtime::reportStat("(NULL)", "Max Iterations", (unsigned long)maxIterations, 0);
+    galois::runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     galois::StatManager statManager;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
       case 'g':
         personality = GPU_CUDA;
@@ -426,7 +426,7 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go((*hg));
       }
@@ -443,12 +443,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
+          if ((*hg).isOwned((*hg).getGID(*ii))) galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), (*hg).getData(*ii).dist_current);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
+          if ((*hg).isOwned((*hg).getGID(*ii))) galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), get_node_dist_current_cuda(cuda_ctx, *ii));
         }
       }
 #endif

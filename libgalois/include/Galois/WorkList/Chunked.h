@@ -37,7 +37,7 @@
 #include "WLCompileCheck.h"
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 extern unsigned activeThreads;
 }
 namespace WorkList {
@@ -50,7 +50,7 @@ struct squeue {
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return Substrate::ThreadPool::getTID(); }
-  int size() { return Runtime::activeThreads; }
+  int size() { return runtime::activeThreads; }
 };
 
 template<template<typename> class PS, typename TQ>
@@ -77,7 +77,7 @@ struct ChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 
-  Runtime::FixedSizeAllocator<Chunk> alloc;
+  runtime::FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* cur;

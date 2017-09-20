@@ -38,7 +38,7 @@
 #include <unordered_map>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 using dbg = galois::Substrate::debug<1>;
 
@@ -472,7 +472,7 @@ public:
 
 template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
 void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
-  galois::Runtime::setThreadContext (c);
+  galois::runtime::setThreadContext (c);
 
   int result = 0;
 
@@ -505,12 +505,12 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
   }
 
 
-  galois::Runtime::setThreadContext (NULL);
+  galois::runtime::setThreadContext (NULL);
 }
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

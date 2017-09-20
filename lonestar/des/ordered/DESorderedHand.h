@@ -317,7 +317,7 @@ protected:
 
       t_find.start ();
       galois::do_all (
-      // galois::Runtime::do_all_coupled (
+      // galois::runtime::do_all_coupled (
           sobjInfoVec.begin (), sobjInfoVec.end (),
           FindReady (readyEvents, findIter), galois::loopname("find_ready_events"));
       t_find.stop ();
@@ -343,7 +343,7 @@ protected:
 
       t_simulate.start ();
       galois::do_all (
-      // galois::Runtime::do_all_coupled (
+      // galois::runtime::do_all_coupled (
           readyEvents.begin_all (), readyEvents.end_all (),
           ProcessEvents (graph, sobjInfoVec, newEvents, nevents), galois::loopname("process_ready_events"));
       t_simulate.stop ();

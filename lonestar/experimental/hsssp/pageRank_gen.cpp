@@ -109,7 +109,7 @@ static uint32_t num_Hosts_recvd = 0;
 static bool didWork = false;
 static std::vector<bool> others_didWork_vec;
 
-static void didWork_landingPad(galois::Runtime::RecvBuffer& buf){
+static void didWork_landingPad(galois::runtime::RecvBuffer& buf){
   //receive didWork from all and decide.
   uint32_t x_id;
   bool x_didWork;
@@ -151,8 +151,8 @@ struct PageRank {
     T_comm.stop();
 
 
-    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
-    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)  T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
+    //std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+    //std::cout << "[" << galois::runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)  T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
   
 
   }
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
     T_total.start();
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
         if(x == net.ID)
           continue;
         //Exchange didWorks to decide if done.
-        galois::Runtime::SendBuffer b;
+        galois::runtime::SendBuffer b;
         gSerialize(b, net.ID, didWork);
         net.send(x,didWork_landingPad, b);
       }
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
         std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        //galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
       }
     }
     return 0;

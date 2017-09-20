@@ -67,16 +67,16 @@ struct BusyBarrier {
 };
 
 static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-  galois::Runtime::LL::initTID(tid % galois::Runtime::LL::getMaxThreads());
-  galois::Runtime::initPTS_cilk ();
+  galois::runtime::LL::initTID(tid % galois::runtime::LL::getMaxThreads());
+  galois::runtime::initPTS_cilk ();
 
-  unsigned id = galois::Runtime::LL::getTID ();
+  unsigned id = galois::runtime::LL::getTID ();
   pthread_t self = pthread_self ();
 
   std::printf ("CILK: Thread %ld assigned id=%d\n", self, id);
 
-  if (id != 0 || !galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
-    galois::Runtime::LL::bindThreadToProcessor(id);
+  if (id != 0 || !galois::runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+    galois::runtime::LL::bindThreadToProcessor(id);
   }
 
 
@@ -98,7 +98,7 @@ void galois::CilkInit (void) {
     // unsigned tot = __cilkrts_get_total_workers ();
     // std::printf ("CILK: total cilk workers = %d\n", tot);
 
-    if (!galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+    if (!galois::runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
       GALOIS_DIE("Run program as: GALOIS_DO_NOT_BIND_MAIN_THREAD=1 prog args");
     }
 

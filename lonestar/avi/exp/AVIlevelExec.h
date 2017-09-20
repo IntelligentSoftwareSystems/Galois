@@ -176,8 +176,8 @@ public:
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     // galois::for_each_ordered (
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeStandardRange (
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeStandardRange (
         boost::make_transform_iterator(elems.begin(), MakeUpdate()),
         boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         GetNextTS (), std::less<double> (), nhVisitor, p, "level-by-level-avi");

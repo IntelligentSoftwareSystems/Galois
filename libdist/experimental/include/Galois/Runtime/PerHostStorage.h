@@ -33,7 +33,7 @@
 #include <typeinfo>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 class PerBackend_v2 {
   std::unordered_map<uint64_t, void*> items;
@@ -144,10 +144,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
     localHost = ~0;
     localPtr = nullptr;
@@ -226,7 +226,7 @@ class PerThreadDist {
     for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
       T*& p = getPerThreadDistBackend().resolveThread<T>(off, x);
       // Invalidate any gptrs we may have generated
-      getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(gptr<T>(p)));
+      getLocalDirectory().invalidate(static_cast<runtime::fatPointer>(gptr<T>(p)));
       delete p;
       p = nullptr;
     }
@@ -310,10 +310,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
   }
 

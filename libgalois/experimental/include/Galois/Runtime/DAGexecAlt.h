@@ -53,7 +53,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace Exp {
 
@@ -95,7 +95,7 @@ template <typename Ctxt>
 struct SharerList {
 public:
   using Cont =  galois::concurrent_gslist<Ctxt*, 16>;
-  using FSHeap =  galois::Runtime::FixedSizeHeap;
+  using FSHeap =  galois::runtime::FixedSizeHeap;
 
   FSHeap heap;
   Cont sharers;
@@ -405,7 +405,7 @@ public:
 
   ~DAGexecutor (void) {
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
@@ -435,11 +435,11 @@ public:
 
           allCtxts.get ().push_back (ctxt);
 
-          galois::Runtime::setThreadContext (ctxt);
+          galois::runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctxt->elem, uctx);
-          galois::Runtime::setThreadContext (NULL);
+          galois::runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
         }, "create_ctxt", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
@@ -452,7 +452,7 @@ public:
         }, 
         "sort_sharers", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           if (ctxt->isSrc ()) {
             ctxt->onWL = true;
@@ -535,7 +535,7 @@ void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& 
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

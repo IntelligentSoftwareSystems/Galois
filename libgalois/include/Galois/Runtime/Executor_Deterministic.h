@@ -67,7 +67,7 @@
 // TODO fixed neighborhood: profile, reuse graph 
 // TODO fixed neighborhood: still ~2X slower than implicit version on bfs
 namespace galois {
-namespace Runtime {
+namespace runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
 
@@ -1623,7 +1623,7 @@ struct Deterministic {
 
 }
 
-namespace Runtime {
+namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 struct ForEachExecutor<WorkList::Deterministic<T>, FunctionTy, ArgsTy>:

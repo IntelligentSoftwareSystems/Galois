@@ -57,10 +57,10 @@ protected:
 
   NHTy& getNextNode() { return nextNode; }
 
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, nextNode, active);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s, nextNode, active);
   }
 
@@ -84,10 +84,10 @@ class GraphNodeData {
   NodeDataTy data;
   
 protected:
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, data);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s, data);
   }
 
@@ -126,10 +126,10 @@ public:
   EdgeDataTy& getValue() { return val; }
 
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, dst, val);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s, dst, val);
   }
 
@@ -173,10 +173,10 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
   EdgeListTy edges;
 
 protected:
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, edges);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s, edges);
   }
   void dump(std::ostream& os) const {
@@ -225,10 +225,10 @@ class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
   EdgeListTy edges;
 
 protected:
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, edges);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s, edges);
   }
   void dump(std::ostream& os) const {
@@ -269,16 +269,16 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
 
 template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNode
-  : public galois::Runtime::Lockable,
-    public GraphNodeBase<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
+  : public galois::runtime::Lockable,
+    public GraphNodeBase<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
     public GraphNodeData<NodeDataTy>,
-    public GraphNodeEdges<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
+    public GraphNodeEdges<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
 {
   friend class ThirdGraph<NodeDataTy, EdgeDataTy, EDir>;
-  using GraphNodeBase<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
+  using GraphNodeBase<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
 
 public:
-  typedef galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
+  typedef galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
   typedef typename galois::Graph::Edge<Handle,EdgeDataTy> EdgeType;
   typedef typename GraphNodeEdges<Handle,EdgeDataTy,EDir>::iterator edge_iterator;
 
@@ -286,16 +286,16 @@ public:
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
 
   GraphNode() = default;
-  GraphNode(galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
+  GraphNode(galois::runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     GraphNodeBase<Handle>::serialize(s);
     GraphNodeData<NodeDataTy>::serialize(s);
     GraphNodeEdges<Handle, EdgeDataTy, EDir>::serialize(s);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     GraphNodeBase<Handle>::deserialize(s);
     GraphNodeData<NodeDataTy>::deserialize(s);
     GraphNodeEdges<Handle, EdgeDataTy, EDir>::deserialize(s);
@@ -330,30 +330,30 @@ class ThirdGraph {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
   typename Bag<gNode>::pointer localStateStore;
-  typename Bag<Runtime::gptr<gNode>>::pointer localStatePtr;
-  Runtime::PerThreadDist<ThirdGraph> basePtr;
+  typename Bag<runtime::gptr<gNode>>::pointer localStatePtr;
+  runtime::PerThreadDist<ThirdGraph> basePtr;
 
   struct is_edge : public std::unary_function<typename gNode::EdgeType&, bool> {
     bool operator()(typename gNode::EdgeType& n) const { 
       return n.getDst()->getActive(); 
     }
   };
-  struct is_node: public std::unary_function<Runtime::gptr<gNode>&, bool>{
-    bool operator() (const Runtime::gptr<gNode>& g) const {
+  struct is_node: public std::unary_function<runtime::gptr<gNode>&, bool>{
+    bool operator() (const runtime::gptr<gNode>& g) const {
       acquire(g, MethodFlag::ALL);
       return g->getActive();
     }
   };
-  struct makePtrLocal: public std::unary_function<gNode&, Runtime::gptr<gNode>> {
-    Runtime::gptr<gNode> operator()(gNode& data) const { return Runtime::gptr<gNode>(&data); }
+  struct makePtrLocal: public std::unary_function<gNode&, runtime::gptr<gNode>> {
+    runtime::gptr<gNode> operator()(gNode& data) const { return runtime::gptr<gNode>(&data); }
   };
 
-  static void invalidate(typename Bag<Runtime::gptr<gNode>>::pointer localStatePtr) {
-    for (unsigned x = 0; x < Runtime::getSystemThreadPool().getMaxThreads(); ++x) {
-      auto lptr = localStatePtr.remote(Runtime::NetworkInterface::ID, x).resolve();
+  static void invalidate(typename Bag<runtime::gptr<gNode>>::pointer localStatePtr) {
+    for (unsigned x = 0; x < runtime::getSystemThreadPool().getMaxThreads(); ++x) {
+      auto lptr = localStatePtr.remote(runtime::NetworkInterface::ID, x).resolve();
       for (auto ii = lptr->local_begin(),
                 ei = lptr->local_end(); ii != ei; ++ii) {
-        galois::Runtime::getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(*ii));
+        galois::runtime::getLocalDirectory().invalidate(static_cast<runtime::fatPointer>(*ii));
       }
     }
   }
@@ -389,7 +389,7 @@ public:
   }
 
   //! Node iterator
-  typedef boost::filter_iterator<is_node, typename Bag<Runtime::gptr<gNode>>::local_iterator> local_iterator;
+  typedef boost::filter_iterator<is_node, typename Bag<runtime::gptr<gNode>>::local_iterator> local_iterator;
 
   local_iterator local_begin() {
     return boost::make_filter_iterator<is_node>(localStatePtr->local_begin(), localStatePtr->local_end());
@@ -400,7 +400,7 @@ public:
     return boost::make_filter_iterator<is_node>(localStatePtr->local_end(), localStatePtr->local_end());
   }
 
-  typedef boost::filter_iterator<is_node, typename Bag<Runtime::gptr<gNode>>::iterator> iterator;
+  typedef boost::filter_iterator<is_node, typename Bag<runtime::gptr<gNode>>::iterator> iterator;
   
   iterator begin() {
     return boost::make_filter_iterator<is_node>(localStatePtr->begin(), localStatePtr->end());
@@ -473,31 +473,31 @@ public:
 
   size_t size() const { GALOIS_DIE("Not implemented"); return 0; }
 
-  typedef Runtime::PerThreadDist<ThirdGraph> pointer;
+  typedef runtime::PerThreadDist<ThirdGraph> pointer;
   static pointer allocate() {
-    return Runtime::PerThreadDist<ThirdGraph>::allocate();
+    return runtime::PerThreadDist<ThirdGraph>::allocate();
   }
   static void deallocate(pointer p) {
-    Runtime::getSystemNetworkInterface().broadcastAlt(&invalidate, p->localStatePtr);
+    runtime::getSystemNetworkInterface().broadcastAlt(&invalidate, p->localStatePtr);
     invalidate(p->localStatePtr);
-    Bag<Runtime::gptr<gNode>>::deallocate(p->localStatePtr);
+    Bag<runtime::gptr<gNode>>::deallocate(p->localStatePtr);
     Bag<gNode>::deallocate(p->localStateStore);
-    Runtime::PerThreadDist<ThirdGraph>::deallocate(p);
+    runtime::PerThreadDist<ThirdGraph>::deallocate(p);
   }
 
   explicit ThirdGraph(pointer p) :basePtr(p) {
     localStateStore = Bag<gNode>::allocate();
-    localStatePtr = Bag<Runtime::gptr<gNode>>::allocate();
+    localStatePtr = Bag<runtime::gptr<gNode>>::allocate();
   }
 
-  explicit ThirdGraph(pointer p, Runtime::DeSerializeBuffer& buf) :basePtr(p) {
+  explicit ThirdGraph(pointer p, runtime::DeSerializeBuffer& buf) :basePtr(p) {
     gDeserialize(buf, localStateStore, localStatePtr);
     //gDeserialize(buf, localStatePtr);
     assert(localStateStore);
     assert(localStatePtr);
   }
 
-  void getInitData(Runtime::SerializeBuffer& buf) {
+  void getInitData(runtime::SerializeBuffer& buf) {
     gSerialize(buf, localStateStore, localStatePtr);
     //gSerialize(buf, localStatePtr);
   }

@@ -54,7 +54,7 @@
  */
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 boost::uuids::uuid getRandUUID();
 
@@ -834,7 +834,7 @@ void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
 void reportNumaAlloc(const char* category);
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

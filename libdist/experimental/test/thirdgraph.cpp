@@ -12,7 +12,7 @@ typedef ThirdGraph<int, void, EdgeDirection::Un> UndirectedGraph;
 struct AddSelfLoop {
   template<typename T, typename Context>
   void operator()(const T& node, const Context&) {
-    galois::Runtime::acquire(node, galois::MethodFlag::ALL);
+    galois::runtime::acquire(node, galois::MethodFlag::ALL);
     GALOIS_ASSERT(&*node);
     node->createEdge(node, node, node->getData());
   }
@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
     N = atoi(argv[2]);
 
   galois::setActiveThreads(threads);
-  auto& net = galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   net.start();
   
   testSerialAdd(N);

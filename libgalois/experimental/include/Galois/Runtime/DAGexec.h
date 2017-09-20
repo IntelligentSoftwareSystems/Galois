@@ -54,7 +54,7 @@
 #include <atomic>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace {
 
@@ -338,7 +338,7 @@ public:
   {}
 
   ~DAGexecutorBase (void) {
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->reclaimAlloc (ctxtAdjAlloc);
           ctxtAlloc.destroy (ctxt);
@@ -391,11 +391,11 @@ public:
 
           allCtxts.get ().push_back (ctxt);
 
-          galois::Runtime::setThreadContext (ctxt);
+          galois::runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctxt->getActive (), uctx);
-          galois::Runtime::setThreadContext (NULL);
+          galois::runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
 
@@ -408,7 +408,7 @@ public:
     createAllEdges ();
 
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->finalizeAdj (ctxtAdjAlloc);
           // std::printf ("ctxt: %p, indegree=%d\n", ctxt, ctxt->origInDeg);
@@ -447,7 +447,7 @@ public:
     galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
@@ -463,7 +463,7 @@ public:
 
     printf ("WARNING: timing affected by measuring DAG stats\n");
 
-    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
         [&numNodes,&numEdges] (Ctxt* ctxt) {
           numNodes += 1;
           numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
@@ -585,7 +585,7 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 

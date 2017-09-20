@@ -319,7 +319,7 @@ public:
     while (!currWL->empty_all ()) {
 #endif
 
-      galois::do_all_choice (galois::Runtime::makeLocalRange(*currWL), 
+      galois::do_all_choice (galois::runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
           std::make_tuple (
             galois::loopname("wavefront_inner_loop"),

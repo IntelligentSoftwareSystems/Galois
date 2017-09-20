@@ -129,7 +129,7 @@ public:
   LC_InOut_Graph(): asymmetric(false) { }
 
   edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) { 
-    // galois::Runtime::checkWrite(mflag, false);
+    // galois::runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
     } else {
@@ -148,14 +148,14 @@ public:
   in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
-      if (galois::Runtime::shouldLock(mflag)) {
+      if (galois::runtime::shouldLock(mflag)) {
         for (edge_iterator ii = this->raw_begin(N), ei = this->raw_end(N); ii != ei; ++ii) {
           this->acquireNode(this->getEdgeDst(ii), mflag);
         }
       }
       return in_edge_iterator(this->raw_begin(N));
     } else {
-      if (galois::Runtime::shouldLock(mflag)) {
+      if (galois::runtime::shouldLock(mflag)) {
         for (typename InGraph::edge_iterator ii = inGraph.raw_begin(inGraphNode(N)),
             ei = inGraph.raw_end(inGraphNode(N)); ii != ei; ++ii) {
           this->acquireNode(nodeFromId(inGraph.getId(inGraph.getEdgeDst(ii))), mflag);

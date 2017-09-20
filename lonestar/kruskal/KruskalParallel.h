@@ -42,7 +42,7 @@ namespace kruskal {
 struct EdgeCtx;
 
 // typedef galois::LazyDynamicArray<int>  VecRep_ty;
-typedef galois::LazyDynamicArray<int, galois::Runtime::SerialNumaAllocator<int> >  VecRep_ty;
+typedef galois::LazyDynamicArray<int, galois::runtime::SerialNumaAllocator<int> >  VecRep_ty;
 
 typedef galois::PerThreadVector<Edge> EdgeWL;
 typedef galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
@@ -52,7 +52,7 @@ typedef Edge::Comparator Cmp;
 // typedef galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
 typedef galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
 // typedef galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
-typedef galois::LazyDynamicArray<AtomicCtxPtr, galois::Runtime::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
+typedef galois::LazyDynamicArray<AtomicCtxPtr, galois::runtime::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
@@ -256,7 +256,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          galois::Runtime::signalConflict ();
+          galois::runtime::signalConflict ();
 
         } else {
           nextWL.get ().push_back (ctx);
@@ -406,7 +406,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
 
   const size_t minWinSize = numT * chunkSize;
 
-  double TARGET_COMMIT_RATIO = galois::Runtime::commitRatioArg;
+  double TARGET_COMMIT_RATIO = galois::runtime::commitRatioArg;
 
   double commitRatio = double (numCommits) / double (prevWindowSize);
 
@@ -449,10 +449,10 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
     }
   }
 
-  // galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
+  // galois::runtime::LL::gDebug("size before refill: ", wl.size_all ());
 
   if (windowLimit != NULL) {
-    // galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
+    // galois::runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
 
     galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), galois::loopname("refill"));
 
@@ -476,7 +476,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
 
   }
 
-  // galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
+  // galois::runtime::LL::gDebug("size after refill: ", wl.size_all ());
 }
 
 
@@ -535,24 +535,24 @@ struct UnionFindWindow {
         break;
       }
 
-      // galois::Runtime::beginSampling ();
+      // galois::runtime::beginSampling ();
       findTimer.start ();
       galois::do_all_local (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
           galois::do_all_steal<true>(),
           galois::loopname("find_loop"));
       findTimer.stop ();
-      // galois::Runtime::endSampling ();
+      // galois::runtime::endSampling ();
 
 
-      // galois::Runtime::beginSampling ();
+      // galois::runtime::beginSampling ();
       linkUpTimer.start ();
       galois::do_all_local (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
           galois::do_all_steal<true>(),
           galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
-      // galois::Runtime::endSampling ();
+      // galois::runtime::endSampling ();
 
       int u = linkUpIter.reduce () - numUnions;
       numUnions = linkUpIter.reduce ();

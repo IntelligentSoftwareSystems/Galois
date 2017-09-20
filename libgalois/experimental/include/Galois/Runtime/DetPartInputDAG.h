@@ -42,7 +42,7 @@
 
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 // TODO: instead of storing partition number, store a pointer to partition meta
 // data every where
@@ -325,7 +325,7 @@ struct InputGraphPartDAGexecutor {
 
     using LocalContrib = typename galois::gstl::Vector<galois::gdeque<GNode, 64> >;
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, &range] (unsigned tid, unsigned numT) {
 
           LocalContrib localContribInner (numPart);
@@ -424,7 +424,7 @@ struct InputGraphPartDAGexecutor {
 
     galois::Substrate::PerThreadStorage<ThreadWorker> workers;
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
           ThreadWorker& w = *workers.getLocal (tid);
 
@@ -457,7 +457,7 @@ struct InputGraphPartDAGexecutor {
     //
     // TODO: what to do with stolen partition? put back in original owner? keep?
 
-    galois::Runtime::on_each_impl (
+    galois::runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
 
           ThreadWorker& worker = *workers.getLocal (tid);
@@ -557,7 +557,7 @@ struct ForEachDet_InputDAG<InputDAG_ExecTy::PART> {
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 
 } // end namespace galois
 

@@ -487,7 +487,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
   typedef galois::WorkList::AltChunkedLIFO<32> WL;
   typedef galois::WorkList::StableIterator<true> WLL;
 
-  galois::preAlloc (galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/galois::Runtime::pagePoolSize());
+  galois::preAlloc (galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   for (int step = 0; step < ntimesteps; step++) {

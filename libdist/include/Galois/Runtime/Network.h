@@ -52,7 +52,7 @@ constexpr decltype(auto) apply(F&& f, Tuple&& t) {
 #endif
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 typedef SerializeBuffer SendBuffer;
 typedef DeSerializeBuffer RecvBuffer;

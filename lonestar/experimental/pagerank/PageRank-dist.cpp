@@ -107,7 +107,7 @@ struct InitializeGraph {
 
 
     const galois::MethodFlag lockflag = galois::MethodFlag::SRC_ONLY;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if(sdata.nout > 0)
     {
       float delta = sdata.value*alpha/sdata.nout;
@@ -194,7 +194,7 @@ struct PageRankMsg {
       galois::for_each_local(g, PageRankMsg{g}, galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
-      galois::Runtime::getSystemNetworkInterface().dumpStats();
+      galois::runtime::getSystemNetworkInterface().dumpStats();
     }
   }
 
@@ -206,7 +206,7 @@ struct PageRankMsg {
   void operator() (GNode src, galois::UserContext<GNode>& cnx) const {
     LNode& sdata = g->at(src);
     galois::MethodFlag lockflag = galois::MethodFlag::SRC_ONLY;
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     /*
      * DEBUG
      */
@@ -262,7 +262,7 @@ using std::vector;
 using namespace galois::Runtime;
 
 void compute_graph_distribution(Graph::pointer g) {
-  int n = galois::Runtime::getSystemNetworkInterface().Num;
+  int n = galois::runtime::getSystemNetworkInterface().Num;
   vector<vector<int>> dist_vec(n);
   vector<int> local_count(n,0);
 
@@ -374,7 +374,7 @@ int main(int argc, char** argv) {
     //Graph Construction ENDS here.
     timerLoad.stop();
     std::cout << "Graph Loading: " << timerLoad.get() << " ms\n";
-    galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::runtime::getSystemNetworkInterface().dumpStats();
 
     /*
      * Check Graph Loading
@@ -392,7 +392,7 @@ int main(int argc, char** argv) {
 
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
-    galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::runtime::getSystemNetworkInterface().dumpStats();
 
     //g->prefetch_all();
 
@@ -407,27 +407,27 @@ int main(int argc, char** argv) {
     timerPR.stop();
 
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
-    galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::runtime::getSystemNetworkInterface().dumpStats();
 
     //HACK: prefetch all the nodes. For Blocking serial code.
     int nodes_check = 0;
     for (auto N = g->begin(); N != g->end(); ++N) {
       ++nodes_check;
-      //galois::Runtime::prefetch(*N);
+      //galois::runtime::prefetch(*N);
     }
     std::cout<<"Nodes_check = " << nodes_check << "\n";
 
-    galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::runtime::getSystemNetworkInterface().dumpStats();
 
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
-    galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::runtime::getSystemNetworkInterface().dumpStats();
 
     //std::cout << "Computing graph Distribution\n";
     //compute_graph_distribution(g);
 
 
 
-    galois::Runtime::getSystemNetworkInterface().terminate();
+    galois::runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
 

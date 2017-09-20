@@ -180,8 +180,8 @@ struct KCoreStep1 {
       iterations++;
     } while ((iterations < maxIterations) && dga.reduce());
 
-    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      galois::Runtime::reportStat("(NULL)", 
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations, 0);
     }
@@ -223,9 +223,9 @@ int main(int argc, char** argv) {
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
     }
 
@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        galois::Runtime::getHostBarrier().wait();
+        galois::runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
 
         InitializeGraph1::go((*h_graph));
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
       for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
         if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
           // prints the flag (alive/dead)
-          galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+          galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
                                        (bool)(*h_graph).getData(*ii).flag);
 
 
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
         } 
       }
     }
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

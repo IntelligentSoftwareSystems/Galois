@@ -379,7 +379,7 @@ struct PerThread {
     };
 };
 
-typedef galois::Runtime::PerThreadStorage<PerThread> PTS;
+typedef galois::runtime::PerThreadStorage<PerThread> PTS;
 
 struct TreeExecModel {
     typedef std::vector<int> ChildList;
@@ -436,7 +436,7 @@ struct TreeExecModel {
     };
     
     void run() {
-        galois::Runtime::for_each_ordered_tree(*(roots.begin()),
+        galois::runtime::for_each_ordered_tree(*(roots.begin()),
             GaloisDivide(this),
             GaloisConquer(this),
             "LeftCholesky");    

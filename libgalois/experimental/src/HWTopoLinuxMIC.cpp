@@ -510,49 +510,49 @@ static Policy& getPolicy() {
 
 } //namespace
 
-bool galois::Runtime::LL::bindThreadToProcessor(int id) {
+bool galois::runtime::LL::bindThreadToProcessor(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return linuxBindToProcessor(getPolicy().processorMap[id]);
 }
 
-unsigned galois::Runtime::LL::getProcessorForThread(int id) {
+unsigned galois::runtime::LL::getProcessorForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().processorMap[id];
 }
 
-unsigned galois::Runtime::LL::getMaxThreads() {
+unsigned galois::runtime::LL::getMaxThreads() {
   return getPolicy().numThreads;
 }
 
-unsigned galois::Runtime::LL::getMaxCores() {
+unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::Runtime::LL::getMaxPackages() {
+unsigned galois::runtime::LL::getMaxPackages() {
   return getPolicy().numPackages;
 }
 
-unsigned galois::Runtime::LL::getPackageForThread(int id) {
+unsigned galois::runtime::LL::getPackageForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().packageMap[id];
 }
 
-unsigned galois::Runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().maxPackageMap[id];
 }
 
-bool galois::Runtime::LL::isPackageLeader(int id) {
+bool galois::runtime::LL::isPackageLeader(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().leaderMapThread[id] == id;
 }
 
-unsigned galois::Runtime::LL::getLeaderForThread(int id) {
+unsigned galois::runtime::LL::getLeaderForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().leaderMapThread[id];
 }
 
-unsigned galois::Runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::runtime::LL::getLeaderForPackage(int id) {
   assert(size_t(id) < getPolicy().numPackages);
   return getPolicy().leaderMapPackage[id];
 }

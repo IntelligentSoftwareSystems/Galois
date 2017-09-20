@@ -55,8 +55,8 @@ public:
     typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
     typedef galois::WorkList::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
 
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeStandardRange (wl.begin (), wl.end ()), 
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeStandardRange (wl.begin (), wl.end ()), 
         GetLevel (), 
         std::less<unsigned> (),
         VisitNhood (graph),

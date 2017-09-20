@@ -33,7 +33,7 @@
 
 #define MINANGLE 30.0
 
-class Element : public galois::Runtime::Lockable {
+class Element : public galois::runtime::Lockable {
   Tuple coords[3]; // The three endpoints of the triangle
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
@@ -46,7 +46,7 @@ public:
 //NOTE!!! serialize and deserialize the data
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,coords[0]);
     gSerialize(s,coords[1]);
     gSerialize(s,coords[2]);
@@ -54,7 +54,7 @@ public:
     gSerialize(s,bDim);
     gSerialize(s,id);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,coords[0]);
     gDeserialize(s,coords[1]);
     gDeserialize(s,coords[2]);

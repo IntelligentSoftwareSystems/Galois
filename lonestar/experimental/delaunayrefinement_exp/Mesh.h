@@ -34,7 +34,7 @@
 #include <cstdio>
 #include <mutex>
 
-struct is_bad : public galois::Runtime::Lockable {
+struct is_bad : public galois::runtime::Lockable {
   Graphp g;
   is_bad() {}
   is_bad(Graphp _g): g(_g) {}
@@ -43,17 +43,17 @@ struct is_bad : public galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 };
 
 
 //new create_nodes
-struct create_nodes { //  : public galois::Runtime::Lockable {
+struct create_nodes { //  : public galois::runtime::Lockable {
   Graphp g;
   //create_nodes(Graphp _g): g(_g) {}
   void static go(Graphp g, std::deque<Element>& elements) {
@@ -68,10 +68,10 @@ struct create_nodes { //  : public galois::Runtime::Lockable {
   //typedef int tt_is_copyable;
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 
@@ -98,7 +98,7 @@ struct create_same {
 */
 
 
-/*struct create_nodes : public galois::Runtime::Lockable {
+/*struct create_nodes : public galois::runtime::Lockable {
   Graphp g;
   create_nodes() {}
   create_nodes(Graphp _g): g(_g) {}
@@ -111,10 +111,10 @@ struct create_same {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 };

@@ -55,12 +55,12 @@ struct EdgeComparator: public galois::CompareCallback {
   }
 };
 
-struct KNodeLockable: public galois::Runtime::Lockable, KNode {
+struct KNodeLockable: public galois::runtime::Lockable, KNode {
 
-  KNodeLockable (unsigned id): galois::Runtime::Lockable (), KNode (id) {}
+  KNodeLockable (unsigned id): galois::runtime::Lockable (), KNode (id) {}
 
   void acquire (galois::MethodFlag mflag=galois::MethodFlag::WRITE) {
-    galois::Runtime::acquire (this, mflag);
+    galois::runtime::acquire (this, mflag);
   }
 
   KNodeLockable* getRep () {
@@ -106,7 +106,7 @@ class KruskalOrderedSrc: public Kruskal<KNodeLockable> {
     {}
 
     // void signalFailSafe () {
-      // galois::Runtime::checkWrite (galois::WRITE);
+      // galois::runtime::checkWrite (galois::WRITE);
     // }
 
     template <typename C>
@@ -232,7 +232,7 @@ class KruskalOrderedNonSrc : public Kruskal<KNodeMin> {
 
         } else {
           // defer processing of this edge to the next round
-          galois::Runtime::signalConflict ();
+          galois::runtime::signalConflict ();
         }
 
 

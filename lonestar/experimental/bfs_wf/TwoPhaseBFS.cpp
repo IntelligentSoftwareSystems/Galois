@@ -53,7 +53,7 @@ class TwoPhaseBFS: public BFS {
       if (up.level <= globalLevel.value) {
         VisitNhood::operator () (up, ctx);
       } else {
-        galois::Runtime::signalConflict();
+        galois::runtime::signalConflict();
       }
 
       if (galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
@@ -103,8 +103,8 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    galois::Runtime::for_each_ordered_ikdg (
-        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::runtime::for_each_ordered_ikdg (
+        galois::runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhoodSafety (graph, globalLevel),
         OpFuncSafety (graph, numIter, globalLevel),

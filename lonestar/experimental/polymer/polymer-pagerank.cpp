@@ -497,7 +497,7 @@ struct PolyPush {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -523,7 +523,7 @@ struct PolyPush {
     }
 
     void mfree() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -572,9 +572,9 @@ struct PolyPush {
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef galois::Runtime::Barrier Barrier;
+  typedef galois::runtime::Barrier Barrier;
 
   std::string name() const { return "polymer push"; }
 
@@ -620,8 +620,8 @@ struct PolyPush {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
@@ -647,12 +647,12 @@ struct PolyPush {
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -892,8 +892,8 @@ struct PolyPush {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
 
       unsigned int nPackages = partitionInfo.nPackages;
 
@@ -984,10 +984,10 @@ struct PolyPush {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPush *self,PerPackageData& packageData){
-      unsigned int localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned int localtid = tid - galois::runtime::LL::getLeaderForThread(tid);
       unsigned int coresCurrPackage;
       unsigned int nodesPerCore;
-      unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -1020,7 +1020,7 @@ struct PolyPush {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -1038,12 +1038,12 @@ struct PolyPush {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned int coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
+    unsigned int coresPerPackage = galois::runtime::LL::getMaxCores()/galois::runtime::LL::getMaxPackages();
     
     unsigned int nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned int coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::runtime::getSystemBarrier();
 
     unsigned int nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -1125,7 +1125,7 @@ struct PolyPull {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -1151,7 +1151,7 @@ struct PolyPull {
     }
 
     void mfree() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -1200,9 +1200,9 @@ struct PolyPull {
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef galois::Runtime::Barrier Barrier;
+  typedef galois::runtime::Barrier Barrier;
 
   std::string name() const { return "polymer pull"; }
 
@@ -1248,8 +1248,8 @@ struct PolyPull {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
@@ -1275,12 +1275,12 @@ struct PolyPull {
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -1520,8 +1520,8 @@ struct PolyPull {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -1610,10 +1610,10 @@ struct PolyPull {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPull *self,PerPackageData& packageData){
-      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -1646,7 +1646,7 @@ struct PolyPull {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -1664,12 +1664,12 @@ struct PolyPull {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::runtime::LL::getMaxCores()/galois::runtime::LL::getMaxPackages();
     
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -1750,7 +1750,7 @@ struct PolyPull {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -1776,7 +1776,7 @@ struct PolyPull {
     }
 
     void mfree() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -1825,9 +1825,9 @@ struct PolyPull {
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef galois::Runtime::Barrier Barrier;
+  typedef galois::runtime::Barrier Barrier;
 
   std::string name() const { return "polymer pull"; }
 
@@ -1873,8 +1873,8 @@ struct PolyPull {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
@@ -1902,12 +1902,12 @@ struct PolyPull {
     graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges), superPartition(superPartition){};
 
     void operator() (unsigned tid, unsigned numT){
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -2150,8 +2150,8 @@ struct PolyPull {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -2241,10 +2241,10 @@ struct PolyPull {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPull2 *self,PerPackageData& packageData){
-      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -2277,7 +2277,7 @@ struct PolyPull {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -2295,12 +2295,12 @@ struct PolyPull {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::runtime::LL::getMaxCores()/galois::runtime::LL::getMaxPackages();
     unsigned superPartition = 2;
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -2381,7 +2381,7 @@ struct DupPull {    // still buggy
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -2407,7 +2407,7 @@ struct DupPull {    // still buggy
     }
 
     void mfree() {
-      using namespace galois::Runtime::MM;
+      using namespace galois::runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -2456,9 +2456,9 @@ struct DupPull {    // still buggy
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef galois::Runtime::Barrier Barrier;
+  typedef galois::runtime::Barrier Barrier;
 
   std::string name() const { return "duplicate pull"; }
 
@@ -2504,8 +2504,8 @@ struct DupPull {    // still buggy
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
@@ -2531,12 +2531,12 @@ struct DupPull {    // still buggy
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -2774,8 +2774,8 @@ struct DupPull {    // still buggy
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -2848,10 +2848,10 @@ struct DupPull {    // still buggy
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, DupPull *self,PerPackageData& packageData){
-      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -2885,9 +2885,9 @@ struct DupPull {    // still buggy
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::runtime::LL::isPackageLeader(tid)){
         
-        unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
+        unsigned currPackage = galois::runtime::LL::getPackageForThread(tid);
         unsigned offset = partitionInfo.nodesStartPackage[currPackage];
         unsigned nodesCurrPackage = partitionInfo.nodesPerPackage[currPackage];
         unsigned nPackages = partitionInfo.nPackages;
@@ -2914,12 +2914,12 @@ struct DupPull {    // still buggy
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::runtime::LL::getMaxCores()/galois::runtime::LL::getMaxPackages();
     
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = 10;
-    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -3714,7 +3714,7 @@ void run() {
   std::cout << "Reading graph \n";
   algo.readGraph(graph);
   std::cout << "preAllocating \n";
-  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::MM::hugePageSize);
+  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::MM::hugePageSize);
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;

@@ -30,7 +30,7 @@ private:
 	// returns effective size of memory allocated for matrices and RHS.
 	unsigned long getAllocatedSize(Vertex *root);
 	int atomic_dec(int *value);
-	//galois::Runtime::PerPackageStorage<WL> pps;
+	//galois::runtime::PerPackageStorage<WL> pps;
 	int leftRange(int tasks, int cpus, int i);
 	int rightRange(int tasks, int cpus, int i);
 };

@@ -50,7 +50,7 @@ namespace galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class DistMemSys: public Runtime::SharedMemRuntime<Runtime::DistStatManager> {
+class DistMemSys: public runtime::SharedMemRuntime<runtime::DistStatManager> {
 
 public:
   explicit DistMemSys(void);
@@ -76,7 +76,7 @@ public:
 // TODO: revive
 // template<typename IterTy, typename FunctionTy, typename... Args>
 // void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  // Runtime::for_each_gen_dist(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
+  // runtime::for_each_gen_dist(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
 // }
 
 /**
@@ -93,7 +93,7 @@ public:
 // template<typename ItemTy, typename FunctionTy, typename... Args>
 // void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   // ItemTy iwl[1] = {i};
-  // Runtime::for_each_gen_dist(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+  // runtime::for_each_gen_dist(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
 // }
 
 

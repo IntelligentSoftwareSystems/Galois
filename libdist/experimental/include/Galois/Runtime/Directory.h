@@ -51,7 +51,7 @@
 #include <fstream>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 enum ResolveFlag {INV=0, RO=1, RW=2, UP_RO=3, UP_RW=4};
 
@@ -485,12 +485,12 @@ inline void dump_dirs_to_file(RecvBuffer&) {
 
 }
 
-} // namespace Runtime
+} // namespace runtime
 
 } // namespace galois
 
 template<typename T>
-void galois::Runtime::detail::recvObject(RecvBuffer& buf) {
+void galois::runtime::detail::recvObject(RecvBuffer& buf) {
   fatPointer ptr;
   ResolveFlag flag;
   gDeserialize(buf, ptr, flag);
@@ -501,7 +501,7 @@ void galois::Runtime::detail::recvObject(RecvBuffer& buf) {
 }
 
 template<typename T>
-void galois::Runtime::detail::recvRequest(RecvBuffer& buf) {
+void galois::runtime::detail::recvRequest(RecvBuffer& buf) {
   fatPointer ptr;
   uint32_t dest;
   ResolveFlag flag;

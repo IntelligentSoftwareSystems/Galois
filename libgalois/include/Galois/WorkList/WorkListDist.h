@@ -26,7 +26,7 @@ class WLdistributed: public WL {
 public:
 
   WLdistributed (GraphTy& _graph): workList(), graph(_graph) {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     bag_vec.resize(net.Num);
   }
 
@@ -68,7 +68,7 @@ public:
   }
 
   void sync() {
-    auto& net = galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::runtime::getSystemNetworkInterface();
     std::string statSendBytes_str("WL_SEND_BYTES_" + graph.get_run_identifier());
     std::string timer_wl_send_recv_str("WL_SYNC_TIME_SEND_RECV_" + graph.get_run_identifier());
     std::string timer_wl_total_str("WL_SYNC_TIME_TOTAL_" + graph.get_run_identifier());
@@ -135,15 +135,15 @@ public:
 
       // otherwise send off itmes to appropriate host
       size_t bagSize =  bag_vec[h].size();
-      galois::Runtime::SendBuffer b;
-      galois::Runtime::gSerialize(b, canTerminate);
-      galois::Runtime::gSerialize(b, bag_vec[h]);
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, canTerminate);
+      galois::runtime::gSerialize(b, bag_vec[h]);
       send_bytes += b.size();
       //assert(b.size() == sizeof(uint64_t)*(bagSize + 2));
       //std::stringstream ss;
       //ss << net.ID << " ] : SENDING : " << bagSize << "\n";
       //std::cerr << ss.str();
-      net.sendTagged(h, galois::Runtime::evilPhase, b);
+      net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush();
 
@@ -151,27 +151,27 @@ public:
     for (auto h = 0; h < net.Num; ++h) {
       if ((h == net.ID)) continue;
 
-      decltype(net.recieveTagged(galois::Runtime::evilPhase,nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
 
       do {
         net.handleReceives();
-        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
 
       bool other_canTerminate = true;
-      galois::Runtime::gDeserialize(p->second, other_canTerminate);
+      galois::runtime::gDeserialize(p->second, other_canTerminate);
       canTerminate = (other_canTerminate && canTerminate);
 
       // get stuff, insert to our list
       std::deque<uint64_t> s;
       //TODO avoid double copy
-      galois::Runtime::gDeserialize(p->second, s);
+      galois::runtime::gDeserialize(p->second, s);
       insertToLocalWL(s);
       //std::stringstream ss;
       //ss << net.ID << " ] : RECV : " << s.size() << " other CT : " << other_canTerminate << "\n";
       //std::cerr << ss.str();
     }
-    ++galois::Runtime::evilPhase;
+    ++galois::runtime::evilPhase;
     StatTimer_send_recv.stop();
 
     // Sort and remove duplicates from the worklist.

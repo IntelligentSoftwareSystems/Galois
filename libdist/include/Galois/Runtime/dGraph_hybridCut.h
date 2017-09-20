@@ -218,7 +218,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         scalefactor.clear();
       }
 
-      galois::Runtime::reportParam("(NULL)", "ONLINE VERTEX CUT PL", "0");
+      galois::runtime::reportParam("(NULL)", "ONLINE VERTEX CUT PL", "0");
 
       galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
@@ -387,7 +387,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       /*******************************************/
 
-      galois::Runtime::getHostBarrier().wait();
+      galois::runtime::getHostBarrier().wait();
 
       if (transpose && (numNodes > 0)) {
         base_hGraph::graph.transpose(edgeNuma);
@@ -457,7 +457,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               receive_edges(graph);
           });
 
-      ++galois::Runtime::evilPhase;
+      ++galois::runtime::evilPhase;
 
       timer.stop();
       fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
@@ -473,7 +473,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                              std::vector<std::vector<size_t>>& mirrorNodes) {
       //Go over assigned nodes and distribute edges.
 
-      auto& net = galois::Runtime::getSystemNetworkInterface();
+      auto& net = galois::runtime::getSystemNetworkInterface();
       galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
       std::vector<std::vector<uint64_t>> numOutgoingEdges(base_hGraph::numHosts);
@@ -495,7 +495,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
       }
 
-      auto activeThreads = galois::Runtime::activeThreads;
+      auto activeThreads = galois::runtime::activeThreads;
       galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
       galois::Timer timer;
@@ -508,8 +508,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
       auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
       auto& id = base_hGraph::id;
-      //galois::Runtime::do_all_coupled(
-      //  galois::Runtime::makeStandardRange(beginIter, endIter),
+      //galois::runtime::do_all_coupled(
+      //  galois::runtime::makeStandardRange(beginIter, endIter),
       //  [&] (auto src) {
       //    auto ee = fileGraph.edge_begin(src);
       //    auto ee_end = fileGraph.edge_end(src);
@@ -589,10 +589,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //send and clear assigned_edges_perhost to receive from other hosts
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
-        galois::Runtime::SendBuffer b;
-        galois::Runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
-        galois::Runtime::gSerialize(b, numOutgoingEdges[x]);
-        net.sendTagged(x, galois::Runtime::evilPhase, b);
+        galois::runtime::SendBuffer b;
+        galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
+        galois::runtime::gSerialize(b, numOutgoingEdges[x]);
+        net.sendTagged(x, galois::runtime::evilPhase, b);
         //std::cerr << "sending size  : " <<  numOutgoingEdges[x].size() << "\n";
       }
 
@@ -603,19 +603,19 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
 
-        decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
+        decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
           net.handleReceives();
-          p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
+          p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         } while(!p);
 
         uint64_t num_edges_from_host = 0;
-        galois::Runtime::gDeserialize(p->second, num_edges_from_host);
-        galois::Runtime::gDeserialize(p->second, numOutgoingEdges[p->first]);
+        galois::runtime::gDeserialize(p->second, num_edges_from_host);
+        galois::runtime::gDeserialize(p->second, numOutgoingEdges[p->first]);
         //std::cerr << "num_edges_from_host : " << num_edges_from_host << " Size : " << numOutgoingEdges[p->first].size()<<"\n";
         num_total_edges_to_receive += num_edges_from_host;
       }
-      ++galois::Runtime::evilPhase;
+      ++galois::runtime::evilPhase;
 
       numNodes = 0;
       numEdges = 0;
@@ -666,7 +666,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
         std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(base_hGraph::numHosts);
-        auto& net = galois::Runtime::getSystemNetworkInterface();
+        auto& net = galois::runtime::getSystemNetworkInterface();
 
         auto ee_end = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
         // Go over assigned nodes and distribute edges.
@@ -719,9 +719,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
             if(h == base_hGraph::id) continue;
             if(gdst_vec[h].size()){
-              galois::Runtime::SendBuffer b;
-              galois::Runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
-              net.sendTagged(h, galois::Runtime::evilPhase, b);
+              galois::runtime::SendBuffer b;
+              galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
+              net.sendTagged(h, galois::runtime::evilPhase, b);
             }
           }
           /*** All the outgoing edges for this src are constructed ***/
@@ -741,7 +741,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                                   uint64_t numEdges_distribute, 
                                   uint32_t VCutThreshold) {
         std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
-        auto& net = galois::Runtime::getSystemNetworkInterface();
+        auto& net = galois::runtime::getSystemNetworkInterface();
 
         auto ee_end = fileGraph.edge_begin(base_hGraph::gid2host[base_hGraph::id].first);
         //Go over assigned nodes and distribute edges.
@@ -792,9 +792,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
             if(h == base_hGraph::id) continue;
             if(gdst_vec[h].size()){
-              galois::Runtime::SendBuffer b;
-              galois::Runtime::gSerialize(b, src, gdst_vec[h]);
-              net.sendTagged(h, galois::Runtime::evilPhase, b);
+              galois::runtime::SendBuffer b;
+              galois::runtime::gSerialize(b, src, gdst_vec[h]);
+              net.sendTagged(h, galois::runtime::evilPhase, b);
             }
           }
         }
@@ -806,18 +806,18 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     template<typename GraphTy>
     void receive_edges(GraphTy& graph){
       galois::StatTimer StatTimer_exchange_edges("RECEIVE_EDGES_TIME");
-      auto& net = galois::Runtime::getSystemNetworkInterface();
+      auto& net = galois::runtime::getSystemNetworkInterface();
 
       //receive the edges from other hosts
       while(num_total_edges_to_receive){
 
-        decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
+        decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         net.handleReceives();
-        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         if (p) {
           std::vector<uint64_t> _gdst_vec;
           uint64_t _src;
-          galois::Runtime::gDeserialize(p->second, _src, _gdst_vec);
+          galois::runtime::gDeserialize(p->second, _src, _gdst_vec);
           num_total_edges_to_receive -= _gdst_vec.size();
           assert(isLocal(_src));
           uint32_t lsrc = G2L(_src);
@@ -830,10 +830,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdges(GraphTy& graph, galois::Runtime::RecvBuffer& b, 
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
       std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
     std::vector<typename GraphTy::edge_data_type> gdata_vec;
-    galois::Runtime::gDeserialize(b, gdata_vec);
+    galois::runtime::gDeserialize(b, gdata_vec);
     uint64_t i = 0;
     while (cur < cur_end) {
       auto gdata = gdata_vec[i];
@@ -844,7 +844,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdges(GraphTy& graph, galois::Runtime::RecvBuffer& b, 
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
       std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
     uint64_t i = 0;
     while (cur < cur_end) {

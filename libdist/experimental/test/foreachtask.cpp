@@ -5,7 +5,7 @@
 using namespace std;
 using namespace galois::Runtime;
 
-struct R : public galois::Runtime::Lockable {
+struct R : public galois::runtime::Lockable {
    int i;
 
    R() { i = 0; }

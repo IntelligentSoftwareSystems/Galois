@@ -32,7 +32,7 @@
 #include <mutex>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace details {
 struct dser_t {};

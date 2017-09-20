@@ -98,15 +98,15 @@ void ResolveCache::reset() {
 ////////////////////////////////////////////////////////////////////////////////
 
 
-ResolveCache* galois::Runtime::getThreadResolve() {
+ResolveCache* galois::runtime::getThreadResolve() {
   return thread_resolve;
 }
 
-void galois::Runtime::setThreadResolve(ResolveCache* rc) {
+void galois::runtime::setThreadResolve(ResolveCache* rc) {
   thread_resolve = rc;
 }
 
-CacheManager& galois::Runtime::getCacheManager() {
+CacheManager& galois::runtime::getCacheManager() {
   static CacheManager CM;
   return CM;
 }

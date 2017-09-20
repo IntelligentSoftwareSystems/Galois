@@ -71,7 +71,7 @@ struct initialize {
 
 */
 
-struct initialize : public galois::Runtime::Lockable {
+struct initialize : public galois::runtime::Lockable {
   Graphp g;
   initialize() {}
   initialize(Graphp _g): g(_g) {}
@@ -82,10 +82,10 @@ struct initialize : public galois::Runtime::Lockable {
   }
  // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 
@@ -94,15 +94,15 @@ struct initialize : public galois::Runtime::Lockable {
 };
 
 struct Point;
-typedef galois::Runtime::PerThreadDist<Point> DistPoint;
-typedef galois::Runtime::gptr<Point> PtrPoint;
+typedef galois::runtime::PerThreadDist<Point> DistPoint;
+typedef galois::runtime::gptr<Point> PtrPoint;
 
 
-struct Point: galois::Runtime::Lockable {
+struct Point: galois::runtime::Lockable {
 
   typedef int tt_is_copyable;
 
-  using Base = galois::Runtime::Lockable;
+  using Base = galois::runtime::Lockable;
 
   int x;
   int y;
@@ -114,9 +114,9 @@ struct Point: galois::Runtime::Lockable {
 
   Point (DistPoint): Base (), x(10), y(20) {}
 
-  Point (DistPoint, galois::Runtime::DeSerializeBuffer& buf): Base (), x(100), y(200) {}
+  Point (DistPoint, galois::runtime::DeSerializeBuffer& buf): Base (), x(100), y(200) {}
 
-  void getInitData (galois::Runtime::SerializeBuffer& buf) {
+  void getInitData (galois::runtime::SerializeBuffer& buf) {
 
   }
 };
@@ -138,7 +138,7 @@ struct OnEachFunc {
     PtrPoint p = dp.local();
 
     std::printf ("In on_each: Host=%u, Thread=%u, x=%d, y=%d\n",
-        galois::Runtime::NetworkInterface::ID, tid, p->x, p->y);
+        galois::runtime::NetworkInterface::ID, tid, p->x, p->y);
   }
 };
 
@@ -147,14 +147,14 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
   galois::StatManager statManager;
 
-  galois::Runtime::getSystemNetworkInterface().start();
+  galois::runtime::getSystemNetworkInterface().start();
 
 
   DistPoint dp = DistPoint::allocate ();
 
   PtrPoint p = dp.local ();
   std::printf ("After allocate: Host=%u, Thread=%u, x=%d, y=%d\n",
-      galois::Runtime::NetworkInterface::ID, 0, p->x, p->y);
+      galois::runtime::NetworkInterface::ID, 0, p->x, p->y);
 
   galois::on_each (OnEachFunc {dp}, "test-loop");
 
@@ -174,5 +174,5 @@ int main(int argc, char** argv) {
 
 
 
-  galois::Runtime::getSystemNetworkInterface().terminate();
+  galois::runtime::getSystemNetworkInterface().terminate();
 }

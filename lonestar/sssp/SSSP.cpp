@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
   // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
   // Graph::edge_data_type) * 2;
   galois::preAlloc(numThreads +
-                   approxNodeData / galois::Runtime::pagePoolSize());
+                   approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   std::cout << "Running Asynch with CAS version\n";
@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
   T.stop();
 
   galois::reportPageAlloc("MeminfoPost");
-  galois::Runtime::reportNumaAlloc("NumaPost");
+  galois::runtime::reportNumaAlloc("NumaPost");
   
   std::cout << "Node " << reportNode << " has distance "
             << graph.getData(report) << "\n";

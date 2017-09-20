@@ -19,7 +19,7 @@
 #include <functional>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 namespace cll = llvm::cl;
 
@@ -417,7 +417,7 @@ protected:
 
 
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif // GALOIS_RUNTIME_IKDG_BASE_H

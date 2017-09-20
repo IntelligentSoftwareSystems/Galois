@@ -15,20 +15,20 @@ struct NodeData: public B, PData {
 
 };
 
-template <galois::Runtime::InputDAG_ExecTy EXEC>
+template <galois::runtime::InputDAG_ExecTy EXEC>
 struct ChooseNodeDataType {
-  using type = galois::Runtime::InputDAGdataInOut;
+  using type = galois::runtime::InputDAGdataInOut;
 };
 
 template <>
-struct ChooseNodeDataType<galois::Runtime::InputDAG_ExecTy::PART> { 
-  using type = galois::Runtime::InputDAGdataPartInOut;
+struct ChooseNodeDataType<galois::runtime::InputDAG_ExecTy::PART> { 
+  using type = galois::runtime::InputDAGdataPartInOut;
 };
 
 
 
 
-template <galois::Runtime::InputDAG_ExecTy EXEC>
+template <galois::runtime::InputDAG_ExecTy EXEC>
 struct ChooseInnerGraph {
   using ND = NodeData<typename ChooseNodeDataType<EXEC>::type>; 
 
@@ -37,7 +37,7 @@ struct ChooseInnerGraph {
     ::template with_no_lockable<true>::type;
 };
 
-template <galois::Runtime::InputDAG_ExecTy EXEC>
+template <galois::runtime::InputDAG_ExecTy EXEC>
 class PageRankInputDAG: public PageRankBase<typename ChooseInnerGraph<EXEC>::type> {
 protected:
 
@@ -58,8 +58,8 @@ protected:
   };
 
   virtual void runPageRank (void) {
-    galois::Runtime::ForEachDet_InputDAG<EXEC>::run (
-        galois::Runtime::makeLocalRange(Base::graph),
+    galois::runtime::ForEachDet_InputDAG<EXEC>::run (
+        galois::runtime::makeLocalRange(Base::graph),
         ApplyOperator {*this},
         Base::graph,
         "page-rank-input-dag"
@@ -71,34 +71,34 @@ protected:
 int main (int argc, char* argv[]) {
   LonestarStart (argc, argv, name, desc, url);
 
-  switch (galois::Runtime::inputDAG_ExecTy) {
-    case galois::Runtime::InputDAG_ExecTy::CHROMATIC: 
+  switch (galois::runtime::inputDAG_ExecTy) {
+    case galois::runtime::InputDAG_ExecTy::CHROMATIC: 
       {
-        PageRankInputDAG<galois::Runtime::InputDAG_ExecTy::CHROMATIC> p;
+        PageRankInputDAG<galois::runtime::InputDAG_ExecTy::CHROMATIC> p;
         p.run ();
         break;
       }
-    case galois::Runtime::InputDAG_ExecTy::EDGE_FLIP: 
+    case galois::runtime::InputDAG_ExecTy::EDGE_FLIP: 
       {
-        PageRankInputDAG<galois::Runtime::InputDAG_ExecTy::EDGE_FLIP> p;
+        PageRankInputDAG<galois::runtime::InputDAG_ExecTy::EDGE_FLIP> p;
         p.run ();
         break;
       }
-    case galois::Runtime::InputDAG_ExecTy::TOPO: 
+    case galois::runtime::InputDAG_ExecTy::TOPO: 
       {
-        PageRankInputDAG<galois::Runtime::InputDAG_ExecTy::TOPO> p;
+        PageRankInputDAG<galois::runtime::InputDAG_ExecTy::TOPO> p;
         p.run ();
         break;
       }
-    case galois::Runtime::InputDAG_ExecTy::PART: 
+    case galois::runtime::InputDAG_ExecTy::PART: 
       {
-        PageRankInputDAG<galois::Runtime::InputDAG_ExecTy::PART> p;
+        PageRankInputDAG<galois::runtime::InputDAG_ExecTy::PART> p;
         p.run ();
         break;
       }
-    case galois::Runtime::InputDAG_ExecTy::HYBRID: 
+    case galois::runtime::InputDAG_ExecTy::HYBRID: 
       {
-        PageRankInputDAG<galois::Runtime::InputDAG_ExecTy::HYBRID> p;
+        PageRankInputDAG<galois::runtime::InputDAG_ExecTy::HYBRID> p;
         p.run ();
         break;
       }

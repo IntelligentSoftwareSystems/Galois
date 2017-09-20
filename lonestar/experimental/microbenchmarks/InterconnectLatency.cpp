@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
   galois::StatTimer T;
   T.start();
-  galois::on_each(PingPong(galois::Runtime::getBarrier(galois::Runtime::activeThreads)), galois::loopname("PingPong"));
+  galois::on_each(PingPong(galois::runtime::getBarrier(galois::runtime::activeThreads)), galois::loopname("PingPong"));
   T.stop();
 
   std::cout << "globalAtomicCounter = " << globalAtomicCounter << std::endl;

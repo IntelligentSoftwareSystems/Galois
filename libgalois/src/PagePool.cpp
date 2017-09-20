@@ -36,35 +36,35 @@
 
 using namespace galois::Runtime;
 
-static galois::Runtime::internal::PageAllocState<>* PA;
+static galois::runtime::internal::PageAllocState<>* PA;
 
-void galois::Runtime::internal::setPagePoolState(PageAllocState<>* pa) {
+void galois::runtime::internal::setPagePoolState(PageAllocState<>* pa) {
   GALOIS_ASSERT(!(PA && pa), "PagePool.cpp: Double Initialization of PageAllocState");
   PA = pa;
 }
 
-int galois::Runtime::numPagePoolAllocTotal() {
+int galois::runtime::numPagePoolAllocTotal() {
   return PA->countAll();
 }
 
-int galois::Runtime::numPagePoolAllocForThread(unsigned tid) {
+int galois::runtime::numPagePoolAllocForThread(unsigned tid) {
   return PA->count(tid);
 }
 
-void* galois::Runtime::pagePoolAlloc() {
+void* galois::runtime::pagePoolAlloc() {
   return PA->pageAlloc();
 }
 
-void galois::Runtime::pagePoolPreAlloc(unsigned num) {
+void galois::runtime::pagePoolPreAlloc(unsigned num) {
   while (num--)
     PA->pagePreAlloc();
 }
 
-void galois::Runtime::pagePoolFree(void* ptr) {
+void galois::runtime::pagePoolFree(void* ptr) {
   PA->pageFree(ptr);
 }
 
-size_t galois::Runtime::pagePoolSize() {
+size_t galois::runtime::pagePoolSize() {
   return Substrate::allocSize();
 }
 

@@ -284,7 +284,7 @@ public:
 void setTermDetect(TerminationDetection* term);
 } // end namespace internal
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

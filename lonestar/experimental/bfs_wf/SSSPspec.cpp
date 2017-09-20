@@ -25,8 +25,8 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    galois::Runtime::for_each_ordered_spec (
-        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::runtime::for_each_ordered_spec (
+        galois::runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFuncSpec (graph, numIter),

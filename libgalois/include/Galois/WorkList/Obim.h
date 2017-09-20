@@ -64,7 +64,7 @@ protected:
 
   Substrate::Barrier& barrier;
 
-  OrderedByIntegerMetricData(): barrier(Runtime::getBarrier(Runtime::activeThreads)) { }
+  OrderedByIntegerMetricData(): barrier(runtime::getBarrier(runtime::activeThreads)) { }
 
   bool hasStored(ThreadData& p, Index idx) {
     for (auto& e : p.stored) {
@@ -251,7 +251,7 @@ private:
     if (BSP && !UseMonotonic) {
       msS = p.scanStart;
       if (localLeader) {
-        for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
+        for (unsigned i = 0; i < runtime::activeThreads; ++i) {
           Index o = data.getRemote(i)->scanStart;
           if (this->compare(o, msS))
             msS = o;
@@ -394,7 +394,7 @@ public:
     Index curIndex = p.curIndex;
     CTy* C = p.current;
 
-    for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
+    for (unsigned i = 0; i < runtime::activeThreads; ++i) {
       ThreadData& o = *data.getRemote(i);
       if (o.hasWork && this->compare(o.curIndex, curIndex)) {
         curIndex = o.curIndex;

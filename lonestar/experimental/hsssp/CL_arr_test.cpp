@@ -187,12 +187,12 @@ void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f){
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
    CLContext * ctx = getCLContext();
-   auto& net = galois::Runtime::getSystemNetworkInterface();
+   auto& net = galois::runtime::getSystemNetworkInterface();
    galois::StatManager statManager;
 
    fprintf(stderr, "Starting OpenCL Test APP \n");
-   auto& barrier = galois::Runtime::getHostBarrier() ;//getSystemBarrier();
-   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
+   auto& barrier = galois::runtime::getHostBarrier() ;//getSystemBarrier();
+   const unsigned my_host_id = galois::runtime::NetworkInterface::ID;
    auto * d = ctx->get_default_device();
    Array<int> arr(1024,d);
    Array<int> f(1,d);

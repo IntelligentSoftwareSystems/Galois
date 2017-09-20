@@ -502,7 +502,7 @@ int main(int argc, char** argv) {
 
   // XXX Test if preallocation matters
   galois::reportPageAlloc("MeminfoPre");
-  // galois::preAlloc(numThreads + 8 * galois::Runtime::MM::numPageAllocTotal());
+  // galois::preAlloc(numThreads + 8 * galois::runtime::MM::numPageAllocTotal());
   // case by case preAlloc to avoid allocating unnecessarily
   switch (algo) {
 
@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
       break;
 
     case edgeiterator: 
-      galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / galois::Runtime::pagePoolSize());
+      galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / galois::runtime::pagePoolSize());
       galois::reportPageAlloc("MeminfoMid");
       run<EdgeIteratorAlgo>(); 
       break;

@@ -161,8 +161,8 @@ class KruskalLevelExec: public Kruskal {
     galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    galois::Runtime::for_each_ordered_level (
-        galois::Runtime::makeStandardRange (edges.begin (), edges.end ()),
+    galois::runtime::for_each_ordered_level (
+        galois::runtime::makeStandardRange (edges.begin (), edges.end ()),
         GetWeight (), std::less<Weight_ty> (), findLoop, linkUpLoop);
 
     runningTime.stop ();

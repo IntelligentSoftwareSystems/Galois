@@ -34,28 +34,28 @@ namespace galois {
 namespace Graph {
 
 template<typename T>
-class Bag :boost::noncopyable, public Runtime::Lockable {
+class Bag :boost::noncopyable, public runtime::Lockable {
 
   typedef gdeque<T> ConTy;
   ConTy items;
 
-  Runtime::PerThreadDist<Bag> basePtr;
+  runtime::PerThreadDist<Bag> basePtr;
 
 public:
-  typedef Runtime::PerThreadDist<Bag> pointer;
+  typedef runtime::PerThreadDist<Bag> pointer;
   static pointer allocate() {
-    return Runtime::PerThreadDist<Bag>::allocate();
+    return runtime::PerThreadDist<Bag>::allocate();
   }
   static void deallocate(pointer ptr) {
-    Runtime::PerThreadDist<Bag>::deallocate(ptr);
+    runtime::PerThreadDist<Bag>::deallocate(ptr);
   }
 
   Bag() {}
   explicit Bag(pointer p) :basePtr(p) {}
-  Bag(pointer p, Runtime::DeSerializeBuffer&) :basePtr(p) {}
-  Bag(Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
+  Bag(pointer p, runtime::DeSerializeBuffer&) :basePtr(p) {}
+  Bag(runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
-  void getInitData(Runtime::SerializeBuffer&) {}
+  void getInitData(runtime::SerializeBuffer&) {}
 
   //LOCAL operations
 
@@ -82,29 +82,29 @@ public:
 
   T& back() { return items.front(); }
 
-  struct InnerBegFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
-    local_iterator operator()(Runtime::gptr<Bag> d) {
+  struct InnerBegFnL : std::unary_function<runtime::gptr<Bag>, local_iterator> {
+    local_iterator operator()(runtime::gptr<Bag> d) {
       acquire(d, MethodFlag::ALL);
       return d->local_begin();
     }
   };
-  struct InnerEndFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
-    local_iterator operator()(Runtime::gptr<Bag> d) {
+  struct InnerEndFnL : std::unary_function<runtime::gptr<Bag>, local_iterator> {
+    local_iterator operator()(runtime::gptr<Bag> d) {
       acquire(d, MethodFlag::ALL);
       return d->local_end();
     }
   };
 
-  typedef TwoLevelIteratorA<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, std::forward_iterator_tag, InnerBegFnL, InnerEndFnL> iterator;
+  typedef TwoLevelIteratorA<typename runtime::PerThreadDist<Bag>::iterator, local_iterator, std::forward_iterator_tag, InnerBegFnL, InnerEndFnL> iterator;
   iterator begin() { return iterator(basePtr.begin(), basePtr.end(), basePtr.begin(), InnerBegFnL(), InnerEndFnL()); }
   iterator end() { return iterator(basePtr.end(), basePtr.end(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s,basePtr, items);
   }
-  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::runtime::DeSerializeBuffer& s) {
     gDeserialize(s,basePtr, items);
   }
 };

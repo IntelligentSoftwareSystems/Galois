@@ -41,7 +41,7 @@ namespace {
 
 class MCSBarrier: public galois::Substrate::Barrier {
   struct treenode {
-    //vpid is galois::Runtime::LL::getTID()
+    //vpid is galois::runtime::LL::getTID()
     std::atomic<bool>* parentpointer; //null for vpid == 0
     std::atomic<bool>* childpointers[2];
     bool havechild[4];

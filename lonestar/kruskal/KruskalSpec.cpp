@@ -46,11 +46,11 @@ class KruskalSpec: public KruskalRuntime {
 
       if (e.repSrc != e.repDst) {
 
-        bool srcFail = !galois::Runtime::owns (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
-        bool dstFail = !galois::Runtime::owns (&lockVec[e.repDst], galois::MethodFlag::WRITE);
+        bool srcFail = !galois::runtime::owns (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
+        bool dstFail = !galois::runtime::owns (&lockVec[e.repDst], galois::MethodFlag::WRITE);
 
         if (srcFail && dstFail) {
-          galois::Runtime::signalConflict();
+          galois::runtime::signalConflict();
 
         } else { 
 
@@ -143,7 +143,7 @@ class KruskalSpec: public KruskalRuntime {
       FindLoopRuntime findLoop {lockVec, repVec, findIter};
       LinkUpLoopSpec linkUpLoop {lockVec, repVec, mstSum, linkUpIter};
 
-      galois::Runtime::for_each_ordered_spec (
+      galois::runtime::for_each_ordered_spec (
           edgeRange,
           Edge::Comparator (), findLoop, linkUpLoop,
           std::make_tuple (
@@ -167,7 +167,7 @@ class KruskalSpec: public KruskalRuntime {
       FindLoopRuntime findLoop {lockVec, repVec, findIter};
       UnionByRankSpec linkUpLoop {lockVec, repVec, mstSum, linkUpIter};
 
-      galois::Runtime::for_each_ordered_spec (
+      galois::runtime::for_each_ordered_spec (
           edgeRange,
           Edge::Comparator (), findLoop, linkUpLoop,
           std::make_tuple (

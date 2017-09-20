@@ -57,7 +57,7 @@ void LonestarStart(int argc, char** argv,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads); 
 
-  galois::Runtime::setStatFile(statFile);
+  galois::runtime::setStatFile(statFile);
 
   LonestarPrintVersion();
   std::cout << "Copyright (C) " << galois::getCopyrightYear() << " The University of Texas at Austin\n";
@@ -75,11 +75,11 @@ void LonestarStart(int argc, char** argv,
     if (i != argc - 1)
       cmdout << " ";
   }
-  galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
-  galois::Runtime::reportParam("(NULL)", "Threads", numThreads);
+  galois::runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+  galois::runtime::reportParam("(NULL)", "Threads", numThreads);
 
   char name[256];
   gethostname(name, 256);
-  galois::Runtime::reportParam("(NULL)", "Hostname", name);
+  galois::runtime::reportParam("(NULL)", "Hostname", name);
 
 }

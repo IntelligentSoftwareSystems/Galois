@@ -52,7 +52,7 @@
 #include <cstddef>
 
 namespace galois {
-namespace Runtime {
+namespace runtime {
 
 //! Low level page pool (individual pages, use largeMalloc for large blocks)
 
@@ -143,12 +143,12 @@ public:
   }
 };
 
-//! Initialize PagePool, used by Runtime::init();
+//! Initialize PagePool, used by runtime::init();
 void setPagePoolState(PageAllocState<>* pa);
 
 } // end namespace internal
 
-} // end namespace Runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif

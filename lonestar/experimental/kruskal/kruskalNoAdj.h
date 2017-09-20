@@ -230,7 +230,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      galois::Runtime::do_all_coupled (
+      galois::runtime::do_all_coupled (
           edges.begin (), edges.end (),
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -239,7 +239,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      galois::Runtime::do_all_coupled (
+      galois::runtime::do_all_coupled (
           edges.begin (), edges.end (),
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -249,7 +249,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      galois::Runtime::do_all_coupled (
+      galois::runtime::do_all_coupled (
           *currWorkList,
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -258,7 +258,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      galois::Runtime::do_all_coupled (
+      galois::runtime::do_all_coupled (
           *currWorkList,
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -440,7 +440,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     matchTimer.start ();
 
-    galois::Runtime::do_all_coupled (
+    galois::runtime::do_all_coupled (
         workList,
         FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -451,7 +451,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     // std::cout << "Starting merge_loop" << std::endl;
 
-    galois::Runtime::do_all_coupled (
+    galois::runtime::do_all_coupled (
         workList,
         UnionLoop<KNode_tp> (round, numUnions, mstSum, mergeIter), "merge_loop");
 

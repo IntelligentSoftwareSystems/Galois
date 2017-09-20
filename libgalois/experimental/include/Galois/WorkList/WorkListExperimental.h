@@ -251,9 +251,9 @@ template<typename T, int chunksize = 64>
 class MP_SC_Bag {
   class Chunk : public FixedSizeRing<T, chunksize, false>, public ConExtListNode<Chunk>::ListNode {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  runtime::MM::FixedSizeAllocator heap;
 
-  Runtime::PerThreadStorage<PtrLock<Chunk*, true> > write_stack;
+  runtime::PerThreadStorage<PtrLock<Chunk*, true> > write_stack;
 
   ConExtLinkedStack<Chunk, true> read_stack;
   Chunk* current;
@@ -1264,7 +1264,7 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class SetQueue : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {
-  std::set<T, Compare, Runtime::FixedSizeAllocator<T> > wl;
+  std::set<T, Compare, runtime::FixedSizeAllocator<T> > wl;
 
   using Substrate::PaddedLock<concurrent>::lock;
   using Substrate::PaddedLock<concurrent>::try_lock;
@@ -1782,7 +1782,7 @@ class PTbb : private boost::noncopyable {
     drand48_data r;
   };
 
-  galois::Runtime::PerThreadStorage<PTD> tld;
+  galois::runtime::PerThreadStorage<PTD> tld;
 
   void pull_in(PTD* N) {
     galois::optional<T> r;
@@ -1810,7 +1810,7 @@ public:
     //index = (index & 0x00FF) ^ ((index >> 8) & 0x00FF);
     //index %= galois::getActiveThreads();
     // PTD* N = tld.getLocal();
-    // if (index == Runtime::LL::getTID()) {
+    // if (index == runtime::LL::getTID()) {
     //   N->wl.push(val);
     // } else {
     //   tld.getRemote(index)->wl.push(val);
@@ -1818,7 +1818,7 @@ public:
     long int index;
     lrand48_r(&tld.getLocal()->r, &index);
     index %= galois::getActiveThreads();
-    if (index == Runtime::LL::getTID())
+    if (index == runtime::LL::getTID())
       tld.getLocal()->wl.push(val);
     else
       tld.getRemote(index)->inq.push(val);
@@ -1828,7 +1828,7 @@ public:
   void push(ItTy b, ItTy e) {
     PTD* N = tld.getLocal();
     long int index;
-    unsigned loc = Runtime::LL::getTID();
+    unsigned loc = runtime::LL::getTID();
     while (b != e) {
       lrand48_r(&N->r, &index);
       index %= galois::getActiveThreads();
@@ -1861,7 +1861,7 @@ template<class Compare = std::less<int>, typename T = int>
 class STbb : private boost::noncopyable {
   typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
   
-  galois::Runtime::PerThreadStorage<TBBTy> tld;
+  galois::runtime::PerThreadStorage<TBBTy> tld;
 
 public:
   template<bool newconcurrent>
@@ -2129,7 +2129,7 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  Runtime::FixedSizeHeap heap;
+  runtime::FixedSizeHeap heap;
 
   Substrate::PerThreadStorage<ChunkTy*> data;
 

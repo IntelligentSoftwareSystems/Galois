@@ -42,7 +42,7 @@ namespace AtomicImpl {
  */
 template<typename T, template <typename _> class W, bool CONCURRENT>
 class GAtomicImpl {
-  // galois::Runtime::LL::CacheLineStorage<T> val;
+  // galois::runtime::LL::CacheLineStorage<T> val;
   W<T> val;
 
 public:
@@ -104,7 +104,7 @@ public:
 // non-current version 
 template<typename T, template <typename _> class W>
 class GAtomicImpl<T, W, false> {
-  // galois::Runtime::LL::CacheLineStorage<T> val;
+  // galois::runtime::LL::CacheLineStorage<T> val;
   W<T> val;
 
 public:

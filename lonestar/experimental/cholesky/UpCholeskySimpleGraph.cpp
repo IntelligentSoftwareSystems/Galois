@@ -321,7 +321,7 @@ struct TreeExecModel {
   void run() {
     // Begin execution -- FIXME: initial elements
     printf("%u root nodes\n", rootnodes.size());
-    galois::Runtime::for_each_ordered_tree(rootnodes[0],
+    galois::runtime::for_each_ordered_tree(rootnodes[0],
                                            GaloisDivide(this),
                                            GaloisConquer(this),
                                            "UpCholeskyTree");

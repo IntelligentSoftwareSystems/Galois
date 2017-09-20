@@ -60,7 +60,7 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
-galois::Runtime::PerThreadStorage<double*> CB;
+galois::runtime::PerThreadStorage<double*> CB;
 
 template<typename T>
 struct PerIt {  
@@ -178,7 +178,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
 
 struct InitializeLocal {
   void operator()(unsigned, unsigned) {
-    *CB.getLocal() = (double*)galois::Runtime::MM::pageAlloc(); 
+    *CB.getLocal() = (double*)galois::runtime::MM::pageAlloc(); 
     std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
   }
 };
@@ -195,11 +195,11 @@ int main(int argc, char** argv) {
 
   //CB.resize(NumNodes);
   //FIXME
-  assert(galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
+  assert(galois::runtime::MM::pageSize >= NumNodes * sizeof(double));
   galois::on_each(InitializeLocal());
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::preAlloc(numThreads * galois::Runtime::MM::numPageAllocTotal() / 3);
+  galois::preAlloc(numThreads * galois::runtime::MM::numPageAllocTotal() / 3);
   galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>

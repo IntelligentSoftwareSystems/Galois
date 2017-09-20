@@ -143,6 +143,6 @@ void DistTerminationDetection::propTokenLandingPad(RecvBuffer& b) {
 
 } // namespace
 
-galois::Runtime::TerminationDetection& galois::Runtime::getSystemTermination() {
+galois::runtime::TerminationDetection& galois::runtime::getSystemTermination() {
   return getDistTermination();
 }

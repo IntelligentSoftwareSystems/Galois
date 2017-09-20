@@ -35,7 +35,7 @@ namespace galois {
 
 template<typename ValueTy, typename FunctionTy>
 class DGBag {
-  galois::Runtime::NetworkInterface& net = galois::Runtime::getSystemNetworkInterface();
+  galois::runtime::NetworkInterface& net = galois::runtime::getSystemNetworkInterface();
 
   const FunctionTy &helper_fn;
   std::string loopName;
@@ -46,7 +46,7 @@ class DGBag {
   static std::vector<ValueTy> workItem_recv_vec;
   static std::vector<bool> hosts_didWork_vec;
 
-  static void recv_BagItems(uint32_t src, galois::Runtime::RecvBuffer& buf){
+  static void recv_BagItems(uint32_t src, galois::runtime::RecvBuffer& buf){
     bool x_didWork;
     unsigned x_ID;
     //XXX: Why pair?
@@ -64,7 +64,7 @@ class DGBag {
     num_Hosts_recvd = 0;
     hosts_didWork_vec.clear();
     workItem_recv_vec.clear();
-    galois::Runtime::getHostBarrier().wait();
+    galois::runtime::getHostBarrier().wait();
   }
 
 public: 
@@ -113,10 +113,10 @@ public:
     for(auto x = 0U; x < net.Num; ++x){
       if(x == net.ID)
         continue;
-      galois::Runtime::SendBuffer b;
+      galois::runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
       num_work_bytes += b.size();
-      net.sendTagged(x, galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::runtime::evilPhase, b);
       //net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
@@ -125,14 +125,14 @@ public:
     for(auto x = 0U; x < net.Num; ++x) {
       if(x == net.ID)
         continue;
-      decltype(net.recieveTagged(galois::Runtime::evilPhase,nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       recv_BagItems(p->first, p->second);
     }
-    ++galois::Runtime::evilPhase;
+    ++galois::runtime::evilPhase;
 
     //while(num_Hosts_recvd < (net.Num - 1)){
       //net.handleReceives();
