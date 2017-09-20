@@ -28,7 +28,7 @@
 #include <iostream>
 
 #include "StressWork.h"
-#include "Galois/gIO.h"
+#include "galois/gIO.h"
 
 StressWork::PerCPUtmpVecTy StressWork::perCPUtmpVec;
 

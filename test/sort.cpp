@@ -1,6 +1,6 @@
-#include "Galois/Galois.h"
-#include "Galois/ParallelSTL.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Timer.h"
 
 #include <iostream>
 #include <cstdlib>

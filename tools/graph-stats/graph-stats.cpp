@@ -21,9 +21,9 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Runtime/OfflineGraph.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Runtime/OfflineGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 

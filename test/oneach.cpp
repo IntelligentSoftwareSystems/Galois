@@ -21,7 +21,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 
 #include <iostream>
 

@@ -31,14 +31,14 @@
 #define DES_ORDERED_H
 
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Atomic.h"
-#include "Galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Atomic.h"
+#include "galois/Galois.h"
 
-#include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/Substrate/PaddedLock.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

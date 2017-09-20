@@ -1,8 +1,8 @@
 //Perform graph layout, Daniel Tunkelang style
 
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/LCGraph.h"
 #include <iostream>
 #include <stdlib.h>
 #include "llvm/Support/CommandLine.h"

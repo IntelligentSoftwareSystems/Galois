@@ -34,7 +34,7 @@
 
 #include <cassert>
 
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "galois/Substrate/PerThreadStorage.h"
 
 #include "ElementalOperation.h"
 #include "AuxDefs.h"

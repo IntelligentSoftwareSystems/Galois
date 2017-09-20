@@ -22,11 +22,11 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Graphs/LC_CSR_Graph.h"
-#include "Galois/Graphs/Util.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Graphs/LC_CSR_Graph.h"
+#include "galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "PGraph.h"

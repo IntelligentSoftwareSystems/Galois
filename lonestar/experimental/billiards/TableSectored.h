@@ -37,9 +37,9 @@
 #include "Collision.h"
 #include "Event.h"
 
-#include "Galois/optional.h"
+#include "galois/optional.h"
 
-#include "Galois/gIO.h"
+#include "galois/gIO.h"
 
 #include <vector>
 

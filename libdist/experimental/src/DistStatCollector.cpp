@@ -29,7 +29,7 @@
 
 
 #if 0 // disabled
-#include "Galois/Runtime/DistStatCollector.h"
+#include "galois/Runtime/DistStatCollector.h"
 
 #include <cmath>
 #include <new>

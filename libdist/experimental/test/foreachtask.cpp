@@ -1,5 +1,5 @@
-#include "Galois/ForeachTask.h"
-#include "Galois/Runtime/DistributedStructs.h"
+#include "galois/ForeachTask.h"
+#include "galois/Runtime/DistributedStructs.h"
 #include <vector>
 
 using namespace std;

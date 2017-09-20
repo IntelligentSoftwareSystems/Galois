@@ -25,11 +25,11 @@
  * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
 
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Substrate/Barrier.h"
+#include "galois/Substrate/Barrier.h"
 
 #include <iostream>
 

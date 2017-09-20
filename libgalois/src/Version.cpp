@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Version.h"
+#include "galois/Version.h"
 
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)

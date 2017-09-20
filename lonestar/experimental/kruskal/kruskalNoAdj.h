@@ -35,13 +35,13 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include "Galois/Timer.h"
-#include "Galois/Accumulator.h"
-#include "Galois/PerThreadContainer.h"
-#include "Galois/util/Markable.h"
+#include "galois/Timer.h"
+#include "galois/Accumulator.h"
+#include "galois/PerThreadContainer.h"
+#include "galois/util/Markable.h"
 
-#include "Galois/Runtime/DoAllCoupled.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "galois/Runtime/DoAllCoupled.h"
+#include "galois/Runtime/ll/CompilerSpecific.h"
 
 
 

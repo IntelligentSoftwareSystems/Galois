@@ -29,14 +29,14 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/hGraph.h"
+#include "galois/Dist/OfflineGraph.h"
+#include "galois/Dist/hGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

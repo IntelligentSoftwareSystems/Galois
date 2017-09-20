@@ -7,8 +7,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_SerialComm.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Timer.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Timer.h"
 
 #include <iostream>
 

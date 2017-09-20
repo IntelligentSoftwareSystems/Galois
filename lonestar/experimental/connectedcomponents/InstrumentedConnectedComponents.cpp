@@ -26,16 +26,16 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Timer.h"
-#include "Galois/UnionFind.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/OCGraph.h"
-#include "Galois/Graphs/TypeTraits.h"
-#include "Galois/ParallelSTL.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/DomainSpecificExecutors.h"
+#include "galois/Timer.h"
+#include "galois/UnionFind.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/OCGraph.h"
+#include "galois/Graphs/TypeTraits.h"
+#include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -48,8 +48,8 @@
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #include "GraphChiAlgo.h"
-#include "Galois/WorkList/WorkSet.h"
-#include "Galois/WorkList/MarkingSet.h"
+#include "galois/WorkList/WorkSet.h"
+#include "galois/WorkList/MarkingSet.h"
 #endif
 
 #include <ostream>

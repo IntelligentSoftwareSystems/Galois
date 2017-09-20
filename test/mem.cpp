@@ -1,5 +1,5 @@
-#include "Galois/Runtime/Mem.h"
-#include "Galois/gIO.h"
+#include "galois/Runtime/Mem.h"
+#include "galois/gIO.h"
 
 using namespace galois::Runtime;
 using namespace galois::substrate;

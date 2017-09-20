@@ -4,14 +4,14 @@
 #include "Production.h"
 #include "GaloisWorker.h"
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Graph/LC_Morph_Graph.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/UnionFind.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/ParallelSTL/ParallelSTL.h"
+#include "galois/Graph/LC_Morph_Graph.h"
 
 #include "Lonestar/BoilerPlate.h"
 

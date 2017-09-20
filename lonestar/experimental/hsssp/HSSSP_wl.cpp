@@ -27,10 +27,10 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
 
 #include "OfflineGraph.h"
 #include "hGraph.h"

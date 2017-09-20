@@ -29,9 +29,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Context.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/CacheLineStorage.h"
+#include "galois/Runtime/Context.h"
+#include "galois/Substrate/SimpleLock.h"
+#include "galois/Substrate/CacheLineStorage.h"
 
 #include <stdio.h>
 

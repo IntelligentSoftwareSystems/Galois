@@ -20,9 +20,9 @@
 #include <dai/factorgraph.h>
 #include <dai/properties.h>
 #include <dai/enum.h>
-#include "Galois/UserContext.h"
-#include "Galois/CheckedObject.h"
-#include "Galois/Accumulator.h"
+#include "galois/UserContext.h"
+#include "galois/CheckedObject.h"
+#include "galois/Accumulator.h"
 
 namespace dai {
 

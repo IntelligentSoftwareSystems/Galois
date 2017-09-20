@@ -2,8 +2,8 @@
 #include "writers/AigWriter.h"
 #include "subjectgraph/aig/Aig.h"
 #include "algorithms/Rewriting.h"
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
 #include <iostream>
 
 #define nOUTPUTS 10			// Number of outputs of the window (not used yet)

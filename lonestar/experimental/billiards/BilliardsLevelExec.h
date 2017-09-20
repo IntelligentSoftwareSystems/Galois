@@ -26,10 +26,10 @@
 #ifndef BILLIARDS_LEVEL_EXEC_H
 #define BILLIARDS_LEVEL_EXEC_H
 
-#include "Galois/Graphs/Graph.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/LevelExecutor.h"
+#include "galois/Runtime/LevelExecutor.h"
 
 #include "Billiards.h"
 

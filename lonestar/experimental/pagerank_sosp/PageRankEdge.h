@@ -23,7 +23,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-//#include "Galois/WorkList/WorkListDebug.h"
+//#include "galois/WorkList/WorkListDebug.h"
 
 static llvm::cl::opt<bool> edgePri("edgePri", llvm::cl::desc("Use priority for edges-based"), llvm::cl::init(false));
 

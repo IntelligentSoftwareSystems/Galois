@@ -24,7 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>
 

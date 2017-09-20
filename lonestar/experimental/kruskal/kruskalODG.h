@@ -30,8 +30,8 @@
 
 #include <tr1/unordered_set>
 
-#include "Galois/Atomic.h"
-#include "Galois/Accumulator.h"
+#include "galois/Atomic.h"
+#include "galois/Accumulator.h"
 
 #include "kruskal.h"
 

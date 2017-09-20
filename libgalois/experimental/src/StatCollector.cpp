@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/StatCollector.h"
+#include "galois/Runtime/StatCollector.h"
 
 #include <cmath>
 #include <new>

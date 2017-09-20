@@ -21,14 +21,14 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  * @author Rashid Kaleem <rashid@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Queue.h"
-#include "Galois/UserContext.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Queue.h"
+#include "galois/UserContext.h"
+#include "galois/Graph/Graph.h"
+#include "galois/Graph/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

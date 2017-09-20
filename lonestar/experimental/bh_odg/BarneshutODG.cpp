@@ -32,13 +32,13 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include "Galois/Galois.h"
-#include "Galois/Atomic.h"
-#include "Galois/CilkInit.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/DoAllCoupled.h"
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Galois.h"
+#include "galois/Atomic.h"
+#include "galois/CilkInit.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/DoAllCoupled.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

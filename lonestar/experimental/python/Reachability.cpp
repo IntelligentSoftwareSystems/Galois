@@ -1,6 +1,6 @@
 #include "Reachability.h"
-#include "Galois/Timer.h"
-#include "Galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Bag.h"
 
 typedef galois::InsertBag<GNode> NodeSet;
 

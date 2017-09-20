@@ -25,13 +25,13 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/TypeTraits.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

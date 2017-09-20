@@ -1,4 +1,4 @@
-#include "Galois/Graphs/Graph.h"
+#include "galois/Graphs/Graph.h"
 #include <string>
 
 int useGraph(std::string inputfile) {

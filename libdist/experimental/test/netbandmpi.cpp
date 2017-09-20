@@ -6,7 +6,7 @@
 
 #include <mpi.h>
 
-#include "Galois/Timer.h"
+#include "galois/Timer.h"
 
 volatile int cont = 0;
 

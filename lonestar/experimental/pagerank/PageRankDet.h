@@ -1,21 +1,21 @@
 #ifndef PAGERANK_DETERMINISTIC_H
 #define PAGERANK_DETERMINISTIC_H
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/DoAllWrap.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Graphs/Util.h"
-#include "Galois/Graphs/Graph.h"
-// #include "Galois/Graph/FileGraph.h"
+#include "galois/Graphs/Util.h"
+#include "galois/Graphs/Graph.h"
+// #include "galois/Graph/FileGraph.h"
 
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/DetChromatic.h"
-#include "Galois/Runtime/DetPartInputDAG.h"
-#include "Galois/Runtime/DetKDGexecutor.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Runtime/DetChromatic.h"
+#include "galois/Runtime/DetPartInputDAG.h"
+#include "galois/Runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

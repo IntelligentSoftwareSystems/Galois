@@ -27,10 +27,10 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "galois/Substrate/PerThreadStorage.h"
 
-//#include "Galois/Runtime/Mem.h"
-#include "Galois/gIO.h"
+//#include "galois/Runtime/Mem.h"
+#include "galois/gIO.h"
 #include <mutex>
 
 __thread char* galois::substrate::ptsBase;

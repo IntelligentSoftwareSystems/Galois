@@ -24,11 +24,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Galois.h"
-#include "Galois/Graph/FileGraph.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graph/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

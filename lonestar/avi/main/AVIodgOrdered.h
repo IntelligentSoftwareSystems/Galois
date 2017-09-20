@@ -24,8 +24,8 @@
 #ifndef AVI_ODG_ORDERED_H
 #define AVI_ODG_ORDERED_H
 
-#include "Galois/Runtime/KDGaddRem.h"
-#include "Galois/Runtime/KDGtwoPhase.h"
+#include "galois/Runtime/KDGaddRem.h"
+#include "galois/Runtime/KDGtwoPhase.h"
 
 
 #include <boost/iterator/transform_iterator.hpp>

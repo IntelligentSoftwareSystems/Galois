@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/NetworkBackend.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/NetworkBackend.h"
 
 #include <mutex>
 

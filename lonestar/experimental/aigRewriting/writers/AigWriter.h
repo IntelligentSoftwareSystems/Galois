@@ -6,7 +6,7 @@
 #include <string>
 
 #include "../subjectgraph/aig/Aig.h"
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 
 typedef aig::Aig Aig;
 

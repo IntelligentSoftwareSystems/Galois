@@ -27,8 +27,8 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#include "Galois/Runtime/Statistics.h"
-#include "Galois/Runtime/Executor_OnEach.h"
+#include "galois/Runtime/Statistics.h"
+#include "galois/Runtime/Executor_OnEach.h"
 
 #include <iostream>
 #include <fstream>

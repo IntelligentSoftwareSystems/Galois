@@ -30,10 +30,10 @@
 #include "Cavity.h"
 #include "Verifier.h"
 
-#include "Galois/Galois.h"
-#include "Galois/ParallelSTL.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

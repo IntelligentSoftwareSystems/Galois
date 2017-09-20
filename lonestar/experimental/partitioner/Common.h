@@ -8,15 +8,15 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
 #include <set>
 #include <vector>
 #include <string>
 
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/OfflineGraph.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Runtime/OfflineGraph.h"
 
 
 

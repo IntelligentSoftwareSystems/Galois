@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "Galois/Runtime/Network.h"
+#include "galois/Runtime/Network.h"
 
 std::atomic<int> num;
 

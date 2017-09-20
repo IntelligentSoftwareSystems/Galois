@@ -29,9 +29,9 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Graphs/OCGraph.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/gIO.h"
+#include "galois/Graphs/OCGraph.h"
+#include "galois/Runtime/Mem.h"
+#include "galois/gIO.h"
 
 #include <cassert>
 

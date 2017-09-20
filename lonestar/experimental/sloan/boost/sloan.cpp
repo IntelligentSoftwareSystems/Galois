@@ -26,19 +26,19 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
 
 //kik 
-#include "Galois/Atomic.h"
+#include "galois/Atomic.h"
 
 #include <string>
 #include <sstream>

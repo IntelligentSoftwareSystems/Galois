@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/CacheManager.h"
+#include "galois/Runtime/CacheManager.h"
 
 using namespace galois::Runtime;
 

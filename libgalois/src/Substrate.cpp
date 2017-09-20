@@ -31,9 +31,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Runtime/Substrate.h"
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/Init.h"
+#include "galois/Runtime/Substrate.h"
+#include "galois/Substrate/Barrier.h"
+#include "galois/Substrate/Init.h"
 
 galois::substrate::Barrier& galois::runtime::getBarrier(unsigned activeThreads) {
   return galois::substrate::getBarrier(activeThreads);

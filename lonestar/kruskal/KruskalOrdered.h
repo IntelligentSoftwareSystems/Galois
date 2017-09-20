@@ -30,7 +30,7 @@
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"
-#include "Galois/Runtime/KDGtwoPhase.h"
+#include "galois/Runtime/KDGtwoPhase.h"
 
 namespace kruskal {
 

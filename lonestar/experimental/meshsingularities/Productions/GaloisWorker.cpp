@@ -10,7 +10,7 @@
 #include <sys/time.h>
 #include "FakeMatrixGenerator.h"
 
-#include "Galois/MethodFlags.h"
+#include "galois/MethodFlags.h"
 
 #include "Node.h"
 

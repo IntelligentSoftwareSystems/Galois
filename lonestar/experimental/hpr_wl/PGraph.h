@@ -4,13 +4,13 @@
  *  Created on: Aug 10, 2015
  *      Author: rashid
  */
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Graph/LC_CSR_Graph.h"
+#include "galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Bag.h"
+#include "galois/Bag.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_

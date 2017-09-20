@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstring>
 
-#include "Galois/Runtime/NetworkBackend.h"
+#include "galois/Runtime/NetworkBackend.h"
 
 using namespace galois::Runtime;
 

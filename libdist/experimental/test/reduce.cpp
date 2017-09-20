@@ -1,7 +1,7 @@
-#include "Galois/Galois.h"
-#include "Galois/Graphs/Graph3.h"
-#include "Galois/Reduction.h"
-#include "Galois/Runtime/PerHostStorage.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/Graph3.h"
+#include "galois/Reduction.h"
+#include "galois/Runtime/PerHostStorage.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/counting_iterator.hpp>

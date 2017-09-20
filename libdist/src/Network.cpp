@@ -21,12 +21,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Tracer.h"
-//#include "Galois/Runtime/Barrier.h"
-//#include "Galois/Runtime/Directory.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/NetworkIO.h"
-#include "Galois/Runtime/NetworkBackend.h"
+#include "galois/Runtime/Tracer.h"
+//#include "galois/Runtime/Barrier.h"
+//#include "galois/Runtime/Directory.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/NetworkIO.h"
+#include "galois/Runtime/NetworkBackend.h"
 
 #include <type_traits>
 #include <cassert>

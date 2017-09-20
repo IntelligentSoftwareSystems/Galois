@@ -1,4 +1,4 @@
-#include "Galois/Runtime/sync_structures.h"
+#include "galois/Runtime/sync_structures.h"
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(dist_current, unsigned int);
 GALOIS_SYNC_STRUCTURE_REDUCE_MIN(dist_current, unsigned int);

@@ -27,9 +27,9 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed

@@ -28,12 +28,12 @@
 #ifndef WAVEFRONT_BFS_H_
 #define WAVEFRONT_BFS_H_
 
-#include "Galois/Accumulator.h"
-#include "Galois/AltBag.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/AltBag.h"
+#include "galois/DoAllWrap.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/WorkList/ExternalReference.h"
+#include "galois/WorkList/ExternalReference.h"
 
 #include "bfs.h"
 

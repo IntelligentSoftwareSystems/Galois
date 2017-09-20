@@ -32,10 +32,10 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/gIO.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Substrate/ThreadPool.h"
+#include "galois/gIO.h"
+#include "galois/Substrate/SimpleLock.h"
+#include "galois/Substrate/EnvCheck.h"
+#include "galois/Substrate/ThreadPool.h"
 
 #include <cstdlib>
 #include <cstdio>

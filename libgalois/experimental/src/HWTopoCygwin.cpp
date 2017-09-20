@@ -35,9 +35,9 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
-#include "Galois/Substrate/HWTopo.h"
-#include "Galois/Substrate/EnvCheck.h"
-#include "Galois/gIO.h"
+#include "galois/Substrate/HWTopo.h"
+#include "galois/Substrate/EnvCheck.h"
+#include "galois/gIO.h"
 
 #include <vector>
 #include <functional>

@@ -26,8 +26,8 @@
  *
  */
 
-#include "Galois/Runtime/Executor_ParaMeter.h"
-#include "Galois/gIO.h"
+#include "galois/Runtime/Executor_ParaMeter.h"
+#include "galois/gIO.h"
 
 namespace galois {
   namespace runtime {

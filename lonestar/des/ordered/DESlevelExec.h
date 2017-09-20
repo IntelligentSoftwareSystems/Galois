@@ -25,16 +25,16 @@
 #define DES_ORDERED_LEVEL_EXEC_H
 
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Atomic.h"
-#include "Galois/Galois.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Atomic.h"
+#include "galois/Galois.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/Runtime/Range.h"
+#include "galois/Substrate/PaddedLock.h"
+#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/LevelExecutor.h"
+#include "galois/Runtime/Range.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

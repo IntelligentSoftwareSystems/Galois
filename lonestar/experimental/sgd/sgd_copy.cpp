@@ -23,15 +23,15 @@
 #include <random>
 #include <cmath>
 
-#include "Galois/Galois.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Graph/Graph.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
 
 //Distributed Galois
-#include "Galois/Graphs/Graph3.h"
-#include "Galois/Runtime/DistSupport.h"
+#include "galois/Graphs/Graph3.h"
+#include "galois/Runtime/DistSupport.h"
 
 
 

@@ -1,4 +1,4 @@
-#include "Galois/Runtime/sync_structures.h"
+#include "galois/Runtime/sync_structures.h"
 
 #define LATENT_VECTOR_SIZE 20
 

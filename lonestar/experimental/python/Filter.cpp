@@ -1,6 +1,6 @@
 #include "Filter.h"
-#include "Galois/Timer.h"
-#include "Galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Bag.h"
 
 #include <regex>
 #include <string>

@@ -36,12 +36,12 @@
 #include <iostream>
 #include <queue>
 
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/DoAllWrap.h"
+#include "galois/Accumulator.h"
+#include "galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

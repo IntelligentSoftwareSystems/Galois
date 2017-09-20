@@ -27,16 +27,16 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/Tracer.h"
 
-#include "Galois/Runtime/OfflineGraph.h"
-#include "Galois/Runtime/hGraph.h"
-#include "Galois/DistAccumulator.h"
+#include "galois/Runtime/OfflineGraph.h"
+#include "galois/Runtime/hGraph.h"
+#include "galois/DistAccumulator.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

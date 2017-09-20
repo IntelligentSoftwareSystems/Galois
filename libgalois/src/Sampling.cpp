@@ -27,11 +27,11 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/Statistics.h"
-#include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/gIO.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Runtime/Statistics.h"
+#include "galois/Substrate/EnvCheck.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/gIO.h"
 #include <cstdlib>
 
 static void endPeriod() {
@@ -76,7 +76,7 @@ static void end() {}
 
 #ifdef GALOIS_USE_HPCTOOLKIT
 #include <hpctoolkit.h>
-#include "Galois/Runtime/ll/TID.h"
+#include "galois/Runtime/ll/TID.h"
 
 namespace hpctoolkit {
 static bool isOn;

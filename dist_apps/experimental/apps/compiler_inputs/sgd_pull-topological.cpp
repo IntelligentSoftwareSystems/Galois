@@ -27,16 +27,16 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_vertexCut.h"
+#include "galois/Runtime/dGraph_edgeCut.h"
+#include "galois/Runtime/dGraph_vertexCut.h"
 
-#include "Galois/DistAccumulator.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/DistAccumulator.h"
+#include "galois/Runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"

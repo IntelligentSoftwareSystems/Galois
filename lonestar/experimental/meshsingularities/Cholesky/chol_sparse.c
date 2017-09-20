@@ -4,12 +4,12 @@
 #include <math.h>
 #include <sys/time.h>
 /*
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/CilkInit.h"
-#include "Galois/Statistics.h"
-#include "Galois/Runtime/TreeExec.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/CilkInit.h"
+#include "galois/Statistics.h"
+#include "galois/Runtime/TreeExec.h"
 */
 
 #define CACHE_LINE_SIZE (64)

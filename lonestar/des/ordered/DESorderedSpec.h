@@ -31,15 +31,15 @@
 #define DES_ORDERED_H
 
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Atomic.h"
-#include "Galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Atomic.h"
+#include "galois/Galois.h"
 
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/ROBexecutor.h"
-#include "Galois/Runtime/OrderedSpeculation.h"
+#include "galois/Substrate/PaddedLock.h"
+#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/ROBexecutor.h"
+#include "galois/Runtime/OrderedSpeculation.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

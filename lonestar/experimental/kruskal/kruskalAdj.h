@@ -32,13 +32,13 @@
 #include <iostream>
 #include <fstream>
 
-#include "Galois/Atomic.h"
-#include "Galois/Timer.h"
-#include "Galois/util/Markable.h"
-#include "Galois/Accumulator.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Atomic.h"
+#include "galois/Timer.h"
+#include "galois/util/Markable.h"
+#include "galois/Accumulator.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/DoAllCoupled.h"
+#include "galois/Runtime/DoAllCoupled.h"
 
 
 #include "kruskalData.h"

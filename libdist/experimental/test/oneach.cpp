@@ -1,4 +1,4 @@
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include <iostream>
 
 struct Function {

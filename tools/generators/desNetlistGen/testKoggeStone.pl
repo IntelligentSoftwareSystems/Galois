@@ -11,7 +11,7 @@ my $numBits = 8;
 my $FinishTime = 100000;
 $numBits = shift @ARGV;
 
-my $GaloisBin = '~/projects/Galois/trunk/bin';
+my $GaloisBin = '~/projects/galois/trunk/bin';
 my $testFile = "/tmp/ks$numBits.net";
 my $cmd = "cd $GaloisBin && java eventdrivensimulation.SerialEventdrivensimulation $testFile";
 

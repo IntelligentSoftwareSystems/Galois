@@ -29,8 +29,8 @@
 #include "Graph.h"
 #include "Point.h"
 
-#include "Galois/Galois.h"
-#include "Galois/ParallelSTL.h"
+#include "galois/Galois.h"
+#include "galois/ParallelSTL.h"
 
 #include <stack>
 #include <set>

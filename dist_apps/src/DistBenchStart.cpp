@@ -32,10 +32,10 @@
  */
 
 #include "DistBenchStart.h"
-#include "Galois/Version.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/DistStats.h"
-#include "Galois/Runtime/DataCommMode.h"
+#include "galois/Version.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/DistStats.h"
+#include "galois/Runtime/DataCommMode.h"
 
 #include <iostream>
 #include <sstream>

@@ -32,7 +32,7 @@
 #ifndef METIS_H_
 #define METIS_H_
 
-#include "Galois/Graphs/LC_Morph_Graph.h"
+#include "galois/Graphs/LC_Morph_Graph.h"
 
 class MetisNode;
 typedef galois::graphs::LC_Morph_Graph<MetisNode, int> GGraph;

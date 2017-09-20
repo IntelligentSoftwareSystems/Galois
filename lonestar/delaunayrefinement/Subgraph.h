@@ -27,8 +27,8 @@
 
 #include "Element.h"
 
-#include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/Graph.h"
 
 #include <vector>
 #include <algorithm>

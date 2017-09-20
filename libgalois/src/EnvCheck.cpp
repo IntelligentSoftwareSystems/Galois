@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/EnvCheck.h"
+#include "galois/Substrate/EnvCheck.h"
 
 #include <cstdlib>
 

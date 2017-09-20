@@ -25,10 +25,10 @@
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
 
 #include "Lonestar/BoilerPlate.h"
 

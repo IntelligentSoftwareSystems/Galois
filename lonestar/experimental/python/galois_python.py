@@ -42,7 +42,7 @@ class AttrList(Structure):
                 ("value", POINTER(ValTy))]
 
 #glib = cdll.LoadLibrary("/opt/galois/libgalois_python.so")
-glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/Galois/release/exp/apps/python/libgalois_python.so")
+glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/galois/release/exp/apps/python/libgalois_python.so")
 
 # cast the result and arg types
 glib.createGraph.restype = GraphPtr

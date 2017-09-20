@@ -1,8 +1,8 @@
-#include "Galois/gIO.h"
-#include "Galois/Substrate/Init.h"
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/Termination.h"
+#include "galois/gIO.h"
+#include "galois/Substrate/Init.h"
+#include "galois/Substrate/Barrier.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/Substrate/Termination.h"
 
 
 #include <memory>

@@ -29,8 +29,8 @@
 #include <vector>
 #include <functional>
 
-#include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/WorkList/WorkList.h"
+#include "galois/Runtime/LevelExecutor.h"
+#include "galois/WorkList/WorkList.h"
 
 #include "bfs.h"
 #include "bfsParallel.h"

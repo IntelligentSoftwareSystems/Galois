@@ -1,7 +1,7 @@
 #ifndef BILLIARDS_PARALLEL_SECTORED_H
 #define BILLIARDS_PARALLEL_SECTORED_H
 
-#include "Galois/AltBag.h"
+#include "galois/AltBag.h"
 
 // TODO:
 // may need finer work-items consisting of a pair of events (contexts) to be tested. 

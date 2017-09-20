@@ -22,10 +22,10 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Bag.h"
-#include "Galois/Accumulator.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Bag.h"
+#include "galois/Accumulator.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/math/constants/constants.hpp>

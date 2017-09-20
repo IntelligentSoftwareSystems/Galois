@@ -27,9 +27,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Executor_OnEach.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/Runtime/PagePool.h"
+#include "galois/Runtime/Executor_OnEach.h"
+#include "galois/Runtime/Mem.h"
+#include "galois/Runtime/PagePool.h"
 
 void galois::runtime::preAlloc_impl(unsigned num) {
   unsigned pagesPerThread = (num + activeThreads - 1) / activeThreads;

@@ -31,8 +31,8 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/gIO.h"
-#include "Galois/Substrate/Termination.h"
+#include "galois/gIO.h"
+#include "galois/Substrate/Termination.h"
 
 // vtable anchoring
 galois::substrate::TerminationDetection::~TerminationDetection(void) {}

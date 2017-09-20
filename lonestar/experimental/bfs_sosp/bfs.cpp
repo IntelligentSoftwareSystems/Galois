@@ -25,14 +25,14 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/TypeTraits.h"
-#include "Galois/ParallelSTL.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/TypeTraits.h"
+#include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -44,7 +44,7 @@
 
 #include "HybridBFS.h"
 #ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/Executor_BulkSynchronous.h"
+#include "galois/Runtime/Executor_BulkSynchronous.h"
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #endif

@@ -26,16 +26,16 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/ParallelSTL.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
-#include "Galois/PriorityScheduling.h"
-#include "Galois/Runtime/BulkSynchronousWork.h"
+#include "galois/PriorityScheduling.h"
+#include "galois/Runtime/BulkSynchronousWork.h"
 #endif
 #ifdef USE_TBB
 #include "tbb/parallel_for.h"

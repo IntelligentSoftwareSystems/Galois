@@ -21,12 +21,12 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/WorkList/WorkList.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/UserContext.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

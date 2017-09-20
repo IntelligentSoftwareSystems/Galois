@@ -24,10 +24,10 @@
 #ifndef AVI_ORDERED_SPEC_H
 #define AVI_ORDERED_SPEC_H
 
-#include "Galois/Galois.h"
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/WorkList/WorkList.h"
-#include "Galois/Runtime/LevelExecutor.h"
+#include "galois/Galois.h"
+#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/WorkList/WorkList.h"
+#include "galois/Runtime/LevelExecutor.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

@@ -1,24 +1,24 @@
-#include "Galois/Galois.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Graphs/Bag.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/ParallelSTL/ParallelSTL.h"
+#include "galois/Graphs/Bag.h"
+#include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Galois/WorkList/WorkListAlt.h"
-#include "Galois/WorkList/WorkListDebug.h"
+#include "galois/WorkList/WorkListAlt.h"
+#include "galois/WorkList/WorkListDebug.h"
 
-#include "Galois/Graphs/Graph3.h"
-#include "Galois/Runtime/DistSupport.h"
+#include "galois/Graphs/Graph3.h"
+#include "galois/Runtime/DistSupport.h"
 
 #include <cassert>
 #include <stdlib.h>
 
 #include "Edge.h"
-#include "Galois/Runtime/Serialize.h"
+#include "galois/Runtime/Serialize.h"
 
-#include "Galois/Runtime/Context.h"
+#include "galois/Runtime/Context.h"
 
 #include <vector>
 #include <algorithm>

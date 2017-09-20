@@ -1,9 +1,9 @@
-#include "Galois/Galois.h"
-#include "Galois/FlatMap.h"
+#include "galois/Galois.h"
+#include "galois/FlatMap.h"
 #ifdef GALOIS_USE_EXP
-#include "Galois/ConcurrentFlatMap.h"
+#include "galois/ConcurrentFlatMap.h"
 #endif
-#include "Galois/Timer.h"
+#include "galois/Timer.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <cstdlib>

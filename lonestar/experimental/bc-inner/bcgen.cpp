@@ -1,4 +1,4 @@
-#include "Galois/Endian.h"
+#include "galois/Endian.h"
 #include <boost/tuple/tuple.hpp>
 
 #include <sys/mman.h>

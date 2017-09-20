@@ -32,19 +32,19 @@
 #include <vector>
 #include <cstdint>
 
-#include "Galois/Galois.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "galois/Galois.h"
+#include "galois/Graph/Graph.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/ParallelSTL/ParallelSTL.h"
 #include "llvm//Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graph/FileGraph.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graph/FileGraph.h"
 //Distributed Galois
-#include "Galois/Graphs/Graph3.h"
-#include "Galois/Runtime/DistSupport.h"
+#include "galois/Graphs/Graph3.h"
+#include "galois/Runtime/DistSupport.h"
 
 
 #include <boost/iterator/transform_iterator.hpp>

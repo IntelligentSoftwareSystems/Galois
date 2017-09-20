@@ -1,7 +1,7 @@
-#include "Galois/Galois.h"
-#include "Galois/gslist.h"
-#include "Galois/gIO.h"
-#include "Galois/Runtime/Mem.h"
+#include "galois/Galois.h"
+#include "galois/gslist.h"
+#include "galois/gIO.h"
+#include "galois/Runtime/Mem.h"
 #include <map>
 
 int main(int argc, char** argv) {

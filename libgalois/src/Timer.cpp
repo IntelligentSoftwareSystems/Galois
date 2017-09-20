@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Timer.h"
+#include "galois/Timer.h"
 
 using namespace galois;
 

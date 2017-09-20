@@ -31,9 +31,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/Substrate/Barrier.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
 

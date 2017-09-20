@@ -26,10 +26,10 @@
 #ifndef GALOIS_GRAPH_LC_PARTITIONEDINLINEEDGE_GRAPH_H
 #define GALOIS_GRAPH_LC_PARTITIONEDINLINEEDGE_GRAPH_H
 
-#include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
+#include "galois/LargeArray.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Graph/Details.h"
+#include "galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>

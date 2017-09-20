@@ -28,10 +28,10 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/TID.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Runtime/ThreadPool.h"
+#include "galois/Runtime/ll/HWTopo.h"
+#include "galois/Runtime/ll/TID.h"
 
 #include <pthread.h>
 

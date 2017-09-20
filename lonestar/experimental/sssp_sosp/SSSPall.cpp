@@ -26,11 +26,11 @@
  */
 #include "SSSPall.h"
 
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/UserContext.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/UserContext.h"
+#include "galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

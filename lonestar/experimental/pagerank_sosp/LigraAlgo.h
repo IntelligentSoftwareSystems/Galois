@@ -1,10 +1,10 @@
 #ifndef APPS_PAGERANK_LIGRAALGO_H
 #define APPS_PAGERANK_LIGRAALGO_H
 
-#include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Graphs/OCGraph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/GraphNodeBag.h"
+#include "galois/DomainSpecificExecutors.h"
+#include "galois/Graphs/OCGraph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/GraphNodeBag.h"
 
 #include <boost/mpl/if.hpp>
 

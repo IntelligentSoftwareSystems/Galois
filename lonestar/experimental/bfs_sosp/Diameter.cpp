@@ -25,13 +25,13 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/ParallelSTL.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

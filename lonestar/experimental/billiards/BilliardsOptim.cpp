@@ -24,12 +24,12 @@
  */
 
 
-#include "Galois/PerThreadContainer.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Graphs/Graph.h"
+#include "galois/Graphs/Graph.h"
 
-#include "Galois/Runtime/ROBexecutor.h"
-#include "Galois/Runtime/OrderedSpeculation.h"
+#include "galois/Runtime/ROBexecutor.h"
+#include "galois/Runtime/OrderedSpeculation.h"
 
 #include "Billiards.h"
 #include "BilliardsParallel.h"

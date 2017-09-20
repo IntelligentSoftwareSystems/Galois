@@ -3,10 +3,10 @@
 
 #include "bfs.h"
 
-#include "Galois/PerThreadContainer.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/CoupledExecutor.h"
+#include "galois/Runtime/ParallelWorkInline_Exp.h"
+#include "galois/Runtime/CoupledExecutor.h"
 
 typedef uint32_t ND_ty;
 class WavefrontBulkSyncEdge: public BFS<ND_ty> {

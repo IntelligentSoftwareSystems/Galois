@@ -1,6 +1,6 @@
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/PerHostStorage.h"
-#include "Galois/Timer.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/PerHostStorage.h"
+#include "galois/Timer.h"
 
 #include <iostream>
 #include <cmath>

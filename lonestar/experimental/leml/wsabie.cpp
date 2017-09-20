@@ -3,7 +3,7 @@
 
 #include <map>
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 using namespace std;

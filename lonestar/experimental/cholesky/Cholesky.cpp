@@ -27,14 +27,14 @@
 
 // A bunch of this is copied from SpanningTree
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/UnionFind.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/ParallelSTL.h"
-#include "Galois/Graphs/Graph.h" // FirstGraph
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/UnionFind.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Graphs/Graph.h" // FirstGraph
 #include "llvm/Support/CommandLine.h"
 #include <float.h>              // For DBL_DIG, significant digits in double
 
@@ -149,7 +149,7 @@ findEdge(GraphType& g, NodeType src, NodeType dst, bool *hasEdge) {
 #endif
 }
 
-// include/Galois/Graphs/Serialize.h
+// include/galois/Graphs/Serialize.h
 // Output a graph to a file as an edgelist
 template<typename GraphType>
 bool outputTextEdgeData(const char* ofile, GraphType& G) {
@@ -162,7 +162,7 @@ bool outputTextEdgeData(const char* ofile, GraphType& G) {
   for (typename GraphType::iterator ii = G.begin(),
          ee = G.end(); ii != ee; ++ii) {
     unsigned src = G.getData(*ii).id;
-    // FIXME: Version in include/Galois/Graphs/Serialize.h is wrong.
+    // FIXME: Version in include/galois/Graphs/Serialize.h is wrong.
     for (typename GraphType::edge_iterator jj = G.edge_begin(*ii),
            ej = G.edge_end(*ii); jj != ej; ++jj) {
       unsigned dst = G.getData(G.getEdgeDst(jj)).id;

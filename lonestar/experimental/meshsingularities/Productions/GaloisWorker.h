@@ -1,14 +1,14 @@
 #ifndef GALOISWORKER_H
 #define GALOISWORKER_H
 
-#include "Galois/Galois.h"
-#include "Galois/Graph/LC_Morph_Graph.h"
+#include "galois/Galois.h"
+#include "galois/Graph/LC_Morph_Graph.h"
 
 #include <functional>
 #include "TaskDescription.h"
 
-#include "Galois/Timer.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/ll/SimpleLock.h"
 #include "Node.h"
 
 #ifdef WITH_PAPI

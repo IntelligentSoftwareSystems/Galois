@@ -1,5 +1,5 @@
-#include "Galois/gtuple.h"
-#include "Galois/Traits.h"
+#include "galois/gtuple.h"
+#include "galois/Traits.h"
 #include <iostream>
 #include <cassert>
 

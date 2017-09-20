@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Network.h"
+#include "galois/Runtime/Network.h"
 #include "NetworkIO_mpi.h"
 
 #include <boost/intrusive/list.hpp>

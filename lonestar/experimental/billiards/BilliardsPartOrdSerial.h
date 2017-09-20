@@ -40,12 +40,12 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 
-#include "Galois/Accumulator.h"
-#include "Galois/Markable.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/Markable.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/Executor_DoAll.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 
 #include "dependTest.h"

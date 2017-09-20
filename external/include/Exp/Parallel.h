@@ -14,7 +14,7 @@
 #endif
 
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 #include <pthread.h>
@@ -220,7 +220,7 @@ struct Init { };
 
 // GALOIS
 #elif defined(EXP_DOALL_GALOIS)
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "boost/iterator/counting_iterator.hpp"
 #define cilk_spawn
 #define cilk_sync

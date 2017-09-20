@@ -26,7 +26,7 @@
  *
  */
 
-#include "Galois/Runtime/TreeExec.h"
+#include "galois/Runtime/TreeExec.h"
 
 namespace galois {
 namespace runtime {

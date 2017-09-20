@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
 #include <vector>
 #include <iostream>
 

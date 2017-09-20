@@ -62,7 +62,7 @@ fi
 
 RUN=ibrun
 
-#source $HOME/Galois/load_modules.sh
+#source $HOME/galois/load_modules.sh
 
 # move to working directory
 WORK_DIR=$SCRATCH/Galois

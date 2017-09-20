@@ -35,7 +35,7 @@
 
 #include <vector>
 
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
 //! Nodal indices, starting at 0. : amber
 typedef size_t GlobalNodalIndex;

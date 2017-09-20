@@ -1,6 +1,6 @@
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

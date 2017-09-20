@@ -21,9 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Tracer.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/Substrate/EnvCheck.h"
+#include "galois/Runtime/Tracer.h"
+#include "galois/Substrate/SimpleLock.h"
+#include "galois/Substrate/EnvCheck.h"
 
 #include <fstream>
 #include <cassert>

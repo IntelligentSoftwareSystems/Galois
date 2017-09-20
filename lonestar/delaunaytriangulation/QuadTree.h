@@ -24,8 +24,8 @@
 #define QUADTREE_H
 
 #include "Point.h"
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/array.hpp>
 

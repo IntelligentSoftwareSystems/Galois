@@ -22,11 +22,11 @@
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Graph/LC_CSR_Graph.h"
+#include "galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "PGraph.h"

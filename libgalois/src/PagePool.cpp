@@ -31,7 +31,7 @@
 
 #define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
 
-#include "Galois/Runtime/PagePool.h"
+#include "galois/Runtime/PagePool.h"
 
 
 using namespace galois::Runtime;

@@ -1,13 +1,13 @@
-#include "Galois/Bag.h"
-#include "Galois/gdeque.h"
-#include "Galois/gslist.h"
-#include "Galois/FlatMap.h"
+#include "galois/Bag.h"
+#include "galois/gdeque.h"
+#include "galois/gslist.h"
+#include "galois/FlatMap.h"
 #ifdef GALOIS_USE_EXP
-#include "Galois/ConcurrentFlatMap.h"
+#include "galois/ConcurrentFlatMap.h"
 #endif
-#include "Galois/LargeArray.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "galois/LargeArray.h"
+#include "galois/Runtime/Mem.h"
+#include "galois/Substrate/PerThreadStorage.h"
 
 struct MoveOnly {
   MoveOnly() = default;

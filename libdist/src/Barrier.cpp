@@ -26,11 +26,11 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Runtime/Substrate.h"
-#include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/Network.h"
-//#include "Galois/Runtime/Directory.h"
+#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/Runtime/Substrate.h"
+#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/Network.h"
+//#include "galois/Runtime/Directory.h"
 
 #include <cstdlib>
 #include <cstdio>

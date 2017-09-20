@@ -27,8 +27,8 @@
  * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
 
-#include "Galois/Runtime/DistStats.h"
-#include "Galois/Runtime/Serialize.h"
+#include "galois/Runtime/DistStats.h"
+#include "galois/Runtime/Serialize.h"
 
 using namespace galois::Runtime;
 

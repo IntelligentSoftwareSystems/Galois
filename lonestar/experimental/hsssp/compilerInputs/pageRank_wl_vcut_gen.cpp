@@ -29,17 +29,17 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/Tracer.h"
 
-#include "Galois/Dist/vGraph.h"
+#include "galois/Dist/vGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Dist/DistBag.h"
+#include "galois/Dist/DistBag.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 struct CUDA_Worklist cuda_wl;

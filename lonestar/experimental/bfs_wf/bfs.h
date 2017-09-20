@@ -34,29 +34,29 @@
 #include <limits>
 #include <iostream>
 #include <set>
-#include "Galois/Graphs/LC_InlineEdge_Graph.h"
+#include "galois/Graphs/LC_InlineEdge_Graph.h"
 
 // #define GALOIS_USE_MIC_CSR_IMPL
 #undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
-  #include "Galois/Graphs/LC_CSR_MIC_Graph.h"
+  #include "galois/Graphs/LC_CSR_MIC_Graph.h"
 #else
-  #include "Galois/Graphs/LC_CSR_Graph.h"
+  #include "galois/Graphs/LC_CSR_Graph.h"
 #endif
 
-#include "Galois/Accumulator.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/Graphs/Util.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "galois/Accumulator.h"
+#include "galois/DoAllWrap.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/Util.h"
+#include "galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "Galois/Substrate/CacheLineStorage.h"
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include "Lonestar/BoilerPlate.h"
 

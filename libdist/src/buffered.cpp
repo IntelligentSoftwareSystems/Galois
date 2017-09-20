@@ -21,9 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/NetworkIO.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/NetworkIO.h"
+#include "galois/Runtime/Tracer.h"
 
 #ifdef GALOIS_USE_LWCI
 #define NO_AGG

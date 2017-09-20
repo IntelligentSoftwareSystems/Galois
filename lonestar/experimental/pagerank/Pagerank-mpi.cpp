@@ -29,8 +29,8 @@
 
 #include <mpi.h>
 #include <iostream>
-#include "Galois/Galois.h"
-#include "Galois/Graph/FileGraph.h"
+#include "galois/Galois.h"
+#include "galois/Graph/FileGraph.h"
 
 #include <list>
 #include <bitset>

@@ -22,12 +22,12 @@
  */
 
 
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
-#include "Galois/Graphs/LC_Dist_Graph.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graphs/LC_Dist_InOut_Graph.h"
-#include "Galois/Bag.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
+#include "galois/Graphs/LC_Dist_Graph.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Graphs/LC_Dist_InOut_Graph.h"
+#include "galois/Bag.h"
 
 
 #include "Lonestar/BoilerPlate.h"

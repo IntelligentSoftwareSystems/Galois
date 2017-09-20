@@ -28,10 +28,10 @@
  * @author Loc Hoang <l_hoang@utexas.edu> (largeMallocSpecified + helpers)
  */
 
-#include "Galois/Substrate/NumaMem.h"
-#include "Galois/Substrate/PageAlloc.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/gIO.h"
+#include "galois/Substrate/NumaMem.h"
+#include "galois/Substrate/PageAlloc.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/gIO.h"
 
 #include <cassert>
 

@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Queue.h"
+#include "galois/Galois.h"
+#include "galois/Queue.h"
 #include <iostream>
 #include <vector>
 

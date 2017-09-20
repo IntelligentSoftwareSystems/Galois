@@ -23,11 +23,11 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
 #include "Metis.h"
 #include <set>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include <map>
 #include <set>
 #include <cstdlib>

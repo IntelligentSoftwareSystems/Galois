@@ -1,9 +1,9 @@
-#include "Galois/Bag.h"
-#include "Galois/gdeque.h"
-#include "Galois/gslist.h"
-#include "Galois/Timer.h"
-#include "Galois/gIO.h"
-#include "Galois/Runtime/Mem.h"
+#include "galois/Bag.h"
+#include "galois/gdeque.h"
+#include "galois/gslist.h"
+#include "galois/Timer.h"
+#include "galois/gIO.h"
+#include "galois/Runtime/Mem.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 

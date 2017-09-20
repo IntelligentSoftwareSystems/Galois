@@ -29,10 +29,10 @@
 #include "Cavity.h"
 #include "Verifier.h"
 
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/SpatialTree.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/SpatialTree.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 

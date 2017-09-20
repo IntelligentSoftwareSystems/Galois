@@ -32,9 +32,9 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#include "Galois/gIO.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Substrate/PageAlloc.h"
+#include "galois/gIO.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Substrate/PageAlloc.h"
 
 #include <cassert>
 #include <fstream>

@@ -22,19 +22,19 @@
  */
 // modified by Joyce Whang <joyce@cs.utexas.edu>
 
-#include "Galois/config.h"
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/Barrier.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "galois/config.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/PerThreadStorage.h"
+#include "galois/Runtime/Barrier.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/Graph/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/WorkList/WorkListDebug.h"
+#include "galois/WorkList/WorkListDebug.h"
 #endif
 
 #include GALOIS_CXX11_STD_HEADER(atomic)

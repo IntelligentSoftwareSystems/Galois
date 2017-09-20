@@ -29,9 +29,9 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/HWTopo.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/Substrate/HWTopo.h"
 
 #include <mutex>
 #include <condition_variable>

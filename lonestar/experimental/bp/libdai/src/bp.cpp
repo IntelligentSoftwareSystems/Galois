@@ -14,10 +14,10 @@
 #include <dai/bp.h>
 #include <dai/util.h>
 #include <dai/properties.h>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
-#include "Galois/PriorityScheduling.h"
-#include "Galois/Timer.h"
+#include "galois/PriorityScheduling.h"
+#include "galois/Timer.h"
 
 static galois::runtime::PerThreadStorage<int> counters;
 extern long GlobalTime;

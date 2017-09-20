@@ -12,7 +12,7 @@
 #include "EquationSystem.h"
 #include "Vertex.h"
 
-#include "Galois/Graph/LC_Morph_Graph.h"
+#include "galois/Graph/LC_Morph_Graph.h"
 
 class AbstractProduction;
 

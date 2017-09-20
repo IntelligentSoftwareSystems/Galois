@@ -3,10 +3,10 @@
 #include <tbb/tbb.h>
 
 
-#include "Galois/Galois.h"
-#include "Galois/CilkInit.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/TreeExec.h"
+#include "galois/Galois.h"
+#include "galois/CilkInit.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

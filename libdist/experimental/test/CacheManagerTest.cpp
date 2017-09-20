@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/CacheManager.h"
-#include "Galois/Runtime/RemotePointer.h"
+#include "galois/Runtime/CacheManager.h"
+#include "galois/Runtime/RemotePointer.h"
 
 #include <iostream>
 

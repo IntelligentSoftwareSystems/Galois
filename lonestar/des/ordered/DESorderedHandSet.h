@@ -30,13 +30,13 @@
 #ifndef DES_ORDERED_HAND_SET_H
 #define DES_ORDERED_HAND_SET_H
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Atomic.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Atomic.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Substrate/PaddedLock.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include <deque>
 #include <functional>

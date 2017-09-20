@@ -32,7 +32,7 @@
 #ifndef _ELEMENT_H
 #define _ELEMENT_H
 
-#include "Galois/gIO.h"
+#include "galois/gIO.h"
 
 #include <cassert>
 #include <stdlib.h>

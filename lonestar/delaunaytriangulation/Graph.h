@@ -28,8 +28,8 @@
 
 #include "Element.h"
 
-#include "Galois/optional.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/optional.h"
+#include "galois/Graphs/Graph.h"
 
 #include <vector>
 #include <deque>

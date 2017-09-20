@@ -1,5 +1,5 @@
-#include "Galois/Timer.h"
-#include "Galois/Runtime/Context.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/Context.h"
 
 #include <cstdlib>
 #include <iostream>

@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Runtime/DistSupport.h"
+#include "galois/Galois.h"
+#include "galois/Runtime/DistSupport.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>
 #include <vector>

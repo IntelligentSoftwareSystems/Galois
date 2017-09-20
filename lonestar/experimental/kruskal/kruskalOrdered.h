@@ -28,10 +28,10 @@
 #ifndef KRUSKAL_ORDERED_H_
 #define KRUSKAL_ORDERED_H_
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Callbacks.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Callbacks.h"
 
 #include "kruskalData.h"
 #include "kruskalFunc.h"

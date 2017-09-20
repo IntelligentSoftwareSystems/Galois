@@ -1,4 +1,4 @@
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 
 #include "multilabel.h"
 #include "smat.h"

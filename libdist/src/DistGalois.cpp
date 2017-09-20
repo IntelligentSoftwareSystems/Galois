@@ -28,7 +28,7 @@
  *
  */
 
-#include "Galois/DistGalois.h"
+#include "galois/DistGalois.h"
 
 galois::DistMemSys::DistMemSys(void)
   : galois::runtime::SharedMemRuntime<galois::runtime::DistStatManager>()

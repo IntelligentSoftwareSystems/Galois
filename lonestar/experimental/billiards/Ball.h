@@ -34,8 +34,8 @@
 #include "FPutils.h"
 #include "CollidingObject.h"
 
-#include "Galois/FlatSet.h"
-#include "Galois/gIO.h"
+#include "galois/FlatSet.h"
+#include "galois/gIO.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

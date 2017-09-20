@@ -1,6 +1,6 @@
 #include "Billiards.h"
 
-#include "Galois/PriorityQueue.h"
+#include "galois/PriorityQueue.h"
 
 template <typename Tbl_t=Table<Ball> >
 class BilliardsSerialGalloc: public Billiards<BilliardsSerialGalloc<Tbl_t>, Tbl_t> {

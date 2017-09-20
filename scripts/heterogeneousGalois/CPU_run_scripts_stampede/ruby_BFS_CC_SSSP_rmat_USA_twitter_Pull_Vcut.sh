@@ -14,8 +14,8 @@ echo $algo
 
 ENV_options="MV2_USE_LAZY_MEM_UNREGISTER=0 MV2_ENABLE_AFFINITY=0 GALOIS_DO_NOT_BIND_THREADS=1"
 
-#GRAPH_rmat="/work/02982/ggill0/Distributed_latest/inputs/pagerank/Galois/scalefree/NEW/transpose/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr"
-#GRAPH_usa="/work/02982/ggill0/Distributed_latest/inputs/pagerank/Galois/road/USA-road-d.USA-trans.gr"
+#GRAPH_rmat="/work/02982/ggill0/Distributed_latest/inputs/pagerank/galois/scalefree/NEW/transpose/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr"
+#GRAPH_usa="/work/02982/ggill0/Distributed_latest/inputs/pagerank/galois/road/USA-road-d.USA-trans.gr"
 
 
 GRAPH_twitter="/scratch/03279/roshand/dist-inputs/transpose/twitter-ICWSM10-component.tgr"

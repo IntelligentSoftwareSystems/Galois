@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Runtime/Directory.h"
+#include "galois/Galois.h"
+#include "galois/Runtime/Directory.h"
 
 using namespace std;
 using namespace galois::Runtime;

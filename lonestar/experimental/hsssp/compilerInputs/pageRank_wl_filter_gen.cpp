@@ -29,15 +29,15 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/Tracer.h"
 
-#include "Galois/Dist/hGraph.h"
-#include "Galois/DistAccumulator.h"
+#include "galois/Dist/hGraph.h"
+#include "galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"

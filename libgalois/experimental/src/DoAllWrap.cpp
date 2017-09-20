@@ -26,7 +26,7 @@
  *
  */
 
-#include "Galois/DoAllWrap.h"
+#include "galois/DoAllWrap.h"
 
 namespace galois {
 

@@ -24,13 +24,13 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
 
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/WorkList/WorkListExperimental.h"
+#include "galois/WorkList/WorkListExperimental.h"
 #endif
 
 #include <iostream>

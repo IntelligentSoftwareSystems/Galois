@@ -29,7 +29,7 @@
 #include <stdlib.h>
 
 #include "Edge.h"
-#include "Galois/Runtime/Serialize.h"
+#include "galois/Runtime/Serialize.h"
 
 #define MINANGLE 30.0
 

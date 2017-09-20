@@ -21,12 +21,12 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/gdeque.h"
-#include "Galois/Bag.h" // XXX
-#include "Galois/Runtime/TaskWork.h"
-#include "Galois/WorkList/WorkListAlt.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/gdeque.h"
+#include "galois/Bag.h" // XXX
+#include "galois/Runtime/TaskWork.h"
+#include "galois/WorkList/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

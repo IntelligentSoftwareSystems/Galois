@@ -27,10 +27,10 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "galois/Runtime/PerThreadStorage.h"
+#include "galois/Runtime/Termination.h"
+#include "galois/Runtime/Network.h"
+#include "galois/Runtime/ll/CompilerSpecific.h"
 
 using namespace galois::Runtime;
 

@@ -42,7 +42,7 @@
 #include "Collision.h"
 #include "Event.h"
 
-#include "Galois/gIO.h"
+#include "galois/gIO.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

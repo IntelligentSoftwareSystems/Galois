@@ -31,21 +31,21 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include "Galois/DistGalois.h"
-#include "Galois/DoAllWrap.h"
+#include "galois/DistGalois.h"
+#include "galois/DoAllWrap.h"
 #include "DistBenchStart.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/Tracer.h"
 
-#include "Galois/Runtime/dGraph_edgeCut.h"
-#include "Galois/Runtime/dGraph_cartesianCut.h"
-#include "Galois/Runtime/dGraph_hybridCut.h"
+#include "galois/Runtime/dGraph_edgeCut.h"
+#include "galois/Runtime/dGraph_cartesianCut.h"
+#include "galois/Runtime/dGraph_hybridCut.h"
 
-#include "Galois/DistAccumulator.h"
+#include "galois/DistAccumulator.h"
 
-#include "Galois/Runtime/dGraphLoader.h"
+#include "galois/Runtime/dGraphLoader.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

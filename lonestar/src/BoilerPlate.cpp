@@ -32,8 +32,8 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Version.h"
-#include "Galois/Runtime/Statistics.h"
+#include "galois/Version.h"
+#include "galois/Runtime/Statistics.h"
 
 #include <iostream>
 #include <sstream>

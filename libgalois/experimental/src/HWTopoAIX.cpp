@@ -31,9 +31,9 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Substrate/HWTopo.h"
-#include "Galois/Substrate/EnvCheck.h"
-#include "Galois/gIO.h"
+#include "galois/Substrate/HWTopo.h"
+#include "galois/Substrate/EnvCheck.h"
+#include "galois/gIO.h"
 
 #include <vector>
 #include <cerrno>

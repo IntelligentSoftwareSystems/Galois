@@ -1,17 +1,17 @@
 #ifndef GRAPH_COLORING_BASE_H
 #define GRAPH_COLORING_BASE_H
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Graphs/Util.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/PerThreadContainer.h"
-// #include "Galois/Graph/FileGraph.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/DoAllWrap.h"
+#include "galois/Graphs/Util.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/PerThreadContainer.h"
+// #include "galois/Graph/FileGraph.h"
 
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Runtime/Sampling.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

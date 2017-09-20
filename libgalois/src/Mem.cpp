@@ -34,7 +34,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Mem.h"
+#include "galois/Runtime/Mem.h"
 
 #include <map>
 #include <mutex>

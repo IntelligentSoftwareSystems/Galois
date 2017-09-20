@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
 
 #include <random>
 #include <cstdio>

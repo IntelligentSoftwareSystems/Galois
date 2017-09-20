@@ -30,12 +30,12 @@
 #ifndef DES_ORDERED_EXP_H
 #define DES_ORDERED_EXP_H
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/PerThreadContainer.h"
 
-#include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Substrate/PaddedLock.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include <deque>
 #include <functional>

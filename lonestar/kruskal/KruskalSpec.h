@@ -29,8 +29,8 @@
 #ifndef KRUSKAL_SPEC_H
 #define KRUSKAL_SPEC_H
 
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Runtime/ROBexecutor.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Runtime/ROBexecutor.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"

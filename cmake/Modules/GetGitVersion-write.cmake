@@ -6,9 +6,9 @@ if(GIT_FOUND)
     WORKING_DIRECTORY ${SOURCE_DIR}
     OUTPUT_VARIABLE GIT_REVISION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  file(WRITE include/Galois/revision.h.txt "#define GALOIS_REVISION \"${GIT_REVISION}\"\n")
+  file(WRITE include/galois/revision.h.txt "#define GALOIS_REVISION \"${GIT_REVISION}\"\n")
 else()
-  file(WRITE include/Galois/revision.h.txt "#define GALOIS_REVISION \"0\"\n")
+  file(WRITE include/galois/revision.h.txt "#define GALOIS_REVISION \"0\"\n")
 endif()
 
-execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different include/Galois/revision.h.txt include/Galois/revision.h)
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different include/galois/revision.h.txt include/galois/revision.h)

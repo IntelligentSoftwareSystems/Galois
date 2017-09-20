@@ -36,7 +36,7 @@
 #include "Event.h"
 
 
-#include "Galois/optional.h"
+#include "galois/optional.h"
 
 
 

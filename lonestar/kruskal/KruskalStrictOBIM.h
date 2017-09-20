@@ -34,9 +34,9 @@
 #ifndef KRUSKALSTRICTOBIM_H
 #define KRUSKALSTRICTOBIM_H
 
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/WorkList/WorkListExperimental.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Runtime/LevelExecutor.h"
+#include "galois/WorkList/WorkListExperimental.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"

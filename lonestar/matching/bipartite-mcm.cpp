@@ -30,12 +30,12 @@
 
 // TODO(ddn): Needs a graph implementation that supports reversing edges more efficiently
 
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/FileGraph.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

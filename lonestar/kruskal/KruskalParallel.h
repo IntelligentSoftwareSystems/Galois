@@ -28,12 +28,12 @@
 #ifndef KRUSKAL_PARALLEL_H
 #define KRUSKAL_PARALLEL_H
 
-#include "Galois/Atomic.h"
-#include "Galois/PerThreadContainer.h"
-#include "Galois/DynamicArray.h"
+#include "galois/Atomic.h"
+#include "galois/PerThreadContainer.h"
+#include "galois/DynamicArray.h"
 
-#include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Substrate/CompilerSpecific.h"
+#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/Substrate/CompilerSpecific.h"
 
 #include "Kruskal.h"
 

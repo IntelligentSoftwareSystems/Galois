@@ -28,9 +28,9 @@
 #ifndef SECTOR_H_
 #define SECTOR_H_
 
-#include "Galois/FlatSet.h"
-#include "Galois/optional.h"
-#include "Galois/Substrate/SimpleLock.h"
+#include "galois/FlatSet.h"
+#include "galois/optional.h"
+#include "galois/Substrate/SimpleLock.h"
 
 #include "GeomUtils.h"
 #include "CollidingObject.h"

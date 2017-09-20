@@ -20,12 +20,12 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Graphs/LCGraph.h"
 
 #include "Lonestar/BoilerPlate.h"
 

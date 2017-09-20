@@ -33,8 +33,8 @@
 #ifndef LONESTAR_BOILERPLATE_H
 #define LONESTAR_BOILERPLATE_H
 
-#include "Galois/Galois.h"
-#include "Galois/Version.h"
+#include "galois/Galois.h"
+#include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
 
 //! standard global options to the benchmarks

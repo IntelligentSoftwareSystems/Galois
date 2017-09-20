@@ -1,5 +1,5 @@
 #include "Coarsen.h"
-#include "Galois/Accumulator.h"
+#include "galois/Accumulator.h"
 
 #include <string>
 #include <unordered_map>

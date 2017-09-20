@@ -27,12 +27,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Substrate/HWTopo.h"
-#include "Galois/Substrate/TID.h"
-#include "Galois/gIO.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/Substrate/EnvCheck.h"
+#include "galois/Substrate/HWTopo.h"
+#include "galois/Substrate/TID.h"
+#include "galois/gIO.h"
 
 #include "boost/utility.hpp"
 

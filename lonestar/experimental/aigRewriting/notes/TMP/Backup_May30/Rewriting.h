@@ -2,9 +2,9 @@
 #define RECONVDRIVENWINDOWING_RECONVDRIVENWINDOWING_H_
 
 #include "Aig.h"
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
 
 namespace algorithm {
 

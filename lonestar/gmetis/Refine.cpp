@@ -22,9 +22,9 @@
  * @author Nikunj Yadav <nikunj@cs.utexas.edu>
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
 #include "Metis.h"
 #include <set>
 #include <iostream>

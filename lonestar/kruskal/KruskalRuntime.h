@@ -3,12 +3,12 @@
 
 #include "Kruskal.h"
 
-#include "Galois/DynamicArray.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Runtime/OrderedSpeculation.h"
-#include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Accumulator.h"
-#include "Galois/PerThreadContainer.h"
+#include "galois/DynamicArray.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/Accumulator.h"
+#include "galois/PerThreadContainer.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

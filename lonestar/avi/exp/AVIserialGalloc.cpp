@@ -1,6 +1,6 @@
 #include "AVIabstractMain.h"
 
-#include "Galois/PriorityQueue.h"
+#include "galois/PriorityQueue.h"
 
 
 class AVIserialGalloc: public AVIabstractMain {

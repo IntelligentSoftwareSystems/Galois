@@ -31,11 +31,11 @@
 #ifndef _DES_UNORDERED_H_
 #define _DES_UNORDERED_H_
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Atomic.h"
-#include "Galois/WorkList/WorkList.h"
-#include "Galois/gIO.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Atomic.h"
+#include "galois/WorkList/WorkList.h"
+#include "galois/gIO.h"
 
 #include "DESunorderedBase.h"
 

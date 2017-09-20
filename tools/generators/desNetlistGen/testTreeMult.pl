@@ -9,7 +9,7 @@ require "../scripts/devicelib.pl";
 
 my $numBits = shift @ARGV;
 
-my $GaloisBin = '~/projects/Galois/trunk/bin';
+my $GaloisBin = '~/projects/galois/trunk/bin';
 my $testFile = "/tmp/mult$numBits.net";
 my $cmd = "cd $GaloisBin && java eventdrivensimulation.SerialEventdrivensimulation $testFile";
 

@@ -25,7 +25,7 @@
 #ifndef LC_PARTITIONED_GRAPH_H
 #define LC_PARTITIONED_GRAPH_H
 
-#include "Galois/Graph/Details.h"
+#include "galois/Graph/Details.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>

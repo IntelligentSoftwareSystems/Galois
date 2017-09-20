@@ -31,9 +31,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Substrate/PageAlloc.h"
-#include "Galois/Substrate/SimpleLock.h"
-#include "Galois/gIO.h"
+#include "galois/Substrate/PageAlloc.h"
+#include "galois/Substrate/SimpleLock.h"
+#include "galois/gIO.h"
 
 #include <mutex>
 

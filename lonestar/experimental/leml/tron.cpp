@@ -6,7 +6,7 @@
 #include "tron.h"
 #include <omp.h>
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 #ifndef min

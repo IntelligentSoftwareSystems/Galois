@@ -1,6 +1,6 @@
 #pragma once
-#include "Galois/Runtime/Cuda/cuda_mtypes.h"
-#include "Galois/Runtime/DataCommMode.h"
+#include "galois/Runtime/Cuda/cuda_mtypes.h"
+#include "galois/Runtime/DataCommMode.h"
 
 struct CUDA_Context;
 

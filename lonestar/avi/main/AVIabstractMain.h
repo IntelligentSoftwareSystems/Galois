@@ -46,14 +46,14 @@
 
 
 
-#include "Galois/Accumulator.h"
-#include "Galois/Atomic.h"
-#include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "galois/Accumulator.h"
+#include "galois/Atomic.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/Sampling.h"
+#include "galois/Substrate/PerThreadStorage.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

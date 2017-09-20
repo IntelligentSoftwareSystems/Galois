@@ -9,7 +9,7 @@
 #include "Production.h"
 #include "EProduction.hxx"
 
-#include <Galois/Galois.h>
+#include <galois/Galois.h>
 
 #include <sys/time.h>
 #include <sched.h>

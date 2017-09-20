@@ -8,7 +8,7 @@
 #include "bilinear.h"
 
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))

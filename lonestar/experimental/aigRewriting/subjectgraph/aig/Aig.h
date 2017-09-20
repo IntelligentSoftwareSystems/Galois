@@ -1,9 +1,9 @@
 #ifndef AIG_AIG_H_
 #define AIG_AIG_H_
 
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/FirstGraph.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/FirstGraph.h"
 #include <iostream>
 #include <vector>
 #include <stack>

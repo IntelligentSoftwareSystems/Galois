@@ -22,16 +22,16 @@
  */
 // modified by Joyce Whang <joyce@cs.utexas.edu>
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/TypeTraits.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/WorkList/WorkListDebug.h"
+#include "galois/WorkList/WorkListDebug.h"
 #endif
 
 #include <atomic>

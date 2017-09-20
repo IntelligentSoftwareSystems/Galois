@@ -26,9 +26,9 @@
 #ifndef GALOIS_GRAPHS_LCITERATEGRAPH_H
 #define GALOIS_GRAPHS_LCITERATEGRAPH_H
 
-#include "Galois/Galois.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "galois/Galois.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Runtime/mm/Mem.h"
 
 #include <iterator>
 #include <new>

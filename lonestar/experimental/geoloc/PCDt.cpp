@@ -1,7 +1,7 @@
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/LCGraph.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/Allocator.h"
 

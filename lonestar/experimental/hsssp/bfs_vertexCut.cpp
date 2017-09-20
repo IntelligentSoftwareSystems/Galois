@@ -27,15 +27,15 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Runtime/OfflineGraph.h"
-#include "Galois/Runtime/vGraph.h"
-#include "Galois/DistAccumulator.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/OfflineGraph.h"
+#include "galois/Runtime/vGraph.h"
+#include "galois/DistAccumulator.h"
+#include "galois/Runtime/Tracer.h"
 
 
 static const char* const name = "BFS - Distributed Heterogeneous using vertex cut";

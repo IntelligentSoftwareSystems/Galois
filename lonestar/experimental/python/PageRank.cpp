@@ -25,9 +25,9 @@
  */
 
 
-#include "Galois/Galois.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/TypeTraits.h"
+#include "galois/Galois.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/TypeTraits.h"
 #include "PageRank.h"
 
 #include <atomic>

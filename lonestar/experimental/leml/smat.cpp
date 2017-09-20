@@ -5,14 +5,14 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 
 #include "smat.h"
 #include "zlib_util.h"
 #include "emmintrin.h"
 
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 #define MALLOC(type, size) (type*)malloc(sizeof(type)*(size))

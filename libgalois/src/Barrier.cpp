@@ -31,7 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/Barrier.h"
+#include "galois/Substrate/Barrier.h"
 
 //anchor vtable
 galois::substrate::Barrier::~Barrier() {}

@@ -1,8 +1,8 @@
 #ifndef _BCGRAPH_H_
 #define _BCGRAPH_H_
 
-#include "Galois/Bag.h"
-#include "Galois/Substrate/CacheLineStorage.h"
+#include "galois/Bag.h"
+#include "galois/Substrate/CacheLineStorage.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>

@@ -23,13 +23,13 @@
  *
  * @author rupesh nasre. <rupesh0508@gmail.com>
  */
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
 #include "SparseBitVector.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/WorkList/WorkList.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/WorkList/WorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

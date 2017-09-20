@@ -1,4 +1,4 @@
-#include "Galois/Runtime/Lockable.h"
+#include "galois/Runtime/Lockable.h"
 
 #include <iostream>
 

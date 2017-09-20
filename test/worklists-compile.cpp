@@ -20,7 +20,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/Range.h"
+#include "galois/Runtime/Range.h"
 
 #include <cstdlib>
 
@@ -59,7 +59,7 @@ struct checker {
 };
 
 #define GALOIS_WLCOMPILECHECK(name) checker<name<> > ck_##name;
-#include "Galois/WorkList/WorkList.h"
+#include "galois/WorkList/WorkList.h"
 
 int main(int argc, char** argv) {
   if (argc > 1)

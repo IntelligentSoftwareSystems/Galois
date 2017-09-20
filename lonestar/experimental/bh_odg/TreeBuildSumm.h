@@ -4,15 +4,15 @@
 #include "Point.h"
 #include "Octree.h"
 
-#include "Galois/Bag.h"
-#include "Galois/Runtime/ROBexecutor.h"
-#include "Galois/Runtime/OrderedSpeculation.h"
-#include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Runtime/DAGexec.h"
-#include "Galois/Runtime/DAGexecAlt.h"
-#include "Galois/Runtime/TreeExec.h"
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Bag.h"
+#include "galois/Runtime/ROBexecutor.h"
+#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/Runtime/LevelExecutor.h"
+#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/Runtime/DAGexec.h"
+#include "galois/Runtime/DAGexecAlt.h"
+#include "galois/Runtime/TreeExec.h"
+#include "galois/Runtime/Sampling.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

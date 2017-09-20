@@ -40,13 +40,13 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Runtime/WorkList.h"
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/Graph/FileGraph.h"
+#include "galois/Graph/LCGraph.h"
+#include "galois/Runtime/WorkList.h"
+#include "galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

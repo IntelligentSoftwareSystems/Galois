@@ -1,10 +1,10 @@
 #include "ReconvDrivenWindowing.h"
 #include "FunctionHandler.h"
 #include "FunctionPool.h"
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Accumulator.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Accumulator.h"
 
 #include <iostream>
 #include <set>

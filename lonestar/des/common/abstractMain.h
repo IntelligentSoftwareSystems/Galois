@@ -34,11 +34,11 @@
 
 #include <cstdio>
 
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Galois.h"
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Galois.h"
+#include "galois/Runtime/Sampling.h"
 
 #include "llvm/Support/CommandLine.h"
 

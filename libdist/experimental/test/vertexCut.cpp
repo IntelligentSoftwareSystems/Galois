@@ -3,14 +3,14 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
-#include "Galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/vGraph.h"
-#include "Galois/DistAccumulator.h"
+#include "galois/Dist/OfflineGraph.h"
+#include "galois/Dist/vGraph.h"
+#include "galois/DistAccumulator.h"
 
 
 static const char* const name = "SSSP - Distributed Heterogeneous";

@@ -1,4 +1,4 @@
-#include "Galois/Substrate/SimpleLock.h"
+#include "galois/Substrate/SimpleLock.h"
 
 #include <cstdlib>
 

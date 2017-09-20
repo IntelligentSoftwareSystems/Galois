@@ -22,9 +22,9 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/LargeArray.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/OfflineGraph.h"
+#include "galois/LargeArray.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Runtime/OfflineGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 

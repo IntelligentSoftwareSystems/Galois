@@ -3,15 +3,15 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/Sampling.h"
+#include "galois/Accumulator.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/DoAllWrap.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Graphs/FileGraph.h"
+#include "galois/Runtime/Sampling.h"
 
 
 #include <iostream>

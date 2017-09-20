@@ -53,9 +53,9 @@ a fixed size allocator can be passed to std::set.
 
 This allocator is typically instantiated outside the parallel loop by the master
 thread and then can be used by multiple parallel loops.  An example from {@link
-include/Galois/gdeque.h} is shown below:
+include/galois/gdeque.h} is shown below:
 
-@snippet include/Galois/gdeque.h Example Fixed Size Allocator
+@snippet include/galois/gdeque.h Example Fixed Size Allocator
 
 
 \subsection plugin-other-alloc Plugging in 3rd Party Allocators
@@ -66,8 +66,8 @@ and STL data structures. It takes the type-name of the heap implementation as a
 template parameter and a reference to it for instantiating the allocator object.  
 
 Following is an example of how \b malloc and \b free, from C, can be wrapped into
-an allocator using this class, (see file {@link include/Galois/Runtime/mm/Mem.h}):
-@snippet include/Galois/Runtime/mm/Mem.h Example Third Party Allocator
+an allocator using this class, (see file {@link include/galois/Runtime/mm/Mem.h}):
+@snippet include/galois/Runtime/mm/Mem.h Example Third Party Allocator
 
 
 \b TODO: show snippet using MallocHeap
@@ -101,12 +101,12 @@ show an example:
   of a source heap provided as a template argument. This is used for defining some
   of the parallel allocators. 
 
-We show the Per Iteration Allocator, from {@link include/Galois/Mem.h}, to show how
+We show the Per Iteration Allocator, from {@link include/galois/Mem.h}, to show how
 heap implementations can be combined together to form useful allocators:
-@snippet include/Galois/Mem.h PerIterAllocTy example
+@snippet include/galois/Mem.h PerIterAllocTy example
 
-Another example, from {@link include/Galois/Runtime/mm/Mem.h} shows how  the Fixed
+Another example, from {@link include/galois/Runtime/mm/Mem.h} shows how  the Fixed
 Size allocator is defined:
-@snippet include/Galois/Runtime/mm/Mem.h FixedSizeAllocator example
+@snippet include/galois/Runtime/mm/Mem.h FixedSizeAllocator example
 
 */

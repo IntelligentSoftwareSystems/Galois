@@ -2,7 +2,7 @@
 #include <cstring>
 #include <sys/time.h>
 
-#include "Galois/Runtime/Network.h"
+#include "galois/Runtime/Network.h"
 
 using namespace galois::Runtime;
 

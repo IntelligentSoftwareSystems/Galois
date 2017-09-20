@@ -27,8 +27,8 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/ThreadPool.h"
+#include "galois/Substrate/Barrier.h"
+#include "galois/Substrate/ThreadPool.h"
 
 #include <mutex>
 #include <condition_variable>

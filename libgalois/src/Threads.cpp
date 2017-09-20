@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Threads.h"
+#include "galois/Substrate/ThreadPool.h"
+#include "galois/Threads.h"
 
 #include <algorithm>
 namespace galois {

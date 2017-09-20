@@ -1,6 +1,6 @@
-#include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Timer.h"
-#include "Galois/Galois.h"
+#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/Timer.h"
+#include "galois/Galois.h"
 
 #include <cstdlib>
 #include <iostream>

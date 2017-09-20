@@ -37,7 +37,7 @@
 #include <cstdio>
 #include <cassert>
 
-#include "Galois/Atomic.h"
+#include "galois/Atomic.h"
 
 template <typename KNode_tp>
 struct KEdge;

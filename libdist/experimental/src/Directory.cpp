@@ -22,9 +22,9 @@
  * @author Gurbinder Gill  <gill@cs.utexas.edu>
  */
 
-#include "Galois/Runtime/DistSupport.h"
-#include "Galois/Runtime/Directory.h"
-#include "Galois/Runtime/ll/TID.h"
+#include "galois/Runtime/DistSupport.h"
+#include "galois/Runtime/Directory.h"
+#include "galois/Runtime/ll/TID.h"
 
 #include <mutex>
 #include <iostream>

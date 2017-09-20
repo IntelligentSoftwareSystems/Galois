@@ -12,9 +12,9 @@
 //#define PAPI
 #include "simple/simplepapi.h"
 
-#include "Galois/Galois.h"      // STRANGE ERRORS IF EXCLUDED
-#include "Galois/Runtime/TreeExec.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"      // STRANGE ERRORS IF EXCLUDED
+#include "galois/Runtime/TreeExec.h"
+#include "galois/Timer.h"
 
 
 typedef struct nodedata {

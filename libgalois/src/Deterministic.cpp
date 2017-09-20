@@ -28,6 +28,6 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Runtime/Executor_Deterministic.h"
+#include "galois/Runtime/Executor_Deterministic.h"
 
 __thread galois::runtime::SizedHeapFactory::SizedHeap* galois::runtime::DeterministicImpl::dagListHeap;

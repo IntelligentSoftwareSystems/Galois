@@ -33,8 +33,8 @@
 #ifndef DIST_BENCH_START_H
 #define DIST_BENCH_START_H
 
-#include "Galois/Galois.h"
-#include "Galois/Version.h"
+#include "galois/Galois.h"
+#include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
 
 //! standard global options to the benchmarks

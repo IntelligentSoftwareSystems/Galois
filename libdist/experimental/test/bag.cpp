@@ -1,5 +1,5 @@
-#include "Galois/Galois.h"
-#include "Galois/Graphs/Bag.h"
+#include "galois/Galois.h"
+#include "galois/Graphs/Bag.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/counting_iterator.hpp>

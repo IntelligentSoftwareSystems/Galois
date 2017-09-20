@@ -8,7 +8,7 @@
 #include "smat.h"
 #include "dmat.h"
 #ifdef EXP_DOALL_GALOIS
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #endif
 
 /*

@@ -11,10 +11,10 @@
 #include "../covering/CoveringHandler.h"
 #include "../mixer/Mixer.h"
 #include "../writers/AigWriter.h""
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Accumulator.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Accumulator.h"
 
 #include <iostream>
 #include <unordered_set>

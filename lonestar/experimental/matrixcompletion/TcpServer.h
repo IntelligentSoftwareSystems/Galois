@@ -2,9 +2,9 @@
 #define TCPSERVER_H
 
 #include "MC.h"
-#include "Galois/Endian.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/TiledExecutor.h"
+#include "galois/Endian.h"
+#include "galois/ParallelSTL/ParallelSTL.h"
+#include "galois/Runtime/TiledExecutor.h"
 
 #include <boost/asio.hpp>
 #include <memory>

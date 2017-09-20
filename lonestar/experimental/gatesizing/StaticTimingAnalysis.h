@@ -1,4 +1,4 @@
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "CircuitGraph.h"
 
 #ifndef GALOIS_STATIC_TIMING_ANALYSIS_H

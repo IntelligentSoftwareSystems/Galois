@@ -27,7 +27,7 @@
 #include "Tuple.h"
 #include "Graph.h"
 
-#include "Galois/CheckedObject.h"
+#include "galois/CheckedObject.h"
 
 #include <ostream>
 #include <algorithm>

@@ -30,9 +30,9 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Mem.h"
-#include "Galois/gIO.h"
+#include "galois/Runtime/Support.h"
+#include "galois/Runtime/Mem.h"
+#include "galois/gIO.h"
 
 #include <fstream>
 #include <limits>

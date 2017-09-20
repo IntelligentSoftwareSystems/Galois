@@ -5,11 +5,11 @@
 
 #include <mpi.h>
 
-#include "Galois/Runtime/Network.h"
-//#include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/Substrate.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
+#include "galois/Runtime/Network.h"
+//#include "galois/Runtime/Barrier.h"
+#include "galois/Runtime/Substrate.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
 
 using namespace galois::Runtime;
 

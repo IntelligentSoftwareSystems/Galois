@@ -4,8 +4,8 @@
 #include "Billiards.h"
 #include "dependTest.h"
 
-#include "Galois/PerThreadContainer.h"
-#include "Galois/Graphs/Graph.h"
+#include "galois/PerThreadContainer.h"
+#include "galois/Graphs/Graph.h"
 
 
 using AddListTy = galois::PerThreadVector<Event>;

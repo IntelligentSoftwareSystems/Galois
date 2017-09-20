@@ -3,9 +3,9 @@
 
 #include "GraphColoringBase.h"
 
-#include "Galois/Runtime/KDGparaMeter.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/gdeque.h"
+#include "galois/Runtime/KDGparaMeter.h"
+#include "galois/Runtime/ll/CompilerSpecific.h"
+#include "galois/gdeque.h"
 
 #include <atomic>
 #include <random>

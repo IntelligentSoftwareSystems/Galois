@@ -2,8 +2,8 @@
 #include "Verilog.h"
 #include "CellLib.h"
 
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
 
 #include <iostream>
 #include <string>

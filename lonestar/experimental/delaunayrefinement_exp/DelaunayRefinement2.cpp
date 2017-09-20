@@ -30,16 +30,16 @@
 #include "Cavity.h"
 #include "Verifier.h"
 
-#include "Galois/Galois.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Graphs/Bag.h"
-#include "Galois/Timer.h"
+#include "galois/Galois.h"
+#include "galois/ParallelSTL/ParallelSTL.h"
+#include "galois/Graphs/Bag.h"
+#include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Galois/WorkList/WorkListAlt.h"
-#include "Galois/WorkList/WorkListDebug.h"
+#include "galois/WorkList/WorkListAlt.h"
+#include "galois/WorkList/WorkListDebug.h"
 
 #include <iostream>
 #include <string.h>

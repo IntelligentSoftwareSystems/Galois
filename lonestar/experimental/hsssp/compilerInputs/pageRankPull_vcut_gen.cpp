@@ -27,18 +27,18 @@
 
 #include <iostream>
 #include <limits>
-#include "Galois/Galois.h"
+#include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/gstl.h"
+#include "galois/gstl.h"
 
-#include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
+#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/Runtime/Tracer.h"
 
-#include "Galois/Dist/vGraph.h"
-#include "Galois/DistAccumulator.h"
+#include "galois/Dist/vGraph.h"
+#include "galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Cuda/cuda_mtypes.h"
+#include "galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif

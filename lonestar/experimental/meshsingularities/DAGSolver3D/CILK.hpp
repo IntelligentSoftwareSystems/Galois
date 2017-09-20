@@ -1,7 +1,7 @@
 #ifndef CILK_HPP
 #define CILK_HPP
 
-#include "Galois/CilkInit.h"
+#include "galois/CilkInit.h"
 
 #include "Node.hpp"
 #include "EquationSystem.hpp"

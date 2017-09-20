@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/PerHostStorage.h"
+#include "galois/Runtime/PerHostStorage.h"
 
 #include <mutex>
 #include <algorithm>

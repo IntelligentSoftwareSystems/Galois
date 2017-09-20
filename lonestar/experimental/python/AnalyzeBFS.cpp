@@ -1,6 +1,6 @@
 #include "AnalyzeBFS.h"
 #include "Auxiliary.h"
-#include "Galois/Timer.h"
+#include "galois/Timer.h"
 
 #include <limits>
 #include <iostream>

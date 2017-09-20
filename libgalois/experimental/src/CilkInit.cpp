@@ -26,14 +26,14 @@
  *
  */
 
-#include "Galois/Threads.h"
-#include "Galois/CilkInit.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/gIO.h"
-#include "Galois/Substrate/HWTopo.h"
-#include "Galois/Substrate/TID.h"
-#include "Galois/Substrate/EnvCheck.h"
+#include "galois/Threads.h"
+#include "galois/CilkInit.h"
+#include "galois/Runtime/PerThreadStorage.h"
+#include "galois/Runtime/ThreadPool.h"
+#include "galois/gIO.h"
+#include "galois/Substrate/HWTopo.h"
+#include "galois/Substrate/TID.h"
+#include "galois/Substrate/EnvCheck.h"
 
 #ifdef HAVE_CILK
 #include <cilk/cilk.h>

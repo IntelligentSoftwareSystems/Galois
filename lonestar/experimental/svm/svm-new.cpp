@@ -22,15 +22,15 @@
  * @author Prad Nelluru <pradn@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Galois.h"
-#include "Galois/Bag.h"
-#include "Galois/Timer.h"
-#include "Galois/Timer.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
-#include "Galois/Accumulator.h"
-#include "Galois/ParallelSTL.h"
-#include "Galois/Substrate/PaddedLock.h"
+#include "galois/Galois.h"
+#include "galois/Bag.h"
+#include "galois/Timer.h"
+#include "galois/Timer.h"
+#include "galois/Graphs/Graph.h"
+#include "galois/Graphs/LCGraph.h"
+#include "galois/Accumulator.h"
+#include "galois/ParallelSTL.h"
+#include "galois/Substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>

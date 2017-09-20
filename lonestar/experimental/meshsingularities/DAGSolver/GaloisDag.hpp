@@ -1,12 +1,12 @@
 #ifndef GALOIS_DAG_HPP
 #define GALOIS_DAG_HPP
 
-#include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-#include "Galois/CilkInit.h"
-#include "Galois/Timer.h"
-#include "Galois/Runtime/TreeExec.h"
+#include "galois/Galois.h"
+#include "galois/Accumulator.h"
+#include "galois/Bag.h"
+#include "galois/CilkInit.h"
+#include "galois/Timer.h"
+#include "galois/Runtime/TreeExec.h"
 
 
 #include "Node.hpp"
