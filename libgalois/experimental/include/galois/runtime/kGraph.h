@@ -30,16 +30,16 @@
 
 #include "galois/gstl.h"
 #include "galois/Graphs/LC_CSR_Graph.h"
-#include "galois/Runtime/Substrate.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/Network.h"
 
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/Serialize.h"
 
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 #include "galois/Threads.h"
 
-#include "galois/Runtime/GlobalObj.h"
-#include "galois/Runtime/OfflineGraph.h"
+#include "galois/runtime/GlobalObj.h"
+#include "galois/runtime/OfflineGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/Cuda/cuda_mtypes.h"

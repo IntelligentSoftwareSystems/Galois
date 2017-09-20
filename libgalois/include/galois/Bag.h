@@ -38,7 +38,7 @@
 #include "galois/gstl.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <stdexcept>

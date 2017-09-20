@@ -39,7 +39,7 @@
 
 //kik 
 #include "galois/Atomic.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 #include "galois/Substrate/PtrLock.h"
 #include "galois/Substrate/SimpleLock.h"
 #include "galois/Substrate/Barrier.h"

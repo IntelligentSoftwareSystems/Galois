@@ -26,8 +26,8 @@
 
 #include <ostream>
 #include <cmath>
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Serialize.h"
 
 class Tuple : public galois::runtime::Lockable {
   double _t[2];

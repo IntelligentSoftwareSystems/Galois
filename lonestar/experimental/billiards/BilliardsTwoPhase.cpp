@@ -24,7 +24,7 @@
  */
 
 
-#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/runtime/KDGtwoPhase.h"
 
 #include "Billiards.h"
 #include "dependTest.h"

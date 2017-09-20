@@ -44,7 +44,7 @@
 
 #include "HybridBFS.h"
 #ifdef GALOIS_USE_EXP
-#include "galois/Runtime/Executor_BulkSynchronous.h"
+#include "galois/runtime/Executor_BulkSynchronous.h"
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #endif

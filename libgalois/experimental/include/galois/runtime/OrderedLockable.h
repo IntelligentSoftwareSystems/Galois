@@ -31,9 +31,9 @@
 
 #include "galois/AltBag.h"
 #include "galois/OrderedTraits.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 #include "galois/Substrate/ThreadRWlock.h"
-#include "galois/Runtime/UserContextAccess.h"
+#include "galois/runtime/UserContextAccess.h"
 
 #include <unordered_map>
 

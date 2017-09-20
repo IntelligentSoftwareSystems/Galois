@@ -30,7 +30,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
-#include "galois/Runtime/ll/HWTopo.h"
+#include "galois/runtime/ll/HWTopo.h"
 
 #include <vector>
 

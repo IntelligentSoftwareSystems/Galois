@@ -1,8 +1,8 @@
 #include "galois/Galois.h"
-#include "galois/Runtime/Directory.h"
+#include "galois/runtime/Directory.h"
 
 using namespace std;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 struct simple :public Lockable {
   int member;

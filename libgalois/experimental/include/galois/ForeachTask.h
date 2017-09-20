@@ -1,7 +1,7 @@
 #ifndef GALOIS_FOREACH_H
 #define GALOIS_FOREACH_H
 
-#include "galois/Runtime/TaskRuntime.h"
+#include "galois/runtime/TaskRuntime.h"
 
 namespace galois {
 

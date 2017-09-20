@@ -28,7 +28,7 @@
 #include <vector>
 #include <iostream>
 
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 
 namespace galois {
   namespace graphs {

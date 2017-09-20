@@ -30,7 +30,7 @@
  */
 
 #include "galois/Graphs/OCGraph.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 
 #include <cassert>

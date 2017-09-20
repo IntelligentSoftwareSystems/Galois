@@ -36,13 +36,13 @@
 #include "galois/ParallelSTL/ParallelSTL.h"
 #include "llvm//Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 
 //Distributed Galois
 #include "galois/Graphs/Graph3.h"
-#include "galois/Runtime/DistSupport.h"
+#include "galois/runtime/DistSupport.h"
 
 
 #include <boost/iterator/transform_iterator.hpp>
@@ -103,7 +103,7 @@ volatile unsigned prog_barrier = 0;
 //std::atomic<unsigned> prog_barrier;
 unsigned int num_movie_nodes = 0;
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 typedef galois::runtime::LL::SimpleLock<true> SLock;
 SLock slock;
 SLock pblock;

@@ -1,11 +1,11 @@
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/PerHostStorage.h"
 #include "galois/Timer.h"
 
 #include <iostream>
 #include <cmath>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 bool didbcast = false;
 

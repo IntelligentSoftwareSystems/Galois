@@ -28,7 +28,7 @@
 #include "BilliardsParallel.h"
 #include "BilliardsParallelSectored.h"
 
-#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/runtime/KDGtwoPhase.h"
 
 class BilliardsSectoredIKDG: public Billiards<BilliardsSectoredIKDG>  {
 

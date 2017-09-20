@@ -55,7 +55,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "galois/Substrate/CacheLineStorage.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/Sampling.h"
 #include "galois/Substrate/CompilerSpecific.h"
 
 #include "Lonestar/BoilerPlate.h"

@@ -29,7 +29,7 @@
 
 
 #if 0 // disabled
-#include "galois/Runtime/DistStatCollector.h"
+#include "galois/runtime/DistStatCollector.h"
 
 #include <cmath>
 #include <new>
@@ -44,7 +44,7 @@
 #include <fstream>
 
 using namespace galois;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 DistStatCollector::DistStatCollector(const std::string& outfile): StatCollector(outfile) {}
 

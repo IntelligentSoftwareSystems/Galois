@@ -3,8 +3,8 @@
 
 #include "GraphColoringBase.h"
 
-#include "galois/Runtime/KDGparaMeter.h"
-#include "galois/Runtime/ll/CompilerSpecific.h"
+#include "galois/runtime/KDGparaMeter.h"
+#include "galois/runtime/ll/CompilerSpecific.h"
 #include "galois/gdeque.h"
 
 #include <atomic>

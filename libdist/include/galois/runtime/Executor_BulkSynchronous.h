@@ -30,8 +30,8 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
 #define GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
 
-#include "galois/Runtime/Executor_ForEach.h"
-#include "galois/Runtime/LoopStatistics.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/LoopStatistics.h"
 
 namespace galois {
 namespace runtime {

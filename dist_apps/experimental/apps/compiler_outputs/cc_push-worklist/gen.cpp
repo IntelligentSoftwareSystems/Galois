@@ -30,17 +30,17 @@
 #include "galois/Galois.h"
 #include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/Runtime/dGraph_edgeCut.h"
-#include "galois/Runtime/dGraph_vertexCut.h"
+#include "galois/runtime/dGraph_edgeCut.h"
+#include "galois/runtime/dGraph_vertexCut.h"
 
 #include "galois/DistAccumulator.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/DistBag.h"
-#include "galois/Runtime/Cuda/cuda_device.h"
+#include "galois/runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 struct CUDA_Worklist cuda_wl;

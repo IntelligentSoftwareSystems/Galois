@@ -33,7 +33,7 @@
 #include "galois/PerThreadContainer.h"
 #include "galois/DynamicArray.h"
 
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 #include "galois/gIO.h"
 

@@ -31,7 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "galois/Runtime/Substrate.h"
+#include "galois/runtime/Substrate.h"
 #include "galois/Substrate/Barrier.h"
 #include "galois/Substrate/Init.h"
 

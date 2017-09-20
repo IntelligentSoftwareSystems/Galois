@@ -31,11 +31,11 @@
 
 #include "galois/Atomic.h"
 
-#include "galois/Runtime/DetChromatic.h"
-#include "galois/Runtime/LCordered.h"
-#include "galois/Runtime/KDGtwoPhase.h"
-#include "galois/Runtime/DAGexec.h"
-#include "galois/Runtime/DAGexecAlt.h"
+#include "galois/runtime/DetChromatic.h"
+#include "galois/runtime/LCordered.h"
+#include "galois/runtime/KDGtwoPhase.h"
+#include "galois/runtime/DAGexec.h"
+#include "galois/runtime/DAGexecAlt.h"
 
 namespace galois {
 namespace runtime {

@@ -24,8 +24,8 @@
 #ifndef AVI_ORDERED_SPEC_H
 #define AVI_ORDERED_SPEC_H
 
-#include "galois/Runtime/ROBexecutor.h"
-#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/runtime/ROBexecutor.h"
+#include "galois/runtime/OrderedSpeculation.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 

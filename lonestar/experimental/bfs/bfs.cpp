@@ -35,7 +35,7 @@
 #include "galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include "galois/PriorityScheduling.h"
-#include "galois/Runtime/BulkSynchronousWork.h"
+#include "galois/runtime/BulkSynchronousWork.h"
 #endif
 #ifdef USE_TBB
 #include "tbb/parallel_for.h"

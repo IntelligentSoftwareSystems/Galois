@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/NetworkIO.h"
+#include "galois/runtime/NetworkIO.h"
 
 #include <mpi.h>
 #include <deque>

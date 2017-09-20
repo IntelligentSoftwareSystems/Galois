@@ -45,8 +45,8 @@
 #include "galois/Galois.h"
 #include "galois/Graph/FileGraph.h"
 #include "galois/Graph/LCGraph.h"
-#include "galois/Runtime/WorkList.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/WorkList.h"
+#include "galois/runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

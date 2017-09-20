@@ -36,16 +36,16 @@
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/Tracer.h"
 
-#include "galois/Runtime/dGraph_edgeCut.h"
-#include "galois/Runtime/dGraph_cartesianCut.h"
-#include "galois/Runtime/dGraph_hybridCut.h"
+#include "galois/runtime/dGraph_edgeCut.h"
+#include "galois/runtime/dGraph_cartesianCut.h"
+#include "galois/runtime/dGraph_hybridCut.h"
 
 #include "galois/DistAccumulator.h"
 
-#include "galois/Runtime/dGraphLoader.h"
+#include "galois/runtime/dGraphLoader.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

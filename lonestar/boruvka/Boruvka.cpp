@@ -34,7 +34,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
-#include "galois/Runtime/BulkSynchronousWork.h"
+#include "galois/runtime/BulkSynchronousWork.h"
 #endif
 
 #include "Lonestar/BoilerPlate.h"

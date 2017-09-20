@@ -3,7 +3,7 @@
 #include "galois/gslist.h"
 #include "galois/Timer.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 

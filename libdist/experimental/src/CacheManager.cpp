@@ -21,9 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/CacheManager.h"
+#include "galois/runtime/CacheManager.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 static __thread ResolveCache* thread_resolve = nullptr;
 

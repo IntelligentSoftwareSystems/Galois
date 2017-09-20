@@ -33,9 +33,9 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/Runtime/vGraph.h"
+#include "galois/runtime/vGraph.h"
 #include "galois/Accumulator.h"
 #include "galois/DistAccumulator.h"
 

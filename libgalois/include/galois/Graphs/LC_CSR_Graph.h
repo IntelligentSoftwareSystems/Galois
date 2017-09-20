@@ -40,7 +40,7 @@
 #include "galois/LargeArray.h"
 #include "galois/Graphs/FileGraph.h"
 #include "galois/Graphs/Details.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/Galois.h"
 #include "galois/Graphs/GraphHelpers.h"
 

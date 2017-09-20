@@ -26,8 +26,8 @@
 #ifndef GALOIS_GRAPH_BAG_H
 #define GALOIS_GRAPH_BAG_H
 
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/PerHostStorage.h"
 #include "galois/TwoLevelIteratorA.h"
 
 namespace galois {

@@ -32,7 +32,7 @@
 
 #include "galois/Bag.h"
 #include "galois/Graph/Details.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 
 #include "galois/gdeque.h"
 

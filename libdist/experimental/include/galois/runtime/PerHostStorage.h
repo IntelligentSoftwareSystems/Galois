@@ -24,9 +24,9 @@
 #ifndef GALOIS_RUNTIME_PERHOSTSTORAGE
 #define GALOIS_RUNTIME_PERHOSTSTORAGE
 
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/DistSupport.h"
-#include "galois/Runtime/ThreadPool.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/DistSupport.h"
+#include "galois/runtime/ThreadPool.h"
 #include <boost/iterator/iterator_facade.hpp>
 
 #include <iostream>

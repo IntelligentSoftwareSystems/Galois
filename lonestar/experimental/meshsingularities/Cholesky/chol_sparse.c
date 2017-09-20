@@ -9,7 +9,7 @@
 #include "galois/Bag.h"
 #include "galois/CilkInit.h"
 #include "galois/Statistics.h"
-#include "galois/Runtime/TreeExec.h"
+#include "galois/runtime/TreeExec.h"
 */
 
 #define CACHE_LINE_SIZE (64)

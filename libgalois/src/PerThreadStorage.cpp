@@ -29,7 +29,7 @@
 
 #include "galois/Substrate/PerThreadStorage.h"
 
-//#include "galois/Runtime/Mem.h"
+//#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 #include <mutex>
 

@@ -53,7 +53,7 @@
 #include "galois/Galois.h"
 #include "galois/Graphs/LCGraph.h"
 #include "galois/WorkList/WorkList.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

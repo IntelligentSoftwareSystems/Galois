@@ -30,12 +30,12 @@
 #include "galois/Galois.h"
 #include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/Runtime/OfflineGraph.h"
-#include "galois/Runtime/hGraph.h"
+#include "galois/runtime/OfflineGraph.h"
+#include "galois/runtime/hGraph.h"
 #include "galois/DistAccumulator.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 
 
 static const char* const name = "BFS - Distributed Heterogeneous";

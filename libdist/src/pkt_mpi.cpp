@@ -21,8 +21,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/NetworkIO.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/NetworkIO.h"
+#include "galois/runtime/Tracer.h"
 #include "galois/Substrate/SimpleLock.h"
 
 //#include "hash/crc32.h"

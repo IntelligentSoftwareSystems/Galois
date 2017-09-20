@@ -1,7 +1,7 @@
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 using namespace galois::substrate;
 
 struct element {

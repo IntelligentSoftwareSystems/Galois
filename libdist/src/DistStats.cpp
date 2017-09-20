@@ -27,10 +27,10 @@
  * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
 
-#include "galois/Runtime/DistStats.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/DistStats.h"
+#include "galois/runtime/Serialize.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 DistStatManager* internal::distSysStatManager(void) {
   galois::runtime::StatManager* sm = internal::sysStatManager();

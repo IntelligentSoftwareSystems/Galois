@@ -38,8 +38,8 @@
 
 #include "galois/Substrate/PaddedLock.h"
 #include "galois/Substrate/CompilerSpecific.h"
-#include "galois/Runtime/ROBexecutor.h"
-#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/runtime/ROBexecutor.h"
+#include "galois/runtime/OrderedSpeculation.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

@@ -30,7 +30,7 @@
 #define KRUSKAL_SPEC_H
 
 #include "galois/Graphs/Graph.h"
-#include "galois/Runtime/ROBexecutor.h"
+#include "galois/runtime/ROBexecutor.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"

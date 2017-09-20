@@ -1,5 +1,5 @@
 #pragma once
-#include "galois/Runtime/Cuda/cuda_mtypes.h"
+#include "galois/runtime/Cuda/cuda_mtypes.h"
 
 struct CUDA_Context;
 

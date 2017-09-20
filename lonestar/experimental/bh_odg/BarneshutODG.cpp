@@ -36,8 +36,8 @@
 #include "galois/Atomic.h"
 #include "galois/CilkInit.h"
 #include "galois/Timer.h"
-#include "galois/Runtime/DoAllCoupled.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/DoAllCoupled.h"
+#include "galois/runtime/Sampling.h"
 #include "galois/Substrate/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"

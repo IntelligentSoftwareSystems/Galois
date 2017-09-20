@@ -25,7 +25,7 @@
 #include "galois/Timer.h"
 #include "galois/gdeque.h"
 #include "galois/Bag.h" // XXX
-#include "galois/Runtime/TaskWork.h"
+#include "galois/runtime/TaskWork.h"
 #include "galois/WorkList/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"

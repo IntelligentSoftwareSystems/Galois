@@ -29,11 +29,11 @@
 
 #include "galois/Threads.h"
 #include "galois/Graphs/Bag.h"
-#include "galois/Runtime/DistSupport.h"
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/MethodFlags.h"
-#include "galois/Runtime/PerThreadStorage.h"
-#include "galois/Runtime/mm/Mem.h"
+#include "galois/runtime/DistSupport.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/MethodFlags.h"
+#include "galois/runtime/PerThreadStorage.h"
+#include "galois/runtime/mm/Mem.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 

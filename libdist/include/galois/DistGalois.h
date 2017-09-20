@@ -34,8 +34,8 @@
 #ifndef GALOIS_DIST_GALOIS_H
 #define GALOIS_DIST_GALOIS_H
 
-#include "galois/Runtime/Init.h"
-#include "galois/Runtime/DistStats.h"
+#include "galois/runtime/Init.h"
+#include "galois/runtime/DistStats.h"
 
 #include <string>
 #include <utility>

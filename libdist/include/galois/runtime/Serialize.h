@@ -34,7 +34,7 @@
 #include <boost/mpl/has_xxx.hpp>
 
 #include <galois/gdeque.h>
-#include <galois/Runtime/Dynamic_bitset.h>
+#include <galois/runtime/Dynamic_bitset.h>
 #include <galois/Atomic_wrapper.h>
 #include "galois/Bag.h"
 

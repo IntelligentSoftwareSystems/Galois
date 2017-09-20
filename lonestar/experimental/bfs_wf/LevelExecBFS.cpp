@@ -29,7 +29,7 @@
 #include <vector>
 #include <functional>
 
-#include "galois/Runtime/LevelExecutor.h"
+#include "galois/runtime/LevelExecutor.h"
 #include "galois/WorkList/WorkList.h"
 
 #include "bfs.h"

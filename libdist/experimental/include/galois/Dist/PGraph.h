@@ -11,7 +11,7 @@
 #include "galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "galois/Bag.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_

@@ -7,7 +7,7 @@
 #include "galois/OpenCL/CL_Header.h"
 #include "galois/OpenCL/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
-//#include "galois/Runtime/hGraph.h"
+//#include "galois/runtime/hGraph.h"
 #ifndef _GDIST_CL_LC_Graph_H_
 #define _GDIST_CL_LC_Graph_H_
 

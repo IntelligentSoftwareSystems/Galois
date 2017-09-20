@@ -31,7 +31,7 @@
 #define GALOIS_WORKLIST_OBIM_H
 
 #include "galois/FlatMap.h"
-#include "galois/Runtime/Substrate.h"
+#include "galois/runtime/Substrate.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/Termination.h"
 #include "galois/WorkList/Chunked.h"

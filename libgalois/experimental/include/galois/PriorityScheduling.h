@@ -43,7 +43,7 @@ namespace Exp {
 __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
 //FIXME: using in a header
-using namespace galois::Runtime;
+using namespace galois::runtime;
 using namespace galois::substrate;
 using namespace galois::worklists;
 

@@ -37,8 +37,8 @@
 #include "galois/gIO.h"
 #include "galois/Timer.h"
 
-#include "galois/Runtime/Executor_OnEach.h"
-#include "galois/Runtime/Statistics.h"
+#include "galois/runtime/Executor_OnEach.h"
+#include "galois/runtime/Statistics.h"
 #include "galois/Substrate/Barrier.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/Termination.h"

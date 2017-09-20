@@ -23,7 +23,7 @@
 #ifndef GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
-#include "galois/Runtime/Substrate.h"
+#include "galois/runtime/Substrate.h"
 #include "Chunked.h"
 #include "WLCompileCheck.h"
 

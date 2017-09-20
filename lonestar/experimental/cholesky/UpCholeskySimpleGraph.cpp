@@ -13,7 +13,7 @@
 #include "simple/simplepapi.h"
 
 #include "galois/Galois.h"      // STRANGE ERRORS IF EXCLUDED
-#include "galois/Runtime/TreeExec.h"
+#include "galois/runtime/TreeExec.h"
 #include "galois/Timer.h"
 
 

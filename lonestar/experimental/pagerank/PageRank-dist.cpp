@@ -28,7 +28,7 @@
 #include "galois/Graph/FileGraph.h"
 #include "galois/Graphs/LC_Dist_InOut_Graph_withEdgeData.h"
 #include "galois/Bag.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -259,7 +259,7 @@ float compute_total_rank(Graph::pointer g) {
 /* Compute Graph Distribution */
 using std::cout;
 using std::vector;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 void compute_graph_distribution(Graph::pointer g) {
   int n = galois::runtime::getSystemNetworkInterface().Num;

@@ -28,11 +28,11 @@
 #include <vector>
 #include <iostream>
 
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 #include "galois/Graph/FileGraph.h"
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/PerHostStorage.h"
-#include "galois/Runtime/DistSupport.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/PerHostStorage.h"
+#include "galois/runtime/DistSupport.h"
 
 
 namespace galois {

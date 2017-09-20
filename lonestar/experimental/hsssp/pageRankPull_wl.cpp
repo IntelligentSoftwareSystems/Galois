@@ -31,12 +31,12 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/Dist/OfflineGraph.h"
 #include "galois/Dist/hGraph.h"
 #include "galois/DistAccumulator.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "PageRank Pull version on Distributed Galois.";

@@ -33,8 +33,8 @@
 
 #include "galois/Substrate/PaddedLock.h"
 #include "galois/Substrate/CompilerSpecific.h"
-#include "galois/Runtime/LevelExecutor.h"
-#include "galois/Runtime/Range.h"
+#include "galois/runtime/LevelExecutor.h"
+#include "galois/runtime/Range.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

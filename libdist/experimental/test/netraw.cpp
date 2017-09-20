@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "galois/Runtime/NetworkIO.h"
+#include "galois/runtime/NetworkIO.h"
 
 int main() {
   uint32_t ID, Num;

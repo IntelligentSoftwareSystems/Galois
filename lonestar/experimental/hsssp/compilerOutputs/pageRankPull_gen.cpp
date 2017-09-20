@@ -31,8 +31,8 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/Tracer.h"
 
 #include "galois/Dist/hGraph.h"
 #include "galois/DistAccumulator.h"

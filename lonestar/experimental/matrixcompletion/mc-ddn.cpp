@@ -30,10 +30,10 @@
 #include "galois/Graph/Graph.h"
 #include "galois/Graph/LCGraph.h"
 #include "galois/ParallelSTL/ParallelSTL.h"
-#include "galois/Runtime/ll/PaddedLock.h"
-#include "galois/Runtime/ll/EnvCheck.h"
-#include "galois/Runtime/TiledExecutor.h"
-#include "galois/Runtime/DetSchedules.h"
+#include "galois/runtime/ll/PaddedLock.h"
+#include "galois/runtime/ll/EnvCheck.h"
+#include "galois/runtime/TiledExecutor.h"
+#include "galois/runtime/DetSchedules.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <algorithm>

@@ -31,10 +31,10 @@
 #ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
-#include "galois/Runtime/StatCollector.h"
-#include "galois/Runtime/Substrate.h"
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/StatCollector.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/Network.h"
 
 namespace galois {
 namespace runtime {

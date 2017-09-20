@@ -41,7 +41,7 @@
 #include "galois/Galois.h"
 #include "galois/DoAllWrap.h"
 #include "galois/Accumulator.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 

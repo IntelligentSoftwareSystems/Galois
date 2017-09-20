@@ -32,7 +32,7 @@
 //FIXME: This is complete bogusness
 
 
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/PerHostStorage.h"
 
 namespace galois {
 

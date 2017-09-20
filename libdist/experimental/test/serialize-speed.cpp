@@ -1,9 +1,9 @@
 #include "galois/Galois.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/Serialize.h"
 
 #include <iostream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 int main() {
 

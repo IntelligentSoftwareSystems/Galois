@@ -42,7 +42,7 @@ class DESunorderedSerial: public des_unord::DESunorderedBase {
 
   /**
    * Run loop.
-   * Does not use galois::Runtime or Galois worklists
+   * Does not use galois::runtime or Galois worklists
    *
    * To ensure uniqueness of items on the workList, we keep a list of boolean flags for each node,
    * which indicate whether the node is on the workList. When adding a node to the workList, the

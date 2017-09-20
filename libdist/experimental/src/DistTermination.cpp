@@ -27,12 +27,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/PerThreadStorage.h"
-#include "galois/Runtime/Termination.h"
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/ll/CompilerSpecific.h"
+#include "galois/runtime/PerThreadStorage.h"
+#include "galois/runtime/Termination.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/ll/CompilerSpecific.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 namespace {
 class DistTerminationDetection : public TerminationDetection {

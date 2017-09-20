@@ -33,9 +33,9 @@
 
 #include "DistBenchStart.h"
 #include "galois/Version.h"
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/DistStats.h"
-#include "galois/Runtime/DataCommMode.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/DistStats.h"
+#include "galois/runtime/DataCommMode.h"
 
 #include <iostream>
 #include <sstream>

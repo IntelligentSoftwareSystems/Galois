@@ -51,11 +51,11 @@
 #include "galois/Threads.h"
 #include "galois/PriorityQueue.h"
 #include "galois/TwoLevelIterator.h"
-#include "galois/Runtime/Executor_DoAll.h"
-#include "galois/Runtime/Executor_OnEach.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_OnEach.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/ThreadPool.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 
 namespace galois {

@@ -23,10 +23,10 @@
 #ifndef GALOIS_RUNTIME_DISTSUPPORT_H
 #define GALOIS_RUNTIME_DISTSUPPORT_H
 
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/Directory.h"
-#include "galois/Runtime/RemotePointer.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/Directory.h"
+#include "galois/runtime/RemotePointer.h"
 
 namespace galois {
 namespace runtime {

@@ -29,10 +29,10 @@
 #ifndef GALOIS_DET_SCHEDULES_H
 #define GALOIS_DET_SCHEDULES_H
 
-#include "galois/Runtime/Executor_Deterministic.h"
-#include "galois/Runtime/DAGexec.h"
-#include "galois/Runtime/DetChromatic.h"
-#include "galois/Runtime/DetKDGexecutor.h"
+#include "galois/runtime/Executor_Deterministic.h"
+#include "galois/runtime/DAGexec.h"
+#include "galois/runtime/DetChromatic.h"
+#include "galois/runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
 

@@ -31,10 +31,10 @@
 
 #define __is_trivial(type)  __has_trivial_constructor(type) && __has_trivial_copy(type)
 
-#include "galois/Runtime/PagePool.h"
+#include "galois/runtime/PagePool.h"
 
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 static galois::runtime::internal::PageAllocState<>* PA;
 

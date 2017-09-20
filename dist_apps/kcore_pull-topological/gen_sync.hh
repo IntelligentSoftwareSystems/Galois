@@ -1,4 +1,4 @@
-#include "galois/Runtime/sync_structures.h"
+#include "galois/runtime/sync_structures.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // current_degree

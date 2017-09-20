@@ -16,7 +16,7 @@
 #include <string>
 
 #include "galois/Graphs/FileGraph.h"
-#include "galois/Runtime/OfflineGraph.h"
+#include "galois/runtime/OfflineGraph.h"
 
 
 

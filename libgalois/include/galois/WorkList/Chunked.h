@@ -32,7 +32,7 @@
 
 #include "galois/FixedSizeRing.h"
 #include "galois/Substrate/PaddedLock.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/WorkList/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 

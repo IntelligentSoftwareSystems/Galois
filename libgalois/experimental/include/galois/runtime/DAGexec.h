@@ -43,11 +43,11 @@
 #include "galois/DoAllWrap.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/Executor_DoAll.h"
-#include "galois/Runtime/OrderedLockable.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/OrderedLockable.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 #include "llvm/Support/CommandLine.h"
 

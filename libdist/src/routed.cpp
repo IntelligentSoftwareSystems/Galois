@@ -21,15 +21,15 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/NetworkIO.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/NetworkIO.h"
 
 #include <thread>
 #include <mutex>
 
 #if 0
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 namespace {
 

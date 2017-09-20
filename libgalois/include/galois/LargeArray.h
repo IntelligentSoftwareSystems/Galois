@@ -34,7 +34,7 @@
 
 #include "galois/gstl.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/Substrate/NumaMem.h"
 
 #include <utility>

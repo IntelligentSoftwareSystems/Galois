@@ -32,7 +32,7 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "OfflineGraph.h"
 #include "hGraph.h"

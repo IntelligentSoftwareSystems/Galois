@@ -42,7 +42,7 @@
 #include <string>
 
 #include "galois/Graphs/FileGraph.h"
-#include "galois/Runtime/OfflineGraph.h"
+#include "galois/runtime/OfflineGraph.h"
 
 static const char* const name = "add random edge weights";
 static const char* const desc = "Utility to add random edge weights for edge-list/dimacs graphs on disk";

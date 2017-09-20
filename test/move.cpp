@@ -6,7 +6,7 @@
 #include "galois/ConcurrentFlatMap.h"
 #endif
 #include "galois/LargeArray.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/Substrate/PerThreadStorage.h"
 
 struct MoveOnly {

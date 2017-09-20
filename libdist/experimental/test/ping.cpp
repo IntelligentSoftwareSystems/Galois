@@ -2,9 +2,9 @@
 #include <cstring>
 #include <sys/time.h>
 
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 std::atomic<int> count;
 

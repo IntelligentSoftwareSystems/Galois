@@ -35,7 +35,7 @@
 #define KRUSKAL_LEVEL_EXEC_H
 
 #include "galois/Graphs/Graph.h"
-#include "galois/Runtime/LevelExecutor.h"
+#include "galois/runtime/LevelExecutor.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"

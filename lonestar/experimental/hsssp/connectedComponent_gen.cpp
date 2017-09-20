@@ -32,10 +32,10 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/gstl.h"
 
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/Runtime/OfflineGraph.h"
-#include "galois/Runtime/hGraph.h"
+#include "galois/runtime/OfflineGraph.h"
+#include "galois/runtime/hGraph.h"
 
 static const char* const name = "Connected Component Label Propagation - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Connected Component Propagation on Distributed Galois.";

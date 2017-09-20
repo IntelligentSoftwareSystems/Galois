@@ -24,10 +24,10 @@
 #define GALOIS_RUNTIME_REMOTEPOINTER_H
 
 //#include "galois/MethodFlags.h"
-#include "galois/Runtime/Directory.h"
-#include "galois/Runtime/CacheManager.h"
-#include "galois/Runtime/FatPointer.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Directory.h"
+#include "galois/runtime/CacheManager.h"
+#include "galois/runtime/FatPointer.h"
+#include "galois/runtime/Context.h"
 
 namespace galois {
 namespace runtime {

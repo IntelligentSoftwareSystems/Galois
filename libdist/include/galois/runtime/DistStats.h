@@ -31,8 +31,8 @@
 #define GALOIS_RUNTIME_DIST_STATS_H
 
 #include "galois/gstl.h"
-#include "galois/Runtime/Statistics.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/Network.h"
 
 #include <string>
 

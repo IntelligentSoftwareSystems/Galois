@@ -30,7 +30,7 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "galois/Runtime/Statistics.h"
+#include "galois/runtime/Statistics.h"
 
 #include "boost/utility.hpp"
 

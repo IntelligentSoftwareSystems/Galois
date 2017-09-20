@@ -8,7 +8,7 @@
 #include "TaskDescription.h"
 
 #include "galois/Timer.h"
-#include "galois/Runtime/ll/SimpleLock.h"
+#include "galois/runtime/ll/SimpleLock.h"
 #include "Node.h"
 
 #ifdef WITH_PAPI

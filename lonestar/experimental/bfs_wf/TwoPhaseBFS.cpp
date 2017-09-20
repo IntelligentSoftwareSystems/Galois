@@ -28,7 +28,7 @@
 #include <vector>
 #include <functional>
 
-#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/runtime/KDGtwoPhase.h"
 
 #include "bfs.h"
 #include "bfsParallel.h"

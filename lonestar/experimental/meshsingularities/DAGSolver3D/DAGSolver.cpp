@@ -11,7 +11,7 @@
 #include "galois/Bag.h"
 #include "galois/CilkInit.h"
 #include "galois/Timer.h"
-#include "galois/Runtime/TreeExec.h"
+#include "galois/runtime/TreeExec.h"
 
 #include "Lonestar/BoilerPlate.h"
 

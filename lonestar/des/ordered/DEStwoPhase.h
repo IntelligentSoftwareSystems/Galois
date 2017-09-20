@@ -36,7 +36,7 @@
 #include "galois/Atomic.h"
 #include "galois/Galois.h"
 
-#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/runtime/KDGtwoPhase.h"
 #include "galois/Substrate/PaddedLock.h"
 #include "galois/Substrate/CompilerSpecific.h"
 

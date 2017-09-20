@@ -30,10 +30,10 @@
 #define D_GRAPH_LOADER
 
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/dGraph_edgeCut.h"
-#include "galois/Runtime/dGraph_cartesianCut.h"
-#include "galois/Runtime/dGraph_hybridCut.h"
-#include "galois/Runtime/dGraph_jaggedCut.h"
+#include "galois/runtime/dGraph_edgeCut.h"
+#include "galois/runtime/dGraph_cartesianCut.h"
+#include "galois/runtime/dGraph_hybridCut.h"
+#include "galois/runtime/dGraph_jaggedCut.h"
 
 /*******************************************************************************
  * Supported partitioning schemes

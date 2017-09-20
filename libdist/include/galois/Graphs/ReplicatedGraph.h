@@ -27,8 +27,8 @@
 
 //#include "galois/Graph/OCGraph.h"
 #include "galois/Graph/LCGraph.h"
-#include "galois/Runtime/PerHostStorage.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/PerHostStorage.h"
+#include "galois/runtime/Serialize.h"
 
 namespace galois {
 namespace graphs {

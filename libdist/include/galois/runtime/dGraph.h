@@ -29,24 +29,24 @@
 
 #include "galois/gstl.h"
 #include "galois/Graphs/LC_CSR_Graph.h"
-#include "galois/Runtime/Substrate.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/Network.h"
 
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/DistStats.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/DistStats.h"
 
-#include "galois/Runtime/GlobalObj.h"
-#include "galois/Runtime/OfflineGraph.h"
+#include "galois/runtime/GlobalObj.h"
+#include "galois/runtime/OfflineGraph.h"
 #include <vector>
 #include <set>
 #include <algorithm>
 #include <unordered_map>
 #include <iostream>
 
-#include "galois/Runtime/sync_structures.h"
+#include "galois/runtime/sync_structures.h"
 
-#include "galois/Runtime/DataCommMode.h"
-#include "galois/Runtime/Dynamic_bitset.h"
+#include "galois/runtime/DataCommMode.h"
+#include "galois/runtime/Dynamic_bitset.h"
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -54,7 +54,7 @@
 #include "galois/Substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/Runtime/Cuda/cuda_mtypes.h"
+#include "galois/runtime/Cuda/cuda_mtypes.h"
 #endif
 
 #ifdef __GALOIS_HET_OPENCL__

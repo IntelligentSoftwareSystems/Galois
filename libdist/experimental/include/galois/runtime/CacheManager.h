@@ -24,8 +24,8 @@
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
 #include "galois/Substrate/SimpleLock.h"
-#include "galois/Runtime/FatPointer.h"
-//#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/FatPointer.h"
+//#include "galois/runtime/Serialize.h"
 
 #include <unordered_map>
 #include <deque>

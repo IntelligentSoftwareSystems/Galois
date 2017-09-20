@@ -30,15 +30,15 @@
 #include "galois/Galois.h"
 #include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-#include "galois/Runtime/mGraph.h"
+#include "galois/runtime/mGraph.h"
 #else
-#include "galois/Runtime/hGraph.h"
+#include "galois/runtime/hGraph.h"
 #endif
 #include "galois/DistAccumulator.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"

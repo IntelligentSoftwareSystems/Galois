@@ -40,7 +40,7 @@
 
 #include "galois/Galois.h"
 
-#include "galois/Runtime/DoAllCoupled.h"
+#include "galois/runtime/DoAllCoupled.h"
 
 namespace galois {
 

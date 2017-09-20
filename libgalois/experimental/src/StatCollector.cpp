@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/StatCollector.h"
+#include "galois/runtime/StatCollector.h"
 
 #include <cmath>
 #include <new>
@@ -47,7 +47,7 @@ extern unsigned activeThreads;
 } } //end namespaces
 
 using namespace galois;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 static galois::runtime::StatCollector* SC;
 

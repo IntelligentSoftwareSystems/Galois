@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 #include "galois/Substrate/SimpleLock.h"
 #include "galois/Substrate/EnvCheck.h"
 
@@ -126,7 +126,7 @@ static std::ofstream& openIfNot_output() {
 
 
 void galois::runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, size_t len, unsigned host){
-  using namespace galois::Runtime;
+  using namespace galois::runtime;
   static SimpleLock lock1;
   std::lock_guard<SimpleLock> lg(lock1);
   auto& out = openIfNot_receive();
@@ -140,7 +140,7 @@ void galois::runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, siz
   out.flush();
 }
 void galois::runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, size_t len, unsigned host){
-  using namespace galois::Runtime;
+  using namespace galois::runtime;
   static SimpleLock lock2;
   std::lock_guard<SimpleLock> lg(lock2);
   auto& out = openIfNot_send();
@@ -158,7 +158,7 @@ void galois::runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, siz
 
 
 void galois::runtime::detail::print_output_impl(std::ostringstream& os){
-  using namespace galois::Runtime;
+  using namespace galois::runtime;
   static SimpleLock lock2;
   std::lock_guard<SimpleLock> lg(lock2);
   auto& out = openIfNot_output();

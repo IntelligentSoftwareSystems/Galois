@@ -34,11 +34,11 @@
 #include "galois/Galois.h"
 #include "galois/optional.h"
 #include "galois/PriorityQueue.h"
-#include "galois/Runtime/UserContextAccess.h"
+#include "galois/runtime/UserContextAccess.h"
 #include "galois/WorkList/WorkList.h"
 #include "galois/WorkList/WorkListWrapper.h"
 #include "galois/Substrate/ThreadRWlock.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 #include "galois/Substrate/ThreadPool.h"
 #include "galois/Substrate/PerThreadStorage.h"
@@ -476,7 +476,7 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
 
 #include "galois/GaloisForwardDecl.h"
 #include "galois/gtuple.h"
-#include "galois/Runtime/ForEachTraits.h"
+#include "galois/runtime/ForEachTraits.h"
 #include "galois/WorkList/Obim.h"
 
 namespace galois {

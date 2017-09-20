@@ -1,5 +1,5 @@
-#include "galois/Runtime/RemotePointer.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/RemotePointer.h"
+#include "galois/runtime/Serialize.h"
 
 struct S {
   int x;

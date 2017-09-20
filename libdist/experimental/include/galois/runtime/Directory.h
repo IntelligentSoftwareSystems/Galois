@@ -27,16 +27,16 @@
 
 #include "galois/gstl.h"
 #include "galois/MethodFlags.h"
-#include "galois/Runtime/CacheManager.h"
-#include "galois/Runtime/FatPointer.h"
-#include "galois/Runtime/Lockable.h"
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/Support.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/CacheManager.h"
+#include "galois/runtime/FatPointer.h"
+#include "galois/runtime/Lockable.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/Support.h"
+#include "galois/runtime/Tracer.h"
 #include "galois/Substrate/SimpleLock.h"
-#include "galois/Runtime//TID.h"
+#include "galois/runtime//TID.h"
 
-#include "galois/Runtime/Barrier.h"
+#include "galois/runtime/Barrier.h"
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/utility.hpp>

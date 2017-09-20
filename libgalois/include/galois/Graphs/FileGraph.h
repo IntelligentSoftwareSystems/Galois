@@ -42,7 +42,7 @@
 #include "galois/MethodFlags.h"
 #include "galois/LargeArray.h"
 #include "galois/Graphs/Details.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 #include "galois/Substrate/CacheLineStorage.h"
 #include "galois/Substrate/CompilerSpecific.h"
 #include "galois/Substrate/NumaMem.h"

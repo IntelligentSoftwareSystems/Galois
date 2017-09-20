@@ -43,12 +43,12 @@
 #include "galois/PerThreadContainer.h"
 
 #include "galois/WorkList/WorkList.h"
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/OrderedLockable.h"
-#include "galois/Runtime/Executor_DoAll.h"
-#include "galois/Runtime/Range.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/OrderedLockable.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Range.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 
 #include "llvm/ADT/SmallVector.h"

@@ -21,12 +21,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/CacheManager.h"
-#include "galois/Runtime/RemotePointer.h"
+#include "galois/runtime/CacheManager.h"
+#include "galois/runtime/RemotePointer.h"
 
 #include <iostream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 struct foo: public Lockable {
   int x;

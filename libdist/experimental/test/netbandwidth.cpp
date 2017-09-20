@@ -5,13 +5,13 @@
 
 #include <mpi.h>
 
-#include "galois/Runtime/Network.h"
-//#include "galois/Runtime/Barrier.h"
-#include "galois/Runtime/Substrate.h"
+#include "galois/runtime/Network.h"
+//#include "galois/runtime/Barrier.h"
+#include "galois/runtime/Substrate.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 //tests small message bandwidth
 

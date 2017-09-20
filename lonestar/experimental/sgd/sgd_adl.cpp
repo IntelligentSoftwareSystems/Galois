@@ -31,8 +31,8 @@
 #include "galois/Graph/Graph.h"
 #include "galois/Graph/LCGraph.h"
 #include "galois/ParallelSTL/ParallelSTL.h"
-#include "galois/Runtime/ll/PaddedLock.h"
-#include "galois/Runtime/TiledExecutor.h"
+#include "galois/runtime/ll/PaddedLock.h"
+#include "galois/runtime/TiledExecutor.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <algorithm>

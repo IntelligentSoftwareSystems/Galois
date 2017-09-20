@@ -21,12 +21,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/PerHostStorage.h"
 
 #include <mutex>
 #include <algorithm>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 PerBackend_v2::PerBackend_v2() :nextID(0) {}
 

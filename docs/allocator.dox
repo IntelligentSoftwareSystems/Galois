@@ -66,8 +66,8 @@ and STL data structures. It takes the type-name of the heap implementation as a
 template parameter and a reference to it for instantiating the allocator object.  
 
 Following is an example of how \b malloc and \b free, from C, can be wrapped into
-an allocator using this class, (see file {@link include/galois/Runtime/mm/Mem.h}):
-@snippet include/galois/Runtime/mm/Mem.h Example Third Party Allocator
+an allocator using this class, (see file {@link include/galois/runtime/mm/Mem.h}):
+@snippet include/galois/runtime/mm/Mem.h Example Third Party Allocator
 
 
 \b TODO: show snippet using MallocHeap
@@ -105,8 +105,8 @@ We show the Per Iteration Allocator, from {@link include/galois/Mem.h}, to show 
 heap implementations can be combined together to form useful allocators:
 @snippet include/galois/Mem.h PerIterAllocTy example
 
-Another example, from {@link include/galois/Runtime/mm/Mem.h} shows how  the Fixed
+Another example, from {@link include/galois/runtime/mm/Mem.h} shows how  the Fixed
 Size allocator is defined:
-@snippet include/galois/Runtime/mm/Mem.h FixedSizeAllocator example
+@snippet include/galois/runtime/mm/Mem.h FixedSizeAllocator example
 
 */

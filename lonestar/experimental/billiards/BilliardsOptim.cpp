@@ -28,8 +28,8 @@
 
 #include "galois/Graphs/Graph.h"
 
-#include "galois/Runtime/ROBexecutor.h"
-#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/runtime/ROBexecutor.h"
+#include "galois/runtime/OrderedSpeculation.h"
 
 #include "Billiards.h"
 #include "BilliardsParallel.h"

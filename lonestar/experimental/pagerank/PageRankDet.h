@@ -12,10 +12,10 @@
 #include "galois/Graphs/Graph.h"
 // #include "galois/Graph/FileGraph.h"
 
-#include "galois/Runtime/Sampling.h"
-#include "galois/Runtime/DetChromatic.h"
-#include "galois/Runtime/DetPartInputDAG.h"
-#include "galois/Runtime/DetKDGexecutor.h"
+#include "galois/runtime/Sampling.h"
+#include "galois/runtime/DetChromatic.h"
+#include "galois/runtime/DetPartInputDAG.h"
+#include "galois/runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

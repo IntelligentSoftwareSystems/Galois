@@ -30,11 +30,11 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
-#include "galois/Runtime/dGraph.h"
+#include "galois/runtime/dGraph.h"
 #include <boost/dynamic_bitset.hpp>
-#include "galois/Runtime/vecBool_bitset.h"
-#include "galois/Runtime/dGraph_edgeAssign_policy.h"
-#include "galois/Runtime/Dynamic_bitset.h"
+#include "galois/runtime/vecBool_bitset.h"
+#include "galois/runtime/dGraph_edgeAssign_policy.h"
+#include "galois/runtime/Dynamic_bitset.h"
 #include "galois/Graphs/FileGraph.h"
 #include <sstream>
 

@@ -21,9 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/NetworkIO.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/NetworkIO.h"
+#include "galois/runtime/Tracer.h"
 
 #ifdef GALOIS_USE_LWCI
 #define NO_AGG
@@ -33,7 +33,7 @@
 #include <mutex>
 #include <iostream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 using namespace galois::substrate;
 
 namespace {

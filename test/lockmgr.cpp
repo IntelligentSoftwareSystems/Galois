@@ -1,8 +1,8 @@
-#include "galois/Runtime/Lockable.h"
+#include "galois/runtime/Lockable.h"
 
 #include <iostream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 struct simple : public Lockable {
   int foo;

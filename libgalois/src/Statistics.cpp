@@ -27,13 +27,13 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#include "galois/Runtime/Statistics.h"
-#include "galois/Runtime/Executor_OnEach.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/Executor_OnEach.h"
 
 #include <iostream>
 #include <fstream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 boost::uuids::uuid galois::runtime::getRandUUID(void) {
   static boost::uuids::uuid UUID = boost::uuids::random_generator()();

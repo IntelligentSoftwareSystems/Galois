@@ -33,7 +33,7 @@
 #include "galois/LargeArray.h"
 #include "galois/NoDerefIterator.h"
 #include "galois/gstl.h"
-#include "galois/Runtime/ll/PaddedLock.h"
+#include "galois/runtime/ll/PaddedLock.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <atomic>

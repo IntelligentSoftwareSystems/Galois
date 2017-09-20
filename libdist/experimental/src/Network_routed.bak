@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 #include "NetworkIO_mpi.h"
 
 #include <boost/intrusive/list.hpp>
@@ -29,7 +29,7 @@
 #include <thread>
 #include <mutex>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 namespace {
 

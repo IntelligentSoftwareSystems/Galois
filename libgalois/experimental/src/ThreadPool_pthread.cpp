@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/Sampling.h"
 #include "galois/Substrate/ThreadPool.h"
 #include "galois/Substrate/EnvCheck.h"
 #include "galois/Substrate/HWTopo.h"
@@ -53,7 +53,7 @@ extern void initPTS();
 }
 }
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 namespace {
 

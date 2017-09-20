@@ -34,8 +34,8 @@
 #include "galois/Galois.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/OrderedTraits.h"
-#include "galois/Runtime/Executor_DoAll_Old.h"
-#include "galois/Runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_DoAll_Old.h"
+#include "galois/runtime/Executor_DoAll.h"
 #include "galois/Substrate/EnvCheck.h"
 
 #ifdef GALOIS_USE_TBB

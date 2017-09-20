@@ -10,15 +10,15 @@
 #include "galois/WorkList/WorkListDebug.h"
 
 #include "galois/Graphs/Graph3.h"
-#include "galois/Runtime/DistSupport.h"
+#include "galois/runtime/DistSupport.h"
 
 #include <cassert>
 #include <stdlib.h>
 
 #include "Edge.h"
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/Serialize.h"
 
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 
 #include <vector>
 #include <algorithm>

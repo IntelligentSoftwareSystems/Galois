@@ -24,7 +24,7 @@
 #ifndef GALOIS_RUNTIME_NETWORK_H
 #define GALOIS_RUNTIME_NETWORK_H
 
-#include "galois/Runtime/Serialize.h"
+#include "galois/runtime/Serialize.h"
 #include "galois/Substrate/Barrier.h"
 
 #include <cstdint>

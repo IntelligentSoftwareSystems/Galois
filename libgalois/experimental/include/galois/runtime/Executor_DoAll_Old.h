@@ -41,8 +41,8 @@
 #include "galois/Timer.h"
 #include "galois/Substrate/Barrier.h"
 #include "galois/Substrate/ThreadPool.h"
-#include "galois/Runtime/Support.h"
-#include "galois/Runtime/Range.h"
+#include "galois/runtime/Support.h"
+#include "galois/runtime/Range.h"
 
 #include <algorithm>
 #include <mutex>

@@ -34,8 +34,8 @@
 
 #include "galois/gdeque.h"
 #include "galois/gslist.h"
-#include "galois/Runtime/Substrate.h"
-#include "galois/Runtime/LoopStatistics.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/LoopStatistics.h"
 
 // #include <array> if c++11
 #include <boost/array.hpp>
@@ -590,7 +590,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
 
   WorkTy W(b, e, loopname);
   
-  using namespace galois::Runtime;
+  using namespace galois::runtime;
   substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }
 

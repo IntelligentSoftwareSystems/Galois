@@ -28,8 +28,8 @@
 
 #include "galois/Threads.h"
 #include "galois/CilkInit.h"
-#include "galois/Runtime/PerThreadStorage.h"
-#include "galois/Runtime/ThreadPool.h"
+#include "galois/runtime/PerThreadStorage.h"
+#include "galois/runtime/ThreadPool.h"
 #include "galois/gIO.h"
 #include "galois/Substrate/HWTopo.h"
 #include "galois/Substrate/TID.h"

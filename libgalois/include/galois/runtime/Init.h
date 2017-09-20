@@ -25,7 +25,7 @@
  * reserved.
  *
  * @section Description
- * Initializes the components of galois::Runtime library
+ * Initializes the components of galois::runtime library
  *
  * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
@@ -33,8 +33,8 @@
 #ifndef GALOIS_RUNTIME_INIT_H
 #define GALOIS_RUNTIME_INIT_H
 
-#include "galois/Runtime/Statistics.h"
-#include "galois/Runtime/PagePool.h"
+#include "galois/runtime/Statistics.h"
+#include "galois/runtime/PagePool.h"
 #include "galois/Substrate/Init.h"
 
 #include <string>

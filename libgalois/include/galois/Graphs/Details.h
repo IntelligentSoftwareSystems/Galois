@@ -39,8 +39,8 @@
 #include "galois/LazyObject.h"
 #include "galois/NoDerefIterator.h"
 #include "galois/Threads.h"
-#include "galois/Runtime/Iterable.h"
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Iterable.h"
+#include "galois/runtime/Context.h"
 #include "galois/Substrate/PerThreadStorage.h"
 
 #include <boost/mpl/if.hpp>

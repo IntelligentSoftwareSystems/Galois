@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "gen_cuda.h"
-#include "galois/Runtime/Cuda/cuda_helpers.h"
+#include "galois/runtime/Cuda/cuda_helpers.h"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
 #define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());

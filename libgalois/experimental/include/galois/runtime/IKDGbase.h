@@ -7,8 +7,8 @@
 #include "galois/OrderedTraits.h"
 #include "galois/DoAllWrap.h"
 
-#include "galois/Runtime/OrderedLockable.h"
-#include "galois/Runtime/WindowWorkList.h"
+#include "galois/runtime/OrderedLockable.h"
+#include "galois/runtime/WindowWorkList.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>

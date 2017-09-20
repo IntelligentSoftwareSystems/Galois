@@ -38,9 +38,9 @@
 #include "galois/Accumulator.h"
 #include "galois/Traits.h"
 #include "galois/Mem.h"
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/Executor_ForEach.h"
-#include "galois/Runtime/Support.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/Support.h"
 #include "galois/gIO.h"
 #include "galois/WorkList/Simple.h"
 

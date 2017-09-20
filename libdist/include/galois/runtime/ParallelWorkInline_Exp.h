@@ -34,7 +34,7 @@
 
 #include <cstdio>
 
-#include "galois/Runtime/ForEachTraits.h"
+#include "galois/runtime/ForEachTraits.h"
 // #define _DO_OUTER_PREFETCH 1
 
 #include <xmmintrin.h>

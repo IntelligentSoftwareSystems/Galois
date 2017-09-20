@@ -45,7 +45,7 @@
 #include "galois/DoAllWrap.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/Executor_OnEach.h"
+#include "galois/runtime/Executor_OnEach.h"
 #include "galois/Substrate/CompilerSpecific.h"
 
 

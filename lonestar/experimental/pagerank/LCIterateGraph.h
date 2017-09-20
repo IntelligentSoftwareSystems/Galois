@@ -28,7 +28,7 @@
 
 #include "galois/Galois.h"
 #include "galois/Graph/FileGraph.h"
-#include "galois/Runtime/mm/Mem.h"
+#include "galois/runtime/mm/Mem.h"
 
 #include <iterator>
 #include <new>

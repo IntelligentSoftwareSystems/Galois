@@ -1,6 +1,6 @@
-#include "galois/Runtime/Cuda/cuda_device.h"
+#include "galois/runtime/Cuda/cuda_device.h"
 #include "galois/Galois.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 #include <algorithm>
 
 int get_gpu_device_id(std::string personality_set, int num_nodes){

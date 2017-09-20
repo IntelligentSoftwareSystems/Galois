@@ -35,7 +35,7 @@
 #define KRUSKALSTRICTOBIM_H
 
 #include "galois/Graphs/Graph.h"
-#include "galois/Runtime/LevelExecutor.h"
+#include "galois/runtime/LevelExecutor.h"
 #include "galois/WorkList/WorkListExperimental.h"
 
 #include "Kruskal.h"

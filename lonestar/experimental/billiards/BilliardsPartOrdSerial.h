@@ -44,7 +44,7 @@
 #include "galois/Markable.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_DoAll.h"
 #include "galois/Substrate/CompilerSpecific.h"
 
 

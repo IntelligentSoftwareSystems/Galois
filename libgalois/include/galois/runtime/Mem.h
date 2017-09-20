@@ -42,7 +42,7 @@
 #include "galois/Substrate/CacheLineStorage.h"
 #include "galois/Substrate/NumaMem.h"
 #include "galois/gIO.h"
-#include "galois/Runtime/PagePool.h"
+#include "galois/runtime/PagePool.h"
 
 #include <memory>
 #include <boost/utility.hpp>

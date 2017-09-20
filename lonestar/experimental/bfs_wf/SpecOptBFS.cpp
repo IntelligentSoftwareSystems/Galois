@@ -28,7 +28,7 @@
 #include <vector>
 #include <functional>
 
-#include "galois/Runtime/KDGspecLocalMin.h"
+#include "galois/runtime/KDGspecLocalMin.h"
 
 #include "bfs.h"
 #include "bfsParallel.h"

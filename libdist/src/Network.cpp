@@ -21,19 +21,19 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Tracer.h"
-//#include "galois/Runtime/Barrier.h"
-//#include "galois/Runtime/Directory.h"
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/NetworkIO.h"
-#include "galois/Runtime/NetworkBackend.h"
+#include "galois/runtime/Tracer.h"
+//#include "galois/runtime/Barrier.h"
+//#include "galois/runtime/Directory.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/NetworkIO.h"
+#include "galois/runtime/NetworkBackend.h"
 
 #include <type_traits>
 #include <cassert>
 #include <iostream>
 #include <mutex>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 uint32_t galois::runtime::evilPhase = 1;
 

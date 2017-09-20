@@ -20,7 +20,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "galois/Runtime/Range.h"
+#include "galois/runtime/Range.h"
 
 #include <cstdlib>
 

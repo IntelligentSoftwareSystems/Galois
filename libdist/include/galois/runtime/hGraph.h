@@ -26,18 +26,18 @@
 
 #include "galois/gstl.h"
 #include "galois/Graphs/LC_CSR_Graph.h"
-#include "galois/Runtime/Substrate.h"
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/Network.h"
 
-//#include "galois/Runtime/Barrier.h"
-#include "galois/Runtime/Serialize.h"
+//#include "galois/runtime/Barrier.h"
+#include "galois/runtime/Serialize.h"
 #include "galois/Timer.h"
 
-#include "galois/Runtime/GlobalObj.h"
-#include "galois/Runtime/OfflineGraph.h"
+#include "galois/runtime/GlobalObj.h"
+#include "galois/runtime/OfflineGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/Runtime/Cuda/cuda_mtypes.h"
+#include "galois/runtime/Cuda/cuda_mtypes.h"
 #endif
 
 #ifdef __GALOIS_HET_OPENCL__

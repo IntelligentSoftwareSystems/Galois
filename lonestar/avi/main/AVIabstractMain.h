@@ -52,7 +52,7 @@
 #include "galois/Graphs/Graph.h"
 #include "galois/Graphs/LCGraph.h"
 #include "galois/Timer.h"
-#include "galois/Runtime/Sampling.h"
+#include "galois/runtime/Sampling.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "llvm/Support/CommandLine.h"
 

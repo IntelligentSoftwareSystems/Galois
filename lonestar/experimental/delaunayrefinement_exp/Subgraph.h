@@ -29,7 +29,7 @@
 
 #include "galois/Galois.h"
 #include "galois/Graphs/Graph3.h"
-#include "galois/Runtime/DistSupport.h"
+#include "galois/runtime/DistSupport.h"
 
 #include <vector>
 #include <algorithm>

@@ -34,12 +34,12 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 
 #include <map>
 #include <mutex>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 //Anchor the class
 SystemHeap::SystemHeap() {

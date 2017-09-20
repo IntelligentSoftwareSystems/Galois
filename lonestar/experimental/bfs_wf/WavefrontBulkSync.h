@@ -32,7 +32,7 @@
 
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/ParallelWorkInline_Exp.h"
+#include "galois/runtime/ParallelWorkInline_Exp.h"
 
 typedef uint32_t ND_ty;
 

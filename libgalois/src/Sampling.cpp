@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Runtime/Sampling.h"
-#include "galois/Runtime/Statistics.h"
+#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Statistics.h"
 #include "galois/Substrate/EnvCheck.h"
 #include "galois/Substrate/ThreadPool.h"
 #include "galois/gIO.h"
@@ -76,7 +76,7 @@ static void end() {}
 
 #ifdef GALOIS_USE_HPCTOOLKIT
 #include <hpctoolkit.h>
-#include "galois/Runtime/ll/TID.h"
+#include "galois/runtime/ll/TID.h"
 
 namespace hpctoolkit {
 static bool isOn;

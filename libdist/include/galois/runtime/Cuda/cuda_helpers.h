@@ -1,7 +1,7 @@
 #pragma once
-#include "galois/Runtime/Cuda/dynamic_bitset.h"
-#include "galois/Runtime/Cuda/cuda_context.h"
-#include "galois/Runtime/DataCommMode.h"
+#include "galois/runtime/Cuda/dynamic_bitset.h"
+#include "galois/runtime/Cuda/cuda_context.h"
+#include "galois/runtime/DataCommMode.h"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
 #define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());

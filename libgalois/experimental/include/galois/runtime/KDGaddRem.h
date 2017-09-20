@@ -42,12 +42,12 @@
 #include "galois/AltBag.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/Context.h"
-#include "galois/Runtime/OrderedLockable.h"
-#include "galois/Runtime/Executor_DoAll.h"
-#include "galois/Runtime/Range.h"
-#include "galois/Runtime/Mem.h"
-#include "galois/Runtime/IKDGbase.h"
+#include "galois/runtime/Context.h"
+#include "galois/runtime/OrderedLockable.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Range.h"
+#include "galois/runtime/Mem.h"
+#include "galois/runtime/IKDGbase.h"
 
 #include "galois/WorkList/WorkList.h"
 

@@ -22,14 +22,14 @@
  * @author Gurbinder Gill  <gill@cs.utexas.edu>
  */
 
-#include "galois/Runtime/DistSupport.h"
-#include "galois/Runtime/Directory.h"
-#include "galois/Runtime/ll/TID.h"
+#include "galois/runtime/DistSupport.h"
+#include "galois/runtime/Directory.h"
+#include "galois/runtime/ll/TID.h"
 
 #include <mutex>
 #include <iostream>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 
 ////////////////////////////////////////////////////////////////////////////////

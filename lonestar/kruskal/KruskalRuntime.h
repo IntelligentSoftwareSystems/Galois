@@ -5,8 +5,8 @@
 
 #include "galois/DynamicArray.h"
 #include "galois/Graphs/Graph.h"
-#include "galois/Runtime/OrderedSpeculation.h"
-#include "galois/Runtime/KDGtwoPhase.h"
+#include "galois/runtime/OrderedSpeculation.h"
+#include "galois/runtime/KDGtwoPhase.h"
 #include "galois/Accumulator.h"
 #include "galois/PerThreadContainer.h"
 

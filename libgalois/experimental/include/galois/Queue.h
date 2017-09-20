@@ -32,7 +32,7 @@
 
 #include "galois/optional.h"
 #include "galois/Substrate/PaddedLock.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "galois/Substrate/PerThreadStorage.h"
 
 #include <boost/utility.hpp>

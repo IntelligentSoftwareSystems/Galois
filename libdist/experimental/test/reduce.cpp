@@ -1,7 +1,7 @@
 #include "galois/Galois.h"
 #include "galois/Graphs/Graph3.h"
 #include "galois/Reduction.h"
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/PerHostStorage.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/counting_iterator.hpp>
@@ -9,7 +9,7 @@
 #include <iostream>
 
 using namespace galois::Graph;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 typedef galois::DGReducible<unsigned, std::plus<unsigned> > RD1;
 

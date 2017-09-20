@@ -1,9 +1,9 @@
 #include "galois/ForeachTask.h"
-#include "galois/Runtime/DistributedStructs.h"
+#include "galois/runtime/DistributedStructs.h"
 #include <vector>
 
 using namespace std;
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 struct R : public galois::runtime::Lockable {
    int i;

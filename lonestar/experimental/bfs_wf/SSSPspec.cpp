@@ -1,7 +1,7 @@
 #include <vector>
 #include <functional>
 
-#include "galois/Runtime/OrderedSpeculation.h"
+#include "galois/runtime/OrderedSpeculation.h"
 
 #include "bfs.h"
 

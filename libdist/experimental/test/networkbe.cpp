@@ -1,9 +1,9 @@
 #include <iostream>
 #include <cstring>
 
-#include "galois/Runtime/NetworkBackend.h"
+#include "galois/runtime/NetworkBackend.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 int main(int argc, char** argv) {
   NetworkBackend& net = getSystemNetworkBackend();

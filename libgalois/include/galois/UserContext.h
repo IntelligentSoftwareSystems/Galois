@@ -26,7 +26,7 @@
 #include "galois/Mem.h"
 #include "galois/gdeque.h"
 
-#include "galois/Runtime/Context.h"
+#include "galois/runtime/Context.h"
 
 #include <functional>
 

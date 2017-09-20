@@ -30,12 +30,12 @@
 #include "galois/Galois.h"
 #include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/Dist/OfflineGraph.h"
 #include "galois/Dist/hGraph.h"
 #include "galois/DistAccumulator.h"
-#include "galois/Runtime/Tracer.h"
+#include "galois/runtime/Tracer.h"
 
 
 static const char* const name = "ConnectedComp - Distributed Heterogeneous with worklist.";

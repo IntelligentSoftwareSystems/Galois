@@ -626,8 +626,8 @@ public:
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
     header << "#pragma once\n";
-    header << "#include \"galois/Runtime/Cuda/cuda_mtypes.h\"\n";
-    header << "#include \"galois/Runtime/DataCommMode.h\"\n";
+    header << "#include \"galois/runtime/Cuda/cuda_mtypes.h\"\n";
+    header << "#include \"galois/runtime/DataCommMode.h\"\n";
     header << "\nstruct CUDA_Context;\n";
     if (requiresWorklist) {
       header << "\nstruct CUDA_Worklist {\n";
@@ -679,7 +679,7 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
-    cuheader << "#include \"galois/Runtime/Cuda/cuda_helpers.h\"\n\n";
+    cuheader << "#include \"galois/runtime/Cuda/cuda_helpers.h\"\n\n";
     cuheader << "struct CUDA_Context : public CUDA_Context_Common {\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tstruct CUDA_Context_Field<" << var.second << "> " << var.first << ";\n";

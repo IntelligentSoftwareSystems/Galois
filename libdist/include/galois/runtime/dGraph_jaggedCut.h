@@ -29,11 +29,11 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
-#include "galois/Runtime/dGraph.h"
-#include "galois/Runtime/OfflineGraph.h"
-#include "galois/Runtime/Serialize.h"
-#include "galois/Runtime/Tracer.h"
-#include "galois/Runtime/CompilerHelperFunctions.h"
+#include "galois/runtime/dGraph.h"
+#include "galois/runtime/OfflineGraph.h"
+#include "galois/runtime/Serialize.h"
+#include "galois/runtime/Tracer.h"
+#include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/DoAllWrap.h"
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>

@@ -1,10 +1,10 @@
 #include "galois/Galois.h"
-#include "galois/Runtime/DistSupport.h"
+#include "galois/runtime/DistSupport.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>
 #include <vector>
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 typedef std::vector<int>::iterator IterTy;
 

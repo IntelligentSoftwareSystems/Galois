@@ -29,7 +29,7 @@
 #include "galois/Graphs/Graph.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/LevelExecutor.h"
+#include "galois/runtime/LevelExecutor.h"
 
 #include "Billiards.h"
 

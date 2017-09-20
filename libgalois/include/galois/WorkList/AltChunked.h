@@ -35,7 +35,7 @@
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/CompilerSpecific.h"
 #include "galois/Substrate/PtrLock.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Mem.h"
 #include "WLCompileCheck.h"
 
 namespace galois {

@@ -38,7 +38,7 @@
 #include "galois/Accumulator.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/DoAllCoupled.h"
+#include "galois/runtime/DoAllCoupled.h"
 
 
 #include "kruskalData.h"

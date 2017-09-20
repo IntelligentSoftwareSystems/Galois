@@ -30,7 +30,7 @@
 
 #include "galois/Graphs/Graph.h"
 
-#include "galois/Runtime/ROBexecutor.h"
+#include "galois/runtime/ROBexecutor.h"
 
 #include "Billiards.h"
 #include "BilliardsLevelExec.h"

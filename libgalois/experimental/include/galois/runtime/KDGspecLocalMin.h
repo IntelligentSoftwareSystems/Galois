@@ -1,9 +1,9 @@
 #ifndef GALOIS_RUNTIME_KDG_SPEC_LOCAL_MIN_H
 #define GALOIS_RUNTIME_KDG_SPEC_LOCAL_MIN_H
 
-#include "galois/Runtime/IKDGbase.h"
-#include "galois/Runtime/WindowWorkList.h"
-#include "galois/Runtime/Executor_ParaMeter.h"
+#include "galois/runtime/IKDGbase.h"
+#include "galois/runtime/WindowWorkList.h"
+#include "galois/runtime/Executor_ParaMeter.h"
 
 namespace galois {
 namespace runtime {

@@ -33,9 +33,9 @@
 
 #include "galois/Substrate/SimpleLock.h"
 #include "galois/Substrate/Termination.h"
-#include "galois/Runtime/DetChromatic.h"
-#include "galois/Runtime/DoAllCoupled.h"
-#include "galois/Runtime/DetPartitioners.h"
+#include "galois/runtime/DetChromatic.h"
+#include "galois/runtime/DoAllCoupled.h"
+#include "galois/runtime/DetPartitioners.h"
 
 #include <atomic>
 #include <functional>

@@ -27,10 +27,10 @@
  */
 
 #include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Runtime/Substrate.h"
+#include "galois/runtime/Substrate.h"
 #include "galois/Substrate/CompilerSpecific.h"
-#include "galois/Runtime/Network.h"
-//#include "galois/Runtime/Directory.h"
+#include "galois/runtime/Network.h"
+//#include "galois/runtime/Directory.h"
 
 #include <cstdlib>
 #include <cstdio>

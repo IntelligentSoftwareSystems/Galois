@@ -31,19 +31,19 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "galois/Runtime/Init.h"
-#include "galois/Runtime/Executor_Deterministic.h"
-#include "galois/Runtime/Executor_DoAll.h"
-#include "galois/Runtime/Executor_ForEach.h"
-#include "galois/Runtime/Executor_OnEach.h"
-#include "galois/Runtime/Executor_Ordered.h"
-#include "galois/Runtime/Mem.h"
+#include "galois/runtime/Init.h"
+#include "galois/runtime/Executor_Deterministic.h"
+#include "galois/runtime/Executor_DoAll.h"
+#include "galois/runtime/Executor_ForEach.h"
+#include "galois/runtime/Executor_OnEach.h"
+#include "galois/runtime/Executor_Ordered.h"
+#include "galois/runtime/Mem.h"
 
 #include "galois/WorkList/WorkList.h"
 
 #ifdef GALOIS_USE_EXP
-//#include "galois/Runtime/Executor_BulkSynchronous.h"
-//#include "galois/Runtime/Executor_ParaMeter.h"
+//#include "galois/runtime/Executor_BulkSynchronous.h"
+//#include "galois/runtime/Executor_ParaMeter.h"
 #endif
 
 #include <utility>

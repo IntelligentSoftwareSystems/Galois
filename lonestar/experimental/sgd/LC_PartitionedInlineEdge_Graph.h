@@ -29,7 +29,7 @@
 #include "galois/LargeArray.h"
 #include "galois/Graph/FileGraph.h"
 #include "galois/Graph/Details.h"
-#include "galois/Runtime/MethodFlags.h"
+#include "galois/runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>

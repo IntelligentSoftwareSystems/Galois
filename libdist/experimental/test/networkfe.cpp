@@ -1,9 +1,9 @@
 #include <iostream>
 #include <cstring>
 
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 unsigned count = 0;
 

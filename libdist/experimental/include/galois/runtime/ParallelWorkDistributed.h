@@ -28,9 +28,9 @@
 #ifndef GALOIS_RUNTIME_PARALLELWORKDIST_H
 #define GALOIS_RUNTIME_PARALLELWORKDIST_H
 
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/DistSupport.h"
-#include "galois/Runtime/PerHostStorage.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/DistSupport.h"
+#include "galois/runtime/PerHostStorage.h"
 
 namespace galois {
 namespace runtime {

@@ -37,7 +37,7 @@
 #include "galois/Galois.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/KDGaddRem.h"
+#include "galois/runtime/KDGaddRem.h"
 #include "galois/Substrate/PaddedLock.h"
 #include "galois/Substrate/CompilerSpecific.h"
 

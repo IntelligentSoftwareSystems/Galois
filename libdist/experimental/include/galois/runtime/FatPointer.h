@@ -27,7 +27,7 @@
 #pragma clang diagnostic ignored "-Wmismatched-tags"
 
 #include <boost/functional/hash.hpp>
-#include "galois/Runtime/Network.h"
+#include "galois/runtime/Network.h"
 
 #include <ostream>
 

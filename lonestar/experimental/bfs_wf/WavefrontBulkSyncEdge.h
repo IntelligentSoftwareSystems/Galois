@@ -5,8 +5,8 @@
 
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Runtime/ParallelWorkInline_Exp.h"
-#include "galois/Runtime/CoupledExecutor.h"
+#include "galois/runtime/ParallelWorkInline_Exp.h"
+#include "galois/runtime/CoupledExecutor.h"
 
 typedef uint32_t ND_ty;
 class WavefrontBulkSyncEdge: public BFS<ND_ty> {

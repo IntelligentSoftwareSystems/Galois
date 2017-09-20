@@ -5,11 +5,11 @@
 
 #include <mpi.h>
 
-#include "galois/Runtime/Network.h"
-#include "galois/Runtime/Barrier.h"
+#include "galois/runtime/Network.h"
+#include "galois/runtime/Barrier.h"
 #include "galois/Timer.h"
 
-using namespace galois::Runtime;
+using namespace galois::runtime;
 
 static std::atomic<int> num;
 
