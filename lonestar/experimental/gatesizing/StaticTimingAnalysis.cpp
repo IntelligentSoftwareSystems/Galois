@@ -168,6 +168,7 @@ struct ComputeArrivalTimeAndPower {
     if (posTablesI != delayTables.end()) {
       pos = extractMaxFromTableSet(posTablesI->second, posVTotalC);
     }
+    float posArrivalTime = inPosInfo.arrivalTime + pos.first;
 
     auto negTablesI = delayTables.find({inPinName, TIMING_SENSE_NEGATIVE_UNATE});
     std::vector<float> negVTotalC = {inNegInfo.slew, pinC + netC};
@@ -175,17 +176,20 @@ struct ComputeArrivalTimeAndPower {
     if (negTablesI != delayTables.end()) {
       neg = extractMaxFromTableSet(negTablesI->second, negVTotalC);
     }
+    float negArrivalTime = inNegInfo.arrivalTime + neg.first;
 
-    bool isPos = (pos.first >= neg.first);
-    edgeDelay = (isPos) ? pos.first : neg.first;
+    // take the parameters for larger arrival time
+    bool isPos = (posArrivalTime >= negArrivalTime);
+    auto arrivalTime = (isPos) ? posArrivalTime : negArrivalTime;
+    auto delay = (isPos) ? pos.first : neg.first;
     auto when = (isPos) ? pos.second : neg.second;
     auto t = (isPos) ? TIMING_SENSE_POSITIVE_UNATE : TIMING_SENSE_NEGATIVE_UNATE;
     auto& inInfo = (isPos) ? inPosInfo : inNegInfo;
     auto& vTotalC = (isPos) ? posVTotalC : negVTotalC;
 
-    auto arrivalTime = inInfo.arrivalTime + edgeDelay;
     if (info.arrivalTime < arrivalTime) {
       // update critical path
+      edgeDelay = delay;
       info.arrivalTime = arrivalTime;
       info.slew = transitionTables.at({inPinName, t}).at(when)->lookup(vTotalC);
 
