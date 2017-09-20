@@ -227,7 +227,7 @@ struct GBPartitioner {
 
          }      //For each node
          std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size() << "\n";
-         using namespace galois::Graph;
+         using namespace galois::graphs;
          FileGraphWriter newGraph;
          newGraph.setNumNodes(newNodeCounter);
          newGraph.setNumEdges(newEdges.size());

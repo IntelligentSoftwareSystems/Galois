@@ -8,7 +8,7 @@
 
 #include <iostream>
 
-using namespace galois::Graph;
+using namespace galois::graphs;
 using namespace galois::runtime;
 
 typedef galois::DGReducible<unsigned, std::plus<unsigned> > RD1;

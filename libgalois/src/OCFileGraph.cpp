@@ -43,7 +43,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-using namespace galois::Graph;
+using namespace galois::graphs;
 
 //File format V1:
 //version (1) {uint64_t LE}

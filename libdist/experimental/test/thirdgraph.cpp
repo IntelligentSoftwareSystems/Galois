@@ -5,7 +5,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>
 
-using namespace galois::Graph;
+using namespace galois::graphs;
 typedef ThirdGraph<int, int, EdgeDirection::Out> Graph;
 typedef ThirdGraph<int, void, EdgeDirection::Un> UndirectedGraph;
 
