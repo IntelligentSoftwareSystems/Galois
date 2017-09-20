@@ -70,17 +70,17 @@ int main(int argc, char** argv) {
 
   CellLib cellLib;
   cellLib.read(lib);
-//  cellLib.printCellLibDebug();
+//  cellLib.printDebug();
   std::cout << "parsed cell library" << std::endl;
 
   VerilogModule vModule;
   vModule.read(inputCircuit, &cellLib);
-//  vModule.printVerilogModuleDebug();
+//  vModule.printDebug();
   std::cout << "parsed verilog module" << std::endl;
 
   SDC sdc;
   sdc.read(sdcFile, &cellLib);
-//  sdc.printSdcDebug();
+//  sdc.printDebug();
   std::cout << "parsed sdc file" << std::endl;
 
   CircuitGraph graph;
@@ -94,16 +94,15 @@ int main(int argc, char** argv) {
   std::cout << "finished static timinig analysis" << std::endl;
 
   doGateSizing();
-//  vModule.printVerilogModuleDebug();
+//  vModule.printDebug();
 //  graph.print();
   std::cout << "finished gate sizing" << std::endl;
 
   T.stop();
-  vModule.writeVerilogModule(outputCircuit);
+  vModule.write(outputCircuit);
   std::cout << "wrote modified verilog module" << std::endl;
 
   auto gStat = graph.getStatistics();
   std::cout << gStat.first << " nodes, " << gStat.second << " edges" << std::endl;
   return 0;
 }
-
