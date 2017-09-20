@@ -1,4 +1,4 @@
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"
 

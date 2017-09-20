@@ -29,7 +29,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/Accumulator.h"
 #include "galois/ParallelSTL.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef HAS_EIGEN

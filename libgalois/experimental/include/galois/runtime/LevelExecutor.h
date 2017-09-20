@@ -37,11 +37,11 @@
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/worklists/WorkList.h"
 #include "galois/worklists/WorkListWrapper.h"
-#include "galois/Substrate/ThreadRWlock.h"
+#include "galois/substrate/ThreadRWlock.h"
 #include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <map>
 #include <vector>

@@ -33,7 +33,7 @@
 #ifndef GALOIS_SUBSTRATE_BARRIER_H
 #define GALOIS_SUBSTRATE_BARRIER_H
 
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/gIO.h"
 
 #include <memory>

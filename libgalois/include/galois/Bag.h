@@ -36,7 +36,7 @@
 #define GALOIS_BAG_H
 
 #include "galois/gstl.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
 

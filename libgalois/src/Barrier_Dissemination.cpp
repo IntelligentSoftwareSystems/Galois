@@ -32,9 +32,9 @@
  */
 
 
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/Barrier.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <atomic>
 

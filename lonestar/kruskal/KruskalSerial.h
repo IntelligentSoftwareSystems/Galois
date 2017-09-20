@@ -34,7 +34,7 @@
 #ifndef KRUSKAL_SERIAL_H_
 #define KRUSKAL_SERIAL_H_
 
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "Kruskal.h"
 

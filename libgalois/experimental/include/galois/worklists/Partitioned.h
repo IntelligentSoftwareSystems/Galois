@@ -31,8 +31,8 @@
 
 #include "galois/worklists/Simple.h"
 #include "galois/worklists/WorkListHelpers.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 #include <atomic>
 #include <deque>

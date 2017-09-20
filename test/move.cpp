@@ -7,7 +7,7 @@
 #endif
 #include "galois/LargeArray.h"
 #include "galois/runtime/Mem.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 struct MoveOnly {
   MoveOnly() = default;

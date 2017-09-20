@@ -32,8 +32,8 @@
 #ifndef GALOIS_PRIORITYQUEUE_H
 #define GALOIS_PRIORITYQUEUE_H
 
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <vector>
 #include <algorithm>

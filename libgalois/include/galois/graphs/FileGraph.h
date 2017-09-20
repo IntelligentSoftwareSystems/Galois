@@ -43,9 +43,9 @@
 #include "galois/LargeArray.h"
 #include "galois/graphs/Details.h"
 #include "galois/runtime/Context.h"
-#include "galois/Substrate/CacheLineStorage.h"
-#include "galois/Substrate/CompilerSpecific.h"
-#include "galois/Substrate/NumaMem.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/CompilerSpecific.h"
+#include "galois/substrate/NumaMem.h"
 #include "galois/Accumulator.h"
 
 #include <boost/iterator/counting_iterator.hpp>

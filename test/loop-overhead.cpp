@@ -1,6 +1,6 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 
 #include <iostream>
 #include <cstdlib>

@@ -37,7 +37,7 @@
 #ifndef GALOIS_SUBSTRATE_PTRLOCK_H
 #define GALOIS_SUBSTRATE_PTRLOCK_H
 
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <stdint.h>
 #include <cassert>

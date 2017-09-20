@@ -32,7 +32,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
 */
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 void galois::substrate::SimpleLock::slow_lock() const {
   int oldval = 0;

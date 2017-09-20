@@ -31,8 +31,8 @@
 #include "galois/runtime/PerThreadStorage.h"
 #include "galois/runtime/ThreadPool.h"
 #include "galois/gIO.h"
-#include "galois/Substrate/HWTopo.h"
-#include "galois/Substrate/EnvCheck.h"
+#include "galois/substrate/HWTopo.h"
+#include "galois/substrate/EnvCheck.h"
 
 #ifdef HAVE_CILK
 #include <cilk/cilk.h>

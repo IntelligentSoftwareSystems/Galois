@@ -36,8 +36,8 @@
 #include "galois/Atomic.h"
 #include "galois/Galois.h"
 
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 #include "galois/runtime/ROBexecutor.h"
 #include "galois/runtime/OrderedSpeculation.h"
 

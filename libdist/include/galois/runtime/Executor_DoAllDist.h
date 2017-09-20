@@ -43,7 +43,7 @@
 #include "galois/gtuple.h"
 #include "galois/Traits.h"
 #include "galois/Timer.h"
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/Barrier.h"
 #include "galois/runtime/Support.h"
 #include "galois/runtime/Range.h"
 

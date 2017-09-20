@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 #include "galois/runtime/FatPointer.h"
 //#include "galois/runtime/Serialize.h"
 

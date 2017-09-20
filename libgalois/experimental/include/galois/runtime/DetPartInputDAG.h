@@ -31,8 +31,8 @@
 
 #include "galois/AltBag.h"
 
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/Termination.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/Termination.h"
 #include "galois/runtime/DetChromatic.h"
 #include "galois/runtime/DoAllCoupled.h"
 #include "galois/runtime/DetPartitioners.h"

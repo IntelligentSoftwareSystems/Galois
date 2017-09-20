@@ -34,7 +34,7 @@
 #include "galois/Traits.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Support.h"
-#include "galois/Substrate/Termination.h"
+#include "galois/substrate/Termination.h"
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"

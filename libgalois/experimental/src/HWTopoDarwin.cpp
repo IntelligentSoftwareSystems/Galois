@@ -30,7 +30,7 @@
  * 
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "galois/Substrate/HWTopo.h"
+#include "galois/substrate/HWTopo.h"
 #include "galois/gIO.h"
 #include <sys/types.h>
 #include <sys/sysctl.h>

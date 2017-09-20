@@ -27,7 +27,7 @@
 #define GALOIS_RUNTIME_RANGE_H
 
 #include "galois/gstl.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 
 #include <iterator>
 

@@ -37,7 +37,7 @@
 #define GALOIS_RUNTIME_LL_PTRRWLOCK_H
 
 //#include "galois/config.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <stdint.h>
 #include <cassert>

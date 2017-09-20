@@ -33,9 +33,9 @@
  */
 
 #include "galois/gIO.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/EnvCheck.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/ThreadPool.h"
 
 #include <cstdlib>
 #include <cstdio>

@@ -53,8 +53,8 @@
 #include "galois/TwoLevelIterator.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_OnEach.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 

@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 //#include "galois/runtime/Mem.h"
 #include "galois/gIO.h"

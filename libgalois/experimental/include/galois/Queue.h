@@ -31,9 +31,9 @@
 #define GALOIS_QUEUE_H
 
 #include "galois/optional.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/runtime/Mem.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <boost/utility.hpp>
 #include <atomic>

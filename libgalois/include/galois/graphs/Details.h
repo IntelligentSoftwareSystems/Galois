@@ -41,7 +41,7 @@
 #include "galois/Threads.h"
 #include "galois/runtime/Iterable.h"
 #include "galois/runtime/Context.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <boost/mpl/if.hpp>
 #include <algorithm>

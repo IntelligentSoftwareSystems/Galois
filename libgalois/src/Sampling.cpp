@@ -29,8 +29,8 @@
 
 #include "galois/runtime/Sampling.h"
 #include "galois/runtime/Statistics.h"
-#include "galois/Substrate/EnvCheck.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/gIO.h"
 #include <cstdlib>
 

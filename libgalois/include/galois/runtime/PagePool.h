@@ -37,11 +37,11 @@
 #define GALOIS_RUNTIME_PAGEPOOL_H
 
 #include "galois/gIO.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/PtrLock.h"
-#include "galois/Substrate/CacheLineStorage.h"
-#include "galois/Substrate/PageAlloc.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/PageAlloc.h"
+#include "galois/substrate/ThreadPool.h"
 
 #include <unordered_map>
 #include <vector>

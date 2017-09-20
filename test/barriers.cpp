@@ -1,6 +1,6 @@
 #include "galois/Timer.h"
 #include "galois/Galois.h"
-#include "galois/Substrate/BarrierImpl.h"
+#include "galois/substrate/BarrierImpl.h"
 
 #include <iostream>
 #include <cstdlib>

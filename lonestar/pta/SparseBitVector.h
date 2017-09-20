@@ -22,7 +22,7 @@ kind.
 #ifndef GALOIS_SPARSEBITVECTOR_H
 #define GALOIS_SPARSEBITVECTOR_H
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 #include <vector>
 #include <string>

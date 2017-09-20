@@ -34,9 +34,9 @@
 #define GALOIS_SUBSTRATE_INIT_H
 
 #include "galois/gIO.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/Barrier.h"
-#include "galois/Substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/Termination.h"
 
 namespace galois {
 namespace substrate {

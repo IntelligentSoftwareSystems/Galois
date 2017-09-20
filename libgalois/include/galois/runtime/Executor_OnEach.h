@@ -39,7 +39,7 @@
 #include "galois/runtime/Statistics.h"
 #include "galois/Threads.h"
 #include "galois/gIO.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 
 #include <tuple>
 

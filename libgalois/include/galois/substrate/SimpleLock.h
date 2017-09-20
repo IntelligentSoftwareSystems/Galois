@@ -35,7 +35,7 @@
 #ifndef GALOIS_SUBSTRATE_SIMPLELOCK_H
 #define GALOIS_SUBSTRATE_SIMPLELOCK_H
 
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <cassert>
 #include <atomic>

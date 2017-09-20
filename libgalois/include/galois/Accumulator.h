@@ -30,7 +30,7 @@
 #ifndef GALOIS_ACCUMULATOR_H
 #define GALOIS_ACCUMULATOR_H
 
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <limits>
 

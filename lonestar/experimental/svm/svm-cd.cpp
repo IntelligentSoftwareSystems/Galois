@@ -36,7 +36,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/Accumulator.h"
 #include "galois/ParallelSTL.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>

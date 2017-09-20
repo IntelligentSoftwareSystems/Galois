@@ -34,8 +34,8 @@
 #ifndef GALOIS_SUBSTRATE_TERMINATION_H
 #define GALOIS_SUBSTRATE_TERMINATION_H
 
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 #include <atomic>
 

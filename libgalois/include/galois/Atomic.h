@@ -30,7 +30,7 @@
 #ifndef GALOIS_ATOMIC_H
 #define GALOIS_ATOMIC_H
 
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 #include <iterator>
 

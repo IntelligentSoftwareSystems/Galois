@@ -38,7 +38,7 @@
 #include "galois/Timer.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/Barrier.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_ParaMeter.h"
@@ -46,11 +46,11 @@
 #include "galois/runtime/Range.h"
 #include "galois/runtime/Sampling.h"
 #include "galois/runtime/Support.h"
-#include "galois/Substrate/Termination.h"
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/gIO.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 #include "galois/runtime/Mem.h"
 #include "galois/runtime/OrderedSpeculation.h"
 

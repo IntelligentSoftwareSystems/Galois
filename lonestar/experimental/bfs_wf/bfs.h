@@ -54,9 +54,9 @@
 #include "galois/graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 #include "galois/runtime/Sampling.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "Lonestar/BoilerPlate.h"
 

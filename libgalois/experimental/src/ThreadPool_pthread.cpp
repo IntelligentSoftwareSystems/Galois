@@ -28,10 +28,10 @@
  */
 
 #include "galois/runtime/Sampling.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/EnvCheck.h"
-#include "galois/Substrate/HWTopo.h"
-#include "galois/Substrate/TID.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/EnvCheck.h"
+#include "galois/substrate/HWTopo.h"
+#include "galois/substrate/TID.h"
 #include "galois/gIO.h"
 
 #include "boost/utility.hpp"

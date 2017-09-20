@@ -26,7 +26,7 @@
 
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 //#include "hash/crc32.h"
 

@@ -32,7 +32,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
 */
 
-#include "galois/Substrate/PtrLock.h"
+#include "galois/substrate/PtrLock.h"
 
 void galois::substrate::detail::ptr_slow_lock(std::atomic<uintptr_t>& _l) {
   uintptr_t oldval;

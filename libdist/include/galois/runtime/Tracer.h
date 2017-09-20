@@ -24,7 +24,7 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
-#include "galois/Substrate/EnvCheck.h"
+#include "galois/substrate/EnvCheck.h"
 
 #include <sstream>
 #include <functional>

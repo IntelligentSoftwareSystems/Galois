@@ -36,7 +36,7 @@
 #include "galois/OrderedTraits.h"
 #include "galois/runtime/Executor_DoAll_Old.h"
 #include "galois/runtime/Executor_DoAll.h"
-#include "galois/Substrate/EnvCheck.h"
+#include "galois/substrate/EnvCheck.h"
 
 #ifdef GALOIS_USE_TBB
 #include "tbb/parallel_for_each.h"

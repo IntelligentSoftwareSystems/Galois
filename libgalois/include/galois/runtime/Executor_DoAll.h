@@ -39,12 +39,12 @@
 
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/runtime/Statistics.h"
-#include "galois/Substrate/Barrier.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/Termination.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 
 namespace galois {

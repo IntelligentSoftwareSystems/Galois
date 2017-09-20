@@ -33,7 +33,7 @@
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/LCGraph.h"
 
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 
 #include "Lonestar/BoilerPlate.h"
 

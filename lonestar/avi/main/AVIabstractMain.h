@@ -53,7 +53,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/Timer.h"
 #include "galois/runtime/Sampling.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

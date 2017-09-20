@@ -32,7 +32,7 @@
  */
 
 #include "galois/gIO.h"
-#include "galois/Substrate/Termination.h"
+#include "galois/substrate/Termination.h"
 
 // vtable anchoring
 galois::substrate::TerminationDetection::~TerminationDetection(void) {}

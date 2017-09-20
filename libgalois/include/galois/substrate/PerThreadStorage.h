@@ -34,9 +34,9 @@
 #ifndef GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 #define GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/HWTopo.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/HWTopo.h"
+#include "galois/substrate/PaddedLock.h"
 
 #include <cstddef>
 //#include <boost/utility.hpp>

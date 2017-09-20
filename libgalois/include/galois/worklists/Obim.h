@@ -32,8 +32,8 @@
 
 #include "galois/FlatMap.h"
 #include "galois/runtime/Substrate.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/Termination.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/Termination.h"
 #include "galois/worklists/Chunked.h"
 #include "galois/worklists/WorkListHelpers.h"
 

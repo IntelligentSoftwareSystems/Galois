@@ -46,8 +46,8 @@
 #include "galois/runtime/Mem.h"
 
 #include "galois/gIO.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <iostream>
 

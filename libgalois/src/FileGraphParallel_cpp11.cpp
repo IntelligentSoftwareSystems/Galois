@@ -30,8 +30,8 @@
  */
 
 #include "galois/graphs/FileGraph.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/HWTopo.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/HWTopo.h"
 
 #include <mutex>
 #include <condition_variable>

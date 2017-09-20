@@ -36,11 +36,11 @@
 #ifndef GALOIS_RUNTIME_MEM_H
 #define GALOIS_RUNTIME_MEM_H
 
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/PtrLock.h"
-#include "galois/Substrate/CacheLineStorage.h"
-#include "galois/Substrate/NumaMem.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/CacheLineStorage.h"
+#include "galois/substrate/NumaMem.h"
 #include "galois/gIO.h"
 #include "galois/runtime/PagePool.h"
 

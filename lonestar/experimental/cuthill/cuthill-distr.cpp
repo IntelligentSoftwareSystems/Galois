@@ -40,9 +40,9 @@
 //kik 
 #include "galois/Atomic.h"
 #include "galois/runtime/Context.h"
-#include "galois/Substrate/PtrLock.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/Barrier.h"
 
 #include <string>
 #include <sstream>

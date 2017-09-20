@@ -34,7 +34,7 @@
 #ifndef GALOIS_RUNTIME_SUBSTRATE_H
 #define GALOIS_RUNTIME_SUBSTRATE_H
 
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/Barrier.h"
 
 namespace galois {
 namespace runtime {

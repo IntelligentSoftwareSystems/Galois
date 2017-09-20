@@ -30,7 +30,7 @@
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
 #include "galois/worklists/Simple.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 namespace galois {
 namespace worklists {

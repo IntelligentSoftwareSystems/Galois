@@ -33,9 +33,9 @@
 #include "galois/gstl.h"
 #include "galois/gIO.h"
 #include "galois/Threads.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/ThreadRWlock.h"
-#include "galois/Substrate/EnvCheck.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/ThreadRWlock.h"
+#include "galois/substrate/EnvCheck.h"
 
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators

@@ -30,7 +30,7 @@
 
 #include "galois/FlatSet.h"
 #include "galois/optional.h"
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 #include "GeomUtils.h"
 #include "CollidingObject.h"

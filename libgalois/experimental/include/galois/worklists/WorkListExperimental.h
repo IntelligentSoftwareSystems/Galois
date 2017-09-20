@@ -38,11 +38,11 @@
 
 #include "galois/worklists/WorkList.h"
 #include "galois/worklists/WorkListDebug.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/Termination.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/Termination.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PaddedLock.h"
 
 #include "llvm/Support/CommandLine.h"
 

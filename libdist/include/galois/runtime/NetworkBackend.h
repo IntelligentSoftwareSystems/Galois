@@ -24,7 +24,7 @@
 #ifndef GALOIS_RUNTIME_NETWORKBACKEND_H
 #define GALOIS_RUNTIME_NETWORKBACKEND_H
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 
 #include <cstdint>
 

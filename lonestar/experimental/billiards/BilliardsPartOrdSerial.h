@@ -45,7 +45,7 @@
 #include "galois/PerThreadContainer.h"
 
 #include "galois/runtime/Executor_DoAll.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 
 #include "dependTest.h"

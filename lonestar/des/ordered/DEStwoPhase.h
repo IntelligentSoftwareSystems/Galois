@@ -37,8 +37,8 @@
 #include "galois/Galois.h"
 
 #include "galois/runtime/KDGtwoPhase.h"
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

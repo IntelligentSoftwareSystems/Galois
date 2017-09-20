@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 #include "galois/Threads.h"
 
 #include <algorithm>

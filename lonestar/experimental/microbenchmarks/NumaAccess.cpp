@@ -30,9 +30,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include "galois/LargeArray.h"
-#include "galois/Substrate/Barrier.h"
-#include "galois/Substrate/ThreadPool.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/ThreadPool.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <iostream>
 #include <chrono>

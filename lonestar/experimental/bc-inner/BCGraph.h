@@ -2,7 +2,7 @@
 #define _BCGRAPH_H_
 
 #include "galois/Bag.h"
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>

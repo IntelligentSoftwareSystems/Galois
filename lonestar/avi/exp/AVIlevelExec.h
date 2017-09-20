@@ -25,7 +25,7 @@
 #define AVI_ORDERED_SPEC_H
 
 #include "galois/Galois.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 #include "galois/worklists/WorkList.h"
 #include "galois/runtime/LevelExecutor.h"
 

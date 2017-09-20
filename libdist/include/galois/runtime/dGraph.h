@@ -51,7 +51,7 @@
 #include <sys/mman.h>
 
 // for thread container stuff
-#include "galois/Substrate/ThreadPool.h"
+#include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/runtime/Cuda/cuda_mtypes.h"

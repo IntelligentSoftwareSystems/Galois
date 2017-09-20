@@ -30,7 +30,7 @@
 #ifndef GALOIS_WORKLIST_FIFO_H
 #define GALOIS_WORKLIST_FIFO_H
 
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/gdeque.h"
 #include "WLCompileCheck.h"
 

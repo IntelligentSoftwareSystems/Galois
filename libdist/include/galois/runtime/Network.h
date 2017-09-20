@@ -25,7 +25,7 @@
 #define GALOIS_RUNTIME_NETWORK_H
 
 #include "galois/runtime/Serialize.h"
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/Barrier.h"
 
 #include <cstdint>
 /* Test for GCC >= 5.2.0 */

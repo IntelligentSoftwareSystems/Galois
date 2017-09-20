@@ -26,9 +26,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PerThreadStorage.h"
 #include "galois/runtime/Substrate.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 #include "galois/runtime/Network.h"
 //#include "galois/runtime/Directory.h"
 

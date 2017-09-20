@@ -34,7 +34,7 @@
 
 #include "galois/gIO.h"
 #include "galois/graphs/FileGraph.h"
-#include "galois/Substrate/PageAlloc.h"
+#include "galois/substrate/PageAlloc.h"
 
 #include <cassert>
 #include <fstream>

@@ -32,9 +32,9 @@
 
 #include "galois/FixedSizeRing.h"
 #include "galois/Threads.h"
-#include "galois/Substrate/PerThreadStorage.h"
-#include "galois/Substrate/CompilerSpecific.h"
-#include "galois/Substrate/PtrLock.h"
+#include "galois/substrate/PerThreadStorage.h"
+#include "galois/substrate/CompilerSpecific.h"
+#include "galois/substrate/PtrLock.h"
 #include "galois/runtime/Mem.h"
 #include "WLCompileCheck.h"
 

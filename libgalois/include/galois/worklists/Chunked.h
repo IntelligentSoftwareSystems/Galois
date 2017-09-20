@@ -31,7 +31,7 @@
 #define GALOIS_WORKLIST_CHUNKED_H
 
 #include "galois/FixedSizeRing.h"
-#include "galois/Substrate/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 #include "galois/runtime/Mem.h"
 #include "galois/worklists/WorkListHelpers.h"
 #include "WLCompileCheck.h"

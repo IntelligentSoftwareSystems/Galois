@@ -32,7 +32,7 @@
 #include "galois/AltBag.h"
 #include "galois/OrderedTraits.h"
 #include "galois/runtime/Context.h"
-#include "galois/Substrate/ThreadRWlock.h"
+#include "galois/substrate/ThreadRWlock.h"
 #include "galois/runtime/UserContextAccess.h"
 
 #include <unordered_map>

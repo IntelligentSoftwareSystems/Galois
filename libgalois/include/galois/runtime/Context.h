@@ -32,7 +32,7 @@
 #define GALOIS_RUNTIME_CONTEXT_H
 
 #include "galois/MethodFlags.h"
-#include "galois/Substrate/PtrLock.h"
+#include "galois/substrate/PtrLock.h"
 #include "galois/gIO.h"
 
 #include <boost/utility.hpp>

@@ -38,7 +38,7 @@
 #include "galois/Timer.h"
 #include "galois/runtime/DoAllCoupled.h"
 #include "galois/runtime/Sampling.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

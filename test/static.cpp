@@ -1,8 +1,8 @@
 // std_tr1__type_traits__is_pod.cpp 
 
-#include "galois/Substrate/PtrLock.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/StaticInstance.h"
+#include "galois/substrate/PtrLock.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/StaticInstance.h"
 
 #include <type_traits>
 #include <iostream> 

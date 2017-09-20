@@ -34,8 +34,8 @@
 #ifndef GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
 #define GALOIS_SUBSTRATE_THREAD_RW_LOCK_H
 
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 namespace galois {
 namespace substrate {

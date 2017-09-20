@@ -34,8 +34,8 @@
 #include "galois/Timer.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <deque>
 #include <functional>

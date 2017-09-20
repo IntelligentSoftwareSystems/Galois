@@ -33,8 +33,8 @@
 #ifndef GALOIS_UNORDERED_SET_H
 #define GALOIS_UNORDERED_SET_H
 
-#include "galois/Substrate/PaddedLock.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/PaddedLock.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include <algorithm>
 #include <unordered_set>

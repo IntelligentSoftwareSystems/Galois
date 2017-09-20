@@ -37,7 +37,7 @@
 
 #include <cassert>
 
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"

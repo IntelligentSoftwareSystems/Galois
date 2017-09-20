@@ -32,7 +32,7 @@
 
 #include "WLCompileCheck.h"
 
-#include "galois/Substrate/PtrLock.h"
+#include "galois/substrate/PtrLock.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 

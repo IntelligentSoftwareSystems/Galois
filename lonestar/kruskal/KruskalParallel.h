@@ -33,7 +33,7 @@
 #include "galois/DynamicArray.h"
 
 #include "galois/runtime/KDGtwoPhase.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/CompilerSpecific.h"
 
 #include "Kruskal.h"
 

@@ -29,7 +29,7 @@
 #ifndef _GALOIS_DIST_OFFLINE_GRAPH_
 #define _GALOIS_DIST_OFFLINE_GRAPH_
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 #include "galois/graphs/Details.h"
 #include "galois/graphs/GraphHelpers.h"
 

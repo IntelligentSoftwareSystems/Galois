@@ -2,7 +2,7 @@
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 #include "galois/Bag.h"
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/CacheLineStorage.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/tuple/tuple.hpp>

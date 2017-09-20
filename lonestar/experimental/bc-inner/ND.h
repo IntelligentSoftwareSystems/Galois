@@ -14,7 +14,7 @@
 #include <pthread.h>
 #endif
 
-#include "galois/Substrate/SimpleLock.h"
+#include "galois/substrate/SimpleLock.h"
 #include "llvm/ADT/SmallVector.h"
 #include "control.h"
 //#include "datatypes.h"

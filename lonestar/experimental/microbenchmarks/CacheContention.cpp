@@ -29,7 +29,7 @@
 #include "galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Substrate/Barrier.h"
+#include "galois/substrate/Barrier.h"
 
 #include <iostream>
 

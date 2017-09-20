@@ -31,8 +31,8 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "galois/Substrate/Barrier.h"
-#include "galois/Substrate/CompilerSpecific.h"
+#include "galois/substrate/Barrier.h"
+#include "galois/substrate/CompilerSpecific.h"
 #include "galois/gIO.h"
 
 #if defined(GALOIS_HAVE_PTHREAD)

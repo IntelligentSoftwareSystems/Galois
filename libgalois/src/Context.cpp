@@ -30,8 +30,8 @@
  */
 
 #include "galois/runtime/Context.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/CacheLineStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/CacheLineStorage.h"
 
 #include <stdio.h>
 

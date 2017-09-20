@@ -35,7 +35,7 @@
 
 #include "galois/runtime/Statistics.h"
 #include "galois/runtime/PagePool.h"
-#include "galois/Substrate/Init.h"
+#include "galois/substrate/Init.h"
 
 #include <string>
 

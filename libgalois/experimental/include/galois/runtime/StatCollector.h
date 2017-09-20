@@ -33,8 +33,8 @@
 
 #include "galois/gdeque.h"
 #include "galois/gIO.h"
-#include "galois/Substrate/SimpleLock.h"
-#include "galois/Substrate/PerThreadStorage.h"
+#include "galois/substrate/SimpleLock.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 #include <string>
 #include <set>
