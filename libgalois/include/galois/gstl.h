@@ -37,6 +37,7 @@
 #include <deque>
 #include <list>
 #include <string>
+#include <sstream>
 
 namespace galois {
 
@@ -71,13 +72,27 @@ namespace gstl {
   template <typename T>
   struct StrMaker {
     Str operator () (const T& x) const {
-      return Str(x);
+      std::basic_ostringstream<char, std::char_traits<char>, Pow2Alloc<char> > os;
+      os << x;
+      return Str(os.str());
     }
   };
 
   template <> struct StrMaker<std::string> {
     Str operator () (const std::string& x) const {
       return Str(x.begin(), x.end());
+    }
+  };
+
+  template <> struct StrMaker<Str> {
+    const Str& operator () (const Str& x) const {
+      return x;
+    }
+  };
+
+  template <> struct StrMaker<const char*> {
+    Str operator () (const char* x) const {
+      return Str(x);
     }
   };
 

@@ -576,64 +576,26 @@ public:
 
   void setStatFile(const std::string& outfile);
 
-  void addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type);
+  template <typename S1, typename S2, typename T
+            , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value> >
+  void addToStat(const S1& region, const S2& category, const T& val, const StatTotal::Type& type) {
 
-  void addToStat(const Str& region, const Str& category, double val, const StatTotal::Type& type);
+    if (std::is_floating_point<T>::value) {
+      fpStats.addToStat(gstl::makeStr(region), gstl::makeStr(category), double(val), type);
 
-  void addToParam(const Str& region, const Str& category, const Str& val);
-
-  void print(void);
-
-};
-
-#elif STAT_MANAGER_IMPL == 1
-
-class StatManager {
-
-  using Str = galois::gstl::Str;
-  using StrSet = galois::gstl::Set<Str>;
-  using Stat = galois::Accumulator<int64_t>;
-  using StatMap = galois::gstl::Map<std::tuple<Str*, Str*>, Stat*>;
-  using StatAlloc = galois::FixedSizeAllocator<Stat>;
-
-  StrSet symbols;
-  StatMap statMap;
-  StatAlloc statAlloc;
-
-public:
-
-  void addToStat(const Str& region, const Str& category, int64_t val) {
-
-    auto* accum = getOrInsertMapping(region, category);
-
-    *accum += val;
-
-
-    Str* ln = symbols.getOrInsert(region);
-    Str* cat = symbols.getOrInsert(category);
-
-    auto tpl = std::make_tuple(ln, cat);
-
-    auto stat = statMap.getStat(tpl);
-
-    if (!stat) {
-      Stat* stat = statAlloc.allocate(1);
-      statAlloc.construct(stat);
-
-      auto p = statMap.getOrInsertMapping(tpl, stat);
-
-      *(p.first) += val;
-
-      if (!p.second) {
-        statAlloc.destruct(stat);
-        statAlloc.deallocate(stat, 1);
-      } 
+    } else {
+      intStats.addToStat(gstl::makeStr(region), gstl::makeStr(category), int64_t(val), type);
     }
   }
 
-protected:
+  template <typename S1, typename S2, typename V>
+  void addToParam(const S1& region, const S2& category, const V& val) {
+    strStats.addToStat(gstl::makeStr(region), gstl::makeStr(category), gstl::makeStr(val), StatTotal::SERIAL);
+  }
 
+  void print(void);
 
+private:
 
 };
 
@@ -761,69 +723,40 @@ namespace internal {
 
 
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
-void reportStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& type) {
-
-  internal::sysStatManager()->addToStat(
-      gstl::makeStr(region), gstl::makeStr(category), 
-      std::is_floating_point<T>::value ? double(value) : int64_t(value), type);
-
-
+template <typename S1, typename S2, typename T>
+inline void reportStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& type) {
+  internal::sysStatManager()->addToStat(region, category, value, type);
 }
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
+template <typename S1, typename S2, typename T>
 inline void reportStat_Serial(const S1& region, const S2& category, const T& value) {
   reportStat(region, category, value, StatTotal::SERIAL);
 }
          
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
+template <typename S1, typename S2, typename T>
 inline void reportStat_Tmin(const S1& region, const S2& category, const T& value) {
   reportStat(region, category, value, StatTotal::TMIN);
 }
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
+template <typename S1, typename S2, typename T>
 inline void reportStat_Tmax(const S1& region, const S2& category, const T& value) {
   reportStat(region, category, value, StatTotal::TMAX);
 }
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
+template <typename S1, typename S2, typename T>
 inline void reportStat_Tsum(const S1& region, const S2& category, const T& value) {
   reportStat(region, category, value, StatTotal::TSUM);
 }
 
-template <typename S1, typename S2, typename T
-          , typename = std::enable_if_t<std::is_integral<T>::value || std::is_floating_point<T>::value > >
+template <typename S1, typename S2, typename T>
 inline void reportStat_Tavg(const S1& region, const S2& category, const T& value) {
   reportStat(region, category, value, StatTotal::TAVG);
 }
 
-namespace hidden {
-
-  template <typename S1, typename S2, typename C, typename A>
-  void reportParamStr(const S1& region, const S2& category, const std::basic_string<C, A>& value) {
-    internal::sysStatManager()->addToParam(
-        gstl::makeStr(region),
-        gstl::makeStr(category),
-        gstl::makeStr(value));
-  }
-} // end namesspace hidden
-
 template <typename S1, typename S2, typename V>
 void reportParam(const S1& region, const S2& category, const V& value) {
-  std::ostringstream os;
-  os << value;
-  hidden::reportParamStr(region, category, os.str());
-}
-
-template <typename S1, typename S2>
-void reportParam(const S1& region, const S2& category, const std::string& value) {
-  hidden::reportParamStr(region, category, value);
+  internal::sysStatManager()->addToParam(region, category, value);
 }
 
 void setStatFile(const std::string& f);

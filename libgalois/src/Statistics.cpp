@@ -59,18 +59,6 @@ bool StatManager::printingThreadVals(void) {
   return galois::substrate::EnvCheck(StatManager::TSTAT_ENV_VAR);
 }
 
-void StatManager::addToStat(const Str& region, const Str& category, int64_t val, const StatTotal::Type& type) {
-  intStats.addToStat(region, category, val, type);
-}
-
-void StatManager::addToStat(const Str& region, const Str& category, double val, const StatTotal::Type& type) {
-  fpStats.addToStat(region, category, val, type);
-}
-
-void StatManager::addToParam(const Str& region, const Str& category, const Str& val) {
-  strStats.addToStat(region, category, val, StatTotal::SERIAL);
-}
-
 void StatManager::print(void) {
   if (m_outfile == "") {
     printStats(std::cout);

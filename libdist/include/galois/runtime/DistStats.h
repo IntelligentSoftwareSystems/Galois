@@ -77,8 +77,8 @@ class DistStatManager: public galois::runtime::StatManager {
     bool merged = false;
     substrate::PerThreadStorage<TMap> perThrdMap;
 
-    void addToStat(const Str& region, const Str& category, const StatTotal::Type& hostTotal) {
-      perThrdMap.getLocal()->addToStat(region, category, 0, hostTotal);
+    void addToStat(const Str& region, const Str& category, const StatTotal::Type& hTotalTy) {
+      perThrdMap.getLocal()->addToStat(region, category, 0, hTotalTy);
     }
 
     void mergeStats(void) {
@@ -123,7 +123,7 @@ class DistStatManager: public galois::runtime::StatManager {
 
     PerHostThrdStats perHostThrdStats;
 
-    explicit HostStat(const StatTotal::Type& hostTotal): Base(hostTotal) {}
+    explicit HostStat(const StatTotal::Type& hTotalTy): Base(hTotalTy) {}
 
     void add(const HostStatVal<T>& val) {
 
@@ -246,10 +246,10 @@ public:
   DistStatManager(const std::string& outfile="");
 
   template <typename T>
-  void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& threadTotal, const StatTotal::Type& hostTotal) {
+  void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& thrdTotalTy, const StatTotal::Type& hTotalTy) {
 
-    Base::addToStat(region, category, val, threadTotal);
-    hostTotalTypes.addToStat(region, category, hostTotal);
+    Base::addToStat(region, category, val, thrdTotalTy);
+    hostTotalTypes.addToStat(region, category, hTotalTy);
   }
 
 private:
@@ -276,10 +276,10 @@ namespace internal {
 
 
 template <typename S1, typename S2, typename T>
-inline void reportDistStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& threadTotal, const StatTotal::Type& hostTotal) {
+inline void reportDistStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& thrdTotalTy, const StatTotal::Type& hTotalTy) {
 
   internal::distSysStatManager()->addToStat(
-      gstl::makeStr(region), gstl::makeStr(category), value, threadTotal, hostTotal);
+      gstl::makeStr(region), gstl::makeStr(category), value, thrdTotalTy, hTotalTy);
 }
 
 
