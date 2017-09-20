@@ -41,7 +41,7 @@
 #include "galois/Endian.h"
 #include "galois/MethodFlags.h"
 #include "galois/LargeArray.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/Details.h"
 #include "galois/runtime/Context.h"
 #include "galois/Substrate/CacheLineStorage.h"
 #include "galois/Substrate/CompilerSpecific.h"
@@ -51,7 +51,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include "galois/Graphs/GraphHelpers.h"
+#include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
 #include <deque>

@@ -8,8 +8,8 @@
 #include "galois/DoAllWrap.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Graphs/Util.h"
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Util.h"
+#include "galois/graphs/Graph.h"
 // #include "galois/Graph/FileGraph.h"
 
 #include "galois/runtime/Sampling.h"

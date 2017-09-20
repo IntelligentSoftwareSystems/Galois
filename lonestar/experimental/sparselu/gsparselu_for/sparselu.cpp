@@ -30,7 +30,7 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/LargeArray.h"
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/runtime/KDGtwoPhase.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>

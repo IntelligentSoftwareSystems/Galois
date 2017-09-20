@@ -30,7 +30,7 @@
 #include "galois/Timer.h"
 
 //Distributed Galois
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 #include "galois/runtime/DistSupport.h"
 
 

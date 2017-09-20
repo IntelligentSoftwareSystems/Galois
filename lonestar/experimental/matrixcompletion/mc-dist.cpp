@@ -32,7 +32,7 @@ std::ostream& operator<<(std::ostream& os, const std::pair<T1,T2>& p) {
 
 #include "galois/Galois.h"
 #include "galois/gstl.h"
-#include "galois/Graphs/LC_Dist_Graph.h"
+#include "galois/graphs/LC_Dist_Graph.h"
 #include "galois/Graph/FileGraph.h"
 #include "galois/Bag.h"
 

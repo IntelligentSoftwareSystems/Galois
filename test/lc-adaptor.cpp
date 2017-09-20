@@ -1,4 +1,4 @@
-#include "galois/Graphs/LC_Adaptor_Graph.h"
+#include "galois/graphs/LC_Adaptor_Graph.h"
 #include <boost/iterator/counting_iterator.hpp>
 
 struct CSRArrays {

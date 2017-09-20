@@ -24,15 +24,15 @@
 
 #include "galois/Galois.h"
 #include "galois/gstl.h"
-#include "galois/Graphs/LC_Dist_Graph.h"
+#include "galois/graphs/LC_Dist_Graph.h"
 #include "galois/Graph/FileGraph.h"
-#include "galois/Graphs/LC_Dist_InOut_Graph_withEdgeData.h"
+#include "galois/graphs/LC_Dist_InOut_Graph_withEdgeData.h"
 #include "galois/Bag.h"
 #include "galois/runtime/Context.h"
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 
 #include <mpi.h>
 #include <iostream>

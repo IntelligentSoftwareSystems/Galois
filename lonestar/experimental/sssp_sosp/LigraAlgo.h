@@ -2,9 +2,9 @@
 #define APPS_SSSP_LIGRAALGO_H
 
 #include "galois/DomainSpecificExecutors.h"
-#include "galois/Graphs/OCGraph.h"
-#include "galois/Graphs/LCGraph.h"
-#include "galois/Graphs/GraphNodeBag.h"
+#include "galois/graphs/OCGraph.h"
+#include "galois/graphs/LCGraph.h"
+#include "galois/graphs/GraphNodeBag.h"
 
 #include <boost/mpl/if.hpp>
 

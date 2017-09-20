@@ -29,7 +29,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "galois/Graphs/OCGraph.h"
+#include "galois/graphs/OCGraph.h"
 #include "galois/runtime/Mem.h"
 #include "galois/gIO.h"
 

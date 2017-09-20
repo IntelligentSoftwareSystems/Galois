@@ -34,15 +34,15 @@
 #include <limits>
 #include <iostream>
 #include <set>
-#include "galois/Graphs/LC_InlineEdge_Graph.h"
+#include "galois/graphs/LC_InlineEdge_Graph.h"
 
 // #define GALOIS_USE_MIC_CSR_IMPL
 #undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
-  #include "galois/Graphs/LC_CSR_MIC_Graph.h"
+  #include "galois/graphs/LC_CSR_MIC_Graph.h"
 #else
-  #include "galois/Graphs/LC_CSR_Graph.h"
+  #include "galois/graphs/LC_CSR_Graph.h"
 #endif
 
 #include "galois/Accumulator.h"
@@ -50,8 +50,8 @@
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"
-#include "galois/Graphs/Util.h"
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/Util.h"
+#include "galois/graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "galois/Substrate/CacheLineStorage.h"

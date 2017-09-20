@@ -26,7 +26,7 @@
 
 #include "galois/PerThreadContainer.h"
 
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 
 #include "galois/runtime/ROBexecutor.h"
 #include "galois/runtime/OrderedSpeculation.h"

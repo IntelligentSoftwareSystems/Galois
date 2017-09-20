@@ -23,9 +23,9 @@
 #include "galois/Galois.h"
 #include "galois/Accumulator.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/Graph.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/Graph.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/LCGraph.h"
 
 #include "Lonestar/BoilerPlate.h"
 

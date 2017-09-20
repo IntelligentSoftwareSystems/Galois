@@ -36,7 +36,7 @@
 #include "galois/Atomic.h"
 //#include "galois/GaloisUnsafe.h"
 
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 
 #include "galois/WorkList/WorkListWrapper.h"
 #include "galois/WorkList/ExternalReference.h"

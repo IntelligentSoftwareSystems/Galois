@@ -18,7 +18,7 @@
 #include "galois/Galois.h"
 #include "galois/Accumulator.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <iostream>

@@ -3,7 +3,7 @@
 
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/FirstGraph.h"
+#include "galois/graphs/FirstGraph.h"
 #include <iostream>
 #include <vector>
 #include <stack>

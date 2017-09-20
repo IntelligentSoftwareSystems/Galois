@@ -25,7 +25,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "galois/Timer.h"
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 #include "galois/Galois.h"
 #include "galois/Accumulator.h"
 

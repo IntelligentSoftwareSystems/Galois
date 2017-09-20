@@ -20,8 +20,8 @@
 */
 
 #include "galois/Galois.h"
-#include "galois/Graphs/Graph.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/Graph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 

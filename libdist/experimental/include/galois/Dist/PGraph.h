@@ -6,9 +6,9 @@
  */
 #include "galois/Galois.h"
 #include "galois/gstl.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/LC_CSR_Graph.h"
-#include "galois/Graphs/Util.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "galois/Bag.h"
 #include "galois/runtime/Network.h"

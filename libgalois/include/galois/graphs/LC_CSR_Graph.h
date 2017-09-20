@@ -38,11 +38,11 @@
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
 #include "galois/LargeArray.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/Galois.h"
-#include "galois/Graphs/GraphHelpers.h"
+#include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
 

@@ -32,7 +32,7 @@
 #include "galois/Galois.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/SpatialTree.h"
+#include "galois/graphs/SpatialTree.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 

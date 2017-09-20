@@ -21,7 +21,7 @@
 #include <random>
 
 
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/runtime/OfflineGraph.h"
 #include <sys/mman.h>
 #include <mcheck.h>

@@ -29,12 +29,12 @@
 #include "galois/Accumulator.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
-#include "galois/Graphs/OCGraph.h"
-#include "galois/Graphs/GraphNodeBag.h"
+#include "galois/graphs/OCGraph.h"
+#include "galois/graphs/GraphNodeBag.h"
 #include "galois/DomainSpecificExecutors.h"
 #endif
 #include "llvm/Support/CommandLine.h"

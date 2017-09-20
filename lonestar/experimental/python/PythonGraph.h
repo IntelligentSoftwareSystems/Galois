@@ -28,7 +28,7 @@
 #ifndef GALOIS_PYTHON_GRAPH_H
 #define GALOIS_PYTHON_GRAPH_H
 
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 
 #include <string>
 #include <unordered_map>

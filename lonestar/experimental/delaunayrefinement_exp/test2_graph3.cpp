@@ -1,6 +1,6 @@
 #include "galois/Galois.h"
 #include "galois/ParallelSTL/ParallelSTL.h"
-#include "galois/Graphs/Bag.h"
+#include "galois/graphs/Bag.h"
 #include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -9,7 +9,7 @@
 #include "galois/WorkList/WorkListAlt.h"
 #include "galois/WorkList/WorkListDebug.h"
 
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 #include "galois/runtime/DistSupport.h"
 
 #include <cassert>

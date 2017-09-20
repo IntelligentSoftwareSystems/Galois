@@ -30,7 +30,7 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

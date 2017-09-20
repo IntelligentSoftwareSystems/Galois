@@ -28,7 +28,7 @@
 #include <deque>
 
 #include "galois/Threads.h"
-#include "galois/Graphs/Bag.h"
+#include "galois/graphs/Bag.h"
 #include "galois/runtime/DistSupport.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/MethodFlags.h"

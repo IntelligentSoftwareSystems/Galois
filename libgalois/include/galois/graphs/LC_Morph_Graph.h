@@ -32,8 +32,8 @@
 
 #include "galois/Bag.h"
 #include "galois/LargeArray.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>

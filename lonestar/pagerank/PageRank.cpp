@@ -26,8 +26,8 @@
 
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/LCGraph.h"
-#include "galois/Graphs/TypeTraits.h"
+#include "galois/graphs/LCGraph.h"
+#include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
 

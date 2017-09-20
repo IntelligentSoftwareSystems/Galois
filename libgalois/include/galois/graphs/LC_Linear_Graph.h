@@ -34,8 +34,8 @@
 #define GALOIS_GRAPH_LC_LINEAR_GRAPH_H
 
 #include "galois/LargeArray.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>

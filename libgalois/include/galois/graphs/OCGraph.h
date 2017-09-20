@@ -35,7 +35,7 @@
 #include "galois/optional.h"
 #include "galois/LazyObject.h"
 #include "galois/LargeArray.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/Details.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>

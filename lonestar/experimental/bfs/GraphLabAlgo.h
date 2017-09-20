@@ -2,9 +2,9 @@
 #define APPS_BFS_GRAPHLABALGO_H
 
 #include "galois/DomainSpecificExecutors.h"
-#include "galois/Graphs/OCGraph.h"
-#include "galois/Graphs/LCGraph.h"
-#include "galois/Graphs/GraphNodeBag.h"
+#include "galois/graphs/OCGraph.h"
+#include "galois/graphs/LCGraph.h"
+#include "galois/graphs/GraphNodeBag.h"
 
 #include <random>
 #include <boost/mpl/if.hpp>

@@ -32,7 +32,7 @@
 #define GALOIS_GRAPH_LC_ADAPTOR_H
 
 #include "galois/LargeArray.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/Details.h"
 
 namespace galois { namespace graphs {
 

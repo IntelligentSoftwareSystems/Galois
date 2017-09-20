@@ -42,7 +42,7 @@
 #include "galois/Timer.h"
 #include "galois/Graph/FileGraph.h"
 //Distributed Galois
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 #include "galois/runtime/DistSupport.h"
 
 

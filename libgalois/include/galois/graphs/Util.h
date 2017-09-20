@@ -33,8 +33,8 @@
 #define GALOIS_GRAPH_UTIL_H
 
 #include "galois/Galois.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 
 namespace galois {
 namespace graphs {

@@ -34,11 +34,11 @@
 #include <fstream>
 
 #include "Metis.h"
-#include "galois/Graphs/Util.h"
+#include "galois/graphs/Util.h"
 #include "galois/Timer.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/LargeArray.h"
 
 namespace cll = llvm::cl;

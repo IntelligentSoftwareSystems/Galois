@@ -4,7 +4,7 @@
 #include "Kruskal.h"
 
 #include "galois/DynamicArray.h"
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 #include "galois/runtime/OrderedSpeculation.h"
 #include "galois/runtime/KDGtwoPhase.h"
 #include "galois/Accumulator.h"

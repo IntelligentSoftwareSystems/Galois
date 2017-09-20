@@ -29,7 +29,7 @@
 #ifndef KRUSKAL_SPEC_H
 #define KRUSKAL_SPEC_H
 
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 #include "galois/runtime/ROBexecutor.h"
 
 #include "Kruskal.h"

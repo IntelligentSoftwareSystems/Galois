@@ -1,6 +1,6 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>

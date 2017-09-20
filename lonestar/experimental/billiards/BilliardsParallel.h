@@ -5,7 +5,7 @@
 #include "dependTest.h"
 
 #include "galois/PerThreadContainer.h"
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 
 
 using AddListTy = galois::PerThreadVector<Event>;

@@ -22,7 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "galois/Galois.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/runtime/OfflineGraph.h"
 
 #include "llvm/Support/CommandLine.h"

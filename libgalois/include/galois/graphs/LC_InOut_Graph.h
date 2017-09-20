@@ -31,7 +31,7 @@
 #ifndef GALOIS_GRAPH_LC_INOUT_GRAPH_H
 #define GALOIS_GRAPH_LC_INOUT_GRAPH_H
 
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/Details.h"
 #include "galois/Galois.h"
 
 #include <boost/iterator/iterator_facade.hpp>

@@ -1,5 +1,5 @@
 #include "galois/Galois.h"
-#include "galois/Graphs/LC_Dist_Graph.h"
+#include "galois/graphs/LC_Dist_Graph.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <vector>

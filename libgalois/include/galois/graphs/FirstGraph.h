@@ -33,8 +33,8 @@
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
 #include "galois/Bag.h"
-#include "galois/Graphs/FileGraph.h"
-#include "galois/Graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
+#include "galois/graphs/Details.h"
 #include "galois/Galois.h"
 
 #include "llvm/ADT/SmallVector.h"

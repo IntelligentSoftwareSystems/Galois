@@ -32,7 +32,7 @@
 
 #include "galois/Galois.h"
 #include "galois/ParallelSTL/ParallelSTL.h"
-#include "galois/Graphs/Bag.h"
+#include "galois/graphs/Bag.h"
 #include "galois/Timer.h"
 
 #include "llvm/Support/CommandLine.h"

@@ -1,4 +1,4 @@
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 
 #include <iostream>
 

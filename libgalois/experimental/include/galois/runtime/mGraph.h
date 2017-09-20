@@ -32,7 +32,7 @@
 #include <deque>
 
 #include "galois/gstl.h"
-#include "galois/Graphs/LC_CSR_Graph.h"
+#include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/Network.h"
 

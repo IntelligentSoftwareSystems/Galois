@@ -23,7 +23,7 @@
  */
 
 #include "galois/LargeArray.h"
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 

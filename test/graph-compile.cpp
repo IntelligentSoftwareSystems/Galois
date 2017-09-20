@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "galois/Graphs/Graph.h"
+#include "galois/graphs/Graph.h"
 
 struct NoDefault {
   int x;

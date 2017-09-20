@@ -33,7 +33,7 @@
  */
 
 #include "galois/gIO.h"
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/Substrate/PageAlloc.h"
 
 #include <cassert>

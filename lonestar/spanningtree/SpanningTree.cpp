@@ -28,7 +28,7 @@
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 

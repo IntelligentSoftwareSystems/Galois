@@ -41,7 +41,7 @@
 #include <vector>
 #include <string>
 
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/runtime/OfflineGraph.h"
 
 static const char* const name = "add random edge weights";

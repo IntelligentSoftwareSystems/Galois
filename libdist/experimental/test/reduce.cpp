@@ -1,5 +1,5 @@
 #include "galois/Galois.h"
-#include "galois/Graphs/Graph3.h"
+#include "galois/graphs/Graph3.h"
 #include "galois/Reduction.h"
 #include "galois/runtime/PerHostStorage.h"
 #include "Lonestar/BoilerPlate.h"

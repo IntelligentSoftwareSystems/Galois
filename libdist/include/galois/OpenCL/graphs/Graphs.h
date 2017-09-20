@@ -17,9 +17,9 @@ extern "C" {
 }
 ;
 #endif
-#include "galois/OpenCL/Graphs/GraphUtils.h"
-#include "galois/OpenCL/Graphs/CL_LC_Graph.h"
-#include "galois/OpenCL/Graphs/CL_LC_VoidGraph.h"
+#include "galois/OpenCL/graphs/GraphUtils.h"
+#include "galois/OpenCL/graphs/CL_LC_Graph.h"
+#include "galois/OpenCL/graphs/CL_LC_VoidGraph.h"
 //#include "LC_GraphVoid_2.h"
 //#include "LC_LinearArray_Graph.h"
 //#include "LC_LinearArray_VoidGraph.h"

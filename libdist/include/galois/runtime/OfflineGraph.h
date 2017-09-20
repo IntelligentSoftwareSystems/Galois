@@ -30,8 +30,8 @@
 #define _GALOIS_DIST_OFFLINE_GRAPH_
 
 #include "galois/Substrate/SimpleLock.h"
-#include "galois/Graphs/Details.h"
-#include "galois/Graphs/GraphHelpers.h"
+#include "galois/graphs/Details.h"
+#include "galois/graphs/GraphHelpers.h"
 
 #include <cstdint>
 #include <iostream>

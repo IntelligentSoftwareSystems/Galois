@@ -32,7 +32,7 @@
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
-#include "galois/Graphs/LCGraph.h"
+#include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -103,13 +103,13 @@ Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
   return ii;
 }
 
-// include/galois/Graphs/Serialize.h
+// include/galois/graphs/Serialize.h
 bool outputTextEdgeData(const char* ofile, Graph& G) {
   std::ofstream file(ofile);
   for (Graph::iterator ii = G.begin(),
          ee = G.end(); ii != ee; ++ii) {
     unsigned src = G.getData(*ii).id;
-    // FIXME: Version in include/galois/Graphs/Serialize.h is wrong.
+    // FIXME: Version in include/galois/graphs/Serialize.h is wrong.
     for (Graph::edge_iterator jj = G.edge_begin(*ii),
            ej = G.edge_end(*ii); jj != ej; ++jj) {
       unsigned dst = G.getData(G.getEdgeDst(jj)).id;

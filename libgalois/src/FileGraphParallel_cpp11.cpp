@@ -29,7 +29,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/Substrate/ThreadPool.h"
 #include "galois/Substrate/HWTopo.h"
 

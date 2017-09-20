@@ -1,4 +1,4 @@
-#include "galois/Graphs/FileGraph.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/gIO.h"
 
 typedef galois::graphs::FileGraph Graph;

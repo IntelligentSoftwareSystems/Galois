@@ -3,8 +3,8 @@
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
-#include "galois/Graphs/Graph.h"
-#include "galois/Graphs/TypeTraits.h"
+#include "galois/graphs/Graph.h"
+#include "galois/graphs/TypeTraits.h"
 #include "galois/Accumulator.h"
 
 #include <iostream>
