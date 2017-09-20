@@ -117,7 +117,7 @@ class kGraph : public GlobalObject {
    typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
    typedef typename std::conditional<BSPEdge, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
+   typedef galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
   GraphTy graph;
   bool round;

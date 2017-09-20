@@ -4,7 +4,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-typedef galois::Graph::Bag<int>::pointer IntPtrs;
+typedef galois::graphs::Bag<int>::pointer IntPtrs;
 
 struct InsertBody { 
   IntPtrs pBodies;
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
   galois::runtime::getSystemNetworkInterface().start();
 
-  IntPtrs pBodies = galois::Graph::Bag<int>::allocate();
+  IntPtrs pBodies = galois::graphs::Bag<int>::allocate();
   galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(10), InsertBody { pBodies });
   galois::for_each_local(pBodies, PrintInt());
 

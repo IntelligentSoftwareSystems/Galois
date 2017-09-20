@@ -34,7 +34,7 @@
 #include <boost/mpl/has_xxx.hpp>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_segmented)
 template<typename T>

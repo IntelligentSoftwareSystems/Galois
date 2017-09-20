@@ -221,7 +221,7 @@ for the first argument. Instead of passing in a pair of iterators, we pass in a
 \b local_begin and \b local_end (in addition to \b begin and \b end), which point
 to the range of data items owned/produced by a thread. 
 
-Example of such data-structure is {@link galois::Graph::FirstGraph}, used in 
+Example of such data-structure is {@link galois::graphs::FirstGraph}, used in 
 {@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
 
 @snippet apps/delaunayrefinement/DelaunayRefinement.cpp do_all_local example

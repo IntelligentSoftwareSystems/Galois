@@ -67,7 +67,7 @@ static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc(
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef galois::Graph::LC_CSR_Graph<void, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<void, void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -258,7 +258,7 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
-  galois::Graph::readGraph(*G, filename); 
+  galois::graphs::readGraph(*G, filename); 
   NumNodes = G->size();
   computeSucSize();
 

@@ -28,7 +28,7 @@
 #include <iostream>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 template<typename NodeTy, typename EdgeTy>
 class LC_Dist {
@@ -316,7 +316,7 @@ public:
 
 };
 
-} //namespace Graph
+} //namespace graphs
 } //namespace galois
 
 #endif

@@ -59,7 +59,7 @@ class hGraph: public GlobalObject {
    typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
    typedef typename std::conditional<BSPEdge, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
+   typedef galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
    GraphTy graph;bool round;
    uint64_t totalNodes; // Total nodes in the complete graph.
@@ -319,7 +319,7 @@ public:
       comm_mode = 0;
 #endif
 #endif
-      galois::Graph::OfflineGraph g(filename);
+      galois::graphs::OfflineGraph g(filename);
       //std::cerr << "Offline Graph Done\n";
 
       masterNodes.resize(numHosts);
@@ -494,7 +494,7 @@ public:
 #endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-   void loadEdges(galois::Graph::OfflineGraph & g) {
+   void loadEdges(galois::graphs::OfflineGraph & g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
 
       uint64_t cur = 0;
@@ -562,7 +562,7 @@ public:
       std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-   void loadEdges(galois::Graph::OfflineGraph & g) {
+   void loadEdges(galois::graphs::OfflineGraph & g) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
       uint64_t cur = 0;
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {

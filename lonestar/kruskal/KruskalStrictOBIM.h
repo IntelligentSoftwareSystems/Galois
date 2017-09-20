@@ -48,7 +48,7 @@ namespace kruskal {
 class KruskalStrictOBIM: public Kruskal {
   protected:
 
-  typedef galois::Graph::FirstGraph<void,void,false> Graph;
+  typedef galois::graphs::FirstGraph<void,void,false> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> VecLocks;
 

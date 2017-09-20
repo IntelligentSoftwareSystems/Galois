@@ -26,8 +26,8 @@
  *
  * @section Description
  *
- * There are two main classes, galois::Graph::FileGraph and LC_XXX_Graph
- * (e.g., galois::Graph::LC_CSR_Graph). The former represents the pure
+ * There are two main classes, galois::graphs::FileGraph and LC_XXX_Graph
+ * (e.g., galois::graphs::LC_CSR_Graph). The former represents the pure
  * structure of a graph (i.e., whether an edge exists between two nodes) and
  * cannot be modified. The latter allows values to be stored on nodes and
  * edges, but the structure of the graph cannot be modified.

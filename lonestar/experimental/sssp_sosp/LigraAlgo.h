@@ -16,13 +16,13 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
-  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
+  typedef typename galois::graphs::LC_InlineEdge_Graph<LNode,uint32_t>
     ::template with_compressed_node_ptr<true>::type
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
-          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::graphs::OCImmutableEdgeGraph<LNode,uint32_t>,
+          galois::graphs::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -76,7 +76,7 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   void operator()(Graph& graph, const GNode& source) {
     galois::Statistic roundStat("Rounds");
 
-    galois::GraphNodeBagPair<> bags(graph.size());
+    galois::graphsNodeBagPair<> bags(graph.size());
 
     graph.getData(source).dist = 0;
 

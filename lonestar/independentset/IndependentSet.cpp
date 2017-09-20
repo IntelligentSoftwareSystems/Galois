@@ -76,7 +76,7 @@ struct Node {
 
 
 struct SerialAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -118,7 +118,7 @@ struct SerialAlgo {
 //! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
-  typedef typename galois::Graph::LC_CSR_Graph<Node,void>
+  typedef typename galois::graphs::LC_CSR_Graph<Node,void>
     ::template with_numa_alloc<true>::type Graph;
 
   typedef typename Graph::GraphNode GNode;
@@ -276,7 +276,7 @@ struct DefaultAlgo {
 };
 
 struct PullAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     Graph;
@@ -454,7 +454,7 @@ void run() {
 
   Algo algo;
   Graph graph;
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / galois::runtime::MM::hugePageSize);
   // Tighter upper bound

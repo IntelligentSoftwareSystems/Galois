@@ -62,7 +62,7 @@ static cll::opt<ExecType> execType (
 
 class AVIodgOrdered: public AVIabstractMain {
 protected:
-  typedef galois::Graph::FirstGraph<void*,void,true> Graph;
+  typedef galois::graphs::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 

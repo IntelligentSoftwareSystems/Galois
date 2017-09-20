@@ -39,8 +39,8 @@ struct AsyncEdge {
     }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return edgePri? "EdgePri" : "EdgeAsync"; }
@@ -48,7 +48,7 @@ struct AsyncEdge {
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     check_types<Graph, InnerGraph>();
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -171,8 +171,8 @@ struct AsyncEdgePriSet {
     }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "EdgePriSet"; }
@@ -180,7 +180,7 @@ struct AsyncEdgePriSet {
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     check_types<Graph, InnerGraph>();
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();

@@ -54,7 +54,7 @@ typedef galois::GAccumulator<size_t> MstWeight;
 struct Prim {
   struct Node;
 
-  typedef galois::Graph::FirstGraph<Node*, Weight, true> Graph;
+  typedef galois::graphs::FirstGraph<Node*, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
 
   struct HeapItem {
@@ -162,7 +162,7 @@ struct Prim {
 
 
 struct Boruvka {
-  typedef galois::Graph::FirstGraph<unsigned, Weight, true> Graph;
+  typedef galois::graphs::FirstGraph<unsigned, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::pair<GraphNode, Weight> Edge;
   typedef std::vector<Edge, galois::PerIterAllocTy::rebind<Edge>::other> EdgeList;
@@ -318,7 +318,7 @@ struct BoruvkaUnionFind {
     Data(): rank(0), next(-1), minWeight(std::numeric_limits<Weight>::max()) { }
   };
 
-  typedef galois::Graph::FirstGraph<Data, Weight, true> Graph;
+  typedef galois::graphs::FirstGraph<Data, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::vector<GraphNode> NodesTy;
   typedef std::pair<GraphNode,Weight> MinPairTy;
@@ -558,11 +558,11 @@ struct BoruvkaUnionFind {
 template<typename Graph>
 void makeGraph(const std::string& in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
-  typedef galois::Graph::LC_CSR_Graph<size_t, Weight> ReaderGraph;
+  typedef galois::graphs::LC_CSR_Graph<size_t, Weight> ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
-  galois::Graph::readGraph(reader, in);
+  galois::graphs::readGraph(reader, in);
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;

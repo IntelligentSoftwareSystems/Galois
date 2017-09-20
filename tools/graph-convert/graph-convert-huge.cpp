@@ -154,7 +154,7 @@ void go(std::istream& input) {
             );
     input.clear();
     input.seekg(0, std::ios_base::beg);
-    galois::Graph::OfflineGraphWriter outFile(outputFilename, useSmallData);
+    galois::graphs::OfflineGraphWriter outFile(outputFilename, useSmallData);
     outFile.setCounts(edgeCount);
     perEdge(input,
             [&outFile, &edgeCount] (uint64_t src, uint64_t dst, dataTy data) {
@@ -177,7 +177,7 @@ void go_edgesSorted(std::istream& input, uint64_t numNodes) {
     std::deque<uint64_t> edgeCount(numNodes, 0);
     input.clear();
     input.seekg(0, std::ios_base::beg);
-    galois::Graph::OfflineGraphWriter outFile(outputFilename, useSmallData, numNodes);
+    galois::graphs::OfflineGraphWriter outFile(outputFilename, useSmallData, numNodes);
     outFile.setCounts(edgeCount);
     outFile.seekEdgesDstStart();
     uint64_t curr_src = 0;

@@ -240,7 +240,7 @@ struct InvLearnFN : public LearnFN {
   }
 };
 
-typedef typename galois::Graph::LC_Dist<Node, int> Graph;
+typedef typename galois::graphs::LC_Dist<Node, int> Graph;
 typedef Graph::GraphNode GNode;
 
 //possibly over-typed
@@ -472,7 +472,7 @@ int main(int argc, char** argv) {
   //allocate local computation graph
   Graph::pointer g;
   {
-    galois::Graph::FileGraph fg;
+    galois::graphs::FileGraph fg;
     fg.fromFile(inputFile);
     std::vector<unsigned> counts;
     for(auto& N : fg)

@@ -90,11 +90,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::graphs::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -139,16 +139,16 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<SNode,void>
     ::template with_no_lockable<true>::type 
     ::template with_numa_alloc<true>::type InnerGraph;
 
   typedef typename boost::mpl::if_c<UseGraphChi,
-          galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          galois::Graph::LC_InOut_Graph<InnerGraph> >::type
+          galois::graphs::OCImmutableEdgeGraph<SNode,void>,
+          galois::graphs::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
-  typedef galois::GraphNodeBag<1024*4> Bag;
+  typedef galois::graphsNodeBag<1024*4> Bag;
 
   std::string name() const { return UseGraphChi ? "LigraChi" : "Ligra"; }
 

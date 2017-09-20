@@ -59,7 +59,7 @@ static const uint32_t removed = 0x1;
 //   set LSB of an edge weight to indicate the removal of the edge.
 //   << 1 to track # triangles an edge supports, 
 //   >> 1 when computing edge supports
-typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
   ::template with_numa_alloc<true>::type 
   ::template with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  galois::Graph::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);

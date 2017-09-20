@@ -59,7 +59,7 @@ static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
 static cll::opt<int> numBins("numBins", cll::desc("Number of bins"), cll::init(-1));
 static cll::opt<int> columns("columns", cll::desc("Columns for sparsity"), cll::init(80));
 
-typedef galois::Graph::OfflineGraph Graph;
+typedef galois::graphs::OfflineGraph Graph;
 typedef Graph::GraphNode GNode;
 
 void doSummary(Graph& graph) {
@@ -150,7 +150,7 @@ void doInDegreeHistogram(Graph& graph) {
 }
 
 struct EdgeComp {
-  typedef galois::Graph::EdgeSortValue<GNode, void> Edge;
+  typedef galois::graphs::EdgeSortValue<GNode, void> Edge;
   bool operator()(const Edge& a, const Edge& b) const {
     return a.dst < b.dst;
   }

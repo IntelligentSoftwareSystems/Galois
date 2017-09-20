@@ -103,7 +103,7 @@ typedef struct Node {
   Node(): w(0.0), field(0) { }
 } Node;
 
-using Graph = galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
+using Graph = galois::graphs::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
 using GNode = Graph::GraphNode;
 
 /**         CONSTANTS AND PARAMETERS       **/
@@ -795,7 +795,7 @@ int main(int argc, char** argv) {
   galois::StatManager statManager;
   
   Graph g;
-  galois::Graph::readGraph(g, inputGraphFilename);
+  galois::graphs::readGraph(g, inputGraphFilename);
   NUM_SAMPLES = loadLabels(g, inputLabelFilename);
   initializeVariableCounts(g);
   NUM_VARIABLES = g.size() - NUM_SAMPLES;

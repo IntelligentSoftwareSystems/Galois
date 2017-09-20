@@ -20,7 +20,7 @@ struct NodeDataDAG {
 
 };
 
-typedef galois::Graph::LC_CSR_Graph<NodeDataDAG, void>
+typedef galois::graphs::LC_CSR_Graph<NodeDataDAG, void>
           ::with_numa_alloc<true>::type 
           // ::with_no_lockable<true>::type Graph;
           ::with_no_lockable<false>::type Graph;

@@ -104,8 +104,8 @@ struct GData: public galois::UnionFindNode<GData> {
 // A graph and its transpose. The main operation in pagerank is computing
 // values based on incoming edges, so we will mainly use the transpose of G,
 // G^T, (tgraph). We keep G around to compute dependencies in G^T.
-typedef galois::Graph::LC_CSR_Graph<GData, void> Graph;
-typedef galois::Graph::LC_CSR_Graph<TData, double> TGraph;
+typedef galois::graphs::LC_CSR_Graph<GData, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<TData, double> TGraph;
 typedef Graph::GraphNode GNode;
 typedef TGraph::GraphNode TNode;
 
@@ -524,14 +524,14 @@ struct AsynchronousAlgo {
 
 //! Transpose in-edges to out-edges
 static void transposeGraph() {
-  typedef galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef galois::graphs::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef galois::Graph::FileGraphWriter OutputGraph;
+  typedef galois::graphs::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  galois::Graph::readGraph(input, inputFilename);
+  galois::graphs::readGraph(input, inputFilename);
 
   size_t node_id = 0;
   for (InputNode src : input) {
@@ -587,8 +587,8 @@ static void transposeGraph() {
 }
 
 static void readGraph() {
-  galois::Graph::readGraph(graph, inputFilename);
-  galois::Graph::readGraph(tgraph, otherFilename);
+  galois::graphs::readGraph(graph, inputFilename);
+  galois::graphs::readGraph(tgraph, otherFilename);
 
   if (graph.size() != tgraph.size() || graph.sizeEdges() != tgraph.sizeEdges()) {
     std::cerr << "Graph and its transpose have different number of nodes or edges\n";

@@ -10,11 +10,11 @@ namespace LigraGraphChi {
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {
-  typedef galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
+  typedef galois::graphs::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
   
   output.densify();
-  galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+  galois::graphsChi::hidden::vertexMap<false,false>(graph, wgraph,
       galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,true>(wgraph, output, output, op),
       static_cast<Bag*>(0),
       size);
@@ -22,7 +22,7 @@ void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {
 
 template<bool Forward,typename Graph, typename EdgeOperator,typename Bag>
 void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward) {
-  typedef galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
+  typedef galois::graphs::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
 
   size_t count = input.getCount();
@@ -32,18 +32,18 @@ void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output
     if (denseForward) {
       abort(); // Never used now
       output.densify();
-      galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+      galois::graphsChi::hidden::vertexMap<false,false>(graph, wgraph,
         galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,false>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     } else {
-      galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+      galois::graphsChi::hidden::vertexMap<false,false>(graph, wgraph,
         galois::Ligra::hidden::DenseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     }
   } else {
-    galois::GraphChi::hidden::vertexMap<true,false>(graph, wgraph,
+    galois::graphsChi::hidden::vertexMap<true,false>(graph, wgraph,
       galois::Ligra::hidden::SparseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, output, op),
       &input,
       size);
@@ -81,7 +81,7 @@ struct ChooseExecutor {
 
   template<typename Graph>
   void checkIfInMemoryGraph(Graph& g, size_t size) {
-    if (galois::GraphChi::hidden::fitsInMemory(g, size)) {
+    if (galois::graphsChi::hidden::fitsInMemory(g, size)) {
       g.keepInMemory();
     }
   }

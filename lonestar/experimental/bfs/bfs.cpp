@@ -125,7 +125,7 @@ struct SNode {
   unsigned int id;
 };
 
-typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -224,7 +224,7 @@ static bool verify(GNode source) {
 }
 
 static void readGraph(GNode& source, GNode& report) {
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();

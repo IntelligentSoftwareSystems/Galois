@@ -71,7 +71,7 @@ class AbstractMain {
 
 public:
 
-  typedef galois::Graph::FirstGraph<typename SimInit_tp::BaseSimObj_ty*, void, true> Graph;
+  typedef galois::graphs::FirstGraph<typename SimInit_tp::BaseSimObj_ty*, void, true> Graph;
   typedef typename Graph::GraphNode GNode;
 
 

@@ -11,10 +11,10 @@
 
 #include <float.h>              // For DBL_DIG, significant digits in double
 
-typedef galois::Graph::LC_CSR_Graph<unsigned int, double> Graph;
+typedef galois::graphs::LC_CSR_Graph<unsigned int, double> Graph;
 typedef Graph::GraphNode GNode;
 
-typedef galois::Graph::LC_Morph_Graph<unsigned int, double> OutGraph;
+typedef galois::graphs::LC_Morph_Graph<unsigned int, double> OutGraph;
 
 Graph graph;
 OutGraph outgraph;
@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
   galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
   {
     unsigned i = 0;
     unsigned nedges[graph.size()];

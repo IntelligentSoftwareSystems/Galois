@@ -74,7 +74,7 @@ struct Node {
   bool hasNoOuts;
 };
 
-typedef galois::Graph::LC_CSR_Graph<Node, double> Graph;
+typedef galois::graphs::LC_CSR_Graph<Node, double> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -269,9 +269,9 @@ void parallelPageRank() {
 #if 0
 //! Transpose in-edges to out-edges
 static void transposeGraph() {
-  typedef galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef galois::graphs::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef galois::Graph::FirstGraph<size_t, double, true> OutputGraph;
+  typedef galois::graphs::FirstGraph<size_t, double, true> OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
@@ -327,7 +327,7 @@ static void transposeGraph() { abort(); }
 #endif
 
 static void readGraph() {
-  galois::Graph::readGraph(graph, inputFilename);
+  galois::graphs::readGraph(graph, inputFilename);
 
   std::string nodeFilename = inputFilename + ".node";
   int fd = open(nodeFilename.c_str(), O_RDONLY);

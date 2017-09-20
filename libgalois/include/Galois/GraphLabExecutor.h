@@ -7,7 +7,7 @@
 
 namespace galois {
 //! Implementation of GraphLab v2/PowerGraph DSL in Galois
-namespace GraphLab {
+namespace graphsLab {
 
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_gather_in_edges)
 template<typename T>

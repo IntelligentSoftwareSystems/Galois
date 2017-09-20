@@ -72,7 +72,7 @@ struct Node: public galois::UnionFindNode<Node> {
   Node(): galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
 };
 
-typedef galois::Graph::LC_CSR_Graph<Node,EdgeData>
+typedef galois::graphs::LC_CSR_Graph<Node,EdgeData>
   ::with_numa_alloc<true>::type
   ::with_no_lockable<true>::type Graph;
 
@@ -408,16 +408,16 @@ bool verify() {
 }
 
 void initializeGraph() {
-  galois::Graph::FileGraph origGraph;
-  galois::Graph::FileGraph symGraph;
+  galois::graphs::FileGraph origGraph;
+  galois::graphs::FileGraph symGraph;
   
   origGraph.fromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
-    galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
+    galois::graphs::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
     std::swap(symGraph, origGraph);
 
-  galois::Graph::readGraph(graph, symGraph);
+  galois::graphs::readGraph(graph, symGraph);
   
   galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();

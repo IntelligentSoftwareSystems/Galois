@@ -156,7 +156,7 @@ public:
 
 };
 
-typedef galois::Graph::LC_Linear_Graph<Vertex, unsigned int> Graph;
+typedef galois::graphs::LC_Linear_Graph<Vertex, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 
@@ -400,7 +400,7 @@ int main(int argc, char **argv) {
   Graph graph;
 
   //read in graph??
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
   //graph.structureFromFile(filename);
 
   nnodes = std::distance(graph.begin(), graph.end());

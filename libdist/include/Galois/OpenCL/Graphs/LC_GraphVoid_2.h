@@ -10,7 +10,7 @@
 
 namespace galois {
 namespace OpenCL {
-namespace Graphs{
+namespace graphs{
 static const char * cl_wrapper_str_LC_GraphVoid_2 =
       "\
       typedef struct _GraphType { \n\
@@ -341,7 +341,7 @@ struct LC_Graph_2<GPUWrapper, NodeDataTy, void> {
    }
 };
 //End LC_Graph_2
-}//namespace Graphs
+}//namespace graphs
 }//Namespace OpenCL
 } // Namespace Galois
 

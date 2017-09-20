@@ -31,7 +31,7 @@
 #include "Galois/Runtime/Context.h"
 
 namespace galois {
-  namespace Graph {
+  namespace graphs {
 
     template<typename NodeTy, typename EdgeTy>
       class LC_Dist_InOut {
@@ -476,7 +476,7 @@ namespace galois {
 
       };
 
-  } //namespace Graph
+  } //namespace graphs
 } //namespace galois
 
 #endif

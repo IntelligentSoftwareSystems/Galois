@@ -133,7 +133,7 @@ struct SNode {
 	unsigned int id;
 	//unsigned int sum;
   //bool flag;
-	//std::vector<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
+	//std::vector<galois::graphs::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 };
 
 struct Prefix {
@@ -142,10 +142,10 @@ struct Prefix {
 	Prefix(unsigned int _id, unsigned _val) : id(_id), val(_val) {}
 };
 
-//typedef galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
-//typedef galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
-//typedef galois::Graph::FirstGraph<SNode, void, false> Graph;
+//typedef galois::graphs::LC_Linear_Graph<SNode, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
+//typedef galois::graphs::LC_CSRInline_Graph<SNode, char> Graph;
+//typedef galois::graphs::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
 
 typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS, boost::property< boost::vertex_color_t, boost::default_color_type, boost::property< boost::vertex_degree_t, int, boost::property< boost::vertex_priority_t, signed int > > > > BGraph;
@@ -489,7 +489,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
   source = *graph.begin();
 
   size_t nnodes = graph.size();

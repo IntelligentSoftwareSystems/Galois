@@ -123,10 +123,10 @@ struct Sync {
     }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_numa_alloc<true>::type
     InnerGraph;
-  typedef typename galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return coord ? "Sync_c" : "Sync_a"; }
@@ -136,7 +136,7 @@ struct Sync {
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();

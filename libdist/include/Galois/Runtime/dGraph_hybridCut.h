@@ -234,7 +234,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_graph_construct.start();
       //std::stringstream ss_cout;
 
-      galois::Graph::OfflineGraph g(filename);
+      galois::graphs::OfflineGraph g(filename);
       isBipartite = bipartite;
 
       //std::cout << "Nodes to divide : " <<  numNodes_to_divide << "\n";
@@ -249,16 +249,16 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // at this point gid2Host has pairs for how to split nodes among
       // hosts; pair has begin and end
       uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
-      typename galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
+      typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
         g.edge_begin(nodeBegin);
 
       uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
-      typename galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
+      typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
     
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
-      galois::Graph::FileGraph fileGraph;
+      galois::graphs::FileGraph fileGraph;
 
       fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
@@ -424,7 +424,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     template<typename GraphTy>
-    void loadEdges(GraphTy& graph, galois::Graph::FileGraph& fileGraph, 
+    void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph, 
                    uint64_t numEdges_distribute, uint32_t VCutThreshold){
       if (base_hGraph::id == 0) {
         if (std::is_void<typename GraphTy::edge_data_type>::value) {
@@ -465,8 +465,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     // Just calculating the number of edges to send to other hosts
-    void assign_edges_phase1(galois::Graph::OfflineGraph& g, 
-                             galois::Graph::FileGraph& fileGraph, 
+    void assign_edges_phase1(galois::graphs::OfflineGraph& g, 
+                             galois::graphs::FileGraph& fileGraph, 
                              uint64_t numEdges_distribute, 
                              uint32_t VCutThreshold, 
                              std::vector<uint64_t>& prefixSumOfEdges, 
@@ -660,7 +660,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     template<typename GraphTy, 
              typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
       void assign_load_send_edges(GraphTy& graph, 
-                                  galois::Graph::FileGraph& fileGraph, 
+                                  galois::graphs::FileGraph& fileGraph, 
                                   uint64_t numEdges_distribute, 
                                   uint32_t VCutThreshold) {
 
@@ -737,7 +737,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     template<typename GraphTy, 
              typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
       void assign_load_send_edges(GraphTy& graph, 
-                                  galois::Graph::FileGraph& fileGraph, 
+                                  galois::graphs::FileGraph& fileGraph, 
                                   uint64_t numEdges_distribute, 
                                   uint32_t VCutThreshold) {
         std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);

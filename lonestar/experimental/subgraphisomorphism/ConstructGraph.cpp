@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     numEdges = maxNumEdges;
   }
 
-  galois::Graph::FirstGraph<int, void, true> g;
+  galois::graphs::FirstGraph<int, void, true> g;
   constructGraph(g);
   printGraph(g);
 

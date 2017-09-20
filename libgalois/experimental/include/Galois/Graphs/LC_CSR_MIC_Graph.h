@@ -51,7 +51,7 @@
 #endif
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 /**
  * Local computation graph (i.e., graph structure does not change). The data representation
@@ -63,11 +63,11 @@ namespace Graph {
  * An example of use:
  * 
  * \code
- * typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
+ * typedef galois::graphs::LC_CSR_Graph<int,int> Graph;
  * 
  * // Create graph
  * Graph g;
- * galois::Graph::readGraph(g, inputfile);
+ * galois::graphs::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -83,12 +83,12 @@ namespace Graph {
  * And in C++11:
  *
  * \code
- * typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
- * // or typedef galois::Graph::LC_CSR_Graph<int,int>::with_no_lockable<true>::with_numa_alloc<true>
+ * typedef galois::graphs::LC_CSR_Graph<int,int> Graph;
+ * // or typedef galois::graphs::LC_CSR_Graph<int,int>::with_no_lockable<true>::with_numa_alloc<true>
  *
  * // Create graph
  * Graph g;
- * galois::Graph::readGraph(g, inputfile);
+ * galois::graphs::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::GraphNode src : g) {

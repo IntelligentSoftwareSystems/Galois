@@ -96,7 +96,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef galois::Graph::LC_Linear_Graph<SNode, void>
+typedef galois::graphs::LC_Linear_Graph<SNode, void>
   ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -983,7 +983,7 @@ void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph() {
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   size_t nnodes = graph.size();
   std::cout << "Read " << nnodes << " nodes\n";

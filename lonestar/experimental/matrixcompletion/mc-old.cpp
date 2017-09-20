@@ -39,7 +39,7 @@ typedef struct Node
 
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int
-typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+typedef galois::graphs::LC_CSR_Graph<Node, unsigned int> Graph;
 
 typedef struct ThreadWorkItem
 {
@@ -738,7 +738,7 @@ int main(int argc, char** argv)
 	Graph g;
 
 	//read structure of graph & edge weights; nodes not initialized
-    galois::Graph::readGraph(g, inputFile);
+    galois::graphs::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
 	unsigned int numMovieNodes = initializeGraphData(g);

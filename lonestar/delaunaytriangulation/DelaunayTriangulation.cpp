@@ -61,7 +61,7 @@ static cll::opt<std::string> doWriteMesh("writemesh",
     cll::value_desc("basename"));
 
 static Graph graph;
-static galois::Graph::SpatialTree2d<Point*> tree;
+static galois::graphs::SpatialTree2d<Point*> tree;
 
 //! Our main functor
 struct Process {

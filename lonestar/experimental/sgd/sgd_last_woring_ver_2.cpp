@@ -81,14 +81,14 @@ namespace std {
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-typedef galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
+typedef galois::graphs::LC_Numa_Graph<Node, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 Graph graph;
 using std::cout;
 using std::endl;
 unsigned track=0;
 //Distributed Graph Nodes.
-typedef galois::Graph::ThirdGraph<Node, unsigned int, galois::Graph::EdgeDirection::Out> DGraph;
+typedef galois::graphs::ThirdGraph<Node, unsigned int, galois::graphs::EdgeDirection::Out> DGraph;
 typedef DGraph::NodeHandle DGNode;
 typedef typename DGraph::pointer Graphp;
 
@@ -644,10 +644,10 @@ int main(int argc, char** argv)
 	localGraph.allocateFrom(f);
 	localGraph.constructFrom(f, 0, 1);
 	//read structure of graph & edge weights; nodes not initialized
-	//galois::Graph::readGraph(localGraph, inputFile);
+	//galois::graphs::readGraph(localGraph, inputFile);
 	//g_ptr = &g;
 
-	//typedef galois::Graph::FileGraph::GraphNode FileGNode;
+	//typedef galois::graphs::FileGraph::GraphNode FileGNode;
 	for(auto ii = localGraph.begin(); ii != localGraph.end(); ++ii) {
 		Node& data = localGraph.getData(*ii);
 		std::cout << data.updates <<"\n";

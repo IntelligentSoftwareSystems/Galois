@@ -49,7 +49,7 @@ static const char* url = "single_source_shortest_path";
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
-typedef galois::Graph::LC_InlineEdge_Graph<SNode, uint32_t>
+typedef galois::graphs::LC_InlineEdge_Graph<SNode, uint32_t>
   ::with_out_of_line_lockable<true>::type
   ::with_compressed_node_ptr<true>::type
   ::with_numa_alloc<true>::type
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
   // BadWork = &sBadWork;
   // WLEmptyWork = &sWLEmptyWork;
 
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";

@@ -46,7 +46,7 @@
 #include <vector>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, bool Directional>
 class MemScalGraph : private boost::noncopyable {

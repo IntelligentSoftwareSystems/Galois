@@ -109,7 +109,7 @@ struct LNode {
 };*/
 //////////////////////////////////////////////////////////////////////////////////////
 
-typedef galois::Graph::LC_CSR_Graph<LNode, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<LNode, void> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
 //std::map<GNode, float> buffered_updates;

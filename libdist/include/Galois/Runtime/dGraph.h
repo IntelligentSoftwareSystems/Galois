@@ -143,7 +143,7 @@ public:
     EdgeTy
   >::type realEdgeTy;
 
-  typedef typename galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy, true>
+  typedef typename galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy, true>
     GraphTy;
 
   enum SyncType { syncReduce, syncBroadcast };
@@ -298,7 +298,7 @@ public:
 
 private:
   // compute owners by blocking Nodes
-  void computeMastersBlockedNodes(galois::Graph::OfflineGraph& g,
+  void computeMastersBlockedNodes(galois::graphs::OfflineGraph& g,
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
@@ -336,7 +336,7 @@ private:
 
   // TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance edges
-  void computeMastersBalancedEdges(galois::Graph::OfflineGraph& g,
+  void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (edgeWeightOfMaster == 0) {
@@ -413,7 +413,7 @@ private:
 
   //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   // compute owners while trying to balance nodes and edges
-  void computeMastersBalancedNodesAndEdges(galois::Graph::OfflineGraph& g,
+  void computeMastersBalancedNodesAndEdges(galois::graphs::OfflineGraph& g,
       uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (nodeWeightOfMaster == 0) {
@@ -477,7 +477,7 @@ private:
   }
 
 protected:
-  uint64_t computeMasters(galois::Graph::OfflineGraph& g,
+  uint64_t computeMasters(galois::graphs::OfflineGraph& g,
       std::vector<unsigned>& scalefactor,
       bool isBipartite = false, unsigned DecomposeFactor = 1) {
     galois::Timer timer;

@@ -144,7 +144,7 @@ struct SNode {
 	//galois::GAtomic<unsigned int>& status;
 	//unsigned int sum;
   //bool flag;
-	//std::vector<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
+	//std::vector<galois::graphs::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 };
 
 std::ostream& operator<<(std::ostream& out, const SNode& n) {
@@ -152,7 +152,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
+typedef galois::graphs::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -568,7 +568,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& terminal) {
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   source = *graph.begin();
   terminal = *graph.begin();

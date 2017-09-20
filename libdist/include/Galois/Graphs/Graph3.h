@@ -40,7 +40,7 @@
 #include <iostream>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 enum class EdgeDirection {Un, Out, InOut};
 
@@ -279,7 +279,7 @@ class GraphNode
 
 public:
   typedef galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
-  typedef typename galois::Graph::Edge<Handle,EdgeDataTy> EdgeType;
+  typedef typename galois::graphs::Edge<Handle,EdgeDataTy> EdgeType;
   typedef typename GraphNodeEdges<Handle,EdgeDataTy,EDir>::iterator edge_iterator;
 
   template<typename... Args>
@@ -503,7 +503,7 @@ public:
   }
 };
 
-} //namespace Graph
+} //namespace graphs
 } //namespace galois
 
 #endif

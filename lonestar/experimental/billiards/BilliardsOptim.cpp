@@ -36,7 +36,7 @@
 
 class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
 
-  using Graph = galois::Graph::FirstGraph<void*, void, true>;
+  using Graph = galois::graphs::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
   using AddListTy = galois::PerThreadVector<Event>;

@@ -153,7 +153,7 @@ typedef struct Node {
 } Node;
 
 
-using Graph = galois::Graph::LC_CSR_Graph<Node, double>
+using Graph = galois::graphs::LC_CSR_Graph<Node, double>
   ::with_out_of_line_lockable<true>::type
   ::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
@@ -2175,7 +2175,7 @@ int main(int argc, char** argv) {
  
   Graph g_train, g_test;
   // Load Training Data
-  galois::Graph::readGraph(g_train, inputTrainGraphFilename);
+  galois::graphs::readGraph(g_train, inputTrainGraphFilename);
   if ( algoType == AlgoType::CDLasso )
 	  NUM_SAMPLES = loadb(g_train, inputTrainLabelFilename);
   else {
@@ -2187,7 +2187,7 @@ int main(int argc, char** argv) {
   assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
 
   // Load Testing Data
-  galois::Graph::readGraph(g_test, inputTestGraphFilename);
+  galois::graphs::readGraph(g_test, inputTestGraphFilename);
   if ( algoType == AlgoType::CDLasso )
 	  NUM_TEST_SAMPLES = loadb(g_test, inputTestLabelFilename);
   else

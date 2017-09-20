@@ -11,10 +11,10 @@
 #include "SSSP.h"
 
 struct GraphLabAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<SNode,uint32_t>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -64,7 +64,7 @@ struct GraphLabAlgo {
     }
     
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::GraphLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
+        galois::graphsLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
       SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       SNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + edgeValue;
@@ -77,7 +77,7 @@ struct GraphLabAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }

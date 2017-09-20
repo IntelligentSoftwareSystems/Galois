@@ -78,13 +78,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(Algo::pull));
 
 struct SerialAlgo {
-  typedef galois::Graph::LC_CSR_Graph<PNode,void>
+  typedef galois::graphs::LC_CSR_Graph<PNode,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
   
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -157,7 +157,7 @@ struct PullAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef galois::Graph::LC_InlineEdge_Graph<LNode,float>
+  typedef galois::graphs::LC_InlineEdge_Graph<LNode,float>
     ::with_compressed_node_ptr<true>::type
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type
@@ -172,7 +172,7 @@ struct PullAlgo {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::graphs::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -277,11 +277,11 @@ struct PullAlgo2 {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::graphs::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Pull2"; }
@@ -291,7 +291,7 @@ struct PullAlgo2 {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -410,26 +410,26 @@ struct Sync {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   /*
-  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::graphs::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   */
 
   /*
-  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::graphs::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
   */
 
@@ -440,7 +440,7 @@ struct Sync {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -561,17 +561,17 @@ struct PrtRsd {
   };
   
   /*
-  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::graphs::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   */ 
  
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "PrtRsd"; }
@@ -581,7 +581,7 @@ struct PrtRsd {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -782,17 +782,17 @@ struct Async {
     float getPageRank() { return value; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   /*
-  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::graphs::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   */
 
@@ -800,7 +800,7 @@ struct Async {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -878,15 +878,15 @@ struct Async {
 
 //! Transpose in-edges to out-edges
 static void precomputePullData() {
-  typedef galois::Graph::LC_CSR_Graph<size_t, void>
+  typedef galois::graphs::LC_CSR_Graph<size_t, void>
     ::with_no_lockable<true>::type InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef galois::Graph::FileGraphWriter OutputGraph;
+  typedef galois::graphs::FileGraphWriter OutputGraph;
   //typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  galois::Graph::readGraph(input, filename); 
+  galois::graphs::readGraph(input, filename); 
 
   size_t node_id = 0;
   for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {

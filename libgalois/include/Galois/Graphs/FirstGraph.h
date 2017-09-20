@@ -51,7 +51,7 @@
 
 namespace galois {
 //! Parallel graph data structures.
-namespace Graph {
+namespace graphs {
 
 namespace FirstGraphImpl {
 /**
@@ -165,7 +165,7 @@ struct EdgeFactory<void> {
  *   ... // Definition of node data
  * };
  *
- * typedef galois::Graph::FirstGraph<Node,int,true> Graph;
+ * typedef galois::graphs::FirstGraph<Node,int,true> Graph;
  * 
  * // Create graph
  * Graph g;

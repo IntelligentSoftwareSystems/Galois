@@ -84,23 +84,23 @@ namespace std {
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
+//typedef galois::graphs::LC_Numa_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
-/*typedef galois::Graph::FileGraph Graph;
+/*typedef galois::graphs::FileGraph Graph;
 typedef uint64_t GNode;
 Graph File_graph;
 */
 
 //Distributed Graph Nodes.
-typedef galois::Graph::ThirdGraph<Node, unsigned int, galois::Graph::EdgeDirection::Out> DGraph;
+typedef galois::graphs::ThirdGraph<Node, unsigned int, galois::graphs::EdgeDirection::Out> DGraph;
 typedef DGraph::NodeHandle DGNode;
 typedef typename DGraph::pointer Graphp;
 
 
-//typedef galois::Graph::FileGraph FGraph;
-//typedef galois::Graph::FileGraph::GraphNode FileGNode;
+//typedef galois::graphs::FileGraph FGraph;
+//typedef galois::graphs::FileGraph::GraphNode FileGNode;
 
-typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+typedef galois::graphs::LC_CSR_Graph<Node, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -759,10 +759,10 @@ int main(int argc, char** argv)
 	localGraph.allocateFrom(f);
 	localGraph.constructFrom(f, 0, 1);
 	//read structure of graph & edge weights; nodes not initialized
-	//galois::Graph::readGraph(localGraph, inputFile);
+	//galois::graphs::readGraph(localGraph, inputFile);
 	//g_ptr = &g;
 
-	//typedef galois::Graph::FileGraph::GraphNode FileGNode;
+	//typedef galois::graphs::FileGraph::GraphNode FileGNode;
 	for(auto ii = localGraph.begin(); ii != localGraph.end(); ++ii) {
 		Node& data = localGraph.getData(*ii);
 		std::cout << data.updates <<"\n";

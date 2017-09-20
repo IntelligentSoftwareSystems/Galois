@@ -34,7 +34,7 @@
 #include <new>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //! Small wrapper to have value void specialization
 template<typename ETy>

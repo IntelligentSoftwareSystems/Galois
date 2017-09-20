@@ -111,7 +111,7 @@ static cll::opt<std::string> filename(cll::Positional,
 struct SNode;
 // Hack: Resolve circular definition of Graph and SNode.parent with fact that
 // all LC_CSR_Graph::GraphNodes have the same type.
-typedef galois::Graph::LC_CSR_Graph<void, void>
+typedef galois::graphs::LC_CSR_Graph<void, void>
   ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type DummyGraph;
 typedef DummyGraph::GraphNode GNode;
@@ -131,8 +131,8 @@ struct SNode {
 	//bool pflag;
 	//bool have;
 	GNode parent;
-	//std::vector<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
-	//galois::gdeque<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
+	//std::vector<galois::graphs::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
+	//galois::gdeque<galois::graphs::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
 	//galois::runtime::LL::SimpleLock mutex;
 };
 
@@ -785,7 +785,7 @@ void resetGraph() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
 
   source = *graph.begin();
   report = *graph.begin();

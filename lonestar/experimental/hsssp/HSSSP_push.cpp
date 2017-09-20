@@ -90,7 +90,7 @@ struct NodeData {
    }
 };
 typedef NodeData NodeDataType;
-typedef galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
+typedef galois::graphs::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
 bool hasChanged = false;

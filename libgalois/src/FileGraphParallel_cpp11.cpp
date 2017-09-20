@@ -37,7 +37,7 @@
 #include <condition_variable>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
   fromFile(filename);

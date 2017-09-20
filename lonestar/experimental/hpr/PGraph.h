@@ -95,7 +95,7 @@ struct pGraph {
     * @return a partitioned graph backed by the #out instance.
     **********************************************************************************/
    void loadGraph(std::string file) {
-      galois::Graph::FileGraph fg;
+      galois::graphs::FileGraph fg;
       fg.fromFile(file);
       unsigned hostID = galois::runtime::NetworkInterface::ID;
       unsigned numHosts = galois::runtime::NetworkInterface::Num;
@@ -135,9 +135,9 @@ struct pGraph {
    //   std::cout << nextSlot << " " << fg.size() << "\n";
       assert(nextSlot == fg.size());
       //permute graph
-      galois::Graph::FileGraph fg2;
-      galois::Graph::permute<void>(fg, perm, fg2);
-      galois::Graph::readGraph(this->g, fg2);
+      galois::graphs::FileGraph fg2;
+      galois::graphs::permute<void>(fg, perm, fg2);
+      galois::graphs::readGraph(this->g, fg2);
 
       loadLastNodes(fg.size(), numHosts);
 

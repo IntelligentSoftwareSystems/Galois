@@ -31,7 +31,7 @@
 #include "Galois/Runtime/Serialize.h"
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 using namespace galois::runtime::Distributed;
 

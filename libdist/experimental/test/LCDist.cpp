@@ -5,7 +5,7 @@
 #include <vector>
 #include <iostream>
 
-typedef galois::Graph::LC_Dist<std::pair<int, int>, int> Graph;
+typedef galois::graphs::LC_Dist<std::pair<int, int>, int> Graph;
 typedef Graph::GraphNode GNode;
 
 struct AddSelfLoop {

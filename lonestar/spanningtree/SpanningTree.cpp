@@ -64,7 +64,7 @@ struct Node: public galois::UnionFindNode<Node> {
   void setComponent(Node* n) { m_component = n; }
 };
 
-typedef galois::Graph::LC_Linear_Graph<Node,void>
+typedef galois::graphs::LC_Linear_Graph<Node,void>
   ::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
@@ -297,7 +297,7 @@ int main(int argc, char** argv) {
 
   galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
-  galois::Graph::readGraph(graph, inputFilename);
+  galois::graphs::readGraph(graph, inputFilename);
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 

@@ -82,11 +82,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::graphs::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -103,11 +103,11 @@ struct AsyncAlgo {
     SNode() :numPaths(-std::numeric_limits<float>::max()), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-//typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
+//typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "async"; }
@@ -292,11 +292,11 @@ struct LeveledAlgo {
     SNode() :numPaths(~0UL), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-//typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
+//typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
   typedef Graph::GraphNode GNode;
   typedef galois::InsertBag<GNode> Bag;
 

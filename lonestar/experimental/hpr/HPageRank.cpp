@@ -106,7 +106,7 @@ struct LNode {
    }
 };*/
 //////////////////////////////////////////////////////////////////////////////////////
-typedef galois::Graph::LC_CSR_Graph<LNode, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
 //////////////////////////////////////////////////////////////////////////////////////
 typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, LNode, void> DeviceGraph;

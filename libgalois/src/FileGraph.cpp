@@ -71,7 +71,7 @@ typedef off_t offset_t;
 #endif
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //File format V1:
 //version (1 or 2) {uint64_t LE}
@@ -486,7 +486,7 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
 -> GraphRange {
   std::vector<unsigned> dummy;
   // note this calls into another findIndex (not the one directly above)....
-  return galois::Graph::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
+  return galois::graphs::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
                                                 edgeSize, id, total, outIdx, 
                                                 dummy, nodeOffset, edgeOffset);
 

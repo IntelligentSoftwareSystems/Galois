@@ -105,23 +105,23 @@ namespace std {
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
+//typedef galois::graphs::LC_Numa_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
-/*typedef galois::Graph::FileGraph Graph;
+/*typedef galois::graphs::FileGraph Graph;
 typedef uint64_t GNode;
 Graph File_graph;
 */
 
 //Distributed Graph Nodes.
-typedef typename galois::Graph::ThirdGraph<Node, uint32_t, galois::Graph::EdgeDirection::Out> DGraph;
+typedef typename galois::graphs::ThirdGraph<Node, uint32_t, galois::graphs::EdgeDirection::Out> DGraph;
 typedef typename DGraph::NodeHandle DGNode;
 typedef typename DGraph::iterator iterator;
 typedef typename DGraph::edge_iterator edge_iterator;
 typedef typename DGraph::pointer Graphp;
 
 
-typedef galois::Graph::FileGraph FGraph;
-typedef galois::Graph::FileGraph::GraphNode FileGNode;
+typedef galois::graphs::FileGraph FGraph;
+typedef galois::graphs::FileGraph::GraphNode FileGNode;
 FGraph fgraph;
 
 /**
@@ -144,7 +144,7 @@ struct HostWorkItem {
 };
 
 
-//typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+//typedef galois::graphs::LC_CSR_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
 
 //Graph graph;
@@ -865,7 +865,7 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
 	//typedef galois::WorkList::BulkSynchronous<galois::WorkList::dChunkedLIFO<256> > WL;
 	//typedef galois::WorkList::dChunkedFIFO<64> dChunk;
 	//typedef galois::WorkList::LIFO<FileGNode, true> chunk;
-	//typedef galois::Graph::FileGraph::iterator IterTy;
+	//typedef galois::graphs::FileGraph::iterator IterTy;
 	galois::for_each(first, last, create_nodes(dgraph,lk));
 	//galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), create_nodes(dgraph,lk));
     

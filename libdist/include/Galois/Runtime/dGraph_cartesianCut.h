@@ -291,7 +291,7 @@ public:
 
     // only used to determine node splits among hosts; abandonded later
     // for the FileGraph which mmaps appropriate regions of memory
-    galois::Graph::OfflineGraph g(filename);
+    galois::graphs::OfflineGraph g(filename);
 
     base_hGraph::totalNodes = g.size();
     if (base_hGraph::id == 0) {
@@ -305,8 +305,8 @@ public:
     // hosts; pair has begin and end
     std::vector<uint64_t> nodeBegin(DecomposeFactor);
     std::vector<uint64_t> nodeEnd(DecomposeFactor);
-    std::vector<typename galois::Graph::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
-    std::vector<typename galois::Graph::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
+    std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
+    std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
     std::cerr << " SIZE : " << base_hGraph::gid2host.size() << "\n";
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       nodeBegin[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
@@ -317,7 +317,7 @@ public:
 
     // file graph that is mmapped for much faster reading; will use this
     // when possible from now on in the code
-    std::vector<galois::Graph::FileGraph> fileGraph(DecomposeFactor);
+    std::vector<galois::graphs::FileGraph> fileGraph(DecomposeFactor);
 
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::stringstream ss;
@@ -429,8 +429,8 @@ public:
     //fprintf(stderr, "[%d] Cartisian graph setup done\n", base_hGraph::id);
   }
 
-  void loadStatistics(galois::Graph::OfflineGraph& g, 
-                      std::vector<galois::Graph::FileGraph>& fileGraph, 
+  void loadStatistics(galois::graphs::OfflineGraph& g, 
+                      std::vector<galois::graphs::FileGraph>& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = 0;
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
@@ -634,8 +634,8 @@ public:
 
     template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
-                 galois::Graph::OfflineGraph& g,
-                 std::vector<galois::Graph::FileGraph>& fileGraph) {
+                 galois::graphs::OfflineGraph& g,
+                 std::vector<galois::graphs::FileGraph>& fileGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
@@ -672,8 +672,8 @@ public:
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
-                         galois::Graph::OfflineGraph& g,
-                         std::vector<galois::Graph::FileGraph>& fileGraph) {
+                         galois::graphs::OfflineGraph& g,
+                         std::vector<galois::graphs::FileGraph>& fileGraph) {
 
     //XXX h_offset not correct
     for(unsigned d = 0; d < DecomposeFactor; ++d){
@@ -732,8 +732,8 @@ public:
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
-                         galois::Graph::OfflineGraph& g,
-                         std::vector<galois::Graph::FileGraph>& fileGraph) {
+                         galois::graphs::OfflineGraph& g,
+                         std::vector<galois::graphs::FileGraph>& fileGraph) {
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;

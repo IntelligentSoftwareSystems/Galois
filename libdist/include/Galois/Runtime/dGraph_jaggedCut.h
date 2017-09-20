@@ -235,7 +235,7 @@ public:
 
     // only used to determine node splits among hosts; abandonded later
     // for the FileGraph which mmaps appropriate regions of memory
-    galois::Graph::OfflineGraph g(filename);
+    galois::graphs::OfflineGraph g(filename);
 
     base_hGraph::totalNodes = g.size();
     if (base_hGraph::id == 0) {
@@ -248,16 +248,16 @@ public:
     // at this point gid2Host has pairs for how to split nodes among
     // hosts; pair has begin and end
     uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
-    typename galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
+    typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
       g.edge_begin(nodeBegin);
 
     uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
-    typename galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
+    typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
     
     // file graph that is mmapped for much faster reading; will use this
     // when possible from now on in the code
-    galois::Graph::FileGraph fileGraph;
+    galois::graphs::FileGraph fileGraph;
 
     fileGraph.partFromFile(filename,
       std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
@@ -354,8 +354,8 @@ public:
 
 private:
 
-  void determineJaggedColumnMapping(galois::Graph::OfflineGraph& g, 
-                      galois::Graph::FileGraph& fileGraph) {
+  void determineJaggedColumnMapping(galois::graphs::OfflineGraph& g, 
+                      galois::graphs::FileGraph& fileGraph) {
     auto activeThreads = galois::runtime::activeThreads;
     galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
@@ -428,7 +428,7 @@ private:
       //auto pair = galois::prefix_range(prefixSumOfInEdges, 
       //    (uint64_t)0U, prefixSumOfInEdges.size(),
       //    i, base_hGraph::numHosts);
-      auto pair = galois::Graph::divideNodesBinarySearch(
+      auto pair = galois::graphs::divideNodesBinarySearch(
         prefixSumOfInEdges.size(), prefixSumOfInEdges.back(),
         0, 1, i, base_hGraph::numHosts, prefixSumOfInEdges).first;
 
@@ -465,8 +465,8 @@ private:
     ++galois::runtime::evilPhase;
   }
 
-  void loadStatistics(galois::Graph::OfflineGraph& g, 
-                      galois::Graph::FileGraph& fileGraph, 
+  void loadStatistics(galois::graphs::OfflineGraph& g, 
+                      galois::graphs::FileGraph& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - base_hGraph::gid2host[base_hGraph::id].first;
 
@@ -612,8 +612,8 @@ private:
 
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
-                 galois::Graph::OfflineGraph& g,
-                 galois::Graph::FileGraph& fileGraph) {
+                 galois::graphs::OfflineGraph& g,
+                 galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         fprintf(stderr, "Loading void edge-data while creating edges.\n");
@@ -643,8 +643,8 @@ private:
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
-                         galois::Graph::OfflineGraph& g,
-                         galois::Graph::FileGraph& fileGraph) {
+                         galois::graphs::OfflineGraph& g,
+                         galois::graphs::FileGraph& fileGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);
@@ -697,8 +697,8 @@ private:
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
-                         galois::Graph::OfflineGraph& g,
-                         galois::Graph::FileGraph& fileGraph) {
+                         galois::graphs::OfflineGraph& g,
+                         galois::graphs::FileGraph& fileGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::vector<std::vector<uint64_t>> gdst_vec(numColumnHosts);

@@ -63,10 +63,10 @@ struct LNode {
   typedef int  tt_is_copyable;
 };
 
-typedef galois::Graph::LC_Dist_InOut<LNode> Graph;
+typedef galois::graphs::LC_Dist_InOut<LNode> Graph;
 typedef typename Graph::GraphNode GNode;
 
-typedef galois::Graph::ThirdGraph<LNode, void, galois::Graph::EdgeDirection::Out > Graph_3;
+typedef galois::graphs::ThirdGraph<LNode, void, galois::graphs::EdgeDirection::Out > Graph_3;
 
 // Constants for page Rank Algo.
 //! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
 
 /*
 
-          galois::Graph::FileGraph fg;
+          galois::graphs::FileGraph fg;
             fg.fromFile(inputFile);
 
             std::cout << " filegraph : " << fg.size() << "\n";

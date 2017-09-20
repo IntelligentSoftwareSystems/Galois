@@ -250,11 +250,11 @@ protected:
 
   void readGraph (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
 
-    typedef galois::Graph::LC_CSR_Graph<unsigned, uint32_t> InGraph;
+    typedef galois::graphs::LC_CSR_Graph<unsigned, uint32_t> InGraph;
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    galois::Graph::readGraph (ingraph, filename);
+    galois::graphs::readGraph (ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph

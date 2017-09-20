@@ -12,12 +12,12 @@
 
 template<bool UseGraphChi>
 struct LigraBFS: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  typedef typename galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<SNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::graphs::OCImmutableEdgeGraph<SNode,void>,
+          galois::graphs::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -55,7 +55,7 @@ struct LigraBFS: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    galois::GraphNodeBagPair<> bags(graph.size());
+    galois::graphsNodeBagPair<> bags(graph.size());
 
     Dist newDist = 1;
     graph.getData(source).dist = 0;
@@ -78,12 +78,12 @@ struct LigraDiameter: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     Visited visited[2];
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          galois::Graph::LC_InOut_Graph<InnerGraph> >::type
+          galois::graphs::OCImmutableEdgeGraph<LNode,void>,
+          galois::graphs::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -149,7 +149,7 @@ struct LigraDiameter: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
   };
 
   size_t operator()(Graph& graph, const GNode& source) {
-    galois::GraphNodeBagPair<> bags(graph.size());
+    galois::graphsNodeBagPair<> bags(graph.size());
 
     if (graph.size() && *graph.begin() != source)
       std::cerr << "Warning: Ignoring user-requested start node\n";

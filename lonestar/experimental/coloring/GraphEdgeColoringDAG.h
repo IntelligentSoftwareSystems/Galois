@@ -31,7 +31,7 @@ struct NodeDataDAG {
 
 };
 ////////////////////////////////////////////////////////////
-typedef galois::Graph::LC_CSR_Graph<NodeDataDAG, EdgeDataDAG*>::with_numa_alloc<true>::type
+typedef galois::graphs::LC_CSR_Graph<NodeDataDAG, EdgeDataDAG*>::with_numa_alloc<true>::type
 // ::with_no_lockable<true>::type Graph;
 ::with_no_lockable<false>::type Graph;
 
@@ -53,12 +53,12 @@ class GraphEdgeColoringDAG: public GraphColoringBase<Graph> {
 public:
    /////////////////////////////////////////////////////////////
    void readGraph(void) {
-      /*     typedef galois::Graph::FileGraph FileGraph;
+      /*     typedef galois::graphs::FileGraph FileGraph;
        FileGraph filegraph;
        filegraph.fromFile(filename);
        graph.allocateFrom(filegraph);
        */
-      galois::Graph::readGraph(graph, filename);
+      galois::graphs::readGraph(graph, filename);
       const size_t numNodes = graph.size();
       galois::GAccumulator<size_t> numEdges;
       galois::FixedSizeAllocator<EdgeDataType> heap;

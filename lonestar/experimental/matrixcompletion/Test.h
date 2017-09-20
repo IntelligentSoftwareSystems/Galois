@@ -4,11 +4,11 @@ struct DotProductFixedTilingAlgo {
   struct Node {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
-  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& g) { galois::Graph::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
 
   void operator()(Graph& g, const StepFunction&) {
     const size_t numUsers = g.size() - NUM_ITEM_NODES;
@@ -90,7 +90,7 @@ struct AsyncALSalgo {
   };
 
   static const bool NEEDS_LOCKS = algo == asyncALSkdg_i || asyncALSkdg_ar;
-  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int> BaseGraph;
+  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int> BaseGraph;
   typedef typename std::conditional<NEEDS_LOCKS,
           typename BaseGraph::template with_out_of_line_lockable<true>::type,
           typename BaseGraph::template with_no_lockable<true>::type>::type Graph;
@@ -110,7 +110,7 @@ struct AsyncALSalgo {
   Sp AT;
 
   void readGraph(Graph& g) {
-    galois::Graph::readGraph(g, inputFilename); 
+    galois::graphs::readGraph(g, inputFilename); 
   }
 
   void copyToGraph(Graph& g, MT& WT, MT& HT) {
@@ -451,7 +451,7 @@ struct SimpleALSalgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
   // Column-major access 
@@ -464,7 +464,7 @@ struct SimpleALSalgo {
   Sp AT;
 
   void readGraph(Graph& g) {
-    galois::Graph::readGraph(g, inputFilename); 
+    galois::graphs::readGraph(g, inputFilename); 
   }
 
   void copyToGraph(Graph& g, MT& WT, MT& HT) {
@@ -1028,13 +1028,13 @@ struct DotProductRecursiveTilingAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
 //    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type InnerGraph;
-  typedef typename galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& g) { galois::Graph::readGraph(g, inputFilename, transposeGraphName); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename, transposeGraphName); }
 
   struct GetDistance: public std::unary_function<GNode, ptrdiff_t> {
     Graph* g;
@@ -1105,12 +1105,12 @@ struct BlockJumpAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef galois::graphs::LC_CSR_Graph<Node, unsigned int>
 //    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& g) { galois::Graph::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
 
   size_t userIdToUserNode(size_t userId) {
     return userId + NUM_ITEM_NODES;

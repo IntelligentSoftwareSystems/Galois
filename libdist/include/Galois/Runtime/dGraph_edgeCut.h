@@ -124,7 +124,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // only used to determine node splits among hosts; abandonded later
       // for the FileGraph which mmaps appropriate regions of memory
-      galois::Graph::OfflineGraph g(filename);
+      galois::graphs::OfflineGraph g(filename);
 
       base_hGraph::totalNodes = g.size();
       base_hGraph::totalEdges = g.sizeEdges();
@@ -136,11 +136,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // at this point gid2Host has pairs for how to split nodes among
       // hosts; pair has begin and end
       uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
-      typename galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
+      typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
         g.edge_begin(nodeBegin);
 
       uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
-      typename galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
+      typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
 
       numOwned_withEdges = base_hGraph::totalOwnedNodes = 
@@ -149,7 +149,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
-      galois::Graph::FileGraph fileGraph;
+      galois::graphs::FileGraph fileGraph;
 
       fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
@@ -383,7 +383,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::Graph::FileGraph& fileGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
     }
@@ -421,7 +421,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::Graph::FileGraph& fileGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
     }

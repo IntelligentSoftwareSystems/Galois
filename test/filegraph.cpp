@@ -1,7 +1,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/gIO.h"
 
-typedef galois::Graph::FileGraph Graph;
+typedef galois::graphs::FileGraph Graph;
 
 void checkGraph(Graph& g) {
   auto numNodes = g.size();
@@ -23,7 +23,7 @@ void testBasic(Graph&& graph, const std::string& filename, Fn fn) {
 
 void testPart(const std::string& filename, int numParts) {
   //! [Reading part of graph]
-  typedef galois::Graph::FileGraph Graph;
+  typedef galois::graphs::FileGraph Graph;
   Graph g;
   size_t nodeSize = 1; // in bytes
   size_t edgeSize = 1; // in bytes

@@ -23,7 +23,7 @@ struct TNode {
 	char type;
 };
 
-typedef galois::Graph::LC_CSR_Graph<TNode, int> Graph;
+typedef galois::graphs::LC_CSR_Graph<TNode, int> Graph;
 typedef Graph::GraphNode GNode;
 static const unsigned int DIST_INFINITY = std::numeric_limits<unsigned int>::max();
 
@@ -185,7 +185,7 @@ int main( int argc, char** argv )
 
 	srand( time( NULL ) );
 	galois::GAccumulator<int> accum_set_size;
-	galois::Graph::readGraph( graph, filename );
+	galois::graphs::readGraph( graph, filename );
 	galois::for_each( graph.begin(), graph.end(), Initialize( accum_set_size ) );
 
 	for ( int iteration = 0; iteration < NUMBER_OF_ITERATIONS; ++iteration ) {

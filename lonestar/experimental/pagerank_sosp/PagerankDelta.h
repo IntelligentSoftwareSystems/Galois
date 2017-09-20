@@ -31,17 +31,17 @@ struct PagerankDelta {
     float getPageRank() { return value; }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
 //    ::with_no_lockable<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "PagerankDelta"; }
 
   void readGraph(Graph& graph) {
-    galois::Graph::readGraph(graph, filename); 
+    galois::graphs::readGraph(graph, filename); 
   }
 
   struct Initialize {

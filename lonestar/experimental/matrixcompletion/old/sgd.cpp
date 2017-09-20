@@ -121,24 +121,24 @@ namespace std {
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
+//typedef galois::graphs::LC_Numa_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
-/*typedef galois::Graph::FileGraph Graph;
+/*typedef galois::graphs::FileGraph Graph;
 typedef uint64_t GNode;
 Graph File_graph;
 */
 
 //Distributed Graph Nodes.
-typedef galois::Graph::ThirdGraph<Node, uint32_t, galois::Graph::EdgeDirection::Out> DGraph;
+typedef galois::graphs::ThirdGraph<Node, uint32_t, galois::graphs::EdgeDirection::Out> DGraph;
 typedef DGraph::NodeHandle DGNode;
 typedef typename DGraph::pointer Graphp;
 
 
-typedef galois::Graph::FileGraph FGraph;
-typedef galois::Graph::FileGraph::GraphNode FileGNode;
+typedef galois::graphs::FileGraph FGraph;
+typedef galois::graphs::FileGraph::GraphNode FileGNode;
 FGraph fgraph;
 
-//typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+//typedef galois::graphs::LC_CSR_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
 
 //Graph graph;

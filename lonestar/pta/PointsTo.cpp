@@ -67,7 +67,7 @@ struct Node {
 	}
 };
 
-typedef galois::Graph::FirstGraph<Node,void,true> Graph;
+typedef galois::graphs::FirstGraph<Node,void,true> Graph;
 typedef Graph::GraphNode GNode;
 
 /* copied from Andrew's SSSP. */

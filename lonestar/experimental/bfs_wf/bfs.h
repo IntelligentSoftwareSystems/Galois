@@ -120,7 +120,7 @@ public:
     galois::StatTimer t_read ("Time for reading from file: ");
 
     t_read.start ();
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
     t_read.stop ();
 
 
@@ -437,9 +437,9 @@ public:
 };
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
-  typedef typename galois::Graph::LC_CSR_MIC_Graph<unsigned, void>
+  typedef typename galois::graphs::LC_CSR_MIC_Graph<unsigned, void>
 #else
-  typedef typename galois::Graph::LC_CSR_Graph<unsigned, void>
+  typedef typename galois::graphs::LC_CSR_Graph<unsigned, void>
 #endif
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<false>::type BFSgraph; // TODO: make lockable a template parameter for different BFS implementations
@@ -502,7 +502,7 @@ public:
 
 };
 
-using SsspGraph =  typename galois::Graph::LC_InlineEdge_Graph<unsigned int, uint32_t>
+using SsspGraph =  typename galois::graphs::LC_InlineEdge_Graph<unsigned int, uint32_t>
     ::with_no_lockable<false>::type
     ::with_numa_alloc<true>::type;
 

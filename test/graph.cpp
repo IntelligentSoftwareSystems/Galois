@@ -3,11 +3,11 @@
 
 int useGraph(std::string inputfile) {
   //! [Using a graph]
-  typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
+  typedef galois::graphs::LC_CSR_Graph<int,int> Graph;
   
   // Create graph
   Graph g;
-  galois::Graph::readGraph(g, inputfile);
+  galois::graphs::readGraph(g, inputfile);
   
   int sum = 0;
 
@@ -29,11 +29,11 @@ int useGraph(std::string inputfile) {
 
 int useGraphCxx11(std::string inputfile) {
   //! [Using a graph cxx11] 
-  typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
+  typedef galois::graphs::LC_CSR_Graph<int,int> Graph;
   
   // Create graph
   Graph g;
-  galois::Graph::readGraph(g, inputfile);
+  galois::graphs::readGraph(g, inputfile);
   
   int sum = 0;
 

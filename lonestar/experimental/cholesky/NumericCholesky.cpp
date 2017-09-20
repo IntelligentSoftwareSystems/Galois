@@ -73,7 +73,7 @@ struct Node {
 typedef double edgedata;
 //typedef float edgedata;
 
-typedef galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -293,7 +293,7 @@ int main(int argc, char** argv) {
   Tinitial.start();
 
   // Load filled graph with edge data
-  galois::Graph::readGraph(graph, inputFilename.c_str());
+  galois::graphs::readGraph(graph, inputFilename.c_str());
   std::cout << "Num nodes: " << graph.size() << "\n";
 
   // Assign IDs to each node

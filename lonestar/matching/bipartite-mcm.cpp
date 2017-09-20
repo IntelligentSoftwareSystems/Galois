@@ -96,8 +96,8 @@ static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding 
 // TODO(ddn): switch to this graph for FF and ABMP algos when we fix reading
 // graphs
 template<typename NodeTy,typename EdgeTy>
-struct BipartiteGraph: public galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
-  typedef galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> Super;
+struct BipartiteGraph: public galois::graphs::LC_Morph_Graph<NodeTy,EdgeTy> {
+  typedef galois::graphs::LC_Morph_Graph<NodeTy,EdgeTy> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
 
   NodeList A;
@@ -105,8 +105,8 @@ struct BipartiteGraph: public galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
 };
 
 template<typename NodeTy,typename EdgeTy>
-struct MFBipartiteGraph: public galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
-  typedef galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
+struct MFBipartiteGraph: public galois::graphs::FirstGraph<NodeTy,EdgeTy,true> {
+  typedef galois::graphs::FirstGraph<NodeTy,EdgeTy,true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
 
   NodeList A;
@@ -1022,7 +1022,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
     << " seed: " << seed
     << "\n";
 
-  galois::Graph::FileGraphWriter p;
+  galois::graphs::FileGraphWriter p;
   p.setNumNodes(numA + numB);
   p.setNumEdges(numEdges);
   p.setSizeofEdgeData(galois::LargeArray<edge_data_type>::size_of::value);
@@ -1079,7 +1079,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
 
   // Leave edge data uninitialized
   p.finish<edge_data_type>();
-  galois::Graph::readGraph(g, p);
+  galois::graphs::readGraph(g, p);
 }
 
 /**
@@ -1091,7 +1091,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
  */
 template<typename G>
 void readInput(const std::string& filename, G& g) {
-  galois::Graph::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename);
 }
 
 template<template<typename,bool> class Algo, typename G>

@@ -71,9 +71,9 @@ struct NodeInfo {
    size_t global_id;
    PartitionIDType owner_id;
 };
-bool verifyParitions(std::string & basename, galois::Graph::OfflineGraph & g, size_t num_hosts) {
+bool verifyParitions(std::string & basename, galois::graphs::OfflineGraph & g, size_t num_hosts) {
    bool verified = true;
-   std::vector<galois::Graph::OfflineGraph*> pGraphs(num_hosts);
+   std::vector<galois::graphs::OfflineGraph*> pGraphs(num_hosts);
    std::vector<std::map<size_t, NodeInfo>> hostLocalToGlobalMap(num_hosts);
    std::cout << "Verifying partitions...\n";
    for (size_t h = 0; h < num_hosts; ++h) {
@@ -96,7 +96,7 @@ bool verifyParitions(std::string & basename, galois::Graph::OfflineGraph & g, si
       }
 
       std::string gFileName = getPartitionFileName(basename, h, num_hosts);
-      pGraphs[h] = new galois::Graph::OfflineGraph(gFileName);
+      pGraphs[h] = new galois::graphs::OfflineGraph(gFileName);
    }      //End for each host.
 
    std::vector<size_t> nodeOwners(g.size());

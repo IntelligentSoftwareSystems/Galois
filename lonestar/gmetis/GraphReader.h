@@ -26,8 +26,8 @@
 #include <vector>
 using namespace std;
 
-typedef galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
-typedef galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
+typedef galois::graphs::LC_CSR_Graph<int, unsigned int> InputGraph;
+typedef galois::graphs::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 
 
@@ -104,7 +104,7 @@ struct parallelMakeEdges {
 
 void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
   InputGraph inputGraph;
-  galois::Graph::readGraph(inputGraph, filename);
+  galois::graphs::readGraph(inputGraph, filename);
   cout<<"start to transfer data to GGraph"<<endl;
   int id = 0;
   for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {

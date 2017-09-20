@@ -36,7 +36,7 @@
 #include <regex>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 struct read_lc_partitioned_graph_tag { };
 

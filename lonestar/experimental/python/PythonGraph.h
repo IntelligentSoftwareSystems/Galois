@@ -46,7 +46,7 @@ struct Node;
 #define DIRECTED true
 #define IN_EDGES true
 
-typedef galois::Graph::FirstGraph<Node, Attr, DIRECTED, IN_EDGES> Graph; // Node nodes and Attr edges
+typedef galois::graphs::FirstGraph<Node, Attr, DIRECTED, IN_EDGES> Graph; // Node nodes and Attr edges
 typedef Graph::GraphNode GNode;
 
 // see StatCollector for the design

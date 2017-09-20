@@ -114,7 +114,7 @@ struct not_consistent {
 };
 
 template<typename Graph>
-struct not_consistent<Graph, typename std::enable_if<!galois::Graph::is_segmented<Graph>::value>::type> {
+struct not_consistent<Graph, typename std::enable_if<!galois::graphs::is_segmented<Graph>::value>::type> {
   Graph& g;
   not_consistent(Graph& g): g(g) { }
 
@@ -224,11 +224,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::graphs::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -236,12 +236,12 @@ void readInOutGraph(Graph& graph) {
 
 //! Serial BFS using optimized flags based off asynchronous algo
 struct SerialAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   void operator()(Graph& graph, const GNode source) const {
     std::deque<GNode> wl;
@@ -271,13 +271,13 @@ struct SerialAlgo {
 
 //! Galois BFS using optimized flags
 struct AsyncAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Asynchronous"; }
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   typedef std::pair<GNode, Dist> WorkItem;
 
@@ -336,10 +336,10 @@ struct AsyncAlgo {
  * search. In Supercomputing. 2012.
  */
 struct HighCentralityAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   
   std::string name() const { return "High Centrality"; }
@@ -466,7 +466,7 @@ struct HighCentralityAlgo {
 //! BFS using optimized flags and barrier scheduling 
 template<typename WL, bool useCas>
 struct BarrierAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
     Graph;
@@ -474,7 +474,7 @@ struct BarrierAlgo {
   typedef std::pair<GNode,Dist> WorkItem;
 
   std::string name() const { return "Barrier"; }
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Process {
     typedef int tt_does_not_need_aborts;
@@ -521,12 +521,12 @@ struct HybridAlgo: public HybridBFS<SNode,Dist> {
 
 template<DetAlgo Version>
 struct DeterministicAlgo {
-  typedef galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Deterministic"; }
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   typedef std::pair<GNode,int> WorkItem;
 

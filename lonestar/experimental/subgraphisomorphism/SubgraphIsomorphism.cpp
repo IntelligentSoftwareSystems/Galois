@@ -83,9 +83,9 @@ struct DNode {
   unsigned int id;
 };
 
-typedef galois::Graph::LC_CSR_Graph<DNode, void> 
+typedef galois::graphs::LC_CSR_Graph<DNode, void> 
   ::template with_no_lockable<true>::type InnerDGraph; // graph with DNode nodes and typeless edges without locks
-typedef galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
+typedef galois::graphs::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -94,9 +94,9 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef galois::Graph::LC_CSR_Graph<QNode, void> 
+typedef galois::graphs::LC_CSR_Graph<QNode, void> 
   ::template with_no_lockable<true>::type InnerQGraph;
-typedef galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
+typedef galois::graphs::LC_InOut_Graph<InnerQGraph> QGraph;
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -666,7 +666,7 @@ template<typename Algo>
 void run() {
   DGraph gD;
   if(graphD.size()) {
-    galois::Graph::readGraph(gD, graphD);
+    galois::graphs::readGraph(gD, graphD);
     std::cout << "Reading data graph..." << std::endl;
   } else
     GALOIS_DIE("Failed to read data graph");
@@ -682,7 +682,7 @@ void run() {
 
   QGraph gQ;
   if(graphQ.size()) {
-    galois::Graph::readGraph(gQ, graphQ);
+    galois::graphs::readGraph(gQ, graphQ);
     std::cout << "Reading query graph..." << std::endl;
   } else
     GALOIS_DIE("Failed to read query graph");

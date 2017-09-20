@@ -9,7 +9,7 @@ struct CSRArrays {
   int numEdges;
 };
 
-class MyGraph : public galois::Graph::LC_Adaptor_Graph<int, void, MyGraph, int, boost::counting_iterator<int>, int*> {
+class MyGraph : public galois::graphs::LC_Adaptor_Graph<int, void, MyGraph, int, boost::counting_iterator<int>, int*> {
   CSRArrays m_instance;
 
 public:

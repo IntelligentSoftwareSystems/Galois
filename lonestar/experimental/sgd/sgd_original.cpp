@@ -111,13 +111,13 @@ namespace std {
 }
 
 //Distributed Graph Nodes.
-typedef galois::Graph::ThirdGraph<Node, uint32_t, galois::Graph::EdgeDirection::Out> DGraph;
+typedef galois::graphs::ThirdGraph<Node, uint32_t, galois::graphs::EdgeDirection::Out> DGraph;
 typedef DGraph::NodeHandle DGNode;
 typedef typename DGraph::pointer Graphp;
 
 
-typedef galois::Graph::FileGraph FGraph;
-typedef galois::Graph::FileGraph::GraphNode FileGNode;
+typedef galois::graphs::FileGraph FGraph;
+typedef galois::graphs::FileGraph::GraphNode FileGNode;
 FGraph fgraph;
 
 //Graph graph;

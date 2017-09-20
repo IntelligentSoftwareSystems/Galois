@@ -134,7 +134,7 @@ static void structure_from_file_genmat (float *M[])
 {
    int ii, jj;
    int a=0, b;
-   galois::Graph::FileGraph g;
+   galois::graphs::FileGraph g;
    int num_blocks;
    unsigned max_id;
 

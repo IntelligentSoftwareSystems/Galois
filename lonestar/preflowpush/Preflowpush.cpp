@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-typedef galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 struct Config {
@@ -667,13 +667,13 @@ struct Process<nondet> {
 
 template<typename EdgeTy>
 void writePfpGraph(const std::string& inputFile, const std::string& outputFile) {
-  typedef galois::Graph::FileGraph ReaderGraph;
+  typedef galois::graphs::FileGraph ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.fromFile(inputFile);
 
-  typedef galois::Graph::FileGraphWriter Writer;
+  typedef galois::graphs::FileGraphWriter Writer;
   typedef galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
@@ -733,7 +733,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   using Wnode = Writer::GraphNode;
 
   struct IdLess {
-    bool operator()(const galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e1, const galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e2) const {
+    bool operator()(const galois::graphs::EdgeSortValue<Wnode,edge_value_type>& e1, const galois::graphs::EdgeSortValue<Wnode,edge_value_type>& e2) const {
       return e1.dst < e2.dst;
     }
   };
@@ -747,7 +747,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 
 void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
-    galois::Graph::readGraph(newApp->graph, inputFile);
+    galois::graphs::readGraph(newApp->graph, inputFile);
     for(auto ss : newApp->graph)
       for (auto ii : newApp->graph.edges(ss))
         newApp->graph.getEdgeData(ii) = 1;
@@ -761,7 +761,7 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
       }
       inputFile = pfpName;
     }
-    galois::Graph::readGraph(newApp->graph, inputFile);
+    galois::graphs::readGraph(newApp->graph, inputFile);
 
     // Assume that input edge data has already been converted instead
 #if 0//def HAVE_BIG_ENDIAN

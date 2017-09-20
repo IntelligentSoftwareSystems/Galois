@@ -85,9 +85,9 @@ struct Process : public galois::runtime::Lockable {
 
 struct Preprocess : public galois::runtime::Lockable {
   Graphp   graph;
-  galois::Graph::Bag<GNode>::pointer wl;
+  galois::graphs::Bag<GNode>::pointer wl;
 
-  Preprocess(Graphp g, galois::Graph::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
+  Preprocess(Graphp g, galois::graphs::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
   Preprocess() {}
 
   void operator()(GNode item, galois::UserContext<GNode>& ctx) const {

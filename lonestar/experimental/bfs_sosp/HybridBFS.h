@@ -6,11 +6,11 @@
 
 template<typename NodeData,typename Dist>
 struct HybridBFS {
-  typedef typename galois::Graph::LC_CSR_Graph<NodeData,void>
+  typedef typename galois::graphs::LC_CSR_Graph<NodeData,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type 
     InnerGraph;
-  typedef typename galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   typedef std::pair<GNode,Dist> WorkItem;

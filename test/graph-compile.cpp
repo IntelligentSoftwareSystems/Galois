@@ -49,10 +49,10 @@ void check() {
 }
 
 int main() {
-  check<galois::Graph::FirstGraph<NoDefault,NoDefault,true> >();
-  check<galois::Graph::FirstGraph<NoDefault,NoDefault,false> >();
-  check<galois::Graph::FirstGraph<NoDefault,NoDefault,true,true> >();
-  check<galois::Graph::FirstGraph<NoDefault,NoDefault,false,true> >();
+  check<galois::graphs::FirstGraph<NoDefault,NoDefault,true> >();
+  check<galois::graphs::FirstGraph<NoDefault,NoDefault,false> >();
+  check<galois::graphs::FirstGraph<NoDefault,NoDefault,true,true> >();
+  check<galois::graphs::FirstGraph<NoDefault,NoDefault,false,true> >();
 
   return 0;
 }

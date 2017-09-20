@@ -33,7 +33,7 @@
 #include <vector>
 #include <algorithm>
 
-typedef galois::Graph::FirstGraph<Element,void,false> Graph;
+typedef galois::graphs::FirstGraph<Element,void,false> Graph;
 typedef Graph::GraphNode GNode;
 
 struct EdgeTuple {

@@ -39,7 +39,7 @@
 #include <boost/fusion/include/at_c.hpp>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 /**
  * Modify a LC_Graph to have in and out edges. In edges are stored by value, so

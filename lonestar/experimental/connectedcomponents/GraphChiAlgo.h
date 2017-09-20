@@ -24,9 +24,9 @@ struct GraphChiAlgo: public galois::LigraGraphChi::ChooseExecutor<true> {
     bool isRep() { return id == comp; }
   };
 
-  typedef galois::Graph::OCImmutableEdgeGraph<LNode,void> Graph;
+  typedef galois::graphs::OCImmutableEdgeGraph<LNode,void> Graph;
   typedef Graph::GraphNode GNode;
-  typedef galois::GraphNodeBagPair<> BagPair;
+  typedef galois::graphsNodeBagPair<> BagPair;
 
   template<typename G>
   void readGraph(G& graph) {
@@ -100,10 +100,10 @@ struct GraphChiAlgo: public galois::LigraGraphChi::ChooseExecutor<true> {
     BagPair bags(graph.size());
 
     galois::do_all_local(graph, Initialize(graph));
-    galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
+    galois::graphsChi::vertexMap(graph, Process(bags.next()), memoryLimit);
     while (!bags.next().empty()) {
       bags.swap();
-      galois::GraphChi::vertexMap(graph, Process(bags.next()), bags.cur(), memoryLimit);
+      galois::graphsChi::vertexMap(graph, Process(bags.next()), bags.cur(), memoryLimit);
     } 
   }
 };

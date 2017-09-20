@@ -59,7 +59,7 @@
 #include <string.h>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //XXX(ddn): Refactor to eliminate OCFileGraph
 //! Graph serialized to a file

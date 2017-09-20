@@ -99,10 +99,10 @@ int main(int argc, char **argv) {
   galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  typedef galois::Graph::LC_CSR_Graph<void, unsigned int> Graph;
+  typedef galois::graphs::LC_CSR_Graph<void, unsigned int> Graph;
   Graph g;
   
-  galois::Graph::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   

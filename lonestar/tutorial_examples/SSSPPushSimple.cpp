@@ -32,7 +32,7 @@
 #include <iostream>
 
 //! [Define LC Graph]
-typedef galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+typedef galois::graphs::LC_Linear_Graph<unsigned int, unsigned int> Graph;
 //! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 
 //! [ReadGraph]
   Graph graph;
-  galois::Graph::readGraph(graph, argv[1]);
+  galois::graphs::readGraph(graph, argv[1]);
 //! [ReadGraph]
 
   //! Use a lambda as the operator

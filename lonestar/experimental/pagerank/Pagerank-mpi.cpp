@@ -62,7 +62,7 @@ struct Node {
 };
 
 size_t ReadFile(std::string inputFile, std::vector<Node>& graph_nodes) {
-  galois::Graph::FileGraph fg;
+  galois::graphs::FileGraph fg;
   fg.fromFile(inputFile);
 
   size_t total_nodes = fg.size();

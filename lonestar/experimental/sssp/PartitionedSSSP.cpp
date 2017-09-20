@@ -238,7 +238,7 @@ template<bool WithPartitioning>
 struct AsyncAlgo {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::template with_out_of_line_lockable<true>
     ::template with_compressed_node_ptr<true>
     ::template with_numa_alloc<!WithPartitioning>
@@ -250,7 +250,7 @@ struct AsyncAlgo {
 
   std::string name() const { return WithPartitioning ? "partitioned" : "not partitioned"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -478,7 +478,7 @@ struct AsyncAlgo {
 struct Algo2 {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_out_of_line_lockable<true>
     ::with_compressed_node_ptr<true>
     //::template with_numa_alloc<!WithPartitioning> XXX
@@ -499,7 +499,7 @@ struct Algo2 {
 
   std::string name() const { return "algo2"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -598,7 +598,7 @@ struct Algo2 {
 struct Algo3 {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_out_of_line_lockable<true>
     ::with_compressed_node_ptr<true>
     //::template with_numa_alloc<!WithPartitioning> XXX
@@ -618,7 +618,7 @@ struct Algo3 {
 
   std::string name() const { return "algo3"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -748,7 +748,7 @@ struct Algo3 {
 struct Algo4 {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_no_lockable<true>
     ::with_compressed_node_ptr<true>
     //::template with_numa_alloc<!WithPartitioning> XXX
@@ -773,7 +773,7 @@ struct Algo4 {
 
   std::string name() const { return "algo4"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -885,7 +885,7 @@ struct Algo4 {
 struct Algo5 {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_no_lockable<true>
     ::with_compressed_node_ptr<true>
     //::template with_numa_alloc<!WithPartitioning> XXX
@@ -910,7 +910,7 @@ struct Algo5 {
 
   std::string name() const { return "algo5"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -1029,7 +1029,7 @@ struct Algo5 {
 struct Algo6 {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_no_lockable<true>
     ::with_compressed_node_ptr<true>
     //::template with_numa_alloc<!WithPartitioning> XXX
@@ -1080,12 +1080,12 @@ struct Algo6 {
       std::ostringstream os;
       os << base << i << ".of." << numParts;
       parts.emplace_back();
-      galois::Graph::readGraph(parts.back(), os.str());
+      galois::graphs::readGraph(parts.back(), os.str());
     }
   }
 
   void readGraph(Graph& graph) {
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
     readGraphParts(partsname);
   }
 
@@ -1256,7 +1256,7 @@ struct Algo7 {
     int start;
   };
 
-  typedef galois::Graph::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
+  typedef galois::graphs::LC_PartitionedInlineEdge_Graph<Node, uint32_t>
     ::with_no_lockable<true>
     ::with_compressed_node_ptr<true>
     ::with_numa_alloc<true>
@@ -1271,7 +1271,7 @@ struct Algo7 {
 
   std::string name() const { return "algo7"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;

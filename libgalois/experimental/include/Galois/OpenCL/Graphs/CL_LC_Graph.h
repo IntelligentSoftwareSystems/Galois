@@ -13,7 +13,7 @@
 
 namespace galois {
    namespace OpenCL {
-      namespace Graphs {
+      namespace graphs {
 
       /*####################################################################################################################################################*/
       template<typename DataType>

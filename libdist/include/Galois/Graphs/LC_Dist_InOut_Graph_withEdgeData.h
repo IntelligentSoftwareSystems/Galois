@@ -36,7 +36,7 @@
 
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 template<typename NodeTy>
 class LC_Dist_InOut {
@@ -203,7 +203,7 @@ private:
     :Starts(runtime::NetworkInterface::Num), Num(runtime::NetworkInterface::Num), 
      PrefixNum(runtime::NetworkInterface::Num), self(_self)
   {
-    galois::Graph::FileGraph fg, fgt;
+    galois::graphs::FileGraph fg, fgt;
     fg.fromFile(inGr);
     fgt.fromFile(inGrTrans);
     
@@ -479,7 +479,7 @@ public:
 
 };
 
-} //namespace Graph
+} //namespace graphs
 } //namespace galois
 
 #endif

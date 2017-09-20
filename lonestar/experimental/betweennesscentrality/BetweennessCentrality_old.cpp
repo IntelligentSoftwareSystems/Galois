@@ -53,7 +53,7 @@ static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of ite
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
+typedef galois::graphs::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
 
   Graph g;
   G = &g;
-  galois::Graph::readGraph(*G, filename);
+  galois::graphs::readGraph(*G, filename);
 
   NumNodes = G->size();
 

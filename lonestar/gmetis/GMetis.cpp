@@ -146,7 +146,7 @@ struct parallelInitMorphGraph {
     }
   }
 };
-typedef galois::Graph::FileGraph FG;
+typedef galois::graphs::FileGraph FG;
 typedef FG::GraphNode FN;
 template<typename GNode, typename Weights>
 struct order_by_degree {
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
   MetisGraph metisGraph;
   GGraph* graph = metisGraph.getGraph();
 
-  galois::Graph::readGraph(*graph, filename);
+  galois::graphs::readGraph(*graph, filename);
 
   galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
 
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
   }
   
   if (orderedfile != "" || permutationfile != "") { 
-    galois::Graph::FileGraph g;
+    galois::graphs::FileGraph g;
     g.fromFile(filename);
     typedef galois::LargeArray<GNode> Permutation;
     Permutation perm; 
@@ -279,8 +279,8 @@ int main(int argc, char** argv) {
       //std::cout<<prevId <<" "<<id<<std::endl;
       id++;
     }
-    galois::Graph::FileGraph out;
-    galois::Graph::permute<int>(g, perm2, out);
+    galois::graphs::FileGraph out;
+    galois::graphs::permute<int>(g, perm2, out);
     if (orderedfile != "")
       out.toFile(orderedfile);
     if (permutationfile != "") {

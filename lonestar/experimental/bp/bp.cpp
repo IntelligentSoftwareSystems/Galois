@@ -25,8 +25,8 @@ static const double DAMPING = 0.2;
 //static const double TOL = 1e-10;
 
 template<typename NodeTy,typename EdgeTy>
-struct BipartiteGraph: public galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
-  typedef galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
+struct BipartiteGraph: public galois::graphs::FirstGraph<NodeTy,EdgeTy,true> {
+  typedef galois::graphs::FirstGraph<NodeTy,EdgeTy,true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
   NodeList factors;
   NodeList variables;
@@ -288,7 +288,7 @@ struct GBP {
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef galois::Graph::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::graphs::FirstGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 
@@ -364,7 +364,7 @@ struct GBP {
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef galois::Graph::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::graphs::FirstGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 

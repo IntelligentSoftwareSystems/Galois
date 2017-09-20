@@ -58,7 +58,7 @@ static cll::opt<int> stepShift("delta",
                                cll::desc("Shift value for the deltastep"),
                                cll::init(10));
 
-typedef galois::Graph::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 static const bool trackWork = false;
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   Graph graph;
   GNode source, report;
 
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {

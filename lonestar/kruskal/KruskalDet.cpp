@@ -17,7 +17,7 @@ struct Node {
   Node(): parent() { }
 };
 
-typedef galois::Graph::LC_CSR_Graph<Node, int> Graph;
+typedef galois::graphs::LC_CSR_Graph<Node, int> Graph;
 typedef Graph::GraphNode GNode;
 
 struct Edge {
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
   Ttotal.start();
 
   Graph graph;
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   //galois::InsertBag<Edge> edges;
   std::deque<Edge> edges;

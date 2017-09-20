@@ -12,13 +12,13 @@
 
 template<bool UseGraphChi>
 struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  typedef typename galois::Graph::LC_CSR_Graph<PNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<PNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
     InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          galois::Graph::OCImmutableEdgeGraph<PNode,void>,
-          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::graphs::OCImmutableEdgeGraph<PNode,void>,
+          galois::graphs::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -30,7 +30,7 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    galois::Graph::readGraph(graph, filename); 
+    galois::graphs::readGraph(graph, filename); 
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }
 
@@ -79,7 +79,7 @@ struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph) { 
-    galois::GraphNodeBagPair<> bags(graph.size());
+    galois::graphsNodeBagPair<> bags(graph.size());
 
     unsigned iteration = 0;
 

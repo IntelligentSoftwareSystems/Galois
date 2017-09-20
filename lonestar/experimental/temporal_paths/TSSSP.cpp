@@ -64,7 +64,7 @@ struct time_dir {
   timeTy d;
 };
 
-typedef galois::Graph::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir> Graph;
+typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir> Graph;
 typedef Graph::GraphNode GNode;
 
 struct EarlyArivalTime {
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
   Graph graph;
   GNode source, report;
 
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {

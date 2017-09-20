@@ -61,7 +61,7 @@ struct Node {
   Node() : dist(std::numeric_limits<unsigned>::max() - 1) { }
 };
 
-typedef galois::Graph::LC_CSR_Graph<Node, uint32_t> Graph;
+typedef galois::graphs::LC_CSR_Graph<Node, uint32_t> Graph;
 typedef Graph::GraphNode GNode;
 
 class Synchronizer {
@@ -449,7 +449,7 @@ int main(int argc, char **argv) {
 
   Graph g;
   
-  galois::Graph::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "Using " << numThreads << " threads\n";

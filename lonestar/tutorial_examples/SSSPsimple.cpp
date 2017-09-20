@@ -32,7 +32,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 //! [Define LC Graph]
-typedef galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+typedef galois::graphs::LC_Linear_Graph<unsigned int, unsigned int> Graph;
 //! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, 0,0,0);
 
 //! [ReadGraph]
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
   galois::for_each(graph.begin(), graph.end(), Init());

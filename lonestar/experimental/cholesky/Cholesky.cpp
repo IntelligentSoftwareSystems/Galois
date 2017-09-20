@@ -93,9 +93,9 @@ typedef double edgedata;
 
 // LC_Linear_Graph cannot have structure modified; not suitable for
 // symbolic factorization.
-//typedef galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
-typedef galois::Graph::FirstGraph<Node,edgedata,true, false,false> Graph;
-typedef galois::Graph::FirstGraph<Node,edgedata,false, false,true> SymbolicGraph;
+//typedef galois::graphs::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::FirstGraph<Node,edgedata,true, false,false> Graph;
+typedef galois::graphs::FirstGraph<Node,edgedata,false, false,true> SymbolicGraph;
 
 typedef Graph::GraphNode GNode;
 typedef SymbolicGraph::GraphNode SGNode;
@@ -756,11 +756,11 @@ template <typename GraphType>
 static void makeGraph(GraphType &graph, const char* input) {
    std::vector<SGNode> nodes;
    //Create local computation graph.
-   typedef galois::Graph::LC_CSR_Graph<Node, edgedata> InGraph;
+   typedef galois::graphs::LC_CSR_Graph<Node, edgedata> InGraph;
    typedef InGraph::GraphNode InGNode;
    InGraph in_graph;
    //Read graph from file.
-   galois::Graph::readGraph(in_graph, input);
+   galois::graphs::readGraph(in_graph, input);
    std::cout << "Read " << in_graph.size() << " nodes\n";
    //A node and a int is an element.
    typedef std::pair<InGNode, edgedata> Element;

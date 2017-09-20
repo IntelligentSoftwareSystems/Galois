@@ -39,7 +39,7 @@ struct PPRAsyncRsd {
     float getPageRank(int x = 0) const { return value; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
@@ -47,7 +47,7 @@ struct PPRAsyncRsd {
   std::string name() const { return "PPRAsyncRsd"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
-    galois::Graph::readGraph(graph, filename); 
+    galois::graphs::readGraph(graph, filename); 
   }
 
   struct Process2 {

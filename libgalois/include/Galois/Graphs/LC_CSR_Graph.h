@@ -47,7 +47,7 @@
 #include <type_traits>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 /**
  * Local computation graph (i.e., graph structure does not change). The data representation
@@ -407,7 +407,7 @@ public:
                     size_t total, VectorTy& edgePrefixSum)
       -> GraphRange {
     return 
-      galois::Graph::divideNodesBinarySearch<VectorTy, uint32_t>(
+      galois::graphs::divideNodesBinarySearch<VectorTy, uint32_t>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 

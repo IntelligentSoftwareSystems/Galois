@@ -17,18 +17,18 @@ struct GraphLabAlgo {
     float getPageRank() { return data; }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
     InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    galois::Graph::readGraph(graph, filename); 
+    galois::graphs::readGraph(graph, filename); 
   }
 
   struct Initialize {
@@ -47,7 +47,7 @@ struct GraphLabAlgo {
       gather_type(): data(0) { }
     };
 
-    typedef galois::GraphLab::EmptyMessage message_type;
+    typedef galois::graphsLab::EmptyMessage message_type;
 
     typedef int tt_needs_gather_in_edges;
     typedef int tt_needs_scatter_out_edges;
@@ -78,7 +78,7 @@ struct GraphLabAlgo {
     }
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
       ctx.push(dst, message_type());
     }
   };
@@ -86,13 +86,13 @@ struct GraphLabAlgo {
   void operator()(Graph& graph) {
     if (UseAsync) {
       // Asynchronous execution
-      galois::GraphLab::AsyncEngine<Graph,Program<true> > engine(graph, Program<true>());
+      galois::graphsLab::AsyncEngine<Graph,Program<true> > engine(graph, Program<true>());
       engine.execute();
     } else if (UseDelta) {
-      galois::GraphLab::SyncEngine<Graph,Program<true> > engine(graph, Program<true>());
+      galois::graphsLab::SyncEngine<Graph,Program<true> > engine(graph, Program<true>());
       engine.execute();
     } else {
-      galois::GraphLab::SyncEngine<Graph,Program<false> > engine(graph, Program<false>());
+      galois::graphsLab::SyncEngine<Graph,Program<false> > engine(graph, Program<false>());
       for (unsigned i = 0; i < maxIterations; ++i)
         engine.execute();
     }

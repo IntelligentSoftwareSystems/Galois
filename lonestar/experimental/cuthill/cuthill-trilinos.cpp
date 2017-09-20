@@ -19,7 +19,7 @@ static cll::opt<int> startNode("startnode", cll::desc("Node to start reordering 
 int main(int argc, char** argv) {
   galois::StatManager statManager;
   Epetra_SerialComm comm;
-  galois::Graph::FileGraph fileGraph;
+  galois::graphs::FileGraph fileGraph;
 
   galois::StatTimer Ttotal("TotalTime");
   Ttotal.start();
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < nonzeros.size(); ++i) {
     double value = 1.0;
     int src = globalElements[i];
-    for (galois::Graph::FileGraph::edge_iterator ii = fileGraph.edge_begin(src), ei = fileGraph.edge_end(src); ii != ei; ++ii) {
+    for (galois::graphs::FileGraph::edge_iterator ii = fileGraph.edge_begin(src), ei = fileGraph.edge_end(src); ii != ei; ++ii) {
       int dst = fileGraph.getEdgeDst(ii);
       A.InsertGlobalValues(globalElements[i], 1, &value, &dst);
     }

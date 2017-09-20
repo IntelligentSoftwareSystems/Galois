@@ -61,7 +61,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 ////////////////////////////////////////////
-typedef galois::Graph::LC_CSR_Graph<unsigned int, unsigned int> Graph;
+typedef galois::graphs::LC_CSR_Graph<unsigned int, unsigned int> Graph;
 typedef galois::OpenCL::Graphs::CL_LC_Graph<unsigned int, unsigned int> DevGraph;
 typedef typename Graph::GraphNode GNode;
 using namespace galois::OpenCL;
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
    const unsigned my_host_id = galois::runtime::NetworkInterface::ID;
    fprintf(stderr, "Starting OpenCL Test APP \n");
    Graph g;
-   galois::Graph::readGraph(g, inputFile);
+   galois::graphs::readGraph(g, inputFile);
    DevGraph cl_graph;
    cl_graph.load_from_galois(g);
    InitializeGraph::go(cl_graph, cl_graph.size());

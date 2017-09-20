@@ -35,12 +35,12 @@
 #include <algorithm>
 
 // Graph nodes
-typedef galois::Graph::ThirdGraph<Element,void,galois::Graph::EdgeDirection::Un> Graph;
+typedef galois::graphs::ThirdGraph<Element,void,galois::graphs::EdgeDirection::Un> Graph;
 typedef Graph::NodeHandle GNode;
 typedef typename Graph::pointer Graphp;
 
 // Worklist Graph nodes
-typedef galois::Graph::ThirdGraph<GNode,void,galois::Graph::EdgeDirection::Un> WLGraph;
+typedef galois::graphs::ThirdGraph<GNode,void,galois::graphs::EdgeDirection::Un> WLGraph;
 typedef WLGraph::NodeHandle WLGNode;
 typedef galois::runtime::gptr<WLGraph> WLGraphp;
 

@@ -32,7 +32,7 @@ template <galois::runtime::InputDAG_ExecTy EXEC>
 struct ChooseInnerGraph {
   using ND = NodeData<typename ChooseNodeDataType<EXEC>::type>; 
 
-  using type = typename galois::Graph::LC_CSR_Graph<ND, void>
+  using type = typename galois::graphs::LC_CSR_Graph<ND, void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type;
 };

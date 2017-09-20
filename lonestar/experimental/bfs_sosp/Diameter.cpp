@@ -191,11 +191,11 @@ void resetGraph(typename Algo::Graph& g) {
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::graphs::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }

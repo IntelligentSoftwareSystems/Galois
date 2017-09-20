@@ -63,11 +63,11 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef galois::Graph::LC_Linear_Graph<uint32_t,void>
+typedef galois::graphs::LC_Linear_Graph<uint32_t,void>
   ::with_numa_alloc<true>::type
   ::with_no_lockable<true>::type Graph;
-//typedef galois::Graph::LC_CSR_Graph<uint32_t,void> Graph;
-//typedef galois::Graph::LC_Linear_Graph<uint32_t,void> Graph;
+//typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
+//typedef galois::graphs::LC_Linear_Graph<uint32_t,void> Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -159,7 +159,7 @@ struct GetDegree: public std::unary_function<typename G::GraphNode, ptrdiff_t> {
 
 template<typename GraphNode,typename EdgeTy>
 struct IdLess {
-  bool operator()(const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
+  bool operator()(const galois::graphs::EdgeSortValue<GraphNode,EdgeTy>& e1, const galois::graphs::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
     return e1.dst < e2.dst;
   }
 };
@@ -440,7 +440,7 @@ void run() {
 }
 
 void makeGraph(const std::string& triangleFilename) {
-  typedef galois::Graph::FileGraph G;
+  typedef galois::graphs::FileGraph G;
   typedef G::GraphNode N;
 
   G initial, permuted;
@@ -461,12 +461,12 @@ void makeGraph(const std::string& triangleFilename) {
     p[n] = idx++;
   }
 
-  galois::Graph::permute<void>(initial, p, permuted);
+  galois::graphs::permute<void>(initial, p, permuted);
   galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); });
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.toFile(triangleFilename);
-  galois::Graph::readGraph(graph, permuted);
+  galois::graphs::readGraph(graph, permuted);
 }
 
 void readGraph() {
@@ -479,10 +479,10 @@ void readGraph() {
       makeGraph(triangleFilename);
     } else {
       // triangles does exist, load it
-      galois::Graph::readGraph(graph, triangleFilename);
+      galois::graphs::readGraph(graph, triangleFilename);
     }
   } else {
-    galois::Graph::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFilename);
   }
 
   size_t index = 0;

@@ -36,7 +36,7 @@ struct node_data {
 
 
 // dummy graph3
-typedef galois::Graph::ThirdGraph<int, void, galois::Graph::EdgeDirection::Un> Graph;
+typedef galois::graphs::ThirdGraph<int, void, galois::graphs::EdgeDirection::Un> Graph;
 typedef Graph::NodeHandle GNode;
 typedef typename Graph::pointer Graphp;
 

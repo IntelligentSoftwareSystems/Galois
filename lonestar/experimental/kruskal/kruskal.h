@@ -90,11 +90,11 @@ protected:
 
   void readGraph (const std::string& filename, VecKNode_ty& nodes, Edges_ty& edges) {
 
-    typedef galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
+    typedef galois::graphs::LC_CSR_Graph<unsigned, unsigned> InGraph;
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    galois::Graph::readGraph(ingraph, filename);
+    galois::graphs::readGraph(ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph

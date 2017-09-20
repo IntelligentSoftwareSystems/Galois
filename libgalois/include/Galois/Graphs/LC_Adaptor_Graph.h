@@ -34,7 +34,7 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graphs/Details.h"
 
-namespace galois { namespace Graph {
+namespace galois { namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, typename DerivedTy,
   typename GraphNodeTy, typename IteratorTy, typename EdgeIteratorTy,

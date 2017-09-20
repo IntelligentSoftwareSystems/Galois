@@ -208,7 +208,7 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode
 // 4. Go back to 1.
 struct BSPTrussJacobiAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -287,7 +287,7 @@ struct BSPTrussJacobiAlgo {
 // 3. Go back to 3.
 struct BSPTrussAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -379,7 +379,7 @@ bool isValidDegreeNoLessThanJ(G& g, typename G::GraphNode n, unsigned int j) {
 // 3. Go back to 1.
 struct BSPCoreAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -439,7 +439,7 @@ struct BSPCoreAlgo {
 // 2. Compute k-truss from k-1 core
 struct BSPCoreThenTrussAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -524,7 +524,7 @@ struct AsyncTrussTxAlgo {
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
   //   >> 1 when computing edge supports
-  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::graphs::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
@@ -657,7 +657,7 @@ struct AsyncTrussTxAlgo {
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
   //   >> 1 when computing edge supports
-  typedef galois::Graph::LC_CSR_Graph<void, std::atomic<uint32_t> >
+  typedef galois::graphs::LC_CSR_Graph<void, std::atomic<uint32_t> >
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -785,7 +785,7 @@ void run() {
 
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::Graph::readGraph(g, filename);
+  galois::graphs::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);

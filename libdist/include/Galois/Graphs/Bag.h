@@ -31,7 +31,7 @@
 #include "Galois/TwoLevelIteratorA.h"
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 template<typename T>
 class Bag :boost::noncopyable, public runtime::Lockable {
@@ -109,7 +109,7 @@ public:
   }
 };
 
-} // namespace Graph
+} // namespace graphs
 } // namespace galois
 
 #endif

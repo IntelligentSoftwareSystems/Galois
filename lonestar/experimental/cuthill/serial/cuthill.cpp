@@ -96,10 +96,10 @@ struct Prefix {
 	Prefix(unsigned int _id, unsigned _val) : id(_id), val(_val) {}
 };
 
-//typedef galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
-//typedef galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
-//typedef galois::Graph::FirstGraph<SNode, void, false> Graph;
+//typedef galois::graphs::LC_Linear_Graph<SNode, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
+//typedef galois::graphs::LC_CSRInline_Graph<SNode, char> Graph;
+//typedef galois::graphs::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -660,7 +660,7 @@ void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   source = *graph.begin();
   report = *graph.begin();

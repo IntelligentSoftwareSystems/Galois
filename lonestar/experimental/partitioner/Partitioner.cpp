@@ -54,7 +54,7 @@ static cll::opt<unsigned int> numPartitions("num", cll::desc("Number of partitio
 static cll::opt<std::string> outputFolder("outputTo", cll::desc("Name of the output folder to store the partitioned graphs."), cll::init("./"));
 static cll::opt<std::string> prefixTmp("prefixTmp", cll::desc("prefix for tmp dir where intermediate files will be stored."), cll::Required);
 
-typedef galois::Graph::OfflineGraph GraphType;
+typedef galois::graphs::OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
 typedef GraphType::iterator NodeItType;
 
@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
    T_total.start();
    T_hGraph_init.start();
-   galois::Graph::OfflineGraph g(inputFile);
+   galois::graphs::OfflineGraph g(inputFile);
    T_hGraph_init.stop();
    //VertexCutInfo vci;
    T_init.start();

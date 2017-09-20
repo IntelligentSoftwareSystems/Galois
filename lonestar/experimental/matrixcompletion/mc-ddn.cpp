@@ -412,12 +412,12 @@ class BlockedEdgeAlgo {
 
 public:
   bool isSgd() const { return true; }
-  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
     //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
     ::template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { galois::Graph::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
 
   std::string name() const { return WithServer ? "blockedEdgeServer" : "blockedEdge"; }
 

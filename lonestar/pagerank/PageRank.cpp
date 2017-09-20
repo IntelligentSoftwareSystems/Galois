@@ -66,7 +66,7 @@ struct LNode {
 };
 
 
-typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
 //! Make values unique
@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
 
   Graph graph;
 
-  galois::Graph::readGraph(graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
   std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
 

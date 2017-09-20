@@ -28,8 +28,8 @@ static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input fi
 static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("<output base filename>"), cll::Required);
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 
-typedef galois::Graph::FileGraph Graph;
-typedef galois::Graph::FileGraph::GraphNode GNode;
+typedef galois::graphs::FileGraph Graph;
+typedef galois::graphs::FileGraph::GraphNode GNode;
 
 struct GraphArrays {
   std::vector<uint32_t> inIdx;

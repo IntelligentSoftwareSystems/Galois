@@ -57,7 +57,7 @@ struct LNode {
   typedef int  tt_is_copyable;
 };
 
-typedef galois::Graph::LC_Dist_InOut<LNode, int> Graph;
+typedef galois::graphs::LC_Dist_InOut<LNode, int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // Constants for page Rank Algo.
@@ -207,7 +207,7 @@ int main(int argc, char** argv) {
       */
     Graph::pointer g;
     {
-      galois::Graph::FileGraph fg;
+      galois::graphs::FileGraph fg;
       fg.fromFile(inputFile);
       std::vector<unsigned> counts;
       std::vector<unsigned> In_counts;

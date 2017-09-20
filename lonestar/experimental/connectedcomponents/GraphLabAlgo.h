@@ -21,10 +21,10 @@ struct GraphLabAlgo {
     bool isRep() { return id == labelid; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
@@ -80,7 +80,7 @@ struct GraphLabAlgo {
     void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
       LNode& data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
       if (node == src && graph.getData(dst, galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
@@ -99,7 +99,7 @@ struct GraphLabAlgo {
   void operator()(Graph& graph) {
     galois::do_all_local(graph, Initialize(graph));
 
-    galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.execute();
   }
 };

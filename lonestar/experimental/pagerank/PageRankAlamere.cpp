@@ -37,12 +37,12 @@ struct PNode {
 };
 
 
-typedef typename galois::Graph::LC_CSR_Graph<PNode,void>
+typedef typename galois::graphs::LC_CSR_Graph<PNode,void>
   ::template with_numa_alloc<true>::type
   ::template with_no_lockable<true>::type
   InnerGraph;
 
-typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
 typedef Graph::GraphNode GNode;
 
 class PageRankAlamere: public PageRankMain<Graph> {
@@ -59,7 +59,7 @@ public:
   }
   void initGraph(Graph& graph) {
 
-    galois::Graph::readGraph(graph, inputFile, transposeFile);
+    galois::graphs::readGraph(graph, inputFile, transposeFile);
 
     // size_t numEdges = 0; 
     // size_t selfEdges = 0;

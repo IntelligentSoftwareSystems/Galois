@@ -70,10 +70,10 @@ protected:
   static const bool DEBUG = false;
 
 #ifdef USE_LC_GRAPH
-  typedef galois::Graph::LC_CSR_Graph<AVI*, void> Graph;
+  typedef galois::graphs::LC_CSR_Graph<AVI*, void> Graph;
   typedef Graph::GraphNode GNode;
 #else
-  typedef galois::Graph::FirstGraph<AVI*, void, false> Graph;
+  typedef galois::graphs::FirstGraph<AVI*, void, false> Graph;
   typedef Graph::GraphNode GNode;
 #endif
 
@@ -95,7 +95,7 @@ protected:
   void genElemAdjGraph (const MeshInit& meshInit, const GlobalVec& g) {
 
 #ifdef USE_LC_GRAPH
-    typedef galois::Graph::FirstGraph<AVI*, void, false> MGraph;
+    typedef galois::graphs::FirstGraph<AVI*, void, false> MGraph;
     typedef MGraph::GraphNode MNode;
 
     MGraph mgraph;

@@ -12,10 +12,10 @@
 #include "BFS.h"
 
 struct GraphLabBFS {
-  typedef typename galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) {
@@ -66,7 +66,7 @@ struct GraphLabBFS {
     void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
       SNode& sdata = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + 1;
 
@@ -77,7 +77,7 @@ struct GraphLabBFS {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }
@@ -107,10 +107,10 @@ struct GraphLabDiameter {
     LNode(): odd_iteration(false) { }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { readInOutGraph(graph); }
@@ -185,7 +185,7 @@ struct GraphLabDiameter {
         return *this;
       }
     };
-    typedef galois::GraphLab::EmptyMessage message_type;
+    typedef galois::graphsLab::EmptyMessage message_type;
 
     typedef std::pair<GNode,message_type> WorkItem;
     typedef int tt_needs_gather_out_edges;
@@ -218,7 +218,7 @@ struct GraphLabDiameter {
     void init(Graph& graph, GNode node, const message_type& msg) { }
     bool needsScatter(Graph& graph, GNode node) { return false; }
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) { }
+        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) { }
   };
 
   struct count_exact_visited {
@@ -261,8 +261,8 @@ struct GraphLabDiameter {
     size_t previous_count = 0;
     size_t diameter = 0;
     for (size_t iter = 0; iter < 100; ++iter) {
-      //galois::GraphLab::executeSync(graph, graph, Program());
-      galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+      //galois::graphsLab::executeSync(graph, graph, Program());
+      galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
       engine.execute();
 
       galois::do_all(graph.begin(), graph.end(), [&](GNode n) {

@@ -45,8 +45,8 @@ typedef struct Node
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
-typedef galois::Graph::ThirdGraph<Node,unsigned int , galois::Graph::EdgeDirection::Out> Graph;
+//typedef galois::graphs::LC_CSR_Graph<Node, unsigned int> Graph;
+typedef galois::graphs::ThirdGraph<Node,unsigned int , galois::graphs::EdgeDirection::Out> Graph;
 typedef Graph::NodeHandle GNode; // will have to probably change this something like GraphNode or something.
 typedef typename Graph::pointer Graphp;
 
@@ -186,7 +186,7 @@ int main(int argc, char** argv)
 
 	Graphp g = Graph::allocate();
 	//read structure of graph & edge weights; nodes not initialized
-        galois::Graph::readGraph(g, inputFile);
+        galois::graphs::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
 	unsigned int num_movie_nodes = initializeGraphData(g);

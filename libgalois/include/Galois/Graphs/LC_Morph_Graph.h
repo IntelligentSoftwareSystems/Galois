@@ -39,7 +39,7 @@
 #include <type_traits>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //! Local computation graph (i.e., graph structure does not change)
 template<typename NodeTy, typename EdgeTy,

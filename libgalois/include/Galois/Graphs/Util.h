@@ -37,7 +37,7 @@
 #include "Galois/Graphs/Details.h"
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 /**
  * Allocates and constructs a graph from a file. Tries to balance

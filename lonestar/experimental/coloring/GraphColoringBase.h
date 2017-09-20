@@ -63,7 +63,7 @@ protected:
   PerThrdColorVec perThrdColorVec;
 
   void readGraph (void) {
-    galois::Graph::readGraph (graph, filename);
+    galois::graphs::readGraph (graph, filename);
 
     const size_t numNodes = graph.size ();
     galois::GAccumulator<size_t> numEdges;

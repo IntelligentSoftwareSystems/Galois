@@ -119,7 +119,7 @@ class vGraph : public GlobalObject {
    typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>, NodeTy>::type realNodeTy;
    typedef typename std::conditional<BSPEdge, std::pair<EdgeTy, EdgeTy>, EdgeTy>::type realEdgeTy;
 
-   typedef galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
+   typedef galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
   GraphTy graph;
   bool round;
@@ -383,7 +383,7 @@ public:
     std::string part_fileName = getPartitionFileName(partitionFolder,id,numHosts);
     std::string part_metaFile = getMetaFileName(partitionFolder, id, numHosts);
 
-    galois::Graph::OfflineGraph g(part_fileName);
+    galois::graphs::OfflineGraph g(part_fileName);
     num_iter_push = 0;
     num_iter_pull = 0;
     num_run = 0;
@@ -507,7 +507,7 @@ public:
 #endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-   void loadEdges(galois::Graph::OfflineGraph & g) {
+   void loadEdges(galois::graphs::OfflineGraph & g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
       uint64_t cur = 0;
       for (auto n = g.begin(); n != g.end(); ++n) {
@@ -520,7 +520,7 @@ public:
       }
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-   void loadEdges(galois::Graph::OfflineGraph & g) {
+   void loadEdges(galois::graphs::OfflineGraph & g) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
       uint64_t cur = 0;
      for(auto n = g.begin(); n != g.end(); ++n){

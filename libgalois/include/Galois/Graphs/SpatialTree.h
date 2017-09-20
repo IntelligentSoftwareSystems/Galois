@@ -31,7 +31,7 @@
 #define GALOIS_GRAPH_SPATIALTREE_H
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //! Stores sets of objects at specific spatial coordinates in a quad tree.
 //! Lookup returns an approximation of the closest item

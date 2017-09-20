@@ -38,7 +38,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 ///**
 // * Return a suitable index between an upper bound and a lower bound that
@@ -257,6 +257,6 @@ divideNodesBinarySearch(NodeType numNodes,
 }
 
 
-} // end namespace Graph
+} // end namespace graphs
 } // end namespace galois
 #endif

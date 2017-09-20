@@ -9,7 +9,7 @@ struct NodeData: public PData {
   NodeData (unsigned id, unsigned outdegree): PData (outdegree) {}
 };
 
-typedef typename galois::Graph::LC_CSR_Graph<NodeData, void>
+typedef typename galois::graphs::LC_CSR_Graph<NodeData, void>
   ::with_numa_alloc<true>::type InnerGraph;
 
 template<bool UseAddRemove>

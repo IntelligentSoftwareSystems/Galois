@@ -44,7 +44,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 //File format V1:
 //version (1) {uint64_t LE}
@@ -334,7 +334,7 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
                     std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
-    return galois::Graph::divideNodesBinarySearch<OfflineGraph, uint64_t>(
+    return galois::graphs::divideNodesBinarySearch<OfflineGraph, uint64_t>(
       numNodes, numEdges, nodeWeight, edgeWeight, id, total, *this, scaleFactor);
   }
 };
@@ -466,7 +466,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
 };
 
 
-} // namespace Graph
+} // namespace graphs
 
 //// In namespace galois
 ///**
@@ -480,7 +480,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
 // * end of the range for the division_id (end not inclusive)
 // */
 //template<typename IterTy>
-//std::pair<IterTy, IterTy> prefix_range(galois::Graph::OfflineGraph& graph,
+//std::pair<IterTy, IterTy> prefix_range(galois::graphs::OfflineGraph& graph,
 //                                       IterTy begin,
 //                                       uint32_t division_id, 
 //                                       uint32_t num_divisions) {
@@ -718,7 +718,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
  * among partitions
  */
 template<typename IterTy>
-void prefix_range(galois::Graph::OfflineGraph& graph, 
+void prefix_range(galois::graphs::OfflineGraph& graph, 
                   IterTy begin, IterTy end, uint32_t num_divisions, 
                   std::vector<std::pair<IterTy, IterTy>>& division_vector,
                   uint32_t node_alpha,

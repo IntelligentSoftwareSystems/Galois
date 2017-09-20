@@ -44,7 +44,7 @@
 #include <string>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 /**
  * Binds the segment parameter of an out-of-core graph so that it can be used in

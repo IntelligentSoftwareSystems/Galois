@@ -47,7 +47,7 @@
 #include <algorithm>
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 
 struct read_default_graph_tag { };
 struct read_with_aux_graph_tag { };

@@ -95,7 +95,7 @@ std::ostream& operator<<(std::ostream& s, Node& n) {
 typedef long NodeDataType;
 typedef int EdgeDataType;
 
-typedef galois::Graph::FirstGraph<Node, EdgeDataType, false> Graph;
+typedef galois::graphs::FirstGraph<Node, EdgeDataType, false> Graph;
 typedef Graph::GraphNode GNode;
 //The graph.
 Graph graph;
@@ -313,11 +313,11 @@ EdgeDataType runBodyParallel() {
 static void makeGraph(const char* input) {
    std::vector<GNode> nodes;
    //Create local computation graph.
-   typedef galois::Graph::LC_CSR_Graph<Node, EdgeDataType> InGraph;
+   typedef galois::graphs::LC_CSR_Graph<Node, EdgeDataType> InGraph;
    typedef InGraph::GraphNode InGNode;
    InGraph in_graph;
    //Read graph from file.
-   galois::Graph::readGraph(in_graph, input);
+   galois::graphs::readGraph(in_graph, input);
    std::cout << "Read " << in_graph.size() << " nodes\n";
    //A node and a int is an element.
    typedef std::pair<InGNode, EdgeDataType> Element;

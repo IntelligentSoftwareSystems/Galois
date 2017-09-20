@@ -112,7 +112,7 @@ struct not_consistent {
 template <typename Graph>
 struct not_consistent<
     Graph,
-    typename std::enable_if<!galois::Graph::is_segmented<Graph>::value>::type> {
+    typename std::enable_if<!galois::graphs::is_segmented<Graph>::value>::type> {
   Graph& g;
   not_consistent(Graph& g) : g(g) {}
 
@@ -212,13 +212,13 @@ void initialize(Algo& algo, typename Algo::Graph& graph,
 
 template <typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
     //! [Reading a graph]
-    galois::Graph::readGraph(graph, filename);
+    galois::graphs::readGraph(graph, filename);
     //! [Reading a graph]
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::graphs::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -226,7 +226,7 @@ void readInOutGraph(Graph& graph) {
 
 struct SerialAlgo {
   //! [Define LC_CSR_Graph]
-  typedef galois::Graph::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<
+  typedef galois::graphs::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<
       true>::type Graph;
   //! [Define LC_CSR_Graph]
 
@@ -234,7 +234,7 @@ struct SerialAlgo {
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -278,7 +278,7 @@ struct AsyncAlgo {
   typedef SNode Node;
 
   // ! [Define LC_InlineEdge_Graph]
-  typedef galois::Graph::LC_InlineEdge_Graph<
+  typedef galois::graphs::LC_InlineEdge_Graph<
       Node, uint32_t>::template with_out_of_line_lockable<true>::type::
       template with_compressed_node_ptr<true>::type::template with_numa_alloc<
           true>::type Graph;
@@ -291,7 +291,7 @@ struct AsyncAlgo {
     return UseCas ? "Asynchronous with CAS" : "Asynchronous";
   }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -390,7 +390,7 @@ struct AsyncAlgo {
 struct AsyncAlgoPP {
   typedef SNode Node;
 
-  typedef galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>::
+  typedef galois::graphs::LC_InlineEdge_Graph<Node, uint32_t>::
       with_out_of_line_lockable<true>::type::with_compressed_node_ptr<
           true>::type::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -398,7 +398,7 @@ struct AsyncAlgoPP {
 
   std::string name() const { return "Asynchronous with CAS and Push and pull"; }
 
-  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::graphs::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;

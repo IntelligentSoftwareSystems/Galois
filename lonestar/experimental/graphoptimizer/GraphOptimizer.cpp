@@ -347,7 +347,7 @@ void rleCode(Iter b, Iter e, Iter2 out) {
 }
 
 namespace galois {
-namespace Graph {
+namespace graphs {
 template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
   bool UseNumaAlloc=false,
@@ -543,8 +543,8 @@ public:
 } // end namespace
 
 
-typedef galois::Graph::LC_CSR_Graph<unsigned, void> Graph;
-typedef galois::Graph::LC_CCSR_Graph<unsigned, void> GraphC;
+typedef galois::graphs::LC_CSR_Graph<unsigned, void> Graph;
+typedef galois::graphs::LC_CCSR_Graph<unsigned, void> GraphC;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -885,8 +885,8 @@ int main(int argc, char **argv) {
   if (dostat)
     std::cout << "Collecting All Histograms\n";
 
-  galois::Graph::readGraph(graph, filename);
-  //galois::Graph::readGraph(graphc, filename);
+  galois::graphs::readGraph(graph, filename);
+  //galois::graphs::readGraph(graphc, filename);
 
   // for (unsigned int x = 0; x < 0; ++x) {
   //   auto ii = graph.edge_begin(x);

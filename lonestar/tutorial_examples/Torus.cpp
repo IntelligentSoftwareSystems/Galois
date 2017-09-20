@@ -32,7 +32,7 @@
 
 //! Graph has int node data, void edge data and is directed
 //! [define a graph]
-typedef galois::Graph::FirstGraph<int,void,true> Graph;
+typedef galois::graphs::FirstGraph<int,void,true> Graph;
 //! [define a graph]
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;

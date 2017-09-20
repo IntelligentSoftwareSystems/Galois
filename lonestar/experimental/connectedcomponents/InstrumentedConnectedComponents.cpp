@@ -264,11 +264,11 @@ struct Node: public galois::UnionFindNode<Node> {
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace galois::Graph;
+  using namespace galois::graphs;
   if (symmetricGraph) {
-    galois::Graph::readGraph(graph, inputFilename);
+    galois::graphs::readGraph(graph, inputFilename);
   } else if (transposeGraphName.size()) {
-    galois::Graph::readGraph(graph, inputFilename, transposeGraphName);
+    galois::graphs::readGraph(graph, inputFilename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -278,12 +278,12 @@ void readInOutGraph(Graph& graph) {
  * Serial connected components algorithm. Just use union-find.
  */
 struct SerialAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   template<typename G>
-  void readGraph(G& graph) { galois::Graph::readGraph(graph, inputFilename); }
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
 
   struct Merge {
     Graph& graph;
@@ -316,13 +316,13 @@ struct SerialAlgo {
  * component.
  */
 struct SynchronousAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   template<typename G>
-  void readGraph(G& graph) { galois::Graph::readGraph(graph, inputFilename); }
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
 
   struct Edge {
     GNode src;
@@ -474,9 +474,9 @@ struct LabelPropNoCasAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
   typedef typename LNode::component_type component_type;
 
@@ -708,10 +708,10 @@ struct LabelPropAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
   typedef typename LNode::component_type component_type;
 
@@ -972,17 +972,17 @@ struct PullLPAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
 
   template<typename G>
   void readGraph(G& graph) {
-    using namespace galois::Graph;
+    using namespace galois::graphs;
     if (symmetricGraph) {
-      galois::Graph::readGraph(graph, inputFilename);
+      galois::graphs::readGraph(graph, inputFilename);
     } else {
       GALOIS_DIE("Graph type not supported");
     }
@@ -1066,18 +1066,18 @@ struct PullLPCASAlgo {
     bool isRep() { return id == comp; }
   };
 
-  typedef galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::graphs::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
 
   template<typename G>
   void readGraph(G& graph) {
-    using namespace galois::Graph;
+    using namespace galois::graphs;
     if (symmetricGraph) {
-      galois::Graph::readGraph(graph, inputFilename);
+      galois::graphs::readGraph(graph, inputFilename);
     } else {
       GALOIS_DIE("Graph type not supported");
     }
@@ -1231,7 +1231,7 @@ struct PullLPCASAlgo {
 #endif
 
 struct AsyncOCAlgo {
-  typedef galois::Graph::OCImmutableEdgeGraph<Node,void> Graph;
+  typedef galois::graphs::OCImmutableEdgeGraph<Node,void> Graph;
   typedef Graph::GraphNode GNode;
 
   template<typename G>
@@ -1268,7 +1268,7 @@ struct AsyncOCAlgo {
   void operator()(Graph& graph) {
     galois::Statistic emptyMerges("EmptyMerges");
     
-    galois::GraphChi::vertexMap(graph, Merge(emptyMerges), memoryLimit);
+    galois::graphsChi::vertexMap(graph, Merge(emptyMerges), memoryLimit);
   }
 };
 
@@ -1277,14 +1277,14 @@ struct AsyncOCAlgo {
  * @link{UnionFindNode}), we can perform unions and finds concurrently.
  */
 struct AsyncAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
 
   template<typename G>
-  void readGraph(G& graph) { galois::Graph::readGraph(graph, inputFilename); }
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -1339,7 +1339,7 @@ struct AsyncAlgo {
  * Improve performance of async algorithm by following machine topology.
  */
 struct BlockedAsyncAlgo {
-  typedef galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     Graph;
@@ -1351,7 +1351,7 @@ struct BlockedAsyncAlgo {
   };
 
   template<typename G>
-  void readGraph(G& graph) { galois::Graph::readGraph(graph, inputFilename); }
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -1438,13 +1438,13 @@ struct is_bad {
 
 template<typename Graph>
 bool verify(Graph& graph,
-    typename std::enable_if<galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+    typename std::enable_if<galois::graphs::is_segmented<Graph>::value>::type* = 0) {
   return true;
 }
 
 template<typename Graph>
 bool verify(Graph& graph,
-    typename std::enable_if<!galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+    typename std::enable_if<!galois::graphs::is_segmented<Graph>::value>::type* = 0) {
   return galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad<Graph>(graph)) == graph.end();
 }
 
@@ -1468,13 +1468,13 @@ void writeComponent(Algo& algo, CGraph& cgraph, typename CGraph::node_data_type:
 
 template<typename Graph>
 void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_type component,
-    typename std::enable_if<galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+    typename std::enable_if<galois::graphs::is_segmented<Graph>::value>::type* = 0) {
   GALOIS_DIE("Writing component not supported for this graph");
 }
 
 template<typename Graph>
 void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_type component,
-    typename std::enable_if<!galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+    typename std::enable_if<!galois::graphs::is_segmented<Graph>::value>::type* = 0) {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
 
@@ -1491,7 +1491,7 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
     }
   }
 
-  typedef galois::Graph::FileGraphWriter Writer;
+  typedef galois::graphs::FileGraphWriter Writer;
   typedef galois::LargeArray<typename Graph::edge_data_type> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 

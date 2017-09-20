@@ -13,7 +13,7 @@ struct NodeData {
   explicit NodeData (unsigned _id=0): color (0), priority (0), id(_id) {}
 };
 
-typedef galois::Graph::LC_CSR_Graph<NodeData, void>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<NodeData, void>::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode; 
 
 class GraphColoringLocking: public GraphColoringBase<Graph> {

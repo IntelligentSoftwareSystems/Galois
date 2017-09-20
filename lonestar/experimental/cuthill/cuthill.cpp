@@ -103,7 +103,7 @@ struct SNode {
   bool done;
 };
 
-typedef galois::Graph::LC_CSR_Graph<SNode, void>
+typedef galois::graphs::LC_CSR_Graph<SNode, void>
   ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -819,15 +819,15 @@ struct AnyBFSUnordered {
 
 template<typename EdgeTy>
 void writeGraph() {
-  galois::Graph::FileGraph origGraph;
+  galois::graphs::FileGraph origGraph;
   origGraph.fromFileInterleaved<EdgeTy>(filename);
   std::vector<size_t> perm;
   perm.resize(graph.size());
   for (GNode n : graph)
     perm[n] = graph.getData(n).id;
 
-  galois::Graph::FileGraph out;
-  galois::Graph::permute<EdgeTy>(origGraph, perm, out);
+  galois::graphs::FileGraph out;
+  galois::graphs::permute<EdgeTy>(origGraph, perm, out);
   std::cout 
     << "Writing permuted graph to " << outputFilename 
     << " (nodes: " << out.size() << " edges: " << out.sizeEdges() << ")\n";
@@ -856,7 +856,7 @@ int main(int argc, char **argv) {
 
   galois::StatTimer itimer("InitTime");
   itimer.start();
-  galois::Graph::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename); 
   {
     size_t id = 0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii){

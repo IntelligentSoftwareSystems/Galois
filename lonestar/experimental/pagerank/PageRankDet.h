@@ -57,7 +57,7 @@ class PageRankBase {
 
 protected:
 
-  typedef typename galois::Graph::LC_InOut_Graph<IG> Graph;
+  typedef typename galois::graphs::LC_InOut_Graph<IG> Graph;
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_type NodeData;
 
@@ -67,7 +67,7 @@ protected:
   galois::GAccumulator<size_t> numIter;
 
   void readGraph (void) {
-    galois::Graph::readGraph (graph, inputFile, transposeFile);
+    galois::graphs::readGraph (graph, inputFile, transposeFile);
 
     galois::do_all_choice (galois::runtime::makeLocalRange (graph),
         [&] (GNode n) {

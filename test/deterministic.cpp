@@ -3,7 +3,7 @@
 #include "Galois/Graphs/Graph.h"
 #include <iostream>
 
-typedef galois::Graph::LC_CSR_Graph<int, void> Graph;
+typedef galois::graphs::LC_CSR_Graph<int, void> Graph;
 typedef Graph::GraphNode GNode;
 
 //! [Id]
@@ -74,7 +74,7 @@ struct MatchingWithLocalState {
 
 void runLocalStateMatching(const std::string& name) {
   Graph graph;
-  galois::Graph::readGraph(graph, name);
+  galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
   galois::for_each_local(graph,
@@ -89,7 +89,7 @@ void runLocalStateMatching(const std::string& name) {
 
 void runDetMatching(const std::string& name) {
   Graph graph;
-  galois::Graph::readGraph(graph, name);
+  galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
   galois::for_each(graph.begin(), graph.end(), Matching { graph, size },
@@ -99,7 +99,7 @@ void runDetMatching(const std::string& name) {
 
 void runNDMatching(const std::string& name) {
   Graph graph;
-  galois::Graph::readGraph(graph, name);
+  galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
   galois::for_each(graph.begin(), graph.end(), Matching { graph, size });
