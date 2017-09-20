@@ -34,7 +34,7 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graphs/Details.h"
 
-namespace Galois { namespace Graph {
+namespace galois { namespace Graph {
 
 template<typename NodeTy, typename EdgeTy, typename DerivedTy,
   typename GraphNodeTy, typename IteratorTy, typename EdgeIteratorTy,
@@ -76,13 +76,13 @@ protected:
   
 public:
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return derived().get_data(N);
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return derived().get_edge_data(ni);
   }
 
@@ -100,7 +100,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = derived().get_edge_begin(N), ee = derived().get_edge_end(N); ii != ee; ++ii) {
         acquireNode(getEdgeDst(ii), mflag);
       }

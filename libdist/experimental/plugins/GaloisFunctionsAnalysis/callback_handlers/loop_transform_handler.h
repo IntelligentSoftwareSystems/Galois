@@ -155,10 +155,10 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               SourceLocation for_each_loc_end = for_each_node->getSourceRange().getEnd().getLocWithOffset(2);
               //TODO:: get _graph from go struct IMPORTANT
               // change for_each to do_all
-              string galois_foreach = "Galois::for_each(";
-              string galois_doall = "Galois::do_all_local(nodesWithEdges, ";
+              string galois_foreach = "galois::for_each(";
+              string galois_doall = "galois::do_all_local(nodesWithEdges, ";
               rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
-              string num_run = ",\nGalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \nGalois::do_all_steal<true>(), \nGalois::timeit())";
+              string num_run = ",\ngalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \ngalois::do_all_steal<true>(), \ngalois::timeit())";
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
               string firstItr_func_call = "\nFirstItr_" + i.first + "::go(_graph);\n";
               string nodesWithEdgesRange_str = "\nauto nodesWithEdges = _graph.allNodesWithEdgesRange(); \n";
@@ -177,8 +177,8 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               string iteration_inc = "\n++_num_iterations;\n";
               iteration_inc += "_num_work_items += " + galois_distributed_accumulator_name + ".read();\n";
               string while_conditional = "}while("+ galois_distributed_accumulator_name + ".reduce());\n";
-              string report_iteration = "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
-              report_iteration += "Galois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
+              string report_iteration = "galois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);\n";
+              report_iteration += "galois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + std::to_string(_graph.get_run_num()), (unsigned long)_num_work_items, 0);\n";
               rewriter.InsertText(for_each_loc_end, iteration_inc + while_conditional + report_iteration, true, true);
 
 #if 0

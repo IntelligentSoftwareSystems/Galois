@@ -39,7 +39,7 @@ const bool multiSeed = true;
 namespace {
 
 //gain of moving n from it's current part to new part
-int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) {
+int gain_limited(GGraph& g, GNode n, unsigned newpart, galois::MethodFlag flag) {
   int retval = 0;
   unsigned nPart = g.getData(n,flag).getPart();
   for (auto ii : g.edges(n, flag)) {
@@ -54,7 +54,7 @@ int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) 
 }
 
 
-GNode findSeed(GGraph& g, unsigned partNum, int partWeight, Galois::MethodFlag flag) {
+GNode findSeed(GGraph& g, unsigned partNum, int partWeight, galois::MethodFlag flag) {
   //pick a seed
   
   int rWeight = (int)(drand48()*(partWeight));
@@ -88,7 +88,7 @@ struct bisect_GGP {
     unsigned& newWeight = newPart.partWeight = 0;
     unsigned targetWeight = oldPart.partWeight * ratio.second / (ratio.first + ratio.second);
 
-    auto flag = Galois::MethodFlag::UNPROTECTED;
+    auto flag = galois::MethodFlag::UNPROTECTED;
 
     do {
       boundary.push_back(findSeed(g, oldPart.partNum, oldPart.partWeight, flag));
@@ -123,7 +123,7 @@ struct bisect_GGGP {
     unsigned targetWeight = oldPart.partWeight * ratio.second / (ratio.first + ratio.second);
     //pick a seed
 
-    auto flag = Galois::MethodFlag::UNPROTECTED;
+    auto flag = galois::MethodFlag::UNPROTECTED;
 
     do {
       //boundary[0].insert(findSeed(g, oldPart.partNum, oldPart.partWeight, flag));
@@ -179,12 +179,12 @@ int computeEdgeCut(GGraph& g) {
   return cuts/2;
 }
 int node_gain(GGraph &graph, GNode node) {
-  auto nData = graph.getData(node,Galois::MethodFlag::UNPROTECTED); 
+  auto nData = graph.getData(node,galois::MethodFlag::UNPROTECTED); 
   int gain = 0;
   for (auto ei : graph.edges(node)) {
     auto neigh = graph.getEdgeDst(ei); 
     int ew = graph.getEdgeData(ei); 
-    auto neighData = graph.getData(neigh,Galois::MethodFlag::UNPROTECTED);
+    auto neighData = graph.getData(neigh,galois::MethodFlag::UNPROTECTED);
     if (nData.getPart() != neighData.getPart()) { 
       gain += ew;
     } else {
@@ -195,7 +195,7 @@ int node_gain(GGraph &graph, GNode node) {
 }
 
 typedef std::pair<int,std::pair<GNode,GNode> > PartMatch;
-typedef Galois::Substrate::PerThreadStorage<PartMatch > PerThreadPartInfo;
+typedef galois::Substrate::PerThreadStorage<PartMatch > PerThreadPartInfo;
 struct KLMatch {
   GGraph &graph;
   PerThreadPartInfo &threadInfo;
@@ -214,7 +214,7 @@ struct KLMatch {
   }
   template<typename Context>
   void operator()(GNode node, Context& lwl) {
-    auto flag = Galois::MethodFlag::UNPROTECTED;
+    auto flag = galois::MethodFlag::UNPROTECTED;
     PartMatch *localInfo = threadInfo.getLocal();
     int gain = localInfo->first;
     auto& srcData = graph.getData(node,flag);
@@ -282,7 +282,7 @@ void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int ne
         iterationInfo.getRemote(i)->second.second = NULL; 
       }
       KLMatch matchIter(graph,iterationInfo,oldPartNum,newPartNum);
-      Galois::for_each(boundary.begin(),boundary.end(), matchIter,Galois::wl<Galois::WorkList::ChunkedLIFO<32> >());
+      galois::for_each(boundary.begin(),boundary.end(), matchIter,galois::wl<galois::WorkList::ChunkedLIFO<32> >());
       PartMatch bestMatch;
       bestMatch.first = INT_MIN;
       for (unsigned int i = 0; i < iterationInfo.size(); i++) {
@@ -397,7 +397,7 @@ struct parallelBisect {
   parallelBisect(MetisGraph* mg, unsigned parts, std::vector<partInfo>& pb, bisector b = bisector())
     :totalWeight(mg->getTotalWeight()), nparts(parts), graph(mg->getGraph()), bisect(b), parts(pb)
   {}
-  void operator()(partInfo* item, Galois::UserContext<partInfo*> &cnx) {
+  void operator()(partInfo* item, galois::UserContext<partInfo*> &cnx) {
     if (item->splitID() >= nparts) //when to stop
       return;
     std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
@@ -414,8 +414,8 @@ struct initPart {
   GGraph& g;
   initPart(GGraph& _g): g(_g) {}
   void operator()(GNode item) const {
-    g.getData(item, Galois::MethodFlag::UNPROTECTED).initRefine(0,true);
-    g.getData(item, Galois::MethodFlag::UNPROTECTED).initPartition();
+    g.getData(item, galois::MethodFlag::UNPROTECTED).initRefine(0,true);
+    g.getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
   }
 };
 
@@ -425,7 +425,7 @@ struct initPart {
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, InitialPartMode partMode) {
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight());
-  Galois::do_all_local(*mcg->getGraph(), initPart(*mcg->getGraph()));
+  galois::do_all_local(*mcg->getGraph(), initPart(*mcg->getGraph()));
   bool serialPartition = false;
   if (serialPartition) {
   serialBisect<bisect_GGGP>(mcg, numPartitions, parts)();
@@ -433,11 +433,11 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
     switch (partMode) {
       case GGP:
         std::cout <<"\n  Sarting initial partitioning using GGP:\n";
-        Galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
+        galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), galois::wl<galois::WorkList::ChunkedLIFO<1>>());
         break;
       case GGGP:
         std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
-        Galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
+        galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), galois::wl<galois::WorkList::ChunkedLIFO<1>>());
         break;
       default: abort();
     }
@@ -467,7 +467,7 @@ int edgeCount(GGraph& g) {
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize)
 {
   std::cout <<"\n  Sarting initial partitioning using MGGGP:\n";
-  auto flag = Galois::MethodFlag::UNPROTECTED;
+  auto flag = galois::MethodFlag::UNPROTECTED;
   GGraph& g = *mcg->getGraph();
 
   int bestCut = edgeCount(g);

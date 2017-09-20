@@ -83,9 +83,9 @@ struct DNode {
   unsigned int id;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<DNode, void> 
+typedef galois::Graph::LC_CSR_Graph<DNode, void> 
   ::template with_no_lockable<true>::type InnerDGraph; // graph with DNode nodes and typeless edges without locks
-typedef Galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
+typedef galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -94,9 +94,9 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<QNode, void> 
+typedef galois::Graph::LC_CSR_Graph<QNode, void> 
   ::template with_no_lockable<true>::type InnerQGraph;
-typedef Galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
+typedef galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -107,7 +107,7 @@ struct NodeMatch {
 };
 
 typedef std::vector<NodeMatch> Matching;
-typedef Galois::InsertBag<Matching> MatchingVector;
+typedef galois::InsertBag<Matching> MatchingVector;
 
 static std::minstd_rand0 generator;
 static std::uniform_int_distribution<unsigned> distribution;
@@ -134,8 +134,8 @@ struct VF2Algo {
   class FilterCandidatesInternal {
     DGraph& gD;
     QGraph& gQ;
-    Galois::GReduceLogicalOR& nodeEmpty;
-    FilterCandidatesInternal(DGraph& d, QGraph& q, Galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
+    galois::GReduceLogicalOR& nodeEmpty;
+    FilterCandidatesInternal(DGraph& d, QGraph& q, galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
 
   public:
     void operator()(const QGNode nQ) const {
@@ -161,8 +161,8 @@ struct VF2Algo {
 
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
-      Galois::GReduceLogicalOR isSomeNodeEmpty;
-      Galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), Galois::loopname("filter"), Galois::do_all_steal<true>());
+      galois::GReduceLogicalOR isSomeNodeEmpty;
+      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::do_all_steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -175,7 +175,7 @@ struct VF2Algo {
 
     struct LocalState {
       template<typename T>
-      using PerIterAlloc = typename Galois::PerIterAllocTy::rebind<T>::other;
+      using PerIterAlloc = typename galois::PerIterAllocTy::rebind<T>::other;
 
       // query state
       std::set<QGNode, std::less<QGNode>, PerIterAlloc<QGNode> > qFrontier;
@@ -185,7 +185,7 @@ struct VF2Algo {
       std::set<DGNode, std::less<DGNode>, PerIterAlloc<DGNode> > dFrontier;
       std::set<DGNode, std::less<DGNode>, PerIterAlloc<DGNode> > dMatched;
 
-      LocalState(Galois::PerIterAllocTy& a) :qFrontier(a), qMatched(a), dFrontier(a), dMatched(a) {}
+      LocalState(galois::PerIterAllocTy& a) :qFrontier(a), qMatched(a), dFrontier(a), dMatched(a) {}
       
       QGNode nextQueryNode(QGraph& gQ, Matching& matching) {
         if(qFrontier.size())
@@ -230,10 +230,10 @@ struct VF2Algo {
       counter<typename Graph::GraphNode> count; 
 
       std::set_difference(
-        // Galois::NoDerefIterator lets dereference return the wrapped iterator itself
+        // galois::NoDerefIterator lets dereference return the wrapped iterator itself
         // boost::make_transform_iterator gives an iterator, which is dereferenced to func(in_iter)
-        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.in_edge_begin(n)), l),
-        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.in_edge_end(n)), l),
+        boost::make_transform_iterator(galois::NoDerefIterator<Iter>(g.in_edge_begin(n)), l),
+        boost::make_transform_iterator(galois::NoDerefIterator<Iter>(g.in_edge_end(n)), l),
         sMatched.begin(), sMatched.end(), count);
       return count.get();
     }
@@ -246,14 +246,14 @@ struct VF2Algo {
       counter<typename Graph::GraphNode> count;
 
       std::set_difference(
-        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_begin(n)), l), 
-        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_end(n)), l), 
+        boost::make_transform_iterator(galois::NoDerefIterator<Iter>(g.edge_begin(n)), l), 
+        boost::make_transform_iterator(galois::NoDerefIterator<Iter>(g.edge_end(n)), l), 
         sMatched.begin(), sMatched.end(), count);
       return count.get();
     }
 
     std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > 
-    refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Galois::PerIterAllocTy& alloc, LocalState& state) {
+    refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, galois::PerIterAllocTy& alloc, LocalState& state) {
       std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > refined(alloc);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
       long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched);
@@ -335,7 +335,7 @@ struct VF2Algo {
       }
     }
 
-    void doSearch(LocalState& state, Matching& matching, Galois::PerIterAllocTy& alloc) {
+    void doSearch(LocalState& state, Matching& matching, galois::PerIterAllocTy& alloc) {
       if(currentlyFound.load() >= kFound)
         return;
 
@@ -414,8 +414,8 @@ struct VF2Algo {
       }
     }
  
-    // Galois::for_each expects ctx
-    void operator()(NodeMatch& seed, Galois::UserContext<NodeMatch>& ctx) {
+    // galois::for_each expects ctx
+    void operator()(NodeMatch& seed, galois::UserContext<NodeMatch>& ctx) {
       LocalState state(ctx.getPerIterAlloc());
 
       auto nQ = seed.nQ;
@@ -448,14 +448,14 @@ public:
 
   static MatchingVector subgraphSearch(DGraph& gD, QGraph& gQ) {
     // parallelize the search for candidates of gQ.begin()
-    Galois::InsertBag<NodeMatch> works;
+    galois::InsertBag<NodeMatch> works;
     auto nQ = *(gQ.begin());
     for(auto c : gQ.getData(nQ).candidate)
       works.push_back(NodeMatch(nQ, c));
 
     MatchingVector report;
-    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"), 
-      Galois::does_not_need_aborts<>(), Galois::does_not_need_push<>(), Galois::needs_parallel_break<>(), Galois::needs_per_iter_alloc<>());
+    galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
+      galois::does_not_need_aborts<>(), galois::does_not_need_push<>(), galois::needs_parallel_break<>(), galois::needs_per_iter_alloc<>());
     return report;
   }
 };
@@ -466,8 +466,8 @@ struct UllmannAlgo {
   struct FilterCandidatesInternal {
     DGraph& gD;
     QGraph& gQ;
-    Galois::GReduceLogicalOR& nodeEmpty;
-    FilterCandidatesInternal(DGraph& d, QGraph& q, Galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
+    galois::GReduceLogicalOR& nodeEmpty;
+    FilterCandidatesInternal(DGraph& d, QGraph& q, galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
 
     void operator()(const QGNode nQ) const {
       auto& dQ = gQ.getData(nQ);
@@ -490,8 +490,8 @@ struct UllmannAlgo {
 
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
-      Galois::GReduceLogicalOR isSomeNodeEmpty;
-      Galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), Galois::loopname("filter"), Galois::do_all_steal<true>());
+      galois::GReduceLogicalOR isSomeNodeEmpty;
+      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::do_all_steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -573,8 +573,8 @@ struct UllmannAlgo {
       }
     }
 
-    // Galois::for_each expects ctx
-    void operator()(NodeMatch& seed, Galois::UserContext<NodeMatch>& ctx) {
+    // galois::for_each expects ctx
+    void operator()(NodeMatch& seed, galois::UserContext<NodeMatch>& ctx) {
       Matching matching{seed};
       doSearch(matching);
       if(currentlyFound.load() >= kFound)
@@ -590,14 +590,14 @@ public:
 
   static MatchingVector subgraphSearch(DGraph& gD, QGraph& gQ) {
     // parallelize the search for candidates of gQ.begin()
-    Galois::InsertBag<NodeMatch> works;
+    galois::InsertBag<NodeMatch> works;
     auto nQ = *(gQ.begin());
     for(auto c : gQ.getData(nQ).candidate)
       works.push_back(NodeMatch(nQ, c));
 
     MatchingVector report;
-    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"), 
-      Galois::does_not_need_aborts<>(), Galois::does_not_need_push<>(), Galois::needs_parallel_break<>());
+    galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
+      galois::does_not_need_aborts<>(), galois::does_not_need_push<>(), galois::needs_parallel_break<>());
     return report;
   }
 };
@@ -666,7 +666,7 @@ template<typename Algo>
 void run() {
   DGraph gD;
   if(graphD.size()) {
-    Galois::Graph::readGraph(gD, graphD);
+    galois::Graph::readGraph(gD, graphD);
     std::cout << "Reading data graph..." << std::endl;
   } else
     GALOIS_DIE("Failed to read data graph");
@@ -682,7 +682,7 @@ void run() {
 
   QGraph gQ;
   if(graphQ.size()) {
-    Galois::Graph::readGraph(gQ, graphQ);
+    galois::Graph::readGraph(gQ, graphQ);
     std::cout << "Reading query graph..." << std::endl;
   } else
     GALOIS_DIE("Failed to read query graph");
@@ -699,10 +699,10 @@ void run() {
   Algo algo;
   std::cout << "Running " << algo.name() << " Algorithm..." << std::endl;
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
 
-  Galois::StatTimer filterT("FilterCandidates");
+  galois::StatTimer filterT("FilterCandidates");
   filterT.start();
   bool isSomeNodeUnmatched = algo.filterCandidates(gD, gQ);
   filterT.stop();
@@ -713,7 +713,7 @@ void run() {
     return;
   }
 
-  Galois::StatTimer searchT("SubgraphSearch");
+  galois::StatTimer searchT("SubgraphSearch");
   searchT.start();
   currentlyFound.store(0);
   MatchingVector report = algo.subgraphSearch(gD, gQ);
@@ -730,10 +730,10 @@ void run() {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::ullmann: run<UllmannAlgo>(); break;

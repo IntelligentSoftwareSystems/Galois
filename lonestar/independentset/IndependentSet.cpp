@@ -76,7 +76,7 @@ struct Node {
 
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::Graph::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -118,14 +118,14 @@ struct SerialAlgo {
 //! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
-  typedef typename Galois::Graph::LC_CSR_Graph<Node,void>
+  typedef typename galois::Graph::LC_CSR_Graph<Node,void>
     ::template with_numa_alloc<true>::type Graph;
 
   typedef typename Graph::GraphNode GNode;
 
   struct LocalState {
     bool mod;
-    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
+    LocalState(Process<Version>& self, galois::PerIterAllocTy& alloc): mod(false) { }
   };
 
   struct DeterministicId {
@@ -135,23 +135,23 @@ struct Process {
   };
 
   typedef std::tuple<
-    Galois::does_not_need_push<>,
-    Galois::needs_per_iter_alloc<>,
-    Galois::has_deterministic_id<DeterministicId>,
-    Galois::has_deterministic_local_state<LocalState>
+    galois::does_not_need_push<>,
+    galois::needs_per_iter_alloc<>,
+    galois::has_deterministic_id<DeterministicId>,
+    galois::has_deterministic_local_state<LocalState>
   > function_traits;
 
   Graph& graph;
 
   Process(Graph& g): graph(g) { }
 
-  template<Galois::MethodFlag Flag>
+  template<galois::MethodFlag Flag>
   bool build(GNode src) {
     Node& me = graph.getData(src, Flag);
     if (me.flag != UNMATCHED)
       return false;
 
-    for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Flag);
       if (data.flag == MATCHED)
@@ -162,17 +162,17 @@ struct Process {
   }
 
   void modify(GNode src) {
-    Node& me = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-    for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+    Node& me = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+    for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      Node& data = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       data.flag = OTHER_MATCHED;
     }
 
     me.flag = MATCHED;
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode src, galois::UserContext<GNode>& ctx) {
     bool* modp;
     if (Version == detDisjoint) {
       LocalState* localState = (LocalState*) ctx.getLocalState();
@@ -185,13 +185,13 @@ struct Process {
     }
 
     if (Version == detDisjoint && ctx.isFirstPass ()) {
-      *modp = build<Galois::MethodFlag::WRITE>(src);
+      *modp = build<galois::MethodFlag::WRITE>(src);
     } else {
-      bool mod = build<Galois::MethodFlag::WRITE>(src);
+      bool mod = build<galois::MethodFlag::WRITE>(src);
       if (Version == detPrefix) {
         return;
       } else {
-        graph.getData(src, Galois::MethodFlag::WRITE);
+        graph.getData(src, galois::MethodFlag::WRITE);
         ctx.cautiousPoint(); // Failsafe point
       }
       if (mod)
@@ -219,9 +219,9 @@ struct OrderedProcess {
 
   void operator()(GNode src) {
     if (prefix) {
-      graph.edge_begin(src, Galois::MethodFlag::WRITE);
+      graph.edge_begin(src, galois::MethodFlag::WRITE);
     } else {
-      if (process.build<Galois::MethodFlag::UNPROTECTED>(src))
+      if (process.build<galois::MethodFlag::UNPROTECTED>(src))
         process.modify(src);
     }
   }
@@ -235,7 +235,7 @@ struct Compare {
   Compare(Graph& g): graph(g) { }
   
   bool operator()(const GNode& a, const GNode& b) const {
-    return &graph.getData(a, Galois::MethodFlag::UNPROTECTED)< &graph.getData(b, Galois::MethodFlag::UNPROTECTED);
+    return &graph.getData(a, galois::MethodFlag::UNPROTECTED)< &graph.getData(b, galois::MethodFlag::UNPROTECTED);
   }
 };
 
@@ -245,29 +245,29 @@ struct DefaultAlgo {
   typedef typename Process<>::Graph Graph;
 
   void operator()(Graph& graph) {
-    typedef Galois::WorkList::Deterministic<> DWL;
+    typedef galois::WorkList::Deterministic<> DWL;
 
-    typedef Galois::WorkList::BulkSynchronous<> WL;
-    //    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::WorkList::BulkSynchronous<> WL;
+    //    typedef galois::WorkList::dChunkedFIFO<256> WL;
 
     switch (algo) {
       case nondet: 
-        Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<WL>());
+        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::wl<WL>());
         break;
       case detBase:
-        Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<DWL>());
+        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::wl<DWL>());
         break;
       case detPrefix:
-        Galois::for_each(graph.begin(), graph.end(), Process<>(graph),
-            Galois::wl<DWL>(),
-            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
+        galois::for_each(graph.begin(), graph.end(), Process<>(graph),
+            galois::wl<DWL>(),
+            galois::make_trait_with_args<galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
             );
         break;
       case detDisjoint:
-        Galois::for_each(graph.begin(), graph.end(), Process<detDisjoint>(graph), Galois::wl<DWL>());
+        galois::for_each(graph.begin(), graph.end(), Process<detDisjoint>(graph), galois::wl<DWL>());
         break;
       case orderedBase:
-        Galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
+        galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
             OrderedProcess<true>(graph), OrderedProcess<false>(graph));
         break;
       default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
@@ -276,7 +276,7 @@ struct DefaultAlgo {
 };
 
 struct PullAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+  typedef galois::Graph::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     Graph;
@@ -286,30 +286,30 @@ struct PullAlgo {
     typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_aborts;
 
-    typedef Galois::InsertBag<GNode> Bag;
+    typedef galois::InsertBag<GNode> Bag;
 
     Graph& graph;
     Bag& matched;
     Bag& otherMatched;
     Bag& next;
-    Galois::GAccumulator<size_t>& numProcessed;
+    galois::GAccumulator<size_t>& numProcessed;
 
-    void operator()(GNode src, Galois::UserContext<GNode>&) const {
+    void operator()(GNode src, galois::UserContext<GNode>&) const {
       operator()(src);
     }
 
     void operator()(GNode src) const {
       numProcessed += 1;
-      //Node& n = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      //Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       MatchFlag f = MATCHED;
-      for (auto edge : graph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto edge : graph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(edge);
         if (dst >= src) {
           continue; 
         } 
         
-        Node& other = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        Node& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (other.flag == MATCHED) {
           f = OTHER_MATCHED;
           break;
@@ -331,21 +331,21 @@ struct PullAlgo {
   template<MatchFlag F>
   struct Take {
     Graph& graph;
-    Galois::GAccumulator<size_t>& numTaken;
+    galois::GAccumulator<size_t>& numTaken;
 
     void operator()(GNode src) const {
-      Node& n = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       numTaken += 1;
       n.flag = F;
     }
   };
 
   void operator()(Graph& graph) {
-    Galois::Statistic rounds("Rounds");
-    Galois::GAccumulator<size_t> numProcessed;
-    Galois::GAccumulator<size_t> numTaken;
+    galois::Statistic rounds("Rounds");
+    galois::GAccumulator<size_t> numProcessed;
+    galois::GAccumulator<size_t> numTaken;
 
-    typedef Galois::InsertBag<GNode> Bag;
+    typedef galois::InsertBag<GNode> Bag;
     Bag bags[2];
     Bag *cur = &bags[0];
     Bag *next = &bags[1];
@@ -365,22 +365,22 @@ struct PullAlgo {
       numProcessed.reset();
 
       if (!cur->empty()) {
-        typedef Galois::WorkList::StableIterator<> WL;
-        //Galois::for_each_local(*cur, pull, Galois::wl<WL>());
-        Galois::do_all_local(*cur, pull);
+        typedef galois::WorkList::StableIterator<> WL;
+        //galois::for_each_local(*cur, pull, galois::wl<WL>());
+        galois::do_all_local(*cur, pull);
       }
 
       size_t numCur = numProcessed.reduce();
       std::advance(ei, std::min(size, delta) - numCur);
 
       if (ii != ei)
-        Galois::do_all(ii, ei, pull);
+        galois::do_all(ii, ei, pull);
       ii = ei;
 
       numTaken.reset();
 
-      Galois::do_all_local(matched, takeMatched);
-      Galois::do_all_local(otherMatched, takeOtherMatched);
+      galois::do_all_local(matched, takeMatched);
+      galois::do_all_local(otherMatched, takeOtherMatched);
 
       cur->clear();
       matched.clear();
@@ -442,7 +442,7 @@ struct is_matched {
 
 template<typename Graph>
 bool verify(Graph& graph) {
-  return Galois::ParallelSTL::find_if(
+  return galois::ParallelSTL::find_if(
       graph.begin(), graph.end(), is_bad<Graph>(graph))
     == graph.end();
 }
@@ -454,25 +454,25 @@ void run() {
 
   Algo algo;
   Graph graph;
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
 
-  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::hugePageSize);
+  // galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / galois::Runtime::MM::hugePageSize);
   // Tighter upper bound
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::pagePoolSize());
+    galois::preAlloc(numThreads + 8*graph.size()/galois::Runtime::pagePoolSize());
   } else {
-    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::pagePoolSize());
+    galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/galois::Runtime::pagePoolSize());
   }
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::StatTimer T;
+  galois::reportPageAlloc("MeminfoPre");
+  galois::StatTimer T;
   T.start();
   algo(graph);
   T.stop();
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Cardinality of maximal independent set: " 
-    << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched<Graph>(graph)) 
+    << galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched<Graph>(graph)) 
     << "\n";
 
   if (!skipVerify && !verify(graph)) {
@@ -483,7 +483,7 @@ void run() {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
   
   switch (algo) {

@@ -54,7 +54,7 @@ private:
    std::set<std::string> ParsedTemplates;
    MatchFinder Matchers;
    Rewriter & R;
-   Galois::GAST::GaloisApp app_data;
+   galois::GAST::GaloisApp app_data;
    DoAllHandler do_all_handler;
    GraphDeclHandler graphDeclHandler;
 
@@ -84,7 +84,7 @@ public:
       llvm::outs() << " Done phase 0\n";
       { //2) Get the graph declarations
          MatchFinder graphDecls;
-         Galois::GAST::GraphTypeMapper gtm(R);
+         galois::GAST::GraphTypeMapper gtm(R);
          graphDecls.addMatcher( varDecl(isExpansionInMainFile(), hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType") )  ).bind("graphDecl"), &gtm);
          graphDecls.matchAST(Context);
          llvm :: outs() << "Found graph types :: " << gtm.graph_types.size() << "\n";
@@ -95,7 +95,7 @@ public:
       llvm::outs() << " Done phase 1\n";
       if (false){ //3) Replace typenames for graph data-types based on where they are accessed.
          MatchFinder mf;
-         Galois::GAST::GraphTypeReplacer typeReplacer(R);
+         galois::GAST::GraphTypeReplacer typeReplacer(R);
          mf.addMatcher(varDecl( isExpansionInMainFile(), hasInitializer( callExpr( callee(functionDecl( anyOf(
                                              hasName("getData"),
                                              hasName("edge_begin"),
@@ -117,7 +117,7 @@ public:
       llvm::outs() << " Done phase 2\n";
       {// 4) Find kernels/operators via do_all calls
             Matchers.addMatcher(callExpr(
-                                 callee(functionDecl(hasName("Galois::do_all")))
+                                 callee(functionDecl(hasName("galois::do_all")))
                                         ,hasArgument(2,hasType(recordDecl().bind("kernelType")))
                                  ).bind("galoisLoop"), &do_all_handler);
             Matchers.matchAST(Context);

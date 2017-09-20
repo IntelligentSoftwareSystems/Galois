@@ -31,7 +31,7 @@
 #include <deque>
 #include <mutex>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace details {

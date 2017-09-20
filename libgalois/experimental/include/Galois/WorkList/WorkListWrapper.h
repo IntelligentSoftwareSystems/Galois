@@ -28,7 +28,7 @@
 
 #ifndef GALOIS_RUNTIME_WORK_LIST_WRAPPER_H
 #define GALOIS_RUNTIME_WORK_LIST_WRAPPER_H
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 
@@ -92,6 +92,6 @@ public:
 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RUNTIME_WORK_LIST_WRAPPER_H

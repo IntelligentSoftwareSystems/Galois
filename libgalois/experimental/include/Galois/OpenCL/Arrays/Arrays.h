@@ -31,7 +31,7 @@
 #ifndef ARRAY_WRAPPER_H_
 #define ARRAY_WRAPPER_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 /////////////////////////////////////////////////////////////////
@@ -71,7 +71,7 @@ DEBUG_CODE(
 /*******************************************************************************
  *
  ********************************************************************************/
-}      //namespace Galois
+}      //namespace galois
 #include "Galois/OpenCL/Arrays/ArrayImpl.h"
 #include "Galois/OpenCL/Arrays/MultiDeviceArray.h"
 #include "Galois/OpenCL/Arrays/CPUArray.h"

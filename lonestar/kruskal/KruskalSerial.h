@@ -69,10 +69,10 @@ protected:
   virtual void runMSTsplit (const size_t numNodes, const VecEdge& in_edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    Galois::TimeAccumulator t_run;
-    Galois::TimeAccumulator t_init;
-    Galois::TimeAccumulator t_sort;
-    Galois::TimeAccumulator t_loop;
+    galois::TimeAccumulator t_run;
+    galois::TimeAccumulator t_init;
+    galois::TimeAccumulator t_sort;
+    galois::TimeAccumulator t_loop;
 
     t_init.start ();
     VecEdge edges (in_edges);
@@ -144,10 +144,10 @@ protected:
       size_t& mstWeight, size_t& totalIter) {
 
 
-    Galois::StatTimer t_run("Running time excluding initialization & destruction: ");
-    Galois::StatTimer t_init("initialization time: ");
-    Galois::StatTimer t_sort("serial sorting time: ");
-    Galois::StatTimer t_loop("serial loop time: ");
+    galois::StatTimer t_run("Running time excluding initialization & destruction: ");
+    galois::StatTimer t_init("initialization time: ");
+    galois::StatTimer t_sort("serial sorting time: ");
+    galois::StatTimer t_loop("serial loop time: ");
 
     t_init.start ();
     VecRep repVec (numNodes, -1);

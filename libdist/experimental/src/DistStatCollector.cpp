@@ -43,8 +43,8 @@
 #include <iostream>
 #include <fstream>
 
-using namespace Galois;
-using namespace Galois::Runtime;
+using namespace galois;
+using namespace galois::Runtime;
 
 DistStatCollector::DistStatCollector(const std::string& outfile): StatCollector(outfile) {}
 
@@ -62,7 +62,7 @@ static void recvAtHost_0_str(uint32_t HostID, const std::string loopname, const 
 }
 
 void DistStatCollector::combineAtHost_0(void) {
-  Galois::Runtime::getHostBarrier().wait();
+  galois::Runtime::getHostBarrier().wait();
 
   if (getHostID() != 0) {
     for (auto& p : Stats) {
@@ -101,7 +101,7 @@ void DistStatCollector::combineAtHost_0(void) {
     }
   }
 
-  Galois::Runtime::getHostBarrier().wait();
+  galois::Runtime::getHostBarrier().wait();
 }
 
 

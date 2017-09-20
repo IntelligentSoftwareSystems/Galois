@@ -43,7 +43,7 @@
 #include <cassert>
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 namespace detail {
@@ -168,6 +168,6 @@ public:
 };
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

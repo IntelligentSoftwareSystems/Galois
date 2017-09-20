@@ -33,7 +33,7 @@
 #include <iterator>
 #include <new>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 //! Small wrapper to have value void specialization
@@ -565,7 +565,7 @@ protected:
   //! Divide graph into equal sized chunks
   void distribute(FileGraph& graph, GaloisRuntime::PerThreadStorage<DistributeInfo>& dinfo) {
     size_t total = sizeof(NodeInfo) * numNodes + sizeof(EdgeInfo) * numEdges;
-    unsigned int num = Galois::getActiveThreads();
+    unsigned int num = galois::getActiveThreads();
     size_t blockSize = total / num;
     size_t curSize = 0;
     FileGraph::iterator ii = graph.begin();
@@ -820,8 +820,8 @@ public:
     size_t size = sizeof(NodeInfo*) * numNodes;
     nodes = reinterpret_cast<NodeInfo**>(GaloisRuntime::MM::largeInterleavedAlloc(size));
 
-    Galois::on_each(AllocateNodes(dinfo, headers, nodes, graph));
-    Galois::on_each(AllocateEdges(dinfo, nodes, graph));
+    galois::on_each(AllocateNodes(dinfo, headers, nodes, graph));
+    galois::on_each(AllocateEdges(dinfo, nodes, graph));
   }
 };
 

@@ -26,7 +26,7 @@
 #include <limits>
 #include <ostream>
 
-namespace Galois {
+namespace galois {
 
 class OnlineStat {
   unsigned int n;
@@ -78,6 +78,6 @@ public:
   }
 };
 
-} //namespace Galois
+} //namespace galois
 
 #endif

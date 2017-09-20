@@ -13,9 +13,9 @@ parallel allocators for some of the common usage patterns. We describe some of t
 below:
 
 \subsection per-iter-alloc Per Iteration Allocator
-Per Iteration Allocator {@link Galois::PerIterAllocTy} can be used when dynamic data structures are defined inside
+Per Iteration Allocator {@link galois::PerIterAllocTy} can be used when dynamic data structures are defined inside
 the parallel loop and live for only one iteration of the loop. This allocator can
-be used inside the functors for Galois::for_each and Galois::do_all. It can be used
+be used inside the functors for galois::for_each and galois::do_all. It can be used
 with STL data structures, e.g., std::vector and std::set etc., and, supports
 variable size allocations. 
 
@@ -29,7 +29,7 @@ Allocator. The following steps are required to access the Per Iteration Allocato
   @snippet apps/delaunayrefinement/DelaunayRefinement.cpp Enabling Per Iteration Allocator in DMR
 
 - A reference to the allocator can be accessed through 
-  {@link Galois::UserContext::getPerIterAlloc}, which can then be passed to dynamic
+  {@link galois::UserContext::getPerIterAlloc}, which can then be passed to dynamic
   data structures such as std::vector. E.g., in DMR
   {@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
   @snippet apps/delaunayrefinement/DelaunayRefinement.cpp  Accessing Per Iteration Allocator in DMR
@@ -43,12 +43,12 @@ Allocator (file {@link apps/delaunayrefinement/Cavity.h}):
 
 A common usage pattern is to allocate objects of the same type inside the parallel
 loop. Such an allocator can be implemented easily in a scalable manner. Galois
-provides {@link Galois::GFixedAllocator}, which takes a template parameter as the
+provides {@link galois::GFixedAllocator}, which takes a template parameter as the
 type of object to be allocated. It only supports allocating objects of one specific type
 (and size), therefore, it cannot be used with STL data structures like std::vector
 and std::deque, which allocate variable size chunks. However, it can be used with
 STL data structures like std::set, and std::list, etc., which allocated objects of
-one type only. The source for {@link Galois::ThreadSafeOrderedSet} shows how
+one type only. The source for {@link galois::ThreadSafeOrderedSet} shows how
 a fixed size allocator can be passed to std::set.
 
 This allocator is typically instantiated outside the parallel loop by the master
@@ -60,7 +60,7 @@ include/Galois/gdeque.h} is shown below:
 
 \subsection plugin-other-alloc Plugging in 3rd Party Allocators
 
-{@link Galois::Runtime::MM::ExternRefGaloisAllocator} is a wrapper class that can
+{@link galois::Runtime::MM::ExternRefGaloisAllocator} is a wrapper class that can
 be used to wrap any third-party heap implementation, and make it use-able by Galois
 and STL data structures. It takes the type-name of the heap implementation as a
 template parameter and a reference to it for instantiating the allocator object.  
@@ -81,23 +81,23 @@ Several heap implementations are just wrappers around another heap implementatio
 to modify its interface in some way. In the following we list a few of them and
 show an example:
 
-- {@link Galois::Runtime::MM::SystemBaseAlloc} defines the basic heap
+- {@link galois::Runtime::MM::SystemBaseAlloc} defines the basic heap
   implementation used by Galois allocators, and is the source of all heap memory.
   It is implemented as a list of pages stored by each thread. 
 
-- {@link Galois::Runtime::MM::FreeListHeap} maintains a linked list of blocks of
+- {@link galois::Runtime::MM::FreeListHeap} maintains a linked list of blocks of
   size *B*, where *B* is the size of the objects being allocated. This is a fixed
   size heap, and is a wrapper around a source heap implementation that is passed
   as a template argument.
 
-- {@link Galois::Runtime::MM::SimpleBumpPtr} allows allocating different size
+- {@link galois::Runtime::MM::SimpleBumpPtr} allows allocating different size
   objects within a block of memory by simply moving a pointer within the block. The
   size of the block is determined by the source heap implementation provided as a
   template argument. The memory within a block cannot be freed, however, blocks are 
   freed only at the end of the program when the SimpleBumpPtr's destructor is
   called.
 
-- {@link Galois::Runtime::MM::ThreadAwarePrivateHeap} creates a per-thread instance
+- {@link galois::Runtime::MM::ThreadAwarePrivateHeap} creates a per-thread instance
   of a source heap provided as a template argument. This is used for defining some
   of the parallel allocators. 
 

@@ -134,7 +134,7 @@ static void structure_from_file_genmat (float *M[])
 {
    int ii, jj;
    int a=0, b;
-   Galois::Graph::FileGraph g;
+   galois::Graph::FileGraph g;
    int num_blocks;
    unsigned max_id;
 
@@ -304,14 +304,14 @@ void fwd(float *diag, float *col)
             col[i*bots_arg_size_1+j] = col[i*bots_arg_size_1+j] - diag[i*bots_arg_size_1+k]*col[k*bots_arg_size_1+j];
 }
 
-static Galois::LargeArray<Galois::Runtime::Lockable> locks;
+static galois::LargeArray<galois::Runtime::Lockable> locks;
 
 void sparselu_init (float ***pBENCH, char *pass)
 {
-   Galois::setActiveThreads(bots_arg_size_2);
-   Galois::Substrate::getThreadPool().burnPower(bots_arg_size_2);
-   Galois::preAlloc(5*bots_arg_size_2);
-   Galois::reportPageAlloc("MeminfoPre");
+   galois::setActiveThreads(bots_arg_size_2);
+   galois::Substrate::getThreadPool().burnPower(bots_arg_size_2);
+   galois::preAlloc(5*bots_arg_size_2);
+   galois::reportPageAlloc("MeminfoPre");
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
    genmat(*pBENCH);
    print_structure(pass, *pBENCH);
@@ -368,7 +368,7 @@ struct FwdBdiv {
     }
   };
 
-  void doSeek(const Task& t, Galois::UserContext<Task>& ctx) {
+  void doSeek(const Task& t, galois::UserContext<Task>& ctx) {
     int jj = t.arg;
     if (BENCH[kk*bots_arg_size+jj] != NULL)
       ctx.push(Task {FWD, jj});
@@ -377,17 +377,17 @@ struct FwdBdiv {
       ctx.push(Task {BDIV, ii});
   }
 
-  void doFwd(const Task& t, Galois::UserContext<Task>& ctx) {
+  void doFwd(const Task& t, galois::UserContext<Task>& ctx) {
     int jj = t.arg;
     fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj]);
   }
 
-  void doBdiv(const Task& t, Galois::UserContext<Task>& ctx) {
+  void doBdiv(const Task& t, galois::UserContext<Task>& ctx) {
     int ii = t.arg;
     bdiv(BENCH[kk*bots_arg_size+kk], BENCH[ii*bots_arg_size+kk]);
   }
 
-  void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+  void operator()(const Task& t, galois::UserContext<Task>& ctx) {
     switch (t.type) {
       case SEEK: return doSeek(t, ctx);
       case FWD: return doFwd(t, ctx);
@@ -417,7 +417,7 @@ struct Bmod {
     }
   };
 
-  void doSeek(const Task& t, Galois::UserContext<Task>& ctx) {
+  void doSeek(const Task& t, galois::UserContext<Task>& ctx) {
     int ii = t.arg1;
     if (BENCH[ii*bots_arg_size+kk] != NULL)
       for (int jj=kk+1; jj<bots_arg_size; jj++)
@@ -425,7 +425,7 @@ struct Bmod {
           ctx.push(Task { BMOD, ii, jj });
   }
 
-  void doBmod(const Task& t, Galois::UserContext<Task>& ctx) {
+  void doBmod(const Task& t, galois::UserContext<Task>& ctx) {
     int ii = t.arg1;
     int jj = t.arg2;
     if (BENCH[ii*bots_arg_size+jj]==NULL)
@@ -433,7 +433,7 @@ struct Bmod {
     bmod(BENCH[ii*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj], BENCH[ii*bots_arg_size+jj]);
   }
 
-  void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+  void operator()(const Task& t, galois::UserContext<Task>& ctx) {
     switch (t.type) {
       case SEEK: return doSeek(t, ctx);
       case BMOD: return doBmod(t, ctx);
@@ -479,10 +479,10 @@ struct FwdBdivBmod {
     typedef int tt_does_not_need_push;
 
     void acquire(int ii, int jj) {
-      Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::WRITE);
+      galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], galois::MethodFlag::WRITE);
     }
 
-    void operator()(const Task& t, Galois::UserContext<Task>&) {
+    void operator()(const Task& t, galois::UserContext<Task>&) {
       int ii, jj, kk = t.kk;
       switch (t.type) {
         case LU0:
@@ -539,7 +539,7 @@ struct FwdBdivBmod {
 
     float** BENCH;
 
-    void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+    void operator()(const Task& t, galois::UserContext<Task>& ctx) {
       int ii, jj, kk = t.kk;
 
       switch (t.type) {
@@ -582,21 +582,21 @@ static void bs_algo(float **BENCH)
 {
   int ii, jj, kk;
 
-  namespace ww = Galois::WorkList;
+  namespace ww = galois::WorkList;
   typedef ww::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
 
   for (kk=0; kk<bots_arg_size; kk++) {
     lu0(BENCH[kk*bots_arg_size+kk]);
 
-    Galois::for_each(
+    galois::for_each(
         boost::transform_iterator<FwdBdiv::Initializer, boost::counting_iterator<int>>(kk+1),
         boost::transform_iterator<FwdBdiv::Initializer, boost::counting_iterator<int>>(bots_arg_size),
-        FwdBdiv { BENCH, kk }, Galois::wl<WL>());
+        FwdBdiv { BENCH, kk }, galois::wl<WL>());
 
-    Galois::for_each(
+    galois::for_each(
         boost::transform_iterator<Bmod::Initializer, boost::counting_iterator<int>>(kk+1),
         boost::transform_iterator<Bmod::Initializer, boost::counting_iterator<int>>(bots_arg_size),
-        Bmod { BENCH, kk }, Galois::wl<WL>());
+        Bmod { BENCH, kk }, galois::wl<WL>());
   }
 }
 
@@ -605,22 +605,22 @@ static void ikdg_algo(float **BENCH)
   int kk;
   typedef boost::transform_iterator<FwdBdivBmod::Initializer, boost::counting_iterator<int>> TI;
 
-  Galois::setDoAllImpl (Galois::DOALL_COUPLED);
-  if (Galois::getDoAllImpl () != Galois::DOALL_COUPLED) { std::abort (); }
+  galois::setDoAllImpl (galois::DOALL_COUPLED);
+  if (galois::getDoAllImpl () != galois::DOALL_COUPLED) { std::abort (); }
 
-  Galois::Runtime::for_each_ordered_ikdg(
-      Galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
+  galois::Runtime::for_each_ordered_ikdg(
+      galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
       FwdBdivBmod::Comparator { },
       FwdBdivBmod::NeighborhoodVisitor { BENCH },
       FwdBdivBmod::Process { BENCH },
       std::make_tuple(
-        Galois::loopname("sparselu-ikdg")));
+        galois::loopname("sparselu-ikdg")));
 }
 
 void sparselu_par_call(float **BENCH)
 {
-  Galois::StatManager manager;
-  Galois::StatTimer T;
+  galois::StatManager manager;
+  galois::StatTimer T;
 
   T.start();
   bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
@@ -630,13 +630,13 @@ void sparselu_par_call(float **BENCH)
   else
     ikdg_algo(BENCH);
   bots_message(" completed!\n");
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
   T.stop();
 }
 
 void sparselu_fini (float **BENCH, char *pass)
 {
-  Galois::Substrate::getThreadPool().beKind();
+  galois::Substrate::getThreadPool().beKind();
    print_structure(pass, BENCH);
    locks.destroy();
    locks.deallocate();

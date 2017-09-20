@@ -38,7 +38,7 @@
 
 #include <utility>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 // Store an item with padding
@@ -63,6 +63,6 @@ struct CacheLineStorage {
 };
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

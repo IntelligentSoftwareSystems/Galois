@@ -11,10 +11,10 @@
 #include "SSSP.h"
 
 struct GraphLabAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<SNode,uint32_t>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
@@ -52,7 +52,7 @@ struct GraphLabAlgo {
 
     void apply(Graph& graph, GNode node, const gather_type&) {
       changed = false;
-      SNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+      SNode& data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       if (data.dist > min_dist) {
         changed = true;
         data.dist = min_dist;
@@ -64,9 +64,9 @@ struct GraphLabAlgo {
     }
     
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        Galois::GraphLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+        galois::GraphLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
+      SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+      SNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + edgeValue;
       if (ddata.dist > newDist) {
         ctx.push(dst, message_type(newDist));
@@ -77,7 +77,7 @@ struct GraphLabAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }

@@ -43,7 +43,7 @@
 #include <cassert>
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace LL {
 
@@ -199,6 +199,6 @@ public:
 
 }
 }
-} // end namespace Galois
+} // end namespace galois
 
 #endif

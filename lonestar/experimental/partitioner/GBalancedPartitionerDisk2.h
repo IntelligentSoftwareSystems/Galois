@@ -125,7 +125,7 @@ struct GBPD2 {
       /*
        *
        * */
-      void assignEdge(Galois::Graph::OfflineGraph & g, NodeItType & _src, Galois::Graph::OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
+      void assignEdge(galois::Graph::OfflineGraph & g, NodeItType & _src, galois::Graph::OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
          _vertexOwnersPacked[src][owner]=1;
@@ -146,7 +146,7 @@ struct GBPD2 {
        * smallest number of masters is selected to be the master of the current
        * node, and the masters-count for the host is updated.
        * */
-      void assignMasters(size_t nn, size_t numhost, Galois::Graph::OfflineGraph &g) {
+      void assignMasters(size_t nn, size_t numhost, galois::Graph::OfflineGraph &g) {
          vertexMasters.resize(nn, ~0);
          for (size_t n = 0; n < nn; ++n) {
             if(vertexMasters[n] != ~0){
@@ -258,8 +258,8 @@ struct GBPD2 {
    /*
     * Partitioning routine.
     * */
-   void operator()(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts, std::string prefix_tmpFileName) {
-      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
+   void operator()(std::string & basename, galois::Graph::OfflineGraph & g, size_t num_hosts, std::string prefix_tmpFileName) {
+      galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
 
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
 //      mtrace();
@@ -309,7 +309,7 @@ struct GBPD2 {
     * Optimized implementation for memory usage.
     * Write both the metadata as well as the partition information.
     * */
-   void writePartitionsMem(std::string & basename,Galois::Graph::OfflineGraph & g, size_t num_hosts) {
+   void writePartitionsMem(std::string & basename,galois::Graph::OfflineGraph & g, size_t num_hosts) {
       //Create graph
       std::cout << " Low mem version\n";
       std::vector<std::FILE *> meta_files;
@@ -374,7 +374,7 @@ struct GBPD2 {
          }
 
          std::cout << "Analysis :: " << vcInfo.verticesPerHost[h] << " , " << vcInfo.edgesPerHost[h] << "\n";
-         using namespace Galois::Graph;
+         using namespace galois::Graph;
          FileGraphWriter * ng = new FileGraphWriter();
          FileGraphWriter &newGraph = *ng;
          newGraph.setNumNodes(vcInfo.verticesPerHost[h]);

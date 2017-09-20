@@ -56,7 +56,7 @@ llvm::cl::opt<unsigned int> enforce_metadata("metadata", llvm::cl::desc("Enforce
 DataCommMode enforce_data_mode = noData;
 
 static void PrintVersion() {
-  std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
+  std::cout << "Galois Benchmark Suite v" << galois::getVersion() << " (" << galois::getRevision() << ")\n";
 }
 
 //! initialize lonestar benchmark
@@ -65,18 +65,18 @@ void DistBenchStart(int argc, char** argv,
   
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  numThreads = Galois::setActiveThreads(numThreads); 
-  Galois::Runtime::setStatFile(statFile);
+  numThreads = galois::setActiveThreads(numThreads); 
+  galois::Runtime::setStatFile(statFile);
 
 
   assert(enforce_metadata <= 3);
   enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   
   if (net.ID == 0) {
     PrintVersion();
-    std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
+    std::cout << "Copyright (C) " << galois::getCopyrightYear() << " The University of Texas at Austin\n";
     std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
     std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
     if (desc)
@@ -91,17 +91,17 @@ void DistBenchStart(int argc, char** argv,
       if (i != argc - 1)
         cmdout << " ";
     }
-    Galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
-    Galois::Runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
-    Galois::Runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
-    Galois::Runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
-    Galois::Runtime::reportParam("(NULL)", "Run_UUID", Galois::Runtime::getRandUUID());
+    galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+    galois::Runtime::reportParam("(NULL)", "Threads", (unsigned long)numThreads);
+    galois::Runtime::reportParam("(NULL)", "Hosts", (unsigned long)net.Num);
+    galois::Runtime::reportParam("(NULL)", "Runs", (unsigned long)numRuns);
+    galois::Runtime::reportParam("(NULL)", "Run_UUID", galois::Runtime::getRandUUID());
   }
 
   char name[256];
   gethostname(name, 256);
-  Galois::Runtime::reportParam("(NULL)", "Hostname", name);
+  galois::Runtime::reportParam("(NULL)", "Hostname", name);
 
   if(savegraph)
-    Galois::Runtime::reportParam("(NULL)", "outputFile", outputFile.c_str());
+    galois::Runtime::reportParam("(NULL)", "outputFile", outputFile.c_str());
 }

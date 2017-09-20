@@ -39,31 +39,31 @@
 #include "Galois/WorkList/Separator.h"
 #include "Galois/Timer.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 namespace detail {
 
 template<typename T,
 	 typename Scheduler = dChunkedFIFO<64, T>, 
-         typename Set = Galois::ThreadSafeOrderedSet<T> > 
+         typename Set = galois::ThreadSafeOrderedSet<T> > 
 struct WorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;
   Set set;
-  Galois::Statistic* duplicate;
+  galois::Statistic* duplicate;
 
 public:
   typedef T value_type;
   template<typename _T>
   using retype = WorkSetMaster<_T, typename Scheduler::template retype<_T>, typename Set::template retype<_T> >;
 
-  WorkSetMaster() { duplicate = new Galois::Statistic("SchedulerDuplicates"); }
+  WorkSetMaster() { duplicate = new galois::Statistic("SchedulerDuplicates"); }
 
   template<typename... Args>
-  WorkSetMaster(Galois::WorkList::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
+  WorkSetMaster(galois::WorkList::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
   {
-    duplicate = new Galois::Statistic("SchedulerDuplicates");
+    duplicate = new galois::Statistic("SchedulerDuplicates");
   }
 
   ~WorkSetMaster() { delete duplicate; }
@@ -88,9 +88,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
-    auto defaultRetVal = Galois::optional<value_type>();
-    Galois::optional<value_type> retval = scheduler.pop();
+  galois::optional<value_type> pop() {
+    auto defaultRetVal = galois::optional<value_type>();
+    galois::optional<value_type> retval = scheduler.pop();
 
     if(retval == defaultRetVal)
       return defaultRetVal;
@@ -103,22 +103,22 @@ public:
 }  // end namespace detail
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedOrderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, Galois::ThreadSafeOrderedSet<T> >;
+using dChunkedOrderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedOrderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedUnorderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, Galois::ThreadSafeUnorderedSet<T> >;
+using dChunkedUnorderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedUnorderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelHashFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, Galois::ThreadSafeTwoLevelHash<T> >;
+using dChunkedTwoLevelHashFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedTwoLevelHashFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, Galois::ThreadSafeTwoLevelSet<T> >;
+using dChunkedTwoLevelSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedTwoLevelSetFIFO);
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

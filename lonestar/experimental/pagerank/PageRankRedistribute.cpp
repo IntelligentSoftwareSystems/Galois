@@ -74,7 +74,7 @@ struct Node {
   bool hasNoOuts;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node, double> Graph;
+typedef galois::Graph::LC_CSR_Graph<Node, double> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -109,11 +109,11 @@ void serialPageRank() {
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       GNode src = *ii;
       double value = 0;
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         double w = graph.getEdgeData(ii);
 
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         value += getPageRank(ddata, iterations) * w;
       }
        
@@ -121,7 +121,7 @@ void serialPageRank() {
       if (alpha > 0)
         value = value * (1 - alpha) + alpha/numNodes;
 
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       if (sdata.hasNoOuts) {
         lost_potential += getPageRank(sdata, iterations);
       }
@@ -142,7 +142,7 @@ void serialPageRank() {
       unsigned int next = iterations + 1;
       for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-        Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+        Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
         double value = getPageRank(sdata, next);
         // assuming uniform prior probability, i.e., 1 / numNodes
         double delta = (1 - alpha) * (lost_potential / numNodes);
@@ -170,9 +170,9 @@ void serialPageRank() {
 
 struct Process {
   struct Accum {
-    Galois::GReduceMax<double> max_delta;
-    Galois::GAccumulator<unsigned int> small_delta;
-    Galois::GAccumulator<double> lost_potential;
+    galois::GReduceMax<double> max_delta;
+    galois::GAccumulator<unsigned int> small_delta;
+    galois::GAccumulator<double> lost_potential;
   };
 
   Accum& accum;
@@ -181,17 +181,17 @@ struct Process {
 
   Process(Accum& a, double t, unsigned int numNodes): accum(a), tol(t), addend(alpha/numNodes) { }
 
-  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
     operator()(src);
   }
 
   void operator()(const GNode& src) const {
     double value = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       double w = graph.getEdgeData(ii);
 
-      Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       value += getPageRank(ddata, iterations) * w;
     }
      
@@ -199,7 +199,7 @@ struct Process {
     if (alpha > 0)
       value = value * (1 - alpha) + addend;
 
-    Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     if (sdata.hasNoOuts) {
       accum.lost_potential += getPageRank(sdata, iterations);
     }
@@ -222,7 +222,7 @@ struct RedistributeLost {
   RedistributeLost(double p): delta((1 - alpha) * p), next(iterations + 1) { }
 
   void operator()(const GNode& src) const {
-    Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     double value = getPageRank(sdata, next);
     // assuming uniform prior probability, i.e., 1 / numNodes
     setPageRank(sdata, iterations, value + delta);
@@ -238,10 +238,10 @@ void parallelPageRank() {
   
   while (true) {
     Process::Accum accum;
-    Galois::do_all(graph.begin(), graph.end(), Process(accum, tol, numNodes));
+    galois::do_all(graph.begin(), graph.end(), Process(accum, tol, numNodes));
     double lost_potential = accum.lost_potential.reduce();
     if (lost_potential > 0) {
-      Galois::do_all(graph.begin(), graph.end(), RedistributeLost(lost_potential / numNodes));
+      galois::do_all(graph.begin(), graph.end(), RedistributeLost(lost_potential / numNodes));
     }
 
     unsigned int small_delta = accum.small_delta.reduce();
@@ -269,9 +269,9 @@ void parallelPageRank() {
 #if 0
 //! Transpose in-edges to out-edges
 static void transposeGraph() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef Galois::Graph::FirstGraph<size_t, double, true> OutputGraph;
+  typedef galois::Graph::FirstGraph<size_t, double, true> OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
@@ -327,7 +327,7 @@ static void transposeGraph() { abort(); }
 #endif
 
 static void readGraph() {
-  Galois::Graph::readGraph(graph, inputFilename);
+  galois::Graph::readGraph(graph, inputFilename);
 
   std::string nodeFilename = inputFilename + ".node";
   int fd = open(nodeFilename.c_str(), O_RDONLY);
@@ -396,10 +396,10 @@ void printTop(int topn) {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
-  Galois::StatTimer T;
-  Galois::StatTimer RT("ReadTime");
+  galois::StatTimer T;
+  galois::StatTimer RT("ReadTime");
   switch (phase) {
     case transpose:
       RT.start(); transposeGraph(); RT.stop();

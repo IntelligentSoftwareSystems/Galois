@@ -31,7 +31,7 @@
 #ifndef GALOISGPU_OCL_CPUARRAY_H_
 #define GALOISGPU_OCL_CPUARRAY_H_
 
-namespace Galois{
+namespace galois{
 /*******************************************************************************
  *
  ********************************************************************************/
@@ -39,7 +39,7 @@ template<typename T>
 struct CPUArray {
    typedef cl_mem DevicePtrType;
    typedef T * HostPtrType;
-   explicit CPUArray(size_t sz, Galois::OpenCL::CL_Device * d=nullptr) :
+   explicit CPUArray(size_t sz, galois::OpenCL::CL_Device * d=nullptr) :
             num_elements(sz) {
       (void)d;
          host_data = new T[num_elements];
@@ -82,7 +82,7 @@ struct CPUArray {
    size_t num_elements;
 protected:
 };
-}//end namespace Galois
+}//end namespace galois
 
 
 

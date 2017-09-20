@@ -221,7 +221,7 @@ struct StandardWindowing {
 
 	StandardWindowing( aig::Graph & graph, int nFanins, int nFanouts ) : graph( graph ), nFanins( nFanins ), nFanouts( nFanouts ) { }
 
-	void operator()( aig::GNode node, Galois::UserContext< aig::GNode > & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
 		
 		aig::NodeData & nodeData = graph.getData( node );
 		
@@ -252,7 +252,7 @@ struct StandardWindowing {
 
 void Windowing::runStandardWindowing( int nFanins, int nFanouts ) {
 
-	Galois::InsertBag< aig::GNode > workList;
+	galois::InsertBag< aig::GNode > workList;
 
 	for ( aig::GNode node : this->aig.getGraph() ) {
 		aig::NodeData & nodeData = this->aig.getGraph().getData( node );
@@ -261,7 +261,7 @@ void Windowing::runStandardWindowing( int nFanins, int nFanouts ) {
 		}
 	}
 
-	Galois::for_each( workList.begin(), workList.end(), StandardWindowing( this->aig.getGraph(), nFanins, nFanouts ) );
+	galois::for_each( workList.begin(), workList.end(), StandardWindowing( this->aig.getGraph(), nFanins, nFanouts ) );
 }
 
 struct ReconvDrivenWindowing {
@@ -273,7 +273,7 @@ struct ReconvDrivenWindowing {
 
 	ReconvDrivenWindowing( aig::Graph & graph, int nInputs, int nOutputs, int nLevels ) : graph( graph ), nInputs( nInputs ), nOutputs( nOutputs ), nLevels( nLevels ) { }
 
-	void operator()( aig::GNode node, Galois::UserContext< aig::GNode > & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
 		
 		aig::NodeData & nodeData = graph.getData( node );
 		
@@ -299,7 +299,7 @@ struct ReconvDrivenWindowing {
 
 void Windowing::runReconvDrivenWindowing( int nInputs, int nOutputs, int nLevels ) {
 
-	Galois::InsertBag< aig::GNode > workList;
+	galois::InsertBag< aig::GNode > workList;
 
 	for ( aig::GNode node : this->aig.getGraph() ) {
 		aig::NodeData & nodeData = this->aig.getGraph().getData( node );
@@ -308,7 +308,7 @@ void Windowing::runReconvDrivenWindowing( int nInputs, int nOutputs, int nLevels
 		}
 	}
 	
-	Galois::for_each( workList.begin(), workList.end(), ReconvDrivenWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels ) );
+	galois::for_each( workList.begin(), workList.end(), ReconvDrivenWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels ) );
 }
 
 } /* namespace algorithm */

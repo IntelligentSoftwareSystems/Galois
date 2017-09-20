@@ -48,7 +48,7 @@
 #include <mutex>
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
@@ -76,7 +76,7 @@ class DoAllExecutor {
       if (std::distance(begin, end) > 1) {
         avail = true;
         stealEnd = end;
-        stealBegin = end = Galois::split_range(begin, end);
+        stealBegin = end = galois::split_range(begin, end);
       }
       stealLock.unlock();
     }
@@ -92,7 +92,7 @@ class DoAllExecutor {
           if (std::distance(stealBegin, stealEnd) < 2*minSteal)
             end = stealBegin = stealEnd;
           else
-            end = stealBegin = Galois::split_range(stealBegin, stealEnd);
+            end = stealBegin = galois::split_range(stealBegin, stealEnd);
           if (stealBegin == stealEnd)
             avail = false;
           return begin != end;
@@ -218,6 +218,6 @@ void do_all_gen_old(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) 
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif// GALOIS_RUNTIME_EXECUTOR_DOALL_OLD_H

@@ -16,9 +16,9 @@ void combineCuts( aig::Graph & graph, aig::GNode node, int k, int c );
 struct Preprocess {
 	
 	aig::Graph & graph;
-	Galois::InsertBag< aig::GNode > & workList;
+	galois::InsertBag< aig::GNode > & workList;
   
-	Preprocess( aig::Graph & graph, Galois::InsertBag< aig::GNode > & workList ) : graph( graph ), workList( workList ) { }
+	Preprocess( aig::Graph & graph, galois::InsertBag< aig::GNode > & workList ) : graph( graph ), workList( workList ) { }
   
 	void operator()( aig::GNode pi ) const {
 			
@@ -49,7 +49,7 @@ struct Process {
 
 	Process( aig::Graph & graph, int k, int c ) : graph( graph ), k( k ), c( c ) { }
 
-	void operator()( aig::GNode node, Galois::UserContext<aig::GNode> & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext<aig::GNode> & ctx ) const {
 	
 		aig::NodeData & nodeData = graph.getData( node );
 
@@ -159,11 +159,11 @@ struct Process {
 
 void CutFinder::run( int k, int c ) {
 
-	Galois::InsertBag< aig::GNode > workList;
+	galois::InsertBag< aig::GNode > workList;
 	
-	Galois::do_all( this->aig.getInputNodes().begin(), this->aig.getInputNodes().end(), Preprocess( this->aig.getGraph(), workList ) );
-	Galois::for_each_local( workList, Process( this->aig.getGraph(), k, c ), Galois::loopname("K-Cuts") );
-	// Galois::for_each( workList.begin(), workList.end(), Process( this->aig.getGraph(), k, c ) );
+	galois::do_all( this->aig.getInputNodes().begin(), this->aig.getInputNodes().end(), Preprocess( this->aig.getGraph(), workList ) );
+	galois::for_each_local( workList, Process( this->aig.getGraph(), k, c ), galois::loopname("K-Cuts") );
+	// galois::for_each( workList.begin(), workList.end(), Process( this->aig.getGraph(), k, c ) );
 	
 }
 

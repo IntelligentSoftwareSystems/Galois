@@ -34,7 +34,7 @@
 
 #include <algorithm>
 
-namespace Galois {
+namespace galois {
 
 template <typename T, typename C=typename gstl::Vector<T> > 
 class FlatSet {
@@ -118,7 +118,7 @@ public:
 
 };
 
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif //  GALOIS_FLAT_SET_H

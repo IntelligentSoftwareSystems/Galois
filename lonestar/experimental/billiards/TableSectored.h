@@ -262,15 +262,15 @@ private:
   }
 
 
-  Galois::optional<Event> computeEarliestEvent (Ball_t* ball, const FP& endtime, const Event* prevEvent) const {
+  galois::optional<Event> computeEarliestEvent (Ball_t* ball, const FP& endtime, const Event* prevEvent) const {
 
     auto range = ball->sectorRange ();
 
-    Galois::optional<Event> minEvent;
+    galois::optional<Event> minEvent;
     Event::Comparator cmp;
 
     for (auto i = range.first; i != range.second; ++i) {
-      Galois::optional<Event> e = (*i)->computeEarliestEvent (ball, endtime, prevEvent);
+      galois::optional<Event> e = (*i)->computeEarliestEvent (ball, endtime, prevEvent);
 
       if (e) {
         if (!minEvent || cmp (*e, *minEvent)) {
@@ -290,7 +290,7 @@ private:
 
     if (!prevEvent->firstBallChanged ()) {
 
-      Galois::optional<Event> minE1 = computeEarliestEvent (b1, endtime, prevEvent);
+      galois::optional<Event> minE1 = computeEarliestEvent (b1, endtime, prevEvent);
       if (minE1) {
         addList.push_back (*minE1);
 
@@ -302,7 +302,7 @@ private:
 
     if (!prevEvent->otherBallChanged ()) {
 
-      Galois::optional<Event> minE2 = computeEarliestEvent (b2, endtime, prevEvent);
+      galois::optional<Event> minE2 = computeEarliestEvent (b2, endtime, prevEvent);
       if (minE2) {
         addList.push_back (*minE2);
 
@@ -324,7 +324,7 @@ private:
       // after updating the ball. 
     }
 
-    Galois::optional<Event> minE = computeEarliestEvent (b, endtime, prevEvent);
+    galois::optional<Event> minE = computeEarliestEvent (b, endtime, prevEvent);
     if (minE) {
       addList.push_back (*minE);
 

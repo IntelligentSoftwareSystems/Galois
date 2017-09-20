@@ -40,7 +40,7 @@
 #include <cassert>
 #include <cstdlib>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 enum ConflictFlag {
@@ -118,14 +118,14 @@ class SimpleRuntimeContext: public LockManagerBase {
   bool customAcquire;
 
 protected:
-  friend void doAcquire(Lockable*, Galois::MethodFlag);
+  friend void doAcquire(Lockable*, galois::MethodFlag);
 
   static SimpleRuntimeContext* getOwner(Lockable* lockable) {
     LockManagerBase* owner = LockManagerBase::getOwner(lockable);
     return static_cast<SimpleRuntimeContext*>(owner);
   }
 
-  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m);
+  virtual void subAcquire(Lockable* lockable, galois::MethodFlag m);
 
   void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
@@ -133,7 +133,7 @@ protected:
     locks = lockable;
   }
 
-  void acquire(Lockable* lockable, Galois::MethodFlag m);
+  void acquire(Lockable* lockable, galois::MethodFlag m);
   void release(Lockable* lockable);
 
 public:
@@ -148,7 +148,7 @@ public:
   unsigned commitIteration();
 
 #ifdef GALOIS_USE_EXP
-  virtual bool owns(Lockable* lockable, Galois::MethodFlag m) const;
+  virtual bool owns(Lockable* lockable, galois::MethodFlag m) const;
 #endif
 };
 
@@ -159,9 +159,9 @@ SimpleRuntimeContext* getThreadContext();
 void setThreadContext(SimpleRuntimeContext* n);
 
 //! Helper function to decide if the conflict detection lock should be taken
-inline bool shouldLock(const Galois::MethodFlag g) {
+inline bool shouldLock(const galois::MethodFlag g) {
   // Mask out additional "optional" flags
-  switch (g & Galois::MethodFlag::INTERNAL_MASK) {
+  switch (g & galois::MethodFlag::INTERNAL_MASK) {
   case MethodFlag::UNPROTECTED:
   case MethodFlag::PREVIOUS:
     return false;
@@ -180,7 +180,7 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 }
 
 //! actual locking function.  Will always lock.
-inline void doAcquire(Lockable* lockable, Galois::MethodFlag m) {
+inline void doAcquire(Lockable* lockable, galois::MethodFlag m) {
   SimpleRuntimeContext* ctx = getThreadContext();
   if (ctx)
     ctx->acquire(lockable, m);
@@ -188,20 +188,20 @@ inline void doAcquire(Lockable* lockable, Galois::MethodFlag m) {
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
+inline void acquire(Lockable* lockable, galois::MethodFlag m) {
   if (shouldLock(m))
     doAcquire(lockable, m);
 }
 
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
-    doAcquire(lockable, Galois::MethodFlag::WRITE);
+    doAcquire(lockable, galois::MethodFlag::WRITE);
   }
 };
 
 struct CheckedLockObj {
-  Galois::MethodFlag m;
-  CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
+  galois::MethodFlag m;
+  CheckedLockObj(galois::MethodFlag _m) :m(_m) {}
   void operator()(Lockable* lockable) const {
     acquire(lockable, m);
   }
@@ -216,6 +216,6 @@ bool owns(Lockable* lockable, MethodFlag m);
 void signalFailSafe(void);
 
 }
-} // end namespace Galois
+} // end namespace galois
 
 #endif

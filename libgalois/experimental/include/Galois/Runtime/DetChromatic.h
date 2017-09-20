@@ -45,7 +45,7 @@
 #include <vector>
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 enum class InputDAG_ExecTy {
@@ -192,7 +192,7 @@ struct InputDAGdataInOut: public BaseDAGdata {
 struct InputDAGdataDirected: public InputDAGdata {
 
   // TODO: change to vector with pow 2 alloc
-  typedef Galois::gdeque<unsigned, 64> AdjList;
+  typedef galois::gdeque<unsigned, 64> AdjList;
 
   AdjList incoming;
 
@@ -229,13 +229,13 @@ protected:
   typedef typename G::GraphNode GNode;
   typedef typename G::node_data_type ND;
 
-  typedef Galois::PerThreadVector<bool> PerThrdColorVec;
+  typedef galois::PerThreadVector<bool> PerThrdColorVec;
 
   G& graph;
   A visitAdj;
   D visitDAGsucc;
   PerThrdColorVec perThrdColorVec;
-  Galois::GReduceMax<int> maxColors;
+  galois::GReduceMax<int> maxColors;
   bool initialized = false;
 
   DAGmanagerBase (G& graph, const A& visitAdj, const D& visitDAGsucc=D())
@@ -257,7 +257,7 @@ protected:
 public:
 
   template <typename F>
-  void applyToAdj (GNode src, F& f, const Galois::MethodFlag& flag=Galois::MethodFlag::UNPROTECTED) {
+  void applyToAdj (GNode src, F& f, const galois::MethodFlag& flag=galois::MethodFlag::UNPROTECTED) {
     visitAdj (src, f, flag);
   }
 
@@ -278,23 +278,23 @@ public:
   template <typename P>
   void initDAG (P postInit) {
 
-    Galois::StatTimer t("initDAG");
+    galois::StatTimer t("initDAG");
 
     t.start ();
 
     assignPriority ();
 
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
+    galois::do_all_choice (
+        galois::Runtime::makeLocalRange (graph),
         [this, &postInit] (GNode src) {
           
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
           assert (sd.indegree == 0);
           int indeg = 0;
 
           auto countDegClosure = [this, &sd, &indeg] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
             int c = DAGdataComparator<ND>::compare3val (dd, sd);
             if (c < 0) { // dd < sd
@@ -312,7 +312,7 @@ public:
 
         },
         "init-DAG",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     initialized = true;
 
@@ -326,16 +326,16 @@ public:
   template <typename R, typename W>
   void reinitActiveDAG (const R& range, W& sources) {
 
-    Galois::StatTimer t ("reinitActiveDAG");
+    galois::StatTimer t ("reinitActiveDAG");
 
     t.start ();
 
     GALOIS_ASSERT (initialized);
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode src) {
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
           // if (sd.onWL == 0) {
             // std::printf ("assertion going to fail sd.onWL==0, for id %d\n", sd.id);
@@ -346,17 +346,17 @@ public:
           sd.onWL = IS_ACTIVE;
         },
         "reinitActiveDAG-0",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode src) {
 
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           assert (sd.onWL > 0);
 
           auto closure = [this] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
             if (int(dd.onWL) == IS_ACTIVE) {
               ++(dd.indegree);
             }
@@ -365,12 +365,12 @@ public:
           applyToDAGsucc (src, sd, closure);
         },
         "reinitActiveDAG-1",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this, &sources] (GNode src) {
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           assert (sd.onWL > 0);
           // std::printf ("active node %d, with indegree %d\n", sd.id, int(sd.indegree));
           if (int(sd.onWL) == IS_ACTIVE && sd.indegree == 0) {
@@ -378,7 +378,7 @@ public:
 
             // if (DEBUG) {
               // auto closure = [this] (GNode dst) {
-                // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+                // auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
                 // if (dd.onWL > 0) {
                   // assert (int (dd.indegree) > 0);
                 // }
@@ -389,7 +389,7 @@ public:
           }
         },
         "reinitActiveDAG-2",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     t.stop ();
   }
@@ -402,14 +402,14 @@ public:
     F& func;
     U& userCtx;
     DAGmanagerBase& dagManager;
-    Galois::GAccumulator<size_t>& edgesVisited;
-    Galois::GAccumulator<size_t>& edgesFlipped;
+    galois::GAccumulator<size_t>& edgesVisited;
+    galois::GAccumulator<size_t>& edgesFlipped;
 
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
 
-      auto& sd = dagManager.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      auto& sd = dagManager.graph.getData (src, galois::MethodFlag::UNPROTECTED);
       assert (sd.onWL == dagManager.IS_ACTIVE); 
       sd.onWL = 0;
 
@@ -419,7 +419,7 @@ public:
 
       auto closure = [this, &ctx] (GNode dst) {
 
-        auto& dd = dagManager.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        auto& dd = dagManager.graph.getData (dst, galois::MethodFlag::UNPROTECTED);
         edgesVisited += 1;
 
         if (int (dd.onWL) == dagManager.IS_ACTIVE) { // is a succ in active dag
@@ -440,10 +440,10 @@ public:
 
   };
 
-  template <typename R, typename F, typename U, typename CS = Galois::chunk_size<DEFAULT_CHUNK_SIZE>>
+  template <typename R, typename F, typename U, typename CS = galois::chunk_size<DEFAULT_CHUNK_SIZE>>
   void runActiveDAGcomp (const R& range, F func, U& userCtx, const char* loopname, const CS& cs = CS ()) {
 
-    using WL_ty =  Galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
 
     GALOIS_ASSERT (initialized);
 
@@ -451,23 +451,23 @@ public:
     char str[256];
     sprintf (str, "%s-runActiveDAGcomp", loopname);
 
-    Galois::StatTimer t(str);
+    galois::StatTimer t(str);
     t.start ();
 
 
     WL_ty sources; 
     reinitActiveDAG (range, sources);
 
-    Galois::GAccumulator<size_t> edgesVisited;
-    Galois::GAccumulator<size_t> edgesFlipped;
+    galois::GAccumulator<size_t> edgesVisited;
+    galois::GAccumulator<size_t> edgesFlipped;
 
 
-    typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef galois::WorkList::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = 0;
-    Galois::for_each(it, it,
+    galois::for_each(it, it,
         ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
-        Galois::loopname(loopname),
-                     Galois::wl<WL>(std::ref(sources)));
+        galois::loopname(loopname),
+                     galois::wl<WL>(std::ref(sources)));
 
     // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
@@ -484,9 +484,9 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
+    galois::do_all_choice ( galois::Runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           sd.indegree = sd.indeg_backup;
 
           if (sd.indegree == 0) {
@@ -494,7 +494,7 @@ public:
           }
         },
         "resetDAG",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
   }
 
@@ -512,16 +512,16 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
+    galois::do_all_choice ( galois::Runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           // assert (sd.indegree == sd.indeg_backup);
           if (sd.indegree == 0) {
             sources.push (src);
           }
         }, 
         "collect-sources",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   template <typename F>
@@ -533,13 +533,13 @@ public:
     template <typename C>
     void operator () (GNode src, C& ctx) {
 
-      auto& sd = outer.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      auto& sd = outer.graph.getData (src, galois::MethodFlag::UNPROTECTED);
       assert (sd.indegree == 0);
 
       func (src);
 
       auto dagClosure = [this, &ctx] (GNode dst) {
-        auto& dd = outer.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        auto& dd = outer.graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
         int x = --(dd.indegree);
         // assert (x >= 0); // FIXME
@@ -558,47 +558,47 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    using WL_ty = Galois::WorkList::ExternalReference<W>;
+    using WL_ty = galois::WorkList::ExternalReference<W>;
     typename WL_ty::value_type* it = nullptr;
 
-    Galois::for_each (it, it, 
+    galois::for_each (it, it, 
         RunDAGcomp<F> {*this, func},
-        Galois::loopname (loopname),
-                      Galois::wl<WL_ty> (std::ref(initWL)));
+        galois::loopname (loopname),
+                      galois::wl<WL_ty> (std::ref(initWL)));
 
   }
 
-  template <typename F, typename B, typename CS = Galois::chunk_size<DEFAULT_CHUNK_SIZE> >
+  template <typename F, typename B, typename CS = galois::chunk_size<DEFAULT_CHUNK_SIZE> >
   void runDAGcomputation (F func, B& sources, const char* loopname, const CS& cs = CS ()) {
 
-    Galois::StatTimer t (loopname);
+    galois::StatTimer t (loopname);
 
     t.start ();
 
-    using WL_ty =  Galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
 
     WL_ty initWL;
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         makeLocalRange (sources), 
         [&initWL] (typename WL_ty::value_type src) {
           initWL.push (src);
         },
         "copy-sources",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     runDAGcomputationImpl (func, initWL, loopname);
 
     t.stop ();
   }
 
-  template <typename F, typename CS = Galois::chunk_size<DEFAULT_CHUNK_SIZE> >
+  template <typename F, typename CS = galois::chunk_size<DEFAULT_CHUNK_SIZE> >
   void runDAGcomputation (F func, const char* loopname, const CS& cs = CS ()) {
 
-    Galois::StatTimer t (loopname);
+    galois::StatTimer t (loopname);
 
     t.start ();
-    using WL_ty =  Galois::WorkList::AltChunkedFIFO<CS::value>;
+    using WL_ty =  galois::WorkList::AltChunkedFIFO<CS::value>;
 
     WL_ty sources;
 
@@ -611,7 +611,7 @@ public:
   void assignIDs (void) {
 
     const size_t numNodes = graph.size ();
-    Galois::on_each (
+    galois::on_each (
         [&] (const unsigned tid, const unsigned numT) {
 
           size_t num_per = (numNodes + numT - 1) / numT;
@@ -625,23 +625,23 @@ public:
           std::advance (it_end, (end - beg));
 
           for (; it_beg != it_end; ++it_beg) {
-            auto& nd = graph.getData (*it_beg, Galois::MethodFlag::UNPROTECTED);
+            auto& nd = graph.getData (*it_beg, galois::MethodFlag::UNPROTECTED);
             nd.id = beg++;
           }
         },
-        Galois::loopname ("assign-ids"));
+        galois::loopname ("assign-ids"));
   }
 
 
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
+    galois::do_all_choice (
+        galois::Runtime::makeLocalRange (graph),
         [&] (GNode node) {
           nodeFunc (node);
         },
         "assign-priority",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   static const unsigned MAX_LEVELS = 100;
@@ -663,35 +663,35 @@ public:
   void assignPriority (void) {
     assignIDs ();
     auto byId = [this] (GNode node) {
-      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
       nd.priority = nd.id % MAX_LEVELS;
     };
 
-    Galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
+    galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
 
     // TODO: non-deterministic at the moment
     // can be fixed by making thread K call the generator
     // N times, where N is sum of calls of all threads < K
     auto randPri = [this, &perThrdRNG] (GNode node) {
       auto& rng = *(perThrdRNG.getLocal ());
-      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
       nd.priority = rng ();
     };
 
 
     auto minDegree = [this] (GNode node) {
-      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
       nd.priority = visitAdj.count (node);
       assert (nd.priority >= 0);
     };
 
     const size_t numNodes = graph.size ();
     auto maxDegree = [this, &numNodes] (GNode node) {
-      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
       nd.priority = std::max (size_t (0), numNodes - visitAdj.count (node));
     };
     
-    Galois::StatTimer t_priority ("priority assignment time: ");
+    galois::StatTimer t_priority ("priority assignment time: ");
 
     t_priority.start ();
 
@@ -725,7 +725,7 @@ public:
 
 
   void colorNode (GNode src) {
-    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+    auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
     assert (sd.indegree == 0);
     assert (sd.color == -1); // uncolored
 
@@ -734,7 +734,7 @@ public:
 
 
     auto colorClosure = [this, &forbiddenColors, &sd] (GNode dst) {
-      auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+      auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
       if (int(forbiddenColors.size ()) <= dd.color) {
         forbiddenColors.resize (dd.color + 1, false);
@@ -767,25 +767,25 @@ public:
   }
 
   void verifyColoring (void) {
-    Galois::StatTimer t_verify ("Coloring verification time: ");
+    galois::StatTimer t_verify ("Coloring verification time: ");
 
     t_verify.start ();
     std::printf ("WARNING: verifying Coloring, timing will be off\n");
 
-    Galois::GReduceLogicalOR foundError;
+    galois::GReduceLogicalOR foundError;
 
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
+    galois::do_all_choice (
+        galois::Runtime::makeLocalRange (graph),
         [&] (GNode src) {
 
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           if (sd.color == -1) {
             std::fprintf (stderr, "ERROR: src %d found uncolored\n", sd.id);
             foundError.update (true);
           }
 
           auto visitAdj = [&] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
             if (sd.id != dd.id && sd.color == dd.color) {
               foundError.update (true);
               std::fprintf (stderr, "ERROR: nodes %d and %d have the same color\n",
@@ -800,7 +800,7 @@ public:
 
         }, 
         "check-coloring",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     t_verify.stop ();
 
@@ -837,7 +837,7 @@ struct DAGmanagerInOut {
     G& graph;
 
     template <typename F>
-    void operator () (GNode src, F& func, const Galois::MethodFlag& flag) {
+    void operator () (GNode src, F& func, const galois::MethodFlag& flag) {
 
       for (auto i = graph.in_edge_begin (src, flag)
           , end_i = graph.in_edge_end (src, flag); i != end_i; ++i) {
@@ -873,7 +873,7 @@ struct DAGmanagerInOut {
     template <typename ND, typename F>
     void operator () (GNode src, ND& sd, F& func) {
 
-      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+      for (auto i = graph.in_edge_begin (src, galois::MethodFlag::UNPROTECTED)
           , end_i = i + sd.dagSuccEndIn; i != end_i; ++i) {
 
         assert (i <= end_i);
@@ -881,7 +881,7 @@ struct DAGmanagerInOut {
         func (dst);
       }
 
-      for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+      for (auto i = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED)
           , end_i = i + sd.dagSuccEndOut; i != end_i; ++i) {
 
         assert (i <= end_i);
@@ -928,7 +928,7 @@ struct DAGmanagerInOut {
     const ND& srcData;
 
     bool operator () (GNode dst) const {
-      const auto& dstData = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+      const auto& dstData = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
       return DAGdataComparator<ND>::compare3val (srcData, dstData) < 0;
     }
   };
@@ -986,7 +986,7 @@ struct DAGmanagerInOut {
 
       G& graph = Base_ty::graph;
 
-      Galois::do_all_choice (
+      galois::do_all_choice (
           range, 
           [&graph, &pred] (GNode src) {
             auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
@@ -1015,7 +1015,7 @@ struct DAGmanagerInOut {
 
           },
           "reinitDAG-cutoff",
-          Galois::chunk_size<Base_ty::DEFAULT_CHUNK_SIZE> ());
+          galois::chunk_size<Base_ty::DEFAULT_CHUNK_SIZE> ());
           
     }
 
@@ -1030,7 +1030,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   using GNode = typename G::GraphNode;
   using ND = typename G::node_data_type;
 
-  Galois::Runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
+  galois::Runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
 
   DAGmanagerDefault (G& graph, const A& visitAdj)
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 
@@ -1043,7 +1043,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
       unsigned outdeg = 0;
 
       auto countDegClosure = [&graph, &sd, &outdeg] (GNode dst) {
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
         int c = DAGdataComparator<ND>::compare3val (dd, sd);
         if (c > 0) { // sd < dd
@@ -1059,7 +1059,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
 
       unsigned i = 0;
       auto fillDAGsucc = [&graph, &sd, &i] (GNode dst) {
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
         int c = DAGdataComparator<ND>::compare3val (dd, sd);
         if (c > 0) { // dd > sd
@@ -1075,15 +1075,15 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   }
 
   void freeDAGdata (void) {
-    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (Base::graph), 
+    galois::do_all_choice ( galois::Runtime::makeLocalRange (Base::graph), 
         [this] (GNode src) {
-          auto& sd = Base::graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = Base::graph.getData (src, galois::MethodFlag::UNPROTECTED);
           dagSuccAlloc.deallocate (sd.dagSucc, sd.numSucc);
           sd.numSucc = 0;
           sd.dagSucc = nullptr;
         },
         "freeDAGdata",
-        Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
 
   }
 
@@ -1107,7 +1107,7 @@ struct DAGvisitorUndirected {
     G& graph;
 
     template <typename F>
-    void operator () (GNode src, F& func, const Galois::MethodFlag& flag) {
+    void operator () (GNode src, F& func, const galois::MethodFlag& flag) {
 
       for (auto i = graph.edge_begin (src, flag)
            , end_i = graph.edge_end (src, flag); i != end_i; ++i) {
@@ -1128,17 +1128,17 @@ struct DAGvisitorUndirected {
 // 
   // void addPredecessors (void) {
 // 
-    // Galois::do_all_choice (
-        // Galois::Runtime::makeLocalRange (graph),
+    // galois::do_all_choice (
+        // galois::Runtime::makeLocalRange (graph),
         // [this] (GNode src) {
         // 
-          // auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          // auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           // 
           // unsigned addAmt = 0;
-          // for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
-              // e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+          // for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
+              // e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
             // GNode dst = graph.getEdgeDst (e);
-            // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            // auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 // 
             // if (src != dst) {
               // dd.addPred (src);
@@ -1147,7 +1147,7 @@ struct DAGvisitorUndirected {
 // 
         // },
         // "initDAG",
-        // Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        // galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 // 
   // }
 // 
@@ -1161,8 +1161,8 @@ struct ChromaticExecutor {
   typedef typename G::GraphNode GNode;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
   G& graph;
@@ -1266,7 +1266,7 @@ struct ChromaticExecutor {
 // 
       // userCtx.reset ();
       // outer.func (n, userCtx);
-      auto& nd = outer.graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = outer.graph.getData (n, galois::MethodFlag::UNPROTECTED);
       nd.onWL = 0;
       outer.func (n, outer);
 
@@ -1308,13 +1308,13 @@ struct ChromaticExecutor {
       ++rounds;
 
       // run for_each
-      typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+      typedef galois::WorkList::ExternalReference<WL_ty> WL;
       GNode* it = 0;
 
       for_each(it, it,
           ApplyOperator {*this},
-          Galois::loopname(loopname),
-               Galois::wl<WL>(std::ref(*nextWL)));
+          galois::loopname(loopname),
+               galois::wl<WL>(std::ref(*nextWL)));
 
       nextWL->reset_all ();
     }
@@ -1328,14 +1328,14 @@ struct ChromaticExecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_chromatic (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
 
   ChromaticExecutor<G, M, F> executor {graph, dagManager, func, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1358,8 +1358,8 @@ struct ChromaticReuseExecutor {
   typedef typename G::GraphNode GNode;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
+  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+  typedef galois::PerThreadBag<GNode> Bag_ty;
   
   G& graph;
   M& dagManager;
@@ -1378,7 +1378,7 @@ struct ChromaticReuseExecutor {
 
 
   void push_initial (GNode n) {
-    auto& data = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+    auto& data = graph.getData (n, galois::MethodFlag::UNPROTECTED);
 
     unsigned i = data.color;
     assert (i < colorBags.size ());
@@ -1409,13 +1409,13 @@ struct ChromaticReuseExecutor {
     }
 
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode node) {
           push_initial (node);
         }, 
         "push_initial",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
     t_init.stop ();
   }
@@ -1447,10 +1447,10 @@ struct ChromaticReuseExecutor {
 
       assert (*i != nullptr);
 
-      Galois::do_all_choice (makeLocalRange (**i),
+      galois::do_all_choice (makeLocalRange (**i),
           ApplyOperator {*this},
           loopname,
-          Galois::chunk_size<CHUNK_SIZE> ());
+          galois::chunk_size<CHUNK_SIZE> ());
 
     }
 
@@ -1469,10 +1469,10 @@ struct InputGraphDAGreuseExecutor {
 
   typedef typename G::GraphNode GNode;
 
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
+  typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
+  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
 
 
   G& graph;
@@ -1496,11 +1496,11 @@ struct InputGraphDAGreuseExecutor {
     do_all_choice (
         range,
         [this] (GNode node) {
-          auto& sd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
           sd.onWL = 1;
         },
         "push_initial",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
   }
 
@@ -1542,7 +1542,7 @@ struct InputGraphDAGreuseExecutor {
   void execute (void) {
 
     auto f = [this] (GNode src) { this->func (src, *this); };
-    dagManager.runDAGcomputation (f, initialSources, loopname, Galois::chunk_size<CHUNK_SIZE> ());
+    dagManager.runDAGcomputation (f, initialSources, loopname, galois::chunk_size<CHUNK_SIZE> ());
   }
 
   void resetDAG (void) {
@@ -1563,11 +1563,11 @@ struct InputGraphDAGexecutor {
 
   typedef typename G::GraphNode GNode;
 
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
+  typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
@@ -1596,7 +1596,7 @@ public:
   void push (GNode node) {
     assert (nextWL != nullptr);
 
-    auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+    auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
 
     int expected = 0;
     if (nd.onWL.cas (expected, 1)) {
@@ -1614,7 +1614,7 @@ public:
 // 
       // G& graph = outer.graph;
 // 
-      // auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      // auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
       // assert (sd.onWL > 0); // is active
       // sd.onWL = 0;
 // 
@@ -1622,7 +1622,7 @@ public:
 // 
       // auto closure = [&graph, &ctx] (GNode dst) {
 // 
-        // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        // auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 // 
         // if (int (dd.indegree) > 0) { // is a succ in active dag
           // assert (dd.onWL > 0);
@@ -1647,13 +1647,13 @@ public:
     nextWL = new Bag_ty ();
 
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode node) {
           push (node);
         }, 
         "push_initial",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
     dagManager.initDAG (); 
 
@@ -1670,7 +1670,7 @@ public:
           func, 
           *this,
           loopname,
-          Galois::chunk_size<CHUNK_SIZE> ());
+          galois::chunk_size<CHUNK_SIZE> ());
     }
 
     delete currWL; currWL = nullptr;
@@ -1678,20 +1678,20 @@ public:
 
     std::printf ("InputGraphDAGexecutor: performed %d rounds\n", rounds);
 
-    // Galois::TimeAccumulator t_dag_init;
-    // Galois::TimeAccumulator t_dag_exec;
+    // galois::TimeAccumulator t_dag_init;
+    // galois::TimeAccumulator t_dag_exec;
 // 
     // t_dag_init.start ();
     // dagManager.initDAG (); 
     // t_dag_init.stop ();
 // 
-    // Galois::do_all_choice (
+    // galois::do_all_choice (
         // range,
         // [this] (GNode node) {
           // push (node);
         // }, 
         // "push_initial",
-        // Galois::chunk_size<CHUNK_SIZE> ());
+        // galois::chunk_size<CHUNK_SIZE> ());
 // 
     // WL_ty sources;
     // unsigned rounds = 0;
@@ -1701,7 +1701,7 @@ public:
       // assert (sources.size () == 0);
 // 
       // t_dag_init.start ();
-      // dagManager.reinitActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
+      // dagManager.reinitActiveDAG (galois::Runtime::makeLocalRange (nextWork), sources);
       // nextWork.clear_all_parallel ();
       // t_dag_init.stop ();
 // 
@@ -1713,12 +1713,12 @@ public:
       // ++rounds;
 // 
       // t_dag_exec.start ();
-      // typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+      // typedef galois::WorkList::ExternalReference<WL_ty> WL;
       // typename WL::value_type* it = 0;
-      // Galois::for_each(it, it,
+      // galois::for_each(it, it,
           // ApplyOperator {*this},
-          // Galois::loopname(loopname),
-          // Galois::wl<WL>(&sources));
+          // galois::loopname(loopname),
+          // galois::wl<WL>(&sources));
       // t_dag_exec.stop ();
 // 
       // sources.reset_all ();
@@ -1741,7 +1741,7 @@ public:
     template <typename C>
     void operator () (GNode src, C& ctx) {
 
-      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
       if (sd.onWL > 0) {
         outer.func (src, dummyCtx); 
@@ -1751,7 +1751,7 @@ public:
 
       auto closure = [&graph, &ctx] (GNode dst) {
 
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
         int x = --dd.indegree;
         assert (x >= 0);
@@ -1772,13 +1772,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1811,11 +1811,11 @@ struct InputGraphDAGtopologyDriven {
 
   typedef typename G::GraphNode GNode;
 
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
+  typedef galois::PerThreadBag<GNode> Bag_ty;
 
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
@@ -1839,7 +1839,7 @@ public:
 
   void push (GNode node) {
     numPushes += 1;
-    auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+    auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
     // ++(nd.onWL);
     nd.onWL.cas (0, 1);
   }
@@ -1850,21 +1850,21 @@ public:
 
 
 
-    Galois::TimeAccumulator t_dag_init;
+    galois::TimeAccumulator t_dag_init;
     t_dag_init.start ();
     dagManager.initDAG ();
     dagManager.collectSources (sources);
     t_dag_init.stop ();
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode node) {
           push (node);
         }, 
         "push_initial",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
-    Galois::TimeAccumulator t_dag_exec;
+    galois::TimeAccumulator t_dag_exec;
 
     unsigned rounds = 0;
     while (true) {
@@ -1874,7 +1874,7 @@ public:
       assert (sources.size_all () != 0);
 
       auto f = [this] (GNode src) {
-        auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+        auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
         if (sd.onWL > 0) { // is active
           sd.onWL = 0;
           // --(sd.onWL);
@@ -1885,7 +1885,7 @@ public:
       };
 
       t_dag_exec.start ();
-      dagManager.runDAGcomputation (f, sources, loopname, Galois::chunk_size<CHUNK_SIZE> ());
+      dagManager.runDAGcomputation (f, sources, loopname, galois::chunk_size<CHUNK_SIZE> ());
       t_dag_exec.stop ();
 
       bool term = (numPushes.reduceRO () == 0);
@@ -1917,13 +1917,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphDAGtopologyDriven<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -1943,12 +1943,12 @@ struct HybridInputDAGexecutor {
   typedef typename G::GraphNode GNode;
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
 
-  // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  // typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  // typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  // typedef galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
 
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
+  typedef galois::PerThreadBag<GNode> Bag_ty;
 
-  using ParCounter = Galois::GAccumulator<size_t>;
+  using ParCounter = galois::GAccumulator<size_t>;
 
   G& graph;
   F func;
@@ -1986,13 +1986,13 @@ public:
     std::vector<ParCounter> sumDegree (numColors);
     std::vector<ParCounter> sumSucc (numColors);
 
-    std::vector<Galois::GReduceMin<size_t> > minDegree (numColors);
-    std::vector<Galois::GReduceMax<size_t> > maxDegree (numColors);
+    std::vector<galois::GReduceMin<size_t> > minDegree (numColors);
+    std::vector<galois::GReduceMax<size_t> > maxDegree (numColors);
 
-    std::vector<Galois::GReduceMin<size_t> > minSucc (numColors);
-    std::vector<Galois::GReduceMax<size_t> > maxSucc (numColors);
+    std::vector<galois::GReduceMin<size_t> > minSucc (numColors);
+    std::vector<galois::GReduceMax<size_t> > maxSucc (numColors);
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         makeLocalRange (graph),
         [&] (GNode src) {
           auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
@@ -2013,7 +2013,7 @@ public:
           
         },
         "color_bags",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
     
     size_t sumAllDegree = 0;
@@ -2087,7 +2087,7 @@ public:
 
     std::vector<ParCounter> bagSizes (numColors);
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         makeLocalRange (graph),
         [&] (GNode src) {
           auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
@@ -2095,7 +2095,7 @@ public:
           bagSizes[sd.color] += 1;
         },
         "bag-sizes",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
     const size_t numNodes = graph.size ();
 
@@ -2120,7 +2120,7 @@ public:
   }
 
   void push (GNode node) {
-    auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+    auto& nd = graph.getData (node, galois::MethodFlag::UNPROTECTED);
 
     int expected = 0;
     if (nd.onWL.cas (expected, 1)) {
@@ -2157,7 +2157,7 @@ public:
 
     } else {
 
-      Galois::do_all_choice(
+      galois::do_all_choice(
           makeLocalRange (bag),
           [this] (GNode src) {
             auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
@@ -2177,8 +2177,8 @@ public:
   template <typename R>
   void execute (const R& range) {
 
-    Galois::TimeAccumulator t_chromatic;
-    Galois::TimeAccumulator t_edge_flip;
+    galois::TimeAccumulator t_chromatic;
+    galois::TimeAccumulator t_edge_flip;
 
     dagManager.initDAG ();
     dagManager.colorDAG ();
@@ -2189,7 +2189,7 @@ public:
 
     if (reinitAfterCutOff) {
 
-      Galois::StatTimer t_reinit ("reinit after cutoff");
+      galois::StatTimer t_reinit ("reinit after cutoff");
 
       t_reinit.start ();
       using ND = typename G::node_data_type;
@@ -2200,7 +2200,7 @@ public:
       Bag_ty nodesAfterCutoff;
       // Bag_ty nodesBeforeCutoff;
 
-      Galois::do_all_choice (
+      galois::do_all_choice (
           makeLocalRange (graph),
           // [this, &filterAfter, &nodesAfterCutoff, &nodesBeforeCutoff] (GNode src) {
           [this, &filterAfter, &nodesAfterCutoff] (GNode src) {
@@ -2212,7 +2212,7 @@ public:
             }
           },
           "filter-after-cutoff",
-          Galois::chunk_size<CHUNK_SIZE> ());
+          galois::chunk_size<CHUNK_SIZE> ());
 
       dagManager.filterDAGsucc (makeLocalRange (nodesAfterCutoff), filterAfter);
 
@@ -2235,17 +2235,17 @@ public:
     currHeavyWork = new Bag_ty ();
     nextHeavyWork = new Bag_ty ();
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (GNode node) {
           push (node);
         }, 
         "push_initial",
-        Galois::chunk_size<CHUNK_SIZE> ());
+        galois::chunk_size<CHUNK_SIZE> ());
 
     unsigned rounds = 0;
 
-    Galois::StatTimer t_heavy("operator-heavy-serial");
+    galois::StatTimer t_heavy("operator-heavy-serial");
     while (true) {
 
       ++rounds;
@@ -2274,7 +2274,7 @@ public:
 
           size_t sz = (*currColorBags)[i].size_all ();
 
-          if (sz < (threadMultFactor * Galois::getActiveThreads ())) {
+          if (sz < (threadMultFactor * galois::getActiveThreads ())) {
 
             if (eflipBag == nullptr) {
               eflipBag = &((*currColorBags)[i]);
@@ -2291,7 +2291,7 @@ public:
               // // eflipBag has some stuff, first run that
               // runBag (*eflipBag, runEdgeFlip, 
                   // (runEdgeFlip ? "operator-edge-flip" : "operator-chromatic"),
-                  // Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+                  // galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 // 
               // eflipBag = nullptr;
               // runEdgeFlip = false;
@@ -2299,7 +2299,7 @@ public:
 
             // now run the current bucket using chromatic
             runBag ((*currColorBags) [i], false, "operator-chromatic", 
-                Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+                galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 
 
           } // end if sz
@@ -2314,7 +2314,7 @@ public:
         // eflipBag has some stuff, first run that
         runBag (*eflipBag, runEdgeFlip, 
             (runEdgeFlip ? "operator-edge-flip" : "operator-chromatic"),
-            Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+            galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 
         eflipBag = nullptr;
         runEdgeFlip = false;
@@ -2325,7 +2325,7 @@ public:
       // std::printf ("running edge-flip after cutoff, for heavy bucket, size=%zd\n", currHeavyWork->size_all ());
       // run edge flip
       runBag (*currHeavyWork, true, "operator-edge-flip-remaining",
-          Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+          galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 
 
       if (numPushes.reduceRO () == 0) { 
@@ -2352,13 +2352,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_hybrid (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   HybridInputDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -2416,6 +2416,6 @@ struct ForEachDet_InputDAG<InputDAG_ExecTy::HYBRID> {
 };
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_CHROMATIC_H

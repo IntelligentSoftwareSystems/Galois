@@ -33,7 +33,7 @@ using namespace llvm;
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
-#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
+#define __GALOIS_ACCUMULATOR_TYPE__ "galois::DGAccumulator"
 
 namespace {
 
@@ -171,7 +171,7 @@ public:
     {
       std::size_t start = 0;
       while (1) {
-        std::size_t found = text.find("Galois::atomic", start);
+        std::size_t found = text.find("galois::atomic", start);
         if (found != std::string::npos) {
           std::size_t replace = text.find("(", start);
           text.insert(replace+1, "&");
@@ -180,12 +180,12 @@ public:
           break;
         }
       }
-      findAndReplace(text, "Galois::atomic", "atomic");
+      findAndReplace(text, "galois::atomic", "atomic");
     }
     {
       std::size_t start = 0;
       while (1) {
-        std::size_t found = text.find("Galois::min", start);
+        std::size_t found = text.find("galois::min", start);
         if (found != std::string::npos) {
           std::size_t replace = text.find("(", start);
           text.insert(replace+1, "&");
@@ -194,12 +194,12 @@ public:
           break;
         }
       }
-      findAndReplace(text, "Galois::min", "atomicMin");
+      findAndReplace(text, "galois::min", "atomicMin");
     }
     {
       std::size_t start = 0;
       while (1) {
-        std::size_t found = text.find("Galois::add", start);
+        std::size_t found = text.find("galois::add", start);
         if (found != std::string::npos) {
           std::size_t replace = text.find("(", start);
           text.insert(replace+1, "&");
@@ -208,7 +208,7 @@ public:
           break;
         }
       }
-      findAndReplace(text, "Galois::add", "atomicAdd");
+      findAndReplace(text, "galois::add", "atomicAdd");
     }
 
     {
@@ -849,9 +849,9 @@ public:
   virtual bool VisitCallExpr(CallExpr *callExpr) {
     std::string text = rewriter.getRewrittenText(callExpr->getSourceRange());
     bool isTopological = true;
-    std::size_t begin = text.find("Galois::do_all");
+    std::size_t begin = text.find("galois::do_all");
     if (begin != 0) {
-      begin = text.find("Galois::for_each");
+      begin = text.find("galois::for_each");
       isTopological = false;
     }
     if (begin == 0) {

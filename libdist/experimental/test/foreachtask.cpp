@@ -3,9 +3,9 @@
 #include <vector>
 
 using namespace std;
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
-struct R : public Galois::Runtime::Lockable {
+struct R : public galois::Runtime::Lockable {
    int i;
 
    R() { i = 0; }
@@ -29,16 +29,16 @@ int main(int argc, char *argv[])
    }
   */
 
-   Galois::setActiveThreads(4);
+   galois::setActiveThreads(4);
 
    // check the task id and decide if the following should be executed
-   Galois::for_each_begin();
+   galois::for_each_begin();
 
    vector<int> myvec;
    typedef vector<int>::iterator IterTy;
    f1 f;
    for (int i=1; i<=40; i++) myvec.push_back(i);
-   Galois::for_each_task<IterTy,f1> (myvec.begin(), myvec.end(), f);
+   galois::for_each_task<IterTy,f1> (myvec.begin(), myvec.end(), f);
    printf ("final output: %d\n", f.r->i);
 
    master_terminate();

@@ -503,7 +503,7 @@ struct firstForEach {
 	}
 };
 
-//namespace Galois {
+//namespace galois {
 //  template<>
 //    struct does_not_need_aborts<firstForEach> : public boost::true_type {};
 //}
@@ -658,7 +658,7 @@ struct secondForEachWithInline {
 
 
 
-//namespace Galois {
+//namespace galois {
 //  template<>
 //    struct does_not_need_aborts<secondForEach> : public boost::true_type {};
 //}
@@ -705,9 +705,9 @@ PerCPU<int> fringeCnts;
 #endif
 
 //std::vector<f2Item> *fringeBuffs;
-Galois::InsertBag<ND*>* fringewl;
+galois::InsertBag<ND*>* fringewl;
 //GaloisRuntime::WorkList::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, GaloisRuntime::WorkList::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
-Galois::Substrate::CacheLineStorage<ND> *gnodes;
+galois::Substrate::CacheLineStorage<ND> *gnodes;
 
 //void fringeFindOMP() {
 //  int gsize = graph->size();
@@ -894,7 +894,7 @@ static const char* desc = "Computes betwenness centrality in an unweighted graph
 
 
 int main(int argc, char** argv) {
-   Galois::StatManager statManager;
+   galois::StatManager statManager;
    LonestarStart(argc, argv, name, desc, NULL);
 
 #if CONCURRENT
@@ -927,7 +927,7 @@ int main(int argc, char** argv) {
   }
 	
   cerr << "Bucket size: " << BUCKETSZ << endl;
-//  Galois::setMaxThreads(numThreads);
+//  galois::setMaxThreads(numThreads);
  	cerr << "numThreads " << numThreads << endl; 
 	//omp_set_num_threads(numThreads);
   createCleanupChunks(nnodes, nedges, numThreads);
@@ -944,13 +944,13 @@ int main(int argc, char** argv) {
   //initCapDOALL setPredCapacitiesloop;
 
   int stepCnt = 0;
-  Galois::TimeAccumulator firstLoopTimer;
-  Galois::TimeAccumulator secondLoopTimer;
-  Galois::TimeAccumulator thirdLoopTimer;
-  Galois::TimeAccumulator fourthLoopTimer;
-  Galois::TimeAccumulator totalTimer;
+  galois::TimeAccumulator firstLoopTimer;
+  galois::TimeAccumulator secondLoopTimer;
+  galois::TimeAccumulator thirdLoopTimer;
+  galois::TimeAccumulator fourthLoopTimer;
+  galois::TimeAccumulator totalTimer;
   
-	Galois::TimeAccumulator intCapTimer;	
+	galois::TimeAccumulator intCapTimer;	
   intCapTimer.start();
 	//#if CONCURRENT
 	//	GaloisRuntime::for_all_parallel(setPredCapacitiesloop);
@@ -981,9 +981,9 @@ int main(int argc, char** argv) {
   // new regime: rand26 dcl4, dcl16, ///better dcl32, dcl16
   const int chunksize = 8;
   std::cerr << "Using chunk size : " << chunksize << std::endl;
-  typedef Galois::WorkList::OrderedByIntegerMetric<NodeIndexer, Galois::WorkList::dChunkedLIFO<chunksize> > wl2ty;
+  typedef galois::WorkList::OrderedByIntegerMetric<NodeIndexer, galois::WorkList::dChunkedLIFO<chunksize> > wl2ty;
   //typedef GaloisRuntime::WorkList::ChunkedFIFO<chunksize, ND*, true> wl2ty;
-  Galois::InsertBag<ND*> wl2;
+  galois::InsertBag<ND*> wl2;
 #else
 //  const int chunksize = 64;
 //  std::cerr << "Using chunk size : " << chunksize << std::endl;
@@ -991,30 +991,30 @@ int main(int argc, char** argv) {
 //  GaloisRuntime::galois_insert_bag<ED*> wl2;
 #endif
   //GaloisRuntime::WorkList::OrderedByIntegerMetric<ED*, EdgeIndexer, GaloisRuntime::WorkList::dChunkedFIFO<ED*, 64, true>, true> wl2;
-  typedef Galois::WorkList::dChunkedLIFO<16> wl4ty;  
+  typedef galois::WorkList::dChunkedLIFO<16> wl4ty;  
   //typedef GaloisRuntime::WorkList::dChunkedLIFO<16, ND*,  true> wl4ty;  
   //typedef GaloisRuntime::WorkList::OrderedByIntegerMetric<f2ItemIndexer, GaloisRuntime::WorkList::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
-  Galois::InsertBag<ND*> wl4;
+  galois::InsertBag<ND*> wl4;
 	fringewl = &wl4;
 //  GaloisRuntime::WorkList::FIFO<int,  true> wl5;
 #else
-  Galois::WorkList::GFIFO<ED*, false> wl2;
-  Galois::WorkList::GFIFO<ND*, false> wl4;
+  galois::WorkList::GFIFO<ED*, false> wl2;
+  galois::WorkList::GFIFO<ND*, false> wl4;
 #endif
 
 //  for (int kk=0; kk<numThreads; ++kk) {
 //    std::vector<f2Item> & abuff = fringeBuffs.get(kk);
 //    abuff.reserve(nnodes);
 //  }
-//  Galois::Statistic("Mem1", GaloisRuntime::MM::pageAllocInfo());
-//  Galois::preAlloc(6000);
-//  Galois::Statistic("Mem2", GaloisRuntime::MM::pageAllocInfo());
+//  galois::Statistic("Mem1", GaloisRuntime::MM::pageAllocInfo());
+//  galois::preAlloc(6000);
+//  galois::Statistic("Mem2", GaloisRuntime::MM::pageAllocInfo());
 	//cerr << "OMP Threads: " << omp_get_num_threads() << endl;
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   totalTimer.start();
 	for (int i=startNode; i<nnodes; ++i) {
-//    Galois::Statistic("Mem3", GaloisRuntime::MM::pageAllocInfo());
+//    galois::Statistic("Mem3", GaloisRuntime::MM::pageAllocInfo());
   
 		ND * active = &(gnodes[i].data);
     currSrcNode = active;
@@ -1048,9 +1048,9 @@ int main(int argc, char** argv) {
 #if USE_NODE_BASED
 
 #if CONCURRENT
-    Galois::for_each(wl2.begin(), wl2.end(), feach1NodeBased, Galois::wl<wl2ty>());
+    galois::for_each(wl2.begin(), wl2.end(), feach1NodeBased, galois::wl<wl2ty>());
     wl2.clear();
-//		Galois::for_each<wl2ty>(active, feach1NodeBased);
+//		galois::for_each<wl2ty>(active, feach1NodeBased);
 #else
 	Timer tt;
 		tt.start();
@@ -1067,9 +1067,9 @@ int main(int argc, char** argv) {
 #else
 
 #if CONCURRENT
-    Galois::Timer firstLT;
+    galois::Timer firstLT;
     firstLT.start();
-    Galois::for_each(wl2.begin(), wl2.end(), feach1, Galois::wl<wl2ty>());
+    galois::for_each(wl2.begin(), wl2.end(), feach1, galois::wl<wl2ty>());
     firstLT.stop();
     std::cerr << "FLTime: " << firstLT.get() << std::endl;
 #else
@@ -1103,9 +1103,9 @@ int main(int argc, char** argv) {
 #endif
 	//GaloisRuntime::for_all_parallel(findFringe);
 //  fringeFindOMP();
-//  Galois::on_each(findFringe);
+//  galois::on_each(findFringe);
 //__itt_resume();
-  Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nnodes), findFringe);
+  galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nnodes), findFringe);
 //  __itt_pause();
 //	for (int kk=0; kk<numThreads; ++kk) {
 //    std::vector<f2Item> & abuff = fringeBuffs.get(kk);
@@ -1146,7 +1146,7 @@ int main(int argc, char** argv) {
 		thirdLoopTimer.start();
 		double backupSrcBC = currSrcNode->bc;
 #if CONCURRENT	 
-                Galois::for_each_local(wl4, feach2, Galois::wl<wl4ty>());
+                galois::for_each_local(wl4, feach2, galois::wl<wl4ty>());
 #else
     while (!wl4.empty()) {
       ND *nn = wl4.pop().second;
@@ -1163,10 +1163,10 @@ int main(int argc, char** argv) {
     fourthLoopTimer.start();
 #if CONCURRENT
 // 		wl5.fill_initial(workChunks.begin(), workChunks.end());
-//    Galois::for_each(wl5, feach4);
+//    galois::for_each(wl5, feach4);
 #if MERGE_LOOPS
 #else
-//    Galois::on_each(cleanupGloop);
+//    galois::on_each(cleanupGloop);
 	//	GaloisRuntime::for_all_parallel(cleanupGloop);
 #endif
 		//graph->cleanupDataOMP();
@@ -1177,7 +1177,7 @@ int main(int argc, char** argv) {
 	}
   totalTimer.stop();
   T.stop();
-//  Galois::Statistic("Mem4", GaloisRuntime::MM::pageAllocInfo());
+//  galois::Statistic("Mem4", GaloisRuntime::MM::pageAllocInfo());
   std::cout << "Total Time " << totalTimer.get() << std::endl;
   std::cout<< "First Loop: " << firstLoopTimer.get() << std::endl;
   std::cout<< "Second Loop: " << secondLoopTimer.get() << std::endl;

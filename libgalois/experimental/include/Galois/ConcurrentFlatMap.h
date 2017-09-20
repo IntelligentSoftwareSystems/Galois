@@ -44,7 +44,7 @@
 #include <vector>
 #include <deque>
 
-namespace Galois {
+namespace galois {
 
 namespace detail {
 
@@ -78,11 +78,11 @@ protected:
   typedef value_type* value_type_pointer;
   typedef std::pair<key_type, value_type_pointer> local_map_value_type;
   typedef std::allocator<local_map_value_type> local_map_allocator_type;
-  typedef Galois::flat_map<key_type, value_type_pointer, _Compare, local_map_allocator_type, Galois::gdeque<local_map_value_type>> LocalMapTy;
-  //typedef Galois::flat_map<key_type, value_type_pointer, _Compare, local_map_allocator_type, std::vector<local_map_value_type>> LocalMapTy;
-  typedef Galois::gdeque<Operation> LogTy;
+  typedef galois::flat_map<key_type, value_type_pointer, _Compare, local_map_allocator_type, galois::gdeque<local_map_value_type>> LocalMapTy;
+  //typedef galois::flat_map<key_type, value_type_pointer, _Compare, local_map_allocator_type, std::vector<local_map_value_type>> LocalMapTy;
+  typedef galois::gdeque<Operation> LogTy;
   //typedef std::deque<Operation> LogTy;
-  typedef Galois::InsertBag<value_type> ValuesTy;
+  typedef galois::InsertBag<value_type> ValuesTy;
   typedef Substrate::PaddedLock<true> LockTy;
 
   struct PerThread {

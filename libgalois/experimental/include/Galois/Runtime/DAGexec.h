@@ -53,7 +53,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace {
@@ -65,7 +65,7 @@ struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt>, Ctxt, std::less<Ctxt*
   using Base = OrdLocBase<DAGnhoodItem, Ctxt, CtxtCmp >;
 
 public:
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
+  typedef galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
 
   SharerSet sharers;
 
@@ -85,7 +85,7 @@ struct DAGnhoodItemRW: public OrdLocBase<DAGnhoodItemRW<Ctxt>, Ctxt, std::less<C
   using Base = OrdLocBase<DAGnhoodItemRW, Ctxt, CtxtCmp >;
 
 public:
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
+  typedef galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
 
   SharerSet writers;
   SharerSet readers;
@@ -113,9 +113,9 @@ struct DAGcontextBase: public OrderedContextBase<T> {
 
 
 public:
-  typedef Galois::ThreadSafeOrderedSet<Derived*, std::less<Derived*> > AdjSet;
+  typedef galois::ThreadSafeOrderedSet<Derived*, std::less<Derived*> > AdjSet;
   // TODO: change AdjList to array for quicker iteration
-  typedef Galois::gdeque<Derived*, 64> AdjList;
+  typedef galois::gdeque<Derived*, 64> AdjList;
   typedef std::atomic<int> ParCounter;
 
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
@@ -213,7 +213,7 @@ struct DAGcontext: public DAGcontextBase<T, DAGcontext<T>, DAGnhoodItem<DAGconte
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
     NItem& nitem = Base::nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -236,18 +236,18 @@ struct DAGcontextRW: public DAGcontextBase<T, DAGcontextRW<T>, DAGnhoodItemRW<DA
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag f) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag f) {
 
     NItem& nitem = Base::nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
 
     switch (f) {
-      case Galois::MethodFlag::READ:
+      case galois::MethodFlag::READ:
         nitem.addReader (this);
         break;
 
-      case Galois::MethodFlag::WRITE:
+      case galois::MethodFlag::WRITE:
         nitem.addWriter (this);
         break;
 
@@ -319,7 +319,7 @@ protected:
   CtxtWL allCtxts;
   CtxtWL initSources;
   PerThreadUserCtx userCtxts;
-  Galois::GAccumulator<size_t> numPush;
+  galois::GAccumulator<size_t> numPush;
 
 public:
 
@@ -338,15 +338,15 @@ public:
   {}
 
   ~DAGexecutorBase (void) {
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->reclaimAlloc (ctxtAdjAlloc);
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
         std::make_tuple (
-          Galois::loopname ("free_ctx"), 
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("free_ctx"), 
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -378,12 +378,12 @@ public:
     // 3. Find initial sources and run for_each
     //
 
-    Galois::StatTimer t_init ("Time to create the DAG: ");
+    galois::StatTimer t_init ("Time to create the DAG: ");
 
     std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
 
     t_init.start ();
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this] (const T& x) {
           Ctxt* ctxt = ctxtAlloc.allocate (1);
           assert (ctxt != NULL);
@@ -391,24 +391,24 @@ public:
 
           allCtxts.get ().push_back (ctxt);
 
-          Galois::Runtime::setThreadContext (ctxt);
+          galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctxt->getActive (), uctx);
-          Galois::Runtime::setThreadContext (NULL);
+          galois::Runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
 
         }, 
         std::make_tuple (
-          Galois::loopname ("create_ctxt"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("create_ctxt"),
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     // virtual call implemented by derived classes
     createAllEdges ();
 
 
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->finalizeAdj (ctxtAdjAlloc);
           // std::printf ("ctxt: %p, indegree=%d\n", ctxt, ctxt->origInDeg);
@@ -417,8 +417,8 @@ public:
           }
         }, 
         std::make_tuple (
-          Galois::loopname ("finalize"), 
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("finalize"), 
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
 
@@ -431,12 +431,12 @@ public:
 
     StatTimer t_exec ("Time to execute the DAG: ");
 
-    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
     t_exec.start ();
 
-    Galois::for_each_local (initSources,
-        ApplyOperator {*this}, Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+    galois::for_each_local (initSources,
+        ApplyOperator {*this}, galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
 
     // std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
         // numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
@@ -444,33 +444,33 @@ public:
   }
 
   void resetDAG (void) {
-    Galois::StatTimer t_reset ("Time to reset the DAG: ");
+    galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
         std::make_tuple (
-          Galois::loopname ("resetDAG"), 
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("resetDAG"), 
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
     t_reset.stop ();
   }
 
   void printStats (void) {
-    Galois::GAccumulator<size_t> numEdges;
-    Galois::GAccumulator<size_t> numNodes;
+    galois::GAccumulator<size_t> numEdges;
+    galois::GAccumulator<size_t> numNodes;
 
     printf ("WARNING: timing affected by measuring DAG stats\n");
 
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [&numNodes,&numEdges] (Ctxt* ctxt) {
           numNodes += 1;
           numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
         },
         std::make_tuple (
-          Galois::loopname ("dag_stats"), 
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("dag_stats"), 
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     printf ("DAG created with %zd nodes, %zd edges\n", 
         numNodes.reduceRO (), numEdges.reduceRO ());
@@ -494,7 +494,7 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
   {}
 
   virtual void createAllEdges (void) {
-    Galois::do_all_choice (Base::nhmgr.getAllRange(),
+    galois::do_all_choice (Base::nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
 
@@ -509,8 +509,8 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
           }
         }, 
         std::make_tuple (
-          Galois::loopname ("create_ctxt_edges"), 
-          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("create_ctxt_edges"), 
+          galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 };
 
@@ -531,7 +531,7 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
 
   virtual void createAllEdges (void) {
 
-    Galois::do_all_choice (Base::nhmgr.getAllRange(),
+    galois::do_all_choice (Base::nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
 
@@ -551,8 +551,8 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
           }
         }, 
         std::make_tuple (
-          Galois::loopname ("create_ctxt_edges"), 
-          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("create_ctxt_edges"), 
+          galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 
 };
@@ -586,7 +586,7 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_DAG_H

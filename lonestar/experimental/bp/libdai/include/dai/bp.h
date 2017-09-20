@@ -90,7 +90,7 @@ class BP : public DAIAlgFG {
 
         struct EdgeData {
           int round;
-          Galois::GChecked<char> lock;
+          galois::GChecked<char> lock;
           EdgeData(): round(0), lock(0) { }
         };
 
@@ -128,7 +128,7 @@ class BP : public DAIAlgFG {
           unsigned& count;
 
           Process(BP& p, std::vector<std::vector<EdgeData> >& e, unsigned& c): parent(p), edgeData(e), count(c) { }
-          void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+          void operator()(const Task& t, galois::UserContext<Task>& ctx) {
             parent.runProcess(t, edgeData, count, ctx);
           }
         };
@@ -137,9 +137,9 @@ class BP : public DAIAlgFG {
           typedef int tt_does_not_need_stats;
           typedef int tt_does_not_need_push;
           BP& parent;
-          Galois::GReduceMax<Real>& accMaxDiff;
-          ComputeDiffs(BP& p, Galois::GReduceMax<Real>& a): parent(p), accMaxDiff(a) { }
-          void operator()(size_t v, Galois::UserContext<size_t>& ctx) {
+          galois::GReduceMax<Real>& accMaxDiff;
+          ComputeDiffs(BP& p, galois::GReduceMax<Real>& a): parent(p), accMaxDiff(a) { }
+          void operator()(size_t v, galois::UserContext<size_t>& ctx) {
             parent.runComputeDiffs(v, accMaxDiff);
           }
         };
@@ -152,7 +152,7 @@ class BP : public DAIAlgFG {
           std::vector<std::vector<EdgeData> >& edgeData;
           Initialize(BP& p, std::vector<Task>& i, 
               std::vector<std::vector<EdgeData> >& e): parent(p), initial(i), edgeData(e) { }
-          void operator()(size_t index, Galois::UserContext<size_t>& ctx) {
+          void operator()(size_t index, galois::UserContext<size_t>& ctx) {
             parent.runInitialize(index, initial, edgeData);
           }
         };
@@ -322,8 +322,8 @@ class BP : public DAIAlgFG {
         const Real & residual(size_t i, size_t _I) const { return _edges[i][_I].residual; }
         /// Returns reference to residual for the edge between variable \a i and its \a _I 'th neighbor
         Real & residual(size_t i, size_t _I) { return _edges[i][_I].residual; }
-        void runProcess(const Task&, std::vector<std::vector<EdgeData> >&, unsigned&, Galois::UserContext<Task>&);
-        void runComputeDiffs(size_t v, Galois::GReduceMax<Real>& acc);
+        void runProcess(const Task&, std::vector<std::vector<EdgeData> >&, unsigned&, galois::UserContext<Task>&);
+        void runComputeDiffs(size_t v, galois::GReduceMax<Real>& acc);
         void runInitialize(size_t, std::vector<Task>&, std::vector<std::vector<EdgeData> >& edgeData);
 
         /// Calculate the product of factor \a I and the incoming messages

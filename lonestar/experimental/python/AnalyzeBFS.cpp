@@ -10,7 +10,7 @@ struct BFS {
   BFS(Graph& g): g(g) {}
 
   // use vInt for distance
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
     auto newDist = g.getData(n).ID.vInt + 1;
     for(auto e: g.edges(n)) {
       auto dst = g.getEdgeDst(e);
@@ -24,12 +24,12 @@ struct BFS {
 };
 
 void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
-//  Galois::StatManager statManager;
+//  galois::StatManager statManager;
 
-//  Galois::StatTimer T;
+//  galois::StatTimer T;
 //  T.start();
 
-  Galois::do_all_local(
+  galois::do_all_local(
     *g, 
     [=] (GNode n) 
       {
@@ -39,11 +39,11 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
     );
 
   g->getData(src).ID.vInt = 0;
-  Galois::for_each(src, BFS{*g});
+  galois::for_each(src, BFS{*g});
 
 //  T.stop();
 
-  Galois::do_all_local(
+  galois::do_all_local(
     *g, 
     [=] (GNode n) 
       {

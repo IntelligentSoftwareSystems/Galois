@@ -55,7 +55,7 @@ struct PerThread {
     memset(etree_mark, 0, graph->nodecount*sizeof(char));
   }
 };
-typedef Galois::Substrate::PerThreadStorage<PerThread<CRSGraph> > GPTS;
+typedef galois::Substrate::PerThreadStorage<PerThread<CRSGraph> > GPTS;
 
 node_t *etree = NULL;           // FIXME: ugly hack
 CRSGraph *outgraph = NULL;      // not perthread
@@ -321,7 +321,7 @@ struct TreeExecModel {
   void run() {
     // Begin execution -- FIXME: initial elements
     printf("%u root nodes\n", rootnodes.size());
-    Galois::Runtime::for_each_ordered_tree(rootnodes[0],
+    galois::Runtime::for_each_ordered_tree(rootnodes[0],
                                            GaloisDivide(this),
                                            GaloisConquer(this),
                                            "UpCholeskyTree");
@@ -329,7 +329,7 @@ struct TreeExecModel {
 };
 
 int main(int argc, char *argv[]) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   if ( argc != 2 ) {
     fprintf(stderr, "Usage: %s <threadcount>\n", argv[0]);
     return 1;
@@ -353,10 +353,10 @@ int main(int argc, char *argv[]) {
    }
 
   int nthreads = atoi(argv[1]);
-  nthreads = Galois::setActiveThreads(nthreads);
+  nthreads = galois::setActiveThreads(nthreads);
 
   GPTS pts(&graph);
-  Galois::StatTimer T("NumericTime");
+  galois::StatTimer T("NumericTime");
   struct timeval start, end;
   papi_start();
   T.start();

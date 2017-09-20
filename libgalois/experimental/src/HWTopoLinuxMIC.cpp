@@ -48,7 +48,7 @@
 
 #define GALOIS_USE_MIC_TOPO
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 namespace {
 
@@ -510,49 +510,49 @@ static Policy& getPolicy() {
 
 } //namespace
 
-bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
+bool galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return linuxBindToProcessor(getPolicy().processorMap[id]);
 }
 
-unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+unsigned galois::Runtime::LL::getProcessorForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().processorMap[id];
 }
 
-unsigned Galois::Runtime::LL::getMaxThreads() {
+unsigned galois::Runtime::LL::getMaxThreads() {
   return getPolicy().numThreads;
 }
 
-unsigned Galois::Runtime::LL::getMaxCores() {
+unsigned galois::Runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned Galois::Runtime::LL::getMaxPackages() {
+unsigned galois::Runtime::LL::getMaxPackages() {
   return getPolicy().numPackages;
 }
 
-unsigned Galois::Runtime::LL::getPackageForThread(int id) {
+unsigned galois::Runtime::LL::getPackageForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().packageMap[id];
 }
 
-unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::Runtime::LL::getMaxPackageForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().maxPackageMap[id];
 }
 
-bool Galois::Runtime::LL::isPackageLeader(int id) {
+bool galois::Runtime::LL::isPackageLeader(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().leaderMapThread[id] == id;
 }
 
-unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
+unsigned galois::Runtime::LL::getLeaderForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().leaderMapThread[id];
 }
 
-unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::Runtime::LL::getLeaderForPackage(int id) {
   assert(size_t(id) < getPolicy().numPackages);
   return getPolicy().leaderMapPackage[id];
 }

@@ -102,12 +102,12 @@ private:
 
 
 protected:
-  using PerThrdLocalVec = Galois::Substrate::PerThreadStorage<LocalVec>;
-  using AtomicInteger =  Galois::GAtomic<int>;
-  using IterCounter = Galois::GAccumulator<size_t>;
+  using PerThrdLocalVec = galois::Substrate::PerThreadStorage<LocalVec>;
+  using AtomicInteger =  galois::GAtomic<int>;
+  using IterCounter = galois::GAccumulator<size_t>;
 
   static const int DEFAULT_CHUNK_SIZE = 16;
-  using AVIWorkList =  Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE>;
+  using AVIWorkList =  galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE>;
 
 
   std::string wltype;
@@ -220,7 +220,7 @@ void AVIabstractMain::initGlobalVec (const MeshInit& meshInit, GlobalVec& g) {
 }
 
 void AVIabstractMain::run (int argc, char* argv[]) {
-  Galois::StatManager sm;
+  galois::StatManager sm;
   LonestarStart(argc, argv, name, desc, url);
 
   // print messages e.g. version, input etc.
@@ -248,11 +248,11 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   printf ("AVI %s version\n", getVersion ().c_str ());
   printf ("input mesh: %d elements, %d nodes\n", meshInit->getNumElements (), meshInit->getNumNodes ());
 
-  Galois::preAlloc (64*Galois::getActiveThreads ());
+  galois::preAlloc (64*galois::getActiveThreads ());
 
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer t;
+  galois::StatTimer t;
   t.start ();
 
   // don't write to files when measuring time
@@ -260,7 +260,7 @@ void AVIabstractMain::run (int argc, char* argv[]) {
 
   t.stop ();
 
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     verify (input, *meshInit, g);

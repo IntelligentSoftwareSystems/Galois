@@ -58,13 +58,13 @@ static cll::opt<int> stepShift("delta",
                                cll::desc("Shift value for the deltastep"),
                                cll::init(10));
 
-typedef Galois::Graph::LC_InlineEdge_Graph<std::atomic<unsigned int>,void>::with_no_lockable<true>::type::with_compressed_node_ptr<true>::type::with_numa_alloc<true>::type Graph;
+typedef galois::Graph::LC_InlineEdge_Graph<std::atomic<unsigned int>,void>::with_no_lockable<true>::type::with_compressed_node_ptr<true>::type::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
 static const bool trackWork = false;
-static Galois::Statistic* BadWork;
-static Galois::Statistic* WLEmptyWork;
+static galois::Statistic* BadWork;
+static galois::Statistic* WLEmptyWork;
 
 #include "Lonestar/BFS_SSSP.h"
 
@@ -73,8 +73,8 @@ struct BFS {
   Graph& graph;
   BFS(Graph& g) : graph(g) {}
   void operator()(UpdateRequest& req,
-                  Galois::UserContext<UpdateRequest>& ctx) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+                  galois::UserContext<UpdateRequest>& ctx) {
+    const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
     Dist sdist = graph.getData(req.n, flag);
     
     if (req.w != sdist) {
@@ -100,21 +100,21 @@ struct BFS {
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   if (trackWork) {
-    BadWork     = new Galois::Statistic("BadWork");
-    WLEmptyWork = new Galois::Statistic("EmptyWork");
+    BadWork     = new galois::Statistic("BadWork");
+    WLEmptyWork = new galois::Statistic("EmptyWork");
   }
 
-  Galois::StatTimer T("OverheadTime");
+  galois::StatTimer T("OverheadTime");
   T.start();
   
   Graph graph;
   GNode source, report;
 
-  Galois::Graph::readGraph(graph, filename); 
+  galois::Graph::readGraph(graph, filename); 
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
@@ -134,30 +134,30 @@ int main(int argc, char** argv) {
   size_t approxNodeData = graph.size() * 64;
   // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
   // Graph::edge_data_type) * 2;
-  Galois::preAlloc(numThreads +
-                   approxNodeData / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads +
+                   approxNodeData / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
   std::cout << "Running Asynch with CAS version\n";
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  Galois::do_all_local(graph, 
+  galois::do_all_local(graph, 
                        [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
   graph.getData(source) = 0;
-  Galois::StatTimer Tmain;
+  galois::StatTimer Tmain;
   Tmain.start();
 
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
-  Galois::for_each(UpdateRequest{source, 0}, BFS{graph}, Galois::wl<BSWL>(), Galois::does_not_need_aborts<>());
+  galois::for_each(UpdateRequest{source, 0}, BFS{graph}, galois::wl<BSWL>(), galois::does_not_need_aborts<>());
   Tmain.stop();
   T.stop();
 
-  Galois::reportPageAlloc("MeminfoPost");
-  Galois::Runtime::reportNumaAlloc("NumaPost");
+  galois::reportPageAlloc("MeminfoPost");
+  galois::Runtime::reportNumaAlloc("NumaPost");
   
   std::cout << "Node " << reportNode << " has distance "
             << graph.getData(report) << "\n";

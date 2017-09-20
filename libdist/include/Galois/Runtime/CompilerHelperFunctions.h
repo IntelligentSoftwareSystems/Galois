@@ -29,8 +29,8 @@
 #include <algorithm>
 #include <vector>
 
-namespace Galois {
-  /** Galois::atomicMax + non-atomic max calls **/
+namespace galois {
+  /** galois::atomicMax + non-atomic max calls **/
 
   template<typename Ty>
   const Ty atomicMax(std::atomic<Ty>& a, const Ty b){
@@ -60,7 +60,7 @@ namespace Galois {
     return old_a;
   }
 
-  /** Galois::atomicMin **/
+  /** galois::atomicMin **/
   template<typename Ty>
     const Ty atomicMin(std::atomic<Ty>& a, const Ty b){
       Ty old_a = a;
@@ -86,7 +86,7 @@ namespace Galois {
       return old_a;
     }
 
-  /** Galois::atomicAdd **/
+  /** galois::atomicAdd **/
   template<typename Ty>
     const Ty atomicAdd(std::atomic<Ty>& val, Ty delta){
       Ty old_val = val;
@@ -201,5 +201,5 @@ namespace Galois {
         // Nothing for now.
         return 0;
       }
-}//End namespace Galois
+}//End namespace galois
 #endif

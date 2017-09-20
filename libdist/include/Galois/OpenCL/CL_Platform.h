@@ -32,7 +32,7 @@
 
 #ifndef GALOISGPU_OCL_CL_PLATFORM_H_
 #define GALOISGPU_OCL_CL_PLATFORM_H_
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 
 struct CL_Platform {
@@ -104,7 +104,7 @@ struct CL_Platform {
    }
 };
 }//namespace OpenCL
-} // namespace Galois
+} // namespace galois
 
 
 #endif /* GALOISGPU_OCL_CL_PLATFORM_H_ */

@@ -37,10 +37,10 @@ class BilliardsLevelExec: public Billiards<BilliardsLevelExec> {
 
 public:
 
-  using Graph = Galois::Graph::FirstGraph<void*, void, true>;
+  using Graph = galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::PerThreadVector<Event>;
+  using AddListTy = galois::PerThreadVector<Event>;
 
   struct GetEventTime {
     const FP& operator () (const Event& e) const { 
@@ -104,8 +104,8 @@ public:
 
     createLocks (table, graph, nodes);
 
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
+    galois::Runtime::for_each_ordered_level (
+        galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
         GetEventTime (), std::less<FP> (),
         VisitNhood<Graph, VecNodes> (graph, nodes),
         OpFunc (table, endtime, addList, iter));

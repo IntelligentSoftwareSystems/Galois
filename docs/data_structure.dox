@@ -14,13 +14,13 @@ The current available galois parallel graphs can be seen in the above figure whe
    A local computation graph does not allow graph mutation. Details about how to construct a local computation graphs can be seen in \ref graphio.
 
 <hr>
-<H4> @link Galois::Graph::LC_CSR_Graph </H4>
+<H4> @link galois::Graph::LC_CSR_Graph </H4>
    
-Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row format data structure to represent the graph.  
+Internally, {@link galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row format data structure to represent the graph.  
  
    - Defining a graph
      
-     The {@link Galois::Graph::LC_CSR_Graph} takes five template parameters to customize the graph:
+     The {@link galois::Graph::LC_CSR_Graph} takes five template parameters to customize the graph:
 
      \li NodeTy: the type of data stored on each node. Void can be used when no data is stored on each node.
      
@@ -42,11 +42,11 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
    - Accessing graph topology
      
-     The number of nodes in the graph can be accessed by using {@link Galois::Graph::LC_CSR_Graph::size}. The number of edges in the graph can be accessed by using {@link Galois::Graph::LC_CSR_Graph::sizeEdges}. 
+     The number of nodes in the graph can be accessed by using {@link galois::Graph::LC_CSR_Graph::size}. The number of edges in the graph can be accessed by using {@link galois::Graph::LC_CSR_Graph::sizeEdges}. 
 
-     The nodes in the graph can be accessed by the node iterator {@link Galois::Graph::LC_CSR_Graph::iterator} with {@link Galois::Graph::LC_CSR_Graph::begin} and {@link Galois::Graph::LC_CSR_Graph::end}. 
+     The nodes in the graph can be accessed by the node iterator {@link galois::Graph::LC_CSR_Graph::iterator} with {@link galois::Graph::LC_CSR_Graph::begin} and {@link galois::Graph::LC_CSR_Graph::end}. 
 
-     The outgoing edges of a node can be accessed by the edge iterator {@link Galois::Graph::LC_CSR_Graph::edge_iterator} with {@link Galois::Graph::LC_CSR_Graph::edge_begin} and {@link Galois::Graph::LC_CSR_Graph::edge_end}. Then the outgoing neighbors can be accessed by {@link Galois::Graph::LC_CSR_Graph::getEdgeDst} given a outgoing edge. 
+     The outgoing edges of a node can be accessed by the edge iterator {@link galois::Graph::LC_CSR_Graph::edge_iterator} with {@link galois::Graph::LC_CSR_Graph::edge_begin} and {@link galois::Graph::LC_CSR_Graph::edge_end}. Then the outgoing neighbors can be accessed by {@link galois::Graph::LC_CSR_Graph::getEdgeDst} given a outgoing edge. 
 
      An example of accessing the topology of the graph can be seen as follows:
 
@@ -56,7 +56,7 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
    - Accessing node data and edge data
     
-     Given a node or edge, the data on them can be accessed by {@link Galois::Graph::LC_CSR_Graph::getData} or {@link Galois::Graph::LC_CSR_Graph::getEdgeData} correspondingly. 
+     Given a node or edge, the data on them can be accessed by {@link galois::Graph::LC_CSR_Graph::getData} or {@link galois::Graph::LC_CSR_Graph::getEdgeData} correspondingly. 
     
      An example of accessing node data and edge data can be seen as follows:
 
@@ -66,7 +66,7 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
    - Other Functionalities
      
-    {@link Galois::Graph::LC_CSR_Graph::sortEdges} and {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData} can be used to make the outgoing edges of a node sorted. The two functions differ by the comparison functions. In {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData}, the comparison function is over edge data type EdgeTy. In {@link Galois::Graph::LC_CSR_Graph::sortEdges}, the comparison function is over {@link Galois::Graph::EdgeSortValue} which represents a pair of GraphNode and EdgeTy.   
+    {@link galois::Graph::LC_CSR_Graph::sortEdges} and {@link galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData} can be used to make the outgoing edges of a node sorted. The two functions differ by the comparison functions. In {@link galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData}, the comparison function is over edge data type EdgeTy. In {@link galois::Graph::LC_CSR_Graph::sortEdges}, the comparison function is over {@link galois::Graph::EdgeSortValue} which represents a pair of GraphNode and EdgeTy.   
  
     An example of sort edges can be seen as follows:
 
@@ -77,22 +77,22 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
 <hr>
 
-<H4> @link Galois::Graph::LC_Linear_Graph </H4>
+<H4> @link galois::Graph::LC_Linear_Graph </H4>
 
-A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structures are slightly different but the functionalities of the two graphs are the same. Depending on the applications, the two graphs may achieve different performance from other variants.
+A variant of {@link galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structures are slightly different but the functionalities of the two graphs are the same. Depending on the applications, the two graphs may achieve different performance from other variants.
 
-An example to define a {@link Galois::Graph::LC_Linear_Graph} can be seen as follows:
+An example to define a {@link galois::Graph::LC_Linear_Graph} can be seen as follows:
 
 In {@link apps/tutorial/SSSPsimple.cpp}
 
 @snippet apps/tutorial/SSSPsimple.cpp Define LC Graph
 
 <hr>
-<H4> @link Galois::Graph::LC_InlineEdge_Graph </H4>
+<H4> @link galois::Graph::LC_InlineEdge_Graph </H4>
 
-A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structure are slightly different but the functionalities of those graphs are the same. Depending on the applications, the graph may achieve different performance from other variants.
+A variant of {@link galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structure are slightly different but the functionalities of those graphs are the same. Depending on the applications, the graph may achieve different performance from other variants.
 
-An example to define a {@link Galois::Graph::LC_InlineEdge_Graph} can be seen as follows:
+An example to define a {@link galois::Graph::LC_InlineEdge_Graph} can be seen as follows:
 
 In {@link apps/sssp/SSSP.cpp}
 
@@ -100,17 +100,17 @@ In {@link apps/sssp/SSSP.cpp}
 
 <hr>
 
-<H4> @link Galois::Graph::LC_InOut_Graph </H4>
+<H4> @link galois::Graph::LC_InOut_Graph </H4>
 
-{@link Galois::Graph::LC_InOut_Graph} provides accessing incoming neighbors besides the functionalities provided {@link Galois::Graph::LC_CSR_Graph}.   
+{@link galois::Graph::LC_InOut_Graph} provides accessing incoming neighbors besides the functionalities provided {@link galois::Graph::LC_CSR_Graph}.   
    
    - Accessing incoming edges and neighbors of a node
 
-     The incoming edges of a node can be accessed by {@link Galois::Graph::LC_InOut_Graph::in_edge_iterator} with {@link Galois::Graph::LC_InOut_Graph::in_edge_begin}. The data associated with the incoming edge can be accessed using {Galois::Graph::LC_CSR_Graph::getInEdgeData}. Given an incoming edge, the incoming neighbor node can be accessed using {@link Galois::Graph::LC_InOut_Graph::getInEdgeDst}.       
+     The incoming edges of a node can be accessed by {@link galois::Graph::LC_InOut_Graph::in_edge_iterator} with {@link galois::Graph::LC_InOut_Graph::in_edge_begin}. The data associated with the incoming edge can be accessed using {galois::Graph::LC_CSR_Graph::getInEdgeData}. Given an incoming edge, the incoming neighbor node can be accessed using {@link galois::Graph::LC_InOut_Graph::getInEdgeDst}.       
 
     In {@link apps/pagerank/PageRank.cpp}
 
-    An example to define a {@link Galois::Graph::LC_InOut_Graph} can be seen as follows:
+    An example to define a {@link galois::Graph::LC_InOut_Graph} can be seen as follows:
 
     @snippet apps/pagerank/PageRank.cpp Define LC_InOut_Graph
 
@@ -126,11 +126,11 @@ In {@link apps/sssp/SSSP.cpp}
 Morph graphs allow concurrent graph mutations.
 
 <hr>
-<H4> @link Galois::Graph::FirstGraph </H4>
+<H4> @link galois::Graph::FirstGraph </H4>
 
    - Defining a graph
 
-     The {@link Galois::Graph::FirstGraph} takes four template parameters to customize the graph:
+     The {@link galois::Graph::FirstGraph} takes four template parameters to customize the graph:
 
      \li NodeTy: the type of data stored on each node. Void can be used when no data is stored on each edge. 
      
@@ -142,7 +142,7 @@ Morph graphs allow concurrent graph mutations.
 
      Directional and HasNoLockable are optional.  
 
-     An example to define a {@link Galois::Graph::FirstGraph} can be seen as follows:
+     An example to define a {@link galois::Graph::FirstGraph} can be seen as follows:
 
      In {@link apps/tutorial/Torus.cpp}
 
@@ -152,13 +152,13 @@ Morph graphs allow concurrent graph mutations.
 
    - Mutating a graph
     
-     A graph node can be created using {@link Galois::Graph::FirstGraph::createNode}. If the node data type specified is not void, {@link Galois::Graph::FirstGraph::createNode} will create a node data object internally. The parameters of {@link Galois::Graph::FirstGraph::createNode} will passed to the constuctor of the node data type to create the node data instance. There are three cases: 
+     A graph node can be created using {@link galois::Graph::FirstGraph::createNode}. If the node data type specified is not void, {@link galois::Graph::FirstGraph::createNode} will create a node data object internally. The parameters of {@link galois::Graph::FirstGraph::createNode} will passed to the constuctor of the node data type to create the node data instance. There are three cases: 
      
-     \li if no parameter is passed into {@link Galois::Graph::FirstGraph::createNode}, then the default constructor of the node data type will be called to create the node data instance. 
-     \li if some parameters are passed into {@link Galois::Graph::FirstGraph::createNode}, the corresponding constructor of the node data type will be called to create the node data instance.
-     \li if a node data instance is passed into {@link Galois::Graph::FirstGraph::createNode}, then the copy constrcutor of the node data type will be called to create the node data instance.
+     \li if no parameter is passed into {@link galois::Graph::FirstGraph::createNode}, then the default constructor of the node data type will be called to create the node data instance. 
+     \li if some parameters are passed into {@link galois::Graph::FirstGraph::createNode}, the corresponding constructor of the node data type will be called to create the node data instance.
+     \li if a node data instance is passed into {@link galois::Graph::FirstGraph::createNode}, then the copy constrcutor of the node data type will be called to create the node data instance.
      
-     if the node data type specified is void, then {@link Galois::Graph::FirstGraph::createNode} should be called without paramters. {@link Galois::Graph::FirstGraph::createNode} will return an instance of {Galois::Graph::FistGraph::GraphNode} which stands for a reference to the created node. Through this instance, the created node can be added to the graph using {@link Galois::Graph::FirstGraph::addNode}. An existing node in the graph can be removed using {@link Galois::Graph::FirstGraph::removeNode}, the parameter of which is also an instace of {Galois::Graph::FistGraph::GraphNode}. 
+     if the node data type specified is void, then {@link galois::Graph::FirstGraph::createNode} should be called without paramters. {@link galois::Graph::FirstGraph::createNode} will return an instance of {galois::Graph::FistGraph::GraphNode} which stands for a reference to the created node. Through this instance, the created node can be added to the graph using {@link galois::Graph::FirstGraph::addNode}. An existing node in the graph can be removed using {@link galois::Graph::FirstGraph::removeNode}, the parameter of which is also an instace of {galois::Graph::FistGraph::GraphNode}. 
      
      An example of creating nodes in the graph can be seen as follows:
       
@@ -166,7 +166,7 @@ Morph graphs allow concurrent graph mutations.
      
      @snippet apps/tutorial/Torus.cpp create and add node
 
-     A graph edge can be created and added into a graph using {@link Galois::Graph::FirstGraph::addEdge}.In the directional case, the paramters src and dst of {@link Galois::Graph::FirstGraph::addEdge} represents the source node and the destination node of the edge to be added. When the graph is un-directional, any order of the two ending nodes of the edge to be added will be treated as the same edge and can be passed into this function with equal effects. {@link Galois::Graph::FirstGraph::addEdge} will first detect whether the edge to be added exists so that the graph does not contain multi-edges. If such edge does not exist, this function will create an edge in the graph with an edge data object initialized to the default value of the edge data type; otherwise, it will not add new edge into the graph. In either case, the function will return an edge_iterator pointing to the added edge. Passing this edge_iterator to {@link Galois::Graph::FirstGraph::getEdgeData} will return a reference to the edge data object associated with the added edge. Through the returned reference, the edge data object can be modified. To add multi-edges into the graph, {@link Galois::Graph::FirstGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link Galois::Graph::FirstGraph::addEdge}. An edge can be removed by using {@link Galois::Graph::FirstGraph::removeEdge}.
+     A graph edge can be created and added into a graph using {@link galois::Graph::FirstGraph::addEdge}.In the directional case, the paramters src and dst of {@link galois::Graph::FirstGraph::addEdge} represents the source node and the destination node of the edge to be added. When the graph is un-directional, any order of the two ending nodes of the edge to be added will be treated as the same edge and can be passed into this function with equal effects. {@link galois::Graph::FirstGraph::addEdge} will first detect whether the edge to be added exists so that the graph does not contain multi-edges. If such edge does not exist, this function will create an edge in the graph with an edge data object initialized to the default value of the edge data type; otherwise, it will not add new edge into the graph. In either case, the function will return an edge_iterator pointing to the added edge. Passing this edge_iterator to {@link galois::Graph::FirstGraph::getEdgeData} will return a reference to the edge data object associated with the added edge. Through the returned reference, the edge data object can be modified. To add multi-edges into the graph, {@link galois::Graph::FirstGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link galois::Graph::FirstGraph::addEdge}. An edge can be removed by using {@link galois::Graph::FirstGraph::removeEdge}.
 
      An example of creating edges can be seen as follows:
     
@@ -174,15 +174,15 @@ Morph graphs allow concurrent graph mutations.
    
      @snippet apps/tutorial/Torus.cpp add edges
   
-     {@link Galois::Graph::FirstGraph::resizeEdges} is used to pre-allocate space for edges of a graph node.
+     {@link galois::Graph::FirstGraph::resizeEdges} is used to pre-allocate space for edges of a graph node.
 
    - Accessing graph topology
     
-     The number of nodes in the graph can be accessed by using {@link Galois::Graph::FirstGraph::size}. Note that this function is not threadsafe. {@link Galois::Graph::FirstGraph::sizeOfEdgeData} can be used to return size of the edge data.
+     The number of nodes in the graph can be accessed by using {@link galois::Graph::FirstGraph::size}. Note that this function is not threadsafe. {@link galois::Graph::FirstGraph::sizeOfEdgeData} can be used to return size of the edge data.
 
-     The nodes in the graph can be accessed by the node iterator {@link Galois::Graph::FirstGraph::iterator} with {@link Galois::Graph::FirstGraph::begin} and {@link Galois::Graph::FirstGraph::end}. 
+     The nodes in the graph can be accessed by the node iterator {@link galois::Graph::FirstGraph::iterator} with {@link galois::Graph::FirstGraph::begin} and {@link galois::Graph::FirstGraph::end}. 
 
-     The outgoing edges of a node can be accessed by the edge iterator {@link Galois::Graph::FirstGraph::edge_iterator} with {@link Galois::Graph::FirstGraph::edge_begin} and {@link Galois::Graph::FirstGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link Galois::Graph::FirstGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
+     The outgoing edges of a node can be accessed by the edge iterator {@link galois::Graph::FirstGraph::edge_iterator} with {@link galois::Graph::FirstGraph::edge_begin} and {@link galois::Graph::FirstGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link galois::Graph::FirstGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
 
     An example to access the outgoing neighbors of a node can be seen as follows:
 
@@ -191,7 +191,7 @@ Morph graphs allow concurrent graph mutations.
 
    - Accessing node data and edge data   
  
-    Given a node or edge, the data on them can be accessed by {@link Galois::Graph::FirstGraph::getData} or {@link Galois::Graph::FirstGraph::getEdgeData} correspondingly. 
+    Given a node or edge, the data on them can be accessed by {@link galois::Graph::FirstGraph::getData} or {@link galois::Graph::FirstGraph::getEdgeData} correspondingly. 
 
     An example to access the data of a node can be seen as follows:
 
@@ -200,30 +200,30 @@ Morph graphs allow concurrent graph mutations.
 
 <hr> 
 
-<H4> @link Galois::Graph::LC_Morph_Graph </H4>
+<H4> @link galois::Graph::LC_Morph_Graph </H4>
 
-This graph extends {@link Galois::Graph::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The outgoing edges of this node should not exceed this degree. {@link Galois::Graph::LC_Morph_Graph::createNode} is used to create node and its first parameter "nedges" is used to specify the maximum allowed degree. The remaining parameters of {@link Galois::Graph::LC_Morph_Graph::createNode} will be passed to the constructor of the node data type to create the node data instance, same as the parameters of {@link Galois::Graph::FirstGraph::createNode}. Importantly, removing nodes in the graph is not supported. Edges can be removed using {@link Galois::Graph::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used. Other functionalities of {@link Galois::Graph::LC_Morph_Graph} is same as {@link Galois::Graph::LC_CSR_Graph} which can be seen in \ref localcompgraph 
+This graph extends {@link galois::Graph::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The outgoing edges of this node should not exceed this degree. {@link galois::Graph::LC_Morph_Graph::createNode} is used to create node and its first parameter "nedges" is used to specify the maximum allowed degree. The remaining parameters of {@link galois::Graph::LC_Morph_Graph::createNode} will be passed to the constructor of the node data type to create the node data instance, same as the parameters of {@link galois::Graph::FirstGraph::createNode}. Importantly, removing nodes in the graph is not supported. Edges can be removed using {@link galois::Graph::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used. Other functionalities of {@link galois::Graph::LC_Morph_Graph} is same as {@link galois::Graph::LC_CSR_Graph} which can be seen in \ref localcompgraph 
 
 <hr> 
 
 
 @subsubsection methodFlags Method flags for controlling conflict detection
      
-When using abstract locks, whenever a graph operation is called in parallel region, the runtime will check if the nodes or edges the graph operations will access has been locked by other threads. If yes, the runtime will roll back the computation. Otherwise, the runtime will log the information for un-do the computation when roll back happens. There are overheads associated with such conflict detection. The users can control such conflict detection by passing method flags into the graph operations to indicate the runtime not performing certain checks. One of {@link Galois::MethodFlag::WRITE}, {@link Galois::READ_INTENT}, or {@link Galois::MethodFlag::UNPROTECTED}, that dictates what support the runtime will provide for each call. By default, the runtime assumes Galois::WRITE. Note: the current version of Galois, version 2.1, does not support saving undo information. Version 2.0 does support saving undo information. 
+When using abstract locks, whenever a graph operation is called in parallel region, the runtime will check if the nodes or edges the graph operations will access has been locked by other threads. If yes, the runtime will roll back the computation. Otherwise, the runtime will log the information for un-do the computation when roll back happens. There are overheads associated with such conflict detection. The users can control such conflict detection by passing method flags into the graph operations to indicate the runtime not performing certain checks. One of {@link galois::MethodFlag::WRITE}, {@link galois::READ_INTENT}, or {@link galois::MethodFlag::UNPROTECTED}, that dictates what support the runtime will provide for each call. By default, the runtime assumes galois::WRITE. Note: the current version of Galois, version 2.1, does not support saving undo information. Version 2.0 does support saving undo information. 
 
 @subsection reducers Reducers
 
-The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link Galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen in the following sections.     
+The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen in the following sections.     
 
 \image html galois_parallel_reducers.png "Galois Parallel Reducers"
 
 @subsubsection greducible General Reducer 
 
-<H4> @link Galois::GReducible </H4>
+<H4> @link galois::GReducible </H4>
 
   - Defining a reducer
     
-    {@link Galois::GReducible} is used to reduce a set of values of type T to a single value. It takes the type T of the values to be reduced and a functor BinFunc as template parameters. The functor BinFunc represents an associate two-input, one output reduction operator.   
+    {@link galois::GReducible} is used to reduce a set of values of type T to a single value. It takes the type T of the values to be reduced and a functor BinFunc as template parameters. The functor BinFunc represents an associate two-input, one output reduction operator.   
 
     The BinFunc functor should conform to:
 
@@ -235,15 +235,15 @@ The relationships among the reducers available in Galois can be seen in the abov
     
     @snippet apps/bfs/Diameter.cpp Define BinFunc for GReducible 
     
-    Given the BinFunc, defining a {@link Galois::GReducible} can be seen in the {@link apps/bfs/Diameter.cpp}:
+    Given the BinFunc, defining a {@link galois::GReducible} can be seen in the {@link apps/bfs/Diameter.cpp}:
 
     @snippet apps/bfs/Diameter.cpp Define GReducible 
 
   - Reducing values
    
-    {@link Galois::GReducible} starts with the default value of Type T. {@link Galois::GReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link Galois::GReducible::reduce}  
+    {@link galois::GReducible} starts with the default value of Type T. {@link galois::GReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link galois::GReducible::reduce}  
 
-    An example of using {@link Galois::GReducible} in parallel region can be seen in the {@link apps/bfs/Diameter.cpp}:
+    An example of using {@link galois::GReducible} in parallel region can be seen in the {@link apps/bfs/Diameter.cpp}:
 
     @snippet apps/bfs/Diameter.cpp Use GReducible in parallel 
 
@@ -253,29 +253,29 @@ The relationships among the reducers available in Galois can be seen in the abov
 
 There are several built-in special reducers.
 
-{@link Galois::GSimpleReducible} is used for basic types or low copy overhead types where the BinFunc conforms to:
+{@link galois::GSimpleReducible} is used for basic types or low copy overhead types where the BinFunc conforms to:
     
     T operator()(const T& a, const T& b);
  
-{@link Galois::GReduceMax} and {@link Galois::GReduceMin} are used to reduce the maximum and minimum values. The type T has to meet the type requirements of std::max and std::min respectively.   
+{@link galois::GReduceMax} and {@link galois::GReduceMin} are used to reduce the maximum and minimum values. The type T has to meet the type requirements of std::max and std::min respectively.   
 
-{@link Galois::GAccumulator} is used to accumulate a set of values. It provides {@link Galois::GAccumulator::operator+=} and {@link Galois::GAccumulator::operator-=} for adding or minusing new values.     
+{@link galois::GAccumulator} is used to accumulate a set of values. It provides {@link galois::GAccumulator::operator+=} and {@link galois::GAccumulator::operator-=} for adding or minusing new values.     
    
-{@link Galois::GCollectionAccumulator} is used to union collections. Since union/append/push_back are not standard among collections, the AdaptorTy template parameter of {@link Galois::GCollectionAccumulator} allows users to provide an iterator adaptor along the lines of std::inserter or std::back_inserter. {@link Galois::GSetAccumulator} is used to union set. Special collection accumulators exist. {@link Galois::GSetAccumulator} is used to union sets. {@link Galois::GVectorAccumulator} is used to concatenate vectors.   
+{@link galois::GCollectionAccumulator} is used to union collections. Since union/append/push_back are not standard among collections, the AdaptorTy template parameter of {@link galois::GCollectionAccumulator} allows users to provide an iterator adaptor along the lines of std::inserter or std::back_inserter. {@link galois::GSetAccumulator} is used to union set. Special collection accumulators exist. {@link galois::GSetAccumulator} is used to union sets. {@link galois::GVectorAccumulator} is used to concatenate vectors.   
   
-{@link Galois::GVectorElementAccumulator} and {@link Galois::GMapElementAccumulator} provides element-wise accumulation over vector and map. {@link Galois::GVectorElementAccumulator} accumulates vectors where the accumulation operator is element-wise plus operator of the type of the elements inside the vector. Here assumes the accumulated vectors have equal size. {@link Galois::GMapElementAccumulator} accumulates maps each of which is a set of key-value pairs. The accumulation operator performs the plus operator on the values of the maps with the same keys. The plus operator is defined by the value type of the maps.   
+{@link galois::GVectorElementAccumulator} and {@link galois::GMapElementAccumulator} provides element-wise accumulation over vector and map. {@link galois::GVectorElementAccumulator} accumulates vectors where the accumulation operator is element-wise plus operator of the type of the elements inside the vector. Here assumes the accumulated vectors have equal size. {@link galois::GMapElementAccumulator} accumulates maps each of which is a set of key-value pairs. The accumulation operator performs the plus operator on the values of the maps with the same keys. The plus operator is defined by the value type of the maps.   
 
 <hr>
 
 @subsection collections Collections
 
-<H4> @link Galois::InsertBag </H4>
+<H4> @link galois::InsertBag </H4>
 
-{@link Galois::InsertBag} is an unordered collection allowing parallel insertions. One of its important characteristics is that it uses customized memory allocations to achieve scalable parallel insertions. 
+{@link galois::InsertBag} is an unordered collection allowing parallel insertions. One of its important characteristics is that it uses customized memory allocations to achieve scalable parallel insertions. 
 
-  - Defining an {@link Galois::InsertBag}
+  - Defining an {@link galois::InsertBag}
 
-    {@link Galois::InsertBag} has two template parameters:
+    {@link galois::InsertBag} has two template parameters:
      
      - T: Type of elements that the insertBag contains. 
 
@@ -287,7 +287,7 @@ There are several built-in special reducers.
 
   - Inserting elements
     
-    {@link Galois::InsertBag::emplace} is used to insert copies of elements. Its paramters will be passed to the constuctor of the type of the elements to create the element in the bag. {@link Galois::InsertBag::push} is a shortcut of {@link Galois::InsertBag::emplace} to call the copy or move constuctor of the type of the elements. 
+    {@link galois::InsertBag::emplace} is used to insert copies of elements. Its paramters will be passed to the constuctor of the type of the elements to create the element in the bag. {@link galois::InsertBag::push} is a shortcut of {@link galois::InsertBag::emplace} to call the copy or move constuctor of the type of the elements. 
 
     An example of inserting elements into a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
 
@@ -297,9 +297,9 @@ There are several built-in special reducers.
     
     Accessing the elements is only allowed in serial. 
 
-    {@link Galois::InsertBag::begin} and {@link Galois::InsertBag::end} are used to access the elements.  
+    {@link galois::InsertBag::begin} and {@link galois::InsertBag::end} are used to access the elements.  
 
-    {@link Galois::InsertBag::empty} is used to check if the bag is empty. 
+    {@link galois::InsertBag::empty} is used to check if the bag is empty. 
   
     An example of accessing elements inside a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
 
@@ -310,23 +310,23 @@ There are several built-in special reducers.
 
 @subsection perthreadstorage PerThreadStorage
 
-{@link Galois::Runtime::PerThreadStorage} provides the ability to store data per thread. 
+{@link galois::Runtime::PerThreadStorage} provides the ability to store data per thread. 
 
- - Defining {@link Galois::Runtime::PerThreadStorage}
+ - Defining {@link galois::Runtime::PerThreadStorage}
 
-   The template parameter of {@link Galois::Runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link Galois::Runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
+   The template parameter of {@link galois::Runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link galois::Runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
 
-   An example to define a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to define a {@link galois::Runtime::PerThreadStorage} can be seen as follows:
 
    In {@link apps/boruvka/BoruvkaMerge.cpp}
  
    @snippet apps/boruvka/BoruvkaMerge.cpp define per thread storage
 
- - Accessing {@link Galois::Runtime::PerThreadStorage}
+ - Accessing {@link galois::Runtime::PerThreadStorage}
 
-   {@link Galois::Runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link Galois::Runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
+   {@link galois::Runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link galois::Runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
 
-   An example to access a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to access a {@link galois::Runtime::PerThreadStorage} can be seen as follows:
 
    In {@link apps/boruvka/BoruvkaMerge.cpp}
  

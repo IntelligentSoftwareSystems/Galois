@@ -19,7 +19,7 @@
 #ifndef LC_LinearArray_Graph_H_
 #define LC_LinearArray_Graph_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 static const char * _str_LC_LinearArray_Graph = "typedef struct _GraphType { \n"

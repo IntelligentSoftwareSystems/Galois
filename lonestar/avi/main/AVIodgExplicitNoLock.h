@@ -109,7 +109,7 @@ protected:
      */
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void addToWL (C& lwl, const GNode& gn, AVI* avi) {
-      assert (graph.getData (gn, Galois::MethodFlag::UNPROTECTED) == avi);
+      assert (graph.getData (gn, galois::MethodFlag::UNPROTECTED) == avi);
 
       if (avi->getNextTimeStamp () < meshInit.getSimEndTime ()) {
         lwl.push (gn);
@@ -120,11 +120,11 @@ protected:
     GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG (const GNode& src, AVI* srcAVI, C& lwl) {
       unsigned addAmt = 0;
 
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
-          , ende = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
+      for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED)
+          , ende = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
         GNode dst = graph.getEdgeDst (e);
-        AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        AVI* dstAVI = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
         if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
           ++addAmt;
@@ -141,11 +141,11 @@ protected:
       else {
         inDegVec[srcAVI->getGlobalIndex ()] += addAmt;
 
-        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
-            , ende = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED)
+            , ende = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
           GNode dst = graph.getEdgeDst (e);
-          AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+          AVI* dstAVI = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
           if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
             int din = --inDegVec[dstAVI->getGlobalIndex ()];
@@ -166,7 +166,7 @@ protected:
 
     template <typename ContextTy> 
     void operator () (const GNode& src, ContextTy& lwl) {
-      AVI* srcAVI = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      AVI* srcAVI = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
       int inDeg = (int)inDegVec[srcAVI->getGlobalIndex ()];
       // assert  inDeg == 0 : String.format ("active node %s with inDeg = %d\n", srcAVI, inDeg);
@@ -212,7 +212,7 @@ public:
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
 //    for (size_t i = 0; i < initWL.size (); ++i) {
-//      std::cout << graph.getData (initWL[i], Galois::MethodFlag::UNPROTECTED)->toString () << ", ";
+//      std::cout << graph.getData (initWL[i], galois::MethodFlag::UNPROTECTED)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 
@@ -233,7 +233,7 @@ public:
 
     Process p (graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
-    Galois::for_each(initWL.begin (), initWL.end (), p, Galois::wl<AVIWorkList>());
+    galois::for_each(initWL.begin (), initWL.end (), p, galois::wl<AVIWorkList>());
 
     printf ("iterations = %zd\n", iter.reduce ());
 

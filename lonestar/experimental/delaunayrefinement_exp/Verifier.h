@@ -33,7 +33,7 @@
 #include <set>
 #include <iostream>
 
-class Verifier : public Galois::Runtime::Lockable {
+class Verifier : public galois::Runtime::Lockable {
   struct inconsistent: public std::unary_function<GNode,bool> {
     Graphp graph;
     inconsistent() { }
@@ -61,15 +61,15 @@ class Verifier : public Galois::Runtime::Lockable {
     }
     // // serialization functions
     // typedef int tt_has_serialize;
-    // void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    // void serialize(galois::Runtime::SerializeBuffer& s) const {
     //   gSerialize(s,graph);
     // }
-    // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    // void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     //   gDeserialize(s,graph);
     // }
   };
 
-  struct not_delaunay: public std::unary_function<GNode,bool>, public Galois::Runtime::Lockable {
+  struct not_delaunay: public std::unary_function<GNode,bool>, public galois::Runtime::Lockable {
     Graphp graph;
     not_delaunay() { }
     not_delaunay(Graphp g): graph(g) { }
@@ -125,10 +125,10 @@ class Verifier : public Galois::Runtime::Lockable {
     }
     // serialization functions
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::Runtime::SerializeBuffer& s) const {
       gSerialize(s,graph);
     }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
       gDeserialize(s,graph);
     }
   };
@@ -159,7 +159,7 @@ class Verifier : public Galois::Runtime::Lockable {
       }
     }
 
-    auto size = Galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
+    auto size = galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
     if (found.size() != size) {
       std::cerr << "Error: Not all elements are reachable. ";
       std::cerr << "Found: " << found.size() << " needed: " << size << ".\n";
@@ -170,8 +170,8 @@ class Verifier : public Galois::Runtime::Lockable {
 
 public:
   bool verify(Graphp g) {
-    return checkReachability(g) && !Galois::ParallelSTL::count_if_local(g, inconsistent(g))
-      && !Galois::ParallelSTL::count_if_local(g, not_delaunay(g));
+    return checkReachability(g) && !galois::ParallelSTL::count_if_local(g, inconsistent(g))
+      && !galois::ParallelSTL::count_if_local(g, not_delaunay(g));
   }
 };
 

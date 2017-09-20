@@ -111,13 +111,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(Algo::pull));
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<PNode,void>
+  typedef galois::Graph::LC_CSR_Graph<PNode,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
   
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -151,7 +151,7 @@ struct SerialAlgo {
 
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-        PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        PNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
         float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
         if (diff <= tolerance)
@@ -190,7 +190,7 @@ struct PullAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,float>
     ::with_compressed_node_ptr<true>::type
     ::with_no_lockable<true>::type
     ::with_numa_alloc<false>::type
@@ -199,13 +199,13 @@ struct PullAlgo {
 
   std::string name() const { return "Pull"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<size_t> small_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -216,7 +216,7 @@ struct PullAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
     }
@@ -226,7 +226,7 @@ struct PullAlgo {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
   };
@@ -238,19 +238,19 @@ struct PullAlgo {
 
     Process(PullAlgo* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
       double sum = 0;
 
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         float w = graph.getEdgeData(jj);
 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         sum += ddata.getPageRank(iteration) * w;
       }
 
@@ -269,7 +269,7 @@ struct PullAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration), Galois::wl<Galois::WorkList::dChunkedFIFO<256> >());
+      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::WorkList::dChunkedFIFO<256> >());
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -296,7 +296,7 @@ struct PullAlgo {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -310,34 +310,34 @@ struct PullAlgo2 {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
   
   //! [Define LC_InOut_Graph]
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   //! [Define LC_InOut_Graph]
   
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Pull2"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
-    Galois::Graph::readGraph(graph, filename);
+    galois::Graph::readGraph(graph, filename);
   }
 
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.nout = outs;
     }
   };
@@ -346,7 +346,7 @@ struct PullAlgo2 {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
   };
@@ -358,20 +358,20 @@ struct PullAlgo2 {
 
     Process(PullAlgo2* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
 
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
       //! [Access in-neighbors of LC_InOut_Graph]
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE);
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::NONE), ej = graph.in_edge_end(src, galois::MethodFlag::NONE);
           jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         sum += ddata.getPageRank(iteration) / ddata.nout;
       }
       //! [Access in-neighbors of LC_InOut_Graph]
@@ -389,7 +389,7 @@ struct PullAlgo2 {
     unsigned int iteration = 0;
 
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -415,7 +415,7 @@ struct PullAlgo2 {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -497,7 +497,7 @@ struct PolyPush {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -523,7 +523,7 @@ struct PolyPush {
     }
 
     void mfree() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -562,28 +562,28 @@ struct PolyPush {
     float getPageRank() {return pagerank; }
     void setPageRank(float pr) { pagerank = pr; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<false>::type    // interleaved allocate
     InnerGraph;
 
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  /*typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  /*typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef Galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef Galois::Runtime::Barrier Barrier;
+  typedef galois::Runtime::Barrier Barrier;
 
   std::string name() const { return "polymer push"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -594,10 +594,10 @@ struct PolyPush {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      unsigned int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
+      unsigned int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.outDegree = outs;
-      unsigned int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));
+      unsigned int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::NONE), g.in_edge_end(n, galois::MethodFlag::NONE));
       data.inDegree = ins;
       GNode start = *g.begin();
       data.id = g.idFromNode(n);//n - start;
@@ -620,12 +620,12 @@ struct PolyPush {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::Runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
           if(sdata.id >= nodesStartPackage[currPackage] && sdata.id < nodesStartPackage[currPackage + 1] )
             sdata.pagerank = packageData.getLocal()->PR_curr[sdata.id - nodesStartPackage[currPackage]];
@@ -647,12 +647,12 @@ struct PolyPush {
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -672,14 +672,14 @@ struct PolyPush {
         edgeCount = 0;
         for (auto ii = graph.begin( ), end = graph.end( ); ii != end; ii++)  {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
           //printf("%d %d\n", sdata.id, edgeCount);
           packageData.getLocal()->nodeList[sdata.id] = edgeCount;
           outDegree[sdata.id] = sdata.outDegree;
           inDegree[sdata.id] = sdata.inDegree;
-          for(auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj!=ej; ++jj){    
+          for(auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj!=ej; ++jj){    
             GNode dst = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+            LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 
             if(ddata.id < rangeHi && ddata.id >= rangeLow) {
               packageData.getLocal()->edgeList[edgeCount] = ddata.id;
@@ -750,7 +750,7 @@ struct PolyPush {
       unsigned int counter = 0;
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii)  {
         GNode src = *ii;
-        LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
         accum[counter] += sdata.inDegree;
         nodesPerThread[counter]++;
         if ((accum[counter] >= averageDegree && counter < numThreads - 1 )|| ii == ei - 1) {
@@ -892,8 +892,8 @@ struct PolyPush {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = Galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
 
       unsigned int nPackages = partitionInfo.nPackages;
 
@@ -984,10 +984,10 @@ struct PolyPush {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPush *self,PerPackageData& packageData){
-      unsigned int localtid = tid - Galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned int localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
       unsigned int coresCurrPackage;
       unsigned int nodesPerCore;
-      unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -1020,7 +1020,7 @@ struct PolyPush {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -1038,12 +1038,12 @@ struct PolyPush {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned int coresPerPackage = Galois::Runtime::LL::getMaxCores()/Galois::Runtime::LL::getMaxPackages();
+    unsigned int coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
     
     unsigned int nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned int coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = Galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
 
     unsigned int nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -1062,15 +1062,15 @@ struct PolyPush {
 
     PerPackageData packageData(nnodes, max_nodes_per_package, max_edges_per_package);
 
-    Galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
+    galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
     unsigned int iteration = 0;
-    Galois::StatTimer T("pure time");
+    galois::StatTimer T("pure time");
 
     //partitionInfo.print();
     T.start();
     while (true) {
-      Galois::on_each(Process(packageData, partitionInfo, gbarrier, this));
-      Galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -1085,21 +1085,21 @@ struct PolyPush {
 
       max_delta.reset();
       sum_delta.reset();
-      /*Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+      /*galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
       printTop(graph, 10);*/
     }
     T.stop();
     if (iteration >= maxIterations) {
       std::cout << "Failed to converge\n";
     }
-    Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+    galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
 
     partitionInfo.mfree();
 
     /*if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }*/
   }
 };
@@ -1125,7 +1125,7 @@ struct PolyPull {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -1151,7 +1151,7 @@ struct PolyPull {
     }
 
     void mfree() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -1190,28 +1190,28 @@ struct PolyPull {
     float getPageRank() {return pagerank; }
     void setPageRank(float pr) { pagerank = pr; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type
     InnerGraph;
 
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  /*typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  /*typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef Galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef Galois::Runtime::Barrier Barrier;
+  typedef galois::Runtime::Barrier Barrier;
 
   std::string name() const { return "polymer pull"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -1222,10 +1222,10 @@ struct PolyPull {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      unsigned int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
+      unsigned int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.outDegree = outs;
-      unsigned int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));
+      unsigned int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::NONE), g.in_edge_end(n, galois::MethodFlag::NONE));
       data.inDegree = ins;
       GNode start = *g.begin();
       data.id = g.idFromNode(n);//n - start;
@@ -1248,12 +1248,12 @@ struct PolyPull {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::Runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
           if(sdata.id >= nodesStartPackage[currPackage] && sdata.id < nodesStartPackage[currPackage + 1] )
             sdata.pagerank = packageData.getLocal()->PR_curr[sdata.id - nodesStartPackage[currPackage]];
@@ -1275,12 +1275,12 @@ struct PolyPull {
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -1300,14 +1300,14 @@ struct PolyPull {
         edgeCount = 0;
         for (auto ii = graph.begin( ), end = graph.end( ); ii != end; ii++)  {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
           //printf("%d %d\n", sdata.id, edgeCount);
           packageData.getLocal()->nodeList[sdata.id] = edgeCount;
           outDegree[sdata.id] = sdata.outDegree;
           inDegree[sdata.id] = sdata.inDegree;
-          for(auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj!=ej; ++jj){    
+          for(auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj!=ej; ++jj){    
             GNode dst = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+            LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 
             if(ddata.id < rangeHi && ddata.id >= rangeLow) {
               packageData.getLocal()->edgeList[edgeCount] = ddata.id;
@@ -1378,7 +1378,7 @@ struct PolyPull {
       int counter = 0;
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii)  {
         GNode src = *ii;
-        LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
         accum[counter] += sdata.outDegree;
         nodesPerThread[counter]++;
         if ((accum[counter] >= averageDegree && counter < numThreads - 1 )|| ii == ei - 1) {
@@ -1520,8 +1520,8 @@ struct PolyPull {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = Galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -1610,10 +1610,10 @@ struct PolyPull {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPull *self,PerPackageData& packageData){
-      unsigned localtid = tid - Galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -1646,7 +1646,7 @@ struct PolyPull {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -1664,12 +1664,12 @@ struct PolyPull {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = Galois::Runtime::LL::getMaxCores()/Galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
     
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = Galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -1688,15 +1688,15 @@ struct PolyPull {
 
     PerPackageData packageData(nnodes, max_nodes_per_package, max_edges_per_package);
 
-    Galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
+    galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
     unsigned int iteration = 0;
-    Galois::StatTimer T("pure time");
+    galois::StatTimer T("pure time");
 
     //partitionInfo.print();
     T.start();
     while (true) {
-      Galois::on_each(Process(packageData, partitionInfo, gbarrier, this));      
-      Galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process(packageData, partitionInfo, gbarrier, this));      
+      galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -1711,20 +1711,20 @@ struct PolyPull {
 
       max_delta.reset();
       sum_delta.reset();
-      //Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+      //galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
     }
     T.stop();
     if (iteration >= maxIterations) {
       std::cout << "Failed to converge\n";
     }
-    Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+    galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
 
     partitionInfo.mfree();
 
     /*if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }*/
   }
 };
@@ -1750,7 +1750,7 @@ struct PolyPull {
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -1776,7 +1776,7 @@ struct PolyPull {
     }
 
     void mfree() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -1815,28 +1815,28 @@ struct PolyPull {
     float getPageRank() {return pagerank; }
     void setPageRank(float pr) { pagerank = pr; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type
     InnerGraph;
 
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  /*typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  /*typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef Galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef Galois::Runtime::Barrier Barrier;
+  typedef galois::Runtime::Barrier Barrier;
 
   std::string name() const { return "polymer pull"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -1847,10 +1847,10 @@ struct PolyPull {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      unsigned int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
+      unsigned int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.outDegree = outs;
-      unsigned int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));
+      unsigned int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::NONE), g.in_edge_end(n, galois::MethodFlag::NONE));
       data.inDegree = ins;
       GNode start = *g.begin();
       data.id = g.idFromNode(n);//n - start;
@@ -1873,12 +1873,12 @@ struct PolyPull {
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::Runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
           if(sdata.id >= nodesStartPackage[currPackage] && sdata.id < nodesStartPackage[currPackage + 1] )
             sdata.pagerank = packageData.getLocal()->PR_curr[sdata.id - nodesStartPackage[currPackage]];
@@ -1902,12 +1902,12 @@ struct PolyPull {
     graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges), superPartition(superPartition){};
 
     void operator() (unsigned tid, unsigned numT){
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -1932,14 +1932,14 @@ struct PolyPull {
         }
         for (auto ii = graph.begin( ), end = graph.end( ); ii != end; ii++)  {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
           //printf("%d %d\n", sdata.id, edgeCount);
           packageData.getLocal()->nodeList[sdata.id] = edgeCount;
           outDegree[sdata.id] = sdata.outDegree;
           inDegree[sdata.id] = sdata.inDegree;
-          for(auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj!=ej; ++jj){    
+          for(auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj!=ej; ++jj){    
             GNode dst = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+            LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 
             if(ddata.id < rangeHi && ddata.id >= rangeLow) {
               packageData.getLocal()->edgeList[edgeCount] = ddata.id;
@@ -2012,7 +2012,7 @@ struct PolyPull {
       int counter = 0;
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii)  {
         GNode src = *ii;
-        LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
         accum[counter] += sdata.outDegree;
         nodesPerThread[counter]++;
         if ((accum[counter] >= averageDegree && counter < numThreads - 1 )|| ii == ei - 1) {
@@ -2150,8 +2150,8 @@ struct PolyPull {
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = Galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -2241,10 +2241,10 @@ struct PolyPull {
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, PolyPull2 *self,PerPackageData& packageData){
-      unsigned localtid = tid - Galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -2277,7 +2277,7 @@ struct PolyPull {
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         float *temp;
         temp = packageData.getLocal()->PR_curr;
         packageData.getLocal()->PR_curr = packageData.getLocal()->PR_next;
@@ -2295,12 +2295,12 @@ struct PolyPull {
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = Galois::Runtime::LL::getMaxCores()/Galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
     unsigned superPartition = 2;
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = coresPerPackage;
-    Barrier& gbarrier = Galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -2319,15 +2319,15 @@ struct PolyPull {
 
     PerPackageData packageData(nnodes, max_nodes_per_package, max_edges_per_package);
 
-    Galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
+    galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
     unsigned int iteration = 0;
-    Galois::StatTimer T("pure time");
+    galois::StatTimer T("pure time");
 
     //partitionInfo.print();
     T.start();
     while (true) {
-      Galois::on_each(Process(packageData, partitionInfo, gbarrier, this));      
-      Galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process(packageData, partitionInfo, gbarrier, this));      
+      galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -2342,20 +2342,20 @@ struct PolyPull {
 
       max_delta.reset();
       sum_delta.reset();
-      //Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+      //galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
     }
     T.stop();
     if (iteration >= maxIterations) {
       std::cout << "Failed to converge\n";
     }
-    Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+    galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
 
     partitionInfo.mfree();
 
     /*if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }*/
   }
 };*/
@@ -2381,7 +2381,7 @@ struct DupPull {    // still buggy
       nnodes(nnodes1),max_nodes_per_package(max_nodes_per_package1),max_edges_per_package(max_edges_per_package1) {};
 
     void alloc() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*Bit_curr = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       Bit_next = (bool * ) largeAlloc( max_nodes_per_package * sizeof(bool));
       PR_curr = (float * ) largeAlloc( max_nodes_per_package * sizeof(float));
@@ -2407,7 +2407,7 @@ struct DupPull {    // still buggy
     }
 
     void mfree() {
-      using namespace Galois::Runtime::MM;
+      using namespace galois::Runtime::MM;
       /*largeFree( (void *)Bit_curr, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)Bit_next, max_nodes_per_package * sizeof(bool));
       largeFree( (void *)PR_curr, max_nodes_per_package * sizeof(float));
@@ -2446,28 +2446,28 @@ struct DupPull {    // still buggy
     float getPageRank() {return pagerank; }
     void setPageRank(float pr) { pagerank = pr; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<false>::type
     InnerGraph;
 
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  /*typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  /*typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type Graph;*/
   typedef Graph::GraphNode GNode;
 
-  typedef Galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
+  typedef galois::Runtime::PerPackageStorage<LocalData> PerPackageData;
 
-  typedef Galois::Runtime::Barrier Barrier;
+  typedef galois::Runtime::Barrier Barrier;
 
   std::string name() const { return "duplicate pull"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -2478,10 +2478,10 @@ struct DupPull {    // still buggy
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      unsigned int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
+      unsigned int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.outDegree = outs;
-      unsigned int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));
+      unsigned int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::NONE), g.in_edge_end(n, galois::MethodFlag::NONE));
       data.inDegree = ins;
       GNode start = *g.begin();
       data.id = g.idFromNode(n);//n - start;
@@ -2504,12 +2504,12 @@ struct DupPull {    // still buggy
         } 
      }
     void operator()(unsigned tid, unsigned numT) {
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      if(galois::Runtime::LL::isPackageLeader(tid)){
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         for(auto ii = graph.begin(), end = graph.end(); ii != end ; ii++)
         {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
           if(sdata.id >= nodesStartPackage[currPackage] && sdata.id < nodesStartPackage[currPackage + 1] )
             sdata.pagerank = packageData.getLocal()->PR_next[sdata.id - nodesStartPackage[currPackage]];
@@ -2531,12 +2531,12 @@ struct DupPull {    // still buggy
     distributeEdges(Graph &g, PerPackageData& p, unsigned int *nodes, unsigned int* edges): graph(g), packageData(p), nodesPerPackage(nodes), edgesPerPackage(edges) {};
 
     void operator() (unsigned tid, unsigned numT){
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         //printf("tid: %d\n", tid);
         packageData.getLocal()->alloc();
 
         unsigned int nnodes = graph.size();
-        unsigned int currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+        unsigned int currPackage = galois::Runtime::LL::getPackageForThread(tid);
         unsigned int * outDegree = packageData.getLocal()->outDegree;
         unsigned int * inDegree = packageData.getLocal()->inDegree;
         packageData.getLocal()->nodeList[nnodes] = edgesPerPackage[currPackage];
@@ -2556,14 +2556,14 @@ struct DupPull {    // still buggy
         edgeCount = 0;
         for (auto ii = graph.begin( ), end = graph.end( ); ii != end; ii++)  {
           GNode src = *ii;
-          LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+          LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
           //printf("%d %d\n", sdata.id, edgeCount);
           packageData.getLocal()->nodeList[sdata.id] = edgeCount;
           outDegree[sdata.id] = sdata.outDegree;
           inDegree[sdata.id] = sdata.inDegree;
-          for(auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj!=ej; ++jj){    
+          for(auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj!=ej; ++jj){    
             GNode dst = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+            LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 
             if(ddata.id < rangeHi && ddata.id >= rangeLow) {
               packageData.getLocal()->edgeList[edgeCount] = ddata.id;
@@ -2632,7 +2632,7 @@ struct DupPull {    // still buggy
       int counter = 0;
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii)  {
         GNode src = *ii;
-        LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
         accum[counter] += sdata.inDegree;
         nodesPerThread[counter]++;
         if ((accum[counter] >= averageDegree && counter < numThreads - 1 )|| ii == ei - 1) {
@@ -2774,8 +2774,8 @@ struct DupPull {    // still buggy
       //PR_next[offset] += value;
     }
     void operator() (unsigned tid, unsigned numT) {
-      unsigned leader = Galois::Runtime::LL::getLeaderForThread(tid);
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned leader = galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
 
       unsigned nPackages = partitionInfo.nPackages;
 
@@ -2848,10 +2848,10 @@ struct DupPull {    // still buggy
       packageData(p), partitionInfo(partitionInfo), gbarrier(gbarrier), self(self) {}
 
     void damping(float * PR_next, unsigned tid, DupPull *self,PerPackageData& packageData){
-      unsigned localtid = tid - Galois::Runtime::LL::getLeaderForThread(tid);
+      unsigned localtid = tid - galois::Runtime::LL::getLeaderForThread(tid);
       unsigned coresCurrPackage;
       unsigned nodesPerCore;
-      unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+      unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
       if(currPackage != partitionInfo.nPackages - 1){
         coresCurrPackage = partitionInfo.coresPerPackage;
       }
@@ -2885,9 +2885,9 @@ struct DupPull {    // still buggy
       float* PR_next = packageData.getLocal()->PR_next;
       damping(PR_next, tid, self, packageData);
       gbarrier.wait();
-      if(Galois::Runtime::LL::isPackageLeader(tid)){
+      if(galois::Runtime::LL::isPackageLeader(tid)){
         
-        unsigned currPackage = Galois::Runtime::LL::getPackageForThread(tid);
+        unsigned currPackage = galois::Runtime::LL::getPackageForThread(tid);
         unsigned offset = partitionInfo.nodesStartPackage[currPackage];
         unsigned nodesCurrPackage = partitionInfo.nodesPerPackage[currPackage];
         unsigned nPackages = partitionInfo.nPackages;
@@ -2914,12 +2914,12 @@ struct DupPull {    // still buggy
 
   void operator()(Graph& graph) {
     //nPackages = LL::getMaxPackages();
-    unsigned coresPerPackage = Galois::Runtime::LL::getMaxCores()/Galois::Runtime::LL::getMaxPackages();
+    unsigned coresPerPackage = galois::Runtime::LL::getMaxCores()/galois::Runtime::LL::getMaxPackages();
     
     unsigned nPackages = (numThreads - 1)/ coresPerPackage + 1;
     unsigned coresLastPackage = numThreads % coresPerPackage;
     if(coresLastPackage == 0) coresLastPackage = 10;
-    Barrier& gbarrier = Galois::Runtime::getSystemBarrier();
+    Barrier& gbarrier = galois::Runtime::getSystemBarrier();
 
     unsigned nnodes = graph.size();
     std::cout<<"nnodes:"<<nnodes<<" nedges:"<<graph.sizeEdges()<<std::endl;
@@ -2938,15 +2938,15 @@ struct DupPull {    // still buggy
 
     PerPackageData packageData(nnodes, max_nodes_per_package, max_edges_per_package);
 
-    Galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
+    galois::on_each(distributeEdges(graph, packageData, nodesPerPackage, edgesPerPackage));
     unsigned int iteration = 0;
-    Galois::StatTimer T("pure time");
+    galois::StatTimer T("pure time");
 
     //partitionInfo.print();
     T.start();
     while (true) {
-      Galois::on_each(Process(packageData, partitionInfo, gbarrier, this));
-      Galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process(packageData, partitionInfo, gbarrier, this));
+      galois::on_each(Process2(packageData, partitionInfo, gbarrier, this));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -2961,20 +2961,20 @@ struct DupPull {    // still buggy
 
       max_delta.reset();
       sum_delta.reset();
-      //Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+      //galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
     }
     T.stop();
     if (iteration >= maxIterations) {
       std::cout << "Failed to converge\n";
     }
-    Galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
+    galois::on_each(Copy(graph, packageData, nodesPerPackage,nPackages));
 
     partitionInfo.mfree();
 
     /*if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }*/
   }
 };
@@ -2988,22 +2988,22 @@ struct PushAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Push"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<size_t> small_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -3014,10 +3014,10 @@ struct PushAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 0.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.outDegree = outs;
     }
   };
@@ -3026,7 +3026,7 @@ struct PushAlgo {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
   };
@@ -3036,7 +3036,7 @@ struct PushAlgo {
     unsigned iteration;
     Reset(Graph& g, unsigned i): g(g), iteration(i) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[(iteration+1) & 1] = data.value[(iteration+1) & 1] * alpha2 + 1-alpha2;
       data.value[iteration & 1] = 0.0;
     }
@@ -3049,19 +3049,19 @@ struct PushAlgo {
 
     Process(PushAlgo* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
       unsigned outDegree = sdata.outDegree;
       float delta = sdata.getPageRank(iteration) /(float) outDegree;
       double sum = 0;
 
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 	if(delta > tolerance)
         writeAdd(&ddata.value[(iteration+1) & 1],delta);
       }
@@ -3080,8 +3080,8 @@ struct PushAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration), Galois::wl<Galois::WorkList::dChunkedFIFO<256> >());
-      Galois::do_all_local(graph, Reset(graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration), galois::wl<galois::WorkList::dChunkedFIFO<256> >());
+      galois::do_all_local(graph, Reset(graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -3108,7 +3108,7 @@ struct PushAlgo {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -3136,21 +3136,21 @@ struct Synch {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Synch"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -3161,10 +3161,10 @@ struct Synch {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.nout = outs;
       data.id = idcount++;
     }
@@ -3174,7 +3174,7 @@ struct Synch {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
   };
@@ -3186,20 +3186,20 @@ struct Synch {
 
     Process(Synch* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
 
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::NONE);
 
       //std::cout<<sdata.id<<" picked up...\n";
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE);
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::NONE), ej = graph.in_edge_end(src, galois::MethodFlag::NONE);
           jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         sum += ddata.getPageRank(iteration) / ddata.nout;
 	//std::cout<<"- id: "<<ddata.id<<"\n";
       }
@@ -3217,7 +3217,7 @@ struct Synch {
     unsigned int iteration = 0;
 
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -3243,7 +3243,7 @@ struct Synch {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -3260,20 +3260,20 @@ struct PrtRsd {
     float getResidual() { return residual; }
   };
   
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "PrtRsd"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -3284,11 +3284,11 @@ struct PrtRsd {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
       data.id = idcount++;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.nout = outs;
     }
   };
@@ -3299,7 +3299,7 @@ struct PrtRsd {
      
     Process1(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
@@ -3320,13 +3320,13 @@ struct PrtRsd {
      
     Process2(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
       // scale the residual 
-      LNode& data = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(src, galois::MethodFlag::NONE);
       data.residual = alpha2*(1-alpha2)*data.residual;
     }
   }; //--- end of Process2
@@ -3342,14 +3342,14 @@ struct PrtRsd {
   struct Process3 {
     PrtRsd* self;
     Graph& graph;
-    Galois::Statistic& pre;
-    Galois::Statistic& post;
+    galois::Statistic& pre;
+    galois::Statistic& post;
      
-    Process3(PrtRsd* s, Graph& g, Galois::Statistic& _pre, Galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
+    Process3(PrtRsd* s, Graph& g, galois::Statistic& _pre, galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
 
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
+    void operator()(const UpdateRequest& srcRq, galois::UserContext<UpdateRequest>& ctx) {
       GNode src = srcRq.second;
-      LNode* node = &graph.getData(src, Galois::MethodFlag::NONE);
+      LNode* node = &graph.getData(src, galois::MethodFlag::NONE);
       if ((node->residual < tolerance) || (amp*(int)node->residual != srcRq.first) ) {
         post += 1;
         return;
@@ -3358,9 +3358,9 @@ struct PrtRsd {
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::NONE), ej = graph.in_edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         sum += ddata.getPageRank() / ddata.nout;
       }
 
@@ -3369,9 +3369,9 @@ struct PrtRsd {
       unsigned nopush = 0;
 
       // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj){
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj){
         GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         float oldR = ddata.residual;
         ddata.residual += lres;
 	if(ddata.residual>tolerance && ((int)oldR != (int)ddata.residual || oldR <tolerance)) {
@@ -3391,12 +3391,12 @@ struct PrtRsd {
   }; //--- end of Process3
 
   void operator()(Graph& graph) {
-    Galois::Statistic pre("PrePrune");
-    Galois::Statistic post("PostPrune");
-    Galois::for_each_local(graph, Process1(this, graph));
-    Galois::for_each_local(graph, Process2(this, graph)); 
+    galois::Statistic pre("PrePrune");
+    galois::Statistic post("PostPrune");
+    galois::for_each_local(graph, Process1(this, graph));
+    galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp2: "<<amp2<<"\n";
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedLIFO<4> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 #ifdef GALOIS_USE_EXP
@@ -3404,16 +3404,16 @@ struct PrtRsd {
 #else
     typedef OBIM dOBIM;
 #endif
-    Galois::InsertBag<UpdateRequest> initialWL;
-    Galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
+    galois::InsertBag<UpdateRequest> initialWL;
+    galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
 	LNode& data = graph.getData(src);
         if(data.residual>tolerance){
 	  initialWL.push_back(std::make_pair(amp*(int)data.residual, src)); // max residual
         }
       });
-    Galois::StatTimer T("InnerTime");
+    galois::StatTimer T("InnerTime");
     T.start();
-    Galois::for_each_local(initialWL, Process3(this, graph, pre, post), Galois::wl<dOBIM>(), Galois::loopname("mainloop"));   
+    galois::for_each_local(initialWL, Process3(this, graph, pre, post), galois::wl<dOBIM>(), galois::loopname("mainloop"));   
     T.stop();
   }
 
@@ -3433,21 +3433,21 @@ struct PrtDeg {
     float getResidual() { return residual; }
   };
   
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     :: with_no_lockable<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "PrtDeg"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -3458,13 +3458,13 @@ struct PrtDeg {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, galois::MethodFlag::NONE);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
       data.id = idcount++;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::NONE), g.edge_end(n, galois::MethodFlag::NONE));
       data.nout = outs;
-      int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));
+      int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::NONE), g.in_edge_end(n, galois::MethodFlag::NONE));
       data.deg = outs + ins;
     }
   };
@@ -3475,16 +3475,16 @@ struct PrtDeg {
      
     Process1(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
-      LNode& data = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(src, galois::MethodFlag::NONE);
       // for each out-going neighbour, add residuals
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj){
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj){
         GNode dst = graph.getInEdgeDst(jj);
-	LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+	LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
 	ddata.residual = (float) ddata.residual + (float) 1/data.nout;   
       }
     }
@@ -3496,13 +3496,13 @@ struct PrtDeg {
      
     Process2(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
       // scale the residual 
-      LNode& data = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(src, galois::MethodFlag::NONE);
       data.residual = alpha2*(1-alpha2)*data.residual;
     }
   }; //--- end of Process2
@@ -3521,9 +3521,9 @@ struct PrtDeg {
      
     Process3(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
+    void operator()(const UpdateRequest& srcRq, galois::UserContext<UpdateRequest>& ctx) {
       GNode src = srcRq.second;
-      LNode* node = &graph.getData(src, Galois::MethodFlag::NONE);
+      LNode* node = &graph.getData(src, galois::MethodFlag::NONE);
       int tmp=(*node).residual*amp/(*node).deg; // degree biased
       if(tmp != srcRq.first){
 	return;
@@ -3534,17 +3534,17 @@ struct PrtDeg {
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::NONE), ej = graph.in_edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         sum += ddata.getPageRank() / ddata.nout;
       }
       node->pagerank = alpha2*sum + (1-alpha2);
      
       // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj){
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::NONE), ej = graph.edge_end(src, galois::MethodFlag::NONE); jj != ej; ++jj){
         GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::NONE);
         ddata.residual = (float) ddata.residual + (float) node->residual*alpha2/node->nout;
 	if(ddata.residual>tolerance){
 	  ctx.push(std::make_pair(ddata.residual*amp/ddata.deg, dst)); // degree biased
@@ -3558,21 +3558,21 @@ struct PrtDeg {
 
   void operator()(Graph& graph) {
   
-    Galois::for_each_local(graph, Process1(this, graph));
-    Galois::for_each_local(graph, Process2(this, graph)); 
+    galois::for_each_local(graph, Process1(this, graph));
+    galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-     Galois::InsertBag<UpdateRequest> initialWL;
+     galois::InsertBag<UpdateRequest> initialWL;
     for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-	LNode& data = graph.getData(src, Galois::MethodFlag::NONE);
+	LNode& data = graph.getData(src, galois::MethodFlag::NONE);
         if(data.residual>tolerance){
 	  initialWL.push_back(std::make_pair(data.residual*amp/data.deg, src)); // degree biased
         }
     }
-    Galois::for_each_local(initialWL, Process3(this, graph), Galois::wl<OBIM>());   
+    galois::for_each_local(initialWL, Process3(this, graph), galois::wl<OBIM>());   
   }
 
 };
@@ -3590,15 +3590,15 @@ struct PrtDeg {
 //! Transpose in-edges to out-edges
 //![WriteGraph]
 static void precomputePullData() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void>
+  typedef galois::Graph::LC_CSR_Graph<size_t, void>
     ::with_no_lockable<true>::type InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef Galois::Graph::FileGraphWriter OutputGraph;
+  typedef galois::Graph::FileGraphWriter OutputGraph;
   //typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  Galois::Graph::readGraph(input, filename); 
+  galois::Graph::readGraph(input, filename); 
 
   size_t node_id = 0;
   for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {
@@ -3714,18 +3714,18 @@ void run() {
   std::cout << "Reading graph \n";
   algo.readGraph(graph);
   std::cout << "preAllocating \n";
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::MM::hugePageSize);
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "Target max delta: " << tolerance << "\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all_local(graph, typename Algo::Initialize(graph));
   algo(graph);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify)
     printTop(graph, 10);
@@ -3733,14 +3733,14 @@ void run() {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
   if (outputPullFilename.size()) {
     precomputePullData();
     return 0;
   }
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::pull: run<PullAlgo>(); break;

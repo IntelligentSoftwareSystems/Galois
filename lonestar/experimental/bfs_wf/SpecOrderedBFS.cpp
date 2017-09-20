@@ -51,12 +51,12 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_spec (
-        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::Runtime::for_each_ordered_spec (
+        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFuncSpec (graph, numIter),
-        std::make_tuple (Galois::loopname ("bfs-speculative")));
+        std::make_tuple (galois::loopname ("bfs-speculative")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

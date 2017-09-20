@@ -31,12 +31,12 @@
 
 #include "Galois/FlatMap.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class OrderedList : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {
-  typedef Galois::flat_map<T, std::deque<T>, Compare> Map;
+  typedef galois::flat_map<T, std::deque<T>, Compare> Map;
 
   Map map;
 
@@ -77,15 +77,15 @@ public:
       push(range.begin(), range.end());
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     lock();
     if (map.empty()) {
       unlock();
-      return Galois::optional<value_type>();
+      return galois::optional<value_type>();
     }
     auto ii = map.begin();
     std::deque<T>& list = ii->second;
-    Galois::optional<value_type> v(list.front());
+    galois::optional<value_type> v(list.front());
     list.pop_front();
     if (list.empty())
       map.erase(ii);

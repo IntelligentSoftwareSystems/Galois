@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Replacement for <code>boost::optional</code> using {@link Galois::LazyObject},
+ * Replacement for <code>boost::optional</code> using {@link galois::LazyObject},
  * which conforms to a more strict aliasing policy.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
@@ -29,7 +29,7 @@
 #include "Galois/LazyObject.h"
 #include <cassert>
 
-namespace Galois {
+namespace galois {
 
 /**
  * Galois version of <code>boost::optional</code>.

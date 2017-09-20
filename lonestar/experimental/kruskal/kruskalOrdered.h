@@ -37,11 +37,11 @@
 #include "kruskalFunc.h"
 #include "kruskal.h"
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 
 template <typename KNode_tp>
-struct EdgeComparator: public Galois::CompareCallback {
+struct EdgeComparator: public galois::CompareCallback {
 
   virtual bool compare (void* a, void* b) const {
     KEdge<KNode_tp>** ea = static_cast<KEdge<KNode_tp>**> (a);
@@ -55,12 +55,12 @@ struct EdgeComparator: public Galois::CompareCallback {
   }
 };
 
-struct KNodeLockable: public Galois::Runtime::Lockable, KNode {
+struct KNodeLockable: public galois::Runtime::Lockable, KNode {
 
-  KNodeLockable (unsigned id): Galois::Runtime::Lockable (), KNode (id) {}
+  KNodeLockable (unsigned id): galois::Runtime::Lockable (), KNode (id) {}
 
-  void acquire (Galois::MethodFlag mflag=Galois::MethodFlag::WRITE) {
-    Galois::Runtime::acquire (this, mflag);
+  void acquire (galois::MethodFlag mflag=galois::MethodFlag::WRITE) {
+    galois::Runtime::acquire (this, mflag);
   }
 
   KNodeLockable* getRep () {
@@ -106,7 +106,7 @@ class KruskalOrderedSrc: public Kruskal<KNodeLockable> {
     {}
 
     // void signalFailSafe () {
-      // Galois::Runtime::checkWrite (Galois::WRITE);
+      // galois::Runtime::checkWrite (galois::WRITE);
     // }
 
     template <typename C>
@@ -144,10 +144,10 @@ protected:
     Accumulator_ty mergeIter;
 
 
-    Galois::StatTimer t_feach ("for_each loop time: ");
+    galois::StatTimer t_feach ("for_each loop time: ");
 
     t_feach.start ();
-    Galois::for_each_ordered (edges.begin (), edges.end (),
+    galois::for_each_ordered (edges.begin (), edges.end (),
         MatchOperator (matchIter),
         UnionOperator (mstSum, mergeIter), EdgeComparator<KNodeLockable> ());
     t_feach.stop ();
@@ -232,7 +232,7 @@ class KruskalOrderedNonSrc : public Kruskal<KNodeMin> {
 
         } else {
           // defer processing of this edge to the next round
-          Galois::Runtime::signalConflict ();
+          galois::Runtime::signalConflict ();
         }
 
 
@@ -273,10 +273,10 @@ protected:
     Accumulator_ty mergeIter;
 
 
-    Galois::StatTimer t_feach ("for_each loop time: ");
+    galois::StatTimer t_feach ("for_each loop time: ");
 
     t_feach.start ();
-    Galois::for_each_ordered (edges.begin (), edges.end (),
+    galois::for_each_ordered (edges.begin (), edges.end (),
         MatchOperator (matchIter),
         LinkUpOperator (mstSum, numUnions, mergeIter), EdgeComparator<KNodeMin> ());
     t_feach.stop ();

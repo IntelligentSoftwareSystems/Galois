@@ -35,7 +35,7 @@
 #include "Galois/Runtime/DistSupport.h"
 
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 template<typename NodeTy>
@@ -203,7 +203,7 @@ private:
     :Starts(Runtime::NetworkInterface::Num), Num(Runtime::NetworkInterface::Num), 
      PrefixNum(Runtime::NetworkInterface::Num), self(_self)
   {
-    Galois::Graph::FileGraph fg, fgt;
+    galois::Graph::FileGraph fg, fgt;
     fg.fromFile(inGr);
     fgt.fromFile(inGrTrans);
     
@@ -254,7 +254,7 @@ private:
            fgi != fge; ++fgi) {
         //        std::cout << *ii << " " << *fgi << " " << num_o << " " << num_i << " " << num << " " << num_out << " " << num_in << "\n";
         if (*fgi < num) { 
-          addEdge(*ii, *fgi, Galois::MethodFlag::NONE);
+          addEdge(*ii, *fgi, galois::MethodFlag::NONE);
         } else {
           std::cerr << "error in graph, dropping edge\n";
         }
@@ -262,7 +262,7 @@ private:
       for (auto fgti = fgt.edge_begin(*iit), fgte = fgt.edge_end(*iit);
            fgti != fgte; ++fgti)
         if (*fgti < num) {
-          addInEdge(*iit, *fgti, Galois::MethodFlag::NONE);
+          addInEdge(*iit, *fgti, galois::MethodFlag::NONE);
         } else {
           std::cerr << "error in graph, dropping edge\n";
         }
@@ -309,7 +309,7 @@ private:
     return Starts[host].first + offset;
   }
 
-  void acquireNode(NodePtr node, Galois::MethodFlag mflag) {
+  void acquireNode(NodePtr node, galois::MethodFlag mflag) {
     acquire(node, mflag);
   }
 
@@ -366,7 +366,7 @@ public:
   }
 
   uint32_t getHost(GraphNode N) {
-    return ((Galois::Runtime::fatPointer)makeNodePtr(N)).getHost();
+    return ((galois::Runtime::fatPointer)makeNodePtr(N)).getHost();
   }
 
   //EdgeTy& at(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
@@ -480,6 +480,6 @@ public:
 };
 
 } //namespace Graph
-} //namespace Galois
+} //namespace galois
 
 #endif

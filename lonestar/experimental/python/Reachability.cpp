@@ -2,7 +2,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Bag.h"
 
-typedef Galois::InsertBag<GNode> NodeSet;
+typedef galois::InsertBag<GNode> NodeSet;
 
 template<bool isBackward>
 struct Reach {
@@ -11,7 +11,7 @@ struct Reach {
 
   Reach(Graph& g, int h): g(g), hop(h) {}
 
-  void operator()(const GNode n, Galois::UserContext<GNode>& ctx) {
+  void operator()(const GNode n, galois::UserContext<GNode>& ctx) {
     auto& data = g.getData(n);
     auto& dist = (isBackward) ? data.II.vInt2 : data.II.vInt1;
     auto newDist = dist + 1;
@@ -50,14 +50,14 @@ struct Reach {
 
 static void initialize(Graph *g) {
   // set all distance to infinity
-  Galois::do_all_local(*g, 
+  galois::do_all_local(*g, 
     [=] (GNode n)
       {
         auto& data = (*g).getData(n);
         data.II.vInt1 = DIST_INFINITY;
         data.II.vInt2 = DIST_INFINITY;
       },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
     );
 }
 
@@ -74,7 +74,7 @@ static void findOutward(Graph *g, NodeList l, int hop) {
   }
 
   // move from w up to hop steps
-  Galois::for_each_local(w, Reach<isBackward>{*g, hop});
+  galois::for_each_local(w, Reach<isBackward>{*g, hop});
 }
 
 // collect nodes marked within hop steps
@@ -82,7 +82,7 @@ template<bool isBackward>
 static NodeSet collectOutward(Graph *g, int hop) {
   NodeSet w;
 
-  Galois::do_all_local(*g, 
+  galois::do_all_local(*g, 
     [g, &w, hop] (GNode n)
       {
         auto dist = (!isBackward) ? (*g).getData(n).II.vInt1 : (*g).getData(n).II.vInt2;
@@ -90,7 +90,7 @@ static NodeSet collectOutward(Graph *g, int hop) {
           w.push_back(n);
         }
       },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
     );
 
   return w;
@@ -100,7 +100,7 @@ static NodeSet collectOutward(Graph *g, int hop) {
 static NodeSet collectBetween(Graph *g, int hop) {
   NodeSet w;
 
-  Galois::do_all_local(
+  galois::do_all_local(
     *g, 
     [g, &w, hop] (GNode n) 
       {
@@ -112,7 +112,7 @@ static NodeSet collectBetween(Graph *g, int hop) {
           w.push_back(n);
         }
       },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
     );
 
   return w;
@@ -130,9 +130,9 @@ static NodeList allocateNodeList(NodeSet& w) {
 
 template<bool isBackward>
 static NodeList findReachableOutward(Graph *g, NodeList l, int hop) {
-//  Galois::StatManager statManager;
+//  galois::StatManager statManager;
 
-//  Galois::StatTimer T("findReachableOutward");
+//  galois::StatTimer T("findReachableOutward");
 //  T.start();
 
   initialize(g);
@@ -155,9 +155,9 @@ NodeList findReachableFrom(Graph *g, NodeList dst, int hop) {
 }
 
 NodeList findReachableBetween(Graph *g, NodeList src, NodeList dst, int hop) {
-//  Galois::StatManager statManager;
+//  galois::StatManager statManager;
 
-//  Galois::StatTimer T("findReachableBetween");
+//  galois::StatTimer T("findReachableBetween");
 //  T.start();
 
   initialize(g);

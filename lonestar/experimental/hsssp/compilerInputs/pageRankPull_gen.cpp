@@ -94,7 +94,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
@@ -103,7 +103,7 @@ struct InitializeGraph {
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
-      Galois::atomicAdd(ddata.nout, 1);
+      galois::atomicAdd(ddata.nout, 1);
     }
   }
 };
@@ -116,11 +116,11 @@ struct PageRank_pull {
   void static go(Graph& _graph) {
     do{
       DGAccumulator_accum.reset();
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
+      galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, galois::loopname("pageRank"));
     } while (DGAccumulator_accum.reduce());
   }
 
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  static galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
     float sum = 0;
@@ -142,21 +142,21 @@ struct PageRank_pull {
     }
   }
 };
-Galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
+galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = Galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::Runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
       case 'g':
         personality = GPU_CUDA;
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m);
     } else if (personality == GPU_OPENCL) {
-      //Galois::OpenCL::cl_env.init(cldevice.Value);
+      //galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
     T_hGraph_init.stop();
@@ -218,12 +218,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
         }
       }
 #endif
@@ -244,12 +244,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
         }
       }
 #endif

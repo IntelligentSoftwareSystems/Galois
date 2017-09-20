@@ -36,7 +36,7 @@
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/Network.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 
@@ -60,7 +60,7 @@ private:
 };
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #endif

@@ -32,7 +32,7 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 namespace {
 class DistTerminationDetection : public TerminationDetection {
@@ -143,6 +143,6 @@ void DistTerminationDetection::propTokenLandingPad(RecvBuffer& b) {
 
 } // namespace
 
-Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
+galois::Runtime::TerminationDetection& galois::Runtime::getSystemTermination() {
   return getDistTermination();
 }

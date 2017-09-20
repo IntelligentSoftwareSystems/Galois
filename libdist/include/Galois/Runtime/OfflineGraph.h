@@ -43,7 +43,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 //File format V1:
@@ -80,7 +80,7 @@ class OfflineGraph {
 
   void* file_buffer;
 
-  Galois::Substrate::SimpleLock lock;
+  galois::Substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);
@@ -334,7 +334,7 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
                     std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
-    return Galois::Graph::divideNodesBinarySearch<OfflineGraph, uint64_t>(
+    return galois::Graph::divideNodesBinarySearch<OfflineGraph, uint64_t>(
       numNodes, numEdges, nodeWeight, edgeWeight, id, total, *this, scaleFactor);
   }
 };
@@ -468,7 +468,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
 
 } // namespace Graph
 
-//// In namespace Galois
+//// In namespace galois
 ///**
 // * Given an offline graph, find a division of nodes based on edges.
 // *
@@ -480,7 +480,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
 // * end of the range for the division_id (end not inclusive)
 // */
 //template<typename IterTy>
-//std::pair<IterTy, IterTy> prefix_range(Galois::Graph::OfflineGraph& graph,
+//std::pair<IterTy, IterTy> prefix_range(galois::Graph::OfflineGraph& graph,
 //                                       IterTy begin,
 //                                       uint32_t division_id, 
 //                                       uint32_t num_divisions) {
@@ -718,7 +718,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
  * among partitions
  */
 template<typename IterTy>
-void prefix_range(Galois::Graph::OfflineGraph& graph, 
+void prefix_range(galois::Graph::OfflineGraph& graph, 
                   IterTy begin, IterTy end, uint32_t num_divisions, 
                   std::vector<std::pair<IterTy, IterTy>>& division_vector,
                   uint32_t node_alpha,
@@ -935,6 +935,6 @@ void prefix_range(Galois::Graph::OfflineGraph& graph,
   assert(division_vector.size() == num_divisions);
 }
 
-} // namespace Galois
+} // namespace galois
 
 #endif//_GALOIS_DIST_OFFLINE_GRAPH_

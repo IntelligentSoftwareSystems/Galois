@@ -33,7 +33,7 @@
 
 #include <boost/mpl/has_xxx.hpp>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_segmented)

@@ -53,9 +53,9 @@ void check_forward() {
   }
 
 #if __cplusplus >= 201103L
-  auto r = Galois::make_two_level_iterator<Tag>(data.begin(), data.end());
+  auto r = galois::make_two_level_iterator<Tag>(data.begin(), data.end());
 #else
-  auto r = Galois::make_two_level_iterator<
+  auto r = galois::make_two_level_iterator<
     Tag,
     typename D::iterator,
     typename I::iterator,
@@ -100,9 +100,9 @@ void check_backward() {
   }
 
 #if __cplusplus >= 201103L
-  auto r = Galois::make_two_level_iterator<Tag>(data.begin(), data.end());
+  auto r = galois::make_two_level_iterator<Tag>(data.begin(), data.end());
 #else
-  auto r = Galois::make_two_level_iterator<
+  auto r = galois::make_two_level_iterator<
     Tag,
     typename D::iterator,
     typename I::iterator,
@@ -160,9 +160,9 @@ void check_strided() {
   }
 
 #if __cplusplus >= 201103L
-  auto r = Galois::make_two_level_iterator<Tag>(data.begin(), data.end());
+  auto r = galois::make_two_level_iterator<Tag>(data.begin(), data.end());
 #else
-  auto r = Galois::make_two_level_iterator<
+  auto r = galois::make_two_level_iterator<
     Tag,
     typename D::iterator,
     typename I::iterator,
@@ -233,9 +233,9 @@ void check_random() {
   }
 
 #if __cplusplus >= 201103L
-  auto r = Galois::make_two_level_iterator<Tag>(data.begin(), data.end());
+  auto r = galois::make_two_level_iterator<Tag>(data.begin(), data.end());
 #else
-  auto r = Galois::make_two_level_iterator<
+  auto r = galois::make_two_level_iterator<
     Tag,
     typename D::iterator,
     typename I::iterator,
@@ -355,9 +355,9 @@ int main(int argc, char** argv) {
   NestedVector data;
   const NestedVector& d(data);
 #if __cplusplus >= 201103L
-  auto r = Galois::make_two_level_iterator(d.begin(), d.end());
+  auto r = galois::make_two_level_iterator(d.begin(), d.end());
 #else
-  auto r = Galois::make_two_level_iterator<
+  auto r = galois::make_two_level_iterator<
     std::forward_iterator_tag,
     NestedVector::const_iterator,
     std::vector<int>::const_iterator,

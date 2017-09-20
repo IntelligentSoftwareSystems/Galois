@@ -37,7 +37,7 @@
 #include <atomic>
 #include <deque>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
@@ -81,8 +81,8 @@ private:
   //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
 
   GALOIS_ATTRIBUTE_NOINLINE
-  Galois::optional<value_type> slowPop(int cur) {
-    Galois::optional<value_type> r;
+  galois::optional<value_type> slowPop(int cur) {
+    galois::optional<value_type> r;
 
     if (empty.data.load(std::memory_order_acquire))
       return r;
@@ -135,9 +135,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     int c = current.data.load(std::memory_order_acquire);
-    Galois::optional<value_type> r = items[c].pop();
+    galois::optional<value_type> r = items[c].pop();
     if (r)
       return r;
     return slowPop(c);
@@ -182,8 +182,8 @@ private:
   //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
 
   GALOIS_ATTRIBUTE_NOINLINE
-  Galois::optional<value_type> slowPop() {
-    Galois::optional<value_type> r;
+  galois::optional<value_type> slowPop() {
+    galois::optional<value_type> r;
 
     for (int i = 0; i < items.size(); ++i) {
       r = items.getRemote(i)->wl.pop();
@@ -196,7 +196,7 @@ private:
 
 public:
   ThreadPartitioned(const Indexer& x = Indexer()): indexer(x), empty(false) {
-    unsigned n = Galois::getActiveThreads();
+    unsigned n = galois::getActiveThreads();
 
     for (mask = 1; mask < n; mask <<= 1)
       ;
@@ -223,8 +223,8 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
-    Galois::optional<value_type> r = items.getLocal()->wl.pop();
+  galois::optional<value_type> pop() {
+    galois::optional<value_type> r = items.getLocal()->wl.pop();
     //if (r)
       return r;
     //return slowPop();

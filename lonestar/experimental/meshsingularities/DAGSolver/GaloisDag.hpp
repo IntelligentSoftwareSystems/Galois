@@ -12,16 +12,16 @@
 #include "Node.hpp"
 #include "EquationSystem.h"
 
-struct GaloisElimination: public Galois::Runtime::TreeTaskBase
+struct GaloisElimination: public galois::Runtime::TreeTaskBase
 {
     Node *node;
 
     GaloisElimination (Node *_node):
-        Galois::Runtime::TreeTaskBase (),
+        galois::Runtime::TreeTaskBase (),
         node (_node)
     {}
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext& ctx)
+    virtual void operator () (galois::Runtime::TreeTaskContext& ctx)
     {
         if (node->getLeft() != NULL && node->getRight() != NULL) {
             GaloisElimination left {node->getLeft()};
@@ -37,20 +37,20 @@ struct GaloisElimination: public Galois::Runtime::TreeTaskBase
     }
 };
 
-struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
+struct GaloisBackwardSubstitution: public galois::Runtime::TreeTaskBase
 {
     Node *node;
 
     GaloisBackwardSubstitution (Node *_node):
-        Galois::Runtime::TreeTaskBase(),
+        galois::Runtime::TreeTaskBase(),
         node(_node)
     {}
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+    virtual void operator () (galois::Runtime::TreeTaskContext &ctx)
     {
         node->bs();
         if (node->getLeft() != NULL && node->getRight() != NULL) {
-            // change to Galois::for_each (scales better)
+            // change to galois::for_each (scales better)
             GaloisBackwardSubstitution left { node->getLeft() };
             GaloisBackwardSubstitution right { node->getRight() };
 
@@ -61,16 +61,16 @@ struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
     }
 };
 
-struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
+struct GaloisAllocation: public galois::Runtime::TreeTaskBase
 {
     Node *node;
     SolverMode mode;
     GaloisAllocation (Node *_node, SolverMode _mode):
-        Galois::Runtime::TreeTaskBase(),
+        galois::Runtime::TreeTaskBase(),
         node(_node), mode(mode)
     {}
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+    virtual void operator () (galois::Runtime::TreeTaskContext &ctx)
     {
         node->allocateSystem(mode);
         if (node->getLeft() != NULL && node->getRight() != NULL) {

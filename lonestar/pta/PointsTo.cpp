@@ -67,7 +67,7 @@ struct Node {
 	}
 };
 
-typedef Galois::Graph::FirstGraph<Node,void,true> Graph;
+typedef galois::Graph::FirstGraph<Node,void,true> Graph;
 typedef Graph::GraphNode GNode;
 
 /* copied from Andrew's SSSP. */
@@ -92,7 +92,7 @@ struct UpdateRequestIndexer
 
 //typedef std::pair<GNode,GNode> Edge;
 typedef std::vector<UpdateRequest> WorkList;
-typedef Galois::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, Galois::WorkList::dChunkedFIFO<1024> > OBIM;
+typedef galois::WorkList::OrderedByIntegerMetric<UpdateRequestIndexer, galois::WorkList::dChunkedFIFO<1024> > OBIM;
 
 class PtsToCons {
 public:
@@ -130,7 +130,7 @@ private:
 };
 
 typedef std::vector<PtsToCons> PointsToConstraints;
-typedef std::vector<Galois::SparseBitVector> PointsToInfo;
+typedef std::vector<galois::SparseBitVector> PointsToInfo;
 
 Graph graph;
 std::vector<GNode> nodes;
@@ -157,7 +157,7 @@ public:
 	}
 	unsigned cyclenode = numNodes;	// set to invalid id.
 	for (WorkList::iterator ii = worklist.begin(); ii != worklist.end(); ++ii) {
-		Node &nn = graph.getData(ii->n, Galois::MethodFlag::UNPROTECTED);
+		Node &nn = graph.getData(ii->n, galois::MethodFlag::UNPROTECTED);
 		unsigned nodeid = nn.id;
 		//std::cout << "debug: cycle process " << nodeid << std::endl;
 		if (cycleDetect(nodeid, cyclenode)) {
@@ -179,8 +179,8 @@ public:
 	ancestors.push_back(nodeid);
 
 	GNode nn = nodes[nodeid];
-	for (Graph::edge_iterator ii = graph.edge_begin(nn, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(nn, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
-	  Node &nn = graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED);
+	for (Graph::edge_iterator ii = graph.edge_begin(nn, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(nn, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+	  Node &nn = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
 		unsigned iiid = nn.id;
 		if (cycleDetect(iiid, cyclenode)) {
 			//return true;	// don't pop from ancestors.
@@ -276,7 +276,7 @@ void printPointsToInfo(PointsToInfo &result) {
 		result[repr].print(std::cout, prefix);
 	}
 }
-void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist, Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED) {
+void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist, galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED) {
 	// add edges to the graph based on points-to information of the nodes
 	// and then add the source of each edge to the worklist.
 	for (PointsToConstraints::iterator ii = constraints.begin(); ii != constraints.end(); ++ii) {
@@ -295,7 +295,7 @@ void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist
 					GNode &nn = nodes[pointeerepr];
 					graph.addEdge(nn, nndstrepr, flag);
 					//std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-					worklist.push_back(UpdateRequest(nn, graph.getData(nn, Galois::MethodFlag::UNPROTECTED).priority));
+					worklist.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
 				}
 			}
 		} else {	// store.
@@ -312,7 +312,7 @@ void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist
 				}
 			}
 			if (newedgeadded) {
-				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, Galois::MethodFlag::UNPROTECTED).priority));
+				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, galois::MethodFlag::UNPROTECTED).priority));
 			}
 		}
 	}
@@ -328,15 +328,15 @@ void processAddressOfCopy(PointsToConstraints &constraints, WorkList &worklist) 
 			}
 		} else if (src != dst) {	// copy.
 			GNode &nn = nodes[src];
-			graph.addEdge(nn, nodes[dst], Galois::MethodFlag::UNPROTECTED);
+			graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
 			//std::cout << "debug: adding edge from " << src << " to " << dst << std::endl;
-			worklist.push_back(UpdateRequest(nn, graph.getData(nn, Galois::MethodFlag::UNPROTECTED).priority));
+			worklist.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
 		}
 	}
 }
-unsigned propagate(GNode &src, GNode &dst, Galois::MethodFlag flag = Galois::MethodFlag::WRITE) {
-	unsigned srcid = graph.getData(src, Galois::MethodFlag::UNPROTECTED).id;
-	unsigned dstid = graph.getData(dst, Galois::MethodFlag::UNPROTECTED).id;
+unsigned propagate(GNode &src, GNode &dst, galois::MethodFlag flag = galois::MethodFlag::WRITE) {
+	unsigned srcid = graph.getData(src, galois::MethodFlag::UNPROTECTED).id;
+	unsigned dstid = graph.getData(dst, galois::MethodFlag::UNPROTECTED).id;
 	unsigned newptsto = 0;
 
 	if (srcid != dstid) {
@@ -352,7 +352,7 @@ unsigned propagate(GNode &src, GNode &dst, Galois::MethodFlag flag = Galois::Met
 	return newptsto;
 }
 
-void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galois::MethodFlag flag = Galois::MethodFlag::WRITE) {
+void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, galois::MethodFlag flag = galois::MethodFlag::WRITE) {
 	// add edges to the graph based on points-to information of the nodes
 	// and then add the source of each edge to the worklist.
 	for (PointsToConstraints::iterator ii = constraints.begin(); ii != constraints.end(); ++ii) {
@@ -371,7 +371,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 					GNode &nn = nodes[pointeerepr];
 					graph.addEdge(nn, nndstrepr, flag);
 					//std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-					worklist.push_back(UpdateRequest(nn, graph.getData(nn, Galois::MethodFlag::WRITE).priority));
+					worklist.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::WRITE).priority));
 				}
 			}
 		} else {	// store.
@@ -388,7 +388,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 				}
 			}
 			if (newedgeadded) {
-				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, Galois::MethodFlag::WRITE).priority));
+				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, galois::MethodFlag::WRITE).priority));
 			}
 		}
 	}
@@ -403,10 +403,10 @@ struct Process {
   void operator()(UpdateRequest &req, Context& ctx) {
    if (++nfired < THRESHOLD_LOADSTORE) {
     GNode &src = req.n;
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+        ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-	unsigned newptsto = propagate(src, dst, Galois::MethodFlag::WRITE);
+	unsigned newptsto = propagate(src, dst, galois::MethodFlag::WRITE);
 	if (newptsto) {
 		ctx.push(UpdateRequest(dst, newptsto));
 	}
@@ -414,7 +414,7 @@ struct Process {
   } else {
 	nfired = 0;
 	WorkList wl;
-	processLoadStore(loadstoreconstraints, wl, Galois::MethodFlag::WRITE);
+	processLoadStore(loadstoreconstraints, wl, galois::MethodFlag::WRITE);
 	/*if (wl.size() > THRESHOLD_OCD) {
 		ocd.process(wl);
 	}*/
@@ -436,7 +436,7 @@ void runSerial(PointsToConstraints &addrcopyconstraints, PointsToConstraints &lo
 	unsigned nnodesprocessed = 0;
 
 	processAddressOfCopy(addrcopyconstraints, worklist);
-        processLoadStoreSerial(loadstoreconstraints, worklist, Galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps worklist empty.
+        processLoadStoreSerial(loadstoreconstraints, worklist, galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps worklist empty.
 
 	//std::cout << "debug: no of addr+copy constraints = " << addrcopyconstraints.size() << ", no of load+store constraints = " << loadstoreconstraints.size() << std::endl;
 	//std::cout << "debug: no of nodes = " << nodes.size() << std::endl;
@@ -446,10 +446,10 @@ void runSerial(PointsToConstraints &addrcopyconstraints, PointsToConstraints &lo
 		GNode src = worklist.back().n;
 		worklist.pop_back();
 
-		//std::cout << "debug: processing worklist element " << graph.getData(src, Galois::MethodFlag::UNPROTECTED).id << std::endl;
-    		for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+		//std::cout << "debug: processing worklist element " << graph.getData(src, galois::MethodFlag::UNPROTECTED).id << std::endl;
+    		for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 		  GNode dst = graph.getEdgeDst(ii);
-			unsigned newptsto = propagate(src, dst, Galois::MethodFlag::UNPROTECTED);
+			unsigned newptsto = propagate(src, dst, galois::MethodFlag::UNPROTECTED);
 			if (newptsto) {
 				worklist.push_back(UpdateRequest(dst, newptsto));
 			}
@@ -469,21 +469,21 @@ void runParallel(PointsToConstraints &addrcopyconstraints, PointsToConstraints &
 	//unsigned niteration = 0;
 	
 	processAddressOfCopy(addrcopyconstraints, worklist);
-	processLoadStore(loadstoreconstraints, worklist, Galois::MethodFlag::UNPROTECTED);
+	processLoadStore(loadstoreconstraints, worklist, galois::MethodFlag::UNPROTECTED);
 
-		//using namespace Galois::Runtime::WorkList;
-	  	//Galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<FIFO<> >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<ChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<dChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<ChunkedLIFO<32> >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<ChunkedLIFO<32> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<FIFO<1024> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<ChunkedFIFO<32> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<dChunkedLIFO<32>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<ChunkedLIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
-	  	//Galois::for_each<LocalQueues<ChunkedFIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
-	  	Galois::for_each(worklist.begin(), worklist.end(), Process());
+		//using namespace galois::Runtime::WorkList;
+	  	//galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<FIFO<> >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<ChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<dChunkedFIFO<1024> >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<ChunkedLIFO<32> >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<ChunkedLIFO<32> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<FIFO<1024> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<ChunkedFIFO<32> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<dChunkedLIFO<32>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<ChunkedLIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	//galois::for_each<LocalQueues<ChunkedFIFO<1024>, FIFO<> > >(worklist.begin(), worklist.end(), Process());
+	  	galois::for_each(worklist.begin(), worklist.end(), Process());
 }
 
 unsigned readConstraints(const char *file, PointsToConstraints &addrcopyconstraints, PointsToConstraints &loadstoreconstraints) {
@@ -532,7 +532,7 @@ void printConstraints(PointsToConstraints &constraints) {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   numNodes = readConstraints(input.c_str(), addrcopyconstraints, loadstoreconstraints);
@@ -554,7 +554,7 @@ int main(int argc, char** argv) {
 	nodes[nodeid] = src;
   }
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
 
 	//numThreads = 0;

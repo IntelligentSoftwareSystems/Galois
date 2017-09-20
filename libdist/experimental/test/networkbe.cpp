@@ -3,7 +3,7 @@
 
 #include "Galois/Runtime/NetworkBackend.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 int main(int argc, char** argv) {
   NetworkBackend& net = getSystemNetworkBackend();

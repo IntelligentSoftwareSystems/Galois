@@ -32,7 +32,7 @@
 #include <iostream>
 #include <typeinfo>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 class PerBackend_v2 {
@@ -144,10 +144,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
     localHost = ~0;
     localPtr = nullptr;
@@ -310,10 +310,10 @@ public:
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,offset);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
   }
 

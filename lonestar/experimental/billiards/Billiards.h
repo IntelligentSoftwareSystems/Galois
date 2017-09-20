@@ -64,7 +64,7 @@ static cll::opt<unsigned>   endtime("end", cll::desc("simulation end time"), cll
 static cll::opt<bool> veriFlat ("vflat", cll::desc ("Verify against serial flat simulation"), cll::init (false));
 
 
-typedef Galois::GAccumulator<size_t> Accumulator;
+typedef galois::GAccumulator<size_t> Accumulator;
 
 
 static const unsigned DEFAULT_CHUNK_SIZE = 4;
@@ -199,17 +199,17 @@ private:
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
-    Galois::preAlloc ((Galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/Galois::Runtime::pagePoolSize());
-    Galois::reportPageAlloc("MeminfoPre");
+    galois::preAlloc ((galois::getActiveThreads () * unsigned(endtime) * numballs * 10)/galois::Runtime::pagePoolSize());
+    galois::reportPageAlloc("MeminfoPre");
 
-    Galois::StatTimer timer;
+    galois::StatTimer timer;
 
     timer.start ();
-    Galois::Runtime::beginSampling ();
+    galois::Runtime::beginSampling ();
     size_t numEvents = static_cast<Derived*> (this)->runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
-    Galois::Runtime::endSampling ();
+    galois::Runtime::endSampling ();
     timer.stop ();
-    Galois::reportPageAlloc("MeminfoPost");
+    galois::reportPageAlloc("MeminfoPost");
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
 
@@ -228,7 +228,7 @@ private:
 public:
   void run (int argc, char* argv[]) {
     
-    Galois::StatManager sm;
+    galois::StatManager sm;
     LonestarStart (argc, argv, name, desc, url);
     runImpl ();
   }
@@ -321,7 +321,7 @@ void Billiards<Derived, Tbl_t>::verify (const Tbl_t& initial, Tbl_t& final, size
   std::vector<Event> initEvents;
   serialTable.genInitialEvents (initEvents, endtime);
 
-  Galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
+  galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
   
   timer.start ();
   size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false, true);

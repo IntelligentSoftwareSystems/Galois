@@ -25,10 +25,10 @@ void check() {
   g.addNode(n3);
   g.addNode(n4);
   g.addNode(n5);
-  g.addMultiEdge(n1, n2, Galois::MethodFlag::WRITE, v);
-  g.addMultiEdge(n5, n2, Galois::MethodFlag::WRITE, v);
-  g.addMultiEdge(n2, n3, Galois::MethodFlag::WRITE, v);
-  g.addMultiEdge(n2, n4, Galois::MethodFlag::WRITE, v);
+  g.addMultiEdge(n1, n2, galois::MethodFlag::WRITE, v);
+  g.addMultiEdge(n5, n2, galois::MethodFlag::WRITE, v);
+  g.addMultiEdge(n2, n3, galois::MethodFlag::WRITE, v);
+  g.addMultiEdge(n2, n4, galois::MethodFlag::WRITE, v);
   for(auto ii : g.edges(n2))
     std::cout << "o " << g.getData(g.getEdgeDst(ii)).x << "\n";
   for(auto ii : g.in_edges(n2))
@@ -49,10 +49,10 @@ void check() {
 }
 
 int main() {
-  check<Galois::Graph::FirstGraph<NoDefault,NoDefault,true> >();
-  check<Galois::Graph::FirstGraph<NoDefault,NoDefault,false> >();
-  check<Galois::Graph::FirstGraph<NoDefault,NoDefault,true,true> >();
-  check<Galois::Graph::FirstGraph<NoDefault,NoDefault,false,true> >();
+  check<galois::Graph::FirstGraph<NoDefault,NoDefault,true> >();
+  check<galois::Graph::FirstGraph<NoDefault,NoDefault,false> >();
+  check<galois::Graph::FirstGraph<NoDefault,NoDefault,true,true> >();
+  check<galois::Graph::FirstGraph<NoDefault,NoDefault,false,true> >();
 
   return 0;
 }

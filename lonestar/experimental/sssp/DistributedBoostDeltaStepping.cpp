@@ -96,13 +96,13 @@ int main(int argc, char **argv) {
   boost::mpi::environment env(argc, argv);
   boost::mpi::communicator world;
 
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  typedef Galois::Graph::LC_CSR_Graph<void, unsigned int> Graph;
+  typedef galois::Graph::LC_CSR_Graph<void, unsigned int> Graph;
   Graph g;
   
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   boost::graph::distributed::delta_stepping_shortest_paths(bg,
       boost::vertex(startNode, bg),

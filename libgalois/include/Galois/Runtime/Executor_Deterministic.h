@@ -66,7 +66,7 @@
 // TODO fixed neighborhood: reduce list contention
 // TODO fixed neighborhood: profile, reuse graph 
 // TODO fixed neighborhood: still ~2X slower than implicit version on bfs
-namespace Galois {
+namespace galois {
 namespace Runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
@@ -114,9 +114,9 @@ public:
 
   void resetFirstPass (void) { firstPassFlag = false; }
 
-  virtual void alwaysAcquire (Lockable*, Galois::MethodFlag) = 0;
+  virtual void alwaysAcquire (Lockable*, galois::MethodFlag) = 0;
 
-  virtual void subAcquire (Lockable* lockable, Galois::MethodFlag f) {
+  virtual void subAcquire (Lockable* lockable, galois::MethodFlag f) {
     if (isFirstPass()) {
       alwaysAcquire(lockable, f);
     }
@@ -140,7 +140,7 @@ public:
 
   bool isReady() { return !notReady; }
 
-  virtual void alwaysAcquire(Lockable* lockable, Galois::MethodFlag) { 
+  virtual void alwaysAcquire(Lockable* lockable, galois::MethodFlag) { 
 
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
@@ -182,13 +182,13 @@ public:
   bool isReady() { return !notReady; }
 };
 
-class ReaderContext: public Galois::UnionFindNode<ReaderContext>, public HasIntentToReadContext {
+class ReaderContext: public galois::UnionFindNode<ReaderContext>, public HasIntentToReadContext {
   template<typename, bool, bool>
     friend class DeterministicContextBase;
 
 public:
   ReaderContext(unsigned long id): 
-    Galois::UnionFindNode<ReaderContext>(const_cast<ReaderContext*>(this)),
+    galois::UnionFindNode<ReaderContext>(const_cast<ReaderContext*>(this)),
     HasIntentToReadContext(id, false) { }
 
   void build() {
@@ -203,7 +203,7 @@ public:
     return this->find()->isReady();
   }
 
-  virtual void alwaysAcquire (Lockable*, Galois::MethodFlag) {
+  virtual void alwaysAcquire (Lockable*, galois::MethodFlag) {
     GALOIS_DIE("shouldn't reach here");
   }
 };
@@ -284,7 +284,7 @@ public:
       this->notReady = true;
   }
 
-  virtual void alwaysAcquire(Lockable* lockable, Galois::MethodFlag m) { 
+  virtual void alwaysAcquire(Lockable* lockable, galois::MethodFlag m) { 
     assert (m == MethodFlag::READ || m == MethodFlag::WRITE);
 
     if (this->tryLock(lockable))
@@ -305,7 +305,7 @@ template<typename OptionsTy>
 class DeterministicContextBase<OptionsTy, true, false>: public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
-  typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
+  typedef galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
   Item item;
   ContextList edges;
   ContextList succs;
@@ -338,7 +338,7 @@ public:
 
   bool isReady() { return false; }
 
-  virtual void alwaysAcquire (Lockable* lockable, Galois::MethodFlag) {
+  virtual void alwaysAcquire (Lockable* lockable, galois::MethodFlag) {
 
     // First to lock becomes representative
     DeterministicContextBase* owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
@@ -421,23 +421,23 @@ struct FIFO {
   FIFO(): m_size(0) { }
 
   ~FIFO() {
-    Galois::optional<T> p;
+    galois::optional<T> p;
     while ((p = m_buffer.pop()))
       ;
     while ((p = m_data.pop()))
       ;
   }
 
-  Galois::optional<T> pop() {
-    Galois::optional<T> p;
+  galois::optional<T> pop() {
+    galois::optional<T> p;
     if ((p = m_buffer.pop()) || (p = m_data.pop())) {
       --m_size;
     }
     return p;
   }
 
-  Galois::optional<T> peek() {
-    Galois::optional<T> p;
+  galois::optional<T> peek() {
+    galois::optional<T> p;
     if ((p = m_buffer.pop())) {
       m_buffer.push(*p);
     } else if ((p = m_data.pop())) {
@@ -564,7 +564,7 @@ public:
 
   bool buildDAG() {
     ThreadLocalData& tld = *data.getLocal();
-    Galois::optional<Context*> p;
+    galois::optional<Context*> p;
     while ((p = taskList.pop())) {
       Context* ctx = *p;
       tld.sortBuf.clear();
@@ -589,7 +589,7 @@ public:
   template<typename Executor, typename ExecutorTLD>
   bool executeDAG(Executor& e, ExecutorTLD& etld) {
     auto& local = e.getLocalWindowManager();
-    Galois::optional<Context*> p;
+    galois::optional<Context*> p;
     Context* ctx;
 
     // Go through all tasks to find intial sources and
@@ -606,7 +606,7 @@ public:
     size_t oldCommitted = 0;
     size_t committed = 0;
     do {
-      Galois::optional<Context*> p;
+      galois::optional<Context*> p;
       while ((p = sourceList.pop())) {
         ctx = *p;
         assert(ctx->preds == 0);
@@ -765,7 +765,7 @@ public:
 template<typename OptionsTy>
 class IntentToReadManagerBase<OptionsTy, true> {
   typedef DeterministicContext<OptionsTy> Context;
-  typedef Galois::gdeque<Context*> WL;
+  typedef galois::gdeque<Context*> WL;
   Substrate::PerThreadStorage<WL> pending;
   Substrate::Barrier& barrier;
 
@@ -1117,7 +1117,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
     ThreadLocalData& local = *data.getLocal();
 
     local.newItems.clear();
-    Galois::optional<NewItem> p;
+    galois::optional<NewItem> p;
     while ((p = this->new_.pop())) {
       local.newItems.push_back(*p);
     }
@@ -1226,7 +1226,7 @@ public:
   template<typename WL>
   void pushNextWindow(WL* wl, size_t window) {
     ThreadLocalData& local = *data.getLocal();
-    Galois::optional<Item> p;
+    galois::optional<Item> p;
     while ((p = local.reserve.peek())) {
       if (p->id >= window)
         break;
@@ -1464,7 +1464,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 {
   auto& local = this->getLocalWindowManager();
   bool retval = false;
-  Galois::optional<Item> p;
+  galois::optional<Item> p;
   while ((p = tld.wlcur->pop())) {
     // Use a new context for each item because there is a race when reusing
     // between aborted iterations.

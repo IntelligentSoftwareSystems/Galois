@@ -31,7 +31,7 @@
 
 #include "WLCompileCheck.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
@@ -86,9 +86,9 @@ public:
       pushBuffer.getRemote(x)->flush();
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     cWL& wl = *items.getLocal();
-    Galois::optional<value_type> retval = wl.pop();
+    galois::optional<value_type> retval = wl.pop();
     if (retval)
       return retval;
     pWL& p = *pushBuffer.getLocal();
@@ -101,6 +101,6 @@ GALOIS_WLCOMPILECHECK(OwnerComputes)
 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

@@ -33,7 +33,7 @@
 #ifndef GALOIS_WORKLIST_EXTERNALREFERENCE_H
 #define GALOIS_WORKLIST_EXTERNALREFERENCE_H
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename Container, bool IgnorePushInitial = false>
@@ -63,7 +63,7 @@ public:
   void push_initial(const RangeTy& r) { if (!IgnorePushInitial) wl.push_initial(r); }
 
   //! pop a value from the queue.
-  Galois::optional<value_type> pop() { return wl.pop(); }
+  galois::optional<value_type> pop() { return wl.pop(); }
 };
 
 }

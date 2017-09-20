@@ -175,7 +175,7 @@ public:
 
 class BallSectored: public Ball {
 
-  using SectorSet = Galois::FlatSet<Sector*>;
+  using SectorSet = galois::FlatSet<Sector*>;
   using SectorIterator = typename SectorSet::const_iterator;
 
   Vec2 m_ghost_pos;
@@ -247,11 +247,11 @@ public:
 template <typename B, typename E=Event>
 class BallOptimWrapper  {
 
-  using BallAlloc = Galois::FixedSizeAllocator<B>;
+  using BallAlloc = galois::FixedSizeAllocator<B>;
   using CheckP = std::pair<E, B*>;
-  using StateLog = Galois::gstl::List<CheckP>;
+  using StateLog = galois::gstl::List<CheckP>;
 
-  using dbg = Galois::debug<0>;
+  using dbg = galois::debug<0>;
 
   B* m_ball;
   BallAlloc m_alloc;

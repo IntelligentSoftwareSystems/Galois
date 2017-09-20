@@ -16,16 +16,16 @@
 
 namespace algorithm {
 
-typedef Galois::PerIterAllocTy Alloc;
-typedef std::unordered_set< aig::GNode, std::hash<aig::GNode>, std::equal_to<aig::GNode>, Galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeSet;
-typedef std::deque< aig::GNode, Galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeDeque;
+typedef galois::PerIterAllocTy Alloc;
+typedef std::unordered_set< aig::GNode, std::hash<aig::GNode>, std::equal_to<aig::GNode>, galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeSet;
+typedef std::deque< aig::GNode, galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeDeque;
 
 class Windowing {
 
 private:
 
 	aig::Graph & graph;
-	Galois::PerIterAllocTy & allocator;
+	galois::PerIterAllocTy & allocator;
 
 	GNodeSet window;
 	GNodeSet leaves;
@@ -55,7 +55,7 @@ private:
 
 public:
 
-	Windowing( aig::Graph & graph, Galois::PerIterAllocTy & allocator, int nInputs, int nOutputs, int nLevels, int cutSizeLimit );
+	Windowing( aig::Graph & graph, galois::PerIterAllocTy & allocator, int nInputs, int nOutputs, int nLevels, int cutSizeLimit );
 
 	virtual ~Windowing();
 

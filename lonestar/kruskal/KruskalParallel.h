@@ -41,18 +41,18 @@ namespace kruskal {
 
 struct EdgeCtx;
 
-// typedef Galois::LazyDynamicArray<int>  VecRep_ty;
-typedef Galois::LazyDynamicArray<int, Galois::Runtime::SerialNumaAllocator<int> >  VecRep_ty;
+// typedef galois::LazyDynamicArray<int>  VecRep_ty;
+typedef galois::LazyDynamicArray<int, galois::Runtime::SerialNumaAllocator<int> >  VecRep_ty;
 
-typedef Galois::PerThreadVector<Edge> EdgeWL;
-typedef Galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
-typedef Galois::FixedSizeAllocator<EdgeCtx> EdgeCtxAlloc;
+typedef galois::PerThreadVector<Edge> EdgeWL;
+typedef galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
+typedef galois::FixedSizeAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 
-// typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
-typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
-// typedef Galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
-typedef Galois::LazyDynamicArray<AtomicCtxPtr, Galois::Runtime::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
+// typedef galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
+typedef galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
+// typedef galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
+typedef galois::LazyDynamicArray<AtomicCtxPtr, galois::Runtime::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
@@ -256,7 +256,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          Galois::Runtime::signalConflict ();
+          galois::Runtime::signalConflict ();
 
         } else {
           nextWL.get ().push_back (ctx);
@@ -318,9 +318,9 @@ struct PreSort {
 };
 
 template <typename WL>
-void presort (WL& wl, Galois::TimeAccumulator& sortTimer) {
+void presort (WL& wl, galois::TimeAccumulator& sortTimer) {
   sortTimer.start ();
-  Galois::on_each (PreSort<WL> (wl), Galois::loopname("pre_sort"));
+  galois::on_each (PreSort<WL> (wl), galois::loopname("pre_sort"));
   sortTimer.stop ();
 }
 
@@ -329,7 +329,7 @@ struct Range {
   typedef typename std::iterator_traits<Iter>::difference_type difference_type;
   typedef typename std::iterator_traits<Iter>::value_type value_type;
 
-  typedef Galois::Substrate::PerThreadStorage<Range> PTS;
+  typedef galois::Substrate::PerThreadStorage<Range> PTS;
 
   Iter m_beg;
   Iter m_end;
@@ -402,11 +402,11 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
   typedef typename Range<I>::value_type T;
 
   const size_t chunkSize = LinkUpLoop<false>::CHUNK_SIZE;
-  const size_t numT = Galois::getActiveThreads ();
+  const size_t numT = galois::getActiveThreads ();
 
   const size_t minWinSize = numT * chunkSize;
 
-  double TARGET_COMMIT_RATIO = Galois::Runtime::commitRatioArg;
+  double TARGET_COMMIT_RATIO = galois::Runtime::commitRatioArg;
 
   double commitRatio = double (numCommits) / double (prevWindowSize);
 
@@ -449,12 +449,12 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
     }
   }
 
-  // Galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
+  // galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
 
   if (windowLimit != NULL) {
-    // Galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
+    // galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
 
-    Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), Galois::loopname("refill"));
+    galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), galois::loopname("refill"));
 
     for (unsigned i = 0; i < ranges.size (); ++i) {
       Range<I>& r = *ranges.getRemote (i);
@@ -476,7 +476,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
 
   }
 
-  // Galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
+  // galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
 }
 
 
@@ -488,9 +488,9 @@ struct UnionFindWindow {
       VecAtomicCtxPtr& repOwnerCtxVec, 
       size_t& mstWeight, 
       size_t& totalIter,
-      Galois::TimeAccumulator& sortTimer,
-      Galois::TimeAccumulator& findTimer,
-      Galois::TimeAccumulator& linkUpTimer,
+      galois::TimeAccumulator& sortTimer,
+      galois::TimeAccumulator& findTimer,
+      galois::TimeAccumulator& linkUpTimer,
       Accumulator& findIter,
       Accumulator& linkUpIter) const {
 
@@ -535,24 +535,24 @@ struct UnionFindWindow {
         break;
       }
 
-      // Galois::Runtime::beginSampling ();
+      // galois::Runtime::beginSampling ();
       findTimer.start ();
-      Galois::do_all_local (*currWL,
+      galois::do_all_local (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
-          Galois::do_all_steal<true>(),
-          Galois::loopname("find_loop"));
+          galois::do_all_steal<true>(),
+          galois::loopname("find_loop"));
       findTimer.stop ();
-      // Galois::Runtime::endSampling ();
+      // galois::Runtime::endSampling ();
 
 
-      // Galois::Runtime::beginSampling ();
+      // galois::Runtime::beginSampling ();
       linkUpTimer.start ();
-      Galois::do_all_local (*currWL,
+      galois::do_all_local (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-          Galois::do_all_steal<true>(),
-          Galois::loopname("link_up_loop"));
+          galois::do_all_steal<true>(),
+          galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
-      // Galois::Runtime::endSampling ();
+      // galois::Runtime::endSampling ();
 
       int u = linkUpIter.reduce () - numUnions;
       numUnions = linkUpIter.reduce ();
@@ -595,11 +595,11 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   totalIter = 0;
   mstWeight = 0;
 
-  Galois::TimeAccumulator runningTime;
-  Galois::TimeAccumulator sortTimer;
-  Galois::TimeAccumulator findTimer;
-  Galois::TimeAccumulator linkUpTimer;
-  Galois::TimeAccumulator fillUpTimer;
+  galois::TimeAccumulator runningTime;
+  galois::TimeAccumulator sortTimer;
+  galois::TimeAccumulator findTimer;
+  galois::TimeAccumulator linkUpTimer;
+  galois::TimeAccumulator fillUpTimer;
 
   Accumulator findIter;
   Accumulator linkUpIter;
@@ -611,29 +611,29 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   VecAtomicCtxPtr repOwnerCtxVec (numNodes);
 
  
-  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+  galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   fillUpTimer.start ();
-  Galois::do_all (
+  galois::do_all (
       boost::counting_iterator<size_t>(0),
       boost::counting_iterator<size_t>(numNodes),
       [&repVec, &repOwnerCtxVec] (size_t i) {
         repVec.initialize (i, -1);
         repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
       },
-      Galois::loopname ("init-vectors"));
+      galois::loopname ("init-vectors"));
 
 
 
   EdgeCtxWL initWL;
-  unsigned numT = Galois::getActiveThreads ();
+  unsigned numT = galois::getActiveThreads ();
   for (unsigned i = 0; i < numT; ++i) {
     initWL[i].reserve ((edges.size () + numT - 1) / numT);
   }
 
-  Galois::do_all (edges.begin (), edges.end (), 
+  galois::do_all (edges.begin (), edges.end (), 
       FillUp (initWL), 
-      Galois::loopname("fill_init"));
+      galois::loopname("fill_init"));
 
   fillUpTimer.stop ();
 
@@ -653,7 +653,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
   std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
-  Galois::Substrate::getThreadPool().beKind();
+  galois::Substrate::getThreadPool().beKind();
 }
 
 template <typename Iter>
@@ -750,9 +750,9 @@ void partition_edges (Iter b, Iter e,
 
   Edge pivot = pick_kth (b, e, k);
 
-  Galois::do_all (b, e, 
+  galois::do_all (b, e, 
       Partition (pivot, lighter, heavier), 
-      Galois::loopname ("partition_loop"));
+      galois::loopname ("partition_loop"));
 
   assert ((lighter.size_all () + heavier.size_all ()) == old_sz + size_t (std::distance (b, e)));
 
@@ -794,29 +794,29 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   totalIter = 0;
   mstWeight = 0;
 
-  Galois::TimeAccumulator runningTime;
-  Galois::TimeAccumulator partitionTimer;
-  Galois::TimeAccumulator sortTimer;
-  Galois::TimeAccumulator findTimer;
-  Galois::TimeAccumulator linkUpTimer;
-  Galois::TimeAccumulator filterTimer;
+  galois::TimeAccumulator runningTime;
+  galois::TimeAccumulator partitionTimer;
+  galois::TimeAccumulator sortTimer;
+  galois::TimeAccumulator findTimer;
+  galois::TimeAccumulator linkUpTimer;
+  galois::TimeAccumulator filterTimer;
 
   Accumulator findIter;
   Accumulator linkUpIter;
 
-  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+  galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
 
   VecRep_ty repVec (numNodes);
   VecAtomicCtxPtr repOwnerCtxVec (numNodes);
-  Galois::do_all (
+  galois::do_all (
       boost::counting_iterator<size_t>(0),
       boost::counting_iterator<size_t>(numNodes),
       [&repVec, &repOwnerCtxVec] (size_t i) {
         repVec.initialize (i, -1);
         repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
       },
-      Galois::loopname ("init-vectors"));
+      galois::loopname ("init-vectors"));
 
 
 
@@ -830,9 +830,9 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
 
   typedef std::iterator_traits<VecEdge::iterator>::difference_type Dist_ty;
   Dist_ty splitPoint = (4 * numNodes) / 3;
-  lighter.reserve_all (numNodes / Galois::getActiveThreads ());
+  lighter.reserve_all (numNodes / galois::getActiveThreads ());
   assert (edges.size () >= numNodes);
-  heavier.reserve_all (numNodes / Galois::getActiveThreads ());
+  heavier.reserve_all (numNodes / galois::getActiveThreads ());
   partition_edges (edges.begin (), edges.end (), splitPoint, lighter, heavier);
 
   partitionTimer.stop ();
@@ -845,10 +845,10 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   lighter.clear_all_parallel ();
 
   filterTimer.start ();
-  Galois::do_all_local (heavier,
+  galois::do_all_local (heavier,
       FilterSelfEdges<EdgeCtxWL> (repVec, lighter),
-      Galois::do_all_steal<true>(),
-      Galois::loopname ("filter_loop"));
+      galois::do_all_steal<true>(),
+      galois::loopname ("filter_loop"));
   filterTimer.stop ();
 
 
@@ -866,7 +866,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
   std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
 
-  Galois::Substrate::getThreadPool().beKind();
+  galois::Substrate::getThreadPool().beKind();
 }
 }// end namespace kruskal
 

@@ -71,18 +71,18 @@ template<int Version=detBase>
 struct Process {
   struct LocalState {
     Cavity cav;
-    LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
+    LocalState(Process<Version>& self, galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
   };
 
   //! [Enabling Per Iteration Allocator in DMR]
   typedef std::tuple<
-    Galois::has_deterministic_local_state<LocalState>,
-    Galois::needs_per_iter_alloc<>
+    galois::has_deterministic_local_state<LocalState>,
+    galois::needs_per_iter_alloc<>
   > function_traits;
   //! [Enabling Per Iteration Allocator in DMR]
 
-  void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::MethodFlag::WRITE))
+  void operator()(GNode item, galois::UserContext<GNode>& ctx) {
+    if (!graph->containsNode(item, galois::MethodFlag::WRITE))
       return;
     
     if (Version == detDisjoint) {
@@ -114,25 +114,25 @@ struct Process {
 };
 
 struct Preprocess {
-  Galois::InsertBag<GNode>& wl;
-  Preprocess(Galois::InsertBag<GNode>& w): wl(w) { }
+  galois::InsertBag<GNode>& wl;
+  Preprocess(galois::InsertBag<GNode>& w): wl(w) { }
   void operator()(GNode item) const {
-    if (graph->getData(item, Galois::MethodFlag::UNPROTECTED).isBad())
+    if (graph->getData(item, galois::MethodFlag::UNPROTECTED).isBad())
       wl.push(item);
   }
 };
 
 struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, Galois::MethodFlag::UNPROTECTED).getId();
-    int idB = graph->getData(b, Galois::MethodFlag::UNPROTECTED).getId();
+    int idA = graph->getData(a, galois::MethodFlag::UNPROTECTED).getId();
+    int idB = graph->getData(b, galois::MethodFlag::UNPROTECTED).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   graph = new Graph();
@@ -147,35 +147,35 @@ int main(int argc, char** argv) {
   std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
-  Galois::reportPageAlloc("MeminfoPre1");
+  galois::reportPageAlloc("MeminfoPre1");
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
   if (detAlgo == nondet) {
-    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::pagePoolSize());
+    galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / galois::Runtime::pagePoolSize());
 
   } else {
-    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::pagePoolSize());
+    galois::preAlloc(galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / galois::Runtime::pagePoolSize());
   }
-  Galois::reportPageAlloc("MeminfoPre2");
+  galois::reportPageAlloc("MeminfoPre2");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
 
   //! [do_all_local example]
-  Galois::InsertBag<GNode> initialBad;
+  galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
-    Galois::do_all_local(*graph, Preprocess(initialBad), Galois::loopname("findbad"));
+    galois::do_all_local(*graph, Preprocess(initialBad), galois::loopname("findbad"));
   //! [do_all_local example]
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
-  Galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoMid");
   
-  Galois::StatTimer Trefine("refine");
+  galois::StatTimer Trefine("refine");
   Trefine.start();
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   
   typedef Deterministic<> DWL;
   //! [for_each_local example]
@@ -184,28 +184,28 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
+      galois::for_each_local(initialBad, Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
       break;
       //! [for_each_local example]
     case detBase:
-      Galois::for_each(initialBad.begin(), initialBad.end(), Process<>(), Galois::wl<DWL>());
+      galois::for_each(initialBad.begin(), initialBad.end(), Process<>(), galois::wl<DWL>());
       break;
     case detPrefix:
-      Galois::for_each(initialBad.begin(), initialBad.end(), Process<>(),
-          Galois::wl<DWL>(), Galois::has_neighborhood_visitor<Process<detPrefix>>());
+      galois::for_each(initialBad.begin(), initialBad.end(), Process<>(),
+          galois::wl<DWL>(), galois::has_neighborhood_visitor<Process<detPrefix>>());
       break;
     case detDisjoint:
-      Galois::for_each(initialBad.begin(), initialBad.end(), Process<detDisjoint>(), Galois::wl<DWL>());
+      galois::for_each(initialBad.begin(), initialBad.end(), Process<detDisjoint>(), galois::wl<DWL>());
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
   Trefine.stop();
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
   
   if (!skipVerify) {
-    int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
+    int size = galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {
       GALOIS_DIE("Bad triangles remaining");
     }

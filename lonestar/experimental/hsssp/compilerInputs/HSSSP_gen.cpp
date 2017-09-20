@@ -61,7 +61,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
 
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitGraph"));
   }
 
   void operator()(GNode src) const {
@@ -75,7 +75,7 @@ struct SSSP {
 
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"));
+    galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, galois::loopname("sssp"));
   }
 
   void operator()(GNode src) const {
@@ -86,7 +86,7 @@ struct SSSP {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       int new_dist = graph->getEdgeData(jj) + sdist;
-      Galois::atomicMin(dnode.dist_current, new_dist);
+      galois::atomicMin(dnode.dist_current, new_dist);
     }
   }
 };
@@ -95,8 +95,8 @@ struct SSSP {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
     T_total.start();
 

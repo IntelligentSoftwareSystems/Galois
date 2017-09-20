@@ -50,10 +50,10 @@ public:
    ASTContext * astContext;
    Rewriter & rewriter;
    std::vector<Type * > typeDecls;
-   Galois::GAST::GaloisApp * app_data;
+   galois::GAST::GaloisApp * app_data;
 
 public :
-      GraphTypeParser (ASTContext * _a , Rewriter & R, Galois::GAST::GaloisApp * ad): astContext(_a), rewriter(R),app_data(ad){
+      GraphTypeParser (ASTContext * _a , Rewriter & R, galois::GAST::GaloisApp * ad): astContext(_a), rewriter(R),app_data(ad){
 
       }
       virtual ~GraphTypeParser(){
@@ -116,9 +116,9 @@ public:
 class DoAllHandler: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
-   Galois::GAST::GaloisApp & app_data;
+   galois::GAST::GaloisApp & app_data;
 public:
-   DoAllHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & _ad) :
+   DoAllHandler(Rewriter &rewriter, galois::GAST::GaloisApp & _ad) :
          rewriter(rewriter), app_data(_ad) {
    }
 /*
@@ -138,7 +138,7 @@ public:
          CXXRecordDecl * kernel = const_cast<CXXRecordDecl*>(Results.Nodes.getNodeAs<CXXRecordDecl>("kernelType"));
          assert(kernel!=nullptr && "KernelType cast failed.");
          app_data.add_doAll_call(callFS, kernel);
-         llvm::outs() << "Galois::do_All loop found " << callFS->getCalleeDecl()->getCanonicalDecl()->getAsFunction()->getNameAsString() << "\n";
+         llvm::outs() << "galois::do_All loop found " << callFS->getCalleeDecl()->getCanonicalDecl()->getAsFunction()->getNameAsString() << "\n";
          //Get the arguments:
          clang::LangOptions LangOpts;
          LangOpts.CPlusPlus = true;
@@ -199,7 +199,7 @@ public:
 //               llvm::outs() << " REDECLS:: " << t->getNameAsString() << "\n";
 //            }
 //            decl->getSourceRange()
-            string s = "#include \"CL_Header.h\"\nusing namespace Galois::OpenCL;\n";
+            string s = "#include \"CL_Header.h\"\nusing namespace galois::OpenCL;\n";
             s+=ast_utility.get_string(decl->getSourceRange().getBegin(), decl->getSourceRange().getEnd());
 //            llvm::outs() << "Decl String :: " << s << "\n";
             string old_name =decl->getUnderlyingType().getAsString();
@@ -209,7 +209,7 @@ public:
             s.replace(s.find(old_name), old_name.length(), "Graphs::CL_LC_Graph");
 //            llvm::outs() << "New name:: " << s<< "\n";
             rewriter.ReplaceText(SourceRange(decl->getLocStart(),decl->getLocEnd()), s);
-//            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace Galois::OpenCL;\n");
+//            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace galois::OpenCL;\n");
 
          }
    }

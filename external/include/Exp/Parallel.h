@@ -114,7 +114,7 @@ void do_all(IterTy begin, IterTy end, FunctionTy fn) {
 #ifdef EXP_DOALL_GALOIS
 struct Init {
   Init() {
-    Galois::setActiveThreads(Exp::getNumThreads()); 
+    galois::setActiveThreads(Exp::getNumThreads()); 
   }
 };
 #endif
@@ -225,13 +225,13 @@ struct Init { };
 #define cilk_spawn
 #define cilk_sync
 #define parallel_doall(type, index, begin, end) \
-  Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
+  galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_1(type, index, begin, end) \
-  Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
+  galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_obj(type, index, begin, end, obj) \
-  Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
+  galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_obj_1(type, index, begin, end, obj) \
-  Galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
+  galois::do_all(boost::counting_iterator<type>(begin), boost::counting_iterator<type>(end), [&](type index)
 #define parallel_doall_end );
 
 // TBB

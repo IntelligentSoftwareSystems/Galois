@@ -105,23 +105,23 @@ namespace std {
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef Galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
+//typedef galois::Graph::LC_Numa_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
-/*typedef Galois::Graph::FileGraph Graph;
+/*typedef galois::Graph::FileGraph Graph;
 typedef uint64_t GNode;
 Graph File_graph;
 */
 
 //Distributed Graph Nodes.
-typedef typename Galois::Graph::ThirdGraph<Node, uint32_t, Galois::Graph::EdgeDirection::Out> DGraph;
+typedef typename galois::Graph::ThirdGraph<Node, uint32_t, galois::Graph::EdgeDirection::Out> DGraph;
 typedef typename DGraph::NodeHandle DGNode;
 typedef typename DGraph::iterator iterator;
 typedef typename DGraph::edge_iterator edge_iterator;
 typedef typename DGraph::pointer Graphp;
 
 
-typedef Galois::Graph::FileGraph FGraph;
-typedef Galois::Graph::FileGraph::GraphNode FileGNode;
+typedef galois::Graph::FileGraph FGraph;
+typedef galois::Graph::FileGraph::GraphNode FileGNode;
 FGraph fgraph;
 
 /**
@@ -144,7 +144,7 @@ struct HostWorkItem {
 };
 
 
-//typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+//typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
 //typedef Graph::GraphNode GNode;
 
 //Graph graph;
@@ -161,7 +161,7 @@ std::unordered_map<FileGNode,DGNode> mapping;
 // DGNode ==> hostID mapping
 std::map<DGNode, uint64_t> HostIDMap;
 
-using accumulator = Galois::GAccumulator<int64_t>;
+using accumulator = galois::GAccumulator<int64_t>;
 
 //Processed movie nodes:
 uint64_t Processed_movie_nodes = 0;
@@ -172,8 +172,8 @@ volatile unsigned prog_barrier = 0;
 uint64_t num_movie_nodes = 0;
 uint64_t num_user_nodes = 0;
 
-using namespace Galois::Runtime;
-typedef Galois::Runtime::LL::SimpleLock<true> SLock;
+using namespace galois::Runtime;
+typedef galois::Runtime::LL::SimpleLock<true> SLock;
 SLock slock;
 SLock pblock;
 
@@ -276,13 +276,13 @@ static void program_barrier() {
   printf("Left barrier..\n");
 }
 
-Galois::GAccumulator<double> RMS;
-Galois::GAccumulator<unsigned> count_data;
+galois::GAccumulator<double> RMS;
+galois::GAccumulator<unsigned> count_data;
 /*void verify() {
-typedef Galois::GAccumulator<double> AccumDouble;
+typedef galois::GAccumulator<double> AccumDouble;
     AccumDouble rms;
     cout<<"Host:"<<networkHostID<<" is verifying before SGD..\n";
-    //Galois::do_all(graph.begin(), graph.begin()+num_movie_nodes, [&] (GNode n) {
+    //galois::do_all(graph.begin(), graph.begin()+num_movie_nodes, [&] (GNode n) {
     for(auto ni = graph.begin(), ei = graph.begin()+num_movie_nodes; ni != ei; ++ni) {
 	for(auto ii = graph.edge_begin(*ni); ii != graph.edge_end(*ni); ++ii){
 	    GNode m = graph.getEdgeDst(ii);
@@ -301,10 +301,10 @@ typedef Galois::GAccumulator<double> AccumDouble;
     std::cout << "RMSE Total: " << total_rms << " Normalized: " << normalized_rms << std::endl;
 }*/
 void verify(Graphp g){
-    typedef Galois::GAccumulator<double> AccumDouble;
+    typedef galois::GAccumulator<double> AccumDouble;
     AccumDouble rms;
     cout<<"Host:"<<networkHostID<<" is verifying after SGD..\n";
-    //Galois::do_all_local(g, [&g,&rms] (DGNode n) {
+    //galois::do_all_local(g, [&g,&rms] (DGNode n) {
 	auto ei = g->begin();
 	std::advance(ei,num_movie_nodes);
 	unsigned int count=0;
@@ -344,19 +344,19 @@ struct printN {
     Graphp g;
     printN(Graphp g_) : g(g_) { }  
 
-    void operator()(const DGNode& data, Galois::UserContext<DGNode>& ctx) {
+    void operator()(const DGNode& data, galois::UserContext<DGNode>& ctx) {
 	printNode(g->getData(data));
     }  
 };
 */
 /*
-struct verify_before : public Galois::Runtime::Lockable {
+struct verify_before : public galois::Runtime::Lockable {
     Graphp g;
     verify_before() {}
     verify_before(Graphp g_) : g(g_) { 
     }
 
-    void operator()(const DGNode& movie, Galois::UserContext<DGNode>& ctx ) {
+    void operator()(const DGNode& movie, galois::UserContext<DGNode>& ctx ) {
 	for(auto ii = g->edge_begin(movie); ii != g->edge_end(movie); ++ii){
 	    const DGNode& m = g->getEdgeDst(ii);
 	    if(g->edge_begin(m) != g->edge_end(m))
@@ -371,29 +371,29 @@ struct verify_before : public Galois::Runtime::Lockable {
 	count_data +=1;
     } 
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::Runtime::SerializeBuffer& s) const {
 	gSerialize(s,g);
     }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
 	gDeserialize(s,g);
     } 
 };
 */
 
 /* Operator */
-Galois::GAccumulator<size_t> numNodes; 
+galois::GAccumulator<size_t> numNodes; 
 unsigned count_done=0;
 struct sgd_algo {
    //unsigned int num_movie_nodes;
 
-struct Process : public Galois::Runtime::Lockable {
+struct Process : public galois::Runtime::Lockable {
     Graphp g;
     sgd_algo* self;
     Process(){ }
     // sgd(Graphp _g) : g(_g) {}
     Process(sgd_algo* s, Graphp _g) : g(_g), self(s) { }
-    //void operator()(const DGNode& n, Galois::UserContext<DGNode>&) {(*this)(n);} 
-    void operator()(const DGNode& movie, Galois::UserContext<DGNode>& ctx)
+    //void operator()(const DGNode& n, galois::UserContext<DGNode>&) {(*this)(n);} 
+    void operator()(const DGNode& movie, galois::UserContext<DGNode>& ctx)
     {
      Node& movie_data = g->getData(movie); 
     //printNode(movie_data);
@@ -448,7 +448,7 @@ struct Process : public Galois::Runtime::Lockable {
      ++movie_data.edge_offset;
 
 	   // This is the last user
-     if(edge_it == g->edge_end(movie))// Galois::MethodFlag::NONE))
+     if(edge_it == g->edge_end(movie))// galois::MethodFlag::NONE))
      {
 	//start back at the first edge again
 	movie_data.edge_offset = 0;
@@ -471,10 +471,10 @@ struct Process : public Galois::Runtime::Lockable {
 
 
 typedef int tt_has_serialize;
-void serialize(Galois::Runtime::SerializeBuffer& s) const {
+void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
 }
-void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
 } 
 
@@ -500,7 +500,7 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 	}
 */
 //	std::cout<<"Value of k= "<<k<<std::endl; 
-        //Galois::for_each(g->begin(), ii, printN(g),"Printing nodes");
+        //galois::for_each(g->begin(), ii, printN(g),"Printing nodes");
 	int movie_host0 = 0;
 	int movie_host1 = 0;
 
@@ -513,9 +513,9 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 */
 
 //	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
-	//Galois::for_each_local(g, Process(this,g), "Process");
-	Galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
-	//Galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
+	//galois::for_each_local(g, Process(this,g), "Process");
+	galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
+	//galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
     
         // Verification routine
   //      std::cout << "Running Verification after completion\n";
@@ -647,9 +647,9 @@ struct create_nodes {
     create_nodes() = default;
     create_nodes(Graphp _g, SLock _l) : g(_g),l(_l){}
     
-    //void operator ()(FileGNode& item, Galois::UserContext<FileGNode>& ctx) {
+    //void operator ()(FileGNode& item, galois::UserContext<FileGNode>& ctx) {
     template<typename Context>
-    //void operator ()(const int& item, const Galois::UserContext<FileGNode>& ctx) {
+    //void operator ()(const int& item, const galois::UserContext<FileGNode>& ctx) {
     void operator ()(const FileGNode& item, const Context& ctx) {
 	//Node& node =  graph.getData(item);
 	//cout << "creating node\n";
@@ -673,10 +673,10 @@ struct create_nodes {
 //	num_ns++;
     }
   /*  typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::Runtime::SerializeBuffer& s) const {
 	gSerialize(s,g,l);
     }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
 	gDeserialize(s,g,l);
     }
 */
@@ -838,7 +838,7 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
     last = graph_begin + ((networkHostID + 1) * block);
     if(networkHostID == (networkHostNum - 1)) last = graph_end; 
     printf ("host: %u creating Movie nodes = %ld\n", networkHostID, (last-first));
-    Galois::for_each(first, last, create_nodes(dgraph,lk));
+    galois::for_each(first, last, create_nodes(dgraph,lk));
 */	
 /*****************************************************************
 *Divide rest of the  nodes equally first.
@@ -862,16 +862,16 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
    // if(networkHostID == 0) {   
 //	std::cout << "number of node on host = " << networkHostID << " are: = " << last - first << "\n";
 	printf ("host: %u creating rest of the nodes\n", networkHostID);
-	//typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
-	//typedef Galois::WorkList::dChunkedFIFO<64> dChunk;
-	//typedef Galois::WorkList::LIFO<FileGNode, true> chunk;
-	//typedef Galois::Graph::FileGraph::iterator IterTy;
-	Galois::for_each(first, last, create_nodes(dgraph,lk));
-	//Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), create_nodes(dgraph,lk));
+	//typedef galois::WorkList::BulkSynchronous<galois::WorkList::dChunkedLIFO<256> > WL;
+	//typedef galois::WorkList::dChunkedFIFO<64> dChunk;
+	//typedef galois::WorkList::LIFO<FileGNode, true> chunk;
+	//typedef galois::Graph::FileGraph::iterator IterTy;
+	galois::for_each(first, last, create_nodes(dgraph,lk));
+	//galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), create_nodes(dgraph,lk));
     
   // }
    /* else {
-	Galois::for_each(graph.begin(),graph.end(),dummy_func());
+	galois::for_each(graph.begin(),graph.end(),dummy_func());
     }*/
 
 }
@@ -926,9 +926,9 @@ void verify_(Graphp g) {
     auto ii = g->begin();
     std::advance(ii,num_movie_nodes);
     if(networkHostID == 0)	
-	Galois::for_each(g->begin(),ii,verify_before(g),"Verifying");
+	galois::for_each(g->begin(),ii,verify_before(g),"Verifying");
     else
-	Galois::for_each(g->begin(),ii,dummy_func2());
+	galois::for_each(g->begin(),ii,dummy_func2());
 }
 */
 int main(int argc, char** argv)
@@ -944,18 +944,18 @@ int main(int argc, char** argv)
 	unsigned int threadCount = atoi(argv[2]);
 
 	//how many threads Galois should use
-	Galois::setActiveThreads(threadCount);
+	galois::setActiveThreads(threadCount);
   //      graph.structureFromFile(inputFile);
 
 //	num_movie_nodes =  initializeGraphData(graph);
 //	std::cout << "num_movie_nodes = " << num_movie_nodes <<"\n";
 //	cout<<"Number of ratings = "<<NUM_RATINGS<<endl;	
-	Galois::StatManager statManager;
-	Galois::Runtime::networkStart();
+	galois::StatManager statManager;
+	galois::Runtime::networkStart();
 	
 	Graphp dgraph = DGraph::allocate();
 
-	Galois::StatTimer Tinitial("Initialization Time");
+	galois::StatTimer Tinitial("Initialization Time");
 	Tinitial.start();
 	readGraph(dgraph, inputFile);    
 	Tinitial.stop();
@@ -969,17 +969,17 @@ int main(int argc, char** argv)
 	cout<<"Verifying before SGD\n";
 	verify(dgraph);
 	std::cout << "calling sgd \n";
-	Galois::StatTimer T("Sgd Time");
+	galois::StatTimer T("Sgd Time");
 	T.start();
 	sgd_algo()(dgraph);
 	 T.stop();   
-	Galois::StatTimer T2("Verify Time");
+	galois::StatTimer T2("Verify Time");
 	T2.start();
 	cout<<"Verifying after SGD\n";
 	verify(dgraph);
 	T2.stop();
 	printf("NUMBER OF MOVIE NODES = %d\n", num_movie_nodes);
-	Galois::Runtime::networkTerminate();
+	galois::Runtime::networkTerminate();
 	return 0;
 
 }

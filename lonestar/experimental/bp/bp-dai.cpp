@@ -103,14 +103,14 @@ int main(int argc, char **argv) {
 
   bp.init();
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   bp.run();
   T.stop();
   std::cout << "Time: " << GlobalTime << "\n";
 
   if (!skipVerify) {
-    Galois::StatTimer verify("verify");
+    galois::StatTimer verify("verify");
     verify.start();
     std::cout << "Starting verification...\n";
     verb = 0;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     verify.stop();
   }
 #if 0
-  Galois::StatTimer Texact("exact");
+  galois::StatTimer Texact("exact");
   dai::ExactInf ei(fg, dai::PropertySet()("verbose",(size_t)0) );
   ei.init();
   Texact.start();

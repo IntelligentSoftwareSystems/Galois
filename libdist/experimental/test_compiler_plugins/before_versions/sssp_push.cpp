@@ -63,14 +63,14 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) :graph(_graph){}
   void static go(Graph& _graph) {
 
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitGraph"));
 
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if((net.ID == 0) && (src == src_node)){
       sdata.dist_current = 0;
     }
@@ -79,7 +79,7 @@ struct InitializeGraph {
 
 struct SSSP {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  static galois::DGAccumulator<int> DGAccumulator_accum;
 
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -87,7 +87,7 @@ struct SSSP {
     do{
       DGAccumulator_accum.reset();
 
-      Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"));
+      galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, galois::loopname("sssp"));
      ++iteration;
     }while(DGAccumulator_accum.reduce());
 
@@ -102,21 +102,21 @@ struct SSSP {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned long long new_dist = graph->getEdgeData(jj) + sdist;
-      auto old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+      auto old_dist = galois::atomicMin(dnode.dist_current, new_dist);
       if(old_dist > new_dist){
         DGAccumulator_accum += 1;
       }
     }
   }
 };
-Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
+galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 
 
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
 
     T_total.start();
 
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "SSSP::go run2 called  on " << net.ID << "\n";
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "SSSP::go run3 called  on " << net.ID << "\n";
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

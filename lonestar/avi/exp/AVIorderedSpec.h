@@ -47,7 +47,7 @@
 
 class AVIorderedSpec: public AVIabstractMain {
 protected:
-  using Graph =  Galois::Graph::FirstGraph<void*,void,true>;
+  using Graph =  galois::Graph::FirstGraph<void*,void,true>;
   using Lockable =  Graph::GraphNode;
   using Locks =  std::vector<Lockable>;
 
@@ -143,7 +143,7 @@ protected:
       createSyncFiles(createSyncFiles),
       niter(niter) { }
 
-    void operator () (const Update& item, Galois::UserContext<Update>& ctx) {
+    void operator () (const Update& item, galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
       LocalVec& l = *perIterLocalVec.getLocal();
@@ -215,13 +215,13 @@ public:
 
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
-    // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_spec (
-        Galois::Runtime::makeStandardRange (
+    // galois::for_each_ordered (
+    galois::Runtime::for_each_ordered_spec (
+        galois::Runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         Comparator(), nhVisitor, p,
-        std::make_tuple (Galois::loopname ("avi-optim")));
+        std::make_tuple (galois::loopname ("avi-optim")));
 
 
     printf("iterations = %lu\n", niter.reduce());

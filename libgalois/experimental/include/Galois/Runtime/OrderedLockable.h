@@ -37,10 +37,10 @@
 
 #include <unordered_map>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
-using dbg = Galois::Substrate::debug<1>;
+using dbg = galois::Substrate::debug<1>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
@@ -92,7 +92,7 @@ class TwoPhaseContext: public OrderedContextBase<T> {
 public:
 
   using Base = OrderedContextBase<T>;
-  // using NhoodList =  Galois::gdeque<Lockable*, 4>;
+  // using NhoodList =  galois::gdeque<Lockable*, 4>;
   using CtxtCmp = ContextComparator<TwoPhaseContext, Cmp>;
 
   CtxtCmp ctxtCmp;
@@ -124,7 +124,7 @@ public:
     source = true;
   }
 
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
 
 
     if (Base::tryLock (l)) {
@@ -263,7 +263,7 @@ public:
   typedef typename NItem::Factory NItemFactory;
 
   typedef FixedSizeAllocator<NItem> NItemAlloc;
-  typedef Galois::PerThreadBag<NItem*> NItemWL;
+  typedef galois::PerThreadBag<NItem*> NItemWL;
 
 protected:
   NItemAlloc niAlloc;
@@ -329,8 +329,8 @@ protected:
           destroy(ni);
         },
         std::make_tuple (
-          Galois::loopname ("resetNItems"), 
-          Galois::chunk_size<16>()));
+          galois::loopname ("resetNItems"), 
+          galois::chunk_size<16>()));
   }
 };
 
@@ -351,7 +351,7 @@ public:
       MapAlloc
     > NhoodMap;
 
-  typedef Galois::Substrate::ThreadRWlock Lock_ty;
+  typedef galois::Substrate::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
 
 protected:
@@ -472,7 +472,7 @@ public:
 
 template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
 void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
-  Galois::Runtime::setThreadContext (c);
+  galois::Runtime::setThreadContext (c);
 
   int result = 0;
 
@@ -505,13 +505,13 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
   }
 
 
-  Galois::Runtime::setThreadContext (NULL);
+  galois::Runtime::setThreadContext (NULL);
 }
 
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 

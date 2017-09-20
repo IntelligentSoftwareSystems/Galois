@@ -39,7 +39,7 @@
 
 #include <iostream>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 enum class EdgeDirection {Un, Out, InOut};
@@ -57,10 +57,10 @@ protected:
 
   NHTy& getNextNode() { return nextNode; }
 
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, nextNode, active);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, nextNode, active);
   }
 
@@ -84,10 +84,10 @@ class GraphNodeData {
   NodeDataTy data;
   
 protected:
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, data);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, data);
   }
 
@@ -126,10 +126,10 @@ public:
   EdgeDataTy& getValue() { return val; }
 
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, dst, val);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, dst, val);
   }
 
@@ -173,10 +173,10 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
   EdgeListTy edges;
 
 protected:
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, edges);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, edges);
   }
   void dump(std::ostream& os) const {
@@ -225,10 +225,10 @@ class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
   EdgeListTy edges;
 
 protected:
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, edges);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, edges);
   }
   void dump(std::ostream& os) const {
@@ -269,33 +269,33 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
 
 template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNode
-  : public Galois::Runtime::Lockable,
-    public GraphNodeBase<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
+  : public galois::Runtime::Lockable,
+    public GraphNodeBase<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
     public GraphNodeData<NodeDataTy>,
-    public GraphNodeEdges<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
+    public GraphNodeEdges<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
 {
   friend class ThirdGraph<NodeDataTy, EdgeDataTy, EDir>;
-  using GraphNodeBase<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
+  using GraphNodeBase<galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
 
 public:
-  typedef Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
-  typedef typename Galois::Graph::Edge<Handle,EdgeDataTy> EdgeType;
+  typedef galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
+  typedef typename galois::Graph::Edge<Handle,EdgeDataTy> EdgeType;
   typedef typename GraphNodeEdges<Handle,EdgeDataTy,EDir>::iterator edge_iterator;
 
   template<typename... Args>
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
 
   GraphNode() = default;
-  GraphNode(Galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
+  GraphNode(galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
   //serialize
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     GraphNodeBase<Handle>::serialize(s);
     GraphNodeData<NodeDataTy>::serialize(s);
     GraphNodeEdges<Handle, EdgeDataTy, EDir>::serialize(s);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     GraphNodeBase<Handle>::deserialize(s);
     GraphNodeData<NodeDataTy>::deserialize(s);
     GraphNodeEdges<Handle, EdgeDataTy, EDir>::deserialize(s);
@@ -353,7 +353,7 @@ class ThirdGraph {
       auto lptr = localStatePtr.remote(Runtime::NetworkInterface::ID, x).resolve();
       for (auto ii = lptr->local_begin(),
                 ei = lptr->local_end(); ii != ei; ++ii) {
-        Galois::Runtime::getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(*ii));
+        galois::Runtime::getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(*ii));
       }
     }
   }
@@ -413,7 +413,7 @@ public:
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(NodeHandle N) {
     assert(N);
-    acquire(N, Galois::MethodFlag::ALL);
+    acquire(N, galois::MethodFlag::ALL);
     // prefetch all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
       //ii->getDst().prefetch();
@@ -422,7 +422,7 @@ public:
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
       // NOTE: Andrew thinks acquire may be needed for inactive nodes too
       //       not sure why though. he had to do this in the prev graph
-      acquire(ii->getDst(), Galois::MethodFlag::ALL);
+      acquire(ii->getDst(), galois::MethodFlag::ALL);
       if (ii->getDst()->getActive()) {
         // modify the call when local nodes aren't looked up in directory
 	//        ii->getDst().acquire();
@@ -434,7 +434,7 @@ public:
   //! Returns the end of the neighbor iterator 
   edge_iterator edge_end(NodeHandle N) {
     assert(N);
-    acquire(N, Galois::MethodFlag::ALL);
+    acquire(N, galois::MethodFlag::ALL);
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
   }
 
@@ -504,6 +504,6 @@ public:
 };
 
 } //namespace Graph
-} //namespace Galois
+} //namespace galois
 
 #endif

@@ -38,7 +38,7 @@
 #include "SimpleLock.h"
 #include "CacheLineStorage.h"
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 /// PaddedLock is a spinlock.  If the second template parameter is
@@ -65,6 +65,6 @@ public:
 };
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

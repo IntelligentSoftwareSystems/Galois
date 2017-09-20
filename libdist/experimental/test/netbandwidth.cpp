@@ -11,7 +11,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Timer.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 //tests small message bandwidth
 
@@ -23,16 +23,16 @@ void func(uint32_t, RecvBuffer&) {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager s;
+  galois::StatManager s;
 
-  using Galois::start_now;
+  using galois::start_now;
 
   int trials = 1000000;
   if (argc > 1)
     trials = atoi(argv[1]);
 
   NetworkInterface& net = getSystemNetworkInterface();
-  //Galois::StatManager sm;
+  //galois::StatManager sm;
 
 
   std::cerr << "I am " << net.ID << " using " << net.Num << "\n";
@@ -42,11 +42,11 @@ int main(int argc, char** argv) {
 
   for (int num = 0; num < 20; num += 2) {  
     num_recv = 0;
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
 
     std::vector<uint32_t> payload(num);
 
-    Galois::Timer T(start_now), T2(start_now), T3(start_now);
+    galois::Timer T(start_now), T2(start_now), T3(start_now);
     for (int j = 0; j < net.Num ; ++j) {
       if (j != net.ID) {
         for(int i = 0; i < trials; ++i) {
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     T3.stop();
     while (num_recv < trials * (net.Num - 1)) { net.handleReceives(); }
     T2.stop();
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     T.stop();
     std::stringstream os;
     auto t = T.get();
@@ -91,11 +91,11 @@ int main(int argc, char** argv) {
 
   for (int num = 0; num < 20; num += 2) {  
     num_recv = 0;
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     tnum = num * 1024;
     std::vector<uint32_t> payload(tnum, 1);
 
-    Galois::Timer T(start_now), T2(start_now), T3(start_now);
+    galois::Timer T(start_now), T2(start_now), T3(start_now);
     for (int j = 0; j < net.Num ; ++j) {
       if (j != net.ID) {
         for (int i = 0; i < 10; ++i) {
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
       }
     }
     T2.stop();
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     T.stop();
     std::stringstream os;
     tnum *= (net.Num - 1);
@@ -149,10 +149,10 @@ int main(int argc, char** argv) {
 
 
 
-  Galois::Runtime::reportStat(nullptr, "NetSB", net.reportSendBytes(),0);
-  Galois::Runtime::reportStat(nullptr, "NetSM", net.reportSendMsgs(),0);
-  Galois::Runtime::reportStat(nullptr, "NetRB", net.reportRecvBytes(),0);
-  Galois::Runtime::reportStat(nullptr, "NetRM", net.reportRecvMsgs(),0);
-  Galois::Runtime::getHostBarrier().wait();
+  galois::Runtime::reportStat(nullptr, "NetSB", net.reportSendBytes(),0);
+  galois::Runtime::reportStat(nullptr, "NetSM", net.reportSendMsgs(),0);
+  galois::Runtime::reportStat(nullptr, "NetRB", net.reportRecvBytes(),0);
+  galois::Runtime::reportStat(nullptr, "NetRM", net.reportRecvMsgs(),0);
+  galois::Runtime::getHostBarrier().wait();
   return 0;
 }

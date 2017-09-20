@@ -23,7 +23,7 @@
 template<typename GraphTy>
 struct pGraph {
    typedef typename GraphTy::GraphNode GNode;
-   typedef typename Galois::InsertBag<GNode> Bag;
+   typedef typename galois::InsertBag<GNode> Bag;
    GraphTy g;
    unsigned g_offset; // LID + g_offset = GID
    unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
@@ -66,7 +66,7 @@ struct pGraph {
       if (numHosts == 1)
          return;
 
-      auto p = Galois::block_range(0UL, size, 0, numHosts);
+      auto p = galois::block_range(0UL, size, 0, numHosts);
       unsigned pernum = p.second - p.first;
       unsigned pos = pernum;
 
@@ -89,11 +89,11 @@ struct pGraph {
     * @return a partitioned graph backed by the #out instance.
     **********************************************************************************/
    void loadGraph(std::string file) {
-      Galois::Graph::FileGraph fg;
+      galois::Graph::FileGraph fg;
       fg.fromFile(file);
-      unsigned hostID = Galois::Runtime::NetworkInterface::ID;
-      unsigned numHosts = Galois::Runtime::NetworkInterface::Num;
-      auto p = Galois::block_range(0UL, fg.size(), hostID, numHosts);
+      unsigned hostID = galois::Runtime::NetworkInterface::ID;
+      unsigned numHosts = galois::Runtime::NetworkInterface::Num;
+      auto p = galois::block_range(0UL, fg.size(), hostID, numHosts);
       this->g_offset = p.first;
       this->numOwned = p.second - p.first;
       this->id = hostID;
@@ -127,9 +127,9 @@ struct pGraph {
    //   std::cout << nextSlot << " " << fg.size() << "\n";
       assert(nextSlot == fg.size());
       //permute graph
-      Galois::Graph::FileGraph fg2;
-      Galois::Graph::permute<void>(fg, perm, fg2);
-      Galois::Graph::readGraph(this->g, fg2);
+      galois::Graph::FileGraph fg2;
+      galois::Graph::permute<void>(fg, perm, fg2);
+      galois::Graph::readGraph(this->g, fg2);
 
       loadLastNodes(fg.size(), numHosts);
 

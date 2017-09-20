@@ -40,7 +40,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace Galois {
+namespace galois {
 
 // Experimental random access iterator. Slower than old iterator for simple
 // traversals, so disable for now
@@ -95,7 +95,7 @@ private:
   unsigned num;
 
   //! [Example Fixed Size Allocator]
-  Galois::FixedSizeAllocator<Block> heap;
+  galois::FixedSizeAllocator<Block> heap;
   
   template<typename... Args>
   Block* alloc_block(Args&&... args) {
@@ -183,13 +183,13 @@ private:
 
 public:
 #ifdef _NEW_ITERATOR
-  typedef Galois::TwoLevelIteratorA<
+  typedef galois::TwoLevelIteratorA<
     outer_iterator<Block>, 
     inner_iterator, 
     std::random_access_iterator_tag, 
     GetBegin<Block>,
     GetEnd<Block> > iterator;
-  typedef Galois::TwoLevelIteratorA<
+  typedef galois::TwoLevelIteratorA<
     outer_iterator<const Block>,
     const_inner_iterator,
     std::random_access_iterator_tag,

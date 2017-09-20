@@ -243,12 +243,12 @@ template<typename EdgeValues,bool Enable>
 void setEdgeValue(EdgeValues& edgeValues, int value, typename std::enable_if<!Enable>::type* = 0) { }
 
 template<typename EdgeTy,bool Enable>
-EdgeTy getEdgeValue(Galois::Graph::FileGraph& g, Galois::Graph::FileGraph::edge_iterator ii, typename std::enable_if<Enable>::type* = 0) {
+EdgeTy getEdgeValue(galois::Graph::FileGraph& g, galois::Graph::FileGraph::edge_iterator ii, typename std::enable_if<Enable>::type* = 0) {
   return g.getEdgeData<EdgeTy>(ii);
 }
 
 template<typename EdgeTy,bool Enable>
-int getEdgeValue(Galois::Graph::FileGraph& g, Galois::Graph::FileGraph::edge_iterator ii, typename std::enable_if<!Enable>::type* = 0) {
+int getEdgeValue(galois::Graph::FileGraph& g, galois::Graph::FileGraph::edge_iterator ii, typename std::enable_if<!Enable>::type* = 0) {
   return 1;
 }
 
@@ -268,8 +268,8 @@ void outputPermutation(const T& perm) {
 struct Edgelist2Gr: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -362,8 +362,8 @@ struct Edgelist2Gr: public Conversion {
 struct Mtx2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -457,7 +457,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 struct Gr2Mtx: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) { 
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -489,7 +489,7 @@ struct Nodelist2Gr: public HasOnlyVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     static_assert(std::is_same<EdgeTy,void>::value, "conversion undefined for non-void graphs");
-    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef galois::Graph::FileGraphWriter Writer;
 
     Writer p;
     std::ifstream infile(infilename.c_str());
@@ -559,9 +559,9 @@ struct Nodelist2Gr: public HasOnlyVoidSpecialization {
 struct Gr2Edgelist: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -589,10 +589,10 @@ template<bool LittleEndian, typename T>
 void writeEndian(T* out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
-    case 3: value = Galois::convert_htobe64(value); break;
-    case 2: value = Galois::convert_htole64(value); break;
-    case 1: value = Galois::convert_htobe32(value); break;
-    case 0: value = Galois::convert_htole32(value); break;
+    case 3: value = galois::convert_htobe64(value); break;
+    case 2: value = galois::convert_htole64(value); break;
+    case 1: value = galois::convert_htobe32(value); break;
+    case 0: value = galois::convert_htole32(value); break;
     default: abort();
   }
 
@@ -603,10 +603,10 @@ template<bool LittleEndian, typename T>
 void writeEndian(std::ofstream& out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
-    case 3: value = Galois::convert_htobe64(value); break;
-    case 2: value = Galois::convert_htole64(value); break;
-    case 1: value = Galois::convert_htobe32(value); break;
-    case 0: value = Galois::convert_htole32(value); break;
+    case 3: value = galois::convert_htobe64(value); break;
+    case 2: value = galois::convert_htole64(value); break;
+    case 1: value = galois::convert_htobe32(value); break;
+    case 0: value = galois::convert_htole32(value); break;
     default: abort();
   }
 
@@ -617,9 +617,9 @@ template<typename OutEdgeTy, bool LittleEndian>
 struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
   template<typename InEdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<InEdgeTy> EdgeData;
+    typedef galois::LargeArray<InEdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -682,9 +682,9 @@ struct UniformDist {
 struct RandomizeNodes: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
     typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
@@ -702,7 +702,7 @@ struct RandomizeNodes: public Conversion {
     std::random_shuffle(perm.begin(), perm.end(), dist);
 
     Graph out;
-    Galois::Graph::permute<EdgeTy>(graph, perm, out);
+    galois::Graph::permute<EdgeTy>(graph, perm, out);
     outputPermutation(perm);
 
     out.toFile(outfilename);
@@ -713,9 +713,9 @@ struct RandomizeNodes: public Conversion {
 struct SortByBFS: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -726,7 +726,7 @@ struct SortByBFS: public Conversion {
 
     // perform a BFS traversal
     std::vector<GNode> curr, next;
-    Galois::LargeArray<bool> visited;
+    galois::LargeArray<bool> visited;
     visited.create(graph.size());
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       GNode node = *ii;
@@ -761,7 +761,7 @@ struct SortByBFS: public Conversion {
     assert(perm_index == graph.size());
 
     Graph out;
-    Galois::Graph::permute<EdgeTy>(graph, perm, out);
+    galois::Graph::permute<EdgeTy>(graph, perm, out);
     outputPermutation(perm);
 
     out.toFile(outfilename);
@@ -800,7 +800,7 @@ struct UniformDistribution<T, false> {
 struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
   template<typename OutEdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     
     Graph graph, outgraph;
@@ -827,10 +827,10 @@ template<bool AddLine>
 struct AddRing: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
-    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraphWriter Writer;
     typedef typename Graph::GraphNode GNode;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -898,10 +898,10 @@ template<bool AddComplement>
 struct AddTree: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
-    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraphWriter Writer;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -994,12 +994,12 @@ struct AddTree: public Conversion {
 struct MakeSymmetric: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
 
     Graph ingraph;
     Graph outgraph;
     ingraph.fromFile(infilename);
-    Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
+    galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
     outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
@@ -1015,9 +1015,9 @@ struct MakeSymmetric: public Conversion {
 struct BipartiteSortByDegree: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph, transposegraph;
     ingraph.fromFile(infilename);
@@ -1050,7 +1050,7 @@ struct BipartiteSortByDegree: public Conversion {
       inverse[n] = idx++;
     }
 
-    Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
+    galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
     outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
@@ -1061,9 +1061,9 @@ struct BipartiteSortByDegree: public Conversion {
 struct SortByDegree: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
     ingraph.fromFile(infilename);
@@ -1085,7 +1085,7 @@ struct SortByDegree: public Conversion {
       inverse[n] = idx++;
     }
 
-    Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
+    galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
     outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
@@ -1095,9 +1095,9 @@ struct SortByDegree: public Conversion {
 struct ToBigEndian: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
     ingraph.fromFile(infilename);
@@ -1114,9 +1114,9 @@ struct ToBigEndian: public HasNoVoidSpecialization {
 struct SortByHighDegreeParent: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -1174,7 +1174,7 @@ struct SortByHighDegreeParent: public Conversion {
     std::cout << "Zero is at " << perm2[0] << "\n";
 
     Graph out;
-    Galois::Graph::permute<EdgeTy>(graph, perm2, out);
+    galois::Graph::permute<EdgeTy>(graph, perm2, out);
     outputPermutation(perm2);
 
     // std::cout << "Biggest was " << first << " now " << perm2[first] << " with "
@@ -1189,10 +1189,10 @@ struct SortByHighDegreeParent: public Conversion {
 struct RemoveHighDegree: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1276,10 +1276,10 @@ struct RemoveHighDegree: public Conversion {
 struct PartitionBySource: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1368,11 +1368,11 @@ static void compute_indegree(GraphTy& graph, InDegree& inDegree) {
 struct PartitionByDestination: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
-    typedef Galois::LargeArray<size_t> InDegree;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::LargeArray<size_t> InDegree;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1446,10 +1446,10 @@ struct PartitionByDestination: public Conversion {
 struct Transpose: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
@@ -1498,14 +1498,14 @@ struct Transpose: public Conversion {
 
 template<typename GraphNode,typename EdgeTy>
 struct IdLess {
-  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
+  bool operator()(const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
     return e1.dst < e2.dst;
   }
 };
 
 template<typename GraphNode,typename EdgeTy>
 struct WeightLess {
-  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
+  bool operator()(const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
     return e1.get() < e2.get();
   }
 };
@@ -1516,7 +1516,7 @@ struct WeightLess {
 struct Cleanup: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     
     Graph orig, graph;
@@ -1552,8 +1552,8 @@ struct Cleanup: public Conversion {
       return;
     }
 
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Writer p;
@@ -1611,10 +1611,10 @@ template<template<typename,typename> class SortBy, bool NeedsEdgeData>
 struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization, Conversion>::type {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph orig, graph;
@@ -1641,7 +1641,7 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
 struct MakeUnsymmetric: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
     
     Graph graph;
@@ -1668,8 +1668,8 @@ struct MakeUnsymmetric: public Conversion {
       return;
     }
 
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
     Writer p;
@@ -1726,8 +1726,8 @@ struct MakeUnsymmetric: public Conversion {
 struct Dimacs2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;
@@ -1841,7 +1841,7 @@ struct Pbbs2Gr: public HasOnlyVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     static_assert(std::is_same<EdgeTy,void>::value, "conversion undefined for non-void graphs");
-    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef galois::Graph::FileGraphWriter Writer;
     
     Writer p;
 
@@ -1898,7 +1898,7 @@ struct Gr2Pbbsedges: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     // Use FileGraph because it is basically in CSR format needed for pbbs
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -1944,8 +1944,8 @@ struct Gr2Pbbsedges: public HasNoVoidSpecialization {
 struct Gr2Pbbs: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraph Graph;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
@@ -1991,7 +1991,7 @@ struct Gr2BinaryPbbs: public HasOnlyVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     static_assert(std::is_same<EdgeTy,void>::value, "conversion undefined for non-void graphs");
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -2036,7 +2036,7 @@ struct Gr2BinaryPbbs: public HasOnlyVoidSpecialization {
 struct Gr2Dimacs: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -2071,7 +2071,7 @@ template<typename OutEdgeTy>
 struct Gr2Rmat: public HasNoVoidSpecialization {
   template<typename InEdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) { 
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -2101,7 +2101,7 @@ template<template<typename,typename> class SortBy>
 struct Gr2Totem: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph orig,graph;
@@ -2186,7 +2186,7 @@ struct Gr2Totem: public HasNoVoidSpecialization {
 struct Gr2Metis: public HasOnlyVoidSpecialization {
   template<typename InEdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef Graph::GraphNode GNode;
 
     Graph graph;
@@ -2237,9 +2237,9 @@ struct Gr2Metis: public HasOnlyVoidSpecialization {
 struct Gr2Bsml: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) { 
-    typedef Galois::Graph::FileGraph Graph;
+    typedef galois::Graph::FileGraph Graph;
     typedef typename Graph::GraphNode GNode;
-    typedef typename Galois::LargeArray<EdgeTy> EdgeData;
+    typedef typename galois::LargeArray<EdgeTy> EdgeData;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -2300,8 +2300,8 @@ struct Gr2Bsml: public Conversion {
 struct Svmlight2Gr: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
-    typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef galois::Graph::FileGraphWriter Writer;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
 
     Writer p;

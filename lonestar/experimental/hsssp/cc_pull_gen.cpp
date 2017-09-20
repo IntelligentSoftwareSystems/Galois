@@ -95,7 +95,7 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
@@ -108,7 +108,7 @@ struct InitializeGraph {
 
 struct ConnectedComp {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  static galois::DGAccumulator<int> DGAccumulator_accum;
 
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -140,7 +140,7 @@ struct ConnectedComp {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("ConnectedComp"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned long long"));
+      galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, galois::loopname("ConnectedComp"), galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned long long"));
       _graph.sync_pull<SyncerPull_0>();
       
 
@@ -168,18 +168,18 @@ struct ConnectedComp {
       }
     }
 
-    //auto old_dist = Galois::atomicMin(snode.comp_current, current_min);
+    //auto old_dist = galois::atomicMin(snode.comp_current, current_min);
     if(snode.comp_current > current_min){
       snode.comp_current = current_min;
       DGAccumulator_accum += 1;
     }
   }
 };
-Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
+galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 
 /********Set source Node ************/
 void setSource(Graph& _graph){
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   if(net.ID == 0){
     auto& nd = _graph.getData(src_node);
     nd.comp_current = 0;
@@ -189,8 +189,8 @@ void setSource(Graph& _graph){
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_ConnectedComp1, T_ConnectedComp2, T_ConnectedComp3;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_ConnectedComp1, T_ConnectedComp2, T_ConnectedComp3;
 
     T_total.start();
 
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "ConnectedComp::go run2 called  on " << net.ID << "\n";
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "ConnectedComp::go run3 called  on " << net.ID << "\n";
@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).comp_current);
+        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).comp_current);
       }
     }
     return 0;

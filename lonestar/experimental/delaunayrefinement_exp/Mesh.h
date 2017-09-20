@@ -34,7 +34,7 @@
 #include <cstdio>
 #include <mutex>
 
-struct is_bad : public Galois::Runtime::Lockable {
+struct is_bad : public galois::Runtime::Lockable {
   Graphp g;
   is_bad() {}
   is_bad(Graphp _g): g(_g) {}
@@ -43,24 +43,24 @@ struct is_bad : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 };
 
 
 //new create_nodes
-struct create_nodes { //  : public Galois::Runtime::Lockable {
+struct create_nodes { //  : public galois::Runtime::Lockable {
   Graphp g;
   //create_nodes(Graphp _g): g(_g) {}
   void static go(Graphp g, std::deque<Element>& elements) {
-    Galois::for_each(elements.begin(), elements.end(), create_nodes{g}, Galois::loopname("create node"));
+    galois::for_each(elements.begin(), elements.end(), create_nodes{g}, galois::loopname("create node"));
   }
 
-  void operator() (Element& item, Galois::UserContext<Element>& cnx) const {
+  void operator() (Element& item, galois::UserContext<Element>& cnx) const {
     GNode n = g->createNode(item);
     g->addNode(n);
   }
@@ -68,10 +68,10 @@ struct create_nodes { //  : public Galois::Runtime::Lockable {
   //typedef int tt_is_copyable;
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 
@@ -83,10 +83,10 @@ struct create_same {
   Graphp g;
 
   void static go(Graphp g, std::deque<Element>& elements) {
-    Galois::for_each(g, create_same{g}, Galois::loopname("Create same node"));
+    galois::for_each(g, create_same{g}, galois::loopname("Create same node"));
   }
 
-  void operator() (Galois::UserContext<Element>& cnx) const {
+  void operator() (galois::UserContext<Element>& cnx) const {
     Element item = new Element();
     GNode n = g->createNode(item);
     g->addNode(n);
@@ -98,7 +98,7 @@ struct create_same {
 */
 
 
-/*struct create_nodes : public Galois::Runtime::Lockable {
+/*struct create_nodes : public galois::Runtime::Lockable {
   Graphp g;
   create_nodes() {}
   create_nodes(Graphp _g): g(_g) {}
@@ -111,10 +111,10 @@ struct create_same {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 };
@@ -436,13 +436,13 @@ private:
   void divide(const Iter& b, const Iter& e) {
     if (std::distance(b,e) > 16) {
       std::sort(b,e, centerXCmp());
-      Iter m = Galois::split_range(b,e);
+      Iter m = galois::split_range(b,e);
       std::sort(b,m, centerYCmpInv());
       std::sort(m,e, centerYCmp());
-      divide(b, Galois::split_range(b,m));
-      divide(Galois::split_range(b,m), m);
-      divide(m,Galois::split_range(m,e));
-      divide(Galois::split_range(m,e), e);
+      divide(b, galois::split_range(b,m));
+      divide(galois::split_range(b,m), m);
+      divide(m,galois::split_range(m,e));
+      divide(galois::split_range(m,e), e);
     }
   }
 
@@ -454,7 +454,7 @@ private:
     // while (x) {}
 
     std::cout << "MakeGraph\n";
-    //Galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),Galois::loopname("create"), Galois::wl<Galois::WorkList::StableIterator<>>());
+    //galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),galois::loopname("create"), galois::wl<galois::WorkList::StableIterator<>>());
     create_nodes::go(mesh, elements);
     std::cout << "... now adding edges\n";
 

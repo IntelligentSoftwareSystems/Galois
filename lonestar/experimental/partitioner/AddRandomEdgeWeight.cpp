@@ -57,7 +57,7 @@ static cll::opt<std::string> outputFile(cll::Positional, cll::desc("Name of the 
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   Galois::Timer T_total;
+   galois::Timer T_total;
    typedef uint64_t NodeIDType;
    {
       std::ifstream infile (inputFile);

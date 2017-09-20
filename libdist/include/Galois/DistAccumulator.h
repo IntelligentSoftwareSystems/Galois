@@ -38,13 +38,13 @@
 #include "Galois/OpenCL/CL_Header.h"
 #endif
 
-namespace Galois {
+namespace galois {
 
 template<typename Ty>
 class DGAccumulator {
-  Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+  galois::Runtime::NetworkInterface& net = galois::Runtime::getSystemNetworkInterface();
 
-  Galois::GAccumulator<Ty> mdata;
+  galois::GAccumulator<Ty> mdata;
   Ty local_mdata, global_mdata;
 #ifdef __GALOIS_HET_OPENCL__
   cl_mem dev_data;
@@ -54,14 +54,14 @@ public:
   // Default constructor
   DGAccumulator() {
 #ifdef __GALOIS_HET_OPENCL__
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_int err;
     dev_data= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(Ty) , nullptr, &err);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error allocating DGAccumulator!\n");
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error allocating DGAccumulator!\n");
     Ty val = 0;
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
 #endif
   }
   DGAccumulator& operator+=(const Ty& rhs) {
@@ -77,11 +77,11 @@ public:
     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
     int err;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     Ty val = mdata.load();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
 #endif
   }
 
@@ -94,10 +94,10 @@ public:
     mdata += rhs;
 #ifdef __GALOIS_HET_OPENCL__
     int err;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &mdata.load(), 0, NULL, NULL);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
 #endif
   }
    
@@ -119,33 +119,33 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, tmp);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    Galois::atomicAdd(mdata, tmp);
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::Runtime::NetworkInterface::ID, tmp);
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
-      Galois::Runtime::SendBuffer b;
+      galois::Runtime::SendBuffer b;
       gSerialize(b, local_mdata);
-      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::Runtime::evilPhase, b);
     }
     net.flush();
 
     unsigned num_Hosts_recvd = 1;
     while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
       gDeserialize(p->second, x_mdata);
       global_mdata += x_mdata;
       ++num_Hosts_recvd;
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
 
     return global_mdata;
   }
@@ -159,40 +159,40 @@ public:
    */
   Ty reduce(std::string runID) {
     std::string timer_str("REDUCE_DGACCUM_" + runID); 
-    Galois::StatTimer reduceTimer(timer_str.c_str());
+    galois::StatTimer reduceTimer(timer_str.c_str());
     reduceTimer.start();
 
     if (local_mdata == 0) local_mdata = mdata.reduce();
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, tmp);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    Galois::atomicAdd(mdata, tmp);
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::Runtime::NetworkInterface::ID, tmp);
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
-      Galois::Runtime::SendBuffer b;
+      galois::Runtime::SendBuffer b;
       gSerialize(b, local_mdata);
-      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::Runtime::evilPhase, b);
     }
     net.flush();
 
     unsigned num_Hosts_recvd = 1;
     while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
       gDeserialize(p->second, x_mdata);
       global_mdata += x_mdata;
       ++num_Hosts_recvd;
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
 
     reduceTimer.stop();
 
@@ -210,34 +210,34 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, tmp);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::Runtime::NetworkInterface::ID, tmp);
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     // TODO change to atomic max?
-    Galois::atomicAdd(mdata, tmp);
+    galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
-      Galois::Runtime::SendBuffer b;
+      galois::Runtime::SendBuffer b;
       gSerialize(b, local_mdata);
-      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::Runtime::evilPhase, b);
     }
     net.flush();
 
     unsigned num_Hosts_recvd = 1;
     while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
       gDeserialize(p->second, x_mdata);
-      Galois::max(global_mdata, x_mdata);
+      galois::max(global_mdata, x_mdata);
       ++num_Hosts_recvd;
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
 
     // returns max from all accumulators
     return global_mdata;
@@ -253,34 +253,34 @@ public:
     global_mdata = local_mdata;
 #ifdef __GALOIS_HET_OPENCL__
     Ty tmp;
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, tmp);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::Runtime::NetworkInterface::ID, tmp);
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
     // TODO change to atomic min?
-    Galois::atomicAdd(mdata, tmp);
+    galois::atomicAdd(mdata, tmp);
 #endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
-      Galois::Runtime::SendBuffer b;
+      galois::Runtime::SendBuffer b;
       gSerialize(b, local_mdata);
-      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::Runtime::evilPhase, b);
     }
     net.flush();
 
     unsigned num_Hosts_recvd = 1;
     while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase, nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
       gDeserialize(p->second, x_mdata);
-      Galois::min(global_mdata, x_mdata);
+      galois::min(global_mdata, x_mdata);
       ++num_Hosts_recvd;
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
 
     // returns min from all accumulators
     return global_mdata;
@@ -306,11 +306,11 @@ public:
 #ifdef __GALOIS_HET_OPENCL__
     int err;
     Ty val = mdata.load();
-    Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
+    galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
     cl_command_queue queue = ctx->get_default_device()->command_queue();
     err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    Galois::OpenCL::CHECK_CL_ERROR(err, "Error writing (reset) DGAccumulator!\n");
-//    fprintf(stderr, "RESET-DGA[%d, %d]\n", Galois::Runtime::NetworkInterface::ID, val);
+    galois::OpenCL::CHECK_CL_ERROR(err, "Error writing (reset) DGAccumulator!\n");
+//    fprintf(stderr, "RESET-DGA[%d, %d]\n", galois::Runtime::NetworkInterface::ID, val);
 #endif
     return retval;
   }

@@ -225,7 +225,7 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
         //clang::PrintingPolicy Policy(LangOpts);
         // Add text before
         //stringstream SSBefore;
-        //SSBefore << "/* Galois:: do_all before  */\n";
+        //SSBefore << "/* galois:: do_all before  */\n";
         //SourceLocation ST = callFS->getSourceRange().getBegin();
         //rewriter.InsertText(ST, "hello", true, true);
 
@@ -280,14 +280,14 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
 
               // write out the write set as an argument to the do all function
               if (j.SYNC_TYPE == "sync_push") {
-                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
+                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
                         << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" 
                         << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" 
                         << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR 
                         << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" 
                         << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
               } else if(j.SYNC_TYPE == "sync_pull") {
-                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
+                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
                         << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE 
                         << "\", \"" << j.FIELD_TYPE << "\", \"" 
                         << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" 
@@ -868,7 +868,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_plusOp_vec),
                                                                       binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_assignment_vec),
 
-                                                                       /** Galois::atomicAdd(field, val) **/
+                                                                       /** galois::atomicAdd(field, val) **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExpr)).bind(str_atomicAdd),
 
                                                                       /** Galois Reset noticed **/
@@ -1110,7 +1110,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
       for (auto& i : info.reductionOps_map){
         if(i.second.size() > 0) {
-          Matchers_doall.addMatcher(callExpr(callee(functionDecl(anyOf(hasName("Galois::do_all"),hasName("Galois::do_all_local"), hasName("Galois::for_each")))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
+          Matchers_doall.addMatcher(callExpr(callee(functionDecl(anyOf(hasName("galois::do_all"),hasName("galois::do_all_local"), hasName("galois::for_each")))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
         }
       }
 
@@ -1209,7 +1209,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                           hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata))
                           ).bind(str_method_operator)), /*TODO: Get begin of constructor to add DGAccumulator */
                       hasDescendant(constructorDecl(hasDescendant(declRefExpr().bind(str_struct_constructor_initList))).bind(str_struct_constructor)),
-                      hasDescendant(callExpr(callee(functionDecl(anyOf(hasName("Galois::do_all"),hasName("Galois::do_all_local"), hasName("Galois::for_each"))))).bind(str_do_all))
+                      hasDescendant(callExpr(callee(functionDecl(anyOf(hasName("galois::do_all"),hasName("galois::do_all_local"), hasName("galois::for_each"))))).bind(str_do_all))
                       ).bind(str_main_struct))
                   ).bind(str_resetField_expr);
 

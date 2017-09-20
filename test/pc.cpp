@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iostream>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 int num = 1;
 
@@ -37,13 +37,13 @@ template<typename T>
 void testf(const char* str) {
   PerThreadStorage<T> b;
   std::cout << "\nRunning: " << str << " sizeof " << sizeof(PerThreadStorage<T>) << "\n";
-  Galois::Timer tL;
+  galois::Timer tL;
   tL.start();
-  Galois::on_each(testL<T>(b));
+  galois::on_each(testL<T>(b));
   tL.stop();
-  Galois::Timer tR;
+  galois::Timer tR;
   tR.start();
-  Galois::on_each(testR<T>(b));
+  galois::on_each(testR<T>(b));
   tR.stop();
   std::cout << str << " L: " << tL.get() << " R: " << tR.get() << '\n';
 }
@@ -54,10 +54,10 @@ int main(int argc, char** argv) {
   if (num <= 0)
     num = 1024 * 1024 * 1024;
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
 
   while (M) {
-    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
 
     testf<int>("int");

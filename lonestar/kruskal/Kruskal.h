@@ -73,7 +73,7 @@ static cll::opt<unsigned> numPages (
 
 namespace kruskal {
 
-typedef Galois::GAccumulator<size_t> Accumulator;
+typedef galois::GAccumulator<size_t> Accumulator;
 
 typedef unsigned Weight_ty;
 typedef std::vector<int> VecRep;
@@ -250,18 +250,18 @@ protected:
 
   void readGraph (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
 
-    typedef Galois::Graph::LC_CSR_Graph<unsigned, uint32_t> InGraph;
+    typedef galois::Graph::LC_CSR_Graph<unsigned, uint32_t> InGraph;
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    Galois::Graph::readGraph (ingraph, filename);
+    galois::Graph::readGraph (ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph
     unsigned idCntr = 0;
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
-      ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED) = idCntr++;
+      ingraph.getData (*n, galois::MethodFlag::UNPROTECTED) = idCntr++;
     }
     numNodes = ingraph.size ();
 
@@ -272,13 +272,13 @@ protected:
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
 
-      unsigned src = ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED);
+      unsigned src = ingraph.getData (*n, galois::MethodFlag::UNPROTECTED);
 
 
-      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
-          ende = ingraph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
+      for (InGraph::edge_iterator e = ingraph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
+          ende = ingraph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
-        unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::MethodFlag::UNPROTECTED);
+        unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), galois::MethodFlag::UNPROTECTED);
 
         if (src != dst) {
           const Weight_ty& w = ingraph.getEdgeData (e);
@@ -292,7 +292,7 @@ protected:
             edgeSet.insert (edgeSet.erase (res.first), ke);
           }
         } else {
-	  Galois::Substrate::gDebug("Warning: Ignoring self edge (",
+	  galois::Substrate::gDebug("Warning: Ignoring self edge (",
 				      src, ",", dst, ",", ingraph.getEdgeData (*e), ")");
         }
       }
@@ -395,7 +395,7 @@ protected:
 public:
 
   virtual void run (int argc, char* argv[]) {
-    Galois::StatManager stat;
+    galois::StatManager stat;
     LonestarStart (argc, argv, name, desc, url);
 
     size_t numNodes;
@@ -404,7 +404,7 @@ public:
     size_t mstWeight = 0;
     size_t totalIter = 0;
 
-    Galois::StatTimer t_read ("InitializeTime");
+    galois::StatTimer t_read ("InitializeTime");
 
     t_read.start ();
     readGraph (filename, numNodes, edgeSet);
@@ -431,15 +431,15 @@ public:
 
 
     // pre allocate memory from OS for parallel runs
-    Galois::preAlloc (numPages*Galois::getActiveThreads ());
-    Galois::reportPageAlloc("MeminfoPre");
+    galois::preAlloc (numPages*galois::getActiveThreads ());
+    galois::reportPageAlloc("MeminfoPre");
     
-    Galois::StatTimer t;
+    galois::StatTimer t;
 
     t.start ();
     runMST (numNodes, edges, mstWeight, totalIter);
     t.stop ();
-    Galois::reportPageAlloc("MeminfoPost");
+    galois::reportPageAlloc("MeminfoPost");
 
     printResults (mstWeight, totalIter);
 
@@ -596,7 +596,7 @@ private:
   }
 
   bool verify (const size_t numNodes, const SetInEdge& edgeSet, const size_t kruskalSum) const {
-    Galois::StatTimer pt("PrimTime");
+    galois::StatTimer pt("PrimTime");
     pt.start ();
     size_t primSum = runPrim (numNodes, edgeSet);
     pt.stop ();

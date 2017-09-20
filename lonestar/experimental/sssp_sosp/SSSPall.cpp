@@ -49,7 +49,7 @@ static const char* url = "single_source_shortest_path";
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
-typedef Galois::Graph::LC_InlineEdge_Graph<SNode, uint32_t>
+typedef galois::Graph::LC_InlineEdge_Graph<SNode, uint32_t>
   ::with_out_of_line_lockable<true>::type
   ::with_compressed_node_ptr<true>::type
   ::with_numa_alloc<true>::type
@@ -71,8 +71,8 @@ Graph graph;
 struct process {
   typedef int tt_does_not_need_aborts;
 
-  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& lwl) {
-    SNode& data = graph.getData(req.n,Galois::MethodFlag::UNPROTECTED);
+  void operator()(UpdateRequest& req, galois::UserContext<UpdateRequest>& lwl) {
+    SNode& data = graph.getData(req.n,galois::MethodFlag::UNPROTECTED);
     // if (req.w >= data.dist)
     //   *WLEmptyWork += 1;
     unsigned int v;
@@ -80,11 +80,11 @@ struct process {
       if (__sync_bool_compare_and_swap(&data.dist[req.c], v, req.w)) {
 	// if (v != DIST_INFINITY)
 	//   *BadWork += 1;
-        for (auto ii : graph.edges(req.n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto ii : graph.edges(req.n, galois::MethodFlag::UNPROTECTED)) {
 	  GNode dst = graph.getEdgeDst(ii);
 	  int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;
-	  SNode& rdata = graph.getData(dst,Galois::MethodFlag::UNPROTECTED);
+	  SNode& rdata = graph.getData(dst,galois::MethodFlag::UNPROTECTED);
 	  if (newDist < rdata.dist[req.c])
 	    lwl.push(UpdateRequest(dst, newDist, req.c));
 	}
@@ -95,45 +95,45 @@ struct process {
 };
 
 struct reset {
-  void operator()(GNode n) const {//, Galois::UserContext<GNode>& lwl) {
-    SNode& S = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+  void operator()(GNode n) const {//, galois::UserContext<GNode>& lwl) {
+    SNode& S = graph.getData(n, galois::MethodFlag::UNPROTECTED);
     for (int i = 0; i < NUM; ++i)
       S.dist[i] = DIST_INFINITY;
   }
-  // void operator()(GNode n, Galois::UserContext<GNode>& lwl) {
+  // void operator()(GNode n, galois::UserContext<GNode>& lwl) {
   //   operator()(n);
   // }
 };
 
 void runBodyParallel(const GNode src[NUM], int n) {
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef ChunkedLIFO<16> Chunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
 
   UpdateRequest one[NUM];
   for (int i = 0; i < n; ++i)
     one[i] = UpdateRequest(src[i], 0, i);
   T.start();
-  Galois::for_each(&one[0], &one[n], process(), Galois::wl<OBIM>());
+  galois::for_each(&one[0], &one[n], process(), galois::wl<OBIM>());
   T.stop();
 }
 
 void resetParallel() {
-  Galois::do_all(graph.begin(), graph.end(), reset());
+  galois::do_all(graph.begin(), graph.end(), reset());
 }
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
-  // Galois::Statistic<unsigned int> sBadWork("BadWork");
-  // Galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
+  // galois::Statistic<unsigned int> sBadWork("BadWork");
+  // galois::Statistic<unsigned int> sWLEmptyWork("WLEmptyWork");
   // BadWork = &sBadWork;
   // WLEmptyWork = &sWLEmptyWork;
 
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
 
   std::cout << "Read " << graph.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
@@ -143,13 +143,13 @@ int main(int argc, char **argv) {
   unsigned int id = 0;
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src) {
-    SNode& node = graph.getData(*src,Galois::MethodFlag::UNPROTECTED);
+    SNode& node = graph.getData(*src,galois::MethodFlag::UNPROTECTED);
     node.id = id++;
   }
 
   resetParallel();
 
-  Galois::StatTimer T("AllSourcesTimer");
+  galois::StatTimer T("AllSourcesTimer");
   T.start();
   int at = 0;
   GNode N[NUM];

@@ -5,34 +5,34 @@
 
 \subsection for_each For-Each Loop
 
- {@link Galois::for_each} is the most commonly used loop construct to express
+ {@link galois::for_each} is the most commonly used loop construct to express
  parallelism. It provides speculative unordered execution of a set of active
  elements (or work items). A for_each can be invoked with the following parameters:
 
  - A pair of iterators [begin,end) that mark the set of initial active elements
  - The *operator*, which is a C++ functor containing the loop body code. 
  - The scheduling policy for work items, used by the internal worklist. It is
-   specified using the {@link Galois::wl} construct. 
+   specified using the {@link galois::wl} construct. 
  - Optional argument for specifying the loop name, using the {@link
-   Galois::loopname} construct
+   galois::loopname} construct
 
 
 An example to use for_each in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
 @snippet apps/tutorial/SSSPsimple.cpp for_each in SSSPsimple
 
- - {@link Galois::for_each_ordered}
+ - {@link galois::for_each_ordered}
  
 This is for ordered Galois Iterators. 
 
 
 \subsection operator Operator
 
-The loop body of a {@link Galois::for_each} is specified as a C++ functor. We call
+The loop body of a {@link galois::for_each} is specified as a C++ functor. We call
 this the *operator* of the loop. The functor takes two arguments:
 
 - The active element (or work item) to process in current iteration. This is picked
   by the runtime using the scheduling policy
-- A reference to the runtime context of the loop {@link Galois::UserContext}. This
+- A reference to the runtime context of the loop {@link galois::UserContext}. This
   reference provides certain services needed by the loop body, e.g. the ability to add 
   new items to the internal worklist (maintained by the runtime), allocate
   iteration local objects, and suspend the parallel loop temporarily, etc.
@@ -75,9 +75,9 @@ optimized execution:
 
 \subsection scheduling Scheduling Policies
 
-The scheduling policy for {@link Galois::for_each} can be specified by choosing
-one of the types in {@link Galois::WorkList} namespace and providing the type-name
-as an argument to {@link Galois::wl} parameter of the for_each. 
+The scheduling policy for {@link galois::for_each} can be specified by choosing
+one of the types in {@link galois::WorkList} namespace and providing the type-name
+as an argument to {@link galois::wl} parameter of the for_each. 
 The scheduling policies are listed as follows:
 
  - \b OrderedList
@@ -158,16 +158,16 @@ The scheduling policies are listed as follows:
 
  - \b StableIterator
 
-    Similar to {@link Galois::do_all}, where the loop iterates over a fixed range
+    Similar to {@link galois::do_all}, where the loop iterates over a fixed range
     of items, and the operator does not generate new work. The key difference from
-    {@link Galois::do_all} is that this scheduling policy supports speculation and
+    {@link galois::do_all} is that this scheduling policy supports speculation and
     allows for iterations to abort. 
 
 
 
 \subsection Deterministic for_each
 
-{@link Galois::for_each_det} is a deterministic parallel implementation of the
+{@link galois::for_each_det} is a deterministic parallel implementation of the
 unordered for_each, described above. This implementation forces a deterministic
 parallel schedule on the work-items. 
 
@@ -186,7 +186,7 @@ the Prefix, while the second contains the remaining code for the operator.
 
 \subsection do_all Do-All Loop
 
-{@link Galois::do_all} is a loop construct for trivially parallel loops that do not
+{@link galois::do_all} is a loop construct for trivially parallel loops that do not
 need any speculation, fancy scheduling policies, and do not generate new work items. The
 threads iterate in parallel over a range of iterators specified in the invocation
 of the do_all. The arguments are as follows:
@@ -196,11 +196,11 @@ of the do_all. The arguments are as follows:
 - A functor specifying the loop body of the do_all. It takes only one argument,
   which is the current work item. 
 
-- {@link Galois::do_all_steal} can be supplied with argument \b true or \b false to
+- {@link galois::do_all_steal} can be supplied with argument \b true or \b false to
   turn on work-stealing. This can be useful for loops where iterations have varying
   execution time. 
 
-- Optionally {@link Galois::loopname} can be used to specify a name of loop, which
+- Optionally {@link galois::loopname} can be used to specify a name of loop, which
   is useful for loop statistics
 
 The file {@link apps/tutorial/HelloWorld.cpp} contains some examples of do_all
@@ -213,7 +213,7 @@ Often a parallel loop iterates over (or consumes) data that was produced by a
 previous parallel loop. In such cases, locality can be improved if the threads in
 the consuming loop operate over the same elements they produced in the previous
 loop. This notion of *ownership* of data is supported in Galois, through 
-{@link Galois::for_each_local} and {@link Galois::do_all_local}. 
+{@link galois::for_each_local} and {@link galois::do_all_local}. 
 
 The for_each_local and do_all_local are similar to their non-local counterparts, except
 for the first argument. Instead of passing in a pair of iterators, we pass in a
@@ -221,13 +221,13 @@ for the first argument. Instead of passing in a pair of iterators, we pass in a
 \b local_begin and \b local_end (in addition to \b begin and \b end), which point
 to the range of data items owned/produced by a thread. 
 
-Example of such data-structure is {@link Galois::Graph::FirstGraph}, used in 
+Example of such data-structure is {@link galois::Graph::FirstGraph}, used in 
 {@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
 
 @snippet apps/delaunayrefinement/DelaunayRefinement.cpp do_all_local example
 
 And similarly, for_each_local, in the same file (iterating over a bag 
-{@link Galois::InsertBag} of items produced by the do_all_local above):
+{@link galois::InsertBag} of items produced by the do_all_local above):
 
 @snippet apps/delaunayrefinement/DelaunayRefinement.cpp for_each_local example
 
@@ -235,7 +235,7 @@ And similarly, for_each_local, in the same file (iterating over a bag
 
 \subsection on_each on_each loop
 
-{@link Galois::on_each} loop is for performing simple tasks on each thread in the
+{@link galois::on_each} loop is for performing simple tasks on each thread in the
 execution. The task is encoded in a functor passed to on_each loop. The functor
 takes two arguments:
 

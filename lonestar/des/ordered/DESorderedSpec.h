@@ -54,11 +54,11 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 
 
@@ -84,7 +84,7 @@ class DESorderedSpec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::WRITE);
+      graph.getData (n, galois::MethodFlag::WRITE);
     }
   };
 
@@ -120,7 +120,7 @@ class DESorderedSpec:
 
       size_t stateSize = recvObj->getStateSize ();
 
-      Galois::Runtime::FixedSizeHeap heap (stateSize);
+      galois::Runtime::FixedSizeHeap heap (stateSize);
       void* const p = heap.allocate (stateSize);
 
       recvObj->copyState (p, stateSize);
@@ -165,7 +165,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::UNPROTECTED);
+      BaseSimObj_ty* so = graph.getData (*n, galois::MethodFlag::UNPROTECTED);
       nodes[so->getID ()] = *n;
     }
   }
@@ -174,15 +174,15 @@ protected:
 
     Accumulator_ty nevents;
 
-    // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_spec (
-        Galois::Runtime::makeStandardRange(
+    // galois::for_each_ordered (
+    galois::Runtime::for_each_ordered_spec (
+        galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, nodes),
         OpFunc (graph, nodes, nevents),
         std::make_tuple (
-          Galois::loopname("des_ordered_spec")));
+          galois::loopname("des_ordered_spec")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

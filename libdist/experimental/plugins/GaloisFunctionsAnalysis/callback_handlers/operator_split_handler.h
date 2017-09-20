@@ -159,8 +159,8 @@ class OperatorSplitHandler : public MatchFinder::MatchCallback {
               splitOP_struct += "\n  " + member_variables.str() + "";
               splitOP_struct += "\n  splitOP_" + j.FIELD_NAME + "(" + str_constructor_arguments + ") : " + str_constructor_initList + "{}";
               splitOP_struct += "\n  static void go(Graph& _graph) {\n\t\t auto& allNodes = _graph.allNodesRange();";
-              splitOP_struct += "\n    Galois::do_all_local(allNodes.begin(), allNodes.end(),\n       splitOP_" + j.FIELD_NAME + "{" + str_arguments + " },";
-              splitOP_struct += "\n      Galois::loopname(_graph.get_run_identifier(\"splitOP_" + j.FIELD_NAME + "\").c_str()),\n      Galois::timeit()\n);}\n"; 
+              splitOP_struct += "\n    galois::do_all_local(allNodes.begin(), allNodes.end(),\n       splitOP_" + j.FIELD_NAME + "{" + str_arguments + " },";
+              splitOP_struct += "\n      galois::loopname(_graph.get_run_identifier(\"splitOP_" + j.FIELD_NAME + "\").c_str()),\n      galois::timeit()\n);}\n"; 
 
               splitOP_struct += operator_body + "};\n\n"; // End of struct
 

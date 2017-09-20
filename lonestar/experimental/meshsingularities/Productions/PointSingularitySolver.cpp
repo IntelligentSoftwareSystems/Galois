@@ -72,7 +72,7 @@ static cll::opt<bool> mumps("mumps", cll::desc("Pass data to MUMPS"), cll::init(
 
 template<typename Algorithm>
 std::vector<double> *run(TaskDescription &td) {
-	Galois::StatTimer U(name);
+	galois::StatTimer U(name);
 	Algorithm algorithm;
 	U.start();
 	std::vector<double> *res = algorithm(td);

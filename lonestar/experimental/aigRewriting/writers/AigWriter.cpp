@@ -47,7 +47,7 @@ void AigWriter::writeInputs( Aig & aig ) {
 	aig::Graph & graph = aig.getGraph();
 
 	for ( auto input : aig.getInputNodes() ) {
-		aig::NodeData & inputData = graph.getData( input, Galois::MethodFlag::READ );
+		aig::NodeData & inputData = graph.getData( input, galois::MethodFlag::READ );
 		aigerFile << inputData.id * 2 << std::endl;
 	}
 }
@@ -78,9 +78,9 @@ void AigWriter::writeOutputs( Aig & aig ) {
 	for ( auto output : aig.getOutputNodes() ) {
 
 		auto inEdge = graph.in_edges( output ).begin();
-		bool inEdgePolarity = graph.getEdgeData( *inEdge, Galois::MethodFlag::READ );
+		bool inEdgePolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
 		aig::GNode inNode = graph.getEdgeDst( *inEdge );
-		aig::NodeData & inNodeData = graph.getData( inNode, Galois::MethodFlag::READ );
+		aig::NodeData & inNodeData = graph.getData( inNode, galois::MethodFlag::READ );
 		if ( inEdgePolarity ) {
 			aigerFile << inNodeData.id * 2 << std::endl;
 		}
@@ -105,7 +105,7 @@ void AigWriter::writeAndsAag( Aig & aig ) {
 		aig::GNode node = stack.top();
 		stack.pop();
 
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::WRITE );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );
 		//std::cout << nodeData.id << " -> ";
 		//nodeData.id = currentID++; // Redefines the AND IDs according to the topological sorting.	
 		//std::cout << nodeData.id << std::endl;		
@@ -113,16 +113,16 @@ void AigWriter::writeAndsAag( Aig & aig ) {
 		unsigned int andIndex = nodeData.id * 2;
 
 		auto inEdge = graph.in_edges( node ).begin();
-		bool lhsPolarity = graph.getEdgeData( *inEdge, Galois::MethodFlag::READ );
+		bool lhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
 		aig::GNode lhsNode = graph.getEdgeDst( *inEdge );
-		aig::NodeData & lhsNodeData = graph.getData( lhsNode, Galois::MethodFlag::READ );
+		aig::NodeData & lhsNodeData = graph.getData( lhsNode, galois::MethodFlag::READ );
 		unsigned int lhsIndex = lhsNodeData.id * 2;
 		lhsIndex = lhsPolarity ? lhsIndex : (lhsIndex+1);
 
 		inEdge++;
-		bool rhsPolarity = graph.getEdgeData( *inEdge, Galois::MethodFlag::READ );
+		bool rhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
 		aig::GNode rhsNode = graph.getEdgeDst( *inEdge );
-		aig::NodeData & rhsNodeData = graph.getData( rhsNode, Galois::MethodFlag::READ );
+		aig::NodeData & rhsNodeData = graph.getData( rhsNode, galois::MethodFlag::READ );
 		unsigned int rhsIndex = rhsNodeData.id * 2;		
 		rhsIndex = rhsPolarity ? rhsIndex : (rhsIndex+1); 
 		
@@ -183,7 +183,7 @@ void AigWriter::writeAndsAig( Aig & aig ) {
 		aig::GNode node = stack.top();
 		stack.pop();
 
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::WRITE );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );
 		//std::cout << nodeData.id << " -> ";
 		//nodeData.id = currentID++; // Redefines the AND IDs according to the topological sorting.
 		//std::cout << nodeData.id << std::endl;
@@ -191,16 +191,16 @@ void AigWriter::writeAndsAig( Aig & aig ) {
 		unsigned int andIndex = nodeData.id * 2;
 
 		auto inEdge = graph.in_edges( node ).begin();
-		bool lhsPolarity = graph.getEdgeData( *inEdge, Galois::MethodFlag::READ );
+		bool lhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
 		aig::GNode lhsNode = graph.getEdgeDst( *inEdge );
-		aig::NodeData & lhsNodeData = graph.getData( lhsNode, Galois::MethodFlag::READ );
+		aig::NodeData & lhsNodeData = graph.getData( lhsNode, galois::MethodFlag::READ );
 		unsigned int lhsIndex = lhsNodeData.id * 2;
 		lhsIndex = lhsPolarity ? lhsIndex : (lhsIndex+1);
 
 		inEdge++;
-		bool rhsPolarity = graph.getEdgeData( *inEdge, Galois::MethodFlag::READ );
+		bool rhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
 		aig::GNode rhsNode = graph.getEdgeDst( *inEdge );
-		aig::NodeData & rhsNodeData = graph.getData( rhsNode, Galois::MethodFlag::READ );
+		aig::NodeData & rhsNodeData = graph.getData( rhsNode, galois::MethodFlag::READ );
 		unsigned int rhsIndex = rhsNodeData.id * 2;		
 		rhsIndex = rhsPolarity ? rhsIndex : (rhsIndex+1); 
 		

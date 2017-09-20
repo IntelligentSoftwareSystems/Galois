@@ -499,10 +499,10 @@ public:
 class OpenCLDeviceHandler: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
-   Galois::GAST::GaloisApp & app_data;
+   galois::GAST::GaloisApp & app_data;
 
 public:
-   OpenCLDeviceHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & a) :
+   OpenCLDeviceHandler(Rewriter &rewriter, galois::GAST::GaloisApp & a) :
          rewriter(rewriter), app_data(a) {
    }
    virtual void run(const MatchFinder::MatchResult &Results) {

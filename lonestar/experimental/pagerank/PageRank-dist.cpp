@@ -63,10 +63,10 @@ struct LNode {
   typedef int  tt_is_copyable;
 };
 
-typedef Galois::Graph::LC_Dist_InOut<LNode> Graph;
+typedef galois::Graph::LC_Dist_InOut<LNode> Graph;
 typedef typename Graph::GraphNode GNode;
 
-typedef Galois::Graph::ThirdGraph<LNode, void, Galois::Graph::EdgeDirection::Out > Graph_3;
+typedef galois::Graph::ThirdGraph<LNode, void, galois::Graph::EdgeDirection::Out > Graph_3;
 
 // Constants for page Rank Algo.
 //! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
@@ -90,24 +90,24 @@ struct InitializeGraph {
 
   void static go(Graph::pointer g)
   {
-    Galois::for_each_local(g, InitializeGraph{g}, Galois::loopname("init"));
+    galois::for_each_local(g, InitializeGraph{g}, galois::loopname("init"));
   }
 
   void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
-    auto& lnode = pr->at(src, Galois::MethodFlag::SRC_ONLY);
+    auto& lnode = pr->at(src, galois::MethodFlag::SRC_ONLY);
     atomicAdd(lnode.residual, delta);
   }
 
 
-  void operator()(GNode src, Galois::UserContext<GNode>& cnx) const {
+  void operator()(GNode src, galois::UserContext<GNode>& cnx) const {
     LNode& sdata = g->at(src);
     sdata.value = 1.0 - alpha;
-    sdata.nout = std::distance(g->edge_begin(src, Galois::MethodFlag::SRC_ONLY),g->edge_end(src, Galois::MethodFlag::SRC_ONLY));
+    sdata.nout = std::distance(g->edge_begin(src, galois::MethodFlag::SRC_ONLY),g->edge_end(src, galois::MethodFlag::SRC_ONLY));
     sdata.residual = 0;
 
 
-    const Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    const galois::MethodFlag lockflag = galois::MethodFlag::SRC_ONLY;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if(sdata.nout > 0)
     {
       float delta = sdata.value*alpha/sdata.nout;
@@ -133,10 +133,10 @@ struct checkGraph {
 
     void static go(Graph::pointer g)
     {
-      Galois::for_each_local(g, checkGraph{g}, Galois::loopname("checkGraph"));
+      galois::for_each_local(g, checkGraph{g}, galois::loopname("checkGraph"));
     }
 
-    void operator()(GNode n, Galois::UserContext<GNode>& cnx) const {
+    void operator()(GNode n, galois::UserContext<GNode>& cnx) const {
       LNode& data = g->at(n);
       std::cout << data.value << "\n";
     }
@@ -149,21 +149,21 @@ struct PageRank {
     Graph::pointer g;
     void static go(Graph::pointer g)
     {
-      Galois::Timer round_time;
+      galois::Timer round_time;
       for(int iterations = 0; iterations < maxIterations; ++iterations){
           std::cout<<"Iteration : " << iterations << "  start : " << "\n";
           round_time.start();
-          Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+          galois::for_each_local(g, PageRank{g}, galois::loopname("Page Rank"));
           round_time.stop();
           std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
       }
     }
 
-    void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
+    void operator() (GNode src, galois::UserContext<GNode>& cnx) const {
       double sum = 0;
-      Galois::MethodFlag flag_src = Galois::MethodFlag::SRC_ONLY;
+      galois::MethodFlag flag_src = galois::MethodFlag::SRC_ONLY;
 
-      LNode& sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
+      LNode& sdata = g->at(src, galois::MethodFlag::SRC_ONLY);
       for (auto jj = g->in_edge_begin(src, flag_src), ej = g->in_edge_end(src, flag_src); jj != ej; ++jj) {
         GNode dst = g->dst(jj, flag_src);
         LNode& ddata = g->at(dst, flag_src);
@@ -187,26 +187,26 @@ struct PageRankMsg {
   Graph::pointer g;
   static int count;
   void static go(Graph::pointer g) {
-    Galois::Timer round_time;
+    galois::Timer round_time;
     for(int iterations = 0; iterations < maxIterations; ++iterations){
       std::cout<<"Iteration : " << iterations << "  start : " << "\n";
       round_time.start();
-      Galois::for_each_local(g, PageRankMsg{g}, Galois::loopname("Page Rank"));
+      galois::for_each_local(g, PageRankMsg{g}, galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
-      Galois::Runtime::getSystemNetworkInterface().dumpStats();
+      galois::Runtime::getSystemNetworkInterface().dumpStats();
     }
   }
 
   void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
-    auto& lnode = pr->at(src, Galois::MethodFlag::SRC_ONLY);
+    auto& lnode = pr->at(src, galois::MethodFlag::SRC_ONLY);
     atomicAdd(lnode.residual, delta);
   }
 
-  void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
+  void operator() (GNode src, galois::UserContext<GNode>& cnx) const {
     LNode& sdata = g->at(src);
-    Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    galois::MethodFlag lockflag = galois::MethodFlag::SRC_ONLY;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     /*
      * DEBUG
      */
@@ -259,10 +259,10 @@ float compute_total_rank(Graph::pointer g) {
 /* Compute Graph Distribution */
 using std::cout;
 using std::vector;
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 void compute_graph_distribution(Graph::pointer g) {
-  int n = Galois::Runtime::getSystemNetworkInterface().Num;
+  int n = galois::Runtime::getSystemNetworkInterface().Num;
   vector<vector<int>> dist_vec(n);
   vector<int> local_count(n,0);
 
@@ -271,9 +271,9 @@ void compute_graph_distribution(Graph::pointer g) {
     fatPointer fptr = static_cast<fatPointer>(*ii);
     auto hostID_src = fptr.getHost();
     //cout << "src :" << hostID_src <<"\n";
-    for(auto jj = g->in_edge_begin(*ii, Galois::MethodFlag::SRC_ONLY), ej = g->in_edge_end(*ii, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+    for(auto jj = g->in_edge_begin(*ii, galois::MethodFlag::SRC_ONLY), ej = g->in_edge_end(*ii, galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
 
-      GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
+      GNode dst = g->dst(jj, galois::MethodFlag::SRC_ONLY);
       fatPointer fptr_dst = static_cast<fatPointer>(dst);
       auto hostID_dst = fptr_dst.getHost();
       if(hostID_dst == hostID_src) {
@@ -338,9 +338,9 @@ void compute_graph_distribution(Graph::pointer g) {
 
 int main(int argc, char** argv) {
     LonestarStart (argc, argv, name, desc, url);
-    Galois::StatManager statManager;
+    galois::StatManager statManager;
 
-    Galois::Timer timerLoad;
+    galois::Timer timerLoad;
     timerLoad.start();
 
     //allocate local computation graph and Reading from the inputFile using FileGraph
@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
 
 /*
 
-          Galois::Graph::FileGraph fg;
+          galois::Graph::FileGraph fg;
             fg.fromFile(inputFile);
 
             std::cout << " filegraph : " << fg.size() << "\n";
@@ -374,7 +374,7 @@ int main(int argc, char** argv) {
     //Graph Construction ENDS here.
     timerLoad.stop();
     std::cout << "Graph Loading: " << timerLoad.get() << " ms\n";
-    Galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     /*
      * Check Graph Loading
@@ -385,20 +385,20 @@ int main(int argc, char** argv) {
     //std::cout <<"CHECKING GRAPH : " << check_graph(g, counts, In_counts) <<"\n";
 
     //Graph Initialization begins.
-    Galois::Timer timerInit;
+    galois::Timer timerInit;
     timerInit.start();
 
     InitializeGraph::go(g);
 
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
-    Galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     //g->prefetch_all();
 
     //std::cout << " All prefetched\n";
 
-    Galois::Timer timerPR;
+    galois::Timer timerPR;
     timerPR.start();
 
     //PageRank::go(g);
@@ -407,27 +407,27 @@ int main(int argc, char** argv) {
     timerPR.stop();
 
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
-    Galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     //HACK: prefetch all the nodes. For Blocking serial code.
     int nodes_check = 0;
     for (auto N = g->begin(); N != g->end(); ++N) {
       ++nodes_check;
-      //Galois::Runtime::prefetch(*N);
+      //galois::Runtime::prefetch(*N);
     }
     std::cout<<"Nodes_check = " << nodes_check << "\n";
 
-    Galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
-    Galois::Runtime::getSystemNetworkInterface().dumpStats();
+    galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     //std::cout << "Computing graph Distribution\n";
     //compute_graph_distribution(g);
 
 
 
-    Galois::Runtime::getSystemNetworkInterface().terminate();
+    galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
 

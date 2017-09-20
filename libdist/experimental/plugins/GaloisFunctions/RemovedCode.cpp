@@ -48,7 +48,7 @@ Located in getSyncer
       << "\t\t\tif (personality == GPU_CUDA) " << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
-      << "\t\t\t\t{ Galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
+      << "\t\t\t\t{ galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
       << "\t\t}\n";
     s << "\t\tstatic bool reduce_batch(unsigned from_id, unsigned long long int *b, unsigned int *o, " << i.VAL_TYPE << " *y, size_t s, DataCommMode data_mode) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"

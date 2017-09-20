@@ -112,7 +112,7 @@ struct InitializeGraph {
       			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
-      				{ Galois::atomicAdd(node.residual, y);}
+      				{ galois::atomicAdd(node.residual, y);}
       		}
       		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -128,7 +128,7 @@ struct InitializeGraph {
       		InitializeGraph_cuda(alpha, cuda_ctx);
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, galois::loopname("Init"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
       _graph.sync_push<Syncer_0>();
       
   }
@@ -143,7 +143,7 @@ struct InitializeGraph {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        galois::atomicAdd(ddata.residual, delta);
       }
     }
   }
@@ -168,7 +168,7 @@ void static go(Graph& _graph) {
 			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
 		#endif
-				{ Galois::atomicAdd(node.residual, y);}
+				{ galois::atomicAdd(node.residual, y);}
 		}
 		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
 		#ifdef __GALOIS_HET_CUDA__
@@ -184,11 +184,11 @@ void static go(Graph& _graph) {
 		FirstItr_PageRank_cuda(alpha, tolerance, cuda_ctx);
 	} else if (personality == CPU)
 #endif
-Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
 _graph.sync_push<Syncer_0>();
 
 }
-void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
@@ -198,7 +198,7 @@ void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+        auto dst_residual_old = galois::atomicAdd(ddata.residual, delta);
 
         //Schedule TOLERANCE threshold crossed.
         
@@ -231,7 +231,7 @@ struct PageRank {
      			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
      			else if (personality == CPU)
      		#endif
-     				{ Galois::atomicAdd(node.residual, y);}
+     				{ galois::atomicAdd(node.residual, y);}
      		}
      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
      		#ifdef __GALOIS_HET_CUDA__
@@ -249,15 +249,15 @@ struct PageRank {
      		DGAccumulator_accum += __retval;
      	} else if (personality == CPU)
      #endif
-     Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+     galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
      _graph.sync_push<Syncer_0>();
      
      }while(DGAccumulator_accum.reduce());
      
   }
 
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
-void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+  static galois::DGAccumulator<int> DGAccumulator_accum;
+void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
 
     if( sdata.residual > this->local_tolerance){
@@ -271,7 +271,7 @@ DGAccumulator_accum+= 1;
 for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+        auto dst_residual_old = galois::atomicAdd(ddata.residual, delta);
 
         //Schedule TOLERANCE threshold crossed.
         
@@ -280,22 +280,22 @@ for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       }
   }
 };
-Galois::DGAccumulator<int>  PageRank::DGAccumulator_accum;
+galois::DGAccumulator<int>  PageRank::DGAccumulator_accum;
 
 
 int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = Galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::Runtime::getHostID();
     int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id]) {
       case 'g':
         personality = GPU_CUDA;
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m);
     } else if (personality == GPU_OPENCL) {
-      //Galois::OpenCL::cl_env.init(cldevice.Value);
+      //galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
     T_hGraph_init.stop();
@@ -358,12 +358,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
         }
       }
 #endif
@@ -380,12 +380,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
         }
 #ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
         }
       }
 #endif

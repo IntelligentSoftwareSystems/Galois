@@ -28,7 +28,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 /**
  * Intrusive union-find implementation. Users subclass this to get disjoint
  * functionality for the subclass object.

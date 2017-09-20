@@ -35,7 +35,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 namespace {
 
@@ -60,42 +60,42 @@ static Policy& getPolicy() {
 
 } //namespace
 
-bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
+bool galois::Runtime::LL::bindThreadToProcessor(int id) {
   return false;
 }
 
-unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+unsigned galois::Runtime::LL::getProcessorForThread(int id) {
   return id;
 }
 
-unsigned Galois::Runtime::LL::getMaxThreads() {
+unsigned galois::Runtime::LL::getMaxThreads() {
   return getPolicy().numCpus;
 }
 
-unsigned Galois::Runtime::LL::getMaxCores() {
+unsigned galois::Runtime::LL::getMaxCores() {
   return getPolicy().numCpus;
 }
 
-unsigned Galois::Runtime::LL::getMaxPackages() {
+unsigned galois::Runtime::LL::getMaxPackages() {
   return getPolicy().numCpus;
 }
 
-unsigned Galois::Runtime::LL::getPackageForThread(int id) {
+unsigned galois::Runtime::LL::getPackageForThread(int id) {
   return id;
 }
 
-unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::Runtime::LL::getMaxPackageForThread(int id) {
   return id;
 }
 
-bool Galois::Runtime::LL::isPackageLeader(int id) {
+bool galois::Runtime::LL::isPackageLeader(int id) {
   return true;
 }
 
-unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
+unsigned galois::Runtime::LL::getLeaderForThread(int id) {
   return id;
 }
 
-unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::Runtime::LL::getLeaderForPackage(int id) {
   return id;
 }

@@ -168,7 +168,7 @@ int main(int argc, char ** argv)
         galoisAllocation(m->getRootNode(), solverMode);
     }     else if (scheduler == CILK) {
 #ifdef HAVE_CILK
-        Galois::CilkInit();
+        galois::CilkInit();
         cilk_alloc_tree(m->getRootNode(), solverMode);
 #else
         printf("CILK is not supported.\n");

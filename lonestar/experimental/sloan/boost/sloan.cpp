@@ -133,7 +133,7 @@ struct SNode {
 	unsigned int id;
 	//unsigned int sum;
   //bool flag;
-	//std::vector<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
+	//std::vector<galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 };
 
 struct Prefix {
@@ -142,10 +142,10 @@ struct Prefix {
 	Prefix(unsigned int _id, unsigned _val) : id(_id), val(_val) {}
 };
 
-//typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
-//typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
-//typedef Galois::Graph::FirstGraph<SNode, void, false> Graph;
+//typedef galois::Graph::LC_Linear_Graph<SNode, void> Graph;
+typedef galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
+//typedef galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
+//typedef galois::Graph::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
 
 typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS, boost::property< boost::vertex_color_t, boost::default_color_type, boost::property< boost::vertex_degree_t, int, boost::property< boost::vertex_priority_t, signed int > > > > BGraph;
@@ -190,19 +190,19 @@ struct UpdateRequestIndexer {
 
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::MethodFlag::UNPROTECTED).dist;
+    return graph.getData(val, galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist < graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
+    return graph.getData(a, galois::MethodFlag::UNPROTECTED).dist < graph.getData(b, galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist > graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
+    return graph.getData(a, galois::MethodFlag::UNPROTECTED).dist > graph.getData(b, galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
@@ -216,13 +216,13 @@ std::vector<GNode> perm;
 //std::vector<GNode> tperm;
 //std::vector< std::vector<GNode> > bucket;
 //debug
-Galois::GAtomic<unsigned int> loops = Galois::GAtomic<unsigned int>(0);
-Galois::GAtomic<unsigned int> sorts = Galois::GAtomic<unsigned int>(0);
-Galois::GAtomic<unsigned int> maxbucket = Galois::GAtomic<unsigned int>(0);
-Galois::GAtomic<unsigned int> minbucket = Galois::GAtomic<unsigned int>(DIST_INFINITY);
-Galois::GAtomic<unsigned int> avgbucket = Galois::GAtomic<unsigned int>(0);
-Galois::GAtomic<unsigned int> numbucket = Galois::GAtomic<unsigned int>(0);
-Galois::GAtomic<unsigned int> smallbucket = Galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> loops = galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> sorts = galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> maxbucket = galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> minbucket = galois::GAtomic<unsigned int>(DIST_INFINITY);
+galois::GAtomic<unsigned int> avgbucket = galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> numbucket = galois::GAtomic<unsigned int>(0);
+galois::GAtomic<unsigned int> smallbucket = galois::GAtomic<unsigned int>(0);
 
 static void printSloan(){
 	std::cerr << "Sloan Permutation:\n";
@@ -271,10 +271,10 @@ static void printAccess(std::string msg){
 
 		std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), 
-				ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, galois::MethodFlag::UNPROTECTED), 
+				ei = graph.edge_end(*src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+			SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -321,7 +321,7 @@ class GReduceAverage {
       lhs.second += rhs.second;
     }
   };
-  Galois::GReducible<std::pair<T, unsigned>, AVG> data;
+  galois::GReducible<std::pair<T, unsigned>, AVG> data;
 
 public:
   void update(const T& _newVal) {
@@ -414,8 +414,8 @@ struct not_visited {
 };
 
 struct max_dist {
-  Galois::GReduceMax<unsigned long int>& m;
-  max_dist(Galois::GReduceMax<unsigned long int>& _m): m(_m) { }
+  galois::GReduceMax<unsigned long int>& m;
+  max_dist(galois::GReduceMax<unsigned long int>& _m): m(_m) { }
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
@@ -433,24 +433,24 @@ static bool verify(GNode& source) {
   //size_t id = 0;
   
 #ifdef GALOIS_JUNE
-  bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
-    && Galois::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
+  bool okay = galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
+    && galois::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
 #else
-  bool okay = Galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
-    && Galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
+  bool okay = galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
+    && galois::ParallelSTL::find_if(graph.begin(), graph.end(), not_visited()) == graph.end();
 #endif
 
   //if (okay) {
-    Galois::GReduceMax<unsigned long int> m;
+    galois::GReduceMax<unsigned long int> m;
     GReduceAverage<unsigned long int> mean;
-    Galois::do_all(graph.begin(), graph.end(), max_dist(m));
+    galois::do_all(graph.begin(), graph.end(), max_dist(m));
 #ifdef GALOIS_JUNE
     std::cout << "max dist: " << m.get() << "\n";
 #else
     std::cout << "max dist: " << m.reduce() << "\n";
 #endif
-    Galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
-    Galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
+    galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
+    galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
     std::cout << "avg dist: " << mean.reduce() << "\n";
 
 		variance(mean.reduce());
@@ -469,7 +469,7 @@ struct resetNode {
 };
 
 static void resetGraph() {
-	Galois::do_all(graph.begin(), graph.end(), resetNode());
+	galois::do_all(graph.begin(), graph.end(), resetNode());
 	perm.clear();
 }
 
@@ -478,7 +478,7 @@ static void printDegreeDistribution() {
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
 			distr[degree(*n)]++;
-			//std::cerr << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).id << "	" << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).dist << "\n";
+			//std::cerr << graph.getData(*n, galois::MethodFlag::UNPROTECTED).id << "	" << graph.getData(*n, galois::MethodFlag::UNPROTECTED).dist << "\n";
 	}
 
 	std::cerr << "Degree	Count\n";
@@ -489,7 +489,7 @@ static void printDegreeDistribution() {
 
 // Read graph from a binary .gr as dirived from a Matrix Market .mtx using graph-convert
 static void readGraph(GNode& source, GNode& report) {
-  Galois::Graph::readGraph(graph, filename); 
+  galois::Graph::readGraph(graph, filename); 
   source = *graph.begin();
 
   size_t nnodes = graph.size();
@@ -500,17 +500,17 @@ static void readGraph(GNode& source, GNode& report) {
   bgraph = new BGraph(nnodes);
 
   for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-    SNode& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+    SNode& node = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
     node.id = id++;
   }
 
   std::cout << "Read binary graph\n";
 
 	for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+		SNode& dsrc = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(*src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddst = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+			SNode& ddst = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 			boost::add_edge(dsrc.id, ddst.id, *bgraph);
 		}
 	}
@@ -543,12 +543,12 @@ struct BoostSloan {
 		std::vector<Vertex>::iterator skato = permutation;
 
 #ifdef FINE_GRAIN_TIMING
-		Galois::TimeAccumulator vTmain[5]; 
-		vTmain[0] = Galois::TimeAccumulator();
-		vTmain[1] = Galois::TimeAccumulator();
-		vTmain[2] = Galois::TimeAccumulator();
-		vTmain[3] = Galois::TimeAccumulator();
-		vTmain[4] = Galois::TimeAccumulator();
+		galois::TimeAccumulator vTmain[5]; 
+		vTmain[0] = galois::TimeAccumulator();
+		vTmain[1] = galois::TimeAccumulator();
+		vTmain[2] = galois::TimeAccumulator();
+		vTmain[3] = galois::TimeAccumulator();
+		vTmain[4] = galois::TimeAccumulator();
 
 		vTmain[0].start();
 #endif
@@ -772,10 +772,10 @@ void run(const AlgoTy& algo) {
   GNode source, report;
 
 	int maxThreads = numThreads; 
-	Galois::TimeAccumulator vT[maxThreads+2]; 
+	galois::TimeAccumulator vT[maxThreads+2]; 
 
 	//Measure time to read graph
-	vT[INIT] = Galois::TimeAccumulator();
+	vT[INIT] = galois::TimeAccumulator();
 	vT[INIT].start();
 
   readGraph(source, report);
@@ -793,10 +793,10 @@ void run(const AlgoTy& algo) {
 	//Measure total computation time to read graph
 	vT[TOTAL].start();
 
-	//Galois::setActiveThreads(1);
+	//galois::setActiveThreads(1);
 
 	// Execution with the specified number of threads
-	vT[RUN] = Galois::TimeAccumulator();
+	vT[RUN] = galois::TimeAccumulator();
 
 	std::cout << "Running " << algo.name() << " version with " << numThreads << " threads for " << niter << " iterations\n";
 
@@ -836,10 +836,10 @@ void run(const AlgoTy& algo) {
 }
 
 int main(int argc, char **argv) {
-  //Galois::StatManager statManager;
+  //galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
   //#ifdef GALOIS_USE_EXP

@@ -35,7 +35,7 @@
 
 #include <vector>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 struct threadTopoInfo {
@@ -62,6 +62,6 @@ bool bindThreadSelf(unsigned osContext);
   
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif //_HWTOPO_H

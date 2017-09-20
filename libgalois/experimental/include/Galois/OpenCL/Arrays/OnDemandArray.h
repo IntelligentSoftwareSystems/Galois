@@ -32,7 +32,7 @@
 #define GALOISGPU_OCL_ONDEMANDARRAY_H_
 
 
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 /*******************************************************************************
  *
@@ -154,7 +154,7 @@ struct OnDemandArray {
 protected:
 };
 }//end namespace OpenCL
-}//end namespace Galois
+}//end namespace galois
 
 
 #endif /* GALOISGPU_OCL_ONDEMANDARRAY_H_ */

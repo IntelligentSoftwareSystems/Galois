@@ -30,7 +30,7 @@
 #include "Galois/Runtime/PerHostStorage.h"
 #include "Galois/TwoLevelIteratorA.h"
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 template<typename T>
@@ -101,15 +101,15 @@ public:
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,basePtr, items);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,basePtr, items);
   }
 };
 
 } // namespace Graph
-} // namespace Galois
+} // namespace galois
 
 #endif

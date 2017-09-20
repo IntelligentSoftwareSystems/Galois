@@ -38,7 +38,7 @@
 #include <list>
 #include <string>
 
-namespace Galois {
+namespace galois {
 
 namespace gstl {
 

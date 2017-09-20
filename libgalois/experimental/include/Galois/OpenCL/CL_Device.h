@@ -32,12 +32,12 @@
 #ifndef GALOISGPU_OCL_CL_DEVICE_H_
 #define GALOISGPU_OCL_CL_DEVICE_H_
 
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 
 struct CL_Device {
 protected:
-   friend struct Galois::OpenCL::CL_Platform;
+   friend struct galois::OpenCL::CL_Platform;
    cl_device_id _id;
    cl_command_queue _queue;
    cl_context _context;

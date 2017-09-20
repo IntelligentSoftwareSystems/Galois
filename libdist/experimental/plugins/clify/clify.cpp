@@ -67,7 +67,7 @@ static cl::extrahelp MoreHelp("\nMore help text...");
 class OpenCLHostGenConsumer: public ASTConsumer {
 private:
    Rewriter & R;
-   Galois::GAST::GaloisApp app_data;
+   galois::GAST::GaloisApp app_data;
 
 public:
    OpenCLHostGenConsumer(Rewriter &_R) :
@@ -134,7 +134,7 @@ public:
          DoAllHandler do_all_handler(R, app_data);
          MatchFinder doAllMatcher;
          doAllMatcher.addMatcher(callExpr(
-                                 callee(functionDecl(hasName("Galois::do_all")))
+                                 callee(functionDecl(hasName("galois::do_all")))
                                         ,hasArgument(2,hasType(recordDecl().bind("kernelType")))
                                  ).bind("galoisLoop"), &do_all_handler);
          doAllMatcher.matchAST(Context);

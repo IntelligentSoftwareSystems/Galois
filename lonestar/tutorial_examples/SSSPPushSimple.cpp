@@ -32,7 +32,7 @@
 #include <iostream>
 
 //! [Define LC Graph]
-typedef Galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+typedef galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
 //! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
@@ -47,7 +47,7 @@ struct SSSP {
   Graph& graph;
   SSSP(Graph& _g) :graph(_g) {}
 
-  void operator()(GNode active_node, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode active_node, galois::UserContext<GNode>& ctx) const {
     //![Get the value on the node]
     unsigned data = graph.getData(active_node);
 
@@ -69,14 +69,14 @@ struct UpdateRequestIndexer {
   UpdateRequestIndexer(Graph& _g) :g(_g) {}
 
   unsigned int operator() (const GNode N) const {
-    return g.getData(N, Galois::MethodFlag::UNPROTECTED) >> stepShift;
+    return g.getData(N, galois::MethodFlag::UNPROTECTED) >> stepShift;
   }
 };
 
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
-  Galois::setActiveThreads(256); // Galois will cap at hw max
+  galois::StatManager statManager;
+  galois::setActiveThreads(256); // Galois will cap at hw max
 
   if (argc != 2) {
     std::cout << "Usage: " << argv[0] << " filename\n";
@@ -87,25 +87,25 @@ int main(int argc, char **argv) {
 
 //! [ReadGraph]
   Graph graph;
-  Galois::Graph::readGraph(graph, argv[1]);
+  galois::Graph::readGraph(graph, argv[1]);
 //! [ReadGraph]
 
   //! Use a lambda as the operator
-  Galois::do_all(graph.begin(), graph.end(), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
+  galois::do_all(graph.begin(), graph.end(), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
 
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPPushSimple]
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   //clear source
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPPushSimple]
   std::array<GNode,1> init = {*graph.begin()};
   //!use a structure as an operator and pass a loopname for stats
-  Galois::for_each(init.begin(), init.end(), SSSP{graph}, Galois::wl<OBIM>(UpdateRequestIndexer{graph}), Galois::loopname("sssp_run_loop"));
+  galois::for_each(init.begin(), init.end(), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;

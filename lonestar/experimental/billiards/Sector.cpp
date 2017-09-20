@@ -39,7 +39,7 @@ void Sector::simulate (const Event& e) {
 
 }
 
-Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const {
+galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const {
 
   // FIXME: add logic to check for new Event being the same as prevEvent
 
@@ -49,14 +49,14 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const 
   // 3. earliest sector entry
   // 4. earliest sector leaving
 
-  Galois::optional<Event> minEvent;
+  galois::optional<Event> minEvent;
   Event::Comparator cmp;
 
 
-  Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, balls.begin (), balls.end (), endtime, prevEvent, this);
+  galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, balls.begin (), balls.end (), endtime, prevEvent, this);
   minEvent = ballColl;
 
-  Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, cushions.begin (), cushions.end (), endtime, prevEvent, this);
+  galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, cushions.begin (), cushions.end (), endtime, prevEvent, this);
   if (cushColl) {
     if (!minEvent || cmp (*cushColl, *minEvent)) {
       minEvent = cushColl;
@@ -64,7 +64,7 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const 
   }
 
 
-  Galois::optional<Event> secEntry = earliestSectorEntry (ball, endtime);
+  galois::optional<Event> secEntry = earliestSectorEntry (ball, endtime);
 
   if (secEntry) {
     if (!minEvent || cmp (*secEntry, *minEvent)) {
@@ -72,7 +72,7 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const 
     }
   }
 
-  Galois::optional<Event> secLeave = earliestSectorLeave (ball, endtime);
+  galois::optional<Event> secLeave = earliestSectorLeave (ball, endtime);
 
   if (secLeave) {
     if (!minEvent || cmp (*secLeave, *minEvent)) {
@@ -87,7 +87,7 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const 
   return minEvent;
 }
 
-Galois::optional<Event> Sector::earliestSectorEntry (const Ball_t* ball, const FP& endtime) const {
+galois::optional<Event> Sector::earliestSectorEntry (const Ball_t* ball, const FP& endtime) const {
 
   assert (ball);
 
@@ -185,7 +185,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball_t* ball, const F
   } // end for
 
 
-  Galois::optional<Event> e;
+  galois::optional<Event> e;
 
   if (minSector != nullptr) { 
     assert (minTime >= FP (0.0));
@@ -201,11 +201,11 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball_t* ball, const F
 
 }
 
-Galois::optional<Event> Sector::earliestSectorLeave (const Ball_t* ball, const FP& endtime) const {
+galois::optional<Event> Sector::earliestSectorLeave (const Ball_t* ball, const FP& endtime) const {
 
   assert (ball);
 
-  Galois::optional<Event> retVal;
+  galois::optional<Event> retVal;
 
   
   if (!ball->hasSector (this)) { 

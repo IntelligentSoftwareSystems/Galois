@@ -32,17 +32,17 @@
 #include "Galois/WorkList/Simple.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename QueueTy>
-Galois::optional<typename QueueTy::value_type>
+galois::optional<typename QueueTy::value_type>
 stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Substrate::ThreadPool::getTID();
   unsigned pkg = Substrate::ThreadPool::getPackage();
-  unsigned num = Galois::getActiveThreads();
+  unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  Galois::optional<typename QueueTy::value_type> retval;
+  galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -59,13 +59,13 @@ stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
 }
 
 template<typename QueueTy>
-Galois::optional<typename QueueTy::value_type>
+galois::optional<typename QueueTy::value_type>
 stealRemote(Substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Substrate::ThreadPool::getTID();
   //  unsigned pkg = Runtime::LL::getPackageForThread(id);
-  unsigned num = Galois::getActiveThreads();
+  unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  Galois::optional<typename QueueTy::value_type> retval;
+  galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -86,8 +86,8 @@ public:
 private:
   Substrate::PerThreadStorage<QueueTy> local;
 
-  Galois::optional<value_type> doSteal() {
-    Galois::optional<value_type> retval = stealHalfInPackage(local);
+  galois::optional<value_type> doSteal() {
+    galois::optional<value_type> retval = stealHalfInPackage(local);
     if (retval)
       return retval;
     return stealRemote(local);
@@ -95,7 +95,7 @@ private:
 
   template<typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
-    unsigned int a = Galois::getActiveThreads();
+    unsigned int a = galois::getActiveThreads();
     unsigned int id = Substrate::ThreadPool::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
@@ -114,7 +114,7 @@ private:
     Iter b2 = b;
     Iter e2 = e;
     fill_work_l2(b2, e2);
-    unsigned int a = Galois::getActiveThreads();
+    unsigned int a = galois::getActiveThreads();
     //    unsigned int id = Runtime::LL::getTID();
     std::vector<std::vector<value_type> > ranges;
     ranges.resize(a);
@@ -170,8 +170,8 @@ public:
     fill_work_l1(range.begin(), range.end());
   }
 
-  Galois::optional<value_type> pop() {
-    Galois::optional<value_type> retval = local.getLocal()->pop();
+  galois::optional<value_type> pop() {
+    galois::optional<value_type> retval = local.getLocal()->pop();
     if (retval)
       return retval;
     return doSteal();// stealHalfInPackage(local);
@@ -207,7 +207,7 @@ public:
     local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     return local.getLocal()->pop();
   }
 };
@@ -215,7 +215,7 @@ GALOIS_WLCOMPILECHECK(LocalWorklist)
 
 template<typename T, typename OwnerFn, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
 class OwnerComputeChunkedMaster : private boost::noncopyable {
-  class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+  class Chunk : public galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
   Runtime::FixedSizeHeap heap;
   OwnerFn Fn;
@@ -329,9 +329,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  Galois::optional<value_type> pop()  {
+  galois::optional<value_type> pop()  {
     p& n = *data.getLocal();
-    Galois::optional<value_type> retval;
+    galois::optional<value_type> retval;
     if (isStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -340,7 +340,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return Galois::optional<value_type>();
+      return galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -353,7 +353,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return Galois::optional<value_type>();
+      return galois::optional<value_type>();
     }
   }
 };
@@ -364,6 +364,6 @@ GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
 
 
 }//End namespace
-} // end namespace Galois
+} // end namespace galois
 
 #endif

@@ -94,7 +94,7 @@ unsigned galoisFib (unsigned n) {
 
   FibRecord init { n, &result, 0, 0};
 
-  Galois::Runtime::for_each_ordered_tree (
+  galois::Runtime::for_each_ordered_tree (
       init,
       GaloisDivide (),
       GaloisConquer (),
@@ -131,22 +131,22 @@ struct GaloisFibStack {
 unsigned galoisFibStack (unsigned n) {
   GaloisFibStack init {n, 0};
 
-  Galois::Runtime::for_each_ordered_tree (init, "fib");
+  galois::Runtime::for_each_ordered_tree (init, "fib");
 
   return init.result;
 }
 
-struct GaloisFibGeneric: public Galois::Runtime::TreeTaskBase {
+struct GaloisFibGeneric: public galois::Runtime::TreeTaskBase {
   unsigned n;
   unsigned result;
 
   GaloisFibGeneric (unsigned _n, unsigned _result): 
-    Galois::Runtime::TreeTaskBase (),
+    galois::Runtime::TreeTaskBase (),
     n (_n),
     result (_result)
   {}
 
-  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+  virtual void operator () (galois::Runtime::TreeTaskContext& ctx) {
     if (n <= 2) {
       result = n;
       return;
@@ -167,7 +167,7 @@ struct GaloisFibGeneric: public Galois::Runtime::TreeTaskBase {
 unsigned galoisFibGeneric (unsigned n) {
   GaloisFibGeneric init {n, 0};
 
-  Galois::Runtime::for_each_ordered_tree_generic (init, "fib-gen");
+  galois::Runtime::for_each_ordered_tree_generic (init, "fib-gen");
   return init.result;
 }
 
@@ -178,7 +178,7 @@ struct FibHandFrame {
   FibHandFrame* parent;
 };
 
-Galois::InsertBag<FibHandFrame> B;
+galois::InsertBag<FibHandFrame> B;
 
 struct FibHandOp {
   typedef int tt_does_not_need_aborts;
@@ -218,18 +218,18 @@ struct FibHandOp {
 
 unsigned fibHand (unsigned n) {
 
-  typedef Galois::WorkList::AltChunkedFIFO<64> Chunked;
-  // typedef Galois::WorkList::AltChunkedLIFO<4> Chunked;
+  typedef galois::WorkList::AltChunkedFIFO<64> Chunked;
+  // typedef galois::WorkList::AltChunkedLIFO<4> Chunked;
 
   FibHandFrame init;
   init.sum = 0;
   init.done = 0;
   init.parent = 0;
 
-  Galois::for_each(std::make_pair(n, &init), 
+  galois::for_each(std::make_pair(n, &init), 
       FibHandOp(), 
-      Galois::loopname ("fib-hand"),
-      Galois::wl<Chunked>());
+      galois::loopname ("fib-hand"),
+      galois::wl<Chunked>());
 
   return init.sum;
 }
@@ -320,12 +320,12 @@ unsigned fibTBB (unsigned n) {
 
 int main (int argc, char* argv[]) {
 
-  Galois::StatManager sm;
+  galois::StatManager sm;
   LonestarStart (argc, argv, name, desc, url);
 
   unsigned result = -1;
 
-  Galois::StatTimer t;
+  galois::StatTimer t;
 
   t.start ();
   switch (execType) {
@@ -334,7 +334,7 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
-      Galois::CilkInit ();
+      galois::CilkInit ();
       result = fib (N);
       break;
 

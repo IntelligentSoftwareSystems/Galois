@@ -14,7 +14,7 @@ namespace andInverterGraph {
 struct NodeData;
 
 // Nodes hold a NodeData structure, edges hold a boolean value and are directional with InOut distinction
-typedef Galois::Graph::FirstGraph< NodeData, bool, true, true > Graph;
+typedef galois::Graph::FirstGraph< NodeData, bool, true, true > Graph;
 
 typedef Graph::GraphNode GNode;
 

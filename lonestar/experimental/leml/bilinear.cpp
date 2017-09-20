@@ -155,7 +155,7 @@ public:
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
             [&](size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,barXv)
@@ -367,7 +367,7 @@ public:
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
             [&](size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
@@ -424,7 +424,7 @@ public:
 		// z = barX*w-y
 		long nnz_Y = prob->Y->nnz;
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+	galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
             [&](long i) {
 #else
 #pragma omp parallel for schedule(static)
@@ -442,7 +442,7 @@ public:
 		long nnz_Y =prob->Y->nnz;
 		barXv(s, D);
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+	galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
             [&](long i) {
 #else
 #pragma omp parallel for schedule(static)
@@ -497,7 +497,7 @@ public:
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
             [&](size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
@@ -556,7 +556,7 @@ public:
 		long nnz_Y = prob->Y->nnz;
 
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+	galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
             [&](long i) {
 #else
 #pragma omp parallel for schedule(static)
@@ -578,7 +578,7 @@ public:
 
 		barXv(s, wa);
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+	galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
             [&](long i) {
 #else
 #pragma omp parallel for schedule(static)
@@ -634,7 +634,7 @@ public:
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
             [&](size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
@@ -665,7 +665,7 @@ public:
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
             [&](size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
@@ -736,7 +736,7 @@ public:
 		long nnz_Y = prob->Y->nnz;
 		subbarXv(s, D);
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+	galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
             [&](long i) {
 #else
 #pragma omp parallel for schedule(static)
@@ -756,7 +756,7 @@ static void construct_C_array(double *C, smat_t *Y, double Cp, double Cn){
 	double *y = Y->val_t;
 	size_t nnz_Y = Y->nnz;
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nnz_Y),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nnz_Y),
             [&](size_t i) {
 #else
 #pragma omp parallel for 
@@ -946,14 +946,14 @@ void bilinear_predict_full(const bilinear_problem* prob, const double *H, biline
 
 	//size_t true_insts = 0;
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
             [&](size_t inst) {
 #else
 #pragma omp parallel for 
 	for(size_t inst = 0; inst < nr_insts; ++inst){
 #endif
 #ifdef EXP_DOALL_GALOIS
-		int tid = Galois::Substrate::ThreadPool::getTID();
+		int tid = galois::Substrate::ThreadPool::getTID();
 #else
 		int tid = omp_get_thread_num(); // thread ID
 #endif
@@ -1054,14 +1054,14 @@ void bilinear_predict(const bilinear_problem* prob, const double *W, const doubl
 
 	//size_t true_insts = 0;
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
+	galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
             [&](size_t inst) {
 #else
 #pragma omp parallel for 
 	for(size_t inst = 0; inst < nr_insts; ++inst){
 #endif
 #ifdef EXP_DOALL_GALOIS
-		int tid = Galois::Substrate::ThreadPool::getTID();
+		int tid = galois::Substrate::ThreadPool::getTID();
 #else
 		int tid = omp_get_thread_num(); // thread ID
 #endif

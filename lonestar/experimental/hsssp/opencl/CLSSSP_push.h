@@ -21,9 +21,9 @@ template<typename GraphType>
 struct OPENCL_Context {
    typedef typename GraphType::NodeDataType NodeDataType;
    GraphType m_graph;
-   Galois::OpenCL::CL_Kernel kernel;
-   Galois::OpenCL::CL_Kernel wb_kernel;
-   Galois::OpenCL::Array<int> *meta_array;
+   galois::OpenCL::CL_Kernel kernel;
+   galois::OpenCL::CL_Kernel wb_kernel;
+   galois::OpenCL::Array<int> *meta_array;
    OPENCL_Context() :
          meta_array(nullptr) {
    }
@@ -40,9 +40,9 @@ struct OPENCL_Context {
       m_graph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
    }
    void init(int num_items, int num_inits) {
-      Galois::OpenCL::CL_Kernel init_nodes;
+      galois::OpenCL::CL_Kernel init_nodes;
       init_nodes.init("sssp_kernel.cl", "initialize_nodes");
-      meta_array = new Galois::OpenCL::Array<int>(16);
+      meta_array = new galois::OpenCL::Array<int>(16);
       kernel.init("sssp_kernel.cl", "sssp");
       wb_kernel.init("sssp_kernel.cl", "writeback");
       m_graph.copy_to_device();

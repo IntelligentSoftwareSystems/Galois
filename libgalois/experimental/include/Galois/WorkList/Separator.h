@@ -30,7 +30,7 @@
 #ifndef GALOIS_WORKLIST_SEPARATOR_H
 #define GALOIS_WORKLIST_SEPARATOR_H
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 struct Separator { constexpr Separator() {} };
@@ -38,6 +38,6 @@ struct Separator { constexpr Separator() {} };
 constexpr Separator dummy; 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

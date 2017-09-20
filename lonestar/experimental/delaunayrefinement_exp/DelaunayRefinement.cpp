@@ -53,7 +53,7 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-struct Process : public Galois::Runtime::Lockable {
+struct Process : public galois::Runtime::Lockable {
   Graphp   graph;
 
   typedef int tt_needs_per_iter_alloc;
@@ -61,7 +61,7 @@ struct Process : public Galois::Runtime::Lockable {
   Process(Graphp g): graph(g) {}
   Process() {}
 
-  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode node, galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(node))
       return;
 
@@ -74,43 +74,43 @@ struct Process : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Preprocess : public Galois::Runtime::Lockable {
+struct Preprocess : public galois::Runtime::Lockable {
   Graphp   graph;
-  Galois::Graph::Bag<GNode>::pointer wl;
+  galois::Graph::Bag<GNode>::pointer wl;
 
-  Preprocess(Graphp g, Galois::Graph::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
+  Preprocess(Graphp g, galois::Graph::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
   Preprocess() {}
 
-  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode item, galois::UserContext<GNode>& ctx) const {
     if (graph->getData(item).isBad())
       wl->push(item);
   }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph,wl);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph,wl);
   }
 };
 
-struct Verification : public Galois::Runtime::Lockable {
+struct Verification : public galois::Runtime::Lockable {
   Graphp   graph;
 
   Verification(Graphp g): graph(g) {}
   Verification() {}
 
-  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode item, galois::UserContext<GNode>& ctx) const {
     if (graph->getData(item).isBad()) {
       printf("Found bad triangle\n");
     }
@@ -118,41 +118,41 @@ struct Verification : public Galois::Runtime::Lockable {
 
   //serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
-struct Prefetch : public Galois::Runtime::Lockable {
+struct Prefetch : public galois::Runtime::Lockable {
   Graphp   graph;
 
   Prefetch(Graphp g): graph(g) {}
   Prefetch() {}
 
-  void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode item, galois::UserContext<GNode>& ctx) const {
     (void)graph->getData(item).isBad();
   }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,graph);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,graph);
   }
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   // check the host id and initialise the network
-  Galois::Runtime::NetworkInterface::start();
-  //Galois::Runtime::setTrace(false);
+  galois::Runtime::NetworkInterface::start();
+  //galois::Runtime::setTrace(false);
 
   Graphp graph = Graph::allocate();
   {
@@ -165,73 +165,73 @@ int main(int argc, char** argv) {
     }
   }
   //  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-  //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  //  std::cout << galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
   //ThirdGraphSize(graph);
 
   // call prefetch to get the nodes to the owner
-  Galois::StatTimer Tprefetch;
+  galois::StatTimer Tprefetch;
 
   Tprefetch.start();
   std::cout << "beginning prefetch\n";
-  Galois::for_each_local(graph, Prefetch(graph), 
-      Galois::loopname("prefetch"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
-  //Galois::Runtime::setTrace(true);
+  galois::for_each_local(graph, Prefetch(graph), 
+      galois::loopname("prefetch"), galois::wl<galois::WorkList::AltChunkedLIFO<32>>());
+  //galois::Runtime::setTrace(true);
   Tprefetch.stop();
 
-  Galois::StatTimer Tprealloc;
+  galois::StatTimer Tprealloc;
   Tprealloc.start();
   std::cout << "beginning prealloc\n";
-  Galois::reportPageAlloc("MeminfoPre1");
-  // Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  galois::reportPageAlloc("MeminfoPre1");
+  // galois::preAlloc(galois::Runtime::MM::numPageAllocTotal() * 10);
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t nodeSize = sizeof(**graph->begin());
-  auto graphSize = Galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
-  Galois::preAlloc(5 * Galois::getActiveThreads() + nodeSize * 8 * graphSize / Galois::Runtime::MM::hugePageSize);
+  auto graphSize = galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
+  galois::preAlloc(5 * galois::getActiveThreads() + nodeSize * 8 * graphSize / galois::Runtime::MM::hugePageSize);
   // Relaxed upper bound
-  // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
-  Galois::reportPageAlloc("MeminfoPre2");
+  // galois::preAlloc(15 * numThreads + galois::Runtime::MM::numPageAllocTotal() * 10);
+  galois::reportPageAlloc("MeminfoPre2");
   Tprealloc.stop();
 
-  Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
+  galois::Graph::Bag<GNode>::pointer gwl = galois::Graph::Bag<GNode>::allocate();
 
-  Galois::StatTimer Tb("BIGGER");
+  galois::StatTimer Tb("BIGGER");
   Tb.start();
-  Galois::StatTimer T;
-  Galois::StatTimer Tfindbad("findbad");
+  galois::StatTimer T;
+  galois::StatTimer Tfindbad("findbad");
   T.start();
   Tfindbad.start();
   std::cout << "beginning findbad\n";
-  Galois::for_each_local(graph, Preprocess(graph,gwl),
-      Galois::loopname("findbad"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
+  galois::for_each_local(graph, Preprocess(graph,gwl),
+      galois::loopname("findbad"), galois::wl<galois::WorkList::AltChunkedLIFO<32>>());
   Tfindbad.stop();
 
-  Galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoMid");
 
-  Galois::StatTimer Trefine("refine");
+  galois::StatTimer Trefine("refine");
   Trefine.start();
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   
       //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
 
   std::cout << "beginning refine\n";
-  Galois::for_each_local(gwl, Process(graph), Galois::loopname("refine"), Galois::wl<Chunked>());
+  galois::for_each_local(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunked>());
   Trefine.stop();
   T.stop();
   Tb.stop();
 
   std::cout << "beginning verify\n";
-  Galois::for_each_local(graph, Verification(graph), Galois::loopname("verification"), Galois::wl<Chunked>());
+  galois::for_each_local(graph, Verification(graph), galois::loopname("verification"), galois::wl<Chunked>());
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-  //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
+  //  std::cout << galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
 
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    int size = Galois::ParallelSTL::count_if_local(graph, is_bad(graph));
+    int size = galois::ParallelSTL::count_if_local(graph, is_bad(graph));
     if (size != 0) {
       GALOIS_DIE("Bad triangles remaining");
     }
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
   }
 
   // master_terminate();
-  Galois::Runtime::NetworkInterface::terminate();
+  galois::Runtime::NetworkInterface::terminate();
 
   return 0;
 }

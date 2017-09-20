@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <cstdio>
 /*
-class StupidDistBarrier : public Galois::Substrate::Barrier {
+class StupidDistBarrier : public galois::Substrate::Barrier {
   Barrier& localBarrier;
 
   std::atomic<int> count;
@@ -56,22 +56,22 @@ public:
   }
 
   virtual void wait() {
-    if (Galois::Runtime::LL::getTID() == 0) {
-      count += Galois::Runtime::NetworkInterface::Num;
+    if (galois::Runtime::LL::getTID() == 0) {
+      count += galois::Runtime::NetworkInterface::Num;
     }
 
     //wait at local barrier
     localBarrier.wait();
 
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    if (Galois::Runtime::LL::getTID() == 0) {
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    if (galois::Runtime::LL::getTID() == 0) {
       //notify global and wait on global
       net.broadcastAlt(barrierLandingPad);
       --count;
     }
 
     while (count > 0) {
-      Galois::Runtime::doNetworkWork();
+      galois::Runtime::doNetworkWork();
     }
 
     //wait at local barrier
@@ -84,11 +84,11 @@ public:
 #include <mpi.h>
 
 namespace {
-class HostBarrier : public Galois::Substrate::Barrier {
+class HostBarrier : public galois::Substrate::Barrier {
   std::atomic<int> count;
 
   static void barrierLandingPad(uint32_t) {
-    --static_cast<HostBarrier&>(Galois::Runtime::getHostBarrier()).count;
+    --static_cast<HostBarrier&>(galois::Runtime::getHostBarrier()).count;
   }
 
 public:
@@ -100,12 +100,12 @@ public:
 
   virtual void wait() {
 
-    if (Galois::Substrate::ThreadPool::getTID() == 0) {
-      count += Galois::Runtime::NetworkInterface::Num;
+    if (galois::Substrate::ThreadPool::getTID() == 0) {
+      count += galois::Runtime::NetworkInterface::Num;
     }
 
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    if (Galois::Substrate::ThreadPool::getTID() == 0) {
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    if (galois::Substrate::ThreadPool::getTID() == 0) {
       //      std::cerr << "@";
       //notify global and wait on global
       net.broadcastSimple(barrierLandingPad);
@@ -121,7 +121,7 @@ public:
 };
 } // end namespace ""
 
-Galois::Substrate::Barrier& Galois::Runtime::getHostBarrier() {
+galois::Substrate::Barrier& galois::Runtime::getHostBarrier() {
   static HostBarrier b;
   return b;
 }

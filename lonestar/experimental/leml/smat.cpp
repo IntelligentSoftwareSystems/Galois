@@ -318,7 +318,7 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t k, double *H)
 {
 	size_t m = X.rows;
 #ifdef EXP_DOALL_GALOIS
-        Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(m),
+        galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(m),
            [&] (size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,H,W)
@@ -339,7 +339,7 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t k, double *H)
                           Hi[k-1] += Xij*Wj[k-1];
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal<>());
+        }, galois::do_all_steal<>());
 #else
         }
 #endif
@@ -356,7 +356,7 @@ void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t 
 {
 	size_t m = X.rows;
 #ifdef EXP_DOALL_GALOIS
-        Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(m),
+        galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(m),
            [&] (size_t i) {
 #else
 #pragma omp parallel for schedule(dynamic,50) shared(X,H,W)
@@ -378,7 +378,7 @@ void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t 
                           Hi[k-1] += Xij*Wj[k-1];
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal<>());
+        }, galois::do_all_steal<>());
 #else
         }
 #endif

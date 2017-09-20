@@ -36,7 +36,7 @@
 #include <vector>
 
 
-namespace Galois {
+namespace galois {
 
 // TODO: dynamic Array using Fixed Size Allocator
 
@@ -122,7 +122,7 @@ public:
   const_reverse_iterator crend() const { return rend(); }
 };
 
-}// end namespace Galois
+}// end namespace galois
 
 
 #endif // GALOIS_DYNAMIC_ARRAY_H

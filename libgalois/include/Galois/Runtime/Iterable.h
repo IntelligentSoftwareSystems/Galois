@@ -33,7 +33,7 @@
 #ifndef GALOIS_RUNTIME_ITERABLE_H
 #define GALOIS_RUNTIME_ITERABLE_H
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 //iterable and make_iterable specific
@@ -60,6 +60,6 @@ static inline iterable<It> make_iterable(It a, It b)
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //GALOIS_RUNTIME_ITERABLE_H

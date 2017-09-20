@@ -8,7 +8,7 @@
 #ifndef GDIST_EXP_INCLUDE_OPENCL_LC_GRAPHVOID_2_H_
 #define GDIST_EXP_INCLUDE_OPENCL_LC_GRAPHVOID_2_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 namespace Graphs{
 static const char * cl_wrapper_str_LC_GraphVoid_2 =

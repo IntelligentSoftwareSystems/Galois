@@ -143,7 +143,7 @@ struct GBPartitionerDisk {
       /*
        *
        * */
-      void assignEdge(Galois::Graph::OfflineGraph & g, NodeItType & _src, Galois::Graph::OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
+      void assignEdge(galois::Graph::OfflineGraph & g, NodeItType & _src, galois::Graph::OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
@@ -164,19 +164,19 @@ struct GBPartitionerDisk {
        * This will ensure that localids and globalids are sequential
        * */
 
-      void assignLocalIDs(size_t numhost, Galois::Graph::OfflineGraph &g) {
+      void assignLocalIDs(size_t numhost, galois::Graph::OfflineGraph &g) {
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
 #if 1 // Currently some error in stats - use threaded code after it is fixed.
          std::vector<size_t> hosts;
          for(size_t i=0; i<numhost; ++i)hosts.push_back(i);
-         Galois::do_all(hosts.begin(),hosts.end(), [&] (size_t h){
+         galois::do_all(hosts.begin(),hosts.end(), [&] (size_t h){
             for(size_t n = 0; n < g.size(); ++n){
                if(_vertexOwnersPacked[n][h]){
                      global2Local[h][n]=verticesPerHost[h]++;
                }
             }
 
-         }, Galois::loopname("localIDs"));
+         }, galois::loopname("localIDs"));
 #else
          for(size_t h=0; h<numhost; ++h){
             for(size_t n = 0; n < g.size(); ++n){
@@ -188,7 +188,7 @@ struct GBPartitionerDisk {
 #endif
       }
 
-      void writeReplicaInfo(std::string &basename, Galois::Graph::OfflineGraph &g, size_t numhosts) {
+      void writeReplicaInfo(std::string &basename, galois::Graph::OfflineGraph &g, size_t numhosts) {
 #if 0
          this->print_size_stats(numhosts);
          for (size_t n = 0; n < g.size(); ++n) {
@@ -221,7 +221,7 @@ struct GBPartitionerDisk {
        * smallest number of masters is selected to be the master of the current
        * node, and the masters-count for the host is updated.
        * */
-      void assignMasters(size_t nn, size_t numhost, Galois::Graph::OfflineGraph &g) {
+      void assignMasters(size_t nn, size_t numhost, galois::Graph::OfflineGraph &g) {
          auto & _vertexOwnersPacked = * vertexOwnersPacked;
 
          vertexMasters.resize(nn, ~0);
@@ -343,8 +343,8 @@ struct GBPartitionerDisk {
    /*
     * Partitioning routine.
     * */
-   void operator()(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts) {
-      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
+   void operator()(std::string & basename, galois::Graph::OfflineGraph & g, size_t num_hosts) {
+      galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
 
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
 //      mtrace();
@@ -399,7 +399,7 @@ struct GBPartitionerDisk {
     * Write both the metadata as well as the partition information.
     * */
 
-   void writePartitionsMem(std::string & basename, Galois::Graph::OfflineGraph & g, size_t num_hosts) {
+   void writePartitionsMem(std::string & basename, galois::Graph::OfflineGraph & g, size_t num_hosts) {
       //Create graph
       //TODO RK - Fix edgeData
       std::cout << " Low mem version\n";
@@ -407,7 +407,7 @@ struct GBPartitionerDisk {
       for (size_t h = 0; h < num_hosts; ++h) {
          std::cout << "Building partition " << h << "...\n";
          std::cout << "Analysis :: " << vcInfo.verticesPerHost[h] << " , " << vcInfo.edgesPerHost[h] << "\n";
-         using namespace Galois::Graph;
+         using namespace galois::Graph;
          FileGraphWriter * ng = new FileGraphWriter();
          FileGraphWriter &newGraph = *ng;
          newGraph.setNumNodes(vcInfo.verticesPerHost[h]);

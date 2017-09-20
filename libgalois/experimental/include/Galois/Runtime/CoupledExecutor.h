@@ -34,7 +34,7 @@
 
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 enum ExecType {
@@ -73,9 +73,9 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();
 
-  Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
-  Galois::on_each(
+  galois::on_each(
       [&initRange, &next] (const unsigned tid, const unsigned numT) {
         auto rp = initRange.local_pair ();
         for (auto i = rp.first, i_end = rp.second; i != i_end; ++i) {
@@ -89,20 +89,20 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
   while (!next->empty_all ()) {
     std::swap (curr, next);
 
-    Galois::on_each(
+    galois::on_each(
         [&next] (const unsigned tid, const unsigned numT) {
           next->get ().clear ();
         });
 
     // std::printf ("Current size: %zd\n", curr->size_all ());
 
-    Galois::do_all_local(*curr,
+    galois::do_all_local(*curr,
         [&func_cpy, &next] (const T& t) {
           PushWrapper<typename WL_ty::Cont_ty> w(next->get());
           func_cpy (t, w);
         },
-        Galois::loopname("do_all_bs"),
-        Galois::do_all_steal<DO_STEAL>());
+        galois::loopname("do_all_bs"),
+        galois::do_all_steal<DO_STEAL>());
   }
 
   Substrate::getThreadPool ().beKind ();
@@ -151,32 +151,32 @@ template <typename R, typename F>
 void for_each_coupled_wake (const R& initRange, const F& func, const char* loopname=nullptr) {
   const unsigned CHUNK_SIZE = 64;
   typedef typename R::value_type T;
-  typedef WorkList::WLsizeWrapper<typename Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
+  typedef WorkList::WLsizeWrapper<typename galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
 
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();
 
   F func_cpy (func);
 
-  Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
-  Galois::on_each(
+  galois::on_each(
       [&next, &initRange] (const unsigned tid, const unsigned numT) {
         next->push_initial (initRange);
       });
 
   while (next->size () != 0) {
-    typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef galois::WorkList::ExternalReference<WL_ty> WL;
     typedef typename WL_ty::value_type value_type;
     value_type* it = nullptr;
 
     std::swap (curr, next);
     next->reset_all ();
 
-    Galois::for_each(it, it,
+    galois::for_each(it, it,
         impl::FunctorWrapper<F, WL_ty> (func_cpy, next),
-        Galois::loopname("for_each_coupled"),
-        Galois::wl<WL>(curr));
+        galois::loopname("for_each_coupled"),
+        galois::wl<WL>(curr));
   }
 
   Substrate::getThreadPool ().beKind ();
@@ -191,7 +191,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   typedef typename R::value_type T;
 
-  typedef WorkList::WLsizeWrapper<typename Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
+  typedef WorkList::WLsizeWrapper<typename galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
 
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();
@@ -200,11 +200,11 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   typedef impl::FunctorWrapper<F, WL_ty> FWrap;
 
-  typedef Galois::Runtime::ForEachWork<WorkList::ExternalReference<WL_ty>, T, FWrap> ForEachExec_ty;
+  typedef galois::Runtime::ForEachWork<WorkList::ExternalReference<WL_ty>, T, FWrap> ForEachExec_ty;
 
   ForEachExec_ty exec (curr, FWrap (func_cpy, next), loopname);
 
-  Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier ();
+  galois::Substrate::Barrier& barrier = galois::Substrate::getSystemBarrier ();
 
   std::atomic<bool> done(false);
 
@@ -241,7 +241,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
   };
 
   exec.init();
-  Galois::Substrate::getThreadPool ().run (Galois::getActiveThreads (), loop);
+  galois::Substrate::getThreadPool ().run (galois::getActiveThreads (), loop);
   
   delete curr;
   delete next;
@@ -268,7 +268,7 @@ void for_each_coupled_bs (const R& initRange, const F& func, const char* loopnam
 #endif
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_COUPLED_EXECUTOR_H

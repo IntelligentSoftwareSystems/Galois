@@ -94,12 +94,12 @@ struct ResetGraph {
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
-    Galois::do_all(
+    galois::do_all(
       allNodes.begin(),
       allNodes.end(),
       ResetGraph{ &_graph },
-      Galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
-      Galois::timeit()
+      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
+      galois::timeit()
     );
   }
 
@@ -131,12 +131,12 @@ struct InitializeGraph {
     {
      // regular do all without stealing; just initialization of nodes with
      // outgoing edges
-     Galois::do_all(
+     galois::do_all(
         nodesWithEdges.begin(),
         nodesWithEdges.end(),
         InitializeGraph{alpha, &_graph},
-        Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        Galois::timeit()
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
+        galois::timeit()
       );
     }
   }
@@ -144,7 +144,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.residual = local_alpha;
-    Galois::atomicAdd(sdata.nout, 
+    galois::atomicAdd(sdata.nout, 
       (uint32_t) std::distance(graph->edge_begin(src), 
                                graph->edge_end(src)));
   }
@@ -154,16 +154,16 @@ struct PageRank {
   const float & local_alpha;
   cll::opt<float> & local_tolerance;
   Graph* graph;
-  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
   PageRank(const float & _local_alpha, 
            cll::opt<float> & _local_tolerance,
-           Graph* _g, Galois::DGAccumulator<unsigned int>& _dga): 
+           Graph* _g, galois::DGAccumulator<unsigned int>& _dga): 
       local_alpha(_local_alpha),
       local_tolerance(_local_tolerance),
       graph(_g), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     unsigned _num_iterations = 0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -172,24 +172,24 @@ struct PageRank {
       PageRank_delta::go(_graph);
       dga.reset();
       {
-        Galois::do_all_local(
+        galois::do_all_local(
           nodesWithEdges,
           PageRank{ alpha, tolerance, &_graph, dga },
-          Galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          Galois::do_all_steal<true>(),
-          Galois::timeit()
+          galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
+          galois::do_all_steal<true>(),
+          galois::timeit()
         );
       }
 
-      Galois::Runtime::reportStat("(NULL)", 
+      galois::Runtime::reportStat("(NULL)", 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
           (unsigned long)dga.read_local(), 0);
 
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce());
 
-    if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
+      galois::Runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations, 0);
     }
@@ -220,7 +220,7 @@ struct PageRank {
         GNode dst = graph->getEdgeDst(nbr);
         NodeData& ddata = graph->getData(dst);
 
-        Galois::atomicAdd(ddata.residual, _delta);
+        galois::atomicAdd(ddata.residual, _delta);
       }
     }
   }
@@ -232,20 +232,20 @@ struct PageRank {
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    galois::DistMemSys G(getStatsFile());
     DistBenchStart(argc, argv, name, desc, url);
 
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
 
     {
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
       std::ostringstream ss;
       ss << tolerance;
-      Galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
+      galois::Runtime::reportStat("(NULL)", "Tolerance", ss.str(), 0);
     }
-    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
+    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -266,19 +266,19 @@ int main(int argc, char** argv) {
       InitializeGraph::go((*hg));
     StatTimer_init.stop();
 
-    Galois::DGAccumulator<unsigned int> PageRank_accum;
+    galois::DGAccumulator<unsigned int> PageRank_accum;
 
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
-      Galois::StatTimer StatTimer_main(timer_str.c_str());
+      galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
         PageRank::go(*hg, PageRank_accum);
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        //Galois::Runtime::getHostBarrier().wait();
+        //galois::Runtime::getHostBarrier().wait();
         (*hg).reset_num_iter(run+1);
         InitializeGraph::go(*hg);
       }
@@ -290,13 +290,13 @@ int main(int argc, char** argv) {
     if (verify) {
         for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
           if ((*hg).isOwned((*hg).getGID(*ii)))
-            Galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+            galois::Runtime::printOutput("% %\n", (*hg).getGID(*ii), 
               (*hg).getData(*ii).value);
         }
     }
 
     }
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch (const char* c) {

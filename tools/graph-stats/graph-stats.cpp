@@ -59,7 +59,7 @@ static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
 static cll::opt<int> numBins("numBins", cll::desc("Number of bins"), cll::init(-1));
 static cll::opt<int> columns("columns", cll::desc("Columns for sparsity"), cll::init(80));
 
-typedef Galois::Graph::OfflineGraph Graph;
+typedef galois::Graph::OfflineGraph Graph;
 typedef Graph::GraphNode GNode;
 
 void doSummary(Graph& graph) {
@@ -120,7 +120,7 @@ void doSparsityPattern(Graph& graph,
 
   for (int i = 0; i < columns; ++i) {
     std::vector<bool> row(columns);
-    auto p = Galois::block_range(graph.begin(), graph.end(), i, columns);
+    auto p = galois::block_range(graph.begin(), graph.end(), i, columns);
     for (auto ii = p.first, ei = p.second; ii != ei; ++ii) {
       for (auto jj : graph.edges(*ii)) {
         row[graph.getEdgeDst(jj) / blockSize] = true;
@@ -150,7 +150,7 @@ void doInDegreeHistogram(Graph& graph) {
 }
 
 struct EdgeComp {
-  typedef Galois::Graph::EdgeSortValue<GNode, void> Edge;
+  typedef galois::Graph::EdgeSortValue<GNode, void> Edge;
   bool operator()(const Edge& a, const Edge& b) const {
     return a.dst < b.dst;
   }
@@ -178,7 +178,7 @@ void doSortedLogOffsetHistogram(Graph& graph) {
   // hists.emplace_back();
   // auto hist = &hists.back();
   // int curHist = 0;
-  // auto p = Galois::block_range(
+  // auto p = galois::block_range(
   //     boost::counting_iterator<size_t>(0),
   //     boost::counting_iterator<size_t>(graph.sizeEdges()),
   //     curHist,
@@ -202,7 +202,7 @@ void doSortedLogOffsetHistogram(Graph& graph) {
   //       hists.emplace_back();
   //       hist = &hists.back();
   //       curHist += 1;
-  //       p = Galois::block_range(
+  //       p = galois::block_range(
   //           boost::counting_iterator<size_t>(0),
   //           boost::counting_iterator<size_t>(graph.sizeEdges()),
   //           curHist,

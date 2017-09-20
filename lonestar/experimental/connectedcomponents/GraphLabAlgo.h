@@ -21,10 +21,10 @@ struct GraphLabAlgo {
     bool isRep() { return id == labelid; }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
@@ -32,7 +32,7 @@ struct GraphLabAlgo {
 
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.labelid = data.id;
     }
   };
@@ -67,9 +67,9 @@ struct GraphLabAlgo {
     void apply(Graph& graph, GNode node, const gather_type&) {
       if (received_labelid == std::numeric_limits<size_t>::max()) {
         perform_scatter = true;
-      } else if (graph.getData(node, Galois::MethodFlag::UNPROTECTED).labelid > received_labelid) {
+      } else if (graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid > received_labelid) {
         perform_scatter = true;
-        graph.getData(node, Galois::MethodFlag::UNPROTECTED).labelid = received_labelid;
+        graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid = received_labelid;
       }
     }
 
@@ -80,12 +80,12 @@ struct GraphLabAlgo {
     void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
-      LNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+        galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+      LNode& data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
-      if (node == src && graph.getData(dst, Galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
+      if (node == src && graph.getData(dst, galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
         ctx.push(dst, message_type(data.labelid));
-      } else if (node == dst && graph.getData(src, Galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
+      } else if (node == dst && graph.getData(src, galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
         ctx.push(src, message_type(data.labelid));
       }
     }
@@ -97,9 +97,9 @@ struct GraphLabAlgo {
   }
 
   void operator()(Graph& graph) {
-    Galois::do_all_local(graph, Initialize(graph));
+    galois::do_all_local(graph, Initialize(graph));
 
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.execute();
   }
 };

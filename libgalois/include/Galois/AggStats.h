@@ -5,5 +5,5 @@
 
 
 
-} // end namespace Galois
+} // end namespace galois
 #endif// GALOIS_AGG_STATS_H

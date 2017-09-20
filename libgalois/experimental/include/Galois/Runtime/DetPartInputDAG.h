@@ -41,7 +41,7 @@
 #include <functional>
 
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 // TODO: instead of storing partition number, store a pointer to partition meta
@@ -60,12 +60,12 @@ template <typename G, typename F, typename M>
 struct InputGraphPartDAGexecutor {
 
   using GNode = typename G::GraphNode;
-  using Bag_ty = Galois::PerThreadBag<GNode>;
+  using Bag_ty = galois::PerThreadBag<GNode>;
   using PartAdjMatrix = std::vector<std::vector<unsigned> >;
 
   struct PartMetaData: private boost::noncopyable {
 
-    using LocalWL = Galois::gdeque<GNode, 64>;
+    using LocalWL = galois::gdeque<GNode, 64>;
     // using LocalWL = typename gstl::Deque<GNode>;
     using IncomingBoundaryWLmap = std::vector<LocalWL>;
 
@@ -130,7 +130,7 @@ struct InputGraphPartDAGexecutor {
   struct ThreadWorker {
 
     Substrate::SimpleLock stealLock;
-    Galois::gdeque<PartMetaData*> myPartitions;
+    galois::gdeque<PartMetaData*> myPartitions;
 
     size_t innerIter = 0;
     size_t boundaryIter = 0;
@@ -192,8 +192,8 @@ struct InputGraphPartDAGexecutor {
       func (func),
       dagManager (dagManager),
       loopname (loopname),
-      term(Substrate::getSystemTermination(Galois::getActiveThreads())), 
-      numPart (PARTITION_MULT_FACTOR * Galois::getActiveThreads ())
+      term(Substrate::getSystemTermination(galois::getActiveThreads())), 
+      numPart (PARTITION_MULT_FACTOR * galois::getActiveThreads ())
   {
 
     // partitions.clear ();
@@ -256,7 +256,7 @@ struct InputGraphPartDAGexecutor {
 
 
   void push (GNode n, PartMetaData& pusher) {
-    auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+    auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
 
     assert (nd.partition != -1);
     PartMetaData& owner = partitions[nd.partition];
@@ -288,7 +288,7 @@ struct InputGraphPartDAGexecutor {
   }
 
   // void push (GNode n, PartMetaData& pusher) {
-    // auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+    // auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
 // 
     // assert (nd.partition != -1);
     // PartMetaData& owner = partitions[nd.partition];
@@ -323,9 +323,9 @@ struct InputGraphPartDAGexecutor {
   template <typename R>
   void fill_initial (const R& range) {
 
-    using LocalContrib = typename Galois::gstl::Vector<Galois::gdeque<GNode, 64> >;
+    using LocalContrib = typename galois::gstl::Vector<galois::gdeque<GNode, 64> >;
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, &range] (unsigned tid, unsigned numT) {
 
           LocalContrib localContribInner (numPart);
@@ -334,7 +334,7 @@ struct InputGraphPartDAGexecutor {
           for (auto i = range.local_begin (), end_i = range.local_end ();
             i != end_i; ++i) {
 
-            auto& nd = graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
+            auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
             assert (nd.partition != -1);
 
             if (nd.isBoundary) {
@@ -383,7 +383,7 @@ struct InputGraphPartDAGexecutor {
       GNode n = workList.front ();
       workList.pop_front ();
 
-      auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+      auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
       assert (nd.partition == ctxt.pusher.id);
       nd.onWL = 0;
       func (n, ctxt);
@@ -422,9 +422,9 @@ struct InputGraphPartDAGexecutor {
     texec.start ();
     fill_initial (range);
 
-    Galois::Substrate::PerThreadStorage<ThreadWorker> workers;
+    galois::Substrate::PerThreadStorage<ThreadWorker> workers;
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
           ThreadWorker& w = *workers.getLocal (tid);
 
@@ -457,7 +457,7 @@ struct InputGraphPartDAGexecutor {
     //
     // TODO: what to do with stolen partition? put back in original owner? keep?
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
 
           ThreadWorker& worker = *workers.getLocal (tid);
@@ -524,13 +524,13 @@ struct InputGraphPartDAGexecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_part (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   InputGraphPartDAGexecutor<G, F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 
 }
 
@@ -559,6 +559,6 @@ struct ForEachDet_InputDAG<InputDAG_ExecTy::PART> {
 
 } // end namespace Runtime
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_PART_INPUT_DAG

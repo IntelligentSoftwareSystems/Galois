@@ -29,7 +29,7 @@
 #include <tuple>
 #include <memory>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 class NetworkIO {
@@ -68,6 +68,6 @@ std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI();
 #endif
 
 } //namespace Runtime
-} //namespace Galois
+} //namespace galois
 
 #endif

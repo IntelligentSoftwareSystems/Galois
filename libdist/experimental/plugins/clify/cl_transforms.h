@@ -33,7 +33,7 @@ public:
             decl->dump(llvm::outs());
             llvm::outs() << " =================\n";
             llvm::outs() << decl->getUnderlyingType().getAsString()<<"\n";
-            string s = "#include \"Galois/OpenCL/CL_Header.h\"\nusing namespace Galois::OpenCL;\n";
+            string s = "#include \"Galois/OpenCL/CL_Header.h\"\nusing namespace galois::OpenCL;\n";
             {
                //TODO - RK - A hack. Since the begin/end location of the decl are not returning
                // the entire decl (terminating at 'G' instead of at 'Graph', we try to hack around
@@ -108,9 +108,9 @@ public:
 class DoAllHandler: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
-   Galois::GAST::GaloisApp & app_data;
+   galois::GAST::GaloisApp & app_data;
 public:
-   DoAllHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & _ad) :
+   DoAllHandler(Rewriter &rewriter, galois::GAST::GaloisApp & _ad) :
          rewriter(rewriter), app_data(_ad) {
    }
 
@@ -126,7 +126,7 @@ public:
          CXXRecordDecl * kernel = const_cast<CXXRecordDecl*>(Results.Nodes.getNodeAs<CXXRecordDecl>("kernelType"));
          assert(kernel!=nullptr && "KernelType cast failed.");
          app_data.add_doAll_call(callFS, kernel);
-         llvm::outs() << "Galois::do_All loop found " << callFS->getCalleeDecl()->getCanonicalDecl()->getAsFunction()->getNameAsString() << "\n";
+         llvm::outs() << "galois::do_All loop found " << callFS->getCalleeDecl()->getCanonicalDecl()->getAsFunction()->getNameAsString() << "\n";
          //Get the arguments:
          clang::LangOptions LangOpts;
          LangOpts.CPlusPlus = true;
@@ -164,11 +164,11 @@ class NodeDataGen: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
    ASTContext & ctx;
-   Galois::GAST::GaloisApp & app;
+   galois::GAST::GaloisApp & app;
    std::ofstream header_file;
    bool nodeDataFound, edgeDataFound;
 public:
-   NodeDataGen(Rewriter &rewriter, ASTContext & c, Galois::GAST::GaloisApp & a) :
+   NodeDataGen(Rewriter &rewriter, ASTContext & c, galois::GAST::GaloisApp & a) :
          rewriter(rewriter), ctx(c), app(a), nodeDataFound(false), edgeDataFound(false) {
       char hfilename[1024];
       sprintf(hfilename, "%s/app_header.h" , app.dir);
@@ -262,9 +262,9 @@ public:
 class GetDataHandler: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
-   Galois::GAST::GaloisApp & app;
+   galois::GAST::GaloisApp & app;
 public:
-   GetDataHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & a) :
+   GetDataHandler(Rewriter &rewriter, galois::GAST::GaloisApp & a) :
          rewriter(rewriter), app(a){
    }
    virtual void run(const MatchFinder::MatchResult &Results) {

@@ -8,7 +8,7 @@
 #ifndef GALOISGPU_OCL_ARRAYIMPL_H_
 #define GALOISGPU_OCL_ARRAYIMPL_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 /*******************************************************************************
@@ -35,7 +35,7 @@ struct Array {
       assert(ret==0 && "Posix-memalign failed." );
       allocation_flags = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
       device_data = clCreateBuffer(cl_env.m_context, allocation_flags, sizeof(T) * num_elements, host_data, &err);
-      Galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
+      galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
    }
    ////////////////////////////////////////////////
    ~Array(){
@@ -45,7 +45,7 @@ struct Array {
       if(host_data){
          free(host_data);
          host_data = nullptr;
-         Galois::OpenCL::CHECK_CL_ERROR(clReleaseMemObject(device_data),"Failed to release device memory object.");
+         galois::OpenCL::CHECK_CL_ERROR(clReleaseMemObject(device_data),"Failed to release device memory object.");
       }
    }
    ////////////////////////////////////////////////
@@ -109,7 +109,7 @@ struct Array {
       buff.size = num_items * sizeof(T);
       cl_int err;
       cl_mem res = clCreateSubBuffer(device_data, allocation_flags, CL_BUFFER_CREATE_TYPE_REGION, &buff, &err);
-      Galois::OpenCL::CHECK_CL_ERROR(err, "Failed to create sub-region!");
+      galois::OpenCL::CHECK_CL_ERROR(err, "Failed to create sub-region!");
       return res;
    }
 
@@ -117,6 +117,6 @@ protected:
 };
 
 } //end namespace OpenCL
-} //end namespace Galois
+} //end namespace galois
 
 #endif /* GALOISGPU_OCL_ARRAYIMPL_H_ */

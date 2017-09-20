@@ -26,8 +26,8 @@
 #include <vector>
 using namespace std;
 
-typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
-typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
+typedef galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
+typedef galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 
 
@@ -39,7 +39,7 @@ typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
       if(n1==n2){
         continue;
       }
-      graph->addEdge(n1, n2, Galois::MethodFlag::WRITE, 1);
+      graph->addEdge(n1, n2, galois::MethodFlag::WRITE, 1);
       graph->getData(n1).setEdgeWeight(graph->getData(n1).getEdgeWeight() + 1);
       graph->getData(n1).setNumEdges(graph->getData(n1).getNumEdges() + 1);
       countEdges++;
@@ -48,9 +48,9 @@ typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
 
 
-parallelMakeNodes(GGraph *g,vector <GNode> &gn,InputGraph *in,Galois::GAccumulator<int> &numNodes):
+parallelMakeNodes(GGraph *g,vector <GNode> &gn,InputGraph *in,galois::GAccumulator<int> &numNodes):
   graph(g),inputGraph(in),gnodes(gn),pnumNodes(numNodes) {}
-  void operator()(InputGNode node,Galois::UserContext<InputGNode> &ctx) {
+  void operator()(InputGNode node,galois::UserContext<InputGNode> &ctx) {
     int id = inputGraph->getData(node);
     GNode item = graph->createNode(100,1); // FIXME: edge num
     //    graph->addNode(item);
@@ -65,15 +65,15 @@ struct parallelMakeEdges {
   vector <GNode>  &gnodes;
   bool weighted;
   bool directed;
-  Galois::GAccumulator<int> &pnumEdges;
+  galois::GAccumulator<int> &pnumEdges;
   
-  parallelMakeEdges(GGraph *g,vector <GNode> &gn,InputGraph *in,Galois::GAccumulator<int> &numE,bool w=false,bool dir = true)
+  parallelMakeEdges(GGraph *g,vector <GNode> &gn,InputGraph *in,galois::GAccumulator<int> &numE,bool w=false,bool dir = true)
     :graph(g),inputGraph(in),gnodes(gn),pnumEdges(numE) {
   weighted = w;
   directed = dir;
 }
 
-  void operator()(InputGNode inNode,Galois::UserContext<InputGNode> &ctx) {
+  void operator()(InputGNode inNode,galois::UserContext<InputGNode> &ctx) {
     int nodeId = inputGraph->getData(inNode);
     GNode node = gnodes[nodeId];
     MetisNode& nodeData = graph->getData(node);
@@ -85,7 +85,7 @@ struct parallelMakeEdges {
       if(weighted){
         weight = inputGraph->getEdgeData(jj);
       }
-      graph->addEdge(node, gnodes[neighId], Galois::MethodFlag::WRITE, weight);
+      graph->addEdge(node, gnodes[neighId], galois::MethodFlag::WRITE, weight);
       nodeData.setNumEdges(nodeData.getNumEdges() + 1);
       nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       /*if(!directed){
@@ -104,7 +104,7 @@ struct parallelMakeEdges {
 
 void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = false, bool directed = true){
   InputGraph inputGraph;
-  Galois::Graph::readGraph(inputGraph, filename);
+  galois::Graph::readGraph(inputGraph, filename);
   cout<<"start to transfer data to GGraph"<<endl;
   int id = 0;
   for (InputGraph::iterator ii = inputGraph.begin(), ee = inputGraph.end(); ii != ee; ++ii) {
@@ -122,30 +122,30 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
     }*/
 
 
-  typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  Galois::GAccumulator<int> pnumNodes;
-  Galois::GAccumulator<int> pnumEdges;
+  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  galois::GAccumulator<int> pnumNodes;
+  galois::GAccumulator<int> pnumEdges;
 
 
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
-  Galois::for_each<WL>(inputGraph.begin(),inputGraph.end(),parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
+  galois::for_each<WL>(inputGraph.begin(),inputGraph.end(),parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
   t.stop();
   cout<<t.get()<<" ms "<<endl;
   t.start();
-  Galois::for_each<WL>(inputGraph.begin(),inputGraph.end(),parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
+  galois::for_each<WL>(inputGraph.begin(),inputGraph.end(),parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
   t.stop();
   cout<<t.get()<<" ms "<<endl;
 
   /*
 
-    Galois::Timer t;
+    galois::Timer t;
     t.start();
-    Galois::for_each_local<WL>(inputGraph,parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
+    galois::for_each_local<WL>(inputGraph,parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
     t.stop();
     cout<<t.get()<<" ms "<<endl;
     t.start();
-    Galois::for_each_local<WL>(inputGraph,parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
+    galois::for_each_local<WL>(inputGraph,parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
     t.stop();
     cout<<t.get()<<" ms "<<endl;
 

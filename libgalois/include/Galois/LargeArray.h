@@ -39,7 +39,7 @@
 
 #include <utility>
 
-namespace Galois {
+namespace galois {
 
 namespace Runtime {
 extern unsigned activeThreads;

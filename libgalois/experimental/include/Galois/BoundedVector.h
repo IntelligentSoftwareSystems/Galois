@@ -33,7 +33,7 @@
 
 #include <cassert>
 
-namespace Galois {
+namespace galois {
 
 template <typename T, const size_t SZ>
 class BoundedVector {
@@ -276,7 +276,7 @@ public:
 
 
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_BOUNDED_VECTOR_H
 

@@ -53,7 +53,7 @@
 
  */
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 boost::uuids::uuid getRandUUID();
@@ -135,7 +135,7 @@ public:
 template <typename T>
 class NamedStat {
 
-  using Str = Galois::gstl::Str;
+  using Str = galois::gstl::Str;
 
   Str m_name;
 
@@ -234,9 +234,9 @@ template <typename Stat_tp>
 struct BasicStatMap {
 
   using Stat = Stat_tp;
-  using Str = Galois::gstl::Str;
-  using StrSet = Galois::gstl::Set<Str>;
-  using StatMap = Galois::gstl::Map<std::tuple<const Str*, const Str*>, Stat>;
+  using Str = galois::gstl::Str;
+  using StrSet = galois::gstl::Set<Str>;
+  using StatMap = galois::gstl::Map<std::tuple<const Str*, const Str*>, Stat>;
   using const_iterator = typename StatMap::const_iterator;
 
 protected:
@@ -410,7 +410,7 @@ class StatManager {
 
 public:
 
-  using Str = Galois::gstl::Str;
+  using Str = galois::gstl::Str;
 
   static constexpr const char* const SEP = ", ";
   static constexpr const char* const TSTAT_SEP = "; ";
@@ -590,11 +590,11 @@ public:
 
 class StatManager {
 
-  using Str = Galois::gstl::Str;
-  using StrSet = Galois::gstl::Set<Str>;
-  using Stat = Galois::Accumulator<int64_t>;
-  using StatMap = Galois::gstl::Map<std::tuple<Str*, Str*>, Stat*>;
-  using StatAlloc = Galois::FixedSizeAllocator<Stat>;
+  using Str = galois::gstl::Str;
+  using StrSet = galois::gstl::Set<Str>;
+  using Stat = galois::Accumulator<int64_t>;
+  using StatMap = galois::gstl::Map<std::tuple<Str*, Str*>, Stat*>;
+  using StatAlloc = galois::FixedSizeAllocator<Stat>;
 
   StrSet symbols;
   StatMap statMap;
@@ -644,11 +644,11 @@ class StatManager {
   template<typename T> 
   struct StatManagerImpl {
 
-    using Str = Galois::gstl::Str;
-    using StrSet = Galois::gstl::Set<Str>;
-    using Stat = Galois::Accumulator<T>;
-    using StatMap = Galois::gstl::Map<std::tuple<Str*, Str*>, Stat*> >;
-    using StatAlloc = Galois::FixedSizeAllocator<Stat>;
+    using Str = galois::gstl::Str;
+    using StrSet = galois::gstl::Set<Str>;
+    using Stat = galois::Accumulator<T>;
+    using StatMap = galois::gstl::Map<std::tuple<Str*, Str*>, Stat*> >;
+    using StatAlloc = galois::FixedSizeAllocator<Stat>;
 
     StrSet symbols;
     StatMap statMap;
@@ -719,7 +719,7 @@ class StatManager {
         ret = s;
       };
 
-      Galois::Substrate::readUpdateProtected(rwmutex, readAndCheck, write);
+      galois::Substrate::readUpdateProtected(rwmutex, readAndCheck, write);
 
       assert(ret, "readUpdateProtected shouldn't fail");
 
@@ -835,7 +835,7 @@ void reportPageAlloc(const char* category);
 void reportNumaAlloc(const char* category);
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif// GALOIS_STAT_MANAGER_H

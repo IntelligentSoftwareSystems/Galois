@@ -32,7 +32,7 @@
 
 //! Graph has int node data, void edge data and is directed
 //! [define a graph]
-typedef Galois::Graph::FirstGraph<int,void,true> Graph;
+typedef galois::Graph::FirstGraph<int,void,true> Graph;
 //! [define a graph]
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
@@ -43,7 +43,7 @@ struct IncrementNeighbors {
   IncrementNeighbors(Graph& g): g(g) { }
 
   //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
     // For each outgoing edge (n, dst)
     //! [loop over neighbors]
     for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
@@ -107,15 +107,15 @@ int main(int argc, char** argv) {
   unsigned int numThreads = atoi(argv[1]);
   int n = atoi(argv[2]);
 
-  numThreads = Galois::setActiveThreads(numThreads);
+  numThreads = galois::setActiveThreads(numThreads);
   std::cout << "Using " << numThreads << " thread(s) and " << n << " x " << n << " torus\n";
 
   Graph graph;
   constructTorus(graph, n, n);
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
-  Galois::for_each(graph.begin(), graph.end(), IncrementNeighbors(graph));
+  galois::for_each(graph.begin(), graph.end(), IncrementNeighbors(graph));
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";

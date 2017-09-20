@@ -170,7 +170,7 @@ struct LNodeSetMarker: public std::unary_function<typename Graph::GraphNode, boo
   LNodeSetMarker(Graph& g): graph(g) {}
 
   bool* operator()(const typename Graph::GraphNode n) const {
-    return &(graph.getData(n, Galois::MethodFlag::UNPROTECTED).inSet);
+    return &(graph.getData(n, galois::MethodFlag::UNPROTECTED).inSet);
   }
 };
 
@@ -186,8 +186,8 @@ struct Async {
     }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Async"; }
@@ -195,7 +195,7 @@ struct Async {
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     check_types<Graph, InnerGraph>();
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -208,9 +208,9 @@ struct Async {
      
     Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
+      galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
@@ -227,21 +227,21 @@ struct Async {
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    typedef Galois::WorkList::dChunkedTwoLevelHashFIFO<16> HSet;
-    typedef Galois::WorkList::dChunkedTwoLevelSetFIFO<16> OSet;
-    typedef Galois::WorkList::dChunkedMarkingSetFIFO<LNodeSetMarker<Graph>,16> MSet;
+    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    typedef galois::WorkList::dChunkedTwoLevelHashFIFO<16> HSet;
+    typedef galois::WorkList::dChunkedTwoLevelSetFIFO<16> OSet;
+    typedef galois::WorkList::dChunkedMarkingSetFIFO<LNodeSetMarker<Graph>,16> MSet;
 
     auto marker = LNodeSetMarker<Graph>(graph);
 
     if(algo == Algo::asyncB_hset)
-      Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<HSet>());
+      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<HSet>());
     else if(algo == Algo::asyncB_mset)
-      Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<MSet>(marker));
+      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<MSet>(marker));
     else if(algo == Algo::asyncB_oset)
-      Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<OSet>());
+      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<OSet>());
     else
-      Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
+      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {
@@ -262,15 +262,15 @@ struct AsyncNodePri{
     }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncNodePri"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -283,16 +283,16 @@ struct AsyncNodePri{
     PRPri(Graph& g, PRTy t) : graph(g), tolerance(t) {}
     int operator()(const GNode src, PRTy d) const {
       if (outOnly)
-        d /= (1 + nout(graph, src, Galois::MethodFlag::UNPROTECTED));
+        d /= (1 + nout(graph, src, galois::MethodFlag::UNPROTECTED));
       else
-        d /= ninout(graph, src, Galois::MethodFlag::UNPROTECTED);
+        d /= ninout(graph, src, galois::MethodFlag::UNPROTECTED);
       d /= tolerance;
       if (d > 50)
         return -50;
       return -d; //d*amp; //std::max((int)floor(d*amp), 0);
     }      
     int operator()(const GNode src) const {
-      PRTy d = graph.getData(src, Galois::MethodFlag::UNPROTECTED).residual;
+      PRTy d = graph.getData(src, galois::MethodFlag::UNPROTECTED).residual;
       return operator()(src, d);
     }
   };
@@ -304,13 +304,13 @@ struct AsyncNodePri{
 
     Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,t) { }
 
-    void operator()(const GNode src, Galois::UserContext<GNode>& ctx) const {
+    void operator()(const GNode src, galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
       
       if(sdata.residual < tolerance)
         return;
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
+      galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
@@ -334,33 +334,33 @@ struct AsyncNodePri{
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedFIFO<32> WL;
     typedef OrderedByIntegerMetric<PRPri,WL>::with_block_period<8>::type OBIM;
     typedef detail::MarkingWorkSetMaster<GNode,LNodeSetMarker<Graph>,OBIM> ObimMSet;
-    typedef detail::WorkSetMaster<GNode,OBIM,Galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;
-    typedef detail::WorkSetMaster<GNode,OBIM,Galois::ThreadSafeTwoLevelHash<GNode> > ObimHSet;
+    typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;
+    typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelHash<GNode> > ObimHSet;
 
-    Galois::InsertBag<GNode> bag;
+    galois::InsertBag<GNode> bag;
     PRPri pri(graph, tolerance);
     auto marker = LNodeSetMarker<Graph>(graph);
-    // Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+    // galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });
-    // Galois::for_each_local(bag, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+    // galois::for_each_local(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
 
     if(algo == Algo::asyncB_prt_mset)
-      Galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), Galois::wl<ObimMSet>(marker,dummy,pri));
+      galois::for_each(graph.begin(), graph.end(),
+                       Process(graph, tolerance, amp), galois::wl<ObimMSet>(marker,dummy,pri));
     else if(algo == Algo::asyncB_prt_oset)
-      Galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), Galois::wl<ObimOSet>(dummy,pri));
+      galois::for_each(graph.begin(), graph.end(),
+                       Process(graph, tolerance, amp), galois::wl<ObimOSet>(dummy,pri));
     else if(algo == Algo::asyncB_prt_hset)
-      Galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), Galois::wl<ObimHSet>(dummy,pri));
+      galois::for_each(graph.begin(), graph.end(),
+                       Process(graph, tolerance, amp), galois::wl<ObimHSet>(dummy,pri));
     else
-      Galois::for_each(graph.begin(), graph.end(), 
-                       Process(graph, tolerance, amp), Galois::wl<OBIM>(pri));
+      galois::for_each(graph.begin(), graph.end(), 
+                       Process(graph, tolerance, amp), galois::wl<OBIM>(pri));
   }
 
   void verify(Graph& graph, PRTy tolerance) {    
@@ -377,20 +377,20 @@ void run() {
 
   algo.readGraph(graph, filename, transposeGraphName);
 
-  Galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   auto eamp = -amp;///tolerance;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "tolerance: " << tolerance << "\n";
   std::cout << "effective amp: " << eamp << "\n";
   T.start();
-  Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+  galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   algo(graph, tolerance, eamp);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     algo.verify(graph, tolerance);
@@ -400,11 +400,11 @@ void run() {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
   outOnly = outOnlyP;
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
   case Algo::asyncB: run<Async>(); break;

@@ -59,12 +59,12 @@
 
 #include <cstdio>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace {
 
 template<typename T, unsigned ChunkSize>
-struct RingAdaptor: public Galois::FixedSizeBag<T,ChunkSize> {
+struct RingAdaptor: public galois::FixedSizeBag<T,ChunkSize> {
   typedef typename RingAdaptor::reference reference;
 
   int mark;
@@ -86,7 +86,7 @@ struct RingAdaptor: public Galois::FixedSizeBag<T,ChunkSize> {
 };
 
 template<typename T, unsigned ChunkSize>
-struct Bag: public Galois::gdeque<T, ChunkSize, RingAdaptor<T, ChunkSize> > {
+struct Bag: public galois::gdeque<T, ChunkSize, RingAdaptor<T, ChunkSize> > {
   typedef typename Bag::Block block_type;
 
   block_type* volatile cur;
@@ -266,7 +266,7 @@ template<typename ItemTy>
 struct typeof_worklist { typedef Worklistb<ItemTy, 256> type; };
 
 template<typename ItemTy>
-struct typeof_usercontext { typedef Galois::Runtime::UserContextAccess<ItemTy> type; };
+struct typeof_usercontext { typedef galois::Runtime::UserContextAccess<ItemTy> type; };
 
 template<typename FnTy>
 struct needs_push { typedef boost::mpl::bool_<DEPRECATED::ForEachTraits<FnTy>::NeedsPush> type; };
@@ -529,33 +529,33 @@ static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFn
 } // end Runtime
 } // end Galois
 
-namespace Galois {
+namespace galois {
 template<typename ItemsTy, typename ConTy, typename FnsTy>
 static inline void do_all_bs_local(ConTy& c, const FnsTy& fns) {
   typedef typename std::iterator_traits<typename ConTy::iterator>::value_type value_type;
-  typedef typename Galois::Runtime::CopyIn<value_type> InitFn;
-  Galois::Runtime::do_all_bs_impl<ItemsTy>(
-      Galois::Runtime::makeLocalRange(c), fns, InitFn(), 0);
+  typedef typename galois::Runtime::CopyIn<value_type> InitFn;
+  galois::Runtime::do_all_bs_impl<ItemsTy>(
+      galois::Runtime::makeLocalRange(c), fns, InitFn(), 0);
 }
 
 template<typename ItemsTy, typename ConTy, typename FnsTy, typename InitFnTy>
 static inline void do_all_bs_local(ConTy& c, const FnsTy& fns, InitFnTy initFn) {
-  Galois::Runtime::do_all_bs_impl<ItemsTy>(
-      Galois::Runtime::makeLocalRange(c), fns, initFn, 0);
+  galois::Runtime::do_all_bs_impl<ItemsTy>(
+      galois::Runtime::makeLocalRange(c), fns, initFn, 0);
 }
 
 template<typename ItemsTy, typename IterTy, typename FnsTy>
 static inline void do_all_bs(IterTy b, IterTy e, const FnsTy& fns) {
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
-  typedef typename Galois::Runtime::CopyIn<value_type> InitFn;
-  Galois::Runtime::do_all_bs_impl<ItemsTy>(
-      Galois::Runtime::makeStandardRange(b, e), fns, InitFn(), 0);
+  typedef typename galois::Runtime::CopyIn<value_type> InitFn;
+  galois::Runtime::do_all_bs_impl<ItemsTy>(
+      galois::Runtime::makeStandardRange(b, e), fns, InitFn(), 0);
 }
 
 template<typename ItemsTy, typename IterTy, typename FnsTy, typename InitFnTy>
 static inline void do_all_bs(IterTy b, IterTy e, const FnsTy& fns, InitFnTy initFn) {
-  Galois::Runtime::do_all_bs_impl<ItemsTy>(
-      Galois::Runtime::makeStandardRange(b, e), fns, initFn, 0);
+  galois::Runtime::do_all_bs_impl<ItemsTy>(
+      galois::Runtime::makeStandardRange(b, e), fns, initFn, 0);
 }
 }
 

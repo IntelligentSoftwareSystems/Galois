@@ -5,14 +5,14 @@
 #include <iostream>
 #include <cmath>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 bool didbcast = false;
 
-struct sayHi : public Galois::Runtime::Lockable {
+struct sayHi : public galois::Runtime::Lockable {
   sayHi() = default;
-  sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
-  sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
+  sayHi(galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
+  sayHi(galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }
   void getInitData(SerializeBuffer& b) {}
 };
@@ -54,13 +54,13 @@ int main(int argc, char** argv) {
     getSystemNetworkInterface().start();
   } else {
     net.sendAlt(1, lp3, 4U, 5U);
-    Galois::Runtime::PerHost<sayHi> p = Galois::Runtime::PerHost<sayHi>::allocate();
+    galois::Runtime::PerHost<sayHi> p = galois::Runtime::PerHost<sayHi>::allocate();
     std::cout << p.remote(1) << "\n";
-    Galois::Runtime::PerHost<sayHi>::deallocate(p);
+    galois::Runtime::PerHost<sayHi>::deallocate(p);
 
     std::cout << "Begin loop classic\n";
 
-    Galois::Timer T;
+    galois::Timer T;
     T.start();
     SendBuffer buf;
     gSerialize(buf,(int) NetworkInterface::ID);
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     T.stop();
     std::cout << "Time " << T.get() << "\n";
 
-    Galois::Timer T2;
+    galois::Timer T2;
     T2.start();
     net.sendAlt(1, lp2a);
     for (unsigned int i = 0; i < 1000000; ++i) {

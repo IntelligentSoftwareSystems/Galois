@@ -92,7 +92,7 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>("InitGraph");
   }
@@ -108,7 +108,7 @@ struct InitializeGraph {
 
 struct BFS {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  static galois::DGAccumulator<int> DGAccumulator_accum;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -134,7 +134,7 @@ struct BFS {
       			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
-      				{ Galois::atomicMin(node.dist_current, y);}
+      				{ galois::atomicMin(node.dist_current, y);}
       		}
       		static void reset (uint32_t node_id, struct NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -167,7 +167,7 @@ struct BFS {
       		BFS_cuda(cuda_ctx);
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
+      galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, galois::loopname("BFS"), galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
       _graph.sync_push<Syncer_0>("BFS");
       
       _graph.sync_pull<SyncerPull_0>("BFS");
@@ -188,21 +188,21 @@ struct BFS {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned long long new_dist = sdist + 1;
-      auto old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+      auto old_dist = galois::atomicMin(dnode.dist_current, new_dist);
       if(old_dist > new_dist){
         DGAccumulator_accum += 1;
       }
     }
   }
 };
-Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
+galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    Galois::StatManager statManager;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+    galois::StatManager statManager;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
 
     if(net.ID == 0){
@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
     for(auto run = 0; run < numRuns; ++run){
       std::cout << "BFS::go run " << run << " called  on " << net.ID << "\n";
       std::string timer_str("TIMER_" + std::to_string(run));
-      Galois::StatTimer StatTimer_main(timer_str.c_str());
+      galois::StatTimer StatTimer_main(timer_str.c_str());
 
       hg.reset_num_iter(run);
 
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
-        Galois::Runtime::getHostBarrier().wait();
+        galois::Runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
         InitializeGraph::go(hg);
       }
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

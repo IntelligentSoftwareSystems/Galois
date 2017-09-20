@@ -32,7 +32,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 //! [Define LC Graph]
-typedef Galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+typedef galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
 //! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
@@ -48,7 +48,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 //! [Operator in SSSPPullsimple]
 struct SSSP {
-  void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
+  void operator()(UpdateRequest& req, galois::UserContext<UpdateRequest>& ctx) const {
     GNode active_node = req.second;
     unsigned& data = graph.getData(active_node);
     unsigned newValue = data;
@@ -72,21 +72,21 @@ struct SSSP {
 //! [Operator in SSSPPullsimple]
 
 struct Init {
-  void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode& n, galois::UserContext<GNode>& ctx) const {
     graph.getData(n) = DIST_INFINITY;
   }
 };
 
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
 //! [ReadGraph]
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
 //! [ReadGraph]
 
-  Galois::for_each(graph.begin(), graph.end(), Init());
+  galois::for_each(graph.begin(), graph.end(), Init());
 
   //! [OrderedByIntegerMetic in SSSPsimple]
   struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
@@ -94,12 +94,12 @@ int main(int argc, char **argv) {
       return val.first >> stepShift;
     }
   };
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPPullsimple]
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPPullsimple]
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   for (auto ii : graph.edges(*graph.begin()))
     init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
 
-  Galois::for_each(init.begin(), init.end(), SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
+  galois::for_each(init.begin(), init.end(), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;

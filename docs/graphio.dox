@@ -6,13 +6,13 @@
 <hr>
 @subsection readwrite Reading graphs
 
-- {@link Galois::Graph::readGraph} is used to read in graphs. The parameters for this function are the following:
+- {@link galois::Graph::readGraph} is used to read in graphs. The parameters for this function are the following:
   
   - The first parameter is the graph type to be read in.
 
-  - When the graph type is not {@link Galois::Graph::LC_InOut_Graph}, the second parameter is either a file name represented by a std::string or a {@link Galois::Graph::FileGraph} object.
+  - When the graph type is not {@link galois::Graph::LC_InOut_Graph}, the second parameter is either a file name represented by a std::string or a {@link galois::Graph::FileGraph} object.
 
-  - When the graph type is {@link Galois::Graph::LC_InOut_Graph} and the graph is symmetric, the second parameter is The second parameter is the file name or {@link Galois::Graph::FileGraph} object representing the outgoing-neighbor graph. If the graph is not symmetric, the function takes two extra parameters besides the first parameter graph type. The second parameter is the file name or {@link Galois::Graph::FileGraph} object representing the outgoing-neighbor graph. The third parameter is the file name or {@link Galois::Graph::FileGraph} object representing the outgoing-neighbor graph. 
+  - When the graph type is {@link galois::Graph::LC_InOut_Graph} and the graph is symmetric, the second parameter is The second parameter is the file name or {@link galois::Graph::FileGraph} object representing the outgoing-neighbor graph. If the graph is not symmetric, the function takes two extra parameters besides the first parameter graph type. The second parameter is the file name or {@link galois::Graph::FileGraph} object representing the outgoing-neighbor graph. The third parameter is the file name or {@link galois::Graph::FileGraph} object representing the outgoing-neighbor graph. 
 
   - The file representing the graph should be a binary representation consistent with the in-memory representation of the graph object to be loaded in.
 
@@ -20,13 +20,13 @@
   
   @snippet apps/tutorial/SSSPsimple.cpp ReadGraph
 
-- An alternative way to read in graphs is through {@link Galois::Graph::FileGraph}. {@link Galois::Graph::FileGraph::structureFromFile} is used to mmap a binary format of graphs into a FileGraph object. Then {@link Galois::Graph::FirstGraph} or {@link Galois::Graph::LC_CSR_Graph} can be constructed from {@link Galois::Graph::FileGraph}. {@link Galois::Graph::LC_CSR_Graph} provides directly method {@link Galois::Graph::LC_CSR_Graph::constructFrom} to create {@link Galois::Graph::LC_CSR_Graph} from {@link Galois::Graph::FileGraph}.     
+- An alternative way to read in graphs is through {@link galois::Graph::FileGraph}. {@link galois::Graph::FileGraph::structureFromFile} is used to mmap a binary format of graphs into a FileGraph object. Then {@link galois::Graph::FirstGraph} or {@link galois::Graph::LC_CSR_Graph} can be constructed from {@link galois::Graph::FileGraph}. {@link galois::Graph::LC_CSR_Graph} provides directly method {@link galois::Graph::LC_CSR_Graph::constructFrom} to create {@link galois::Graph::LC_CSR_Graph} from {@link galois::Graph::FileGraph}.     
 
 <hr>
 
 @subsection writegraph Writing graphs
 
-{@link Galois::Graph::FileGraph::structureToFile} is used to write FileGraph to binary file. {@link Galois::Graph::FileGraphWriter} can be used to construct a FileGraph. {@link Galois::Graph::FileGraphWriter::setNumNodes} and {@link Galois::Graph::FileGraphWriter::setNumEdges} can be used to set the number of nodes and number of edges respectively. {@link Galois::Graph::FileGraphWriter::setSizeofEdgeData} is used to set the size of edge data. After setting the three values, {@link Galois::Graph::FileGraphWriter::phase1} has to be called to tell the function to transit to the next phase of counting the degree of nodes. In the transited phase, {@link Galois::Graph::FileGraphWriter::incrementDegree} is used to set the degree for each node in the graph. Then {@link Galois::Graph::FileGraphWriter::phase2} has to be called to tell the function to go to the next phase of adding edges. In the adding edge phase, {@link Galois::Graph::FileGraphWriter::addNeighbor} is used to add neighbors. After this phase, {@link Galois::Graph::FileGraphWriter::finish} has to be called to return a pointer which pointing to the memory location where the edge data can be saved. Then through this pointer, the edge data can be put into the graph.       
+{@link galois::Graph::FileGraph::structureToFile} is used to write FileGraph to binary file. {@link galois::Graph::FileGraphWriter} can be used to construct a FileGraph. {@link galois::Graph::FileGraphWriter::setNumNodes} and {@link galois::Graph::FileGraphWriter::setNumEdges} can be used to set the number of nodes and number of edges respectively. {@link galois::Graph::FileGraphWriter::setSizeofEdgeData} is used to set the size of edge data. After setting the three values, {@link galois::Graph::FileGraphWriter::phase1} has to be called to tell the function to transit to the next phase of counting the degree of nodes. In the transited phase, {@link galois::Graph::FileGraphWriter::incrementDegree} is used to set the degree for each node in the graph. Then {@link galois::Graph::FileGraphWriter::phase2} has to be called to tell the function to go to the next phase of adding edges. In the adding edge phase, {@link galois::Graph::FileGraphWriter::addNeighbor} is used to add neighbors. After this phase, {@link galois::Graph::FileGraphWriter::finish} has to be called to return a pointer which pointing to the memory location where the edge data can be saved. Then through this pointer, the edge data can be put into the graph.       
 
 An example can be seen in {@link apps/pagerank/PageRank.cpp}: 
 
@@ -36,7 +36,7 @@ An example can be seen in {@link apps/pagerank/PageRank.cpp}:
 
 @subsection graphconvert Tools to convert graphs among different formats
 
-graph-convert in the directory of tools/graph-convert can be used to convert the graph files among different formats. The \--help parameter will give the detailed parameters for converting and supported formats. In particular, it can convert a few ASCII-format graph files(e.g. edge list) into binary format which can be directly loaded in by {@link Galois::Graph::readGraph} or {@link Galois::Graph::FileGraph::structureFromFile}.  
+graph-convert in the directory of tools/graph-convert can be used to convert the graph files among different formats. The \--help parameter will give the detailed parameters for converting and supported formats. In particular, it can convert a few ASCII-format graph files(e.g. edge list) into binary format which can be directly loaded in by {@link galois::Graph::readGraph} or {@link galois::Graph::FileGraph::structureFromFile}.  
 
 <hr>
 */

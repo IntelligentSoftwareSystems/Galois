@@ -724,7 +724,7 @@ struct PerThread
     }
 };
 
-typedef Galois::Runtime::PerThreadStorage<PerThread> PTS;
+typedef galois::Runtime::PerThreadStorage<PerThread> PTS;
 
 template<typename Graph>
 struct TreeExecModel
@@ -792,7 +792,7 @@ struct TreeExecModel
   };
 
   void run() {
-    Galois::Runtime::for_each_ordered_tree(*(rootnodes.begin()),
+    galois::Runtime::for_each_ordered_tree(*(rootnodes.begin()),
                     GaloisDivide(this),
                     GaloisConquer(this),
                     "SuperNodalCholesky");
@@ -801,7 +801,7 @@ struct TreeExecModel
 
 int main(int argc, char *argv[]) {
   LonestarStart(argc, argv, 0,0,0); 
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   MutableGraph<true> *temp = new MutableGraph<true>;
   BidiGraph graph(*temp);
   delete temp;
@@ -823,7 +823,7 @@ int main(int argc, char *argv[]) {
   //////////////////////////////////////////////////////////////////////
 
 
-  Galois::StatTimer T("NumericTime");
+  galois::StatTimer T("NumericTime");
   PTS pts(max_c_size);
   TreeExecModel<SuperGraph> tm(&sg, &pts);
   papi_start();

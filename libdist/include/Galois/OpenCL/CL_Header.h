@@ -51,7 +51,7 @@ extern "C" {
 //////////////////////////////////////////
 #ifndef GOPT_CL_HEADER_H_
 #define GOPT_CL_HEADER_H_
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 CLContext * getCLContext(){
    static CLContext ctx;

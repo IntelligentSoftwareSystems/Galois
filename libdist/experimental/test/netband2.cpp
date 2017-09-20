@@ -9,7 +9,7 @@
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Timer.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 static std::atomic<int> num;
 
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
 
   for (int s = 10 ; s < trials; s*=1.1) { //1069 is from 10. 243470 is also
     std::vector<char> vec(s);
-    Galois::Timer T1, T2, T3;
+    galois::Timer T1, T2, T3;
     bar.wait();
     T3.start();
     T1.start();

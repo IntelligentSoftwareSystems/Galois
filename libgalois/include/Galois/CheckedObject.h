@@ -25,7 +25,7 @@
 
 #include "Galois/Runtime/Context.h"
 
-namespace Galois {
+namespace galois {
 
 /**
  * Conflict-checking wrapper for any type.  Performs global conflict detection
@@ -33,29 +33,29 @@ namespace Galois {
  * Galois runtime.
  */
 template<typename T>
-class GChecked : public Galois::Runtime::Lockable {
+class GChecked : public galois::Runtime::Lockable {
   T val;
 
 public:
   template<typename... Args>
   GChecked(Args&&... args): val(std::forward<Args>(args)...) { }
 
-  T& get(Galois::MethodFlag m = MethodFlag::WRITE) {
-    Galois::Runtime::acquire(this, m);
+  T& get(galois::MethodFlag m = MethodFlag::WRITE) {
+    galois::Runtime::acquire(this, m);
     return val;
   }
 
-  const T& get(Galois::MethodFlag m = MethodFlag::WRITE) const {
-    Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
+  const T& get(galois::MethodFlag m = MethodFlag::WRITE) const {
+    galois::Runtime::acquire(const_cast<GChecked*>(this), m);
     return val;
   }
 };
 
 template<>
-class GChecked<void>: public Galois::Runtime::Lockable {
+class GChecked<void>: public galois::Runtime::Lockable {
 public:
-  void get(Galois::MethodFlag m = MethodFlag::WRITE) const {
-    Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
+  void get(galois::MethodFlag m = MethodFlag::WRITE) const {
+    galois::Runtime::acquire(const_cast<GChecked*>(this), m);
   }
 };
 

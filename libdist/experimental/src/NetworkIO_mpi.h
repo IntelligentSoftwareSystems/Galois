@@ -51,7 +51,7 @@ std::pair<int, int> initMPI() {
 }
 
 
-class NetworkIOMPI : public Galois::Runtime::NetworkIO {
+class NetworkIOMPI : public galois::Runtime::NetworkIO {
 public:
   using NetworkIO::message;
   

@@ -80,7 +80,7 @@ struct InitializeGraph{
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, Galois::loopname("SGD Init"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, galois::loopname("SGD Init"));
   }
 
   void operator()(GNode src) const {
@@ -106,7 +106,7 @@ void dummy_func(SGD_NodeData& user, SGD_NodeData& movie){
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 double calcPrediction (const SGD_NodeData& movie_data, const SGD_NodeData& user_data) {
-  double pred = Galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
+  double pred = galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
   double p = pred;
   pred = std::min (MAXVAL, pred);
   pred = std::max (MINVAL, pred);
@@ -121,7 +121,7 @@ struct Sgd {
 
   Sgd(Graph* _graph, double _step_size) : graph(_graph), step_size(_step_size){}
   void static go(Graph& _graph, double _step_size) {
-      Galois::do_all(_graph.begin(), _graph.end(), Sgd{&_graph, _step_size}, Galois::loopname("SGD"));
+      galois::do_all(_graph.begin(), _graph.end(), Sgd{&_graph, _step_size}, galois::loopname("SGD"));
   }
 
   void operator()(GNode src) const {
@@ -136,7 +136,7 @@ struct Sgd {
       double edge_rating = graph->getEdgeData(dst);
 
       //doGradientUpdate
-     double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
+     double old_dp = galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
      double cur_error = edge_rating - old_dp;
      assert(cur_error < 1000 && cur_error > -1000);
      for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
 
     OfflineGraph g(inputFile);
 

@@ -51,13 +51,13 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
-typedef Galois::GAtomicPadded<bool> AtomicBool_ty;
+typedef galois::GAtomicPadded<bool> AtomicBool_ty;
 
 static const bool DEBUG = false;
 
@@ -94,10 +94,10 @@ struct SimObjInfo: public TypeHelper<> {
   };
 
 
-  typedef Galois::Substrate::PaddedLock<true> Lock_ty;
+  typedef galois::Substrate::PaddedLock<true> Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<MarkedEvent, Cmp_ty
-    , Galois::FixedSizeAllocator<MarkedEvent> > PQ;
+    , galois::FixedSizeAllocator<MarkedEvent> > PQ;
   // typedef std::priority_queue<MarkedEvent, std::vector<MarkedEvent>, Cmp_ty::RevCmp> PQ;
 
   Lock_ty mutex;
@@ -367,7 +367,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -410,11 +410,11 @@ protected:
     while (true) {
       ++round;
 
-      typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
+      typedef galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
-      Galois::for_each(initWL.begin (), initWL.end (), 
+      galois::for_each(initWL.begin (), initWL.end (), 
                        OpFuncSet (graph, sobjInfoVec, newEvents,  nevents),
-                       Galois::wl<WL_ty>());
+                       galois::wl<WL_ty>());
 
       initWL.clear ();
 

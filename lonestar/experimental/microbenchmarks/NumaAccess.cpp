@@ -67,14 +67,14 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValEnd), cll::init(Algo::globalInterleaved));
 
 typedef unsigned int Element;
-typedef Galois::LargeArray<Element> Array;
+typedef galois::LargeArray<Element> Array;
 
 static volatile Element globalCounter = 0;
 
 struct StarGraphRead {
   Array& array;
-  Galois::Substrate::Barrier& barrier;
-  StarGraphRead(Array& _a, Galois::Substrate::Barrier& b): array(_a), barrier(b) {}
+  galois::Substrate::Barrier& barrier;
+  StarGraphRead(Array& _a, galois::Substrate::Barrier& b): array(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() + (unsigned)tid;
@@ -89,7 +89,7 @@ struct StarGraphRead {
     // eliminate uneven thread launching overhead
     barrier.wait();
 
-    Galois::StatTimer timer("AccessTime");
+    galois::StatTimer timer("AccessTime");
     timer.start();
 
     for(unsigned i = 0; i < accesses; i++) {
@@ -109,8 +109,8 @@ struct StarGraphRead {
 
 struct GlobalAccess {
   Array& array;
-  Galois::Substrate::Barrier& barrier;
-  GlobalAccess(Array& _a, Galois::Substrate::Barrier& b): array(_a), barrier(b) {}
+  galois::Substrate::Barrier& barrier;
+  GlobalAccess(Array& _a, galois::Substrate::Barrier& b): array(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() + (unsigned)tid;
@@ -132,7 +132,7 @@ struct GlobalAccess {
     // eliminate uneven thread launching overhead
     barrier.wait();
 
-    Galois::StatTimer timer("AccessTime");
+    galois::StatTimer timer("AccessTime");
     timer.start();
 
     unsigned start = distribution(generator);
@@ -166,12 +166,12 @@ struct LocalArray {
   }
 };
 
-typedef Galois::Substrate::PerPackageStorage<LocalArray> PerPackageArray;
+typedef galois::Substrate::PerPackageStorage<LocalArray> PerPackageArray;
 
 struct LocalAccess {
   PerPackageArray& pArray;
-  Galois::Substrate::Barrier& barrier;
-  LocalAccess(PerPackageArray& _a, Galois::Substrate::Barrier& b): pArray(_a), barrier(b) {}
+  galois::Substrate::Barrier& barrier;
+  LocalAccess(PerPackageArray& _a, galois::Substrate::Barrier& b): pArray(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned numEntry = pArray.getLocal()->numEntry;
@@ -196,7 +196,7 @@ struct LocalAccess {
     // eliminate uneven thread launching overhead
     barrier.wait();
 
-    Galois::StatTimer timer("AccessTime");
+    galois::StatTimer timer("AccessTime");
     timer.start();
 
     unsigned start = distribution(generator);
@@ -220,7 +220,7 @@ struct LocalMalloc {
   LocalMalloc(PerPackageArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
-    if(Galois::Substrate::ThreadPool::isLeader()) {
+    if(galois::Substrate::ThreadPool::isLeader()) {
       pArray.getLocal()->alloc();
     }
   }
@@ -231,26 +231,26 @@ struct LocalFree {
   LocalFree(PerPackageArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
-    if(Galois::Substrate::ThreadPool::isLeader()) {
+    if(galois::Substrate::ThreadPool::isLeader()) {
       pArray.getLocal()->dealloc();
     }
   }
 };
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer totalTime("TotalTime");
-  Galois::StatTimer T;
+  galois::StatTimer totalTime("TotalTime");
+  galois::StatTimer T;
   
   totalTime.start();
   Array array;
-  unsigned numPackageUsed = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::Runtime::activeThreads)+1;
+  unsigned numPackageUsed = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::Runtime::activeThreads)+1;
   PerPackageArray perPackageArray(numArrayEntry/numPackageUsed);
 
   if(algo == Algo::local) {
-    Galois::on_each(LocalMalloc(perPackageArray), Galois::loopname("LocalMalloc"));
+    galois::on_each(LocalMalloc(perPackageArray), galois::loopname("LocalMalloc"));
   } else if(algo == Algo::globalLarge || algo == starLargeGraphRead) {
     array.allocateLocal(numArrayEntry);
   } else {
@@ -258,18 +258,18 @@ int main(int argc, char **argv) {
   }
 
   T.start();
-  auto& barrier = Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
+  auto& barrier = galois::Runtime::getBarrier(galois::Runtime::activeThreads);
   if(algo == Algo::starInterleavedGraphRead || algo == Algo::starLargeGraphRead) {
-    Galois::on_each(StarGraphRead(array, barrier), Galois::loopname("StarGraphRead"));
+    galois::on_each(StarGraphRead(array, barrier), galois::loopname("StarGraphRead"));
   } else if(algo == Algo::local) {
-    Galois::on_each(LocalAccess(perPackageArray, barrier), Galois::loopname("LocalAccess"));
+    galois::on_each(LocalAccess(perPackageArray, barrier), galois::loopname("LocalAccess"));
   } else {
-    Galois::on_each(GlobalAccess(array, barrier), Galois::loopname("GlobalAccess"));
+    galois::on_each(GlobalAccess(array, barrier), galois::loopname("GlobalAccess"));
   }
   T.stop();
 
   if(algo == Algo::local) {
-    Galois::on_each(LocalFree(perPackageArray), Galois::loopname("LocalFree"));
+    galois::on_each(LocalFree(perPackageArray), galois::loopname("LocalFree"));
   }
 
   totalTime.stop();

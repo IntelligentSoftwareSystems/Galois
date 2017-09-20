@@ -41,7 +41,7 @@
 #include <boost/array.hpp>
 #include <boost/mpl/has_xxx.hpp>
 
-namespace Galois {
+namespace galois {
 /**
  * Indicates the operator doesn't need abort support
  */
@@ -67,7 +67,7 @@ struct Pipeline {
 
 }
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace Task {
 
@@ -77,7 +77,7 @@ class UserTask {
 };
 
 struct RuntimeTask: public UserTask {
-  typedef Galois::gslist<RuntimeTask*,4> OutExtraType;
+  typedef galois::gslist<RuntimeTask*,4> OutExtraType;
 
 protected:
   typedef boost::array<RuntimeTask*,2> OutType;
@@ -173,7 +173,7 @@ struct TaskTraits {
   enum {
     hasTask = true,
     hasInspect = sizeof(test<TaskTy>(0)) == sizeof(yes),
-    needsAbort = Galois::needs_aborts<TaskTy>::value
+    needsAbort = galois::needs_aborts<TaskTy>::value
   };
 };
 
@@ -215,7 +215,7 @@ struct CallWrapper<false> {
 template<typename PipelineTy>
 class UserTaskContext: private boost::noncopyable {
 protected:
-  typedef Galois::gdeque<RuntimeTask*> BufType;
+  typedef galois::gdeque<RuntimeTask*> BufType;
 
   typedef typename TaskTraits<typename PipelineTy::Task1Type>::GTaskType GTask1Type;
   typedef typename TaskTraits<typename PipelineTy::Task2Type>::GTaskType GTask2Type;
@@ -223,24 +223,24 @@ protected:
   typedef typename TaskTraits<typename PipelineTy::Task4Type>::GTaskType GTask4Type;
   typedef typename TaskTraits<typename PipelineTy::Task5Type>::GTaskType GTask5Type;
 
-  Galois::gdeque<GTask1Type,64> task1;
-  Galois::gdeque<GTask2Type,64> task2;
-  Galois::gdeque<GTask3Type,64> task3;
-  Galois::gdeque<GTask4Type,64> task4;
-  Galois::gdeque<GTask5Type,64> task5;
+  galois::gdeque<GTask1Type,64> task1;
+  galois::gdeque<GTask2Type,64> task2;
+  galois::gdeque<GTask3Type,64> task3;
+  galois::gdeque<GTask4Type,64> task4;
+  galois::gdeque<GTask5Type,64> task5;
 
   BufType buf;
   
-  Galois::IterAllocBaseTy IterationAllocatorBase;
-  Galois::PerIterAllocTy PerIterationAllocator;
-  Galois::Runtime::FixedSizeHeap heap;
+  galois::IterAllocBaseTy IterationAllocatorBase;
+  galois::PerIterAllocTy PerIterationAllocator;
+  galois::Runtime::FixedSizeHeap heap;
 
   UserTaskContext():
     PerIterationAllocator(&IterationAllocatorBase), 
     heap(sizeof(typename RuntimeTask::OutExtraType::block_type)) { }
 
 public:
-  Galois::PerIterAllocTy& getPerIterAlloc() { return PerIterationAllocator; }
+  galois::PerIterAllocTy& getPerIterAlloc() { return PerIterationAllocator; }
 
   template<typename... Args>
   GTask1Type* addTask1(Args&&... args) {
@@ -278,18 +278,18 @@ public:
 }
 
 // Export user visible types
-namespace Galois {
+namespace galois {
 template<typename PipelineTy>
-struct TaskContext: public Galois::Runtime::Task::UserTaskContext<PipelineTy> { };
+struct TaskContext: public galois::Runtime::Task::UserTaskContext<PipelineTy> { };
 }
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace Task {
 
 template<typename PipelineTy>
-class RuntimeTaskContext: public Galois::TaskContext<PipelineTy> {
-  typedef Galois::TaskContext<PipelineTy> SuperType;
+class RuntimeTaskContext: public galois::TaskContext<PipelineTy> {
+  typedef galois::TaskContext<PipelineTy> SuperType;
   typedef typename TaskTraits<typename PipelineTy::Task1Type>::GTaskType GTask1Type;
 
   template<typename TaskTy,typename DequeTy>
@@ -369,11 +369,11 @@ public:
 }
 
 // Export user visible types
-namespace Galois {
-typedef Galois::Runtime::Task::UserTask* Task;
+namespace galois {
+typedef galois::Runtime::Task::UserTask* Task;
 }
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace Task {
 
@@ -432,7 +432,7 @@ class Executor {
     setThreadContext(&tld.ctx);
 
     int count;
-    Galois::optional<typename TaskTraits<TaskTy>::GTaskType*> p;
+    galois::optional<typename TaskTraits<TaskTy>::GTaskType*> p;
     InspectWrapper<TaskTraits<TaskTy>::hasInspect> inspect;
     CallWrapper<TaskTraits<TaskTy>::hasTask> call;
     int result = 0;
@@ -460,7 +460,7 @@ class Executor {
     //FIXME:    clearReleasable(); 
     switch (result) {
       case 0: break;
-      case Galois::Runtime::CONFLICT:
+      case galois::Runtime::CONFLICT:
         tld.facing.abort();
         tld.facing.reset();
         tld.stat.inc_conflicts();
@@ -479,7 +479,7 @@ class Executor {
   template<typename TaskTy,typename WLTy>
   void processSimple(ThreadLocalData& tld, WLTy& wl, bool& didWork) {
     int count;
-    Galois::optional<typename TaskTraits<TaskTy>::GTaskType*> p;
+    galois::optional<typename TaskTraits<TaskTy>::GTaskType*> p;
     InspectWrapper<TaskTraits<TaskTy>::hasInspect> inspect;
     CallWrapper<TaskTraits<TaskTy>::hasTask> call;
 
@@ -507,8 +507,8 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Runtime::getBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
-    barrier.reinit(Galois::getActiveThreads());
+  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(galois::getActiveThreads())), barrier(Runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+    barrier.reinit(galois::getActiveThreads());
   }
 
   void initThread(void) {
@@ -517,7 +517,7 @@ public:
 
   void operator()() {
     ThreadLocalData tld(loopname);
-    std::pair<IterTy,IterTy> range = Galois::block_range(initialBegin, initialEnd, Substrate::ThreadPool::getTID(), Galois::getActiveThreads());
+    std::pair<IterTy,IterTy> range = galois::block_range(initialBegin, initialEnd, Substrate::ThreadPool::getTID(), galois::getActiveThreads());
     tld.facing.push_initial(range.first, range.second, wls.wl1);
 
     barrier.wait();
@@ -581,16 +581,16 @@ public:
 }
 }
 
-namespace Galois {
+namespace galois {
 
 //! Task executor
 template<typename PipelineTy,typename IterTy>
 static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
-  typedef Galois::Runtime::Task::Executor<PipelineTy,IterTy> WorkTy;
+  typedef galois::Runtime::Task::Executor<PipelineTy,IterTy> WorkTy;
 
   WorkTy W(b, e, loopname);
   
-  using namespace Galois::Runtime;
+  using namespace galois::Runtime;
   Substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }
 

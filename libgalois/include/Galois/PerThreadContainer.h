@@ -58,7 +58,7 @@
 #include "Galois/Runtime/Mem.h"
 #include "Galois/gIO.h"
 
-namespace Galois {
+namespace galois {
 
 namespace {
 
@@ -258,10 +258,10 @@ public:
   typedef OuterPerThreadWLIter<This_ty> OuterIter;
   typedef typename std::reverse_iterator<OuterIter> RvrsOuterIter;
 #endif
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::iterator>::type global_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::const_iterator>::type global_const_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::reverse_iterator>::type global_reverse_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::const_reverse_iterator>::type global_const_reverse_iterator;
+  typedef typename galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::iterator>::type global_iterator;
+  typedef typename galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::const_iterator>::type global_const_iterator;
+  typedef typename galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::reverse_iterator>::type global_reverse_iterator;
+  typedef typename galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::const_reverse_iterator>::type global_const_reverse_iterator;
 
   typedef global_iterator iterator;
   typedef global_const_iterator const_iterator;
@@ -280,7 +280,7 @@ private:
     }
 
     container_type** getLocal () const {
-      return getRemote (Galois::Runtime::LL::getTID ());
+      return getRemote (galois::Runtime::LL::getTID ());
     }
 
     container_type** getRemote (size_t i) const {
@@ -288,12 +288,12 @@ private:
       return const_cast<container_type**> (&v[i]);
     }
 
-    size_t size () const { return Galois::Runtime::LL::getMaxThreads(); }
+    size_t size () const { return galois::Runtime::LL::getMaxThreads(); }
 
   };
 #endif
   // typedef FakePTS PerThrdCont_ty;
-  typedef Galois::Substrate::PerThreadStorage<container_type*> PerThrdCont_ty;
+  typedef galois::Substrate::PerThreadStorage<container_type*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
   void destroy() {
@@ -339,12 +339,12 @@ public:
 
 
   global_iterator begin_all() { 
-    return Galois::stl_two_level_begin(
+    return galois::stl_two_level_begin(
         make_outer_begin(*this), make_outer_end(*this)); 
   }
 
   global_iterator end_all() { 
-    return Galois::stl_two_level_end(
+    return galois::stl_two_level_end(
         make_outer_begin(*this), make_outer_end(*this)); 
   }
 
@@ -370,22 +370,22 @@ public:
   global_const_iterator cend () const { return cend_all (); }
 
   global_const_iterator cbegin_all() const { 
-    return Galois::stl_two_level_cbegin(
+    return galois::stl_two_level_cbegin(
         make_outer_begin(*this), make_outer_end(*this));
   }
 
   global_const_iterator cend_all() const { 
-    return Galois::stl_two_level_cend(
+    return galois::stl_two_level_cend(
         make_outer_begin(*this), make_outer_end(*this));
   }
 
   global_reverse_iterator rbegin_all() { 
-    return Galois::stl_two_level_rbegin(
+    return galois::stl_two_level_rbegin(
         make_outer_rbegin(*this), make_outer_rend(*this)); 
   }
 
   global_reverse_iterator rend_all() { 
-    return Galois::stl_two_level_rend(
+    return galois::stl_two_level_rend(
         make_outer_rbegin(*this), make_outer_rend(*this)); 
   }
 
@@ -398,12 +398,12 @@ public:
   }
 
   global_const_reverse_iterator crbegin_all() const { 
-    return Galois::stl_two_level_crbegin(
+    return galois::stl_two_level_crbegin(
         make_outer_rbegin(*this), make_outer_rend(*this));
   }
 
   global_const_reverse_iterator crend_all() const { 
-    return Galois::stl_two_level_crend(
+    return galois::stl_two_level_crend(
         make_outer_rbegin(*this), make_outer_rend(*this));
   }
 
@@ -450,11 +450,11 @@ public:
 
     // XXX: following implementation causes problems with allocators
     // that allocate per thread separately
-    // auto r = Galois::Runtime::makeStandardRange (
+    // auto r = galois::Runtime::makeStandardRange (
         // boost::counting_iterator<unsigned> (0),
         // boost::counting_iterator<unsigned> (perThrdCont.size ()));
 // 
-    // Galois::Runtime:: do_all_impl (
+    // galois::Runtime:: do_all_impl (
         // r, 
         // [this] (unsigned i) {
           // get (i).clear ();
@@ -475,7 +475,7 @@ public:
 
   template <typename Range, typename Ret>
   void fill_parallel (const Range& range, Ret (container_type::*pushFn) (const value_type&) = &container_type::push_back) {
-    Galois::Runtime::do_all_impl (
+    galois::Runtime::do_all_impl (
         range,
         [this, pushFn] (const typename Range::value_type& v) {
           container_type& my = get ();
@@ -491,7 +491,7 @@ public:
   // void fill_serial(Iter begin, Iter end,
       // R(container_type::*pushFn)(const value_type&) = &container_type::push_back) {
 // 
-    // const unsigned P = Galois::getActiveThreads();
+    // const unsigned P = galois::getActiveThreads();
 // 
     // typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
 // 
@@ -542,7 +542,7 @@ public:
   }
 
   void reserve_all(size_t sz) {
-    size_t numT = Galois::getActiveThreads();
+    size_t numT = galois::getActiveThreads();
     size_t perT = (sz + numT - 1) / numT; // round up
 
     for (unsigned i = 0; i < numT; ++i) {
@@ -572,9 +572,9 @@ public:
 };
 
 template <typename T, unsigned ChunkSize=64>
-class PerThreadGdeque: public PerThreadContainer<Galois::gdeque<T, ChunkSize> > {
+class PerThreadGdeque: public PerThreadContainer<galois::gdeque<T, ChunkSize> > {
 
-  using Super_ty = PerThreadContainer<Galois::gdeque<T, ChunkSize> >;
+  using Super_ty = PerThreadContainer<galois::gdeque<T, ChunkSize> >;
   
 public:
 
@@ -665,5 +665,5 @@ public:
 };
 
 
-} // end namespace Galois
+} // end namespace galois
 #endif // GALOIS_PERTHREADCONTAINER_H

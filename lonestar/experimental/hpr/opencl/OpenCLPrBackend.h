@@ -14,8 +14,8 @@ template<typename GraphType>
 struct OPENCL_Context {
    typedef typename GraphType::NodeDataType NodeDataType;
    GraphType m_graph;
-   Galois::OpenCL::CL_Kernel kernel;
-   Galois::OpenCL::CL_Kernel wb_kernel;
+   galois::OpenCL::CL_Kernel kernel;
+   galois::OpenCL::CL_Kernel wb_kernel;
    OPENCL_Context() {
    }
 
@@ -41,7 +41,7 @@ struct OPENCL_Context {
       return std::string(buffer);
    }
    void init(int num_items, int num_inits) {
-      Galois::OpenCL::CL_Kernel init_all, init_nout;
+      galois::OpenCL::CL_Kernel init_all, init_nout;
       kernel.init("pagerank_kernel.cl", "pagerank");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
       init_nout.init("pagerank_kernel.cl", "initialize_nout");

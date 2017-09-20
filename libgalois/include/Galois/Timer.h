@@ -40,7 +40,7 @@
 #include <cstdio>
 #include <ctime>
 
-namespace Galois {
+namespace galois {
 
 //! Flag type for {@link StatTimer}
 struct start_now_t {};
@@ -143,7 +143,7 @@ public:
     if (valid)
       stop();
     if (TimeAccumulator::get()) // only report non-zero stat
-      Galois::Runtime::reportStat_Tmax(region, name, get());
+      galois::Runtime::reportStat_Tmax(region, name, get());
   }
 
   void start() {
@@ -211,14 +211,14 @@ protected:
     std::string timeCat = category + std::string("-per-thread-times(ns)");
     std::string lagCat = category + std::string("-per-thread-lag(ns)");
 
-    Galois::Substrate::getThreadPool(Galois::getActiveThreads(),
+    galois::Substrate::getThreadPool(galois::getActiveThreads(),
         [&] (void) {
           auto ns = timers.getLocal()->get_nsec();
           auto lag = ns - minTime;
           assert(lag > 0 && "negative time lag from min is impossible");
 
-          Galois::Runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
-          Galois::Runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
+          galois::Runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
+          galois::Runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
         });
 
     // for (unsigned i = 0; i < timers.size(); ++i) {
@@ -227,8 +227,8 @@ protected:
       // auto lag = ns - minTime;
       // assert(lag > 0 && "negative time lag from min is impossible");
 // 
-      // Galois::Runtime::reportStat(region, lagCat.c_str(), lag, i);
-      // Galois::Runtime::reportStat(region, timeCat.c_str(), ns, i);
+      // galois::Runtime::reportStat(region, lagCat.c_str(), lag, i);
+      // galois::Runtime::reportStat(region, timeCat.c_str(), ns, i);
     // }
   }
 
@@ -265,6 +265,6 @@ public:
 
 };
 
-} // end namespace Galois
+} // end namespace galois
 #endif
 

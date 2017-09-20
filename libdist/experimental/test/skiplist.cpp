@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 
-void check(const Galois::optional<int>& r, int exp) {
+void check(const galois::optional<int>& r, int exp) {
   if (r && *r == exp)
     ;
   else {
@@ -13,7 +13,7 @@ void check(const Galois::optional<int>& r, int exp) {
 }
 
 void testSerial() {
-  Galois::ConcurrentSkipListMap<int,int> map;
+  galois::ConcurrentSkipListMap<int,int> map;
   int v = 0;
 
   for (int i = 100; i >= 0; --i) {
@@ -26,7 +26,7 @@ void testSerial() {
 }
 
 void testSerial1() {
-  Galois::ConcurrentSkipListMap<int,int> map;
+  galois::ConcurrentSkipListMap<int,int> map;
   std::vector<int> keys;
 
   for (int i = 0; i < 100; ++i)
@@ -47,9 +47,9 @@ void testSerial1() {
 }
 
 struct Process {
-  Galois::ConcurrentSkipListMap<int,int>* map;
+  galois::ConcurrentSkipListMap<int,int>* map;
   int dummy;
-  Process(Galois::ConcurrentSkipListMap<int,int>& m) : map(&m) { }
+  Process(galois::ConcurrentSkipListMap<int,int>& m) : map(&m) { }
   Process() = default;
 
   template<typename Context>
@@ -60,18 +60,18 @@ struct Process {
 
 void testConcurrent() {
   const int top = 1000;
-  Galois::ConcurrentSkipListMap<int,int> map;
+  galois::ConcurrentSkipListMap<int,int> map;
   std::vector<int> range;
   for (int i = top; i >= 0; --i)
     range.push_back(i);
 
-  int numThreads = Galois::setActiveThreads(2);
+  int numThreads = galois::setActiveThreads(2);
   if (numThreads < 2) {
     assert(0 && "Unable to run with multiple threads");
     abort();
   }
 
-  Galois::for_each(range.begin(), range.end(), Process(map));
+  galois::for_each(range.begin(), range.end(), Process(map));
 
   for (int i = 0; i <= top; ++i) {
     check(map.pollFirstKey(), i);

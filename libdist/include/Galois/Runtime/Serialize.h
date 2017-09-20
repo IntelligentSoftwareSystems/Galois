@@ -58,7 +58,7 @@ using is_trivially_copyable = is_trivial<T>;
 #endif
 //#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 //Objects with this tag have a member function which serializes them.
@@ -266,7 +266,7 @@ inline size_t gSerializeObj(const std::deque<T, Alloc>& data) {
 }
 
 template<typename T, unsigned CS>
-inline size_t gSizedObj(const Galois::gdeque<T,CS>& data) {
+inline size_t gSizedObj(const galois::gdeque<T,CS>& data) {
   return gSizedSeq(data);
 }
 
@@ -285,7 +285,7 @@ inline size_t gSizedObj(const DeSerializeBuffer& rbuf) {
 }
 
 template<typename T>
-inline size_t gSizedObj(const Galois::InsertBag<T>& bag){
+inline size_t gSizedObj(const galois::InsertBag<T>& bag){
   return bag.size();
 }
 
@@ -325,7 +325,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
 template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, const Galois::CopyableAtomic<T>& data){
+inline void gSerializeObj(SerializeBuffer& buf, const galois::CopyableAtomic<T>& data){
   buf.insert((uint8_t*)data.load(), sizeof(T));
 }
 
@@ -373,7 +373,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data
 }
 
 template<typename T, unsigned CS>
-inline void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const galois::gdeque<T,CS>& data) {
   gSerializeSeq(buf,data);
 }
 
@@ -390,11 +390,11 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
 
 
 //template<typename T>
-//inline void gSerializeObj(SerializeBuffer& buf, const std::vector<Galois::CopyableAtomic<T>>& data){
+//inline void gSerializeObj(SerializeBuffer& buf, const std::vector<galois::CopyableAtomic<T>>& data){
   //gSerializeSeq(buf, data);
 //}
 
-inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& data) {
      gSerializeObj(buf, data.size());
      gSerializeObj(buf, data.get_vec());
 }
@@ -409,7 +409,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const Galois::DynamicBitSet& dat
  * into a linear sequence like vector or deque.
  */
 template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, Galois::InsertBag<T>& bag){
+inline void gSerializeObj(SerializeBuffer& buf, galois::InsertBag<T>& bag){
   gSerializeObj(buf, bag.size());
   auto headerVec = bag.getHeads();
   size_t totalSize = 0;
@@ -556,11 +556,11 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
 }
 
 template<typename T, unsigned CS>
-void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
+void gDeserializeObj(DeSerializeBuffer& buf, galois::gdeque<T,CS>& data) {
   gDeserializeSeq(buf, data);
 }
 
-inline void gDeserializeObj(DeSerializeBuffer& buf, Galois::DynamicBitSet& data) {
+inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data) {
   size_t size = 0;
   gDeserializeObj(buf, size);
   data.resize(size);

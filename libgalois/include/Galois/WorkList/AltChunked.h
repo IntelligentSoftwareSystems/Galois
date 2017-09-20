@@ -38,7 +38,7 @@
 #include "Galois/Runtime/Mem.h"
 #include "WLCompileCheck.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 struct ChunkHeader {
@@ -247,7 +247,7 @@ class StealingQueue : private boost::noncopyable {
     auto& tp = Substrate::getThreadPool();
     unsigned id = tp.getTID();
     unsigned pkg = Substrate::ThreadPool::getPackage();
-    unsigned num = Galois::getActiveThreads();
+    unsigned num = galois::getActiveThreads();
 
     //First steal from this package
     for (unsigned eid = id + 1; eid < num; ++eid) {
@@ -302,7 +302,7 @@ struct AltChunkedMaster : private boost::noncopyable {
   using with_chunk_size = AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T>;
 
 private:
-  class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
+  class Chunk : public ChunkHeader, public galois::FixedSizeRing<T, ChunkSize> {};
 
   Runtime::FixedSizeAllocator<Chunk> alloc;
   Substrate::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
@@ -339,7 +339,7 @@ private:
     return c->push_back(val);
   }
 
-  Galois::optional<T> doPop(Chunk* c) {
+  galois::optional<T> doPop(Chunk* c) {
     if (!IsLocallyLIFO)
       return c->extract_front();
     else
@@ -384,10 +384,10 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     std::pair<Chunk*, Chunk*>& tld = *data.getLocal();
     Chunk*& n = getPopChunk(tld);
-    Galois::optional<value_type> retval;
+    galois::optional<value_type> retval;
     //simple case, things in current chunk
     if (n && (retval = doPop(n)))
       return retval;

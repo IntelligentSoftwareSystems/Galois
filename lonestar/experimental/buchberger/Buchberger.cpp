@@ -729,16 +729,16 @@ Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
   return const_cast<Poly*>(cur);
 }
 
-Galois::Statistic bkUpdate("BKUpdate");
-Galois::Statistic mfUpdate("MFUpdate");
-Galois::Statistic bpUpdate("BPUpdate");
+galois::Statistic bkUpdate("BKUpdate");
+galois::Statistic mfUpdate("MFUpdate");
+galois::Statistic bpUpdate("BPUpdate");
 
 //! Updates basis with h, adds new pairs and marks some previous pairs as useless.
 template<class R1,class R2,class Pushable>
-void update(Poly* h, PolySet& basis, Galois::InsertBag<PolyPair>& pairs, R1& localRing, R2& ring, Pushable& out) {
+void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs, R1& localRing, R2& ring, Pushable& out) {
   // Gebauer-Moeller criterion B_k
   Term& lcm_t = localRing.makeTerm();
-  for (Galois::InsertBag<PolyPair>::iterator ii = pairs.begin(), ei = pairs.end(); ii != ei; ++ii) {
+  for (galois::InsertBag<PolyPair>::iterator ii = pairs.begin(), ei = pairs.end(); ii != ei; ++ii) {
     PolyPair& p = *ii;
     if (p.useless())
       continue;
@@ -787,19 +787,19 @@ void update(Poly* h, PolySet& basis, Galois::InsertBag<PolyPair>& pairs, R1& loc
   basis.push(h);
 }
 
-Galois::Statistic zeroUpdate("ZeroUpdate");
+galois::Statistic zeroUpdate("ZeroUpdate");
 
 template<class R>
 struct Process {
-  typedef typename R::template realloc<Galois::PerIterAllocTy::rebind<char>::other>::other LocalRing;
+  typedef typename R::template realloc<galois::PerIterAllocTy::rebind<char>::other>::other LocalRing;
 
   PolySet& basis;
-  Galois::InsertBag<PolyPair>& pairs;
+  galois::InsertBag<PolyPair>& pairs;
   R& ring;
 
-  Process(PolySet& _basis, Galois::InsertBag<PolyPair>& _pairs, R& r): basis(_basis), pairs(_pairs), ring(r) { }
+  Process(PolySet& _basis, galois::InsertBag<PolyPair>& _pairs, R& r): basis(_basis), pairs(_pairs), ring(r) { }
 
-  void operator()(const PolyPair* p, Galois::UserContext<PolyPair*>& ctx) {
+  void operator()(const PolyPair* p, galois::UserContext<PolyPair*>& ctx) {
     if (p->useless()) {
       return;
     }
@@ -874,17 +874,17 @@ void interReduce(PolySet& polys, R& ring) {
 
 template<class R>
 void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
-  Galois::InsertBag<PolyPair> pairs;
-  Galois::InsertBag<PolyPair*> initial;
+  galois::InsertBag<PolyPair> pairs;
+  galois::InsertBag<PolyPair*> initial;
 
   for (PolySet::iterator ii = ideal.begin(), ei = ideal.end(); ii != ei; ++ii) {
     if ((*ii)->empty())
       continue;
     update(*ii, basis, pairs, ring, ring, initial);
   }
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef OrderedByIntegerMetric<Indexer,dChunkedLIFO<8> > OBIM;
-  Galois::for_each(initial.begin(), initial.end(), Process<R>(basis, pairs, ring), Galois::wl<OBIM>());
+  galois::for_each(initial.begin(), initial.end(), Process<R>(basis, pairs, ring), galois::wl<OBIM>());
 
   interReduce(basis, ring);
 }
@@ -898,12 +898,12 @@ struct Coef {
   typedef boost::variant<char,char> Sign;
   Sign sign;
   typedef boost::variant<fusion::vector<int,int>, int> Rational;
-  Galois::optional<Rational> rational;
+  galois::optional<Rational> rational;
 };
 
 struct Mono {
   std::string id;
-  Galois::optional<int> expo;
+  galois::optional<int> expo;
 };
 
 struct Term {
@@ -921,13 +921,13 @@ struct Poly {
 BOOST_FUSION_ADAPT_STRUCT(
     parser::Coef,
     (parser::Coef::Sign, sign)
-    (Galois::optional<parser::Coef::Rational>, rational)
+    (galois::optional<parser::Coef::Rational>, rational)
 )
 
 BOOST_FUSION_ADAPT_STRUCT(
     parser::Mono,
     (std::string, id)
-    (Galois::optional<int>, expo)
+    (galois::optional<int>, expo)
 )
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -1208,7 +1208,7 @@ void run() {
   
   TheField.init();
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   interReduce(P.polys(), P.ring());
   PolySet basis;
@@ -1216,10 +1216,10 @@ void run() {
   T.stop();
   
   if (!skipVerify) {
-    Galois::InsertBag<PolyPair> pairs;
+    galois::InsertBag<PolyPair> pairs;
     allPairs(basis, pairs, P.ring());
     Verifier<typename ParserTy::RingTy> v(basis, P.ring());
-    if (Galois::ParallelSTL::find_if(pairs.begin(), pairs.end(), v) != pairs.end()) {
+    if (galois::ParallelSTL::find_if(pairs.begin(), pairs.end(), v) != pairs.end()) {
       std::cerr << "Basis is not Groebner.\n";
       assert(0 && "Triangulation failed");
       abort();
@@ -1231,7 +1231,7 @@ void run() {
 
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   statManager.push(zeroUpdate);
   statManager.push(bkUpdate);
   statManager.push(mfUpdate);

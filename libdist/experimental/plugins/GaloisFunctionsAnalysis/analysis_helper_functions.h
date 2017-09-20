@@ -249,9 +249,9 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   stringstream SS_write_set;
   for(auto j : redOp_vec){
     if(j.SYNC_TYPE == "sync_push")
-      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
+      SS_write_set << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
     else if(j.SYNC_TYPE == "sync_pull")
-      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
+      SS_write_set << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
   }
 
   //TODO: Hack.. For now I am assuming is range has begin, all nodes with edges to be operated on.
@@ -276,15 +276,15 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   string static_go = "void static go(Graph& _graph) {\n";
   static_go += operator_range_definition;
   if(onlyOneNode)
-    static_go += "Galois::do_all(" + operator_range;
+    static_go += "galois::do_all(" + operator_range;
   else
-    static_go += "Galois::do_all_local(" + operator_range;
+    static_go += "galois::do_all_local(" + operator_range;
   static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
-  static_go += "Galois::loopname(_graph.get_run_identifier(\"" + orig_functor_name + "\").c_str()),";
+  static_go += "galois::loopname(_graph.get_run_identifier(\"" + orig_functor_name + "\").c_str()),";
   if(!onlyOneNode)
-    static_go += "\nGalois::do_all_steal<true>(),";
+    static_go += "\ngalois::do_all_steal<true>(),";
 
-  static_go += "\nGalois::timeit()";
+  static_go += "\ngalois::timeit()";
   static_go += SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
@@ -299,7 +299,7 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
 /**************************** Helper Functions: End *****************************/
 
 /***Global constants ***/
-string galois_distributed_accumulator_type = "Galois::DGAccumulator<int> ";
+string galois_distributed_accumulator_type = "galois::DGAccumulator<int> ";
 string galois_distributed_accumulator_name = "DGAccumulator_accum";
 
 

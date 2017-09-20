@@ -54,7 +54,7 @@
 
 #include <sched.h>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 
 namespace {
@@ -89,9 +89,9 @@ static unsigned getNumaNode(cpuinfo& c) {
 #ifdef GALOIS_USE_NUMA
     numaAvail = numa_available() >= 0;
     if (!numaAvail)
-      Galois::gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
+      galois::gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
 #else
-    Galois::gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
+    galois::gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
 #endif
   }
 
@@ -257,7 +257,7 @@ std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
 
 } //namespace ""
 
-std::pair<machineTopoInfo, std::vector<threadTopoInfo> > Galois::Substrate::getHWTopo() {
+std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::Substrate::getHWTopo() {
   machineTopoInfo retMTI;
 
   auto rawInfo = parseCPUInfo();
@@ -305,7 +305,7 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > Galois::Substrate::getH
 } 
 
 //! binds current thread to OS HW context "proc"
-bool Galois::Substrate::bindThreadSelf(unsigned osContext) {
+bool galois::Substrate::bindThreadSelf(unsigned osContext) {
 #ifndef __CYGWIN__
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
@@ -317,12 +317,12 @@ bool Galois::Substrate::bindThreadSelf(unsigned osContext) {
   
   /* sched_setaffinity returns 0 in success */
   if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
-    Galois::gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
+    galois::gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
     return false;
   }
   return true;
 #else
-  Galois::gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  galois::gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
   return false;
 #endif
 }

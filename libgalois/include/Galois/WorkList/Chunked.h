@@ -36,7 +36,7 @@
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 extern unsigned activeThreads;
 }
@@ -236,9 +236,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop()  {
+  galois::optional<value_type> pop()  {
     p& n = data.get();
-    Galois::optional<value_type> retval;
+    galois::optional<value_type> retval;
     if (IsStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -247,7 +247,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return Galois::optional<value_type>();
+      return galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -260,7 +260,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return Galois::optional<value_type>();
+      return galois::optional<value_type>();
     }
   }
 };
@@ -315,6 +315,6 @@ GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

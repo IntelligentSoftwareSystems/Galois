@@ -51,7 +51,7 @@
 
 #include <cstddef>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 //! Low level page pool (individual pages, use largeMalloc for large blocks)
@@ -74,8 +74,8 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
-typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
+typedef galois::Substrate::PtrLock<FreeNode> HeadPtr;
+typedef galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
 template <typename _UNUSED=void>
@@ -83,21 +83,21 @@ class PageAllocState {
   std::deque<std::atomic<int>> counts;
   std::vector<HeadPtrStorage> pool;
   std::unordered_map<void*, int> ownerMap;
-  Galois::Substrate::SimpleLock mapLock;
+  galois::Substrate::SimpleLock mapLock;
 
   void* allocFromOS() {
-    void* ptr = Galois::Substrate::allocPages(1, true);
+    void* ptr = galois::Substrate::allocPages(1, true);
     assert(ptr);
-    auto tid = Galois::Substrate::ThreadPool::getTID();
+    auto tid = galois::Substrate::ThreadPool::getTID();
     counts[tid] += 1;
-    std::lock_guard<Galois::Substrate::SimpleLock> lg(mapLock);
+    std::lock_guard<galois::Substrate::SimpleLock> lg(mapLock);
     ownerMap[ptr] = tid;
     return ptr;
   }
 
 public:
   PageAllocState() { 
-    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
+    auto num = galois::Substrate::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
   }
@@ -111,7 +111,7 @@ public:
   }
 
   void* pageAlloc() {
-    auto tid = Galois::Substrate::ThreadPool::getTID();
+    auto tid = galois::Substrate::ThreadPool::getTID();
     HeadPtr& hp = pool[tid].data;
     if (hp.getValue()) {
       hp.lock();
@@ -149,6 +149,6 @@ void setPagePoolState(PageAllocState<>* pa);
 } // end namespace internal
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

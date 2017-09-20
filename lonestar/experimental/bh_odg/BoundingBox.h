@@ -71,7 +71,7 @@ struct BoxMergeFunc {
   }
 };
 
-struct ReducibleBox: public Galois::GReducible<BoundingBox, BoxMergeFunc> {
+struct ReducibleBox: public galois::GReducible<BoundingBox, BoxMergeFunc> {
 };
 
 struct ReduceBoxes {

@@ -39,7 +39,7 @@
 #include <math.h>
 
 using namespace std;
-using namespace Galois::WorkList;
+using namespace galois::WorkList;
 
 namespace cll = llvm::cl;
 
@@ -111,19 +111,19 @@ struct SPNode {
   SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false), t(0) {}
 };
 
-typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false> Graph;
-typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
+typedef galois::Graph::FirstGraph<SPNode, SPEdge, false> Graph;
+typedef galois::Graph::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
 static Graph graph;
 
 static std::vector<GNode> literalsN;
 static std::vector<std::pair<GNode,int> > clauses;
 
-static Galois::GAccumulator<unsigned int> nontrivial;
+static galois::GAccumulator<unsigned int> nontrivial;
 
-static Galois::GReduceMax<double> maxBias;
-static Galois::GAccumulator<int> numBias;
-static Galois::GAccumulator<double> sumBias;
+static galois::GReduceMax<double> maxBias;
+static galois::GAccumulator<int> numBias;
+static galois::GAccumulator<double> sumBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
@@ -141,12 +141,12 @@ void initialize_random_formula(int M, int N, int K) {
 
   for (int m = 0; m < M; ++m) {
     GNode node = graph.createNode(SPNode(m, true));
-    graph.addNode(node, Galois::MethodFlag::UNPROTECTED);
+    graph.addNode(node, galois::MethodFlag::UNPROTECTED);
     clauses[m] = std::make_pair(node, 0);
   }
   for (int n = 0; n < N; ++n) {
     GNode node = graph.createNode(SPNode(n, false));
-    graph.addNode(node, Galois::MethodFlag::UNPROTECTED);
+    graph.addNode(node, galois::MethodFlag::UNPROTECTED);
     literalsN[n] = node;
   }
 
@@ -158,7 +158,7 @@ void initialize_random_formula(int M, int N, int K) {
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
 	touse.push_back(newK);
-	graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], Galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
+	graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
@@ -173,14 +173,14 @@ void print_formula() {
       std::cout << " & ";
     std::cout << "c" << m << "( ";
     GNode N = clauses[m].first;
-    for (auto ii : graph.edges(N, Galois::MethodFlag::UNPROTECTED)) {
-      if (ii != graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED))
+    for (auto ii : graph.edges(N, galois::MethodFlag::UNPROTECTED)) {
+      if (ii != graph.edge_begin(N, galois::MethodFlag::UNPROTECTED))
 	std::cout << " | ";
-      SPEdge& E = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
+      SPEdge& E = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
       if (E.isNegative)
 	std::cout << "-";
       
-      SPNode& V = graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED);
+      SPNode& V = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
       std::cout << "v" << V.name;
       if (V.solved)
 	std::cout << "[" << (V.value ? 1 : 0) << "]";
@@ -195,7 +195,7 @@ void print_formula() {
 void print_fixed() {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
-    SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
+    SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       std::cout << V.name << "[" << (V.value ? 1 : 0) << "] ";
   }
@@ -206,7 +206,7 @@ int count_fixed() {
   int retval = 0;
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
-    SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
+    SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       ++retval;
   }
@@ -218,17 +218,17 @@ struct update_eta {
   double eta_for_a_i(GNode a, GNode i) {
     double etaNew = 1.0;
     //for each j
-    for (auto jii : graph.edges(a, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto jii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
       GNode j = graph.getEdgeDst(jii);
       if (j != i) {
-	bool ajNegative = graph.getEdgeData(jii, Galois::MethodFlag::UNPROTECTED).isNegative;
+	bool ajNegative = graph.getEdgeData(jii, galois::MethodFlag::UNPROTECTED).isNegative;
 	double prodP = 1.0;
 	double prodN = 1.0;
 	double prod0 = 1.0;
 	//for each b
-        for (auto bii : graph.edges(j, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto bii : graph.edges(j, galois::MethodFlag::UNPROTECTED)) {
 	  GNode b = graph.getEdgeDst(bii);
-	  SPEdge Ebj = graph.getEdgeData(bii, Galois::MethodFlag::UNPROTECTED);
+	  SPEdge Ebj = graph.getEdgeData(bii, galois::MethodFlag::UNPROTECTED);
 	  if (b != a)
 	    prod0 *= (1.0 - Ebj.eta);
 	  if (Ebj.isNegative)
@@ -259,7 +259,7 @@ struct update_eta {
   template<typename Context>
   void operator()(GNode a, Context& ctx) {
     //std::cerr << graph.getData(a).t << " ";
-    // if (graph.getData(a, Galois::MethodFlag::UNPROTECTED).t >= tlimit)
+    // if (graph.getData(a, galois::MethodFlag::UNPROTECTED).t >= tlimit)
     //   return;
 
     //    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
@@ -274,16 +274,16 @@ struct update_eta {
     ++graph.getData(a).t;
 
     //for each i
-    for (auto iii : graph.edges(a, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto iii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
       GNode i = graph.getEdgeDst(iii);
       double e = eta_for_a_i(a, i);
-      double olde = graph.getEdgeData(iii, Galois::MethodFlag::UNPROTECTED).eta;
+      double olde = graph.getEdgeData(iii, galois::MethodFlag::UNPROTECTED).eta;
       graph.getEdgeData(iii).eta = e;
       //std::cout << olde << ',' << e << " ";
       if (fabs(olde - e) > epsilon) {
-        for (auto bii : graph.edges(i, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto bii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
 	  GNode b = graph.getEdgeDst(bii);
-	  if (a != b) // && graph.getData(b, Galois::MethodFlag::UNPROTECTED).t < tlimit)
+	  if (a != b) // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
 	    ctx.push(std::make_pair(b,100-(int)(100.0*(olde - e))));
 	}
       }
@@ -294,7 +294,7 @@ struct update_eta {
 //compute biases on each node
 struct update_biases {
   void operator()(GNode i) const {
-    SPNode& idata = graph.getData(i, Galois::MethodFlag::UNPROTECTED);
+    SPNode& idata = graph.getData(i, galois::MethodFlag::UNPROTECTED);
     if (idata.solved) return;
 
     double pp1 = 1.0;
@@ -304,8 +304,8 @@ struct update_biases {
     double p0 = 1.0;
 
     //for each function a
-    for (auto aii : graph.edges(i, Galois::MethodFlag::UNPROTECTED)) {
-      SPEdge& aie = graph.getEdgeData(aii, Galois::MethodFlag::UNPROTECTED);
+    for (auto aii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
+      SPEdge& aie = graph.getEdgeData(aii, galois::MethodFlag::UNPROTECTED);
 
       double etaai = aie.eta;
       if (etaai > epsilon)
@@ -373,14 +373,14 @@ void SP_algorithm() {
   //  tlimit += tmax;
 
   //FIXME: check obim again
-  //  Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"));
-  Galois::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"), Galois::wl<WLWL>());
+  //  Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), galois::loopname("update_eta"));
+  galois::for_each(clauses.begin(), clauses.end(), update_eta(), galois::loopname("update_eta"), galois::wl<WLWL>());
 
   maxBias.reset();
   numBias.reset();
   sumBias.reset();
   nontrivial.reset();
-  Galois::do_all(literalsN.begin(), literalsN.end(), update_biases(), Galois::loopname("update_biases"));
+  galois::do_all(literalsN.begin(), literalsN.end(), update_biases(), galois::loopname("update_biases"));
 }
 
 struct fix_variables {
@@ -409,7 +409,7 @@ void decimate() {
   double average = num > 0 ? sumBias.reduce() / num : 0.0;
   std::cout << "NonTrivial " << n << " MaxBias " << m << " Average Bias " << average << "\n";
   double d = ((m - average) * 0.25) + average;
-  Galois::do_all(literalsN.begin(), literalsN.end(), fix_variables(d), Galois::loopname("fix_variables"));
+  galois::do_all(literalsN.begin(), literalsN.end(), fix_variables(d), galois::loopname("fix_variables"));
 }
 
 bool survey_inspired_decimation() {
@@ -439,7 +439,7 @@ bool survey_inspired_decimation() {
 
 
 int main(int argc, char** argv) {
-  Galois::StatManager MM;
+  galois::StatManager MM;
   LonestarStart(argc, argv, name, desc, url);
   srand(seed);
   initialize_random_formula(M,N,K);
@@ -449,7 +449,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Starting...\n";
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   survey_inspired_decimation();
   T.stop();

@@ -66,7 +66,7 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     struct Syncer_0 {
     	static int extract(GNode src, const struct PR_NodeData & node){ return node.nout; }
-    	static void reduce (GNode src, struct PR_NodeData & node, int y) { Galois::atomicAdd(node.nout, y);}
+    	static void reduce (GNode src, struct PR_NodeData & node, int y) { galois::atomicAdd(node.nout, y);}
     	static void reset (GNode src, struct PR_NodeData & node ) { node.nout = 0; }
     	typedef int ValTy;
     };
@@ -82,7 +82,7 @@ struct InitializeGraph {
     	typedef float ValTy;
     };
  
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, galois::loopname("Init"));
 
     _graph.sync_push<Syncer_0>();
     _graph.sync_pull<SyncerPull_0>();
@@ -93,11 +93,11 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - local_alpha;
-    Galois::atomicAdd(sdata.nout, 0);
+    galois::atomicAdd(sdata.nout, 0);
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
-      Galois::atomicAdd(ddata.nout, 1);
+      galois::atomicAdd(ddata.nout, 1);
     }
   }
 };
@@ -110,7 +110,7 @@ struct PageRank_pull {
 
 
  template <typename GraphTy>
-    struct Get_info_functor : public Galois::op_tag {
+    struct Get_info_functor : public galois::op_tag {
       GraphTy &graph;
 
       struct SyncerPull_0 {
@@ -144,14 +144,14 @@ struct PageRank_pull {
 
  void static go(Graph& _graph) {
 
-   using namespace Galois::WorkList;
+   using namespace galois::WorkList;
    typedef dChunkedFIFO<64> dChunk;
 
-   Galois::for_each(_graph.begin(), _graph.end(), PageRank_pull(tolerance, alpha, &_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+   galois::for_each(_graph.begin(), _graph.end(), PageRank_pull(tolerance, alpha, &_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
 
  }
 
- void operator()(GNode src, Galois::UserContext<GNode>& ctx)const {
+ void operator()(GNode src, galois::UserContext<GNode>& ctx)const {
    PR_NodeData& sdata = graph->getData(src);
    float sum = 0;
    for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
@@ -177,8 +177,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
 
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
 
     // Verify
 #if 0
@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+          galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
           //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
         }
     }

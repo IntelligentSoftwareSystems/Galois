@@ -122,8 +122,8 @@ public:
 
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
-    Galois::TimeAccumulator findTimer;
-    Galois::TimeAccumulator simTimer;
+    galois::TimeAccumulator findTimer;
+    galois::TimeAccumulator simTimer;
     
     WLTy* workList = new WLTy (initEvents.begin (), initEvents.end ());
     WLTy* remainingList = new WLTy ();
@@ -361,8 +361,8 @@ public:
       table.ballsToCSV ();
     }
 
-    Galois::TimeAccumulator findTimer;
-    Galois::TimeAccumulator simTimer;
+    galois::TimeAccumulator findTimer;
+    galois::TimeAccumulator simTimer;
 
     WLTy workList (initEvents.begin (), initEvents.end ());
 

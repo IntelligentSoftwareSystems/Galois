@@ -13,7 +13,7 @@ class AVIserialGalloc: public AVIabstractMain {
 
   virtual void runLoop(MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
     // typedef std::priority_queue<AVI*, std::vector<AVI*>, AVIReverseComparator> PQ;
-    using PQ = Galois::ThreadSafeOrderedSet<AVI*, AVIComparator>; 
+    using PQ = galois::ThreadSafeOrderedSet<AVI*, AVIComparator>; 
 
     // temporary matrices
     int nrows = meshInit.getSpatialDim ();

@@ -34,18 +34,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 
 static bool doCerr = false;
 static bool doCerrInit = false;
 
-namespace Galois { 
+namespace galois { 
 namespace Runtime {
 uint32_t getHostID() __attribute__((weak));
 } // end namespace Runtime
-} // end namespace Galois
-uint32_t Galois::Runtime::getHostID() {
+} // end namespace galois
+uint32_t galois::Runtime::getHostID() {
   return 0;
 }
 
@@ -69,7 +69,7 @@ static std::ostream& openIfNot() {
   return output;
 }
 
-void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
+void galois::Runtime::detail::printTrace(std::ostringstream& os) {
   using namespace std::chrono;
   static SimpleLock lock;
   std::lock_guard<SimpleLock> lg(lock);
@@ -117,7 +117,7 @@ static std::ofstream& openIfNot_output() {
     char name[100] = "";
     gethostname(name, sizeof(name));
     char fname[120];
-    snprintf(fname, sizeof(fname), "output_%s_%d.log", name, Galois::Runtime::getHostID());
+    snprintf(fname, sizeof(fname), "output_%s_%d.log", name, galois::Runtime::getHostID());
     output_file.open(fname, std::ios_base::app);
   }
   assert(output_file.is_open());
@@ -125,8 +125,8 @@ static std::ofstream& openIfNot_output() {
 }
 
 
-void Galois::Runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, size_t len, unsigned host){
-  using namespace Galois::Runtime;
+void galois::Runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, size_t len, unsigned host){
+  using namespace galois::Runtime;
   static SimpleLock lock1;
   std::lock_guard<SimpleLock> lg(lock1);
   auto& out = openIfNot_receive();
@@ -139,8 +139,8 @@ void Galois::Runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, siz
   out << "\n";
   out.flush();
 }
-void Galois::Runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, size_t len, unsigned host){
-  using namespace Galois::Runtime;
+void galois::Runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, size_t len, unsigned host){
+  using namespace galois::Runtime;
   static SimpleLock lock2;
   std::lock_guard<SimpleLock> lg(lock2);
   auto& out = openIfNot_send();
@@ -157,8 +157,8 @@ void Galois::Runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, siz
 }
 
 
-void Galois::Runtime::detail::print_output_impl(std::ostringstream& os){
-  using namespace Galois::Runtime;
+void galois::Runtime::detail::print_output_impl(std::ostringstream& os){
+  using namespace galois::Runtime;
   static SimpleLock lock2;
   std::lock_guard<SimpleLock> lg(lock2);
   auto& out = openIfNot_output();
@@ -166,5 +166,5 @@ void Galois::Runtime::detail::print_output_impl(std::ostringstream& os){
   out.flush();
 }
 
-bool Galois::Runtime::detail::doTrace = false;
-bool Galois::Runtime::detail::initTrace = false;
+bool galois::Runtime::detail::doTrace = false;
+bool galois::Runtime::detail::initTrace = false;

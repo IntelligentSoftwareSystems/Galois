@@ -37,9 +37,9 @@
 
 #include "Galois/BoundedVector.h"
 
-namespace Galois {
+namespace galois {
 
-template <typename T, typename Cmp, unsigned N=1024, typename WL=Galois::BoundedVector<T, N> > 
+template <typename T, typename Cmp, unsigned N=1024, typename WL=galois::BoundedVector<T, N> > 
 class RangeBuffer: public WL {
 
   using Super = WL;
@@ -163,8 +163,8 @@ namespace hidden {
   struct TypeHelper {
     using RBuf = RangeBuffer<T, Cmp>;
     using UnitBuf = RangeBuffer<T, Cmp, 1>;
-    using RBufAlloc = Galois::Runtime::FixedSizeAllocator<RBuf>;
-    using RBufPtrAlloc = Galois::Runtime::FixedSizeAllocator<RBuf*>;
+    using RBufAlloc = galois::Runtime::FixedSizeAllocator<RBuf>;
+    using RBufPtrAlloc = galois::Runtime::FixedSizeAllocator<RBuf*>;
     using Tree = std::map<RBuf*, RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
     using Set = std::set<RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
   };
@@ -542,7 +542,7 @@ struct SetBasedPartialPQ: public PartialPQBase<T, Cmp, RangePQSetBased<T, Cmp> >
 
 
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RANGE_PQ_H
 

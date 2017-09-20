@@ -346,7 +346,7 @@ void rleCode(Iter b, Iter e, Iter2 out) {
   }
 }
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
@@ -419,7 +419,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    Galois::Runtime::acquire(&nodeData[N], mflag);
+    galois::Runtime::acquire(&nodeData[N], mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -440,14 +440,14 @@ protected:
 
 public:
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -468,7 +468,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
         acquireNode(*ii, mflag);
       }
@@ -543,8 +543,8 @@ public:
 } // end namespace
 
 
-typedef Galois::Graph::LC_CSR_Graph<unsigned, void> Graph;
-typedef Galois::Graph::LC_CCSR_Graph<unsigned, void> GraphC;
+typedef galois::Graph::LC_CSR_Graph<unsigned, void> Graph;
+typedef galois::Graph::LC_CCSR_Graph<unsigned, void> GraphC;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -580,19 +580,19 @@ struct AsyncBFS {
     Gr& gr;
     Process(Gr& g): gr(g) { }
 
-    void operator()(WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       GNode n = item.first;
 
       unsigned newDist = item.second;
-      if (newDist > gr.getData(n, Galois::MethodFlag::UNPROTECTED))
+      if (newDist > gr.getData(n, galois::MethodFlag::UNPROTECTED))
         return;
 
       ++newDist;
 
-      for (typename Gr::edge_iterator ii = gr.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-             ei = gr.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (typename Gr::edge_iterator ii = gr.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+             ei = gr.edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = gr.getEdgeDst(ii);
-        volatile unsigned* ddata = &gr.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        volatile unsigned* ddata = &gr.getData(dst, galois::MethodFlag::UNPROTECTED);
         
         unsigned  oldDist;
         while (true) {
@@ -609,16 +609,16 @@ struct AsyncBFS {
   };
 
   void operator()(Gr& graph, const GNode& source, const char* name) const {
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     //typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    Galois::do_all_local(graph, [&graph] (const GNode& n) { graph.getData(n) = ~0; }, Galois::loopname("init"));
+    galois::do_all_local(graph, [&graph] (const GNode& n) { graph.getData(n) = ~0; }, galois::loopname("init"));
 
     graph.getData(source) = 0;
 
-    Galois::for_each(WorkItem(source, 0), Process(graph), Galois::wl<OBIM>(), Galois::loopname(name));
+    galois::for_each(WorkItem(source, 0), Process(graph), galois::wl<OBIM>(), galois::loopname(name));
   }
 };
 
@@ -799,7 +799,7 @@ std::pair<unsigned long, unsigned> tryHuffDeltaOnly() {
 
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
   if (false) {
@@ -885,8 +885,8 @@ int main(int argc, char **argv) {
   if (dostat)
     std::cout << "Collecting All Histograms\n";
 
-  Galois::Graph::readGraph(graph, filename);
-  //Galois::Graph::readGraph(graphc, filename);
+  galois::Graph::readGraph(graph, filename);
+  //galois::Graph::readGraph(graphc, filename);
 
   // for (unsigned int x = 0; x < 0; ++x) {
   //   auto ii = graph.edge_begin(x);
@@ -924,7 +924,7 @@ int main(int argc, char **argv) {
   delta.resize(size);
   lenBW.resize(11);
 
-  Galois::do_all(graph.begin(), graph.end(), ComputeRatio(), Galois::do_all_steal<>());
+  galois::do_all(graph.begin(), graph.end(), ComputeRatio(), galois::do_all_steal<>());
 
   if (dostat) {
     std::cout << "Writing to " << outfilename.c_str() << "\n";

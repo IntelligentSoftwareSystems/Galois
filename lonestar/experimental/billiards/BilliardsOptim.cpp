@@ -36,10 +36,10 @@
 
 class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
 
-  using Graph = Galois::Graph::FirstGraph<void*, void, true>;
+  using Graph = galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::PerThreadVector<Event>;
+  using AddListTy = galois::PerThreadVector<Event>;
 
   using Tbl_t = Table<BallOptim<> >;
   using Ball_t = typename Tbl_t::Ball_t;
@@ -135,13 +135,13 @@ public:
 
     createLocks (table, graph, nodes);
 
-    Galois::Runtime::for_each_ordered_spec (
-        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::Runtime::for_each_ordered_spec (
+        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
         ExecSourcesOptim {table, enablePrints, logEvents},
         AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints),
-        std::make_tuple (Galois::loopname ("billiards-optimistic")));
+        std::make_tuple (galois::loopname ("billiards-optimistic")));
 
 
     for (unsigned i = 0; i < table.getNumBalls (); ++i) {

@@ -28,7 +28,7 @@ struct Edge {
   float riseDelay, fallDelay;
 };
 
-typedef Galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
+typedef galois::Graph::FirstGraph<Node, Edge, true, true> Graph;
 typedef Graph::GraphNode GNode;
 
 struct CircuitGraph {

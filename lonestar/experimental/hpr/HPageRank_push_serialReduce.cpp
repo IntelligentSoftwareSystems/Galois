@@ -113,10 +113,10 @@ struct LNode {
 };
 
 //////////////////////////////////////////////////////////////////////////////////////
-typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
+typedef galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
 //////////////////////////////////////////////////////////////////////////////////////
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
+typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, LNode, void> DeviceGraph;
 
 struct CUDA_Context *cuda_ctx;
 struct OPENCL_Context<DeviceGraph> cl_ctx;
@@ -127,14 +127,14 @@ struct OPENCL_Context<DeviceGraph> cl_ctx;
 struct InitializeGraph {
    pGraph<Graph>* g;
    void static go(pGraph<Graph>& _g) {
-      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, InitializeGraph { &_g }, Galois::loopname("init"));
+      galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, InitializeGraph { &_g }, galois::loopname("init"));
    }
    void operator()(GNode src) const {
       LNode& sdata = g->g.getData(src);
       sdata.value = 1.0 - alpha;
       sdata.nout = std::distance(g->g.edge_begin(src), g->g.edge_end(src));
 #if _HETERO_DEBUG_
-      if(Galois::Runtime::NetworkInterface::ID == 0)
+      if(galois::Runtime::NetworkInterface::ID == 0)
         std::cout << "Src : " << src << " nout : " <<sdata.nout << "\n"; 
 #endif
       //Initializing Residual is like running one round of pagerank
@@ -152,12 +152,12 @@ struct InitializeGraph {
 struct InitializeGhostCells {
   pGraph<Graph>* g;
   void static go(pGraph<Graph>& _g){
-      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("init ghost cells"));
+      galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, galois::loopname("init ghost cells"));
   }
   void operator()(GNode src) const {
     //Residual for ghost cells should start from zero.
 #if _HETERO_DEBUG_
-      if (Galois::Runtime::NetworkInterface::ID == 0)
+      if (galois::Runtime::NetworkInterface::ID == 0)
         std::cout << " Ghost : " << src << "\n";
 #endif
       LNode& sdata = g->g.getData(src);
@@ -172,7 +172,7 @@ struct PageRank_push {
    pGraph<Graph>* g;
 
    void static go(pGraph<Graph>& _g) {
-      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank_push { &_g }, Galois::loopname("Page Rank (push)"));
+      galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank_push { &_g }, galois::loopname("Page Rank (push)"));
    }
 
    void operator()(GNode src) const {
@@ -242,10 +242,10 @@ void reduceNodeValue(pGraph<Graph>* p, unsigned GID, PRTy residual) {
 struct reduceGhostCells_struct {
   pGraph<Graph>* g;
   void static go(pGraph<Graph>& _g){
-      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, Galois::loopname("init ghost cells"));
+      galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, galois::loopname("init ghost cells"));
   }
   void operator()(GNode src) const {
-     Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+     galois::Runtime::NetworkInterface& net = galois::Runtime::getSystemNetworkInterface();
      LNode& sdata = g->g.getData(src);
 
      auto n = g->uid(src);
@@ -254,7 +254,7 @@ struct reduceGhostCells_struct {
      switch (personality) {
          case CPU:
             net.sendAlt(x, reduceNodeValue, magicPointer[x], n, sdata.residual.exchange(0.0));
-            //if (Galois::Runtime::NetworkInterface::ID)
+            //if (galois::Runtime::NetworkInterface::ID)
               //std::cout << "In : " << g.g_offset<< " r : " << g.g.getData(n - g.g_offset).residual << "\n";
             break;
          default:
@@ -264,7 +264,7 @@ struct reduceGhostCells_struct {
   }
 };
 
-void reduceGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void reduceGhostCells(galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
 
   for(auto ii = g.g.begin() + g.numOwned; ii != g.g.begin() + g.numNodes; ++ii){
     auto n = g.uid(*ii);
@@ -300,7 +300,7 @@ struct clearGhostCells {
   pGraph<Graph>* g;
 
   void static go(pGraph<Graph>& _g){
-    Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("Clear residual on Ghost cells"));
+    galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, galois::loopname("Clear residual on Ghost cells"));
   }
 
   void operator()(GNode src){
@@ -369,16 +369,16 @@ void loadGraphNonCPU(pGraph<Graph> &g) {
  *
  **********************************************************************************/
 void inner_main() {
-   auto& net = Galois::Runtime::getSystemNetworkInterface();
-   Galois::StatManager statManager;
-   auto& barrier = Galois::Runtime::getSystemBarrier();
-   const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   Galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init;
+   auto& net = galois::Runtime::getSystemNetworkInterface();
+   galois::StatManager statManager;
+   auto& barrier = galois::Runtime::getSystemBarrier();
+   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
+   galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init;
    T_total.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
-   if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[Galois::Runtime::NetworkInterface::ID]) {
+   if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+      switch (personality_set.c_str()[galois::Runtime::NetworkInterface::ID]) {
       case 'g':
          personality = GPU_CUDA;
          break;
@@ -391,19 +391,19 @@ void inner_main() {
          break;
       }
    }
-   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
    barrier.wait();
-   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
    T_graph_load.start();
    pGraph<Graph> g;
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
+      cuda_ctx = get_CUDA_context(galois::Runtime::NetworkInterface::ID);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return ;
    } else if (personality == GPU_OPENCL) {
-      Galois::OpenCL::cl_env.init(cldevice);
+      galois::OpenCL::cl_env.init(cldevice);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
@@ -428,16 +428,16 @@ void inner_main() {
    std::cout << g.id << " initialized\n";
 #endif
    barrier.wait();
-   fprintf(stderr, "Post-barrier 2- Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Post-barrier 2- Host: %d, Personality %s\n",galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
 
 
    //send pGraph pointers
-   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
-      net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
+   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
+      net.sendAlt(x, setRemotePtr, galois::Runtime::NetworkInterface::ID, &g);
 
    //Ask for cells
    for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::Runtime::NetworkInterface::ID);
 #if _HETERO_DEBUG_
    std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
 #endif
@@ -511,7 +511,7 @@ void inner_main() {
 
    if (verify) {
       std::stringstream ss;
-      ss << personality_str(personality) << "_" << my_host_id << "_of_" << Galois::Runtime::NetworkInterface::Num << "_page_ranks.csv";
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::Runtime::NetworkInterface::Num << "_page_ranks.csv";
       std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {
@@ -538,7 +538,7 @@ void inner_main() {
    }
 
    T_total.stop();
-   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
+   std::cout << "[" << galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
 
    std::cout << "Terminated on [ " << my_host_id << " ]\n";
    net.terminate();
@@ -548,7 +548,7 @@ void inner_main() {
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   //auto& net = Galois::Runtime::getSystemNetworkInterface();
+   //auto& net = galois::Runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }

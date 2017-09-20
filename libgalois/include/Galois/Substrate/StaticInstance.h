@@ -36,7 +36,7 @@
 
 #include "Galois/Substrate/CompilerSpecific.h"
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 //This should be much simpler in c++03 mode, but be general for now
@@ -75,6 +75,6 @@ struct StaticInstance {
 };
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

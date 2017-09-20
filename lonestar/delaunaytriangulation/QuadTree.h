@@ -133,11 +133,11 @@ class PQuadTree {
     }
   };
 
-  struct MinBox: public Galois::GReducible<MTuple<false>, MTupleReducer<false> > { 
+  struct MinBox: public galois::GReducible<MTuple<false>, MTupleReducer<false> > { 
     MinBox() { }
   };
 
-  struct MaxBox: public Galois::GReducible<MTuple<true>, MTupleReducer<true> > { 
+  struct MaxBox: public galois::GReducible<MTuple<true>, MTupleReducer<true> > { 
     MaxBox() { }
   };
 
@@ -175,7 +175,7 @@ class PQuadTree {
     void operator()(WorkItem<IterTy>& w) {
       w();
     }
-    void operator()(WorkItem<IterTy>& w, Galois::UserContext<WorkItem<IterTy> >&) {
+    void operator()(WorkItem<IterTy>& w, galois::UserContext<WorkItem<IterTy> >&) {
       w();
     }
   };
@@ -193,14 +193,14 @@ class PQuadTree {
   double m_radius;
   Node* m_root;
 
-  Galois::FixedSizeAllocator<Node> nodeAlloc;
-  Galois::FixedSizeAllocator<Node::PointsTy> pointsAlloc;
+  galois::FixedSizeAllocator<Node> nodeAlloc;
+  galois::FixedSizeAllocator<Node::PointsTy> pointsAlloc;
 
   template<typename IterTy>
   void init(IterTy begin, IterTy end) {
     MinBox least;
     MaxBox most;
-    Galois::do_all(begin, end, ComputeBox(least, most));
+    galois::do_all(begin, end, ComputeBox(least, most));
     //std::for_each(begin, end, ComputeBox(least, most));
 
     MTuple<true> mmost = most.reduce();
@@ -365,14 +365,14 @@ public:
     typedef std::vector<Point*> PointsBufTy;
     typedef WorkItem<PointsBufTy::iterator> WIT;
     typedef std::vector<WIT> WorkTy;
-    typedef Galois::WorkList::dChunkedLIFO<1> WL;
+    typedef galois::WorkList::dChunkedLIFO<1> WL;
     PointsBufTy points;
     std::copy(begin, end, std::back_inserter(points));
 
     WorkTy work;
     std::back_insert_iterator<WorkTy> it(work);
     divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
-    Galois::for_each(work.begin(), work.end(), PAdd<PointsBufTy::iterator>(), Galois::wl<WL>());
+    galois::for_each(work.begin(), work.end(), PAdd<PointsBufTy::iterator>(), galois::wl<WL>());
   }
 
   ~PQuadTree() {

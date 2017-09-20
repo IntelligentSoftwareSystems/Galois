@@ -36,19 +36,19 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Bag.h"
 
-namespace Galois {
+namespace galois {
 
 /**
  * Stores graph nodes to execute for {@link Ligra} executor.
  */
 template<unsigned int BlockSize = 0>
 class GraphNodeBag {
-  typedef Galois::InsertBag<size_t, BlockSize> Bag;
-  typedef Galois::LargeArray<bool> Bitmask;
+  typedef galois::InsertBag<size_t, BlockSize> Bag;
+  typedef galois::LargeArray<bool> Bitmask;
 
   Bag bag;
-  Galois::GAccumulator<size_t> counts;
-  Galois::GAccumulator<size_t> numNodes;
+  galois::GAccumulator<size_t> counts;
+  galois::GAccumulator<size_t> numNodes;
   Bitmask bitmask;
   size_t size;
   bool isDense;
@@ -64,7 +64,7 @@ class GraphNodeBag {
     GraphNodeBag* self;
     void operator()(unsigned id, unsigned total) {
       typedef typename Bitmask::iterator It;
-      std::pair<It,It> p = Galois::block_range(self->bitmask.begin(), self->bitmask.end(), id, total);
+      std::pair<It,It> p = galois::block_range(self->bitmask.begin(), self->bitmask.end(), id, total);
       std::fill(p.first, p.second, 0);
     }
   };
@@ -109,10 +109,10 @@ public:
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
         InitializeSmall fn = { this };
-        Galois::do_all_local(bag, fn);
+        galois::do_all_local(bag, fn);
       } else {
         InitializeBig fn = { this };
-        Galois::on_each(fn);
+        galois::on_each(fn);
       }
     }
     bag.clear();
@@ -136,7 +136,7 @@ public:
     }
 
     Densify fn = { this };
-    Galois::do_all_local(bag, fn);
+    galois::do_all_local(bag, fn);
   }
 };
 

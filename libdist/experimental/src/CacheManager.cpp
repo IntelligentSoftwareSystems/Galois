@@ -23,7 +23,7 @@
 
 #include "Galois/Runtime/CacheManager.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 static __thread ResolveCache* thread_resolve = nullptr;
 
@@ -98,15 +98,15 @@ void ResolveCache::reset() {
 ////////////////////////////////////////////////////////////////////////////////
 
 
-ResolveCache* Galois::Runtime::getThreadResolve() {
+ResolveCache* galois::Runtime::getThreadResolve() {
   return thread_resolve;
 }
 
-void Galois::Runtime::setThreadResolve(ResolveCache* rc) {
+void galois::Runtime::setThreadResolve(ResolveCache* rc) {
   thread_resolve = rc;
 }
 
-CacheManager& Galois::Runtime::getCacheManager() {
+CacheManager& galois::Runtime::getCacheManager() {
   static CacheManager CM;
   return CM;
 }

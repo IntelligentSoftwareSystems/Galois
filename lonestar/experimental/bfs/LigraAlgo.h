@@ -11,13 +11,13 @@
 #include "BFS.h"
 
 template<bool UseGraphChi>
-struct LigraBFS: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+struct LigraBFS: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+  typedef typename galois::Graph::LC_CSR_Graph<SNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::Graph::OCImmutableEdgeGraph<SNode,void>,
+          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -34,12 +34,12 @@ struct LigraBFS: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return graph.getData(n, Galois::MethodFlag::UNPROTECTED).dist == DIST_INFINITY;
+      return graph.getData(n, galois::MethodFlag::UNPROTECTED).dist == DIST_INFINITY;
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -55,7 +55,7 @@ struct LigraBFS: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphNodeBagPair<> bags(graph.size());
+    galois::GraphNodeBagPair<> bags(graph.size());
 
     Dist newDist = 1;
     graph.getData(source).dist = 0;
@@ -71,19 +71,19 @@ struct LigraBFS: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 };
 
 template<bool UseGraphChi>
-struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
+struct LigraDiameter: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   typedef int Visited;
 
   struct LNode:  public SNode {
     Visited visited[2];
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
+          galois::Graph::OCImmutableEdgeGraph<LNode,void>,
+          galois::Graph::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -96,7 +96,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.dist = DIST_INFINITY;
       data.visited[0] = data.visited[1] = 0;
     }
@@ -114,8 +114,8 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       Visited toWrite = sdata.visited[cur] | ddata.visited[cur];
 
       if (toWrite != ddata.visited[cur]) {
@@ -143,13 +143,13 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     Update(LigraDiameter* s, Graph& g, int c, int n): self(s), graph(g), cur(c), next(n) { 
     }
     void operator()(size_t id) const {
-      LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
       data.visited[next] |= data.visited[cur];
     }
   };
 
   size_t operator()(Graph& graph, const GNode& source) {
-    Galois::GraphNodeBagPair<> bags(graph.size());
+    galois::GraphNodeBagPair<> bags(graph.size());
 
     if (graph.size() && *graph.begin() != source)
       std::cerr << "Warning: Ignoring user-requested start node\n";
@@ -172,7 +172,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
       newDist++;
       int cur = newDist & 1;
       int next = (newDist + 1) & 1;
-      Galois::do_all_local(bags.cur(), Update(this, graph, cur, next));
+      galois::do_all_local(bags.cur(), Update(this, graph, cur, next));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(this, cur, next, newDist), bags.cur(), bags.next(), false);
     }
 

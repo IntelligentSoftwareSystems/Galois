@@ -160,11 +160,11 @@ double sumSquaredError(Graph& g) {
   typedef typename Graph::GraphNode GNode;
   // computing Root Mean Square Error
   // Assuming only item nodes have edges
-  Galois::GAccumulator<double> error;
+  galois::GAccumulator<double> error;
 
   // Save for performance testing
 #if 0
-  Galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
+  galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
       LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, -static_cast<LatentValue>(g.getEdgeData(ii)));
@@ -173,7 +173,7 @@ double sumSquaredError(Graph& g) {
     }
   });
 #else
-  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
@@ -189,8 +189,8 @@ double sumSquaredError(Graph& g) {
 template<typename Graph>
 size_t countEdges(Graph& g) {
   typedef typename Graph::GraphNode GNode;
-  Galois::GAccumulator<size_t> edges;
-  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  galois::GAccumulator<size_t> edges;
+  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
@@ -286,12 +286,12 @@ double countFlops(size_t nnz, int rounds, int k) {
 
 template<typename Graph, typename Fn>
 void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
-  Galois::GAccumulator<double> errorAccum;
+  galois::GAccumulator<double> errorAccum;
   std::vector<LatentValue> steps(updatesPerEdge);
   LatentValue last = -1.0;
   int deltaRound = updatesPerEdge;
   LatentValue rate = learningRate;
-  Galois::TimeAccumulator elapsed;
+  galois::TimeAccumulator elapsed;
 
   elapsed.start();
   unsigned long lastTime = 0;
@@ -355,13 +355,13 @@ void for_each_tiled_impl(GraphPtrTy g, FuncTy func) {
   auto& barrier = getSystemBarrier();
   //Perminate blocking of one dimension
   unsigned x1,x2;
-  std::tie(x1,x2) = Galois::block_range(0, g.size_x(), Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num);
+  std::tie(x1,x2) = galois::block_range(0, g.size_x(), galois::Runtime::NetworkInterface::ID, galois::Runtime::NetworkInterface::Num);
 
   //for each block of other dimension
-  for(unsigned offset = 0; offset < Galois::Runtime::NetworkInterface::Num; ++offset) {
+  for(unsigned offset = 0; offset < galois::Runtime::NetworkInterface::Num; ++offset) {
     //compute current range
-    unsigned local_offset = (Galois::Runtime::NetworkInterface::ID + offset) % Galois::Runtime::NetworkInterface::Num;
-    std::tie(y1,y2) = Galois::block_range(0, g.size_y(), local_offset, Galois::Runtime::NetworkInterface::Num);
+    unsigned local_offset = (galois::Runtime::NetworkInterface::ID + offset) % galois::Runtime::NetworkInterface::Num;
+    std::tie(y1,y2) = galois::block_range(0, g.size_y(), local_offset, galois::Runtime::NetworkInterface::Num);
     //for each item of first dimension
     for (unsigned x = x1; x < x2; ++x) {
       std::vector<unsigned> v = g->intersect_edges(x, y1, y2);
@@ -378,7 +378,7 @@ template<typename GraphPtrTy, typename FuncTy>
 void for_each_tiled(GraphPtrTy g, FuncTy func) {
 }
                    
-      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
       executor.execute(
           g.begin(), g.begin() + NUM_ITEM_NODES,
           g.begin() + NUM_ITEM_NODES, g.end(),
@@ -391,7 +391,7 @@ void for_each_tiled(GraphPtrTy g, FuncTy func) {
 template<bool WithServer>
 class BlockedEdgeAlgo {
   static const bool makeSerializable = false;
-  typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
 
   struct BasicNode {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
@@ -417,12 +417,12 @@ class BlockedEdgeAlgo {
   }
 
 public:
-  typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::Graph::LC_CSR_Graph<Node, unsigned int>
     //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
     ::template with_no_lockable<!makeSerializable>::type Graph;
 
-  void readGraph(Graph& g) { Galois::Graph::readGraph(g, inputFilename); }
+  void readGraph(Graph& g) { galois::Graph::readGraph(g, inputFilename); }
 
   std::string name() const { return WithServer ? "blockedEdgeServer" : "blockedEdge"; }
 
@@ -457,19 +457,19 @@ private:
     }
   };
 
-  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
+  typedef galois::NoDerefIterator<edge_iterator> no_deref_iterator;
   typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
 
   struct Process {
     Graph& g;
-    Galois::Statistic& edgesVisited;
-    Galois::Statistic& failures;
+    galois::Statistic& edgesVisited;
+    galois::Statistic& failures;
     std::vector<SpinLock>& xLocks;
     std::vector<SpinLock>& yLocks;
     std::vector<Task>& tasks;
     LatentValue* steps;
     int maxUpdates;
-    Galois::GAccumulator<double>* errorAccum;
+    galois::GAccumulator<double>* errorAccum;
 
 #if 0
     void updateBlock(Task& task) {
@@ -483,7 +483,7 @@ private:
       // TODO add round blocking -- Added by not very useful
       // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        galois::MethodFlag flag = phase == 0 ? galois::ALL : galois::NONE;
         int numWorking;
         int round = 0;
         int limit = 0;
@@ -491,10 +491,10 @@ private:
           numWorking = 0;
           int index = 0;
           for (auto ii = task.start1; ii != task.end1; ++ii, ++index) {
-            Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
-            Graph::edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+            Node& nn = g.getData(*ii, round == 0 ? flag : galois::NONE);
+            Graph::edge_iterator begin = g.edge_begin(*ii, galois::NONE);
             no_deref_iterator nbegin(round == 0 ? no_deref_iterator(begin) : starts[index]);
-            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, Galois::NONE)));
+            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, galois::NONE)));
             edge_dst_iterator dbegin(nbegin, fn);
             edge_dst_iterator dend(nend, fn);
             edge_dst_iterator jj = round == 0 ? std::lower_bound(dbegin, dend, task.start2) : dbegin;
@@ -545,14 +545,14 @@ private:
 
       // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        galois::MethodFlag flag = phase == 0 ? galois::ALL : galois::NONE;
         for (auto ii = task.start1; ii != task.end1; ++ii) {
-          Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::NONE);
+          Node& nn = g.getData(*ii, phase == 0 ? flag : galois::NONE);
           if (deleted(nn))
             continue;
-          edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+          edge_iterator begin = g.edge_begin(*ii, galois::NONE);
           no_deref_iterator nbegin(begin);
-          no_deref_iterator nend(g.edge_end(*ii, Galois::NONE));
+          no_deref_iterator nend(g.edge_end(*ii, galois::NONE));
           edge_dst_iterator dbegin(nbegin, fn);
           edge_dst_iterator dend(nend, fn);
           for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
@@ -582,10 +582,10 @@ private:
       updateBlock(task);
     }
 
-    void operator()(Task& task, Galois::UserContext<Task>& ctx) {
+    void operator()(Task& task, galois::UserContext<Task>& ctx) {
 #if 1
       if (std::try_lock(xLocks[task.x], yLocks[task.y]) >= 0) {
-        //Galois::Runtime::forceAbort();
+        //galois::Runtime::forceAbort();
         ctx.push(task);
         return;
       }
@@ -678,7 +678,7 @@ private:
         Task* t = &tasks[start];
         if (t == &tasks[numBlocks])
           break;
-        //Galois::Runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
+        //galois::Runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
         updateBlock(*t);
 
         xLocks[t->x].unlock();
@@ -689,7 +689,7 @@ private:
 
   struct Inspect {
     Graph& g;
-    Galois::InsertBag<Task>& initial;
+    galois::InsertBag<Task>& initial;
     std::vector<SpinLock>& xLocks;
     std::vector<SpinLock>& yLocks;
     std::vector<Task>& tasks;
@@ -747,7 +747,7 @@ private:
         task.updates = 0;
         task.error = 0.0;
         task.start1 = g.begin();
-        std::tie(task.start1, task.end1) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, task.x, numBlocks0);
+        std::tie(task.start1, task.end1) = galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, task.x, numBlocks0);
         task.start2 = task.y * usersPerBlock + NUM_ITEM_NODES;
         task.end2 = (task.y + 1) * usersPerBlock + NUM_ITEM_NODES - 1;
 
@@ -764,16 +764,16 @@ private:
     }
 
     void adaptiveTiling(unsigned tid, unsigned total) {
-      Galois::Statistic numTasks("Tasks");
-      Galois::Statistic underTasks("UnderTasks");
-      Galois::Statistic overTasks("OverTasks");
+      galois::Statistic numTasks("Tasks");
+      galois::Statistic underTasks("UnderTasks");
+      galois::Statistic overTasks("OverTasks");
 
       size_t totalSize = usersPerBlock * (size_t) itemsPerBlock;
       size_t targetSize = static_cast<size_t>(std::max(std::sqrt(totalSize), 1.0));
       size_t sampleSize = static_cast<size_t>(std::max(std::sqrt(targetSize), 1.0));
       iterator cur, end;
-      std::tie(cur, end) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, tid, total);
-      //std::tie(cur, end) = Galois::block_range(g.begin(), g.end(), tid, total);
+      std::tie(cur, end) = galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, tid, total);
+      //std::tie(cur, end) = galois::block_range(g.begin(), g.end(), tid, total);
       std::vector<edge_iterator> prevStarts;
 
       while (cur != end) {
@@ -824,7 +824,7 @@ private:
           //nodeBlockSize = itemsPerBlock;
           //edgeBlockSize = usersPerBlock;
 
-          task.end1 = Galois::safe_advance(task.start1, end, nodeBlockSize);
+          task.end1 = galois::safe_advance(task.start1, end, nodeBlockSize);
           // Adjust lower limit because new range (start1, end1) may include
           // more nodes than sample range
           if (std::distance(task.start1, cur) < std::distance(task.start1, task.end1)) {
@@ -904,27 +904,27 @@ private:
 
 public:
   void operator()(Graph& g, const StepFunction& sf) {
-    Galois::StatTimer inspect("InspectTime");
+    galois::StatTimer inspect("InspectTime");
     inspect.start();
-    Galois::InsertBag<Task> initial;
+    galois::InsertBag<Task> initial;
     std::vector<SpinLock> xLocks;
     std::vector<SpinLock> yLocks;
     std::vector<Task> tasks;
     Inspect fn1 { g, initial, xLocks, yLocks, tasks };
-    Galois::on_each(fn1);
+    galois::on_each(fn1);
     inspect.stop();
 
-    Galois::Statistic edgesVisited("EdgesVisited");
-    Galois::Statistic failures("PopFailures");
-    Galois::StatTimer execute("ExecuteTime");
+    galois::Statistic edgesVisited("EdgesVisited");
+    galois::Statistic failures("PopFailures");
+    galois::StatTimer execute("ExecuteTime");
     execute.start();
 
 #if 1
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, galois::GAccumulator<double>* errorAccum) {
       if (errorAccum)
         GALOIS_DIE("not yet implemented");
 
-      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
       executor.execute(
           g.begin(), g.begin() + NUM_ITEM_NODES,
           g.begin() + NUM_ITEM_NODES, g.end(),
@@ -944,13 +944,13 @@ public:
     });
 #endif
 #if 0
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, galois::GAccumulator<double>* errorAccum) {
       Process fn2 { g, edgesVisited, failures, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
       // Testing sufficient optimizations by moving towards BlockJump
-      //Galois::for_each(initial.begin(), initial.end(), fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
-      //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
-      //Galois::do_all_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedLIFO<1>>());
-      Galois::on_each(fn2);
+      //galois::for_each(initial.begin(), initial.end(), fn2, galois::wl<galois::WorkList::dChunkedFIFO<1>>());
+      //galois::for_each_local(initial, fn2, galois::wl<galois::WorkList::dChunkedFIFO<1>>());
+      //galois::do_all_local(initial, fn2, galois::wl<galois::WorkList::dChunkedLIFO<1>>());
+      galois::on_each(fn2);
       //TODO: delete when racy fix is in
       if (!std::all_of(tasks.begin(), tasks.end(), [maxUpdates](Task& t) { return t.updates == maxUpdates; }))
         std::cerr << "WARNING: Missing tasks\n";
@@ -965,7 +965,7 @@ template<typename Graph>
 size_t initializeGraphData(Graph& g) {
   double top = 1.0/std::sqrt(LATENT_VECTOR_SIZE);
 
-  Galois::Runtime::PerThreadStorage<std::mt19937> gen;
+  galois::Runtime::PerThreadStorage<std::mt19937> gen;
 
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_real_distribution<LatentValue> dist(0, top);
@@ -973,7 +973,7 @@ size_t initializeGraphData(Graph& g) {
   std::uniform_real<LatentValue> dist(0, top);
 #endif
 
-  Galois::do_all_local(g, [&](typename Graph::GraphNode n) {
+  galois::do_all_local(g, [&](typename Graph::GraphNode n) {
   //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
     auto& data = g.getData(n);
 
@@ -987,7 +987,7 @@ size_t initializeGraphData(Graph& g) {
     }
   });
 
-  size_t numItemNodes = Galois::ParallelSTL::count_if(g.begin(), g.end(), [&](typename Graph::GraphNode n) -> bool {
+  size_t numItemNodes = galois::ParallelSTL::count_if(g.begin(), g.end(), [&](typename Graph::GraphNode n) -> bool {
     return std::distance(g.edge_begin(n), g.edge_end(n)) != 0;
   });
 
@@ -1037,7 +1037,7 @@ void run() {
   typename Algo::Graph g;
   Algo algo;
 
-  Galois::Runtime::reportNumaAlloc("NumaAlloc0");
+  galois::Runtime::reportNumaAlloc("NumaAlloc0");
 
   // Represent bipartite graph in general graph data structure:
   //  * items are the first m nodes
@@ -1045,11 +1045,11 @@ void run() {
   //  * only items have outedges
   algo.readGraph(g);
 
-  Galois::Runtime::reportNumaAlloc("NumaAlloc1");
+  galois::Runtime::reportNumaAlloc("NumaAlloc1");
 
   NUM_ITEM_NODES = initializeGraphData(g);
 
-  Galois::Runtime::reportNumaAlloc("NumaAlloc2");
+  galois::Runtime::reportNumaAlloc("NumaAlloc2");
 
   std::cout 
     << "num users: " << g.size() - NUM_ITEM_NODES 
@@ -1072,7 +1072,7 @@ void run() {
     verify(g, "Initial");
   }
 
-  Galois::StatTimer timer;
+  galois::StatTimer timer;
   timer.start();
   algo(g, *sf);
   timer.stop();
@@ -1094,12 +1094,12 @@ void run() {
     startServer(algo, g, serverPort, std::cerr);
   }
 
-  Galois::Runtime::reportNumaAlloc("NumaAlloc");
+  galois::Runtime::reportNumaAlloc("NumaAlloc");
 }
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
   switch (algo) {
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;

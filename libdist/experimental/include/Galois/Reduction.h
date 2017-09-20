@@ -34,7 +34,7 @@
 
 #include "Galois/Runtime/PerHostStorage.h"
 
-namespace Galois {
+namespace galois {
 
 template<typename T, typename BinFunc>
 class DGReducible : public Runtime::Lockable {
@@ -54,9 +54,9 @@ class DGReducible : public Runtime::Lockable {
 
   static int expected() {
     int retval = 0;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 1 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 1 < galois::Runtime::NetworkInterface::Num)
       ++retval;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 2 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 2 < galois::Runtime::NetworkInterface::Num)
       ++retval;
     return retval;
   }
@@ -72,19 +72,19 @@ class DGReducible : public Runtime::Lockable {
 
 public:
   static void broadcastData(Runtime::RecvBuffer& buf) {
-    //std::cout << "B: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "B: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducible* dst;
     std::vector<DGReducible*> hosts;
     T data;
     gDeserialize(buf, hosts, data);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->localReset(data);
     dst->hosts = hosts;
   }
 
   static void registerInstance(Runtime::RecvBuffer& buf) {
-    assert(Galois::Runtime::NetworkInterface::ID == 0);
+    assert(galois::Runtime::NetworkInterface::ID == 0);
     DGReducible* dst;
     uint32_t host;
     DGReducible* ptr;
@@ -93,40 +93,40 @@ public:
   }
 
   static void reduceData(Runtime::RecvBuffer& buf) {
-    //std::cout << "R: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "R: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducible* dst;
     std::vector<DGReducible*> hosts;
     T data;
     gDeserialize(buf, hosts, data);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->hosts = hosts;
     dst->reduced++;
     dst->reduceWith(data);
     int expect = expected();
-    if (expect == dst->reduced && Galois::Runtime::NetworkInterface::ID != 0) {
-      //std::cout << "r: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+    if (expect == dst->reduced && galois::Runtime::NetworkInterface::ID != 0) {
+      //std::cout << "r: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       dst->reduced = 0;
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
       dst->r_data = dst->m_initial; //Reset reduce buffer
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
     }
   }
 
   static void startReduce(Runtime::RecvBuffer& buf) {
-    //std::cout << "S: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "S: " << galois::Runtime::NetworkInterface::ID << "\n";
     std::vector<DGReducible*> hosts;
     gDeserialize(buf, hosts);
-    DGReducible* dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    DGReducible* dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->hosts = hosts;
     dst->localReduce();
     if (expected() == 0) {
-      //std::cout << "s: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+      //std::cout << "s: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->r_data);
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -161,23 +161,23 @@ public:
   }
 
   DGReducible(const BinFunc& f = BinFunc(), const T& initial = T()) :m_func(f), m_initial(initial), reduced(0) {
-    hosts.resize(Galois::Runtime::NetworkInterface::Num);
-    hosts[Galois::Runtime::NetworkInterface::ID] = this;
+    hosts.resize(galois::Runtime::NetworkInterface::Num);
+    hosts[galois::Runtime::NetworkInterface::ID] = this;
     localReset(m_initial);
   }
 
-  DGReducible(Galois::Runtime::DeSerializeBuffer& s) :reduced(0) {
+  DGReducible(galois::Runtime::DeSerializeBuffer& s) :reduced(0) {
     gDeserialize(s, m_func, m_initial, hosts);
     localReset(m_initial);
     Runtime::SendBuffer buf;
-    gSerialize(buf, hosts[0], Galois::Runtime::NetworkInterface::ID, this);
+    gSerialize(buf, hosts[0], galois::Runtime::NetworkInterface::ID, this);
     Runtime::getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   // mark the graph as persistent so that it is distributed
   typedef int tt_is_persistent;
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
     gSerialize(s, m_func, m_initial, hosts);
   }
@@ -192,27 +192,27 @@ class DGReducibleInplace {
 
   static int expected() {
     int retval = 0;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 1 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 1 < galois::Runtime::NetworkInterface::Num)
       ++retval;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 2 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 2 < galois::Runtime::NetworkInterface::Num)
       ++retval;
     return retval;
   }
 
 public:
   static void broadcastData(Runtime::RecvBuffer& buf) {
-    //std::cout << "B: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "B: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducibleInplace* dst;
     std::vector<DGReducibleInplace*> hosts;
     T data;
     gDeserialize(buf, hosts);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     gDeserialize(buf, dst->m_data);
     dst->doBroadcast(data);
   }
 
   static void registerInstance(Runtime::RecvBuffer& buf) {
-    assert(Galois::Runtime::NetworkInterface::ID == 0);
+    assert(galois::Runtime::NetworkInterface::ID == 0);
     DGReducibleInplace* dst;
     uint32_t host;
     DGReducibleInplace* ptr;
@@ -221,38 +221,38 @@ public:
   }
 
   static void reduceData(Runtime::RecvBuffer& buf) {
-    //std::cout << "R: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "R: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducibleInplace* dst;
     std::vector<DGReducibleInplace*> hosts;
     T data;
     gDeserialize(buf, hosts, data);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->hosts = hosts;
     dst->reduced++;
     dst->m_func(dst->m_data, data);
     int expect = expected();
-    if (expect == dst->reduced && Galois::Runtime::NetworkInterface::ID != 0) {
-      //std::cout << "r: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+    if (expect == dst->reduced && galois::Runtime::NetworkInterface::ID != 0) {
+      //std::cout << "r: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       dst->reduced = 0;
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->m_data);
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
     }
   }
 
   static void startReduce(Runtime::RecvBuffer& buf) {
-    //std::cout << "S: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "S: " << galois::Runtime::NetworkInterface::ID << "\n";
     std::vector<DGReducibleInplace*> hosts;
     gDeserialize(buf, hosts);
-    DGReducibleInplace* dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    DGReducibleInplace* dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->hosts = hosts;
     if (expected() == 0) {
-      //std::cout << "s: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+      //std::cout << "s: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, dst->m_data);
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
     }
   }
 
@@ -278,21 +278,21 @@ public:
   }
 
   DGReducibleInplace(const BinFunc& f = BinFunc()) :m_func(f), reduced(0) {
-    hosts.resize(Galois::Runtime::NetworkInterface::Num);
-    hosts[Galois::Runtime::NetworkInterface::ID] = this;
+    hosts.resize(galois::Runtime::NetworkInterface::Num);
+    hosts[galois::Runtime::NetworkInterface::ID] = this;
   }
 
-  DGReducibleInplace(Galois::Runtime::DeSerializeBuffer& s) :reduced(0) {
+  DGReducibleInplace(galois::Runtime::DeSerializeBuffer& s) :reduced(0) {
     gDeserialize(s, m_func, hosts);
     Runtime::SendBuffer buf;
-    gSerialize(buf, hosts[0], Galois::Runtime::NetworkInterface::ID, this);
+    gSerialize(buf, hosts[0], galois::Runtime::NetworkInterface::ID, this);
     Runtime::getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   // mark the graph as persistent so that it is distributed
   typedef int tt_is_persistent;
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     //This is what is called on the source of a replicating source
     gSerialize(s, m_func, hosts);
   }
@@ -307,18 +307,18 @@ class DGReducibleVector {
     Item(): first(0) { }
     Item(const T& t): first(0), second(t) { }
 
-    Item(Galois::Runtime::DeSerializeBuffer& s) {
-      Galois::Runtime::gDeserialize(s, second);
+    Item(galois::Runtime::DeSerializeBuffer& s) {
+      galois::Runtime::gDeserialize(s, second);
       first = 0;
     }
 
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
-      Galois::Runtime::gSerialize(s, second);
+    void serialize(galois::Runtime::SerializeBuffer& s) const {
+      galois::Runtime::gSerialize(s, second);
     }
 
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-      Galois::Runtime::gDeserialize(s, second);
+    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
+      galois::Runtime::gDeserialize(s, second);
       first = 0;
     }
   };
@@ -368,9 +368,9 @@ class DGReducibleVector {
 
   static int expected() {
     int retval = 0;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 1 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 1 < galois::Runtime::NetworkInterface::Num)
       ++retval;
-    if (Galois::Runtime::NetworkInterface::ID * 2 + 2 < Galois::Runtime::NetworkInterface::Num)
+    if (galois::Runtime::NetworkInterface::ID * 2 + 2 < galois::Runtime::NetworkInterface::Num)
       ++retval;
     return retval;
   }
@@ -396,18 +396,18 @@ class DGReducibleVector {
   //-------- Message landing pads ----------
 
   static void broadcastData(Runtime::RecvBuffer& buf) {
-    //std::cout << "B: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "B: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducibleVector* dst;
     std::vector<DGReducibleVector*> hosts;
     PerPackage data;
     gDeserialize(buf, hosts, data);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     dst->localUpdate(data);
     dst->hosts = hosts;
   }
 
   static void registerInstance(Runtime::RecvBuffer& buf) {
-    assert(Galois::Runtime::NetworkInterface::ID == 0);
+    assert(galois::Runtime::NetworkInterface::ID == 0);
     DGReducibleVector* dst;
     uint32_t host;
     DGReducibleVector* ptr;
@@ -416,49 +416,49 @@ class DGReducibleVector {
   }
 
   static void reduceData(Runtime::RecvBuffer& buf) {
-    //std::cout << "R: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "R: " << galois::Runtime::NetworkInterface::ID << "\n";
     DGReducibleVector* dst;
     std::vector<DGReducibleVector*> hosts;
     bool reset;
     PerPackage data;
     gDeserialize(buf, hosts, reset, data);
-    dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    dst = hosts[galois::Runtime::NetworkInterface::ID];
     assert(dst);
     dst->hosts = hosts;
     dst->reduced++;
     dst->reduceWith(data);
     int expect = expected();
-    if (expect == dst->reduced && Galois::Runtime::NetworkInterface::ID != 0) {
-      //std::cout << "r: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+    if (expect == dst->reduced && galois::Runtime::NetworkInterface::ID != 0) {
+      //std::cout << "r: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       dst->reduced = 0;
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, reset, *dst->m_data.getLocal());
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
       if (reset)
         dst->localUpdate();
     }
   }
 
   static void startReduce(Runtime::RecvBuffer& buf) {
-    //std::cout << "S: " << Galois::Runtime::NetworkInterface::ID << "\n";
+    //std::cout << "S: " << galois::Runtime::NetworkInterface::ID << "\n";
     std::vector<DGReducibleVector*> hosts;
     bool reset;
     gDeserialize(buf, hosts, reset);
-    DGReducibleVector* dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    DGReducibleVector* dst = hosts[galois::Runtime::NetworkInterface::ID];
     dst->hosts = hosts;
     dst->localReduce();
     if (expected() == 0) {
-      //std::cout << "s: " << Galois::Runtime::NetworkInterface::ID << "->" << ((Galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
+      //std::cout << "s: " << galois::Runtime::NetworkInterface::ID << "->" << ((galois::Runtime::NetworkInterface::ID - 1)/2) << "\n";
       Runtime::SendBuffer sbuf;
       gSerialize(sbuf, hosts, reset, *dst->m_data.getLocal());
-      Runtime::getSystemNetworkInterface().send((Galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
+      Runtime::getSystemNetworkInterface().send((galois::Runtime::NetworkInterface::ID - 1)/2, &reduceData, sbuf);
     }
   }
 
   static void startReset(Runtime::RecvBuffer& buf) {
     std::vector<DGReducibleVector*> hosts;
     gDeserialize(buf, hosts);
-    DGReducibleVector* dst = hosts[Galois::Runtime::NetworkInterface::ID];
+    DGReducibleVector* dst = hosts[galois::Runtime::NetworkInterface::ID];
     dst->hosts = hosts;
     dst->localUpdate();
   }
@@ -542,33 +542,33 @@ public:
   }
 
   void allocate(size_t size) {
-    Galois::on_each(Allocate(Runtime::gptr<DGReducibleVector>(this), size));
+    galois::on_each(Allocate(Runtime::gptr<DGReducibleVector>(this), size));
   }
 
   DGReducibleVector(const BinFunc& f = BinFunc(), const T& initial = T()): 
     m_func(f), m_initial(initial), m_size(0), reduced(0)
   {
-    hosts.resize(Galois::Runtime::NetworkInterface::Num);
-    hosts[Galois::Runtime::NetworkInterface::ID] = this;
+    hosts.resize(galois::Runtime::NetworkInterface::Num);
+    hosts[galois::Runtime::NetworkInterface::ID] = this;
     //Runtime::allocatePerHost(this);
   }
 
-  DGReducibleVector(Galois::Runtime::DeSerializeBuffer& s): reduced(0) {
+  DGReducibleVector(galois::Runtime::DeSerializeBuffer& s): reduced(0) {
     gDeserialize(s, m_func, m_initial, hosts);
     Runtime::SendBuffer buf;
-    gSerialize(buf, hosts[0], Galois::Runtime::NetworkInterface::ID, this);
+    gSerialize(buf, hosts[0], galois::Runtime::NetworkInterface::ID, this);
     Runtime::getSystemNetworkInterface().send(0, &registerInstance, buf);
   }
 
   typedef int tt_is_persistent;
   typedef int tt_has_serialize;
 
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, m_func, m_initial, hosts);
   }
 };
 
 
-} //namespace Galois
+} //namespace galois
 
 #endif

@@ -41,7 +41,7 @@
 #include <limits>
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 namespace detail {
@@ -51,7 +51,7 @@ class OrderedByIntegerMetricData {
 protected:
   struct ThreadData { };
   bool hasStored(ThreadData&, Index) { return false; }
-  Galois::optional<T> popStored(ThreadData&, Index) { return {}; }
+  galois::optional<T> popStored(ThreadData&, Index) { return {}; }
 };
 
 template<typename T, typename Index>
@@ -76,8 +76,8 @@ protected:
     return false;
   }
 
-  Galois::optional<T> popStored(ThreadData& p, Index idx) {
-    Galois::optional<T> item;
+  galois::optional<T> popStored(ThreadData& p, Index idx) {
+    galois::optional<T> item;
     for (auto ii = p.stored.begin(), ei = p.stored.end(); ii != ei; ++ii) {
       if (ii->first == idx) {
         item = ii->second;
@@ -96,7 +96,7 @@ struct OrderedByIntegerMetricComparator {
 
   template<typename C>
   struct with_local_map {
-    typedef Galois::flat_map<Index, C, std::less<Index> > type;
+    typedef galois::flat_map<Index, C, std::less<Index> > type;
   };
   OrderedByIntegerMetricComparator(): identity(std::numeric_limits<Index>::min()) {}
 };
@@ -108,7 +108,7 @@ struct OrderedByIntegerMetricComparator<Index, true> {
 
   template<typename C>
   struct with_local_map {
-    typedef Galois::flat_map<Index, C, std::greater<Index> > type;
+    typedef galois::flat_map<Index, C, std::greater<Index> > type;
   };
   OrderedByIntegerMetricComparator(): identity(std::numeric_limits<Index>::max()) {}
 };
@@ -130,8 +130,8 @@ struct OrderedByIntegerMetricComparator<Index, true> {
  *   int operator()(Item i) const { return i.index; }
  * };
  *
- * typedef Galois::WorkList::OrderedByIntegerMetric<Indexer> WL;
- * Galois::for_each<WL>(items.begin(), items.end(), Fn);
+ * typedef galois::WorkList::OrderedByIntegerMetric<Indexer> WL;
+ * galois::for_each<WL>(items.begin(), items.end(), Fn);
  * \endcode
  *
  * @tparam Indexer        Indexer class
@@ -242,7 +242,7 @@ private:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  Galois::optional<T> slowPop(ThreadData& p) {
+  galois::optional<T> slowPop(ThreadData& p) {
     bool localLeader = Substrate::ThreadPool::isLeader();
     Index msS = this->identity;
     
@@ -264,7 +264,7 @@ private:
     }
 
     for (auto ii = p.local.lower_bound(msS), ei = p.local.end(); ii != ei; ++ii) {
-      Galois::optional<T> item;
+      galois::optional<T> item;
       if ((item = ii->second->pop())) {
         p.current = ii->second;
         p.curIndex = ii->first;
@@ -273,7 +273,7 @@ private:
       }
     }
 
-    return Galois::optional<value_type>();
+    return galois::optional<value_type>();
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -356,7 +356,7 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     // Find a successful pop
     ThreadData& p = *data.getLocal();
     CTy* C = p.current;
@@ -367,7 +367,7 @@ public:
     if (!UseBarrier && BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0)
       return slowPop(p);
 
-    Galois::optional<value_type> item;
+    galois::optional<value_type> item;
     if (C && (item = C->pop()))
       return item;
 
@@ -380,7 +380,7 @@ public:
 
   template<bool Barrier=UseBarrier>
   auto empty() -> typename std::enable_if<Barrier, bool>::type {
-    Galois::optional<value_type> item;
+    galois::optional<value_type> item;
     ThreadData& p = *data.getLocal();
 
     item = slowPop(p);
@@ -423,6 +423,6 @@ public:
 GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

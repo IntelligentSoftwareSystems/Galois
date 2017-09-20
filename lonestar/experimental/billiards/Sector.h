@@ -41,7 +41,7 @@ class Sector: public CollidingObject {
 public: 
   using Ball_t = BallSectored;
 
-  using Lock_t = Galois::Substrate::SimpleLock;
+  using Lock_t = galois::Substrate::SimpleLock;
 
   Lock_t mutex;
 
@@ -56,8 +56,8 @@ public:
 
   BoundingBox boundbox;
 
-  Galois::FlatSet<Cushion*> cushions;
-  Galois::FlatSet<Ball_t*> balls;
+  galois::FlatSet<Cushion*> cushions;
+  galois::FlatSet<Ball_t*> balls;
 
   void init (const Vec2& bottomLeft, const FP& sectorSize) {
 
@@ -189,13 +189,13 @@ public:
 
   virtual void simulate (const Event& e);
 
-  Galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const;
+  galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const;
 
 
-  Galois::optional<Event> earliestSectorEntry (const Ball_t* ball, const FP& endtime) const;
+  galois::optional<Event> earliestSectorEntry (const Ball_t* ball, const FP& endtime) const;
 
 
-  Galois::optional<Event> earliestSectorLeave (const Ball_t* b, const FP& endtime) const;
+  galois::optional<Event> earliestSectorLeave (const Ball_t* b, const FP& endtime) const;
 
 
 };

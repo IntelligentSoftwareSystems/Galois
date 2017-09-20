@@ -51,7 +51,7 @@
 
 #include <iostream>
 
-namespace Galois {
+namespace galois {
 
 namespace Runtime {
 
@@ -240,8 +240,8 @@ struct OptimNItem: public OrdLocBase<OptimNItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<OptimNItem, Ctxt, CtxtCmp>;
 
   using Factory = OrdLocFactoryBase<OptimNItem, Ctxt, CtxtCmp>;
-  using HistList = Galois::gstl::List<Ctxt*>;
-  using Lock_ty = Galois::Substrate::SimpleLock;
+  using HistList = galois::gstl::List<Ctxt*>;
+  using Lock_ty = galois::Substrate::SimpleLock;
   using NF = OptimNItemFunctions<OptimNItem, Ctxt, CtxtCmp>;
 
 
@@ -609,7 +609,7 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
 
   using CF = OptimContextFunctions<OptimContext, NItem>;
 
-  Galois::GAtomic<bool> onWL;
+  galois::GAtomic<bool> onWL;
   bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
   NhoodList nhood;
   ChildList children;
@@ -622,7 +622,7 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag m) {
 
     NItem& nitem = Base::exec.getNhoodMgr().getNhoodItem (l);
     assert (NItem::getOwner (l) == &nitem);
@@ -719,7 +719,7 @@ class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple
 
   using ThisClass = OrdSpecExecBase;
 
-  using CommitQ = Galois::PerThreadVector<Ctxt*>;
+  using CommitQ = galois::PerThreadVector<Ctxt*>;
   using ExecutionRecords = std::vector<ParaMeter::StepStats>;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 4;
@@ -803,7 +803,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
-    Galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           if (!c->hasState (ContextState::ABORTED_CHILD)) {
@@ -822,7 +822,7 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("expandNhood"),
+          galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE>()));
 
   }
@@ -929,7 +929,7 @@ public:
     t.start();
 
     const bool USE_WIN = (this->targetCommitRatio != 0.0);
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this, USE_WIN] (const T& x) {
 
           Ctxt* c = this->ctxtMaker (x);
@@ -941,7 +941,7 @@ public:
 
         }, 
         std::make_tuple (
-          Galois::loopname ("init-fill"),
+          galois::loopname ("init-fill"),
           chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
 
     t.stop();
@@ -982,7 +982,7 @@ protected:
     minWinWL = nullptr;
 
     if (this->targetCommitRatio != 0.0) {
-      Galois::optional<Ctxt*> m = winWL.getMin();
+      galois::optional<Ctxt*> m = winWL.getMin();
       if (m) {
         minWinWL = *m;
       }
@@ -1010,7 +1010,7 @@ protected:
   Ctxt* getMinPending (void) {
     Ctxt* m = minWinWL;
 
-    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
+    for (unsigned i = 0; i < galois::getActiveThreads(); ++i) {
       Ctxt* c = *currMinPending.getRemote (i);
 
       if (!c) { continue; }
@@ -1078,7 +1078,7 @@ protected:
       return; 
     }
 
-    Galois::do_all_choice (makeLocalRange (abortLocations),
+    galois::do_all_choice (makeLocalRange (abortLocations),
         [this] (NItem* ni) {
 
           Ctxt* c = ni->getMin();
@@ -1088,11 +1088,11 @@ protected:
           // c->disableSrc();
         },
         std::make_tuple (
-          Galois::loopname ("mark-aborts"),
-          Galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
+          galois::loopname ("mark-aborts"),
+          galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
 
 
-    Galois::Runtime::for_each_gen (
+    galois::Runtime::for_each_gen (
         makeLocalRange (abortRoots),
         [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1107,13 +1107,13 @@ protected:
           dbg::print("aborted after execution:", c, " with active: ", c->getActive());
         },
         std::make_tuple (
-          Galois::loopname ("handle-aborts"),
-          Galois::does_not_need_aborts<>(),
-          Galois::combine_stats_by_name<>(),
-          Galois::wl<Galois::WorkList::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
+          galois::loopname ("handle-aborts"),
+          galois::does_not_need_aborts<>(),
+          galois::combine_stats_by_name<>(),
+          galois::wl<galois::WorkList::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
 
 
-    Galois::Runtime::on_each_impl(
+    galois::Runtime::on_each_impl(
         [this] (const unsigned tid, const unsigned numT) {
           abortRoots.get().clear();
           abortLocations.get().clear();
@@ -1125,7 +1125,7 @@ protected:
 
     abortRoots.clear_all_parallel();
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
+    galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
         [this, &abortRoots] (Ctxt* c) {
 
           if (c->isSrc()) {
@@ -1144,11 +1144,11 @@ protected:
           } 
         },
         std::make_tuple (
-          Galois::loopname ("mark-aborts"),
-          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
+          galois::loopname ("mark-aborts"),
+          galois::chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
 
 
-    Galois::Runtime::for_each_gen (
+    galois::Runtime::for_each_gen (
         makeLocalRange (abortRoots),
         [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1163,13 +1163,13 @@ protected:
           dbg::print("aborted after execution:", c, " with active: ", c->getActive());
         },
         std::make_tuple (
-          Galois::loopname ("handle-aborts"),
-          Galois::does_not_need_aborts_tag(),
-          Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
+          galois::loopname ("handle-aborts"),
+          galois::does_not_need_aborts_tag(),
+          galois::wl<galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
     
 
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
+    galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
 
         [this, &sources] (Ctxt* c) {
           if (c->isSrc() && !c->hasState (ContextState::ABORTED_CHILD)) {
@@ -1188,8 +1188,8 @@ protected:
           c->resetMarks();
         },
         std::make_tuple ( 
-          Galois::loopname ("collect-sources"),
-          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
+          galois::loopname ("collect-sources"),
+          galois::chunk_size<Base::DEFAULT_CHUNK_SIZE>()));
 
   }
   */
@@ -1213,7 +1213,7 @@ protected:
 
     assert (commitRoots.empty_all());
 
-    Galois::do_all_choice (makeLocalRange (this->commitQ),
+    galois::do_all_choice (makeLocalRange (this->commitQ),
         [this, gvt] (Ctxt* c) {
 
           assert (c);
@@ -1226,11 +1226,11 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("find-commit-srcs"),
-          Galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
+          galois::loopname ("find-commit-srcs"),
+          galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
         
 
-    Galois::Runtime::for_each_gen (
+    galois::Runtime::for_each_gen (
         makeLocalRange (commitRoots),
         [this, gvt] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
@@ -1257,10 +1257,10 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("retire"),
-          Galois::does_not_need_aborts<>(),
-          Galois::combine_stats_by_name<>(),
-          Galois::wl<Galois::WorkList::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
+          galois::loopname ("retire"),
+          galois::does_not_need_aborts<>(),
+          galois::combine_stats_by_name<>(),
+          galois::wl<galois::WorkList::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
 
     commitRoots.clear_all_parallel();
   }
@@ -1278,7 +1278,7 @@ protected:
     // among all threads
 
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           
           auto& localQ = this->commitQ.get();
@@ -1397,7 +1397,7 @@ protected:
     if (ThisClass::HAS_EXEC_FUNC) {
 
 
-      Galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+      galois::do_all_choice (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* ctxt) {
           bool _x = ctxt->hasState (ContextState::ABORTED_CHILD) 
                  || ctxt->hasState (ContextState::SCHEDULED)
@@ -1411,8 +1411,8 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("executeSources"),
-          Galois::chunk_size<ExFunc::CHUNK_SIZE>()));
+          galois::loopname ("executeSources"),
+          galois::chunk_size<ExFunc::CHUNK_SIZE>()));
 
     }
   }
@@ -1422,7 +1422,7 @@ protected:
     // Ctxt in currWL can be in SCHEDULED, UNSCHEDULED (after having been aborted),
     // ABORTED_CHILD
 
-    Galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           bool _x = c->hasState (ContextState::ABORTED_CHILD) 
@@ -1496,8 +1496,8 @@ protected:
           c->resetMarks();
         },
         std::make_tuple (
-          Galois::loopname ("applyOperator"),
-          Galois::chunk_size<OpFunc::CHUNK_SIZE>()));
+          galois::loopname ("applyOperator"),
+          galois::chunk_size<OpFunc::CHUNK_SIZE>()));
 
   }
 
@@ -1512,7 +1512,7 @@ class PessimOrdContext: public SpecContextBase<T, Cmp, Exec> {
 public:
 
   using Base = SpecContextBase<T, Cmp, Exec>;
-  using NhoodList =  Galois::gstl::Vector<Lockable*>;
+  using NhoodList =  galois::gstl::Vector<Lockable*>;
   using CtxtCmp = typename Base::CtxtCmp;
   using Executor = Exec;
 
@@ -1575,7 +1575,7 @@ public:
   }
 
   // TODO: Refactor common code with TwoPhaseContext::subAcquire
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
 
     dbg::print (this, " trying to acquire ", l);
 
@@ -1658,9 +1658,9 @@ protected:
   using CtxtWL = typename Base::CtxtWL;
 
   typename Base::template WindowWLwrapper<PessimOrdExecutor> winWL;
-  Galois::optional<T> minWinWL;
+  galois::optional<T> minWinWL;
 
-  Substrate::PerThreadStorage<Galois::optional<T> > currMinPending; // reset at the beginning of each round
+  Substrate::PerThreadStorage<galois::optional<T> > currMinPending; // reset at the beginning of each round
   CtxtWL abortRoots;
   CtxtWL freeWL;
 
@@ -1678,12 +1678,12 @@ public:
   void push_initial (const R& range) {
     if (this->targetCommitRatio == 0.0) {
 
-      Galois::do_all_choice (range,
+      galois::do_all_choice (range,
           [this] (const T& x) {
             this->getNextWL ().push_back (this->ctxtMaker (x));
           }, 
           std::make_tuple (
-            Galois::loopname ("init-fill"),
+            galois::loopname ("init-fill"),
             chunk_size<NhFunc::CHUNK_SIZE> ()));
 
     } else {
@@ -1749,12 +1749,12 @@ protected:
     // reset currMinPending
     on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
-          *(currMinPending.getLocal()) = Galois::optional<T>();
+          *(currMinPending.getLocal()) = galois::optional<T>();
         });
   }
 
   void updateCurrMinPending (const T& elem) {
-    Galois::optional<T>& minPending = *currMinPending.getLocal();
+    galois::optional<T>& minPending = *currMinPending.getLocal();
 
     if (!minPending || this->getItemCmp()(elem, *minPending)) {
       minPending = elem;
@@ -1763,17 +1763,17 @@ protected:
 
   // invoked after beginRound
   void resetMinWinWL (void) {
-    minWinWL = Galois::optional<T>();
+    minWinWL = galois::optional<T>();
     if (this->targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin();
     }
   }
 
-  Galois::optional<T> getMinPending (void) {
-    Galois::optional<T> m = minWinWL;
+  galois::optional<T> getMinPending (void) {
+    galois::optional<T> m = minWinWL;
 
-    for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
-      Galois::optional<T> c = *currMinPending.getRemote (i);
+    for (unsigned i = 0; i < galois::getActiveThreads(); ++i) {
+      galois::optional<T> c = *currMinPending.getRemote (i);
 
       if (!c) { continue; }
 
@@ -1823,7 +1823,7 @@ protected:
 
   void serviceAborts() {
 
-    Galois::do_all_choice (makeLocalRange (abortRoots),
+    galois::do_all_choice (makeLocalRange (abortRoots),
         [this] (Ctxt* c) {
 
           bool b = c->hasState (ContextState::ABORT_HELP) 
@@ -1837,8 +1837,8 @@ protected:
 
         },
         std::make_tuple (
-          Galois::loopname ("abort-marked"),
-          Galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
+          galois::loopname ("abort-marked"),
+          galois::chunk_size<ThisClass::DEFAULT_CHUNK_SIZE>()));
 
     abortRoots.clear_all_parallel();
 
@@ -1848,7 +1848,7 @@ protected:
 
     if (ThisClass::HAS_EXEC_FUNC) {
 
-      Galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+      galois::do_all_choice (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* ctxt) {
 
           if (ctxt->isSrc()) {
@@ -1858,15 +1858,15 @@ protected:
 
         },
         std::make_tuple (
-          Galois::loopname ("executeSources"),
-          Galois::chunk_size<ExFunc::CHUNK_SIZE>()));
+          galois::loopname ("executeSources"),
+          galois::chunk_size<ExFunc::CHUNK_SIZE>()));
 
     }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
 
-    Galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           if (this->NEEDS_CUSTOM_LOCKING || c->isSrc()) {
@@ -1924,8 +1924,8 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("applyOperator"),
-          Galois::chunk_size<OpFunc::CHUNK_SIZE>()));
+          galois::loopname ("applyOperator"),
+          galois::chunk_size<OpFunc::CHUNK_SIZE>()));
 
   }
 
@@ -1961,7 +1961,7 @@ protected:
 
   void performCommits (void) {
 
-    Galois::optional<T> gvt = getMinPending();
+    galois::optional<T> gvt = getMinPending();
 
     if (gvt) {
       dbg::print ("gvt computed as: ", *gvt);
@@ -1991,7 +1991,7 @@ protected:
     };
 
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, &ptest] (const unsigned tid, const unsigned numT) {
           auto& localQ = this->commitQ.get();
 
@@ -2006,7 +2006,7 @@ protected:
 // 
     // auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
 // 
-    // Galois::Runtime::on_each_impl (
+    // galois::Runtime::on_each_impl (
         // [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
           // auto& localQ = Base::commitQ.get();
           // auto new_end = std::partition (localQ.begin(), 
@@ -2033,10 +2033,10 @@ protected:
     // };
      // 
 // 
-    // using PQ = Galois::MinHeap<C*, typename std::remove_reference<decltype (qcmp)>::type>;
+    // using PQ = galois::MinHeap<C*, typename std::remove_reference<decltype (qcmp)>::type>;
     // PQ commitMetaPQ (qcmp);
 // 
-    // for (unsigned i = 0; i < Galois::getActiveThreads(); ++i) {
+    // for (unsigned i = 0; i < galois::getActiveThreads(); ++i) {
 // 
       // if (!Base::commitQ.get (i).empty()) {
         // commitMetaPQ.push (&(Base::commitQ.get (i))); 
@@ -2145,7 +2145,7 @@ void for_each_ordered_spec_impl (const R& range, const Cmp& cmp, const NhFunc& n
   
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
-  Substrate::getThreadPool().burnPower (Galois::getActiveThreads());
+  Substrate::getThreadPool().burnPower (galois::getActiveThreads());
 
   e.push_initial (range);
   e.execute();
@@ -2217,7 +2217,7 @@ void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_ORDERED_SPECULATION_H

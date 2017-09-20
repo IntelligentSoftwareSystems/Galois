@@ -44,12 +44,12 @@
 #include <functional>
 #include <mutex>
 
-namespace Galois { namespace Runtime {
+namespace galois { namespace Runtime {
 
 template<typename Graph, bool UseExp = false>
 class Fixed2DGraphTiledExecutor {
   static constexpr int numDims = 2;
-  typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::Runtime::LL::PaddedLock<true> SpinLock;
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::iterator iterator;
   typedef typename Graph::edge_iterator edge_iterator;
@@ -85,15 +85,15 @@ class Fixed2DGraphTiledExecutor {
     }
   };
 
-  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
+  typedef galois::NoDerefIterator<edge_iterator> no_deref_iterator;
   typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
 
   Graph& g;
   int cutoff; // XXX: UseExp
-  Galois::Runtime::Barrier& barrier; // XXX: UseExp
-  //std::array<Galois::LargeArray<SpinLock>, numDims> locks;
-  //Galois::LargeArray<Task> tasks;
-  Galois::Statistic failures;
+  galois::Runtime::Barrier& barrier; // XXX: UseExp
+  //std::array<galois::LargeArray<SpinLock>, numDims> locks;
+  //galois::LargeArray<Task> tasks;
+  galois::Statistic failures;
   std::array<std::vector<SpinLock>, numDims> locks;
   std::vector<Task> tasks;
   size_t numTasks;
@@ -122,15 +122,15 @@ class Fixed2DGraphTiledExecutor {
     GetDst getDst { &g };
 
     for (auto ii = task.start0; ii != task.end0; ++ii) {
-      edge_iterator begin = g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED);
+      edge_iterator begin = g.edge_begin(*ii, galois::MethodFlag::UNPROTECTED);
       no_deref_iterator nbegin(begin);
-      no_deref_iterator nend(g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED));
+      no_deref_iterator nend(g.edge_end(*ii, galois::MethodFlag::UNPROTECTED));
       edge_dst_iterator dbegin(nbegin, getDst);
       edge_dst_iterator dend(nend, getDst);
 
-      if (UseExp && cutoff < 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED)) >= -cutoff)
+      if (UseExp && cutoff < 0 && std::distance(g.edge_begin(*ii, galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, galois::MethodFlag::UNPROTECTED)) >= -cutoff)
         continue;
-      else if (UseExp && cutoff > 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED)) < cutoff)
+      else if (UseExp && cutoff > 0 && std::distance(g.edge_begin(*ii, galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, galois::MethodFlag::UNPROTECTED)) < cutoff)
         continue;
 
       for (auto jj = std::lower_bound(dbegin, dend, task.start1); jj != dend; ) {
@@ -422,9 +422,9 @@ class Fixed2DGraphTiledExecutor {
     for (size_t i = 0; i < numBlocks; ++i) {
       Task& task = tasks[i];
       task.coord = { { i % numBlocks0, i / numBlocks0 } };
-      std::tie(task.start0, task.end0) = Galois::block_range(first0, last0, task.coord[0], numBlocks0);
+      std::tie(task.start0, task.end0) = galois::block_range(first0, last0, task.coord[0], numBlocks0);
       iterator s, e;
-      std::tie(s, e) = Galois::block_range(first1, last1, task.coord[1], numBlocks1);
+      std::tie(s, e) = galois::block_range(first1, last1, task.coord[1], numBlocks1);
       // XXX: Works for CSR graphs
       task.start1 = *s;
       task.end1 = *e - 1;
@@ -443,7 +443,7 @@ class Fixed2DGraphTiledExecutor {
 
 public:
   Fixed2DGraphTiledExecutor(Graph& g, int cutoff = 0):
-    g(g), cutoff(cutoff), barrier(Galois::Runtime::getSystemBarrier()), failures("PopFailures") { }
+    g(g), cutoff(cutoff), barrier(galois::Runtime::getSystemBarrier()), failures("PopFailures") { }
 
   template<typename Function>
   void execute(
@@ -456,10 +456,10 @@ public:
     maxUpdates = numIterations;
     useLocks = _useLocks;
     Process<false, Function> p { this, fn };
-    Galois::on_each(p);
+    galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      Galois::Runtime::LL::gWarn("Missing tasks");
+      galois::Runtime::LL::gWarn("Missing tasks");
   }
 
   template<typename Function>
@@ -473,10 +473,10 @@ public:
     maxUpdates = numIterations;
     useLocks = _useLocks;
     Process<true, Function> p { this, fn };
-    Galois::on_each(p);
+    galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      Galois::Runtime::LL::gWarn("Missing tasks");
+      galois::Runtime::LL::gWarn("Missing tasks");
   }
 };
 

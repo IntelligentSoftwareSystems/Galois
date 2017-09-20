@@ -156,7 +156,7 @@ public:
 
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Vertex, unsigned int> Graph;
+typedef galois::Graph::LC_Linear_Graph<Vertex, unsigned int> Graph;
 typedef Graph::GraphNode GNode;
 
 
@@ -182,7 +182,7 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
   //clear
   //edges
   if (true)
-    Galois::do_all(g.begin(), g.end(), [&g, &data, black] (GNode& n) {
+    galois::do_all(g.begin(), g.end(), [&g, &data, black] (GNode& n) {
         Vertex& v = g.getData(n);
         for(Graph::edge_iterator ee = g.edge_begin(n), eee = g.edge_end(n); ee!=eee; ee++) {
           GNode n3 = g.getEdgeDst(ee);
@@ -192,7 +192,7 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
       } );
   if (forces) {
     if (true)
-      Galois::do_all(g.begin(), g.end(), [&g, &data, which, red] (GNode& n) {
+      galois::do_all(g.begin(), g.end(), [&g, &data, which, red] (GNode& n) {
         Vertex& v = g.getData(n);
         auto velocity = v.position(which) - v.position((which + 1) % 2);
         drawline(data, v.coord.x, v.coord.y, 
@@ -261,7 +261,7 @@ Point<double> computeForceRepulsive(int which, Point<double> position, GNode n, 
   Point<double> fRepulse = {0.0,0.0};
   for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
     if (n != *jj) {
-      Vertex& u = g.getData(*jj, Galois::MethodFlag::UNPROTECTED);
+      Vertex& u = g.getData(*jj, galois::MethodFlag::UNPROTECTED);
       auto change = position - u.position(which);
       double lenSQ = change.lengthSQ();
       if (lenSQ < lenLimit) { // not stable
@@ -311,11 +311,11 @@ struct computeImpulse {
   Graph& g;
   int which;
   double stepSize;
-  Galois::Substrate::PerThreadStorage<double>& maxForceSQ;
-  Galois::Substrate::PerThreadStorage<Point<double> >& totalForce;
+  galois::Substrate::PerThreadStorage<double>& maxForceSQ;
+  galois::Substrate::PerThreadStorage<Point<double> >& totalForce;
 
-  computeImpulse(Graph& _g, int w, double ss, Galois::Substrate::PerThreadStorage<double>& mf, 
-                 Galois::Substrate::PerThreadStorage<Point<double>>& tf)
+  computeImpulse(Graph& _g, int w, double ss, galois::Substrate::PerThreadStorage<double>& mf, 
+                 galois::Substrate::PerThreadStorage<Point<double>>& tf)
                  :g(_g), which(w), stepSize(ss), maxForceSQ(mf), totalForce(tf) {}
 
   void operator()(GNode& n) const {
@@ -394,13 +394,13 @@ void computeGlobalTemp(Graph& g, double& Tglob) {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   Graph graph;
 
   //read in graph??
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
   //graph.structureFromFile(filename);
 
   nnodes = std::distance(graph.begin(), graph.end());
@@ -438,18 +438,18 @@ int main(int argc, char **argv) {
   render(data_sf);
 
   //Begin stages of algorithm
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
 
   double mf = 0.0;
   do {
     //Compute v's impulse
-    Galois::Substrate::PerThreadStorage<double> maxForceSQ;
-    Galois::Substrate::PerThreadStorage<Point<double>> totalForce;
+    galois::Substrate::PerThreadStorage<double> maxForceSQ;
+    galois::Substrate::PerThreadStorage<Point<double>> totalForce;
     double step = natStepSize;
     //Vertex& v = graph.getData(*graph.begin());
     //v.dump();
-    Galois::do_all(graph.begin(), graph.end(), computeImpulse(graph, numRounds % 2, step, maxForceSQ, totalForce));
+    galois::do_all(graph.begin(), graph.end(), computeImpulse(graph, numRounds % 2, step, maxForceSQ, totalForce));
     //v.dump();
     Point<double> tf;
     mf = 0.0;
@@ -460,7 +460,7 @@ int main(int argc, char **argv) {
     }
     if (mf > maxForceLimit*maxForceLimit || tf.lengthSQ() > totForceLimit*totForceLimit) {
       step = std::min((double)natStepSize, std::min(maxForceLimit / sqrt(mf), totForceLimit / sqrt(tf.lengthSQ())));
-      Galois::do_all(graph.begin(), graph.end(), recomputePos(graph, numRounds % 2, step));
+      galois::do_all(graph.begin(), graph.end(), recomputePos(graph, numRounds % 2, step));
       //v.dump();
     }
     //    alpha *= .995;

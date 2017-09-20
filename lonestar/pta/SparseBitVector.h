@@ -28,7 +28,7 @@ kind.
 #include <string>
 #include <ostream>
 
-namespace Galois {
+namespace galois {
 
 /**
  * Concurrent version of sparse bit vector.
@@ -38,7 +38,7 @@ namespace Galois {
  */
 struct SparseBitVector {
   typedef unsigned long WORD;
-  typedef Galois::Substrate::SimpleLock LockType;
+  typedef galois::Substrate::SimpleLock LockType;
   static const unsigned wordsize = sizeof(WORD)*8;
 
   struct OneWord {

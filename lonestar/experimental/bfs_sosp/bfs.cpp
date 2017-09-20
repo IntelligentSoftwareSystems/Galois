@@ -114,7 +114,7 @@ struct not_consistent {
 };
 
 template<typename Graph>
-struct not_consistent<Graph, typename std::enable_if<!Galois::Graph::is_segmented<Graph>::value>::type> {
+struct not_consistent<Graph, typename std::enable_if<!galois::Graph::is_segmented<Graph>::value>::type> {
   Graph& g;
   not_consistent(Graph& g): g(g) { }
 
@@ -147,9 +147,9 @@ struct not_visited {
 template<typename Graph>
 struct max_dist {
   Graph& g;
-  Galois::GReduceMax<Dist>& m;
+  galois::GReduceMax<Dist>& m;
 
-  max_dist(Graph& g, Galois::GReduceMax<Dist>& m): g(g), m(m) { }
+  max_dist(Graph& g, galois::GReduceMax<Dist>& m): g(g), m(m) { }
 
   void operator()(typename Graph::GraphNode n) const {
     Dist d = g.getData(n).dist;
@@ -165,7 +165,7 @@ bool verify(Graph& graph, typename Graph::GraphNode source) {
     std::cerr << "source has non-zero dist value\n";
     return false;
   }
-  namespace pstl = Galois::ParallelSTL;
+  namespace pstl = galois::ParallelSTL;
 
   size_t notVisited = pstl::count_if(graph.begin(), graph.end(), not_visited<Graph>(graph));
   if (notVisited) {
@@ -178,8 +178,8 @@ bool verify(Graph& graph, typename Graph::GraphNode source) {
     return false;
   }
 
-  Galois::GReduceMax<Dist> m;
-  Galois::do_all(graph.begin(), graph.end(), max_dist<Graph>(graph, m));
+  galois::GReduceMax<Dist> m;
+  galois::do_all(graph.begin(), graph.end(), max_dist<Graph>(graph, m));
   std::cout << "max dist: " << m.reduce() << "\n";
   
   return true;
@@ -200,7 +200,7 @@ void initialize(Algo& algo,
     typename Algo::Graph::GraphNode& source,
     typename Algo::Graph::GraphNode& report) {
 
-  Galois::StatTimer T("Load");
+  galois::StatTimer T("Load");
   T.start();
   algo.readGraph(graph);
   T.stop();
@@ -224,11 +224,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace Galois::Graph;
+  using namespace galois::Graph;
   if (symmetricGraph) {
-    Galois::Graph::readGraph(graph, filename);
+    galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -236,12 +236,12 @@ void readInOutGraph(Graph& graph) {
 
 //! Serial BFS using optimized flags based off asynchronous algo
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   void operator()(Graph& graph, const GNode source) const {
     std::deque<GNode> wl;
@@ -252,13 +252,13 @@ struct SerialAlgo {
       GNode n = wl.front();
       wl.pop_front();
 
-      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      SNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
       Dist newDist = data.dist + 1;
 
-      for (auto ii : graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         if (newDist < ddata.dist) {
           ddata.dist = newDist;
@@ -271,13 +271,13 @@ struct SerialAlgo {
 
 //! Galois BFS using optimized flags
 struct AsyncAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Asynchronous"; }
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   typedef std::pair<GNode, Dist> WorkItem;
 
@@ -293,14 +293,14 @@ struct AsyncAlgo {
     Graph& graph;
     Process(Graph& g): graph(g) { }
 
-    void operator()(WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       GNode n = item.first;
 
       Dist newDist = item.second;
 
-      for (auto ii : graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -317,14 +317,14 @@ struct AsyncAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) const {
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
     //typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
     graph.getData(source).dist = 0;
 
-    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<OBIM>());
+    galois::for_each(WorkItem(source, 1), Process(graph), galois::wl<OBIM>());
   }
 };
 
@@ -336,10 +336,10 @@ struct AsyncAlgo {
  * search. In Supercomputing. 2012.
  */
 struct HighCentralityAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   
   std::string name() const { return "High Centrality"; }
@@ -347,8 +347,8 @@ struct HighCentralityAlgo {
   void readGraph(Graph& graph) { readInOutGraph(graph); }
 
   struct CountingBag {
-    Galois::InsertBag<GNode> wl;
-    Galois::GAccumulator<size_t> count;
+    galois::InsertBag<GNode> wl;
+    galois::GAccumulator<size_t> count;
 
     void clear() {
       wl.clear();
@@ -370,17 +370,17 @@ struct HighCentralityAlgo {
     Dist newDist;
     ForwardProcess(Graph& g, CountingBag* n, int d): graph(g), next(n), newDist(d) { }
 
-    void operator()(const GNode& n, Galois::UserContext<GNode>&) {
+    void operator()(const GNode& n, galois::UserContext<GNode>&) {
       (*this)(n);
     }
 
-    void operator()(const Graph::edge_iterator& it, Galois::UserContext<Graph::edge_iterator>&) {
+    void operator()(const Graph::edge_iterator& it, galois::UserContext<Graph::edge_iterator>&) {
       (*this)(it);
     }
 
     void operator()(const Graph::edge_iterator& ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -390,15 +390,15 @@ struct HighCentralityAlgo {
         if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
           next->wl.push(dst);
           next->count += 1
-            + std::distance(graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED),
-              graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED));
+            + std::distance(graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(dst, galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
     }
 
     void operator()(const GNode& n) {
-      for (auto ii : graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         (*this)(ii);
       }
     }
@@ -413,26 +413,26 @@ struct HighCentralityAlgo {
     Dist newDist; 
     BackwardProcess(Graph& g, CountingBag* n, int d): graph(g), next(n), newDist(d) { }
 
-    void operator()(const GNode& n, Galois::UserContext<GNode>&) const {
+    void operator()(const GNode& n, galois::UserContext<GNode>&) const {
       operator()(n);
     }
 
     void operator()(const GNode& n) const {
-      SNode& sdata = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      SNode& sdata = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       if (sdata.dist <= newDist)
         return;
 
-      for (Graph::in_edge_iterator ii = graph.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-            ei = graph.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (Graph::in_edge_iterator ii = graph.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
+            ei = graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getInEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         if (ddata.dist + 1 == newDist) {
           sdata.dist = newDist;
           next->wl.push(n);
           next->count += 1
-            + std::distance(graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-              graph.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+            + std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
@@ -440,13 +440,13 @@ struct HighCentralityAlgo {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedLIFO<256> WL;
     int next = 0;
     Dist newDist = 1;
     graph.getData(source).dist = 0;
-    Galois::for_each(graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(), 
-        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
+    galois::for_each(graph.out_edges(source, galois::MethodFlag::UNPROTECTED).begin(), 
+        graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end(),
         ForwardProcess(graph, &bags[next], newDist));
     while (!bags[next].empty()) {
       size_t nextSize = bags[next].size();
@@ -455,9 +455,9 @@ struct HighCentralityAlgo {
       newDist++;
       std::cout << nextSize << " " << (nextSize > graph.sizeEdges() / 20) << "\n";
       if (nextSize > graph.sizeEdges() / 20)
-        Galois::do_all_local(graph, BackwardProcess(graph, &bags[next], newDist));
+        galois::do_all_local(graph, BackwardProcess(graph, &bags[next], newDist));
       else
-        Galois::for_each_local(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist), Galois::wl<WL>());
+        galois::for_each_local(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist), galois::wl<WL>());
       bags[cur].clear();
     }
   }
@@ -466,7 +466,7 @@ struct HighCentralityAlgo {
 //! BFS using optimized flags and barrier scheduling 
 template<typename WL, bool useCas>
 struct BarrierAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
     Graph;
@@ -474,7 +474,7 @@ struct BarrierAlgo {
   typedef std::pair<GNode,Dist> WorkItem;
 
   std::string name() const { return "Barrier"; }
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   struct Process {
     typedef int tt_does_not_need_aborts;
@@ -482,14 +482,14 @@ struct BarrierAlgo {
     Graph& graph;
     Process(Graph& g): graph(g) { }
 
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       GNode n = item.first;
 
       Dist newDist = item.second;
 
-      for (auto ii : graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -509,7 +509,7 @@ struct BarrierAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
     graph.getData(source).dist = 0;
-    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<WL>());
+    galois::for_each(WorkItem(source, 1), Process(graph), galois::wl<WL>());
   }
 };
 
@@ -521,12 +521,12 @@ struct HybridAlgo: public HybridBFS<SNode,Dist> {
 
 template<DetAlgo Version>
 struct DeterministicAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Deterministic"; }
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   typedef std::pair<GNode,int> WorkItem;
 
@@ -536,10 +536,10 @@ struct DeterministicAlgo {
     Process(Graph& g): graph(g) { }
 
     struct LocalState {
-      typedef typename Galois::PerIterAllocTy::rebind<GNode>::other Alloc;
+      typedef typename galois::PerIterAllocTy::rebind<GNode>::other Alloc;
       typedef std::deque<GNode,Alloc> Pending;
       Pending pending;
-      LocalState(Process& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
+      LocalState(Process& self, galois::PerIterAllocTy& alloc): pending(alloc) { }
     };
 
     struct DeterministicId {
@@ -549,10 +549,10 @@ struct DeterministicAlgo {
     };
 
     typedef std::tuple<
-      Galois::has_fixed_neighborhood<>,
-      Galois::has_deterministic_id<DeterministicId>,
-      Galois::has_deterministic_local_state<LocalState>,
-      Galois::needs_per_iter_alloc<>
+      galois::has_fixed_neighborhood<>,
+      galois::has_deterministic_id<DeterministicId>,
+      galois::has_deterministic_local_state<LocalState>,
+      galois::needs_per_iter_alloc<>
     > function_traits;
 
     void build(const WorkItem& item, typename LocalState::Pending* pending) const {
@@ -560,9 +560,9 @@ struct DeterministicAlgo {
 
       Dist newDist = item.second;
       
-      for (auto ii : graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::WRITE);
 
         Dist oldDist;
         while (true) {
@@ -575,13 +575,13 @@ struct DeterministicAlgo {
       }
     }
 
-    void modify(const WorkItem& item, Galois::UserContext<WorkItem>& ctx, typename LocalState::Pending* ppending) const {
+    void modify(const WorkItem& item, galois::UserContext<WorkItem>& ctx, typename LocalState::Pending* ppending) const {
       Dist newDist = item.second;
       bool useCas = false;
 
       for (typename LocalState::Pending::iterator ii = ppending->begin(), ei = ppending->end(); ii != ei; ++ii) {
         GNode dst = *ii;
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -598,7 +598,7 @@ struct DeterministicAlgo {
       }
     }
 
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       typename LocalState::Pending* ppending;
       if (Version == DetAlgo::disjoint) {
         LocalState* localState = (LocalState*) ctx.getLocalState();
@@ -613,7 +613,7 @@ struct DeterministicAlgo {
       } else {
         typename LocalState::Pending pending(ctx.getPerIterAlloc());
         build(item, &pending);
-        graph.getData(item.first, Galois::MethodFlag::WRITE);
+        graph.getData(item.first, galois::MethodFlag::WRITE);
         ctx.cautiousPoint();
         modify(item, ctx, &pending);
       }
@@ -622,17 +622,17 @@ struct DeterministicAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef galois::WorkList::BulkSynchronousInline<> WL;
 #else
-    typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
+    typedef galois::WorkList::BulkSynchronous<galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
-    typedef Galois::WorkList::Deterministic<> DWL;
+    typedef galois::WorkList::Deterministic<> DWL;
     graph.getData(source).dist = 0;
 
     switch (Version) {
-      case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<WL>()); break; 
-      case DetAlgo::base: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<DWL>()); break;
-      case DetAlgo::disjoint: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<DWL>()); break;
+      case DetAlgo::none: galois::for_each(WorkItem(source, 1), Process(graph), galois::wl<WL>()); break; 
+      case DetAlgo::base: galois::for_each(WorkItem(source, 1), Process(graph), galois::wl<DWL>()); break;
+      case DetAlgo::disjoint: galois::for_each(WorkItem(source, 1), Process(graph), galois::wl<DWL>()); break;
       default: GALOIS_DIE("Unknown algorithm ", int(Version));
     }
   }
@@ -659,23 +659,23 @@ void run() {
 
   initialize(algo, graph, source, report);
 
-  //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
-  //Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
-  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::pagePoolSize();
+  //galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::MM::hugePageSize);
+  //galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::MM::hugePageSize));
+  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / galois::Runtime::pagePoolSize();
   baseAlloc += numThreads;
   baseAlloc *= AllocationOverhead<Algo>::value;
-  Galois::preAlloc(baseAlloc);
+  galois::preAlloc(baseAlloc);
 
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(graph, Initialize<typename Algo::Graph>(graph));
+  galois::do_all_local(graph, Initialize<typename Algo::Graph>(graph));
   algo(graph, source);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Node " << reportNode << " has distance " << graph.getData(report).dist << "\n";
 
@@ -691,10 +691,10 @@ void run() {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
@@ -707,7 +707,7 @@ int main(int argc, char **argv) {
   else if (useDetBase)
     algo = Algo::deterministic;
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::serial: run<SerialAlgo>(); break;

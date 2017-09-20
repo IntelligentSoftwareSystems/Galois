@@ -34,7 +34,7 @@
 #ifndef GALOISGPU_OCL_OPENCL_SETUP_H_
 #define GALOISGPU_OCL_OPENCL_SETUP_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 struct CLContext {
    bool initialized;
@@ -123,7 +123,7 @@ struct CLContext {
       }
       GOPT_CL_DEFAULT_PLATFORM_ID=0;
       GOPT_CL_DEFAULT_DEVICE_ID=0;
-      GOPT_CL_DEFAULT_DEVICE_ID=Galois::Runtime::NetworkInterface::ID;
+      GOPT_CL_DEFAULT_DEVICE_ID=galois::Runtime::NetworkInterface::ID;
       setenv("CUDA_CACHE_DISABLE", "1", 1);
       {
          std::ifstream file("device_default.config");
@@ -361,7 +361,7 @@ struct CLContext {
       build_program_source(kernel_file_name, "", device);
       int err;
       cl_kernel kernel = clCreateKernel(program, kernel_method_name, &err);
-      CHECK_CL_ERROR(err, "Galois::OpenCL::OpenCL_Setup::get_default_device()Error: Failed to build kernel in clCreateKernel.");
+      CHECK_CL_ERROR(err, "galois::OpenCL::OpenCL_Setup::get_default_device()Error: Failed to build kernel in clCreateKernel.");
       return kernel;
    }
    /**********************************************************************
@@ -483,7 +483,7 @@ struct CLContext {
     **********************************************************************/
 
    cl_uint get_device_eu() {
-      return Galois::OpenCL::get_device_eu(get_default_device_id());
+      return galois::OpenCL::get_device_eu(get_default_device_id());
    }
    /**********************************************************************
     *
@@ -491,28 +491,28 @@ struct CLContext {
     **********************************************************************/
 
    cl_uint get_device_threads() {
-      return Galois::OpenCL::get_device_threads(get_default_device_id());
+      return galois::OpenCL::get_device_threads(get_default_device_id());
    }
    /**********************************************************************
     *
     *
     **********************************************************************/
    cl_ulong get_device_memory() {
-      return Galois::OpenCL::get_device_memory(get_default_device_id());
+      return galois::OpenCL::get_device_memory(get_default_device_id());
    }
    /**********************************************************************
     *
     *
     **********************************************************************/
    cl_ulong get_max_allocation_size() {
-      return Galois::OpenCL::get_max_allocation_size(get_default_device_id());
+      return galois::OpenCL::get_max_allocation_size(get_default_device_id());
    }
    /**********************************************************************
     *
     *
     **********************************************************************/
    void finish() {
-      Galois::OpenCL::CLContext::get_default_device()->finish();
+      galois::OpenCL::CLContext::get_default_device()->finish();
 
    }   //wait
    /**********************************************************************
@@ -523,6 +523,6 @@ struct CLContext {
 ;
 //struct OpenCLSetup
 }//namespace OpenCL
-} // namespace Galois
+} // namespace galois
 
 #endif /* GALOISGPU_OCL_OPENCL_SETUP_H_ */

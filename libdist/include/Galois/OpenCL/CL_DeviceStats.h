@@ -32,7 +32,7 @@
 #define GALOISGPU_OCL_DEVICESTATS_H_
 
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 struct DeviceStats {
    long copied_to_device;
@@ -70,6 +70,6 @@ struct DeviceStats {
       }
 };
 }//namespace OpenCL
-}//namespace Galois
+}//namespace galois
 
 #endif /* GALOISGPU_OCL_DEVICESTATS_H_ */

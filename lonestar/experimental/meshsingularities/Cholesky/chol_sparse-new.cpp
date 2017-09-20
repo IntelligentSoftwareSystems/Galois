@@ -379,7 +379,7 @@ struct PerThread {
     };
 };
 
-typedef Galois::Runtime::PerThreadStorage<PerThread> PTS;
+typedef galois::Runtime::PerThreadStorage<PerThread> PTS;
 
 struct TreeExecModel {
     typedef std::vector<int> ChildList;
@@ -436,7 +436,7 @@ struct TreeExecModel {
     };
     
     void run() {
-        Galois::Runtime::for_each_ordered_tree(*(roots.begin()),
+        galois::Runtime::for_each_ordered_tree(*(roots.begin()),
             GaloisDivide(this),
             GaloisConquer(this),
             "LeftCholesky");    
@@ -458,7 +458,7 @@ main(int argc, char ** argv)
     sm *matrix;
 
     LonestarStart(argc, argv, 0, 0, 0);
-    Galois::StatManager statManager;
+    galois::StatManager statManager;
 
     FILE *fp = fopen(infile.c_str(), "r");
     if (fp == NULL) {
@@ -501,7 +501,7 @@ main(int argc, char ** argv)
     sm_util *tree = elim_tree(matrix);    
     printf("Solving...\n");
 
-    Galois::StatTimer T("NumericTime");
+    galois::StatTimer T("NumericTime");
     PTS pts(matrix->n, matrix);
     TreeExecModel tm(&pts, matrix, tree);
     

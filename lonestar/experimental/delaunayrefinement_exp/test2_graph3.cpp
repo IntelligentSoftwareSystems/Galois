@@ -36,7 +36,7 @@ struct node_data {
 
 
 // dummy graph3
-typedef Galois::Graph::ThirdGraph<int, void, Galois::Graph::EdgeDirection::Un> Graph;
+typedef galois::Graph::ThirdGraph<int, void, galois::Graph::EdgeDirection::Un> Graph;
 typedef Graph::NodeHandle GNode;
 typedef typename Graph::pointer Graphp;
 
@@ -58,10 +58,10 @@ struct initialize {
 
   Graphp g;
   void static go(Graphp g, std::vector<int>& elements) {
-    Galois::for_each_local(elements.begin(), elements.end(), initialize{g}, Galois::loopname("initialize"));
+    galois::for_each_local(elements.begin(), elements.end(), initialize{g}, galois::loopname("initialize"));
   }
 
-  void operator() (node_data& item, Galois::UserContext<node_data>& cnx) {
+  void operator() (node_data& item, galois::UserContext<node_data>& cnx) {
     GNode n = g->createNode(item);
     g->addNode(n);
   }
@@ -71,21 +71,21 @@ struct initialize {
 
 */
 
-struct initialize : public Galois::Runtime::Lockable {
+struct initialize : public galois::Runtime::Lockable {
   Graphp g;
   initialize() {}
   initialize(Graphp _g): g(_g) {}
 
-  void operator()(int& item, Galois::UserContext<int>& cnx) {
+  void operator()(int& item, galois::UserContext<int>& cnx) {
     GNode n = g->createNode(item);
     g->addNode(n);
   }
  // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g);
   }
 
@@ -95,15 +95,15 @@ struct initialize : public Galois::Runtime::Lockable {
 
 /*
 struct Point;
-typedef Galois::Runtime::PerThreadDist<Point> DistPoint;
-typedef Galois::Runtime::gptr<Point> PtrPoint;
+typedef galois::Runtime::PerThreadDist<Point> DistPoint;
+typedef galois::Runtime::gptr<Point> PtrPoint;
 
 
-struct Point: Galois::Runtime::Lockable {
+struct Point: galois::Runtime::Lockable {
 
   typedef int tt_is_copyable;
 
-  using Base = Galois::Runtime::Lockable;
+  using Base = galois::Runtime::Lockable;
 
   int x;
   int y;
@@ -115,9 +115,9 @@ struct Point: Galois::Runtime::Lockable {
 
   Point (DistPoint): Base (), x(10), y(20) {}
 
-  Point (DistPoint, Galois::Runtime::DeSerializeBuffer& buf): Base (), x(100), y(200) {}
+  Point (DistPoint, galois::Runtime::DeSerializeBuffer& buf): Base (), x(100), y(200) {}
 
-  void getInitData (Galois::Runtime::SerializeBuffer& buf) {
+  void getInitData (galois::Runtime::SerializeBuffer& buf) {
 
   }
 };
@@ -139,7 +139,7 @@ struct OnEachFunc {
     PtrPoint p = dp.local();
 
     std::printf ("In on_each: Host=%u, Thread=%u, x=%d, y=%d\n",
-        Galois::Runtime::NetworkInterface::ID, tid, p->x, p->y);
+        galois::Runtime::NetworkInterface::ID, tid, p->x, p->y);
   }
 };
 */
@@ -147,18 +147,18 @@ struct OnEachFunc {
 int main(int argc, char** argv) {
 
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
-  Galois::Runtime::getSystemNetworkInterface().start();
+  galois::Runtime::getSystemNetworkInterface().start();
 
 /*
   DistPoint dp = DistPoint::allocate ();
 
   PtrPoint p = dp.local ();
   std::printf ("After allocate: Host=%u, Thread=%u, x=%d, y=%d\n",
-      Galois::Runtime::NetworkInterface::ID, 0, p->x, p->y);
+      galois::Runtime::NetworkInterface::ID, 0, p->x, p->y);
 
-  Galois::on_each (OnEachFunc {dp}, "test-loop");
+  galois::on_each (OnEachFunc {dp}, "test-loop");
 */
 
 
@@ -173,9 +173,9 @@ int main(int argc, char** argv) {
    // std::cout << ii.data << "\n";
   //}
 
-   Galois::for_each(vec_items.begin(), vec_items.end(),initialize(g), Galois::loopname("initializing"));//, Galois::wl<Galois::WorkList::StableIterator<>>());
+   galois::for_each(vec_items.begin(), vec_items.end(),initialize(g), galois::loopname("initializing"));//, galois::wl<galois::WorkList::StableIterator<>>());
 
 
 
-  Galois::Runtime::getSystemNetworkInterface().terminate();
+  galois::Runtime::getSystemNetworkInterface().terminate();
 }

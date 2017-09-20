@@ -47,7 +47,7 @@
 #include "Galois/Substrate/CompilerSpecific.h"
 
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace details {
@@ -272,8 +272,8 @@ private:
   GALOIS_ATTRIBUTE_NOINLINE bool transferWork (ThreadContext& rich, ThreadContext& poor, StealAmt amount) {
 
     assert (rich.id != poor.id);
-    assert (rich.id < Galois::getActiveThreads ());
-    assert (poor.id < Galois::getActiveThreads ());
+    assert (rich.id < galois::getActiveThreads ());
+    assert (poor.id < galois::getActiveThreads ());
 
     Iter steal_beg;
     Iter steal_end;
@@ -300,7 +300,7 @@ private:
 
     auto& tp = Substrate::getThreadPool();
 
-    const unsigned maxT = Galois::getActiveThreads ();
+    const unsigned maxT = galois::getActiveThreads ();
     const unsigned my_pack = Substrate::ThreadPool::getPackage ();
     const unsigned per_pack = tp.getMaxThreads() / tp.getMaxPackages ();
 
@@ -336,7 +336,7 @@ private:
     auto& tp = Substrate::getThreadPool();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
-    unsigned maxT = Galois::getActiveThreads ();
+    unsigned maxT = galois::getActiveThreads ();
 
     for (unsigned i = 0; i < maxT; ++i) {
       ThreadContext& rich = *(workers.getRemote ((poor.id + i) % maxT));
@@ -394,7 +394,7 @@ private:
 
   GALOIS_ATTRIBUTE_NOINLINE bool stealWithinActive (ThreadContext& poor) {
 
-    return stealFlat (poor, Galois::getActiveThreads ());
+    return stealFlat (poor, galois::getActiveThreads ());
   }
 
   GALOIS_ATTRIBUTE_NOINLINE bool stealGlobal (ThreadContext& poor) {
@@ -574,7 +574,7 @@ public:
     assert (!ctx.hasWork ());
 
     if (NEEDS_STATS) {
-      Galois::Runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
+      galois::Runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
     }
   }
 
@@ -638,7 +638,7 @@ template <> struct ChooseDoAllImpl<false> {
         totalTime.stop();
 
         if (NEEDS_STATS) {
-          Galois::Runtime::reportStat_Tsum(loopname, "Iterations", iter);
+          galois::Runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 
     }, std::make_tuple(no_stats(), loopname("DoAll-no-steal")));
@@ -678,6 +678,6 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_RUNTIME_DO_ALL_COUPLED_H_

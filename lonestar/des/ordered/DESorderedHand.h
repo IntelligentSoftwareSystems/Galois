@@ -52,18 +52,18 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
-  typedef Galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::Substrate::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
-    , Galois::FixedSizeAllocator<Event_ty> > PQ;
+    , galois::FixedSizeAllocator<Event_ty> > PQ;
 
   Lock_ty mutex;
   PQ pendingEvents;
@@ -200,7 +200,7 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 class DESorderedHand: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
-    typedef Galois::PerThreadVector<Event_ty> WL_ty;
+    typedef galois::PerThreadVector<Event_ty> WL_ty;
 
 
 
@@ -281,7 +281,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -305,9 +305,9 @@ protected:
     size_t round = 0;
     size_t gmin_calls = 0;
 
-    Galois::TimeAccumulator t_find;
-    Galois::TimeAccumulator t_gmin;
-    Galois::TimeAccumulator t_simulate;
+    galois::TimeAccumulator t_find;
+    galois::TimeAccumulator t_gmin;
+    galois::TimeAccumulator t_simulate;
 
     while (true) {
       ++round;
@@ -316,10 +316,10 @@ protected:
       assert (readyEvents.empty_all ());
 
       t_find.start ();
-      Galois::do_all (
-      // Galois::Runtime::do_all_coupled (
+      galois::do_all (
+      // galois::Runtime::do_all_coupled (
           sobjInfoVec.begin (), sobjInfoVec.end (),
-          FindReady (readyEvents, findIter), Galois::loopname("find_ready_events"));
+          FindReady (readyEvents, findIter), galois::loopname("find_ready_events"));
       t_find.stop ();
 
       // std::cout << "Number of ready events found: " << readyEvents.size_all () << std::endl;
@@ -342,10 +342,10 @@ protected:
       }
 
       t_simulate.start ();
-      Galois::do_all (
-      // Galois::Runtime::do_all_coupled (
+      galois::do_all (
+      // galois::Runtime::do_all_coupled (
           readyEvents.begin_all (), readyEvents.end_all (),
-          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), Galois::loopname("process_ready_events"));
+          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), galois::loopname("process_ready_events"));
       t_simulate.stop ();
     }
 
@@ -399,7 +399,7 @@ class DESorderedHandNB:
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       SimObjInfo& recvInfo = sobjInfoVec[recvObj->getID ()];
 
-      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE); 
+      graph.getData (recvInfo.node, galois::MethodFlag::WRITE); 
 
       if (recvInfo.isReady (event) 
           && recvInfo.isMin (event)) {
@@ -451,7 +451,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -484,11 +484,11 @@ protected:
     while (true) {
       ++round;
 
-      typedef Galois::WorkList::dChunkedFIFO<16> WL_ty;
+      typedef galois::WorkList::dChunkedFIFO<16> WL_ty;
 
-      Galois::for_each(initWL.begin (), initWL.end (), 
+      galois::for_each(initWL.begin (), initWL.end (), 
                        OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents),
-                       Galois::wl<WL_ty>());
+                       galois::wl<WL_ty>());
 
       initWL.clear ();
 

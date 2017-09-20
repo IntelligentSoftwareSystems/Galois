@@ -19,7 +19,7 @@
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Timer.h"
 
-static Galois::Runtime::PerThreadStorage<int> counters;
+static galois::Runtime::PerThreadStorage<int> counters;
 extern long GlobalTime;
 
 namespace dai {
@@ -459,15 +459,15 @@ void BP::calcNewMessage( size_t i, size_t _I ) {
 }
 
 void BP::runProcess(const Task& t, std::vector<std::vector<EdgeData> >& edgeData,
-    unsigned& count, Galois::UserContext<Task>& ctx) {
+    unsigned& count, galois::UserContext<Task>& ctx) {
       size_t i = t.i;
       size_t _I = t._I;
 
-      edgeData[i][_I].lock.get(Galois::MethodFlag::WRITE);
+      edgeData[i][_I].lock.get(galois::MethodFlag::WRITE);
       // Acquire neighborhood
       //diaforeach(const Neighbor &J, nbV(i)) {
       //  diaforeach(const Neighbor &j, nbF(J)) {
-      //    edgeData[j][j.dual].lock.getData(Galois::MethodFlag::ALL);
+      //    edgeData[j][j.dual].lock.getData(galois::MethodFlag::ALL);
       //  }
       //}
 
@@ -518,7 +518,7 @@ void BP::runInitialize(size_t index, std::vector<Task>& initial,
   edgeData[t.i][t._I].round = 0;
 }
 
-void BP::runComputeDiffs(size_t v, Galois::GReduceMax<Real>& acc) {
+void BP::runComputeDiffs(size_t v, galois::GReduceMax<Real>& acc) {
   if (v < nrVars()) {
     size_t i = v;
     Factor b(beliefV(i));
@@ -678,7 +678,7 @@ Real BP::run() {
                   }
               }
           } else {
-              Galois::for_each(initialIndex.begin(), initialIndex.end(), 
+              galois::for_each(initialIndex.begin(), initialIndex.end(), 
                   Initialize(*this, initial, edgeData));
               std::sort(initial.begin(), initial.end(), TaskGreater());
 
@@ -692,13 +692,13 @@ Real BP::run() {
               //}
           }
 
-          using namespace Galois::WorkList;
+          using namespace galois::WorkList;
           typedef dChunkedFIFO<64> dChunk;
           typedef ChunkedFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
           unsigned count = 0;
 
-          Galois::Timer t;
+          galois::Timer t;
           t.start();
           Exp::PriAuto<64, Indexer, OBIM, TaskLess,TaskGreater>::for_each(initial.begin(), initial.end(), Process(*this, edgeData, count));
           t.stop();
@@ -707,8 +707,8 @@ Real BP::run() {
           abort();
         }
 
-        Galois::GReduceMax<Real> accMaxDiff;
-        Galois::for_each(integers.begin(), integers.end(), ComputeDiffs(*this, accMaxDiff));
+        galois::GReduceMax<Real> accMaxDiff;
+        galois::for_each(integers.begin(), integers.end(), ComputeDiffs(*this, accMaxDiff));
 
         // calculate new beliefs and compare with old ones
         //maxDiff = -INFINITY;

@@ -45,7 +45,7 @@
 #include <cassert>
 #include <cstdlib>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 namespace detail {

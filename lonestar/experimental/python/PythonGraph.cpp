@@ -58,7 +58,7 @@ void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
 }
 
 Edge addEdge(Graph *g, GNode src, GNode dst) {
-  g->addMultiEdge(src, dst, Galois::MethodFlag::WRITE);
+  g->addMultiEdge(src, dst, galois::MethodFlag::WRITE);
   return {src, dst};
 }
 
@@ -81,7 +81,7 @@ void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
 }
 
 void setNumThreads(int numThreads) {
-  Galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
+  galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
 }
 
 size_t getNumNodes(Graph *g) {

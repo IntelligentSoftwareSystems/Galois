@@ -36,7 +36,7 @@
 #endif
 #include <endian.h>
 
-namespace Galois {
+namespace galois {
 
 // NB: Wrap these standard functions with different names because
 // sometimes le64toh and such are implemented as macros and we don't

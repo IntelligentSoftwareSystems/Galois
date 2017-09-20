@@ -94,57 +94,57 @@ public:
     :p(_p), r(_r), f(_f), x1(_x1), x2(_x2), y1(_y1), y2(_y2) {}
 
   void operator()() {
-    unsigned num = Galois::Runtime::NetworkInterface::Num;
-    unsigned id = Galois::Runtime::NetworkInterface::ID;
+    unsigned num = galois::Runtime::NetworkInterface::Num;
+    unsigned id = galois::Runtime::NetworkInterface::ID;
     unsigned x1Local, x2Local;
-    std::tie(x1Local,x2Local) = Galois::block_range(x1, x2, id, num);
+    std::tie(x1Local,x2Local) = galois::block_range(x1, x2, id, num);
     unsigned tPrefetch = 0, tFind = 0, tDo = 0;
     for (unsigned i = 0; i < num; ++i) {
       unsigned idLocal = (id + i) % num;
       unsigned y1Local, y2Local;
-      std::tie(y1Local, y2Local) = Galois::block_range(y1,y2,idLocal,num);
+      std::tie(y1Local, y2Local) = galois::block_range(y1,y2,idLocal,num);
       std::cout << id
                 << " Movies: " << x1Local << " - " << x2Local
                 << " Users: " << y1Local << " - " << y2Local
                 << "\n";
-      Galois::InsertBag<typename RngTy::value_type> items;
+      galois::InsertBag<typename RngTy::value_type> items;
       RngTy& rL = r;
-      Galois::Timer T;
+      galois::Timer T;
 
       T.start();
-      // Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(y1Local), boost::make_counting_iterator(y2Local)), p, "BlockedExecutor::prefetch", true);
-      // Galois::Runtime::getSystemNetworkInterface().flush();
-      // Galois::Runtime::getSystemNetworkInterface().handleReceives();
+      // galois::Runtime::do_all_impl(galois::Runtime::makeStandardRange(boost::make_counting_iterator(y1Local), boost::make_counting_iterator(y2Local)), p, "BlockedExecutor::prefetch", true);
+      // galois::Runtime::getSystemNetworkInterface().flush();
+      // galois::Runtime::getSystemNetworkInterface().handleReceives();
       T.stop();
       tPrefetch += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
+      std::cout << galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
 
       T.start();
-      Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
+      galois::Runtime::for_each_impl<galois::WorkList::StableIterator<> >(galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
       T.stop();
       tFind += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
+      std::cout << galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
 
       T.start();
-      Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(
-        Galois::Runtime::makeStandardRange(items.begin(), items.end()),
+      galois::Runtime::for_each_impl<galois::WorkList::StableIterator<> >(
+        galois::Runtime::makeStandardRange(items.begin(), items.end()),
         f, "BlockedExecutor::do");
       T.stop();
       tDo += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
+      std::cout << galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
       //barrier before execution in foreach should be sufficient
     }
-    std::cout << Galois::Runtime::NetworkInterface::ID << " ALL p: " << tPrefetch << " f: " << tFind << " d: " << tDo << "\n";
+    std::cout << galois::Runtime::NetworkInterface::ID << " ALL p: " << tPrefetch << " f: " << tFind << " d: " << tDo << "\n";
   }
 };
 
 template<typename PreFn, typename RngTy, typename FnTy>
-void for_each_blocked_pad(Galois::Runtime::RecvBuffer& buf) {
+void for_each_blocked_pad(galois::Runtime::RecvBuffer& buf) {
   PreFn p;
   RngTy r;
   FnTy f;
   unsigned x1, x2, y1, y2;
-  Galois::Runtime::gDeserialize(buf, p, r, f, x1, x2, y1, y2);
+  galois::Runtime::gDeserialize(buf, p, r, f, x1, x2, y1, y2);
   BlockedExecuter<PreFn, RngTy, FnTy> ex(p, r, f, x1,x2,y1,y2);
   ex();
 }
@@ -152,11 +152,11 @@ void for_each_blocked_pad(Galois::Runtime::RecvBuffer& buf) {
 template<typename PreFn, typename RngTy, typename FnTy>
 void for_each_blocked(unsigned x1, unsigned x2, unsigned y1, unsigned y2, 
                       PreFn p, RngTy r, FnTy f) {
-  Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
-  for (unsigned i = 1; i < Galois::Runtime::NetworkInterface::Num; i++) {
-    Galois::Runtime::SendBuffer buf;
+  galois::Runtime::NetworkInterface& net = galois::Runtime::getSystemNetworkInterface();
+  for (unsigned i = 1; i < galois::Runtime::NetworkInterface::Num; i++) {
+    galois::Runtime::SendBuffer buf;
     // serialize function and data
-    Galois::Runtime::gSerialize(buf, p, r, f, x1,x2,y1,y2);
+    galois::Runtime::gSerialize(buf, p, r, f, x1,x2,y1,y2);
     //send data
     net.sendLoop (i, &for_each_blocked_pad<PreFn, RngTy, FnTy>, buf);
   }
@@ -240,7 +240,7 @@ struct InvLearnFN : public LearnFN {
   }
 };
 
-typedef typename Galois::Graph::LC_Dist<Node, int> Graph;
+typedef typename galois::Graph::LC_Dist<Node, int> Graph;
 typedef Graph::GraphNode GNode;
 
 //possibly over-typed
@@ -289,8 +289,8 @@ struct sgd_edge_pair {
   void operator()(std::pair<unsigned, unsigned> edge, Context& cnx) {
     auto src = *(g->begin() + edge.first);
     auto dst = *(g->begin() + edge.second);
-    auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
-    auto ee = g->edge_end(src, Galois::MethodFlag::SRC_ONLY);
+    auto ii = g->edge_begin(src, galois::MethodFlag::SRC_ONLY);
+    auto ee = g->edge_end(src, galois::MethodFlag::SRC_ONLY);
 //G
     ii = std::lower_bound(ii,ee, dst, [] ( decltype(*ii)& edg, GNode n) { return edg.dst < n; });
     if (ii != ee && g->dst(ii) == dst) {
@@ -301,7 +301,7 @@ struct sgd_edge_pair {
   template<typename Context>
   void operator()(std::pair<GNode, unsigned> item, Context& cnx) {
     auto src = item.first;
-    auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
+    auto ii = g->edge_begin(src, galois::MethodFlag::SRC_ONLY);
     ii += item.second;
     auto dst = g->dst(ii);
     doGradientUpdate(g->at(src), g->at(dst), g->at(ii), step_size);
@@ -321,12 +321,12 @@ struct sgd_edge_finder {
 
   //  template<typename Context>
   void operator()(unsigned movie, std::pair<unsigned, unsigned> edge_range, 
-                  Galois::InsertBag<value_type>& bag) { //, Context& cnx) {
+                  galois::InsertBag<value_type>& bag) { //, Context& cnx) {
     auto src = *(g->begin() + movie);
     auto dst1 = *(g->begin() + edge_range.first);
     auto dst2 = *(g->begin() + (edge_range.second - 1));
-    auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
-    auto ee = g->edge_end(src, Galois::MethodFlag::SRC_ONLY);
+    auto ii = g->edge_begin(src, galois::MethodFlag::SRC_ONLY);
+    auto ee = g->edge_end(src, galois::MethodFlag::SRC_ONLY);
 //G
     auto ii2 = std::lower_bound(ii, ee, dst1, [] ( decltype(*ii)& edg, GNode n) { return edg.dst < n; });
 //G
@@ -347,7 +347,7 @@ struct node_prefetch {
   node_prefetch() = default;
 
   void operator()(unsigned user) {
-    Galois::Runtime::prefetch( *(g->begin() + user) );
+    galois::Runtime::prefetch( *(g->begin() + user) );
   }
   //is_trivially_copyable
   typedef int tt_is_copyable;
@@ -357,7 +357,7 @@ void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes,
   for (int i = 0; i < 20; ++i) {
     double step_size = lf->step_size(i);
     std::cout << "Step Size: " << step_size << "\n";
-    Galois::Timer timer;
+    galois::Timer timer;
     timer.start();
     for_each_blocked(0, numMovieNodes, numMovieNodes, numMovieNodes + numUserNodes,
                      node_prefetch{g},
@@ -375,21 +375,21 @@ static double genRand () {
 
 // Initializes latent vector and id for each node
 struct initializeGraphData {
-  struct stats : public Galois::Runtime::Lockable {
+  struct stats : public galois::Runtime::Lockable {
     std::atomic<unsigned int> numMovieNodes;
     std::atomic<unsigned int> numUserNodes;
     std::atomic<unsigned int> numRatings;
     stats() : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
-    stats(Galois::Runtime::PerHost<stats>) : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
-    stats(Galois::Runtime::DeSerializeBuffer& s) {
+    stats(galois::Runtime::PerHost<stats>) : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
+    stats(galois::Runtime::DeSerializeBuffer& s) {
       deserialize(s);
     }
     //serialize
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    void serialize(galois::Runtime::SerializeBuffer& s) const {
       gSerialize(s,(unsigned int)numMovieNodes,(unsigned int)numUserNodes,(unsigned int)numRatings);
     }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    void deserialize(galois::Runtime::DeSerializeBuffer& s) {
       unsigned int mn,un,r;
       gDeserialize(s,mn,un,r);
       numMovieNodes = mn;
@@ -402,7 +402,7 @@ struct initializeGraphData {
   };
 
   Graph::pointer g;
-  Galois::Runtime::PerHost<stats> s;
+  galois::Runtime::PerHost<stats> s;
 
   std::tuple<unsigned int, unsigned int, unsigned int>
   static go(Graph::pointer g)
@@ -410,14 +410,14 @@ struct initializeGraphData {
     const unsigned SEED = 4562727;
     std::srand (SEED);
 
-    Galois::Runtime::PerHost<stats> s = Galois::Runtime::PerHost<stats>::allocate();
+    galois::Runtime::PerHost<stats> s = galois::Runtime::PerHost<stats>::allocate();
     
-    Galois::for_each_local(g, initializeGraphData{g,s}, Galois::loopname("init"));
+    galois::for_each_local(g, initializeGraphData{g,s}, galois::loopname("init"));
 
     unsigned int numMovieNodes = 0;
     unsigned int numUserNodes = 0;
     unsigned int numRatings = 0;
-    for (unsigned x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x) {
+    for (unsigned x = 0; x < galois::Runtime::NetworkInterface::Num; ++x) {
       auto rv = s.remote(x);
       numMovieNodes += rv->numMovieNodes;
       numUserNodes += rv->numUserNodes;
@@ -427,7 +427,7 @@ struct initializeGraphData {
     return std::make_tuple(numMovieNodes, numUserNodes, numRatings);
   }
 
-  void operator()(GNode gnode, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode gnode, galois::UserContext<GNode>& ctx) {
     Node& data = g->at(gnode);
     
     //fill latent vectors with random values
@@ -437,11 +437,11 @@ struct initializeGraphData {
     g->sort_edges(gnode, [] (GNode e1_dst, const int& e1_data,
                              GNode e2_dst, const int& e2_data) {
                     return e1_dst < e2_dst;
-                  }, Galois::MethodFlag::NONE);
+                  }, galois::MethodFlag::NONE);
     
     //count number of movies we've seen; only movies nodes have edges
     unsigned int num_edges = 
-      std::distance(g->edge_begin(gnode, Galois::NONE), g->edge_end(gnode, Galois::NONE));
+      std::distance(g->edge_begin(gnode, galois::NONE), g->edge_end(gnode, galois::NONE));
     s->numRatings += num_edges;
     if(num_edges > 0) {
       s->numMovieNodes++;
@@ -458,7 +458,7 @@ struct initializeGraphData {
 
 int main(int argc, char** argv) {	
   LonestarStart (argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   
   // BoxIterator ii(0,5,0,0), ee(30,5,0,0);
   // while (ii != ee) {
@@ -467,12 +467,12 @@ int main(int argc, char** argv) {
   //   assert(p < *ii);
   // }
 
-  Galois::Timer ltimer;
+  galois::Timer ltimer;
   ltimer.start();
   //allocate local computation graph
   Graph::pointer g;
   {
-    Galois::Graph::FileGraph fg;
+    galois::Graph::FileGraph fg;
     fg.fromFile(inputFile);
     std::vector<unsigned> counts;
     for(auto& N : fg)
@@ -494,7 +494,7 @@ int main(int argc, char** argv) {
 
   //fill each node's id & initialize the latent vectors
   unsigned int numMovieNodes, numUserNodes, numRatings;
-  Galois::Timer itimer;
+  galois::Timer itimer;
   itimer.start();
   std::tie(numMovieNodes, numUserNodes,numRatings) = initializeGraphData::go(g);
   itimer.stop();
@@ -521,12 +521,12 @@ int main(int argc, char** argv) {
     break;
   }
 
-  Galois::StatTimer timer;
+  galois::StatTimer timer;
   timer.start();
   go(g, numMovieNodes, numUserNodes, lf.get());
   timer.stop();
 
-  Galois::Runtime::getSystemNetworkInterface().terminate();
+  galois::Runtime::getSystemNetworkInterface().terminate();
 
   return 0;
 }

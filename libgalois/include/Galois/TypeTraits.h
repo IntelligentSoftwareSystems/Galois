@@ -36,14 +36,14 @@
  * \code
  * struct MyClass {
  *   typedef int tt_needs_parallel_break;
- *   static_assert(Galois::needs_parallel_break<MyClass>::value, "Oops!");
+ *   static_assert(galois::needs_parallel_break<MyClass>::value, "Oops!");
  *   ...
  * };
  * \endcode
  *
  * The second way is by specializing a type:
  * \code
- * namespace Galois {
+ * namespace galois {
  *   template<>
  *   struct needs_parallel_break<MyClass> : public boost::true_type {};
  * }
@@ -57,7 +57,7 @@
 #include "Galois/Substrate/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
 
-namespace Galois {
+namespace galois {
 namespace DEPRECATED {
 #define GALOIS_HAS_MEM_FUNC(func, name) \
   template<typename T, typename Sig> \
@@ -94,7 +94,7 @@ namespace DEPRECATED {
 
 GALOIS_HAS_MEM_FUNC(galoisDeterministicParallelBreak, tf_deterministic_parallel_break);
 /**
- * Indicates the operator has a member function that allows a {@link Galois::for_each}
+ * Indicates the operator has a member function that allows a {@link galois::for_each}
  * loop to be exited deterministically.
  *
  * The function has the following signature:
@@ -141,12 +141,12 @@ GALOIS_HAS_MEM_TYPE(GaloisDeterministicLocalState, tf_deterministic_local_state)
  *  struct T {
  *    struct GaloisDeteministicLocalState {
  *      int x, y, z; // Local state
- *      GaloisDeterministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
+ *      GaloisDeterministicLocalState(T& self, galois::PerIterAllocTy& alloc) {
  *        // initialize local state
  *      }
  *    };
  *
- *    void operator()(const A& item, Galois::UserContext<A>&) { 
+ *    void operator()(const A& item, galois::UserContext<A>&) { 
  *      // An example of using local state
  *      typedef GaloisDeterministicLocalState LS;
  *      bool used;

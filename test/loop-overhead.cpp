@@ -12,17 +12,17 @@ unsigned iter = 1;
 struct emp {
   template<typename T>
   void operator()(const T& t) const { 
-    Galois::Substrate::compilerBarrier(); 
+    galois::Substrate::compilerBarrier(); 
   }
   template<typename T, typename C>
-  void operator()(const T& t, const C& c) const { Galois::Substrate::compilerBarrier(); }
+  void operator()(const T& t, const C& c) const { galois::Substrate::compilerBarrier(); }
   typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_stats;
   typedef int tt_does_not_need_aborts;
 };
 
 unsigned t_inline(std::vector<unsigned>& V, unsigned num) {
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   emp e;
   for (unsigned x = 0; x < iter; ++x)
@@ -33,7 +33,7 @@ unsigned t_inline(std::vector<unsigned>& V, unsigned num) {
 }
 
 unsigned t_stl(std::vector<unsigned>& V, unsigned num) {
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
     std::for_each(V.begin(), V.begin()+num, emp());
@@ -42,9 +42,9 @@ unsigned t_stl(std::vector<unsigned>& V, unsigned num) {
 }
 
 unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
-  omp_set_num_threads(th); //Galois::Runtime::LL::getMaxThreads());
+  omp_set_num_threads(th); //galois::Runtime::LL::getMaxThreads());
    
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x) {
     emp f;
@@ -57,27 +57,27 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
 }
 
 unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, unsigned th) {
-  Galois::setActiveThreads(th); //Galois::Runtime::LL::getMaxThreads());
+  galois::setActiveThreads(th); //galois::Runtime::LL::getMaxThreads());
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    galois::Substrate::getThreadPool().burnPower(th);
    
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    Galois::do_all(V.begin(), V.begin()+num, emp(), Galois::do_all_steal<>());
+    galois::do_all(V.begin(), V.begin()+num, emp(), galois::do_all_steal<>());
   t.stop();
   return t.get();
 }
 
 unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned th) {
-  Galois::setActiveThreads(th);
+  galois::setActiveThreads(th);
   if (burn)
-    Galois::Substrate::getThreadPool().burnPower(th);
+    galois::Substrate::getThreadPool().burnPower(th);
   
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    Galois::for_each(V.begin(), V.begin() + num, emp(), Galois::wl<Galois::WorkList::StableIterator<>>());
+    galois::for_each(V.begin(), V.begin() + num, emp(), galois::wl<galois::WorkList::StableIterator<>>());
   t.stop();
   return t.get();
 }
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
   if (!maxVector)
     maxVector = 1024*1024;
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads() / 2;
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads() / 2;
   test("inline\t",  1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
   test("stl\t",     1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
   test("omp\t",     M, 16, maxVector, t_omp);

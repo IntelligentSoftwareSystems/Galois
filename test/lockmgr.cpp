@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 struct simple : public Lockable {
   int foo;

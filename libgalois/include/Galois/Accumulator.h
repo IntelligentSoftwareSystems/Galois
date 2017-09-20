@@ -34,7 +34,7 @@
 
 #include <limits>
 
-namespace Galois {
+namespace galois {
 
 /**
  * GReducible stores per thread values of a variable of type T
@@ -53,7 +53,7 @@ template<typename T, typename BinFunc>
 class GReducible {
 protected:
   BinFunc m_func;
-  Galois::Substrate::PerThreadStorage<T> m_data;
+  galois::Substrate::PerThreadStorage<T> m_data;
   const T m_identity;
 
   void initialize (void) {

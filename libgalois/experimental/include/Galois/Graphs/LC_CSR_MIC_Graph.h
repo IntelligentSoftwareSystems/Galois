@@ -50,7 +50,7 @@
 #define _DO_UNROLL
 #endif
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -63,11 +63,11 @@ namespace Graph {
  * An example of use:
  * 
  * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
+ * typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
  * 
  * // Create graph
  * Graph g;
- * Galois::Graph::readGraph(g, inputfile);
+ * galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -83,12 +83,12 @@ namespace Graph {
  * And in C++11:
  *
  * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
- * // or typedef Galois::Graph::LC_CSR_Graph<int,int>::with_no_lockable<true>::with_numa_alloc<true>
+ * typedef galois::Graph::LC_CSR_Graph<int,int> Graph;
+ * // or typedef galois::Graph::LC_CSR_Graph<int,int>::with_no_lockable<true>::with_numa_alloc<true>
  *
  * // Create graph
  * Graph g;
- * Galois::Graph::readGraph(g, inputfile);
+ * galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::GraphNode src : g) {
@@ -195,7 +195,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    Galois::Runtime::acquire(&nodeData[N], mflag);
+    galois::Runtime::acquire(&nodeData[N], mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -230,7 +230,7 @@ protected:
 
 public:
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
@@ -415,7 +415,7 @@ public:
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -441,7 +441,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
         acquireNode(edgeDst[*ii], mflag);
       }

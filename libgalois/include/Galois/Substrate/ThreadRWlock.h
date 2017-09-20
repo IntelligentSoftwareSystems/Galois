@@ -37,13 +37,13 @@
 #include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 class ThreadRWlock {
 
   typedef Substrate::PaddedLock<true> Lock_ty;
-  // typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
+  // typedef galois::Runtime::LL::SimpleLock<true> Lock_ty;
   typedef Substrate::PerThreadStorage<Lock_ty> PerThreadLock;
 
   PerThreadLock locks;
@@ -106,7 +106,7 @@ void readUpdateProtected(L& rwmutex, R& readAndCheck, W& write) {
 
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 
 

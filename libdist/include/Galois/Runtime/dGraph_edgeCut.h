@@ -116,15 +116,15 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                     base_hGraph(host, _numHosts) {
       /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
        *  uint64_t& _totalNodes, unsigned _id )*/
-      Galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+      galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
       StatTimer_graph_construct.start();
-      Galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
+      galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
       uint32_t _numNodes;
       uint64_t _numEdges;
 
       // only used to determine node splits among hosts; abandonded later
       // for the FileGraph which mmaps appropriate regions of memory
-      Galois::Graph::OfflineGraph g(filename);
+      galois::Graph::OfflineGraph g(filename);
 
       base_hGraph::totalNodes = g.size();
       base_hGraph::totalEdges = g.sizeEdges();
@@ -136,11 +136,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // at this point gid2Host has pairs for how to split nodes among
       // hosts; pair has begin and end
       uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
-      typename Galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
+      typename galois::Graph::OfflineGraph::edge_iterator edgeBegin = 
         g.edge_begin(nodeBegin);
 
       uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
-      typename Galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
+      typename galois::Graph::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
 
       numOwned_withEdges = base_hGraph::totalOwnedNodes = 
@@ -149,7 +149,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
-      Galois::Graph::FileGraph fileGraph;
+      galois::Graph::FileGraph fileGraph;
 
       fileGraph.partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
@@ -161,7 +161,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if (isBipartite) {
         uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
         for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-          auto p = Galois::block_range(
+          auto p = galois::block_range(
                      0U, (unsigned)numNodes_without_edges, i, 
                      base_hGraph::numHosts);
 
@@ -189,13 +189,13 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
                           _numEdges << "\n";
 
-      Galois::DynamicBitSet ghosts;
+      galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
 
-      auto activeThreads = Galois::Runtime::activeThreads;
-      Galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+      auto activeThreads = galois::Runtime::activeThreads;
+      galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
-      Galois::Timer timer;
+      galois::Timer timer;
       timer.start();
       fileGraph.reset_byte_counters();
 
@@ -209,7 +209,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto edgeOffset = fileGraph.edge_begin(nodeBegin);
       auto beginIter = boost::make_counting_iterator(nodeBegin);
       auto endIter = boost::make_counting_iterator(nodeEnd);
-      Galois::do_all(
+      galois::do_all(
         beginIter, endIter,
         [&] (auto n) {
           auto ii = fileGraph.edge_begin(n);
@@ -219,17 +219,17 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           }
           prefixSumOfEdges[n - nodeBegin] = std::distance(edgeOffset, ee);
         },
-        Galois::loopname("EdgeInspection"),
-        Galois::timeit(),
-        Galois::do_all_steal<true>(),
-        Galois::no_stats()
+        galois::loopname("EdgeInspection"),
+        galois::timeit(),
+        galois::do_all_steal<true>(),
+        galois::no_stats()
       );
 
       timer.stop();
       fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
           base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
 
-      Galois::setActiveThreads(activeThreads); // revert to prior active threads
+      galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       // only nodes we do not own are actual ghosts (i.e. filter the "ghosts"
       // found above)
@@ -305,15 +305,15 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       auto beginIter2 = boost::make_counting_iterator((uint32_t)0);
       auto endIter2 = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
-      Galois::do_all(
+      galois::do_all(
         beginIter2, endIter2,
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        Galois::loopname("EdgeLoading"),
-        Galois::do_all_steal<true>(),
-        Galois::timeit(),
-        Galois::no_stats()
+        galois::loopname("EdgeLoading"),
+        galois::do_all_steal<true>(),
+        galois::timeit(),
+        galois::no_stats()
       );
 
 
@@ -329,7 +329,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // !transpose because tranpose finds thread ranges for you
       if (!edgeNuma && !transpose) {
-        Galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
 
         StatTimer_thread_ranges.start();
 
@@ -383,24 +383,24 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& fileGraph) {
+  void loadEdges(GraphTy& graph, galois::Graph::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
     }
 
-    Galois::Timer timer;
+    galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
 
     auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
     auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
-    Galois::do_all(
+    galois::do_all(
       beginIter, endIter,
       [&] (auto n) {
         auto ii = fileGraph.edge_begin(n);
         auto ee = fileGraph.edge_end(n);
         uint32_t lsrc = this->G2L(n);
-        uint64_t cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
+        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         for (; ii < ee; ++ii) {
           auto gdst = fileGraph.getEdgeDst(ii);
           decltype(gdst) ldst = this->G2L(gdst);
@@ -409,10 +409,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
-      Galois::loopname("EdgeLoading"),
-      Galois::do_all_steal<true>(),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("EdgeLoading"),
+      galois::do_all_steal<true>(),
+      galois::timeit(),
+      galois::no_stats()
     );
 
     timer.stop();
@@ -421,24 +421,24 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, Galois::Graph::FileGraph& fileGraph) {
+  void loadEdges(GraphTy& graph, galois::Graph::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       fprintf(stderr, "Loading void edge-data while creating edges.\n");
     }
 
-    Galois::Timer timer;
+    galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
 
     auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
     auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
-    Galois::do_all(
+    galois::do_all(
       beginIter, endIter,
       [&] (auto n) {
         auto ii = fileGraph.edge_begin(n);
         auto ee = fileGraph.edge_end(n);
         uint32_t lsrc = this->G2L(n);
-        uint64_t cur = *graph.edge_begin(lsrc, Galois::MethodFlag::UNPROTECTED);
+        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         for (; ii < ee; ++ii) {
           auto gdst = fileGraph.getEdgeDst(ii);
           decltype(gdst) ldst = this->G2L(gdst);
@@ -446,10 +446,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
-      Galois::loopname("EdgeLoading"),
-      Galois::do_all_steal<true>(),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("EdgeLoading"),
+      galois::do_all_steal<true>(),
+      galois::timeit(),
+      galois::no_stats()
     );
 
 

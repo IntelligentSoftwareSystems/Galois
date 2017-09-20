@@ -25,20 +25,20 @@ static cll::opt<ExecType> execType (
     cll::init (KDG_R));
 
 
-struct NodeData: public Galois::Runtime::TaskDAGdata, PData {
+struct NodeData: public galois::Runtime::TaskDAGdata, PData {
 
   NodeData (void)
-    : Galois::Runtime::TaskDAGdata (0), PData ()
+    : galois::Runtime::TaskDAGdata (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::TaskDAGdata (id), PData (outdegree)
+    : galois::Runtime::TaskDAGdata (id), PData (outdegree)
   {}
 
 
 };
 
-typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
+typedef typename galois::Graph::LC_CSR_Graph<NodeData, void>
   ::with_numa_alloc<true>::type
   InnerGraph;
 
@@ -46,13 +46,13 @@ class PageRankChromatic: public PageRankBase<InnerGraph> {
 protected:
 
   struct NodeComparator {
-    typedef Galois::Runtime::DAGdataComparator<NodeData> DataCmp;
+    typedef galois::Runtime::DAGdataComparator<NodeData> DataCmp;
 
     Graph& graph;
 
     bool operator () (GNode left, GNode right) const {
-      auto& ld = graph.getData (left, Galois::MethodFlag::UNPROTECTED);
-      auto& rd = graph.getData (right, Galois::MethodFlag::UNPROTECTED);
+      auto& ld = graph.getData (left, galois::MethodFlag::UNPROTECTED);
+      auto& rd = graph.getData (right, galois::MethodFlag::UNPROTECTED);
 
       return DataCmp::compare (ld, rd);
     }
@@ -86,15 +86,15 @@ protected:
 
   virtual void runPageRank (void) {
     
-    typedef typename Galois::Runtime::DAGmanagerInOut<Graph>::Manager Manager;
+    typedef typename galois::Runtime::DAGmanagerInOut<Graph>::Manager Manager;
     Manager m {graph};
     m.assignPriority ();
 
 
     switch (execType) {
       case KDG_REUSE:
-        Galois::Runtime::for_each_det_kdg_ar_reuse (
-            Galois::Runtime::makeLocalRange (graph),
+        galois::Runtime::for_each_det_kdg_ar_reuse (
+            galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
@@ -103,58 +103,58 @@ protected:
         break;
 
       case KDG_R_ALT:
-        Galois::Runtime::for_each_det_kdg (
-            Galois::Runtime::makeLocalRange (graph),
+        galois::Runtime::for_each_det_kdg (
+            galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r-alt",
-            Galois::Runtime::KDG_R_ALT);
+            galois::Runtime::KDG_R_ALT);
         break;
 
       case KDG_R:
-        Galois::Runtime::for_each_det_kdg (
-            Galois::Runtime::makeLocalRange (graph),
+        galois::Runtime::for_each_det_kdg (
+            galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r",
-            Galois::Runtime::KDG_R);
+            galois::Runtime::KDG_R);
         break;
 
       case KDG_AR:
-        Galois::Runtime::for_each_det_kdg (
-            Galois::Runtime::makeLocalRange (graph),
+        galois::Runtime::for_each_det_kdg (
+            galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ar",
-            Galois::Runtime::KDG_AR);
+            galois::Runtime::KDG_AR);
         break;
 
       case IKDG:
-        Galois::Runtime::for_each_det_kdg (
-            Galois::Runtime::makeLocalRange (graph),
+        galois::Runtime::for_each_det_kdg (
+            galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
             ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ikdg",
-            Galois::Runtime::IKDG);
+            galois::Runtime::IKDG);
         break;
 
       case UNORD:
-        Galois::for_each_local (
+        galois::for_each_local (
             graph,
-            [this] (GNode src, Galois::UserContext<GNode>& ctx) {
+            [this] (GNode src, galois::UserContext<GNode>& ctx) {
               // visitNhood (src);
-              applyOperator<Galois::UserContext<GNode>, true, true> (src, ctx);
+              applyOperator<galois::UserContext<GNode>, true, true> (src, ctx);
             },
-            Galois::loopname ("page-rank-unordered"),
-            Galois::wl<Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> > ());
+            galois::loopname ("page-rank-unordered"),
+            galois::wl<galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> > ());
         break;
 
       default:

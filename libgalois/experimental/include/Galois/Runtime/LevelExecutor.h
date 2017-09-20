@@ -46,7 +46,7 @@
 #include <map>
 #include <vector>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace {
 
@@ -64,9 +64,9 @@ public:
   using MapAlloc = FixedSizeAllocator<std::pair<const Key, WL_ty*> >;
   using WLalloc = FixedSizeAllocator<WL_ty>;
   using InternalMap = std::map<Key, WL_ty*, KeyCmp, MapAlloc>;
-  using GarbageVec = Galois::gdeque<WL_ty*>;
+  using GarbageVec = galois::gdeque<WL_ty*>;
   using Level = std::pair<Key, WL_ty*>;
-  using CachedLevel = Galois::optional<Level>;
+  using CachedLevel = galois::optional<Level>;
 
 private:
   Substrate::ThreadRWlock rwmutex;
@@ -156,10 +156,10 @@ class LevelMap<unsigned, std::less<unsigned>, WL_ty> {
 public:
   using value_type = typename WL_ty::value_type;
   using WLalloc = FixedSizeAllocator<WL_ty>;
-  using GarbageVec = Galois::gdeque<WL_ty*>;
+  using GarbageVec = galois::gdeque<WL_ty*>;
   using Level = std::pair<unsigned, WL_ty*>;
   using InternalMap = std::deque<Level>;
-  using CachedLevel = Galois::optional<Level>;
+  using CachedLevel = galois::optional<Level>;
 
 private:
   Substrate::ThreadRWlock rwmutex;
@@ -286,15 +286,15 @@ class LevelExecutor {
   static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
 
   // hack to get ChunkedMaster base class
-  using BaseWL = typename Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
-  using WL_ty = Galois::WorkList::WLsizeWrapper<BaseWL>;
+  using BaseWL = typename galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
+  using WL_ty = galois::WorkList::WLsizeWrapper<BaseWL>;
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
   struct BodyWrapper;
-  using ForEachExec_ty = Galois::Runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
+  using ForEachExec_ty = galois::Runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
 
   struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
     KeyFn& keyFn;
@@ -372,7 +372,7 @@ public:
       level_map (kcmp),
       dummy (new WL_ty ()),
       for_each_exec (
-          Galois::WorkList::ExternPtr<WL_ty> (dummy),
+          galois::WorkList::ExternPtr<WL_ty> (dummy),
           BodyWrapper ( keyFn, nhVisit, opFunc, level_map, userHandles),
           loopname),
       barrier (getSystemBarrier ())
@@ -392,7 +392,7 @@ public:
       level_map.push (keyFn (*i), *i);
     }
 
-    // Galois::do_all (beg, end,
+    // galois::do_all (beg, end,
         // [this] (const T& x) {
           // level_map.push (keyFn (x), x);
         // });
@@ -421,7 +421,7 @@ public:
           ++steps;
           totalWork += currLevel.second->size ();
 
-          for_each_exec.reinit (typename Galois::WorkList::ExternPtr<WL_ty> (currLevel.second));
+          for_each_exec.reinit (typename galois::WorkList::ExternPtr<WL_ty> (currLevel.second));
         }
       }
 
@@ -463,14 +463,14 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
   Exec_ty exec (keyFn, kcmp, nhVisit, opFunc, loopname);
   Barrier& barrier = getSystemBarrier ();
 
-  getThreadPool ().run (Galois::getActiveThreads (),
+  getThreadPool ().run (galois::getActiveThreads (),
     std::bind (&Exec_ty::template fill_initial<R>, std::ref (exec), range),
     std::ref (barrier),
     std::ref (exec));
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #else
 
@@ -479,7 +479,7 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/WorkList/Obim.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
@@ -512,10 +512,10 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
     ::template with_descending<is_greater>::type
     ::template with_monotonic<true>::type WL;
   auto args = std::tuple_cat(
-      typename Galois::Runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
+      typename galois::Runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
       std::make_tuple(
-              Galois::loopname(ln),
-              Galois::wl<WL>(keyFn)));
+              galois::loopname(ln),
+              galois::wl<WL>(keyFn)));
   for_each_ordered_level_(
       make_int_seq<std::tuple_size<decltype(args)>::value>(),
       range, 

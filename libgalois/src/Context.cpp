@@ -36,27 +36,27 @@
 #include <stdio.h>
 
 //! Global thread context for each active thread
-static __thread Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
+static __thread galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
 
 
-void Galois::Runtime::signalFailSafe(void) {
-  throw Galois::Runtime::REACHED_FAILSAFE;
+void galois::Runtime::signalFailSafe(void) {
+  throw galois::Runtime::REACHED_FAILSAFE;
 }
 
-void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* ctx) {
+void galois::Runtime::setThreadContext(galois::Runtime::SimpleRuntimeContext* ctx) {
   thread_ctx = ctx;
 }
 
-Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
+galois::Runtime::SimpleRuntimeContext* galois::Runtime::getThreadContext() {
   return thread_ctx;
 }
 
-void Galois::Runtime::signalConflict(Lockable* lockable) {
-  throw Galois::Runtime::CONFLICT; // Conflict
+void galois::Runtime::signalConflict(Lockable* lockable) {
+  throw galois::Runtime::CONFLICT; // Conflict
 }
 
 #ifdef GALOIS_USE_EXP
-bool Galois::Runtime::owns(Lockable* lockable, MethodFlag m) {
+bool galois::Runtime::owns(Lockable* lockable, MethodFlag m) {
   SimpleRuntimeContext* ctx = getThreadContext();
   if (ctx) {
     return ctx->owns(lockable, m);
@@ -70,8 +70,8 @@ bool Galois::Runtime::owns(Lockable* lockable, MethodFlag m) {
 // LockManagerBase & SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
 
-Galois::Runtime::LockManagerBase::AcquireStatus
-Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) 
+galois::Runtime::LockManagerBase::AcquireStatus
+galois::Runtime::LockManagerBase::tryAcquire(galois::Runtime::Lockable* lockable) 
 {
   assert(lockable);
   // XXX(ddn): Hand inlining this code makes a difference on 
@@ -92,7 +92,7 @@ Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable
   return FAIL;
 }
 
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable, Galois::MethodFlag m) {
+void galois::Runtime::SimpleRuntimeContext::acquire(galois::Runtime::Lockable* lockable, galois::MethodFlag m) {
   AcquireStatus i;
   if (customAcquire) {
     subAcquire(lockable, m);
@@ -101,11 +101,11 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* l
       addToNhood(lockable);
     }
   } else {
-    Galois::Runtime::signalConflict(lockable);
+    galois::Runtime::signalConflict(lockable);
   }
 }
 
-void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* lockable) {
+void galois::Runtime::SimpleRuntimeContext::release(galois::Runtime::Lockable* lockable) {
   assert(lockable);
   // The deterministic executor, for instance, steals locks from other
   // iterations
@@ -114,7 +114,7 @@ void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* l
   lockable->owner.unlock_and_clear();
 }
 
-unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
+unsigned galois::Runtime::SimpleRuntimeContext::commitIteration() {
   unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
@@ -129,16 +129,16 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
   return numLocks;
 }
 
-unsigned Galois::Runtime::SimpleRuntimeContext::cancelIteration() {
+unsigned galois::Runtime::SimpleRuntimeContext::cancelIteration() {
   return commitIteration();
 }
 
-void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable, Galois::MethodFlag) {
+void galois::Runtime::SimpleRuntimeContext::subAcquire(galois::Runtime::Lockable* lockable, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }
 
 #ifdef GALOIS_USE_EXP
-bool Galois::Runtime::SimpleRuntimeContext::owns(Galois::Runtime::Lockable* lockable, Galois::MethodFlag) const {
+bool galois::Runtime::SimpleRuntimeContext::owns(galois::Runtime::Lockable* lockable, galois::MethodFlag) const {
   GALOIS_DIE("SimpleRuntimeContext::owns Not Implemented");
 }
 #endif

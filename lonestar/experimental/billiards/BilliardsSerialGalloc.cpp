@@ -6,7 +6,7 @@ template <typename Tbl_t=Table<Ball> >
 class BilliardsSerialGalloc: public Billiards<BilliardsSerialGalloc<Tbl_t>, Tbl_t> {
 
   // using PriorityQueue =  std::priority_queue<Event, std::vector<Event>, Event::ReverseComparator>; 
-  using PriorityQueue =  Galois::ThreadSafeOrderedSet<Event, Event::Comparator>;
+  using PriorityQueue =  galois::ThreadSafeOrderedSet<Event, Event::Comparator>;
 
 public:
 

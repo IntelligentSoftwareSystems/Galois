@@ -45,7 +45,7 @@ llvm::cl::opt<std::string> statFile("statFile", llvm::cl::desc("ouput file to pr
 
 
 static void LonestarPrintVersion() {
-  std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
+  std::cout << "Galois Benchmark Suite v" << galois::getVersion() << " (" << galois::getRevision() << ")\n";
 }
 
 
@@ -55,12 +55,12 @@ void LonestarStart(int argc, char** argv,
 
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  numThreads = Galois::setActiveThreads(numThreads); 
+  numThreads = galois::setActiveThreads(numThreads); 
 
-  Galois::Runtime::setStatFile(statFile);
+  galois::Runtime::setStatFile(statFile);
 
   LonestarPrintVersion();
-  std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
+  std::cout << "Copyright (C) " << galois::getCopyrightYear() << " The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
   std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
   if (desc)
@@ -75,11 +75,11 @@ void LonestarStart(int argc, char** argv,
     if (i != argc - 1)
       cmdout << " ";
   }
-  Galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
-  Galois::Runtime::reportParam("(NULL)", "Threads", numThreads);
+  galois::Runtime::reportParam("(NULL)", "CommandLine", cmdout.str());
+  galois::Runtime::reportParam("(NULL)", "Threads", numThreads);
 
   char name[256];
   gethostname(name, 256);
-  Galois::Runtime::reportParam("(NULL)", "Hostname", name);
+  galois::Runtime::reportParam("(NULL)", "Hostname", name);
 
 }

@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-static auto unprotected = Galois::MethodFlag::UNPROTECTED;
+static auto unprotected = galois::MethodFlag::UNPROTECTED;
 
 void CircuitGraph::construct(VerilogModule& vModule) {
   dummySrc = g.createNode();

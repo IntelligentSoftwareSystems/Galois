@@ -8,10 +8,10 @@
 
 #include <iostream>
 
-using namespace Galois::Graph;
-using namespace Galois::Runtime;
+using namespace galois::Graph;
+using namespace galois::Runtime;
 
-typedef Galois::DGReducible<unsigned, std::plus<unsigned> > RD1;
+typedef galois::DGReducible<unsigned, std::plus<unsigned> > RD1;
 
 struct op1 {
   gptr<RD1> count;
@@ -19,7 +19,7 @@ struct op1 {
   op1(gptr<RD1> c): count(c) {}
   op1() {}
 
-  void operator()(const int& nodeval, const Galois::UserContext<int>&) {
+  void operator()(const int& nodeval, const galois::UserContext<int>&) {
     count->get() += 1;
   }
 
@@ -32,7 +32,7 @@ void check1() {
   gptr<RD1> Cr(new RD1());
 
   std::cout << "Loop\n";
-  Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op1(Cr));
+  galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op1(Cr));
   std::cout << "\n";
 
   for (int i = 0; i < 4; ++i) {
@@ -46,7 +46,7 @@ void check1() {
   }
 }
 
-typedef Galois::DGReducibleVector<int, std::plus<int>> RD2;
+typedef galois::DGReducibleVector<int, std::plus<int>> RD2;
 
 struct Show {
   gptr<RD2> count;
@@ -69,7 +69,7 @@ struct op2 {
   op2() { }
   op2(gptr<RD2> c): count(c) { }
 
-  void operator()(int n, Galois::UserContext<int>&) {
+  void operator()(int n, galois::UserContext<int>&) {
     count->update(n, n);
   }
 
@@ -82,8 +82,8 @@ void check2() {
   gptr<RD2> p(new RD2());
   p->allocate(20);
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
   for (int i = 0; i < 20; ++i) {
     std::cout << "local[" << i << "]: " << p->get(i) << "\n";
   }
@@ -92,12 +92,12 @@ void check2() {
     std::cout << "reduced[" << i << "]: " << p->get(i) << "\n";
   }
 
-  //Galois::on_each(Show(p)); 
+  //galois::on_each(Show(p)); 
   p->doReset();
   distWait();
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
   for (int i = 0; i < 20; ++i) {
     std::cout << "local[" << i << "]: " << p->get(i) << "\n";
   }
@@ -107,7 +107,7 @@ void check2() {
   }
 
   distWait();
-  //  Galois::Runtime::deallocatePerHost(p);
+  //  galois::Runtime::deallocatePerHost(p);
   delete &*p;
 }
 

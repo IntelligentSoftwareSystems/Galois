@@ -37,7 +37,7 @@
 #include "Galois/gstl.h"
 #include "Galois/WorkList/Chunked.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 /**
@@ -89,7 +89,7 @@ private:
 	shared_state& s = stealState.data;
 	s.stealLock.lock();
 	s.stealEnd = localEnd;
-	s.stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
+	s.stealBegin = localEnd = galois::split_range(localBegin, localEnd);
 	if (s.stealBegin != s.stealEnd)
           s.stealAvail = true;
 	s.stealLock.unlock();
@@ -110,7 +110,7 @@ private:
       }
       if (s.stealBegin != s.stealEnd) {
 	dst.localBegin = s.stealBegin;
-	s.stealBegin = dst.localEnd = Galois::split_range(s.stealBegin, s.stealEnd);
+	s.stealBegin = dst.localEnd = galois::split_range(s.stealBegin, s.stealEnd);
         s.stealAvail = s.stealBegin != s.stealEnd;
       }
       s.stealLock.unlock();
@@ -119,7 +119,7 @@ private:
   }
 
   //pop already failed, try again with stealing
-  Galois::optional<value_type> pop_steal(state& data) {
+  galois::optional<value_type> pop_steal(state& data) {
     //always try stealing self
     if (doSteal(data, data, true))
       return *data.localBegin++;
@@ -133,7 +133,7 @@ private:
     ++data.nextVictim;
     ++data.numStealFailures;
     data.nextVictim %= Runtime::activeThreads;
-    return Galois::optional<value_type>();
+    return galois::optional<value_type>();
   }
 
 public:
@@ -151,12 +151,12 @@ public:
   }
 
   //! pop a value from the queue.
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     state& data = *TLDS.getLocal();
     if (data.localBegin != data.localEnd)
       return *data.localBegin++;
 
-    Galois::optional<value_type> item;
+    galois::optional<value_type> item;
     if (Steal && 2 * data.numStealFailures > Runtime::activeThreads)
       if ((item = pop_steal(data)))
         return item;

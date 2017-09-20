@@ -46,7 +46,7 @@
 
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -168,7 +168,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    Galois::Runtime::acquire(&nodeData[N], mflag);
+    galois::Runtime::acquire(&nodeData[N], mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -269,7 +269,7 @@ public:
   
   node_data_reference getData(GraphNode N, 
                               MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
@@ -277,7 +277,7 @@ public:
 
   edge_data_reference getEdgeData(edge_iterator ni, 
                                   MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -309,7 +309,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
         acquireNode(edgeDst[*ii], mflag);
       }
@@ -377,12 +377,12 @@ public:
    * Sorts all outgoing edges of all nodes in parallel. Comparison is over getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    Galois::do_all_local(*this, [=] 
+    galois::do_all_local(*this, [=] 
       (GraphNode N) {
         this->sortEdgesByDst(N, mflag);
       },
-      Galois::do_all_steal<true>(),
-      Galois::no_stats());
+      galois::do_all_steal<true>(),
+      galois::no_stats());
   }
 
 
@@ -407,7 +407,7 @@ public:
                     size_t total, VectorTy& edgePrefixSum)
       -> GraphRange {
     return 
-      Galois::Graph::divideNodesBinarySearch<VectorTy, uint32_t>(
+      galois::Graph::divideNodesBinarySearch<VectorTy, uint32_t>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
@@ -448,7 +448,7 @@ public:
   //    return;
   //  }
 
-  //  uint32_t num_threads = Galois::Runtime::activeThreads;
+  //  uint32_t num_threads = galois::Runtime::activeThreads;
   //  uint32_t total_nodes = end() - begin();
   //  //printf("nodes is %u\n", total_nodes);
 
@@ -599,7 +599,7 @@ public:
   void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
                              std::vector<uint32_t>& returnRanges, 
                              uint32_t nodeAlpha=0) {
-    uint32_t num_threads = Galois::Runtime::activeThreads;
+    uint32_t num_threads = galois::Runtime::activeThreads;
     uint32_t total_nodes = endNode - beginNode;
 
     returnRanges.resize(num_threads + 1);
@@ -730,7 +730,7 @@ public:
     }
 
     assert(edgePrefixSum.size() == totalNodes);
-    uint32_t num_threads = Galois::Runtime::activeThreads;
+    uint32_t num_threads = galois::Runtime::activeThreads;
 
     threadRanges.resize(num_threads + 1);
 
@@ -763,7 +763,7 @@ public:
     uint64_t units_per_thread = edgePrefixSum[totalNodes - 1] / num_threads +
                                 node_weight;
 
-    Galois::gDebug("Optimally want ", units_per_thread, " units per thread");
+    galois::gDebug("Optimally want ", units_per_thread, " units per thread");
 
     uint32_t current_thread = 0;
     uint32_t current_element = 0;
@@ -889,16 +889,16 @@ public:
    */
   template <typename VectorTy>
   void determineThreadRangesByNode(VectorTy& edgePrefixSum) {
-    uint32_t numThreads = Galois::Runtime::activeThreads;
+    uint32_t numThreads = galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
     if (threadRanges.size() != 0) {
-      Galois::gDebug("Warning: Thread ranges already specified "
+      galois::gDebug("Warning: Thread ranges already specified "
                      "(in detThreadRangesByNode)");
     }
 
     if (threadRangesEdge.size() != 0) {
-      Galois::gDebug("Warning: Thread ranges edge already specified "
+      galois::gDebug("Warning: Thread ranges edge already specified "
                      "(in detThreadRangesByNode)");
     }
 
@@ -935,9 +935,9 @@ public:
         threadRangesEdge[i + 1] = threadRangesEdge[i];
       }
 
-      Galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ", 
+      galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ", 
                      threadRanges[i+1]);
-      Galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ", 
+      galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ", 
                      threadRangesEdge[i+1]);
     }
   }
@@ -951,7 +951,7 @@ public:
   template <typename VectorTy>
   void determineThreadRangesEdge(VectorTy& edgePrefixSum) {
     if (threadRanges.size() > 0) {
-      uint32_t totalThreads = Galois::Runtime::activeThreads;
+      uint32_t totalThreads = galois::Runtime::activeThreads;
 
       threadRangesEdge.resize(totalThreads + 1);
       threadRangesEdge[0] = 0;
@@ -975,7 +975,7 @@ public:
         threadRangesEdge[i + 1] = endEdge;
       }
     } else {
-      Galois::gDebug("WARNING: threadRangesEdge not calculated because "
+      galois::gDebug("WARNING: threadRangesEdge not calculated because "
                      "threadRanges isn't calculated.");
     }
   }
@@ -1122,7 +1122,7 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 
-    uint32_t numThreads = Galois::Runtime::activeThreads;
+    uint32_t numThreads = galois::Runtime::activeThreads;
     assert(numThreads > 0);
 
     threadRanges.resize(numThreads + 1);
@@ -1231,15 +1231,15 @@ public:
       this->outOfLineConstructAt(x);
     }
 #else
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+    galois::do_all(boost::counting_iterator<uint32_t>(0), 
                    boost::counting_iterator<uint32_t>(numNodes),
                    [&](uint32_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    }, 
-                   Galois::loopname("CONSTRUCT_NODES"), 
-                   Galois::numrun("0"),
-                   Galois::no_stats());
+                   galois::loopname("CONSTRUCT_NODES"), 
+                   galois::numrun("0"),
+                   galois::no_stats());
 #endif
   }
 
@@ -1261,7 +1261,7 @@ public:
    * CSR to CSC
    */
   void transpose(bool reallocate = false) {
-    Galois::StatTimer timer("TIME_GRAPH_TRANSPOSE"); timer.start();
+    galois::StatTimer timer("TIME_GRAPH_TRANSPOSE"); timer.start();
 
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;
@@ -1274,15 +1274,15 @@ public:
     edgeData_new.allocateInterleaved(numEdges);
 
     // Copy old node->index location + initialize the temp array
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+    galois::do_all(boost::counting_iterator<uint32_t>(0), 
                    boost::counting_iterator<uint32_t>(numNodes),
                    [&](uint32_t n) {
                      edgeIndData_old[n] = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    }, 
-                   Galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
-                   Galois::numrun("0"),
-                   Galois::no_stats());
+                   galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
+                   galois::numrun("0"),
+                   galois::no_stats());
 
     // parallelization makes this slower
     // get destination of edge, copy to array, and  
@@ -1318,27 +1318,27 @@ public:
     }
 
     // copy over the new tranposed edge index data
-    Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+    galois::do_all(boost::counting_iterator<uint32_t>(0), 
                    boost::counting_iterator<uint32_t>(numNodes),
                    [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
-                   Galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
-                   Galois::numrun("0"),
-                   Galois::no_stats());
+                   galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
+                   galois::numrun("0"),
+                   galois::no_stats());
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
     // before the ith node have
     if (numNodes >= 1) {
       edgeIndData_temp[0] = 0;
-      Galois::do_all(boost::counting_iterator<uint32_t>(1), 
+      galois::do_all(boost::counting_iterator<uint32_t>(1), 
                      boost::counting_iterator<uint32_t>(numNodes),
                      [&](uint32_t n){
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
-                     Galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
-                     Galois::numrun("0"),
-                     Galois::no_stats());
+                     galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
+                     galois::numrun("0"),
+                     galois::no_stats());
     }
 
     // reallocate edgeDst
@@ -1379,14 +1379,14 @@ public:
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
-      Galois::do_all(boost::counting_iterator<uint32_t>(0), 
+      galois::do_all(boost::counting_iterator<uint32_t>(0), 
                      boost::counting_iterator<uint32_t>(numEdges),
                      [&](uint32_t e){
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 
-                     Galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
-                     Galois::numrun("0"),
-                     Galois::no_stats());
+                     galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
+                     galois::numrun("0"),
+                     galois::no_stats());
     }
 
     timer.stop();

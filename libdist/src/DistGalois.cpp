@@ -30,8 +30,8 @@
 
 #include "Galois/DistGalois.h"
 
-Galois::DistMemSys::DistMemSys(void)
-  : Galois::Runtime::SharedMemRuntime<Galois::Runtime::DistStatManager>()
+galois::DistMemSys::DistMemSys(void)
+  : galois::Runtime::SharedMemRuntime<galois::Runtime::DistStatManager>()
 { } 
 
-Galois::DistMemSys::~DistMemSys(void) {}
+galois::DistMemSys::~DistMemSys(void) {}

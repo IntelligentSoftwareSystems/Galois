@@ -47,13 +47,13 @@
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
-namespace Galois {
+namespace galois {
 namespace Runtime {
 extern void initPTS();
 }
 }
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 namespace {
 
@@ -111,7 +111,7 @@ class ThreadPool_pthread : public ThreadPool {
   
 public:
   ThreadPool_pthread():
-    ThreadPool(Galois::Runtime::LL::getMaxThreads())
+    ThreadPool(galois::Runtime::LL::getMaxThreads())
   {
     starts = new Semaphore[maxThreads];
     threads = new pthread_t[maxThreads];
@@ -137,7 +137,7 @@ public:
 } // end namespace
 
 //! Implement the global threadpool
-ThreadPool& Galois::Runtime::getThreadPool() {
+ThreadPool& galois::Runtime::getThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }

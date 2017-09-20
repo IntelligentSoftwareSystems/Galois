@@ -20,9 +20,9 @@ class SyncHandler: public MatchFinder::MatchCallback {
 public:
    Rewriter &rewriter;
    ASTContext & ctx;
-   Galois::GAST::GaloisApp & app;
+   galois::GAST::GaloisApp & app;
 public:
-   SyncHandler(Rewriter &rewriter, ASTContext & c, Galois::GAST::GaloisApp & a) :
+   SyncHandler(Rewriter &rewriter, ASTContext & c, galois::GAST::GaloisApp & a) :
          rewriter(rewriter), ctx(c), app(a){
    }
    //TODO - RK - Clean up graph generation code.

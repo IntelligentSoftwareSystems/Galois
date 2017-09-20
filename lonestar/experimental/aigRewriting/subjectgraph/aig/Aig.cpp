@@ -89,7 +89,7 @@ void Aig::resetAndIDs() {
 	while ( !stack.empty() ) {
 		GNode node = stack.top();
 		stack.pop();
-		NodeData & nodeData = graph.getData( node, Galois::MethodFlag::WRITE );
+		NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );
 		//std::cout << nodeData.id << " -> ";		
 		nodeData.id = currentID++;
 		//std::cout << nodeData.id << std::endl;
@@ -105,7 +105,7 @@ void Aig::computeTopologicalSort( std::stack< GNode > & stack ) {
 
 	for ( auto node : this->graph ) {
 		
-		NodeData & nodeData = this->graph.getData( node, Galois::MethodFlag::READ );
+		NodeData & nodeData = this->graph.getData( node, galois::MethodFlag::READ );
        		
 		if ( nodeData.type == NodeType::AND ) { 
 			visited[ nodeData.id ] = false;
@@ -117,7 +117,7 @@ void Aig::computeTopologicalSort( std::stack< GNode > & stack ) {
 		for ( auto outEdge : this->graph.out_edges( pi ) ) {
 
 			GNode node = this->graph.getEdgeDst( outEdge );
-			NodeData & nodeData = this->graph.getData( node, Galois::MethodFlag::READ );
+			NodeData & nodeData = this->graph.getData( node, galois::MethodFlag::READ );
 
 			if ( (!visited[ nodeData.id ]) && (nodeData.type == NodeType::AND) ) {
 	        		topologicalSort( node, visited, stack );
@@ -128,13 +128,13 @@ void Aig::computeTopologicalSort( std::stack< GNode > & stack ) {
 
 void Aig::topologicalSort( GNode node, std::vector< bool > & visited, std::stack< GNode > & stack ) {
 
-	NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+	NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 	visited[ nodeData.id ] = true;
  	
 	for ( auto outEdge : this->graph.out_edges( node ) ) {
 		
 		GNode nextNode = this->graph.getEdgeDst( outEdge );
-		NodeData & nextNodeData = this->graph.getData( nextNode, Galois::MethodFlag::READ );
+		NodeData & nextNodeData = this->graph.getData( nextNode, galois::MethodFlag::READ );
 
 		if ( (!visited[ nextNodeData.id ]) && (nextNodeData.type == NodeType::AND) ) {
 			 topologicalSort( nextNode, visited, stack );
@@ -149,13 +149,13 @@ std::string Aig::toDot() {
 	// Preprocess PI and PO names
 	std::unordered_map< int, std::string > piNames;	
 	for ( int i = 0; i < this->inputNodes.size(); i++ ) {
-		aig::NodeData & nodeData = graph.getData( this->inputNodes[i], Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( this->inputNodes[i], galois::MethodFlag::READ );
 		piNames.insert( std::make_pair( nodeData.id, this->inputNames[i]) );
 	}
 
 	std::unordered_map< int, std::string > poNames;	
 	for ( int i = 0; i < this->outputNodes.size(); i++ ) {
-		aig::NodeData & nodeData = graph.getData( this->outputNodes[i], Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( this->outputNodes[i], galois::MethodFlag::READ );
 		poNames.insert( std::make_pair( nodeData.id, this->outputNames[i]) );
 	}
 
@@ -163,13 +163,13 @@ std::string Aig::toDot() {
 
 	for ( auto node : this->graph ) {
 
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 
 		// Write Edges
 		for ( auto edge : graph.in_edges( node ) ) {
 			aig::GNode dstNode = graph.getEdgeDst( edge );
-			aig::NodeData & dstData = graph.getData( dstNode, Galois::MethodFlag::READ );
-			bool polarity = graph.getEdgeData( edge, Galois::MethodFlag::READ );			
+			aig::NodeData & dstData = graph.getData( dstNode, galois::MethodFlag::READ );
+			bool polarity = graph.getEdgeData( edge, galois::MethodFlag::READ );			
 
 			std::string nodeName, dstName;
 
@@ -234,14 +234,14 @@ std::string Aig::toDot() {
 	dot << edges.str();
 	dot << "{ rank=source;";
 	for ( GNode node: this->inputNodes ) {
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 		dot << " \"" << piNames[ nodeData.id ] << "\"";
 	}
 	dot << " }" << std::endl;
 	
 	dot << "{ rank=sink;";
 	for ( GNode node: this->outputNodes ) {
-	 	aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+	 	aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 	 	dot << " \"" << poNames[ nodeData.id ] << "\"";
 	}
 	dot << " }" << std::endl;

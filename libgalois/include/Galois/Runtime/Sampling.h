@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_SAMPLING_H
 #define GALOIS_RUNTIME_SAMPLING_H
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 void beginSampling();
@@ -32,6 +32,6 @@ void beginThreadSampling();
 void endThreadSampling();
 
 }
-} // end namespace Galois
+} // end namespace galois
 
 #endif

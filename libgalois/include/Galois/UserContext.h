@@ -30,7 +30,7 @@
 
 #include <functional>
 
-namespace Galois {
+namespace galois {
 
 /** 
  * This is the object passed to the user's parallel loop.  This
@@ -42,7 +42,7 @@ protected:
 // TODO(ddn): move to a separate class for dedicated speculative executors
 #ifdef GALOIS_USE_EXP
   typedef std::function<void (void)> Closure;
-  typedef Galois::gdeque<Closure, 8> UndoLog;
+  typedef galois::gdeque<Closure, 8> UndoLog;
   typedef UndoLog CommitLog;
 
   UndoLog undoLog;
@@ -139,14 +139,14 @@ public:
   //! Push new work 
   template<typename... Args>
   void push(Args&&... args) {
-    // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
+    // galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
     if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);
   }
 
   //! Force the abort of this iteration
-  void abort() { Galois::Runtime::signalConflict(); }
+  void abort() { galois::Runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
   void* getLocalState(void) { return localState; }
@@ -173,7 +173,7 @@ public:
   //! acquired.
   void cautiousPoint() {
     if (isFirstPass()) {
-      Galois::Runtime::signalFailSafe();
+      galois::Runtime::signalFailSafe();
     }
   }
 

@@ -43,7 +43,7 @@ struct TNode {
 	char state;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<TNode, int> Graph;
+typedef galois::Graph::LC_CSR_Graph<TNode, int> Graph;
 typedef Graph::GraphNode GNode;
 static const unsigned int DIST_INFINITY = std::numeric_limits<unsigned int>::max();
 
@@ -64,10 +64,10 @@ Graph graph;
 
 struct CountUNeighbors {
 	Graph& g;
-        Galois::GAccumulator<int>& cnt_l_set_neighbors;
+        galois::GAccumulator<int>& cnt_l_set_neighbors;
 
-	CountUNeighbors( Graph& g, Galois::GAccumulator<int>& cnt_l_set_neighbors ): g( g ), cnt_l_set_neighbors( cnt_l_set_neighbors ) { }
-	void operator()( const GNode& n, Galois::UserContext<GNode>& ctx ) const {
+	CountUNeighbors( Graph& g, galois::GAccumulator<int>& cnt_l_set_neighbors ): g( g ), cnt_l_set_neighbors( cnt_l_set_neighbors ) { }
+	void operator()( const GNode& n, galois::UserContext<GNode>& ctx ) const {
 		TNode& node = g.getData( n );
 
 		if ( node.type != 'U' ) return;
@@ -87,7 +87,7 @@ struct Initialize {
 
 	Initialize( Graph& g ): g( g ) { }
 
-	void operator()( const GNode& n, Galois::UserContext<GNode>& ctx ) const {
+	void operator()( const GNode& n, galois::UserContext<GNode>& ctx ) const {
 		TNode& node = g.getData( n );
 
 		if ( rand() % 100  > probWithinSetU ) {
@@ -161,13 +161,13 @@ float GetMedian( std::vector<float>& vector, int vector_size )
 struct EstimateLocation 
 {
 	Graph& g;
-	Galois::GAccumulator<int>& cnt_useful_it;
-	Galois::GAccumulator<int>& cnt_useless_it;
-	Galois::GAccumulator<float>& error_location;
+	galois::GAccumulator<int>& cnt_useful_it;
+	galois::GAccumulator<int>& cnt_useless_it;
+	galois::GAccumulator<float>& error_location;
 
-	EstimateLocation( Graph& g, Galois::GAccumulator<float>& error_location, Galois::GAccumulator<int>& cnt_useful_it, Galois::GAccumulator<int>& cnt_useless_it ): g( g ), error_location( error_location ), cnt_useful_it( cnt_useful_it ), cnt_useless_it( cnt_useless_it ) { }
+	EstimateLocation( Graph& g, galois::GAccumulator<float>& error_location, galois::GAccumulator<int>& cnt_useful_it, galois::GAccumulator<int>& cnt_useless_it ): g( g ), error_location( error_location ), cnt_useful_it( cnt_useful_it ), cnt_useless_it( cnt_useless_it ) { }
 
-	void operator()( GNode& n, Galois::UserContext<GNode>& ctx ) const {
+	void operator()( GNode& n, galois::UserContext<GNode>& ctx ) const {
 		TNode& node = g.getData( n );
 
 		if ( node.type == 'U' and node.state != 'F' ) {
@@ -295,30 +295,30 @@ if ( DO_PRINT_MESSAGES ) printf( "\t>>>> Error = %.4f\n", diff_loca );
 
 int main( int argc, char** argv ) 
 {
-	Galois::StatManager statManager;
+	galois::StatManager statManager;
 	LonestarStart( argc, argv, name, desc, 0 );
 
-	Galois::Timer T;
+	galois::Timer T;
 
 	srand( time( NULL ) );
-	Galois::GAccumulator<int> cnt_useful_it;
-	Galois::GAccumulator<int> cnt_useless_it;
-	Galois::GAccumulator<int> cnt_l_set_neighbors;
-	Galois::GAccumulator<float> error_location;
-	Galois::Graph::readGraph( graph, filename );
-	Galois::for_each_local( graph, Initialize( graph ) );
+	galois::GAccumulator<int> cnt_useful_it;
+	galois::GAccumulator<int> cnt_useless_it;
+	galois::GAccumulator<int> cnt_l_set_neighbors;
+	galois::GAccumulator<float> error_location;
+	galois::Graph::readGraph( graph, filename );
+	galois::for_each_local( graph, Initialize( graph ) );
 
         int u_set_size = std::count_if( graph.begin(), graph.end(), ValueEqual( graph, 'U' ) );
         int l_set_size = std::count_if( graph.begin(), graph.end(), ValueEqual( graph, 'L' ) );
 
 	T.start();
 	for ( int iteration = 0; iteration < maxIterations; ++iteration ) {
-		// Unlike Galois::for_each, Galois::for_each_local initially assigns work
-  		// based on which thread created each node (Galois::for_each uses a simple
+		// Unlike galois::for_each, galois::for_each_local initially assigns work
+  		// based on which thread created each node (galois::for_each uses a simple
   		// blocking of the iterator range to initialize work, but the iterator order
   		// of a Graph is implementation-defined). 
-  		Galois::for_each_local( graph, EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
-		//Galois::for_each( graph.begin(), graph.end(), EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
+  		galois::for_each_local( graph, EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
+		//galois::for_each( graph.begin(), graph.end(), EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
 	}
 	T.stop();
 
@@ -330,7 +330,7 @@ std::cout << "------------------------------------------------------------------
 	std::cout << "Elapsed time: " << T.get() << " milliseconds\n";
 
 	int u_set_touched = std::count_if( graph.begin(), graph.end(), FindTouched( graph ) );
-	Galois::for_each( graph.begin(), graph.end(), CountUNeighbors( graph, cnt_l_set_neighbors ) );
+	galois::for_each( graph.begin(), graph.end(), CountUNeighbors( graph, cnt_l_set_neighbors ) );
 
 	std::cout << "Number of nodes in U: " << u_set_size << "\n";
 	std::cout << "Number of nodes in L: " << l_set_size << "\n";

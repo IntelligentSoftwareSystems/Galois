@@ -86,7 +86,7 @@ struct min_degree {
   Graph& graph;
   min_degree(Graph& g): graph(g) { }
 
-  Galois::optional<GNode> operator()(const Galois::optional<GNode>& a, const Galois::optional<GNode>& b) const {
+  galois::optional<GNode> operator()(const galois::optional<GNode>& a, const galois::optional<GNode>& b) const {
     if (!a) return b;
     if (!b) return a;
     if (std::distance(graph.edge_begin(*a), graph.edge_end(*a))
@@ -114,9 +114,9 @@ template<typename Graph>
 struct collect_nodes_with_dist {
   typedef typename Graph::GraphNode GNode;
   Graph& graph;
-  Galois::InsertBag<GNode>& bag;
+  galois::InsertBag<GNode>& bag;
   Dist dist;
-  collect_nodes_with_dist(Graph& g, Galois::InsertBag<GNode>& b, Dist d): graph(g), bag(b), dist(d) { }
+  collect_nodes_with_dist(Graph& g, galois::InsertBag<GNode>& b, Dist d): graph(g), bag(b), dist(d) { }
 
   void operator()(const GNode& n) const {
     if (graph.getData(n).dist == dist)
@@ -130,10 +130,10 @@ struct has_dist {
   Graph& graph;
   Dist dist;
   has_dist(Graph& g, Dist d): graph(g), dist(d) { }
-  Galois::optional<GNode> operator()(const GNode& a) const {
+  galois::optional<GNode> operator()(const GNode& a) const {
     if (graph.getData(a).dist == dist)
-      return Galois::optional<GNode>(a);
-    return Galois::optional<GNode>();
+      return galois::optional<GNode>(a);
+    return galois::optional<GNode>();
   }
 };
 
@@ -161,7 +161,7 @@ struct CountLevels {
 
   Graph& graph;
   //! [Define GReducible]
-  Galois::GReducible<std::deque<size_t>, updater>* counts;
+  galois::GReducible<std::deque<size_t>, updater>* counts;
   //! [Define GReducible]
   CountLevels(Graph& g): graph(g) { }
   
@@ -175,9 +175,9 @@ struct CountLevels {
   //! [Use GReducible in parallel]
   
   std::deque<size_t> count() {
-    Galois::GReducible<std::deque<size_t>, updater> C{updater()};
+    galois::GReducible<std::deque<size_t>, updater> C{updater()};
     counts = &C;
-    Galois::do_all_local(graph, *this);
+    galois::do_all_local(graph, *this);
    //![Reduce the final value] 
     return C.reduce(reducer());
    //![Reduce the final value] 
@@ -186,16 +186,16 @@ struct CountLevels {
 
 template<typename Algo>
 void resetGraph(typename Algo::Graph& g) {
-  Galois::do_all_local(g, typename Algo::Initialize(g));
+  galois::do_all_local(g, typename Algo::Initialize(g));
 }
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace Galois::Graph;
+  using namespace galois::Graph;
   if (symmetricGraph) {
-    Galois::Graph::readGraph(graph, filename);
+    galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -240,8 +240,8 @@ struct SimpleAlgo {
 
     size_t ecc = counts.size() - 1;
     //size_t maxWidth = *std::max_element(counts.begin(), counts.end());
-    GNode candidate = *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-        has_dist<Graph>(graph, ecc), Galois::optional<GNode>(), min_degree<Graph>(graph));
+    GNode candidate = *galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
+        has_dist<Graph>(graph, ecc), galois::optional<GNode>(), min_degree<Graph>(graph));
     resetGraph<SimpleAlgo>(graph);
     return Result(ecc, candidate);
   }
@@ -298,8 +298,8 @@ struct PickKAlgo {
   };
   
   std::deque<GNode> select(Graph& graph, unsigned topn, size_t dist) {
-    Galois::InsertBag<GNode> bag;
-    Galois::do_all_local(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
+    galois::InsertBag<GNode> bag;
+    galois::do_all_local(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
 
     // Incrementally sort nodes until we find least N who are not neighbors
     // of each other
@@ -375,7 +375,7 @@ struct PickKAlgo {
   }
 
   size_t operator()(Graph& graph, GNode source) {
-    Galois::optional<size_t> terminal;
+    galois::optional<size_t> terminal;
 
     Result v = search(graph, source, ~0, true);
 
@@ -395,11 +395,11 @@ struct PickKAlgo {
           continue;
         } else if (u.ecc > v.ecc) {
           v = u;
-          terminal = Galois::optional<size_t>();
+          terminal = galois::optional<size_t>();
           break;
         } else if (u.maxWidth < last) {
           last = u.maxWidth;
-          terminal = Galois::optional<size_t>(u.ecc);
+          terminal = galois::optional<size_t>(u.ecc);
         }
       }
 
@@ -446,25 +446,25 @@ void run() {
 
   initialize(algo, graph, source);
 
-  //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::hugePageSize)*8);
-  Galois::reportPageAlloc("MeminfoPre");
+  //galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / galois::Runtime::MM::hugePageSize)*8);
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   resetGraph<Algo>(graph);
   size_t diameter = algo(graph, source);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Estimated diameter: " << diameter << "\n";
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::simple: run<SimpleAlgo>(); break;

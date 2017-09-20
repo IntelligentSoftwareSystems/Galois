@@ -33,8 +33,8 @@
 #include <mutex>
 #include <iostream>
 
-using namespace Galois::Runtime;
-using namespace Galois::Substrate;
+using namespace galois::Runtime;
+using namespace galois::Substrate;
 
 namespace {
 
@@ -171,7 +171,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     void add(NetworkIO::message m) {
       std::lock_guard<SimpleLock> lg(qlock);
       if (data.empty()){
-        Galois::Runtime::trace("ADD LATEST ", m.tag);
+        galois::Runtime::trace("ADD LATEST ", m.tag);
         dataPresent = m.tag;
       }
       //      std::cerr<< m.data.size() << " " << std::count(m.data.begin(), m.data.end(), 0) << "\n";
@@ -311,7 +311,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
       unsigned oldNumBytes = numBytes;
       numBytes += b.size();
-      Galois::Runtime::trace("BufferedAdd", oldNumBytes, numBytes, tag, Galois::Runtime::printVec(b));
+      galois::Runtime::trace("BufferedAdd", oldNumBytes, numBytes, tag, galois::Runtime::printVec(b));
       messages.emplace_back(tag, b);
     }
 
@@ -341,7 +341,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           NetworkIO::message msg;
           msg.host = i;
           std::tie(msg.tag, msg.data) = sd.assemble();
-          Galois::Runtime::trace("BufferedSending", msg.host, msg.tag, Galois::Runtime::printVec(msg.data));
+          galois::Runtime::trace("BufferedSending", msg.host, msg.tag, galois::Runtime::printVec(msg.data));
           ++statSendEnqueued;
           netio->enqueue(std::move(msg));
         }
@@ -352,7 +352,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           assert(rdata.data.size() != 
                  (unsigned int)std::count(rdata.data.begin(), 
                                           rdata.data.end(), 0));
-          Galois::Runtime::trace("BufferedRecieving", rdata.host, rdata.tag, Galois::Runtime::printVec(rdata.data));
+          galois::Runtime::trace("BufferedRecieving", rdata.host, rdata.tag, galois::Runtime::printVec(rdata.data));
           recvData[rdata.host].add(std::move(rdata));
         }
       }
@@ -381,39 +381,39 @@ public:
     worker.join();
   }
 
-  std::unique_ptr<Galois::Runtime::NetworkIO> netio;
+  std::unique_ptr<galois::Runtime::NetworkIO> netio;
 
   virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) {
     statSendNum += 1;
     statSendBytes += buf.size();
-    Galois::Runtime::trace("sendTagged", dest, tag, Galois::Runtime::printVec(buf.getVec()));
+    galois::Runtime::trace("sendTagged", dest, tag, galois::Runtime::printVec(buf.getVec()));
     auto& sd = sendData[dest];
     sd.add(tag, buf.getVec());
   }
 
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<Galois::Substrate::SimpleLock>* rlg) {
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<galois::Substrate::SimpleLock>* rlg) {
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
       if (rq.hasData(tag)) {
         if (recvLock[h].try_lock()) {
-          std::unique_lock<Galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
+          std::unique_lock<galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
           auto buf = rq.popMsg(tag);
           if (buf) {
             ++statRecvNum;
             statRecvBytes += buf->size();
             if (rlg)
               *rlg = std::move(lg);
-            Galois::Runtime::trace("recvTagged", h, tag, Galois::Runtime::printVec(buf->getVec()));
+            galois::Runtime::trace("recvTagged", h, tag, galois::Runtime::printVec(buf->getVec()));
             return optional_t<std::pair<uint32_t, RecvBuffer>>(std::make_pair(h, std::move(*buf)));
           }
         }
       }
-      Galois::Runtime::trace("recvTagged BLOCKED this by that", tag, rq.getPresentTag());
+      galois::Runtime::trace("recvTagged BLOCKED this by that", tag, rq.getPresentTag());
 #if 0
       else if (rq.getPresentTag() != ~0){
-        Galois::Runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
+        galois::Runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
         if (recvLock[h].try_lock()) {
-          std::unique_lock<Galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
+          std::unique_lock<galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
           auto buf = rq.popMsg(rq.getPresentTag());
           if (buf) {
             if (rlg)
@@ -422,7 +422,7 @@ public:
             gDeserializeRaw(buf->r_linearData() + buf->r_size() - sizeof(uintptr_t), fp);
             buf->pop_back(sizeof(uintptr_t));
             assert(fp);
-            Galois::Runtime::trace("FP BLOCKED :", fp);
+            galois::Runtime::trace("FP BLOCKED :", fp);
             return optional_t<std::pair<uint32_t, RecvBuffer>>();
           }
         }
@@ -473,7 +473,7 @@ public:
 
 } //namespace ""
 
-NetworkInterface& Galois::Runtime::makeNetworkBuffered() {
+NetworkInterface& galois::Runtime::makeNetworkBuffered() {
   static std::atomic<NetworkInterfaceBuffered* > net;
   static Substrate::SimpleLock m_mutex;
   

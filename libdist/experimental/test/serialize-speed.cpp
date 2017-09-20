@@ -3,25 +3,25 @@
 
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 int main() {
 
   std::map<int, double> compare;
   
-  std::cout << Galois::Runtime::gSized(std::vector<int>(100)) << "\n";
+  std::cout << galois::Runtime::gSized(std::vector<int>(100)) << "\n";
   //check by hand that gSized reduces this to a constant
-  std::cout << Galois::Runtime::gSized(1.2, 3.4, '1') << "\n";
+  std::cout << galois::Runtime::gSized(1.2, 3.4, '1') << "\n";
 
   std::cout << "Ser\n\n";
   
   for (int num = 1; num < 1024; num *= 2) {
     std::vector<double> input(1024*num, 1.0);
-    Galois::Timer T;
+    galois::Timer T;
     T.start();
     for (int i = 0; i < 1000; ++i) {
       SendBuffer b;
-      Galois::Runtime::gSerialize(b, input);
+      galois::Runtime::gSerialize(b, input);
     }
     T.stop();
     auto bytes = sizeof(double) * 1024*num * 1000;
@@ -38,13 +38,13 @@ int main() {
   
   for (int num = 1; num < 1024; num *= 2) {
     std::vector<double> input(1024*num, 1.0);
-    Galois::Timer T;
+    galois::Timer T;
     T.start();
     for (int i = 0; i < 1000; ++i) {
       SendBuffer b;
-      Galois::Runtime::gSerialize(b, input);
+      galois::Runtime::gSerialize(b, input);
       RecvBuffer r(std::move(b));
-      Galois::Runtime::gDeserialize(r, input);
+      galois::Runtime::gDeserialize(r, input);
     }
     T.stop();
     auto bytes = sizeof(double) * 1024*num * 1000;

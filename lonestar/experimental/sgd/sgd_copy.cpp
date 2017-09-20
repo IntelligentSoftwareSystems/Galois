@@ -45,8 +45,8 @@ typedef struct Node
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int... [movie--->user]
 
-//typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
-typedef Galois::Graph::ThirdGraph<Node,unsigned int , Galois::Graph::EdgeDirection::Out> Graph;
+//typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+typedef galois::Graph::ThirdGraph<Node,unsigned int , galois::Graph::EdgeDirection::Out> Graph;
 typedef Graph::NodeHandle GNode; // will have to probably change this something like GraphNode or something.
 typedef typename Graph::pointer Graphp;
 
@@ -67,20 +67,20 @@ struct sgd
 	//perform SGD update on all edges of a movie
 	//perform update on one user at a time
 
-	//void operator()(Graph::GraphNode movie, Galois::UserContext<Graph::GraphNode>& ctx)
-	void operator()(GNode movie, Galois::UserContext<GNode>& ctx)
+	//void operator()(Graph::GraphNode movie, galois::UserContext<Graph::GraphNode>& ctx)
+	void operator()(GNode movie, galois::UserContext<GNode>& ctx)
 	{
 		Node& movie_data = g->getData(movie);
 		double* movie_latent = movie_data.latent_vector;
 		double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
 
-        Graph::edge_iterator edge_it = g->edge_begin(movie) /*, Galois::MethodFlag::NONE)*/ + movie_data.edge_offset;
+        Graph::edge_iterator edge_it = g->edge_begin(movie) /*, galois::MethodFlag::NONE)*/ + movie_data.edge_offset;
 		GNode user = g->getEdgeDst(edge_it);
-		//abort operation if conflict detected (Galois::ALL)
-		Node& user_data = g->getData(user);//, Galois::MethodFlag::ALL);
+		//abort operation if conflict detected (galois::ALL)
+		Node& user_data = g->getData(user);//, galois::MethodFlag::ALL);
 		double* user_latent = user_data.latent_vector;
-		//abort operation if conflict detected (Galois::ALL)
-		unsigned int edge_rating = edge_it->getValue();               //  g->getEdgeData(edge_it);  //, Galois::MethodFlag::ALL);
+		//abort operation if conflict detected (galois::ALL)
+		unsigned int edge_rating = edge_it->getValue();               //  g->getEdgeData(edge_it);  //, galois::MethodFlag::ALL);
 
 				//calculate error
 		double cur_error = - edge_rating;
@@ -101,7 +101,7 @@ struct sgd
 		++edge_it;
 		movie_data.edge_offset++;
 		//we just looked at the last user
-		if(edge_it == g->edge_end(movie) )//, Galois::MethodFlag::NONE))
+		if(edge_it == g->edge_end(movie) )//, galois::MethodFlag::NONE))
 		{
 			//start back at the first edge
                   movie_data.edge_offset = 0;
@@ -175,10 +175,10 @@ int main(int argc, char** argv)
 	unsigned int threadCount = atoi(argv[2]);
 
 	//how many threads Galois should use
-	Galois::setActiveThreads(threadCount);
+	galois::setActiveThreads(threadCount);
 
 	//prints out the number of conflicts at the end of the program
-	Galois::StatManager statManager;
+	galois::StatManager statManager;
 
 	//allocate local computation graph
 	//Graph g;
@@ -186,12 +186,12 @@ int main(int argc, char** argv)
 
 	Graphp g = Graph::allocate();
 	//read structure of graph & edge weights; nodes not initialized
-        Galois::Graph::readGraph(g, inputFile);
+        galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
 	unsigned int num_movie_nodes = initializeGraphData(g);
 
-	Galois::StatTimer timer;
+	galois::StatTimer timer;
 	timer.start();
 
 	//do the SGD computation in parallel
@@ -201,9 +201,9 @@ int main(int argc, char** argv)
 	//the projCount functor provides the priority function on each node
 	Graphp::iterator ii = g.begin();
 	std::advance(ii,num_movie_nodes); //advance moves passed in iterator
-	/*Galois::for_each(g.begin(), ii, sgd(g),
-                         Galois::wl<Galois::WorkList::OrderedByIntegerMetric
-                         <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
+	/*galois::for_each(g.begin(), ii, sgd(g),
+                         galois::wl<galois::WorkList::OrderedByIntegerMetric
+                         <projCount, galois::WorkList::dChunkedLIFO<32>>>());
 */
 	timer.stop();
 

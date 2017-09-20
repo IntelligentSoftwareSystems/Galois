@@ -23,7 +23,7 @@ struct run_local_helper {
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
     std::uniform_int_distribution<int> randSeed;
-    auto r = Galois::block_range(block, block + size, tid, num);
+    auto r = galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, r.first, d, d);
   }
@@ -34,7 +34,7 @@ void run_local(size_t seed, size_t mega) {
   int *block = (int*) malloc(size*sizeof(*block));
 
   // Assuming first touch policy
-  Galois::on_each(run_local_helper(block, seed, size));
+  galois::on_each(run_local_helper(block, seed, size));
   free(block);
 }
 
@@ -47,7 +47,7 @@ struct run_interleaved_helper {
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
     std::uniform_int_distribution<int> randSeed;
-    auto r = Galois::block_range(block, block + size, tid, num);
+    auto r = galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, block, size, d);
   }
@@ -55,14 +55,14 @@ struct run_interleaved_helper {
 
 void run_interleaved(size_t seed, size_t mega, bool full) {
   size_t size = mega*1024*1024;
-  auto ptr = Galois::Substrate::largeMallocInterleaved(size * sizeof(int), full ? Galois::Substrate::getThreadPool().getMaxThreads() : Galois::Runtime::activeThreads);
+  auto ptr = galois::Substrate::largeMallocInterleaved(size * sizeof(int), full ? galois::Substrate::getThreadPool().getMaxThreads() : galois::Runtime::activeThreads);
   int *block = (int*)ptr.get();
-  Galois::on_each(run_interleaved_helper(block, seed, size));
+  galois::on_each(run_interleaved_helper(block, seed, size));
 }
 
 template<typename Fn>
 long time_run(Fn fn) {
-  Galois::Timer t1;
+  galois::Timer t1;
   t1.start();
   fn();
   t1.stop();
@@ -85,7 +85,7 @@ struct F2 {
 };
 
 int main(int argc, char** argv) {
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads() / 2;
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads() / 2;
   size_t mega = 1;
   if (argc > 1)
     mega = atoi(argv[1]);
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
   printf("Effective random-access bandwidth (MB/s)\n");
   printf("T    LOCAL    INTERLEAVE    FULL-INTERLEAVE\n");
   for (unsigned threads = 1; threads <= M; ++threads) {
-    Galois::setActiveThreads(threads);
+    galois::setActiveThreads(threads);
 
     long local_millis = time_run(F1(seed, mega));
     long interleave_millis = time_run(F2(seed, mega, false));

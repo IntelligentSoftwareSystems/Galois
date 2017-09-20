@@ -59,7 +59,7 @@ struct Heap { };
 
 template<typename C>
 struct Heap<C, true> {
-  Galois::Runtime::FixedSizeHeap heap;
+  galois::Runtime::FixedSizeHeap heap;
   Heap(): heap(sizeof(typename C::block_type)) { }
 };
 
@@ -150,7 +150,7 @@ template<typename C, typename Iterator>
 void timeAccess(std::string prefix, C&& c, Iterator first, Iterator last) {
   Heap<C, needs_heap<C>(0)> heap;
 
-  Galois::Timer t1, t2;
+  galois::Timer t1, t2;
   t1.start();
   while (first != last) {
     addToCollection(c, heap, *first++);
@@ -176,9 +176,9 @@ struct element {
 };
 
 int main(int argc, char** argv) {
-  testBasic("Galois::gslist", Galois::gslist<int>(), 32 * 32);
-  testNormal("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
-  //testSort("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
+  testBasic("galois::gslist", galois::gslist<int>(), 32 * 32);
+  testNormal("galois::gdeque", galois::gdeque<int>(), 32 * 32);
+  //testSort("galois::gdeque", galois::gdeque<int>(), 32 * 32);
 
   int size = 100;
   if (argc > 1)
@@ -187,10 +187,10 @@ int main(int argc, char** argv) {
     size = 1000000;
   timeAccesses("std::deque", std::deque<element>(), size);
   timeAccesses("std::vector", std::vector<element>(), size);
-  timeAccesses("Galois::gdeque", Galois::gdeque<element>(), size);
-  timeAccesses("Galois::gslist", Galois::gslist<element>(), size);
-  timeAccesses("Galois::concurrent_gslist", Galois::concurrent_gslist<element>(), size);
-  timeAccesses("Galois::InsertBag", Galois::InsertBag<element>(), size);
+  timeAccesses("galois::gdeque", galois::gdeque<element>(), size);
+  timeAccesses("galois::gslist", galois::gslist<element>(), size);
+  timeAccesses("galois::concurrent_gslist", galois::concurrent_gslist<element>(), size);
+  timeAccesses("galois::InsertBag", galois::InsertBag<element>(), size);
 
   return 0;
 }

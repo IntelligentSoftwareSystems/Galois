@@ -56,7 +56,7 @@
 #include <iostream>
 #include <unordered_map>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 static const bool debug = false;
@@ -66,7 +66,7 @@ class NhoodItem: public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<NhoodItem, Ctxt, CtxtCmp>;
 
 public:
-  using PQ =  Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using PQ =  galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
   using Factory = OrdLocFactoryBase<NhoodItem, Ctxt, CtxtCmp>;
 
 protected:
@@ -115,8 +115,8 @@ public:
   typedef ContextComparator<MyType, Cmp> CtxtCmp; 
   typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
-  typedef Galois::GAtomic<bool> AtomicBool;
-  // typedef Galois::gdeque<NItem*, 4> NhoodList;
+  typedef galois::GAtomic<bool> AtomicBool;
+  // typedef galois::gdeque<NItem*, 4> NhoodList;
   // typedef llvm::SmallVector<NItem*, 8> NhoodList;
   typedef typename gstl::Vector<NItem*> NhoodList;
   // typedef std::vector<NItem*> NhoodList;
@@ -143,7 +143,7 @@ public:
   const T& getActive () const { return active; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -281,12 +281,12 @@ class LCorderedExec {
   typedef PerThreadVector<Ctxt*> CtxtWL;
   typedef PerThreadDeque<Ctxt*> CtxtDelQ;
   typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
-  // typedef Galois::Runtime::PerThreadVector<T> AddWL;
+  // typedef galois::Runtime::PerThreadVector<T> AddWL;
   typedef UserContextAccess<T> UserCtx;
   typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
-  typedef Galois::GAccumulator<size_t> Accumulator;
+  typedef galois::GAccumulator<size_t> Accumulator;
 
   struct CreateCtxtExpandNhood {
     NhoodFunc& nhoodVisitor;
@@ -315,12 +315,12 @@ class LCorderedExec {
 
       ctxtWL.get ().push_back (ctxt);
 
-      Galois::Runtime::setThreadContext (ctxt);
+      galois::Runtime::setThreadContext (ctxt);
       int tmp=0;
       // TODO: nhoodVisitor should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
       nhoodVisitor (ctxt->active, tmp); 
-      Galois::Runtime::setThreadContext (NULL);
+      galois::Runtime::setThreadContext (NULL);
     }
 
   };
@@ -531,20 +531,20 @@ public:
     Accumulator nInitSrc;
     Accumulator niter;
 
-    Galois::TimeAccumulator t_create;
-    Galois::TimeAccumulator t_find;
-    Galois::TimeAccumulator t_for;
-    Galois::TimeAccumulator t_destroy;
+    galois::TimeAccumulator t_create;
+    galois::TimeAccumulator t_find;
+    galois::TimeAccumulator t_for;
+    galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl(
+    galois::Runtime::do_all_impl(
         range, 
 				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
     //        "create_initial_contexts");
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl(makeLocalRange(initCtxt),
+    galois::Runtime::do_all_impl(makeLocalRange(initCtxt),
 				 FindInitSources (sourceTest, initSrc, nInitSrc));
     //       "find_initial_sources");
     t_find.stop ();
@@ -558,12 +558,12 @@ public:
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
 
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
-    // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    // typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();
-    Galois::for_each_local(initSrc,
+    galois::for_each_local(initSrc,
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -575,11 +575,11 @@ public:
           ctxtDelQ,
           perThUserCtx,
           niter),
-        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+        galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl(makeLocalRange(ctxtDelQ),
+    galois::Runtime::do_all_impl(makeLocalRange(ctxtDelQ),
 				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
@@ -626,6 +626,6 @@ void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhood
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

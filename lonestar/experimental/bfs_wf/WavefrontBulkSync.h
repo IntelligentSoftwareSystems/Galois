@@ -84,15 +84,15 @@ protected:
 
       graph.mapOutNeighbors (up.src, 
           [&up,this, &wl] (GNode dst) {
-            ND_ty dstLevel = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            ND_ty dstLevel = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
             if (dstLevel == BFS_LEVEL_INFINITY) {
-              graph.getData (dst, Galois::MethodFlag::UNPROTECTED) = up.srcLevel + 1;
+              graph.getData (dst, galois::MethodFlag::UNPROTECTED) = up.srcLevel + 1;
               wl.push (Update (dst, up.srcLevel + 1));
               // wl.push_back (dst);
             }
           },
-          Galois::MethodFlag::UNPROTECTED);
+          galois::MethodFlag::UNPROTECTED);
 
     }
   };
@@ -100,15 +100,15 @@ protected:
 
   virtual size_t runBFS (Graph& graph, GNode& startNode) {
 
-    // typedef Galois::WorkList::BulkSynchronousInline<> WL_ty;
+    // typedef galois::WorkList::BulkSynchronousInline<> WL_ty;
 
     ParCounter numAdds;
-    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
+    graph.getData (startNode, galois::MethodFlag::UNPROTECTED) = 0;
 
     Update init[] = { Update (startNode, 0) };
 
-    // Galois::for_each (startNode, OpFunc (graph), Galois::wl<WL_ty> ());
-    Galois::Runtime::for_each_bs (Galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), PftchFunc (graph));
+    // galois::for_each (startNode, OpFunc (graph), galois::wl<WL_ty> ());
+    galois::Runtime::for_each_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), PftchFunc (graph));
 
     return numAdds.reduce ();
   }

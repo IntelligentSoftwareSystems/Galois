@@ -30,7 +30,7 @@ struct Reducer {
 };
 
 struct LocateCoarsenEdges {
-  Galois::GReducible<EdgeMap, Updater>* pg;
+  galois::GReducible<EdgeMap, Updater>* pg;
   Graph& fg;
   KeyAltTy key;
 
@@ -64,9 +64,9 @@ struct LocateCoarsenEdges {
   }
 
   EdgeMap collect() {
-    Galois::GReducible<EdgeMap, Updater> E;
+    galois::GReducible<EdgeMap, Updater> E;
     pg = &E;
-    Galois::do_all_local(fg, *this, Galois::do_all_steal<true>());
+    galois::do_all_local(fg, *this, galois::do_all_steal<true>());
     return E.reduce(Reducer());
   }
 };

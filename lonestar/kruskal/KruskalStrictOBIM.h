@@ -48,7 +48,7 @@ namespace kruskal {
 class KruskalStrictOBIM: public Kruskal {
   protected:
 
-  typedef Galois::Graph::FirstGraph<void,void,false> Graph;
+  typedef galois::Graph::FirstGraph<void,void,false> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> VecLocks;
 
@@ -143,7 +143,7 @@ class KruskalStrictOBIM: public Kruskal {
     Graph graph;
     VecLocks locks;
     locks.resize(numNodes);
-    Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(numNodes), [&](size_t i) {
+    galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(numNodes), [&](size_t i) {
       locks[i] = graph.createNode();
       graph.addNode(locks[i]);
     });
@@ -156,18 +156,18 @@ class KruskalStrictOBIM: public Kruskal {
     FindLoopSpec findLoop (graph, locks, repVec, findIter);
     LinkUpLoopSpec linkUpLoop (repVec, mstSum, linkUpIter);
 
-    Galois::TimeAccumulator runningTime;
+    galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    typedef Galois::WorkList::OrderedByIntegerMetric<GetWeight, Galois::WorkList::ChunkedFIFO<128>>::with_barrier<true>::type WL;
-    Galois::for_each(edges.begin(), edges.end(),
-        [&](const Edge& e, Galois::UserContext<Edge>& ctx) {
+    typedef galois::WorkList::OrderedByIntegerMetric<GetWeight, galois::WorkList::ChunkedFIFO<128>>::with_barrier<true>::type WL;
+    galois::for_each(edges.begin(), edges.end(),
+        [&](const Edge& e, galois::UserContext<Edge>& ctx) {
           findLoop(e, ctx);
           linkUpLoop(e, ctx);
-    }, Galois::wl<WL>());
-    //}, Galois::wl<Galois::WorkList::StableIterator<>>());
-    //Galois::Runtime::for_each_ordered_level (
-    //    Galois::Runtime::makeStandardRange (edges.begin (), edges.end ()),
+    }, galois::wl<WL>());
+    //}, galois::wl<galois::WorkList::StableIterator<>>());
+    //galois::Runtime::for_each_ordered_level (
+    //    galois::Runtime::makeStandardRange (edges.begin (), edges.end ()),
     //    GetWeight (), std::less<Weight_ty> (), findLoop, linkUpLoop);
 
     runningTime.stop ();

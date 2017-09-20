@@ -24,7 +24,7 @@
 #ifndef GALOIS_METHODFLAGS_H
 #define GALOIS_METHODFLAGS_H
 
-namespace Galois {
+namespace galois {
 
 /** 
  * What should the runtime do when executing a method.

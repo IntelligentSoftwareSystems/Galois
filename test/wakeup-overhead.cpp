@@ -10,7 +10,7 @@
 #include <iostream>
 #include <vector>
 
-typedef Galois::GAccumulator<double> AccumDouble;
+typedef galois::GAccumulator<double> AccumDouble;
 
 namespace cll = llvm::cl;
 
@@ -19,28 +19,28 @@ static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(
 static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(1));
 
 void runDoAllBurn(size_t num) {
-  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+  galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   for (int r = 0; r < rounds; ++r) {
-    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+    galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
                    [&](int i) { asm volatile("" ::: "memory"); });
   }
 
-  Galois::Substrate::getThreadPool().beKind();
+  galois::Substrate::getThreadPool().beKind();
 }
 
 void runDoAll(size_t num) {
   for (int r = 0; r < rounds; ++r) {
-    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+    galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
         [&](int i) { asm volatile("" ::: "memory"); });
   }
 }
 
 void runExplicitThread(size_t num) {
-  Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
+  galois::Substrate::Barrier& barrier = galois::Runtime::getBarrier(galois::Runtime::activeThreads);
   
-  Galois::on_each([&](unsigned tid, unsigned total) {
-      auto range = Galois::block_range(
+  galois::on_each([&](unsigned tid, unsigned total) {
+      auto range = galois::block_range(
                                        boost::counting_iterator<int>(0), boost::counting_iterator<int>(num), 
                                        tid, total);
       for (int r = 0; r < rounds; ++r) {
@@ -53,7 +53,7 @@ void runExplicitThread(size_t num) {
 }
 
 void run(std::function<void(size_t)> fn, std::string name) {
-  Galois::Timer t;
+  galois::Timer t;
   t.start();
   fn(size);
   t.stop();
@@ -65,14 +65,14 @@ std::atomic<int> EXIT;
 
 int main(int argc, char* argv[]) {
   LonestarStart(argc, argv, 0, 0, 0);
-  Galois::setActiveThreads(std::max(Galois::getActiveThreads(), 2U));
+  galois::setActiveThreads(std::max(galois::getActiveThreads(), 2U));
 
   EXIT = 0;
   std::function<void(void)> f = [] () { while (!EXIT) { std::cerr << "."; std::this_thread::sleep_for(std::chrono::milliseconds(100)); } };
-  Galois::Substrate::getThreadPool().runDedicated(f);
+  galois::Substrate::getThreadPool().runDedicated(f);
 
   std::cout
-    << "threads: " << Galois::getActiveThreads() 
+    << "threads: " << galois::getActiveThreads() 
     << " rounds: " << rounds
     << " size: " << size << "\n";
 

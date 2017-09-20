@@ -34,7 +34,7 @@
 #ifndef GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 #define GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 inline static void asmPause() {
@@ -90,6 +90,6 @@ inline static void flushInstructionPipeline() {
 #endif
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

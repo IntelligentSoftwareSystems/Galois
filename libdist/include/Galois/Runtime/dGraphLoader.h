@@ -119,7 +119,7 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 2> Graph_cartesianCut_overDecomposeBy2;
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 4> Graph_cartesianCut_overDecomposeBy4;
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   
   switch(partitionScheme) {
     case OEC:
@@ -179,7 +179,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 2> Graph_cartesianCut_overDecomposeBy2;
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, false, 4> Graph_cartesianCut_overDecomposeBy4;
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   
   switch(partitionScheme) {
     case OEC:
@@ -256,7 +256,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, false, 2> Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, false, 4> Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
 
   switch(partitionScheme) {
     case OEC:

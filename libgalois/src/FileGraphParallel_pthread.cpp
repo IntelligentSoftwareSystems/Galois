@@ -35,7 +35,7 @@
 
 #include <pthread.h>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
@@ -54,13 +54,13 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
 
   // Interleave across all NUMA nodes
   // FileGraphAllocator fn { lock, cond, this, sizeofEdgeData, maxPackages, count };
-  Galois::Runtime::getThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
-    unsigned tid = Galois::Runtime::LL::getTID();
+  galois::Runtime::getThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
+    unsigned tid = galois::Runtime::LL::getTID();
     if (pthread_mutex_lock(&lock))
       GALOIS_DIE("PTHREAD");
 
-    if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageInByNode(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
+    if (galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
+      pageInByNode(galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
       if (--count == 0) {
         if (pthread_cond_broadcast(&cond))
           GALOIS_DIE("PTHREAD");

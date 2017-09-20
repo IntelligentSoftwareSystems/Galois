@@ -7,7 +7,7 @@
 
 #include <memory>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 SharedMemSubstrate::SharedMemSubstrate(void) {
   internal::setThreadPool(&m_tpool);

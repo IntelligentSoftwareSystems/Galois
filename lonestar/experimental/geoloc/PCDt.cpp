@@ -27,7 +27,7 @@ struct TNode {
 	char state;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<TNode, int> Graph;
+typedef galois::Graph::LC_CSR_Graph<TNode, int> Graph;
 typedef Graph::GraphNode GNode;
 static const unsigned int DIST_INFINITY = std::numeric_limits<unsigned int>::max();
 
@@ -38,10 +38,10 @@ static cll::opt<std::string> filename( cll::Positional, cll::desc( "<input file>
 Graph graph;
 
 struct Initialize {
-        Galois::GAccumulator<int>& accum_set_size;
-        Initialize( Galois::GAccumulator<int>& accum_set_size ): accum_set_size( accum_set_size ) { }
+        galois::GAccumulator<int>& accum_set_size;
+        Initialize( galois::GAccumulator<int>& accum_set_size ): accum_set_size( accum_set_size ) { }
 
-        void operator()( const GNode& n, Galois::UserContext<GNode>& ctx ) const {
+        void operator()( const GNode& n, galois::UserContext<GNode>& ctx ) const {
                 TNode& node = graph.getData( n );
 
                 if ( rand() % 100  > PROBABILITY_WITHIN_U ) {
@@ -102,10 +102,10 @@ printf( "\n" );
 struct EstimateLocation 
 {
 	Graph& g;
-	Galois::GAccumulator<int>& accum_set_size;
-	EstimateLocation( Graph& g, Galois::GAccumulator<int>& accum_set_size ): g( g ), accum_set_size( accum_set_size ) { }
+	galois::GAccumulator<int>& accum_set_size;
+	EstimateLocation( Graph& g, galois::GAccumulator<int>& accum_set_size ): g( g ), accum_set_size( accum_set_size ) { }
 
-	void operator()( const GNode& n, Galois::UserContext<GNode>& ctx ) const {
+	void operator()( const GNode& n, galois::UserContext<GNode>& ctx ) const {
 		TNode& node = g.getData( n );
 
 		Location sum_num;		// sum for the numerator
@@ -202,31 +202,31 @@ int main( int argc, char** argv )
     		return 1;
   	}
 
-//	Galois::StatManager statManager;
+//	galois::StatManager statManager;
 //  	LonestarStart( argc, argv, 0, 0, 0 );
-	Galois::Timer T;
+	galois::Timer T;
 
   	unsigned int numThreads = atoi( argv[ 1 ] );
   	int n = atoi( argv[ 1 ] );
 
-  	numThreads = Galois::setActiveThreads( numThreads );
+  	numThreads = galois::setActiveThreads( numThreads );
   	std::cout << "Using " << numThreads << " threads and " << argv[2] << " graph\n";
 
 	char *filename = argv[2];
 
 	srand( time( NULL ) );
-	Galois::GAccumulator<int> accum_set_size;
-	Galois::Graph::readGraph( graph, filename );
-	Galois::for_each( graph.begin(), graph.end(), Initialize( accum_set_size ) );
-	//Galois::for_each_local( graph, Initialize( accum_set_size ) );
+	galois::GAccumulator<int> accum_set_size;
+	galois::Graph::readGraph( graph, filename );
+	galois::for_each( graph.begin(), graph.end(), Initialize( accum_set_size ) );
+	//galois::for_each_local( graph, Initialize( accum_set_size ) );
 
 	T.start();
-  	// Unlike Galois::for_each, Galois::for_each_local initially assigns work
-	// based on which thread created each node (Galois::for_each uses a simple
+  	// Unlike galois::for_each, galois::for_each_local initially assigns work
+	// based on which thread created each node (galois::for_each uses a simple
  	// blocking of the iterator range to initialize work, but the iterator order
   	// of a Graph is implementation-defined). 
 	for ( int iteration = 0; iteration < NUMBER_OF_ITERATIONS; ++iteration ) {
-		Galois::for_each_local( graph, EstimateLocation( graph, accum_set_size ) );
+		galois::for_each_local( graph, EstimateLocation( graph, accum_set_size ) );
 	}
 	T.stop();
 

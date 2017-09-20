@@ -95,12 +95,12 @@ struct InitializeGraph2 {
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    Galois::do_all_local(
+    galois::do_all_local(
       nodesWithEdges,
       InitializeGraph2{ &_graph },
-      Galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-      Galois::do_all_steal<true>(),
-      Galois::timeit()
+      galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
+      galois::do_all_steal<true>(),
+      galois::timeit()
     );
   }
 
@@ -114,7 +114,7 @@ struct InitializeGraph2 {
       GNode dest_node = graph->getEdgeDst(current_edge);
 
       NodeData& dest_data = graph->getData(dest_node);
-      Galois::atomicAdd(dest_data.current_degree, (uint32_t)1);
+      galois::atomicAdd(dest_data.current_degree, (uint32_t)1);
     }
   }
 };
@@ -130,11 +130,11 @@ struct InitializeGraph1 {
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
-    Galois::do_all(
+    galois::do_all(
       allNodes.begin(), allNodes.end(),
       InitializeGraph1{ &_graph },
-      Galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-      Galois::timeit()
+      galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
+      galois::timeit()
     );
 
     // degree calculation
@@ -154,13 +154,13 @@ struct KCoreStep1 {
   cll::opt<uint32_t>& local_k_core_num;
   Graph* graph;
 
-  Galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
   KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph,
-             Galois::DGAccumulator<unsigned int>& _dga) : 
+             galois::DGAccumulator<unsigned int>& _dga) : 
     local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, Galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
     auto& allNodes = _graph.allNodesRange();
@@ -169,19 +169,19 @@ struct KCoreStep1 {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      Galois::do_all_local(
+      galois::do_all_local(
         allNodes,
         KCoreStep1{ k_core_num, &_graph, dga },
-        Galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
-        Galois::do_all_steal<true>(),
-        Galois::timeit()
+        galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
+        galois::do_all_steal<true>(),
+        galois::timeit()
       );
 
       iterations++;
     } while ((iterations < maxIterations) && dga.reduce());
 
-    if (Galois::Runtime::getSystemNetworkInterface().ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", 
+    if (galois::Runtime::getSystemNetworkInterface().ID == 0) {
+      galois::Runtime::reportStat("(NULL)", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations, 0);
     }
@@ -219,17 +219,17 @@ struct KCoreStep1 {
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G(getStatsFile());
+    galois::DistMemSys G(getStatsFile());
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportStat("(NULL)", "Max Iterations", 
+      galois::Runtime::reportStat("(NULL)", "Max Iterations", 
                                   (unsigned long)maxIterations, 0);
     }
 
-    Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
+    galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -255,14 +255,14 @@ int main(int argc, char** argv) {
       InitializeGraph1::go((*h_graph));
     StatTimer_graph_init.stop();
 
-    Galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-    Galois::DGAccumulator<uint64_t> dga1;
-    Galois::DGAccumulator<uint64_t> dga2;
+    galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+    galois::DGAccumulator<uint64_t> dga1;
+    galois::DGAccumulator<uint64_t> dga2;
 
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] KCoreStep1::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
-      Galois::StatTimer StatTimer_main(timer_str.c_str());
+      galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
         KCoreStep1::go(*h_graph, DGAccumulator_accum);
@@ -273,7 +273,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        Galois::Runtime::getHostBarrier().wait();
+        galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run+1);
 
         InitializeGraph1::go((*h_graph));
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
       for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
         if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
           // prints the flag (alive/dead)
-          Galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+          galois::Runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
                                        (bool)(*h_graph).getData(*ii).flag);
 
 
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
         } 
       }
     }
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
 
     return 0;
   } catch(const char* c) {

@@ -61,7 +61,7 @@ struct Node {
   Node() : dist(std::numeric_limits<unsigned>::max() - 1) { }
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node, uint32_t> Graph;
+typedef galois::Graph::LC_CSR_Graph<Node, uint32_t> Graph;
 typedef Graph::GraphNode GNode;
 
 class Synchronizer {
@@ -300,9 +300,9 @@ public:
             }
 
             // Relax each light edge. 
-            unsigned u_dist = g.getData(u, Galois::MethodFlag::UNPROTECTED).dist;
-            for (Graph::edge_iterator ii = g.edge_begin(u, Galois::MethodFlag::UNPROTECTED),
-                ei = g.edge_end(u, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+            unsigned u_dist = g.getData(u, galois::MethodFlag::UNPROTECTED).dist;
+            for (Graph::edge_iterator ii = g.edge_begin(u, galois::MethodFlag::UNPROTECTED),
+                ei = g.edge_end(u, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
               unsigned w = g.getEdgeData(ii);
               if (w <= delta) // light edge
                 relax(u, *ii, u_dist + w);
@@ -329,9 +329,9 @@ public:
            iter != deleted_vertices.end(); ++iter) {
         // Relax each heavy edge. 
         GNode u = *iter;
-        unsigned u_dist = g.getData(u, Galois::MethodFlag::UNPROTECTED).dist;
-        for (Graph::edge_iterator ii = g.edge_begin(u, Galois::MethodFlag::UNPROTECTED),
-            ei = g.edge_end(u, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+        unsigned u_dist = g.getData(u, galois::MethodFlag::UNPROTECTED).dist;
+        for (Graph::edge_iterator ii = g.edge_begin(u, galois::MethodFlag::UNPROTECTED),
+            ei = g.edge_end(u, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           unsigned w = g.getEdgeData(ii);
           if (w > delta) // heavy edge
             relax(u, *ii, u_dist + w);
@@ -351,7 +351,7 @@ public:
             << v << ", "
             << x << ")" << std::endl;
 #endif
-    if (x < g.getData(v, Galois::MethodFlag::UNPROTECTED).dist) { 
+    if (x < g.getData(v, galois::MethodFlag::UNPROTECTED).dist) { 
       // We're relaxing the edge to vertex v.
       if (sync.isLocal(id, v)) {
         // Compute the new bucket index for v
@@ -363,12 +363,12 @@ public:
         // Make sure that we have allocated the bucket itself.
         if (!buckets[new_index]) buckets[new_index] = new Bucket;
 
-        if (g.getData(v, Galois::MethodFlag::UNPROTECTED).dist != std::numeric_limits<unsigned>::max() - 1
+        if (g.getData(v, galois::MethodFlag::UNPROTECTED).dist != std::numeric_limits<unsigned>::max() - 1
             && !vertex_was_deleted[v]) {
           // We're moving v from an old bucket into a new one. Compute
           // the old index, then splice it in.
           BucketIndex old_index 
-            = static_cast<BucketIndex>(g.getData(v, Galois::MethodFlag::UNPROTECTED).dist / delta);
+            = static_cast<BucketIndex>(g.getData(v, galois::MethodFlag::UNPROTECTED).dist / delta);
           buckets[new_index]->splice(buckets[new_index]->end(),
                                      *buckets[old_index],
                                      position_in_bucket[v]);
@@ -383,7 +383,7 @@ public:
         --position_in_bucket[v];
 
         // Update predecessor and tentative distance information
-        g.getData(v, Galois::MethodFlag::UNPROTECTED).dist = x;
+        g.getData(v, galois::MethodFlag::UNPROTECTED).dist = x;
       } else {
         sync.sendRequest(id, u, v, x);
       }
@@ -444,18 +444,18 @@ public:
 };
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "Using " << numThreads << " threads\n";
 
   DeltaStepping p(g, startNode, 1 << stepShift, numThreads);
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   p.run();
   T.stop();

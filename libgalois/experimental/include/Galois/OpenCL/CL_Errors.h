@@ -45,7 +45,7 @@ extern "C" {
 
 #ifndef CL_ERROR_HANDLER_H_
 #define CL_ERROR_HANDLER_H_
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 
@@ -218,15 +218,15 @@ inline float toMB(long long b){
 }
 inline void check_context(cl_context & ctx) {
    cl_uint ref_count;
-   Galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_REFERENCE_COUNT, sizeof(cl_uint), &ref_count, 0), "Ref count failed");
+   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_REFERENCE_COUNT, sizeof(cl_uint), &ref_count, 0), "Ref count failed");
    std::cout << "CheckCtx : RefCount[" << ref_count << "]";
    cl_device_id devices[10];
    size_t num_devs;
-   Galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sizeof(cl_device_id) * 10, devices, &num_devs), "Dev count failed");
+   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sizeof(cl_device_id) * 10, devices, &num_devs), "Dev count failed");
    std::cout << ", NumDev[" << num_devs << "]";
    cl_context_properties properties[10];
    size_t num_props;
-   Galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_PROPERTIES, sizeof(cl_context_properties) * 10, properties, &num_props), "Ref count failed");
+   galois::OpenCL::CHECK_CL_ERROR(clGetContextInfo(ctx, CL_CONTEXT_PROPERTIES, sizeof(cl_context_properties) * 10, properties, &num_props), "Ref count failed");
    std::cout << ", NumProps[" << num_props << "], ";
 }
 /**********************************************************************

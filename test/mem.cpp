@@ -1,8 +1,8 @@
 #include "Galois/Runtime/Mem.h"
 #include "Galois/gIO.h"
 
-using namespace Galois::Runtime;
-using namespace Galois::Substrate;
+using namespace galois::Runtime;
+using namespace galois::Substrate;
 
 struct element {
   unsigned val;

@@ -28,7 +28,7 @@
 
 #include "Galois/Runtime/TreeExec.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname) {
@@ -36,4 +36,4 @@ void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois

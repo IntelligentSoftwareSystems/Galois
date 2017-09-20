@@ -58,13 +58,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(blockedasync, "Blocked Asynchronous"),
       clEnumValEnd), cll::init(blockedasync));
 
-struct Node: public Galois::UnionFindNode<Node> {
-  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
+struct Node: public galois::UnionFindNode<Node> {
+  Node(): galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
   Node* component() { return find(); }
   void setComponent(Node* n) { m_component = n; }
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Node,void>
+typedef galois::Graph::LC_Linear_Graph<Node,void>
   ::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
@@ -78,7 +78,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 
 typedef std::pair<GNode,GNode> Edge;
 
-Galois::InsertBag<Edge> mst;
+galois::InsertBag<Edge> mst;
 
 /** 
  * Construct a spanning forest via a modified BFS algorithm. Intended as a
@@ -90,10 +90,10 @@ Galois::InsertBag<Edge> mst;
 struct DemoAlgo {
   Node* root;
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    for (auto ii : graph.edges(src, Galois::MethodFlag::WRITE)) {
+  void operator()(GNode src, galois::UserContext<GNode>& ctx) {
+    for (auto ii : graph.edges(src, galois::MethodFlag::WRITE)) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       if (ddata.component() == root)
         continue;
       ddata.setComponent(root);
@@ -106,7 +106,7 @@ struct DemoAlgo {
     Graph::iterator ii = graph.begin(), ei = graph.end();
     if (ii != ei) {
       root = &graph.getData(*ii);
-      Galois::for_each(*ii, *this);
+      galois::for_each(*ii, *this);
     }
   }
 };
@@ -116,14 +116,14 @@ struct DemoAlgo {
  */
 struct AsyncAlgo {
   struct Merge {
-    Galois::Statistic& emptyMerges;
-    Merge(Galois::Statistic& e): emptyMerges(e) { }
+    galois::Statistic& emptyMerges;
+    Merge(galois::Statistic& e): emptyMerges(e) { }
 
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (sdata.merge(&ddata)) {
           mst.push(std::make_pair(src, dst));
         } else {
@@ -136,16 +136,16 @@ struct AsyncAlgo {
   //! Normalize component by doing find with path compression
   struct Normalize {
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       sdata.setComponent(sdata.findAndCompress());
     }
   };
 
   void operator()() {
-    Galois::Statistic emptyMerges("EmptyMerges");
-    Galois::do_all_local(graph, Merge(emptyMerges),
-        Galois::loopname("Merge"), Galois::do_all_steal<true>());
-    Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
+    galois::Statistic emptyMerges("EmptyMerges");
+    galois::do_all_local(graph, Merge(emptyMerges),
+        galois::loopname("Merge"), galois::do_all_steal<true>());
+    galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
   }
 };
 
@@ -161,17 +161,17 @@ struct BlockedAsyncAlgo {
   struct Merge {
     typedef int tt_does_not_need_aborts;
 
-    Galois::InsertBag<WorkItem>& items;
+    galois::InsertBag<WorkItem>& items;
 
     //! Add the next edge between components to the worklist
     template<bool MakeContinuation, int Limit, typename Pusher>
     void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       int count = 0;
-      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         ++count;
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (sdata.merge(&ddata)) {
           mst.push(std::make_pair(src, dst));
           if (Limit == 0 || count != Limit)
@@ -187,15 +187,15 @@ struct BlockedAsyncAlgo {
     }
 
     void operator()(const GNode& src) const {
-      Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
-      if (Galois::Substrate::ThreadPool::getPackage() == 0) {
+      Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+      if (galois::Substrate::ThreadPool::getPackage() == 0) {
         process<true, 0>(src, start, items);
       } else {
         process<true, 1>(src, start, items);
       }
     }
 
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       process<true, 0>(item.src, item.start, ctx);
     }
   };
@@ -203,18 +203,18 @@ struct BlockedAsyncAlgo {
   //! Normalize component by doing find with path compression
   struct Normalize {
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       sdata.setComponent(sdata.findAndCompress());
     }
   };
 
   void operator()() {
-    Galois::InsertBag<WorkItem> items;
+    galois::InsertBag<WorkItem> items;
     Merge merge = { items };
-    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"));
-    Galois::for_each_local(items, merge,
-        Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
-    Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
+    galois::do_all_local(graph, merge, galois::loopname("Initialize"));
+    galois::for_each_local(items, merge,
+        galois::loopname("Merge"), galois::wl<galois::WorkList::dChunkedFIFO<128> >());
+    galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
   }
 };
 
@@ -241,7 +241,7 @@ struct is_bad_mst {
 
 struct CheckAcyclic {
   struct Accum {
-    Galois::GAccumulator<unsigned> roots;
+    galois::GAccumulator<unsigned> roots;
   };
 
   Accum* accum;
@@ -255,7 +255,7 @@ struct CheckAcyclic {
   bool operator()() {
     Accum a;
     accum = &a;
-    Galois::do_all_local(graph, *this);
+    galois::do_all_local(graph, *this);
     unsigned numRoots = a.roots.reduce();
     unsigned numEdges = std::distance(mst.begin(), mst.end());
     if (graph.size() - numRoots != numEdges) {
@@ -272,8 +272,8 @@ struct CheckAcyclic {
 };
 
 bool verify() {
-  if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
-    if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
+  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
+    if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
       CheckAcyclic c;
       return c();
     }
@@ -285,31 +285,31 @@ template<typename Algo>
 void run() {
   Algo algo;
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   algo();
   T.stop();
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer Tinitial("InitializeTime");
+  galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
-  Galois::Graph::readGraph(graph, inputFilename);
+  galois::Graph::readGraph(graph, inputFilename);
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 
-  //Galois::preAlloc(numThreads + graph.size() / Galois::Runtime::MM::hugePageSize * 60);
-  Galois::reportPageAlloc("MeminfoPre");
+  //galois::preAlloc(numThreads + graph.size() / galois::Runtime::MM::hugePageSize * 60);
+  galois::reportPageAlloc("MeminfoPre");
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
     case asynchronous: run<AsyncAlgo>(); break;
     case blockedasync: run<BlockedAsyncAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify()) {
     std::cerr << "verification failed\n";

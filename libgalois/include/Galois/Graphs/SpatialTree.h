@@ -30,7 +30,7 @@
 #ifndef GALOIS_GRAPH_SPATIALTREE_H
 #define GALOIS_GRAPH_SPATIALTREE_H
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 //! Stores sets of objects at specific spatial coordinates in a quad tree.
@@ -84,7 +84,7 @@ class SpatialTree2d {
     }
   };
 
-  Galois::Runtime::FixedSizeAllocator<Node> nodeAlloc;
+  galois::Runtime::FixedSizeAllocator<Node> nodeAlloc;
   
   Node* root;
   Box2d bounds;

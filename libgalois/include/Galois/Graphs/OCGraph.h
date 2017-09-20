@@ -43,7 +43,7 @@
 #include <type_traits>
 #include <string>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -341,7 +341,7 @@ public:
   };
 
 private:
-  Galois::optional<segment_type> memorySegment;
+  galois::optional<segment_type> memorySegment;
 
   segment_type computeSegment(size_t startNode, size_t numEdges) {
     typedef typename OCFileGraph::edge_offset_iterator edge_offset_iterator;
@@ -381,7 +381,7 @@ private:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    Galois::Runtime::acquire(&nodeData[N], mflag);
+    galois::Runtime::acquire(&nodeData[N], mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -402,7 +402,7 @@ public:
   }
 
   void keepInMemory() {
-    memorySegment = Galois::optional<segment_type>(computeSegment(0, numEdges));
+    memorySegment = galois::optional<segment_type>(computeSegment(0, numEdges));
     load(*memorySegment, LazyObject<EdgeTy>::size_of::value);
   }
 
@@ -445,14 +445,14 @@ public:
   iterator end(const segment_type& cur) { return cur.nodeEnd; }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
   edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return outGraph.getEdgeData<EdgeTy>(segment.out, ni);
   }
 
@@ -473,7 +473,7 @@ public:
 
   edge_iterator edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = outGraph.edge_begin(N), ee = outGraph.edge_end(N); ii != ee; ++ii) {
         acquireNode(outGraph.getEdgeDst(segment.out, *ii), mflag);
       }
@@ -487,7 +487,7 @@ public:
   }
 
   edge_data_reference getInEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return inGraph->getEdgeData<EdgeTy>(segment.in, ni);
   }
 
@@ -497,7 +497,7 @@ public:
 
   in_edge_iterator in_edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (in_edge_iterator ii = inGraph->edge_begin(N), ee = inGraph->edge_end(N); ii != ee; ++ii) {
         acquireNode(inGraph->getEdgeDst(segment.in, ii), mflag);
       }

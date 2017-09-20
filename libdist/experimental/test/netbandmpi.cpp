@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
   for (int s = 10 ; s < trials; s*=1.1) {
     std::vector<char> vec(s);
-    Galois::Timer T1, T2, T3;
+    galois::Timer T1, T2, T3;
     MPI_Barrier(MPI_COMM_WORLD);
     T3.start();
     T1.start();

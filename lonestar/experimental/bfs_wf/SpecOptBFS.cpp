@@ -49,13 +49,13 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_kdg_spec_local_min (
-        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::Runtime::for_each_ordered_kdg_spec_local_min (
+        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFuncLocalMin (graph, numIter),
         std::make_tuple (
-          Galois::loopname ("bfs_spec_local_min")));
+          galois::loopname ("bfs_spec_local_min")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

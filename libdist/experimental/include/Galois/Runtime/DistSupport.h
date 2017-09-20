@@ -28,7 +28,7 @@
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/RemotePointer.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 
@@ -51,7 +51,7 @@ T* resolve(const gptr<T>& p) {
 
   if (inGaloisForEach) {
     try {
-      acquire(obj, Galois::MethodFlag::ALL);
+      acquire(obj, galois::MethodFlag::ALL);
       return static_cast<T*>(obj);
     } catch (const conflict_ex& ex) {
       if (isAcquiredBy(obj, &getSystemDirectory())) {
@@ -126,6 +126,6 @@ void transientRelease(const gptr<T>& p) {
 #endif
 
 } //namespace Runtime
-} //namespace Galois
+} //namespace galois
 
 #endif //DISTSUPPORT

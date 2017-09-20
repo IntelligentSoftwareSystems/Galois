@@ -50,7 +50,7 @@
 #include <string>
 #include <fstream>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 enum ResolveFlag {INV=0, RO=1, RW=2, UP_RO=3, UP_RW=4};
@@ -459,7 +459,7 @@ void BaseDirectory::typeHelperImpl<T>::request(uint32_t dest, fatPointer ptr, ui
 
 struct remote_ex {
   fatPointer ptr;
-  Galois::MethodFlag flag;
+  galois::MethodFlag flag;
   void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag);
   void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag);
 };
@@ -487,10 +487,10 @@ inline void dump_dirs_to_file(RecvBuffer&) {
 
 } // namespace Runtime
 
-} // namespace Galois
+} // namespace galois
 
 template<typename T>
-void Galois::Runtime::detail::recvObject(RecvBuffer& buf) {
+void galois::Runtime::detail::recvObject(RecvBuffer& buf) {
   fatPointer ptr;
   ResolveFlag flag;
   gDeserialize(buf, ptr, flag);
@@ -501,7 +501,7 @@ void Galois::Runtime::detail::recvObject(RecvBuffer& buf) {
 }
 
 template<typename T>
-void Galois::Runtime::detail::recvRequest(RecvBuffer& buf) {
+void galois::Runtime::detail::recvRequest(RecvBuffer& buf) {
   fatPointer ptr;
   uint32_t dest;
   ResolveFlag flag;

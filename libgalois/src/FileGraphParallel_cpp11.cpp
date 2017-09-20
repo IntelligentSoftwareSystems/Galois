@@ -36,7 +36,7 @@
 #include <mutex>
 #include <condition_variable>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {

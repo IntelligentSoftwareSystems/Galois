@@ -32,7 +32,7 @@
 #include "Galois/Runtime/DistSupport.h"
 #include "Galois/Runtime/PerHostStorage.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
@@ -44,7 +44,7 @@ void for_each_landing_pad(RecvBuffer& buf) {
   gDeserialize(buf,f,data,loopname);
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
+  galois::Runtime::for_each_impl<WLTy>(galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
 
   // place a MPI barrier here for all the hosts to synchronize
   //net.systemBarrier();
@@ -59,7 +59,7 @@ void for_each_local_landing_pad(RecvBuffer& buf) {
   gDeserialize(buf,f,r,loopname);
 
   //Start locally
-  Galois::Runtime::for_each_impl<WLTy>(r, f, loopname.c_str());
+  galois::Runtime::for_each_impl<WLTy>(r, f, loopname.c_str());
   
   // place a MPI barrier here for all the hosts to synchronize
   //net.systemBarrier();
@@ -146,7 +146,7 @@ void for_each_dist(const StandardRange<IterTy>& r, const FunctionTy& f, const ch
   auto myblk = block_range(allData.begin(), allData.end(), 0, NetworkInterface::Num);
 
   //Start locally
-  for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
+  for_each_impl<WLTy>(galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
   // net.systemBarrier();
@@ -247,7 +247,7 @@ FunctionTy do_all_dist(const StandardRange<IterTy>& r, const FunctionTy& f, cons
 
   //Start locally
   //FIXME: reduce r
-  return do_all_impl(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
+  return do_all_impl(galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
   // net.systemBarrier();
@@ -319,7 +319,7 @@ struct preAlloc_helper {
 
   void operator()(unsigned, unsigned n) {
     int a = n; a = (num + a - 1) / a;
-    Galois::Runtime::MM::pagePreAlloc(a); 
+    galois::Runtime::MM::pagePreAlloc(a); 
   }
 };
 

@@ -30,8 +30,8 @@
 
 #include "Galois/Galois.h"
 
-Galois::SharedMemSys::SharedMemSys(void)
-  : Galois::Runtime::SharedMemRuntime<Galois::Runtime::StatManager>()
+galois::SharedMemSys::SharedMemSys(void)
+  : galois::Runtime::SharedMemRuntime<galois::Runtime::StatManager>()
 { } 
 
-Galois::SharedMemSys::~SharedMemSys(void) {}
+galois::SharedMemSys::~SharedMemSys(void) {}

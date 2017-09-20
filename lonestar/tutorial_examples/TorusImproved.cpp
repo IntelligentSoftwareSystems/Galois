@@ -33,7 +33,7 @@
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed
-typedef Galois::Graph::FirstGraph<int,void,true> Graph;
+typedef galois::Graph::FirstGraph<int,void,true> Graph;
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
 
@@ -43,7 +43,7 @@ struct IncrementNeighbors {
   IncrementNeighbors(Graph& g): g(g) { }
 
   //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
     // For each outgoing edge (n, dst)
     //for (auto ii : g.edges(n)) {
     for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
@@ -129,7 +129,7 @@ void constructTorus(Graph& g, int height, int width) {
 
   // Using space-filling order, assign nodes and create (and allocate) them in parallel
   std::vector<GNode> nodes(numNodes);
-  Galois::do_all(points.begin(), points.end(), CreateNodes(g, nodes, height));
+  galois::do_all(points.begin(), points.end(), CreateNodes(g, nodes, height));
 
   // Add edges
   for (int x = 0; x < width; ++x) {
@@ -157,19 +157,19 @@ int main(int argc, char** argv) {
 
   GALOIS_ASSERT(n > 2);
 
-  numThreads = Galois::setActiveThreads(numThreads);
+  numThreads = galois::setActiveThreads(numThreads);
   std::cout << "Using " << numThreads << " threads and " << n << " x " << n << " torus\n";
 
   Graph graph;
   constructTorus(graph, n, n);
 
-  Galois::Timer T;
+  galois::Timer T;
   T.start();
-  // Unlike Galois::for_each, Galois::for_each_local initially assigns work
-  // based on which thread created each node (Galois::for_each uses a simple
+  // Unlike galois::for_each, galois::for_each_local initially assigns work
+  // based on which thread created each node (galois::for_each uses a simple
   // blocking of the iterator range to initialize work, but the iterator order
   // of a Graph is implementation-defined). 
-  Galois::for_each_local(graph, IncrementNeighbors(graph));
+  galois::for_each_local(graph, IncrementNeighbors(graph));
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";

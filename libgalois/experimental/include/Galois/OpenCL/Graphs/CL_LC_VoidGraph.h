@@ -11,7 +11,7 @@
 #ifndef _GDIST_CL_LC_VOID_Graph_H_
 #define _GDIST_CL_LC_VOID_Graph_H_
 
-namespace Galois {
+namespace galois {
    namespace OpenCL {
       namespace Graphs {
 #if 0
@@ -35,7 +35,7 @@ namespace Galois {
             }
 
             void allocate() {
-               auto * ctx = Galois::OpenCL::getCLContext();
+               auto * ctx = galois::OpenCL::getCLContext();
                cl_int err;
                gpu_impl.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
                gpu_impl.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
@@ -74,10 +74,10 @@ namespace Galois {
             }
 
             template<typename GraphType>
-            void prepRecv(GraphType & g, Galois::Runtime::RecvBuffer& buffer) {
+            void prepRecv(GraphType & g, galois::Runtime::RecvBuffer& buffer) {
                CL_Kernel applyKernel;
-               auto * ctx = Galois::OpenCL::getCLContext();
-               auto & net = Galois::Runtime::getSystemNetworkInterface();
+               auto * ctx = galois::OpenCL::getCLContext();
+               auto & net = galois::Runtime::getSystemNetworkInterface();
                cl_command_queue queue = ctx->get_default_device()->command_queue();
                unsigned sender=0;
                const uint32_t counter = 0; // get counters from buffers.
@@ -204,7 +204,7 @@ namespace Galois {
 
             typedef NodeDataWrapper UserNodeDataType;
          protected:
-            Galois::OpenCL::CLContext * ctx = getCLContext();
+            galois::OpenCL::CLContext * ctx = getCLContext();
             //CPU Data
             size_t _num_nodes;
             size_t _num_edges;

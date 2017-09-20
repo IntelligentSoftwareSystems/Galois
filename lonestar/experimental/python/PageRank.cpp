@@ -143,11 +143,11 @@ struct PageRank {
   
   PageRank(Graph& g, PRTy t) : graph(g), tolerance(t) {}
   
-  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
     auto& sdata = graph.getData(src);      
     auto& sResidual = sdata.DAd.vAtomicDouble;
     auto& sValue = sdata.DAd.vDouble;
-    Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+    galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
     
     if (std::abs(sResidual) > tolerance) {
       PRTy oldResidual = sResidual.exchange(0.0);
@@ -171,7 +171,7 @@ struct PageRank {
 void initResidual(Graph& graph) {
 
   //use residual for the partial, scaled initial residual
-  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+  galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
       //contribute residual
       auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
       for (auto ii : graph.edges(src)) {
@@ -180,30 +180,30 @@ void initResidual(Graph& graph) {
         auto& dResidual = ddata.DAd.vAtomicDouble;
         atomicAdd(dResidual, 1.0/nout);
       }
-    }, Galois::do_all_steal<true>());
+    }, galois::do_all_steal<true>());
   //scale residual
-  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+  galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
       auto& dResidual = data.DAd.vAtomicDouble;
       dResidual = dResidual * alpha * (1.0-alpha);
-    }, Galois::do_all_steal<true>());
+    }, galois::do_all_steal<true>());
 }
 
 NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy result) {
-//  Galois::StatManager statManager;
+//  galois::StatManager statManager;
 
-//  Galois::StatTimer T("OverheadTime");
+//  galois::StatTimer T("OverheadTime");
 //  T.start();
 
 //  std::cout << "Running Edge Async version\n";
 //  std::cout << "tolerance: " << tolerance << "\n";
-  Galois::do_all_local(*g, Initialization{*g});
+  galois::do_all_local(*g, Initialization{*g});
   initResidual(*g);
 
-//  Galois::StatTimer Tmain;
+//  galois::StatTimer Tmain;
 //  Tmain.start();  
-  typedef Galois::WorkList::dChunkedFIFO<256> WL;
-  Galois::for_each_local(*g, PageRank{*g, tolerance}, Galois::wl<WL>());
+  typedef galois::WorkList::dChunkedFIFO<256> WL;
+  galois::for_each_local(*g, PageRank{*g, tolerance}, galois::wl<WL>());
 //  Tmain.stop();
   
 //  T.stop();

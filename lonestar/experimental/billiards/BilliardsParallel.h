@@ -8,7 +8,7 @@
 #include "Galois/Graphs/Graph.h"
 
 
-using AddListTy = Galois::PerThreadVector<Event>;
+using AddListTy = galois::PerThreadVector<Event>;
 
 struct VisitNhoodSafetyTest {
   static const unsigned CHUNK_SIZE = 1;
@@ -30,7 +30,7 @@ struct VisitNhoodSafetyTest {
     }
 
     if (!indep) {
-      Galois::Runtime::signalConflict ();
+      galois::Runtime::signalConflict ();
     }
   }
 };
@@ -62,12 +62,12 @@ struct VisitNhoodLocks {
 
     Ball* b1 = e.getBall ();
     assert (b1->getID () < nodes.size ());
-    graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
+    graph.getData (nodes[b1->getID ()], galois::MethodFlag::WRITE);
 
     if (e.getKind () == Event::BALL_COLLISION) {
       Ball* b2 = e.getOtherBall ();
       assert (b2->getID () < nodes.size ());
-      graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
+      graph.getData (nodes[b2->getID ()], galois::MethodFlag::WRITE);
     }
 
   }

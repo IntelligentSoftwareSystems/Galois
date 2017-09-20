@@ -42,7 +42,7 @@ namespace kruskal {
 class KruskalSpec: public Kruskal {
   protected:
 
-  typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
+  typedef galois::Graph::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> VecLocks;
 
@@ -156,14 +156,14 @@ class KruskalSpec: public Kruskal {
     FindLoopSpec findLoop (graph, locks, repVec, findIter);
     LinkUpLoopSpec linkUpLoop (repVec, mstSum, linkUpIter);
 
-    Galois::TimeAccumulator runningTime;
+    galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    // Galois::Runtime::for_each_ordered_optim (
-    Galois::Runtime::for_each_ordered_pessim (
-        Galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
+    // galois::Runtime::for_each_ordered_optim (
+    galois::Runtime::for_each_ordered_pessim (
+        galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
         Edge::Comparator (), findLoop, linkUpLoop,
-        std::make_tuple (Galois::loopname ("kruskal-speculative"), Galois::enable_parameter<false> {}));
+        std::make_tuple (galois::loopname ("kruskal-speculative"), galois::enable_parameter<false> {}));
 
     runningTime.stop ();
 

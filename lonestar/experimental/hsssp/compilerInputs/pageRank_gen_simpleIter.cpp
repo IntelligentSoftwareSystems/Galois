@@ -63,7 +63,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
@@ -76,7 +76,7 @@ struct InitializeGraph {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        galois::atomicAdd(ddata.residual, delta);
       }
     }
   }
@@ -88,7 +88,7 @@ struct PageRank {
 
   PageRank(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"));
+    galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, galois::loopname("pageRank"));
   }
 
   void operator()(GNode src)const {
@@ -101,7 +101,7 @@ struct PageRank {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        galois::atomicAdd(ddata.residual, delta);
       }
     }
   }
@@ -111,8 +111,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
     T_total.start();
 

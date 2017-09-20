@@ -7,7 +7,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/utility.hpp>
 
-namespace Galois {
+namespace galois {
 //! Implementation of GraphChi DSL in Galois
 namespace GraphChi {
 
@@ -51,7 +51,7 @@ public:
       segment_type& p, segment_type& c, segment_type& n):
     graph(g), wrappedGraph(w), op(op), first(f), prev(p), cur(c), next(n), updated(false) { }
 
-  void operator()(size_t n, Galois::UserContext<size_t>&) {
+  void operator()(size_t n, galois::UserContext<size_t>&) {
     (*this)(n);
   }
 
@@ -99,7 +99,7 @@ public:
       segment_type& p, segment_type& c, segment_type& n):
     graph(g), wrappedGraph(w), op(op), bag(b), first(f), prev(p), cur(c), next(n), updated(false) { }
 
-  void operator()(GNode n, Galois::UserContext<GNode>&) {
+  void operator()(GNode n, galois::UserContext<GNode>&) {
     (*this)(n);
   }
 
@@ -150,8 +150,8 @@ template<typename Graph,typename Seg,typename Bag>
 bool any_in_range(Graph& graph, const Seg& cur, Bag* input) {
   return std::find_if(graph.begin(cur), graph.end(cur), contains_node<Graph,Bag>(&graph, input)) != graph.end(cur);
   // TODO(ddn): Figure out the memory leak in ParallelSTL::find_if
-  //return Galois::ParallelSTL::find_if(graph.begin(cur), graph.end(cur), contains_node<Graph>(&graph, input)) != graph.end(cur);
-  //return Galois::ParallelSTL::map_reduce(graph.begin(cur), graph.end(cur), contains_node<Graph,Bag>(&graph, input), false, logical_or());
+  //return galois::ParallelSTL::find_if(graph.begin(cur), graph.end(cur), contains_node<Graph>(&graph, input)) != graph.end(cur);
+  //return galois::ParallelSTL::map_reduce(graph.begin(cur), graph.end(cur), contains_node<Graph,Bag>(&graph, input), false, logical_or());
 }
 
 template<typename Graph>
@@ -184,7 +184,7 @@ bool fitsInMemory(Graph& graph, size_t memoryLimit) {
 template<bool CheckInput, bool PassWrappedGraph, typename Graph, typename WrappedGraph, typename VertexOperator, typename Bag>
 void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input, size_t memoryLimit) {
   typedef typename Graph::segment_type segment_type;
-  Galois::Statistic rounds("GraphChiRounds");
+  galois::Statistic rounds("GraphChiRounds");
   
   size_t edges = computeEdgeLimit(graph, memoryLimit);
   segment_type prev;
@@ -216,10 +216,10 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
 
       if (useDense) {
         DenseVertexMap<CheckInput,PassWrappedGraph,Graph,WrappedGraph,VertexOperator,Bag> vop(graph, wgraph, op, input, first, prev, cur, next);
-        Galois::for_each(graph.begin(cur), graph.end(cur), vop);
+        galois::for_each(graph.begin(cur), graph.end(cur), vop);
       } else {
         SparseVertexMap<PassWrappedGraph,Graph,WrappedGraph,VertexOperator> vop(graph, wgraph, op, first, prev, cur, next);
-        Galois::for_each_local(*input, vop);
+        galois::for_each_local(*input, vop);
       }
 
       // XXX Shouldn't be necessary
@@ -250,14 +250,14 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
 
 template<typename Graph, typename VertexOperator>
 void vertexMap(Graph& graph, VertexOperator op, size_t size) {
-  Galois::Graph::BindSegmentGraph<Graph> wgraph(graph);
+  galois::Graph::BindSegmentGraph<Graph> wgraph(graph);
   
   hidden::vertexMap<false,true>(graph, wgraph, op, static_cast<GraphNodeBag<>*>(0), size);
 }
 
 template<typename Graph, typename VertexOperator, typename Bag>
 void vertexMap(Graph& graph, VertexOperator op, Bag& input, size_t size) {
-  Galois::Graph::BindSegmentGraph<Graph> wgraph(graph);
+  galois::Graph::BindSegmentGraph<Graph> wgraph(graph);
   
   hidden::vertexMap<true,true>(graph, wgraph, op, &input, size);
 }

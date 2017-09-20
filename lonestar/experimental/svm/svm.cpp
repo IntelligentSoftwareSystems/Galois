@@ -103,7 +103,7 @@ typedef struct Node {
   Node(): w(0.0), field(0) { }
 } Node;
 
-using Graph = Galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
+using Graph = galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
 using GNode = Graph::GraphNode;
 
 /**         CONSTANTS AND PARAMETERS       **/
@@ -120,9 +120,9 @@ unsigned variableNodeToId(GNode variable_node) {
 
 template<typename T, UpdateType UT>
 class DiffractedCollection {
-  Galois::Substrate::PerThreadStorage<T*> thread;
-  Galois::Substrate::PerPackageStorage<T*> package;
-  Galois::LargeArray<T> old;
+  galois::Substrate::PerThreadStorage<T*> thread;
+  galois::Substrate::PerPackageStorage<T*> package;
+  galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
   unsigned num_packages;
@@ -131,7 +131,7 @@ class DiffractedCollection {
   void doMerge(const GetFn& getFn) {
     bool byThread = UT == UpdateType::ReplicateByThread || UT == UpdateType::Staleness;
     double *local = byThread ? *thread.getLocal() : *package.getLocal();
-    Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
+    galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
       unsigned n = byThread ? num_threads : num_packages;
       for (unsigned j = 1; j < n; j++) {
         double o = byThread ?
@@ -146,7 +146,7 @@ class DiffractedCollection {
       else
         v = local[i];
     });
-    Galois::on_each([&](unsigned tid, unsigned total) {
+    galois::on_each([&](unsigned tid, unsigned total) {
       switch (UT) {
         case UpdateType::Staleness:
         case UpdateType::ReplicateByThread:
@@ -154,7 +154,7 @@ class DiffractedCollection {
             std::copy(local, local + size, *thread.getLocal());
           break;
         case UpdateType::ReplicateByPackage:
-          if (tid && Galois::Substrate::getThreadPool().isLeader(tid))
+          if (tid && galois::Substrate::getThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -164,22 +164,22 @@ class DiffractedCollection {
 
 public:
   DiffractedCollection(size_t n): size(n) {
-    num_threads = Galois::getActiveThreads();
-    num_packages = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_threads = galois::getActiveThreads();
+    num_packages = galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
 
     if (UT == UpdateType::Staleness)
       old.create(n);
     switch (UT) {
       case UpdateType::ReplicateByThread:
       case UpdateType::Staleness:
-        Galois::on_each([n, this](unsigned tid, unsigned total) {
+        galois::on_each([n, this](unsigned tid, unsigned total) {
           T *p = new T[n];
           *thread.getLocal() = p;
           std::fill(p, p + n, 0);
         });
       case UpdateType::ReplicateByPackage:
-        Galois::on_each([n, this](unsigned tid, unsigned total) {
-            if (Galois::Substrate::getThreadPool().isLeader(tid)) {
+        galois::on_each([n, this](unsigned tid, unsigned total) {
+            if (galois::Substrate::getThreadPool().isLeader(tid)) {
             T *p = new T[n];
             *package.getLocal() = p;
             std::fill(p, p + n, 0);
@@ -224,8 +224,8 @@ public:
 
   Accessor get() {
     if (num_packages > 1 && UT == UpdateType::ReplicateByPackage) {
-      unsigned tid = Galois::Substrate::ThreadPool::getTID();
-      unsigned my_package = Galois::Substrate::ThreadPool::getPackage();
+      unsigned tid = galois::Substrate::ThreadPool::getTID();
+      unsigned my_package = galois::Substrate::ThreadPool::getPackage();
       unsigned next = (my_package + 1) % num_packages;
       return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
     }
@@ -267,7 +267,7 @@ struct LinearSVM {
 
   Graph& g;
   DiffractedCollection<double, UT>& dstate;
-  Galois::GAccumulator<size_t>& bigUpdates;
+  galois::GAccumulator<size_t>& bigUpdates;
   double learningRate;
 
 #ifdef DENSE
@@ -276,7 +276,7 @@ struct LinearSVM {
   double* baseEdgeData;
 #endif
 
-  LinearSVM(Graph& _g, DiffractedCollection<double, UT>& d, double _lr, Galois::GAccumulator<size_t>& b):
+  LinearSVM(Graph& _g, DiffractedCollection<double, UT>& d, double _lr, galois::GAccumulator<size_t>& b):
     g(_g), dstate(d), bigUpdates(b), learningRate(_lr) {
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -285,14 +285,14 @@ struct LinearSVM {
 #endif
   }
   
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
-    Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
+    galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
     // Store edge data in iteration-local temporary to reduce cache misses
 #ifdef DENSE
     const ptrdiff_t size = DENSE_NUM_FEATURES;
 #else
-    ptrdiff_t size = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+    ptrdiff_t size = std::distance(g.edge_begin(n, galois::MethodFlag::UNPROTECTED), g.edge_end(n, galois::MethodFlag::UNPROTECTED));
 #endif
     // regularized factors
     double* rfactors = (double*) alloc.allocate(sizeof(double) * size);
@@ -381,7 +381,7 @@ struct LinearSVM {
 void printParameters(const std::vector<GNode>& trainingSamples, const std::vector<GNode>& testingSamples) {
   std::cout << "Input graph file: " << inputGraphFilename << "\n";
   std::cout << "Input label file: " << inputLabelFilename << "\n";
-  std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
+  std::cout << "Threads: " << galois::getActiveThreads() << "\n";
   std::cout << "Samples: " << NUM_SAMPLES << "\n";
   std::cout << "Variables: " << NUM_VARIABLES << "\n";
   std::cout << "Training samples: " << trainingSamples.size() << "\n";
@@ -433,9 +433,9 @@ unsigned loadLabels(Graph& g, std::string filename) {
 }
 
 size_t getNumCorrect(Graph& g, std::vector<GNode>& testing_samples) {
-  Galois::GAccumulator<size_t> correct;
+  galois::GAccumulator<size_t> correct;
 
-  Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
+  galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
     double sum = 0.0;
     Node& data = g.getData(n);
     int label = data.field;
@@ -458,9 +458,9 @@ size_t getNumCorrect(Graph& g, std::vector<GNode>& testing_samples) {
 
 double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
   // 0.5 * w^Tw + C * sum_i [max(0, 1 - y_i * w^T * x_i)]^2
-  Galois::GAccumulator<double> objective;
+  galois::GAccumulator<double> objective;
 
-  Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
+  galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
     double sum = 0.0;
     Node& data = g.getData(n);
     int label = data.field;
@@ -475,8 +475,8 @@ double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
     objective += o * o;
   });
   
-  Galois::GAccumulator<double> norm;
-  Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+  galois::GAccumulator<double> norm;
+  galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
     double v = g.getData(i + NUM_SAMPLES).w;
     norm += v * v;
   });
@@ -485,12 +485,12 @@ double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
 
 template<UpdateType UT>
 void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
-  Galois::TimeAccumulator accumTimer;
+  galois::TimeAccumulator accumTimer;
   accumTimer.start();
 
   DiffractedCollection<double, UT> dstate(NUM_VARIABLES);
 
-  Galois::StatTimer sgdTime("SgdTime");
+  galois::StatTimer sgdTime("SgdTime");
   
   unsigned iterations = maxIterations;
   double minObj = std::numeric_limits<double>::max();
@@ -508,14 +508,14 @@ void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSampl
     double learning_rate = 30/(100.0 + iter);
     auto ts_begin = trainingSamples.begin();
     auto ts_end = trainingSamples.end();
-    auto ln = Galois::loopname("LinearSVM");
-    auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-    Galois::GAccumulator<size_t> bigUpdates;
+    auto ln = galois::loopname("LinearSVM");
+    auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+    galois::GAccumulator<size_t> bigUpdates;
 
-    Galois::Timer flopTimer;
+    galois::Timer flopTimer;
     flopTimer.start();
 
-    Galois::for_each(ts_begin, ts_end, LinearSVM<UT>(g, dstate, learning_rate, bigUpdates), ln, wl);
+    galois::for_each(ts_begin, ts_end, LinearSVM<UT>(g, dstate, learning_rate, bigUpdates), ln, wl);
 
     flopTimer.stop();
     sgdTime.stop();
@@ -561,15 +561,15 @@ void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSampl
 
 double getDualObjective(Graph& g, const std::vector<GNode>& trainingSamples, double* diag, const std::vector<double>& alpha) {
   // 0.5 * w^Tw + C * sum_i [max(0, 1 - y_i * w^T * x_i)]^2
-  Galois::GAccumulator<double> objective;
+  galois::GAccumulator<double> objective;
 
-  Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
+  galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
     //Node& data = g.getData(n);
     int label = g.getData(n).field;
     objective += alpha[n] * (alpha[n] * diag[label + 1] - 2);
   });
   
-  Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+  galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
     double v = g.getData(i + NUM_SAMPLES).w;
     objective += v * v;
   });
@@ -579,7 +579,7 @@ double getDualObjective(Graph& g, const std::vector<GNode>& trainingSamples, dou
 //TODO(ddn): Parallelize
 // See Algorithm 3 of Hsieh et al., ICML 2008
 void runDualCoordinateDescent(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples, bool useL1Loss) {
-  Galois::TimeAccumulator accumTimer;
+  galois::TimeAccumulator accumTimer;
   accumTimer.start();
   
   std::vector<double> alpha(NUM_SAMPLES);
@@ -607,7 +607,7 @@ void runDualCoordinateDescent(Graph& g, std::mt19937& gen, std::vector<GNode>& t
     }
   }
 
-  Galois::StatTimer cdTime("CDTime");
+  galois::StatTimer cdTime("CDTime");
   double maxPG = std::numeric_limits<double>::max();
   double minPG = std::numeric_limits<double>::lowest();
   std::vector<GNode> active = trainingSamples;
@@ -622,7 +622,7 @@ void runDualCoordinateDescent(Graph& g, std::mt19937& gen, std::vector<GNode>& t
       std::shuffle(active.begin(), active.end(), gen);
     }
 
-    Galois::Timer flopTimer;
+    galois::Timer flopTimer;
     flopTimer.start();
     size_t flop = 0;
     for (GNode n : active) {
@@ -792,10 +792,10 @@ void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSa
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   
   Graph g;
-  Galois::Graph::readGraph(g, inputGraphFilename);
+  galois::Graph::readGraph(g, inputGraphFilename);
   NUM_SAMPLES = loadLabels(g, inputLabelFilename);
   initializeVariableCounts(g);
   NUM_VARIABLES = g.size() - NUM_SAMPLES;
@@ -825,7 +825,7 @@ int main(int argc, char** argv) {
     std::cout << "\n";
   }
 
-  Galois::StatTimer timer;
+  galois::StatTimer timer;
   timer.start();
   switch (algoType) {
     case AlgoType::PrimalStochasticGradientDescent:

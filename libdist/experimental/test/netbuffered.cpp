@@ -10,7 +10,7 @@ void say(uint32_t i) {
 }
 
 int main() {
-  Galois::Runtime::NetworkInterface& net = Galois::Runtime::makeNetworkBuffered();
+  galois::Runtime::NetworkInterface& net = galois::Runtime::makeNetworkBuffered();
 
   std::cout << net.ID << " " << net.Num << "\n";
   

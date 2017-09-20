@@ -17,7 +17,7 @@ struct Node {
   Node(): parent() { }
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node, int> Graph;
+typedef galois::Graph::LC_CSR_Graph<Node, int> Graph;
 typedef Graph::GraphNode GNode;
 
 struct Edge {
@@ -28,11 +28,11 @@ struct Edge {
 
 class Process {
   Graph& graph;
-  Galois::GAccumulator<size_t>& weight;
+  galois::GAccumulator<size_t>& weight;
 
 public:
   struct LocalState {
-    LocalState(Process& self, Galois::PerIterAllocTy& alloc) { }
+    LocalState(Process& self, galois::PerIterAllocTy& alloc) { }
   };
 
   struct DeterministicId {
@@ -42,15 +42,15 @@ public:
   };
 
   typedef std::tuple<
-    Galois::has_fixed_neighborhood<>,
-    Galois::has_deterministic_id<DeterministicId>,
-    Galois::has_deterministic_local_state<LocalState>,
-    Galois::needs_per_iter_alloc<>
+    galois::has_fixed_neighborhood<>,
+    galois::has_deterministic_id<DeterministicId>,
+    galois::has_deterministic_local_state<LocalState>,
+    galois::needs_per_iter_alloc<>
   > function_traits;
 
-  Process(Graph& g, Galois::GAccumulator<size_t>& w): graph(g), weight(w) { }
+  Process(Graph& g, galois::GAccumulator<size_t>& w): graph(g), weight(w) { }
 
-  void operator()(const Edge& e, Galois::UserContext<Edge>& ctx) const {
+  void operator()(const Edge& e, galois::UserContext<Edge>& ctx) const {
     if (!ctx.isFirstPass())
       return;
 
@@ -60,18 +60,18 @@ public:
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, "kruskal", nullptr, nullptr);
   
-  Galois::StatTimer Ttotal("TotalTime");
+  galois::StatTimer Ttotal("TotalTime");
   Ttotal.start();
 
   Graph graph;
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
 
-  //Galois::InsertBag<Edge> edges;
+  //galois::InsertBag<Edge> edges;
   std::deque<Edge> edges;
-  Galois::do_all_local(graph, [&](GNode n1) {
+  galois::do_all_local(graph, [&](GNode n1) {
     for (auto edge : graph.out_edges(n1)) {
       GNode n2 = graph.getEdgeDst(edge);
       if (n1 == n2)
@@ -90,13 +90,13 @@ int main(int argc, char** argv) {
     return a.weight < b.weight; 
   });
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::StatTimer T;
+  galois::reportPageAlloc("MeminfoPre");
+  galois::StatTimer T;
   T.start();
-  Galois::GAccumulator<size_t> weight;
-  Galois::for_each(edges.begin(), edges.end(), Process(graph, weight), Galois::wl<Galois::WorkList::Deterministic<>>());
+  galois::GAccumulator<size_t> weight;
+  galois::for_each(edges.begin(), edges.end(), Process(graph, weight), galois::wl<galois::WorkList::Deterministic<>>());
   T.stop();
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "MST weight: " << weight.reduce() << "\n";
   Ttotal.stop();

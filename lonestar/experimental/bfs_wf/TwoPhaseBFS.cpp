@@ -53,10 +53,10 @@ class TwoPhaseBFS: public BFS {
       if (up.level <= globalLevel.value) {
         VisitNhood::operator () (up, ctx);
       } else {
-        Galois::Runtime::signalConflict();
+        galois::Runtime::signalConflict();
       }
 
-      if (Galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
+      if (galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
         globalLevel.updated = false;
       }
     }
@@ -74,7 +74,7 @@ class TwoPhaseBFS: public BFS {
 
     template <typename C>
     void operator () (const Update& up, C& ctx) {
-      if (Galois::Substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
+      if (galois::Substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
         globalLevel.updated = true;
         ++globalLevel.value;
       }
@@ -103,13 +103,13 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_ikdg (
-        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::Runtime::for_each_ordered_ikdg (
+        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhoodSafety (graph, globalLevel),
         OpFuncSafety (graph, numIter, globalLevel),
         std::make_tuple (
-          Galois::loopname ("bfs_two_phase_safety")));
+          galois::loopname ("bfs_two_phase_safety")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

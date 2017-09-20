@@ -82,11 +82,11 @@ static const double alpha = 1.0 - 0.85;
 //! maximum relative change until we deem convergence
 static const double tolerance = 0.1;
 
-struct TData: public Galois::UnionFindNode<TData> {
+struct TData: public galois::UnionFindNode<TData> {
   double values[8];
   unsigned int id;
 
-  TData(): Galois::UnionFindNode<TData>(const_cast<TData*>(this)) { }
+  TData(): galois::UnionFindNode<TData>(const_cast<TData*>(this)) { }
 
   double getPageRank(unsigned int it) {
     return values[it & (8-1)];
@@ -97,21 +97,21 @@ struct TData: public Galois::UnionFindNode<TData> {
   }
 };
 
-struct GData: public Galois::UnionFindNode<GData> { 
-  GData(): Galois::UnionFindNode<GData>(const_cast<GData*>(this)) { }
+struct GData: public galois::UnionFindNode<GData> { 
+  GData(): galois::UnionFindNode<GData>(const_cast<GData*>(this)) { }
 };
 
 // A graph and its transpose. The main operation in pagerank is computing
 // values based on incoming edges, so we will mainly use the transpose of G,
 // G^T, (tgraph). We keep G around to compute dependencies in G^T.
-typedef Galois::Graph::LC_CSR_Graph<GData, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<TData, double> TGraph;
+typedef galois::Graph::LC_CSR_Graph<GData, void> Graph;
+typedef galois::Graph::LC_CSR_Graph<TData, double> TGraph;
 typedef Graph::GraphNode GNode;
 typedef TGraph::GraphNode TNode;
 
 Graph graph;
 TGraph tgraph;
-Galois::LargeArray<GNode> tgraphOrder;
+galois::LargeArray<GNode> tgraphOrder;
 size_t numSmallNeighbors;
 
 struct SerialAlgo {
@@ -127,14 +127,14 @@ struct SerialAlgo {
       unsigned int small_delta = 0;
 
       for (TNode src : tgraph) {
-        TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
+        TData& sdata = tgraph.getData(src, galois::MethodFlag::UNPROTECTED);
         float sum = 0;
 
-        for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
+        for (TGraph::edge_iterator edge : tgraph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
           TNode dst = tgraph.getEdgeDst(edge);
           float w = tgraph.getEdgeData(edge);
 
-          TData& ddata = tgraph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          TData& ddata = tgraph.getData(dst, galois::MethodFlag::UNPROTECTED);
           sum += ddata.getPageRank(iteration) * w;
         }
          
@@ -191,7 +191,7 @@ struct SpMVAlgo {
     poski_threadarg_t* poski_thread = poski_InitThreads();
     poski_ThreadHints(poski_thread, NULL, POSKI_THREADPOOL, numThreads);
 
-    Galois::StatTimer CT("ConvertTime");
+    galois::StatTimer CT("ConvertTime");
     CT.start();
     // OSKI CSR only supports int indices.
     if (tgraph.sizeEdges() > std::numeric_limits<int>::max()
@@ -208,11 +208,11 @@ struct SpMVAlgo {
     int nnz = tgraph.sizeEdges();
     double initial = 1.0;
 
-    Galois::LargeArray<int> Aptr;
-    Galois::LargeArray<int> Aind;
-    Galois::LargeArray<double> Aval;
-    Galois::LargeArray<double> xval;
-    Galois::LargeArray<double> yval;
+    galois::LargeArray<int> Aptr;
+    galois::LargeArray<int> Aind;
+    galois::LargeArray<double> Aval;
+    galois::LargeArray<double> xval;
+    galois::LargeArray<double> yval;
 
     Aptr.create(nrows + 1);
     Aind.create(nnz);
@@ -244,7 +244,7 @@ struct SpMVAlgo {
     poski_vec_t yview = poski_CreateVec(&yval[0], ncols, STRIDE_UNIT, NULL);
 
     if (false) {
-      Galois::StatTimer TT("TuningTime");
+      galois::StatTimer TT("TuningTime");
       TT.start();
       poski_TuneHint_Structure(Atunable, HINT_NO_BLOCKS, ARGS_MethodFlag::UNPROTECTED);
       poski_TuneHint_MatMult(Atunable, OP_NORMAL, 1, SYMBOLIC_VECTOR, 1, SYMBOLIC_VECTOR, ALWAYS_TUNE_AGGRESSIVELY);
@@ -274,8 +274,8 @@ struct DummyAlgo {
   static const int graphBlockSize = 1;
 
   struct Accum {
-    Galois::GReduceMax<double> max_delta;
-    Galois::GAccumulator<unsigned int> small_delta;
+    galois::GReduceMax<double> max_delta;
+    galois::GAccumulator<unsigned int> small_delta;
     void reset() {
       max_delta.reset();
       small_delta.reset();
@@ -319,14 +319,14 @@ struct DummyAlgo {
     }
 
     void process(const TNode& src, unsigned int iteration) {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      TData& sdata = tgraph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       double sum = 0;
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        TData& ddata = tgraph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) * w;
       }
        
@@ -351,7 +351,7 @@ struct DummyAlgo {
     std::cout << "target max delta: " << tol << "\n";
     unsigned int iteration;
     for (iteration = 0; iteration < maxIterations; iteration += timeBlockSize) {
-      Galois::on_each(Process(accum, tol, iteration));
+      galois::on_each(Process(accum, tol, iteration));
       unsigned int small_delta = accum.small_delta.reduce();
       double max_delta = accum.max_delta.reduce();
 
@@ -371,8 +371,8 @@ struct DummyAlgo {
 template<bool useND, bool useS>
 struct SynchronousAlgo {
   struct Accum {
-    Galois::GReduceMax<double> max_delta;
-    Galois::GAccumulator<unsigned int> small_delta;
+    galois::GReduceMax<double> max_delta;
+    galois::GAccumulator<unsigned int> small_delta;
     void reset() {
       max_delta.reset();
       small_delta.reset();
@@ -389,19 +389,19 @@ struct SynchronousAlgo {
     Process(Accum& a, double t, unsigned int i):
       accum(a), tol(t), iteration(i) { }
 
-    void operator()(const TNode& src, Galois::UserContext<TNode>& ctx) const {
+    void operator()(const TNode& src, galois::UserContext<TNode>& ctx) const {
       operator()(src);
     }
 
     void operator()(const TNode& src) const {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      TData& sdata = tgraph.getData(src, galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED);
+        TData& ddata = tgraph.getData(dst, useND && useS ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 
@@ -427,12 +427,12 @@ struct SynchronousAlgo {
     
     while (true) {
       if (useND && useS) {
-        Galois::for_each(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
+        galois::for_each(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
             Process(accum, tol, iteration));
       } else {
-        Galois::do_all(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
+        galois::do_all(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
             Process(accum, tol, iteration));
-        //Galois::do_all_local(tgraph,
+        //galois::do_all_local(tgraph,
         //    Process(accum, tol, iteration));
       }
 
@@ -465,8 +465,8 @@ struct SynchronousAlgo {
 template<bool useND, bool useS>
 struct AsynchronousAlgo {
   struct Accum {
-    Galois::GReduceMax<double> max_delta;
-    Galois::GAccumulator<unsigned int> small_delta;
+    galois::GReduceMax<double> max_delta;
+    galois::GAccumulator<unsigned int> small_delta;
     void reset() {
       max_delta.reset();
       small_delta.reset();
@@ -483,15 +483,15 @@ struct AsynchronousAlgo {
     Process(Accum& a, double t, unsigned int i):
       accum(a), tol(t), iteration(i) { }
 
-    void operator()(const TNode& src, Galois::UserContext<TNode>& ctx) {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    void operator()(const TNode& src, galois::UserContext<TNode>& ctx) {
+      TData& sdata = tgraph.getData(src, galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED);
+        TData& ddata = tgraph.getData(dst, useND && useS ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 
@@ -514,7 +514,7 @@ struct AsynchronousAlgo {
     double tol = tolerance;
 
     std::cout << "target max delta: " << tol << "\n";
-    Galois::for_each(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
+    galois::for_each(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
         Process(accum, tol, iteration));
     
     return 0;
@@ -524,14 +524,14 @@ struct AsynchronousAlgo {
 
 //! Transpose in-edges to out-edges
 static void transposeGraph() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef Galois::Graph::FileGraphWriter OutputGraph;
+  typedef galois::Graph::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  Galois::Graph::readGraph(input, inputFilename);
+  galois::Graph::readGraph(input, inputFilename);
 
   size_t node_id = 0;
   for (InputNode src : input) {
@@ -587,8 +587,8 @@ static void transposeGraph() {
 }
 
 static void readGraph() {
-  Galois::Graph::readGraph(graph, inputFilename);
-  Galois::Graph::readGraph(tgraph, otherFilename);
+  galois::Graph::readGraph(graph, inputFilename);
+  galois::Graph::readGraph(tgraph, otherFilename);
 
   if (graph.size() != tgraph.size() || graph.sizeEdges() != tgraph.sizeEdges()) {
     std::cerr << "Graph and its transpose have different number of nodes or edges\n";
@@ -677,9 +677,9 @@ unsigned int runAlgo() {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
-  Galois::StatTimer RT("ReadTime");
+  galois::StatTimer RT("ReadTime");
   RT.start();
   if (algo == Algo::transpose) {
     transposeGraph();
@@ -701,7 +701,7 @@ int main(int argc, char **argv) {
   //std::random_shuffle(tgraphOrder.begin(), tgraphOrder.end()); // XXX isolate locality issues
   RT.stop();
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   unsigned int lastIteration = runAlgo();
   T.stop();

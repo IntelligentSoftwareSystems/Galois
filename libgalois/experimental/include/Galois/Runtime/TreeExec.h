@@ -43,7 +43,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template <typename T, typename DivFunc, typename ConqFunc, bool NEEDS_CHILDREN>
@@ -90,7 +90,7 @@ protected:
   };
 
   static const unsigned CHUNK_SIZE = 2;
-  typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
+  typedef galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
   typedef FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
   typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
@@ -216,23 +216,23 @@ public:
   template <typename R>
   void execute (const R& initRange) {
 
-    Galois::do_all_choice(initRange,
+    galois::do_all_choice(initRange,
         [this] (const T& item) {
           Task* initTask = taskAlloc.allocate (1);
           taskAlloc.construct (initTask, item, nullptr, Task::DIVIDE);
           push (initTask);
         },
         std::make_tuple(
-          Galois::loopname("create_initial_tasks"),
-          Galois::chunk_size<4>()));
+          galois::loopname("create_initial_tasks"),
+          galois::chunk_size<4>()));
 
     typedef WorkList::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = nullptr;
 
-    Galois::for_each (it, it,
+    galois::for_each (it, it,
         ApplyOperatorSinglePhase {*this},
-        Galois::loopname(loopname.c_str()),
-                      Galois::wl<WL>(std::ref(workList)));
+        galois::loopname(loopname.c_str()),
+                      galois::wl<WL>(std::ref(workList)));
 
     // initialTasks deleted in ApplyOperatorSinglePhase,
   }
@@ -245,7 +245,7 @@ void for_each_ordered_tree (I beg, I end, const DivFunc& divFunc, const ConqFunc
   typedef typename std::iterator_traits<I>::value_type T;
 
   TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor {divFunc, conqFunc, loopname};
-  executor.execute (Galois::Runtime::makeStandardRange (beg, end));
+  executor.execute (galois::Runtime::makeStandardRange (beg, end));
 }
 
 template <typename T, typename DivFunc, typename ConqFunc>
@@ -337,7 +337,7 @@ protected:
   }
 
   void applyOperatorRecursive () {
-    Galois::optional<WorkItem> funcNparent = workList.pop ();
+    galois::optional<WorkItem> funcNparent = workList.pop ();
 
     if (funcNparent) {
       PerThreadData& ptd = *(perThreadData.getLocal ());
@@ -405,7 +405,7 @@ void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
 
   e.initWork (initTask);
 
-  Substrate::getThreadPool().run (Galois::getActiveThreads(),
+  Substrate::getThreadPool().run (galois::getActiveThreads(),
       [&e] () { e.initThread(); },
       std::ref (e));
 }
@@ -425,7 +425,7 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
 
 void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif  // GALOIS_RUNTIME_TREEEXEC_H

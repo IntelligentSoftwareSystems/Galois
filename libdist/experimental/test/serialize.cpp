@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 struct DistObj : public Lockable {
   int i;
@@ -20,28 +20,28 @@ struct DistObj : public Lockable {
 };
 
 int main() {
-  static_assert(Galois::Runtime::is_serializable<DistObj>::value, "DistObj not serializable");
+  static_assert(galois::Runtime::is_serializable<DistObj>::value, "DistObj not serializable");
 
   unsigned i1 {0XDEADBEEF}, i2;
   gptr<DistObj> ptr1, ptr2;
   SendBuffer sbuf;
-  Galois::Runtime::gSerialize(sbuf, ptr1, i1);
+  galois::Runtime::gSerialize(sbuf, ptr1, i1);
 
   RecvBuffer rbuf(std::move(sbuf));
-  Galois::Runtime::gDeserialize(rbuf, ptr2, i2);
+  galois::Runtime::gDeserialize(rbuf, ptr2, i2);
 
   GALOIS_ASSERT(i1 == i2);
 
   {
     std::vector<double> input(1024*1024, 1.0);
     std::vector<double> output;
-    Galois::Timer T;
+    galois::Timer T;
     T.start();
     for (int i = 0; i < 100; ++i) {
       SendBuffer b;
-      Galois::Runtime::gSerialize(b, input);
+      galois::Runtime::gSerialize(b, input);
       RecvBuffer r(std::move(b));
-      Galois::Runtime::gDeserialize(r, output);
+      galois::Runtime::gDeserialize(r, output);
     }
     T.stop();
     std::cout << "Time: " << T.get() << "\n";

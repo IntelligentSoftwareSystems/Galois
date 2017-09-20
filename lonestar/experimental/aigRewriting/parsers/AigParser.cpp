@@ -488,8 +488,8 @@ void AigParser::connectAnds( aig::Aig & aig ) {
 		int rhs1 = std::get<2>( andDef );
 		aig::GNode inNode1 = nodes[rhs1 / 2];
 
-		graph.getEdgeData( graph.addMultiEdge( inNode0, andNode, Galois::MethodFlag::UNPROTECTED ) ) = !(rhs0 % 2);
-		graph.getEdgeData( graph.addMultiEdge( inNode1, andNode, Galois::MethodFlag::UNPROTECTED ) ) = !(rhs1 % 2);
+		graph.getEdgeData( graph.addMultiEdge( inNode0, andNode, galois::MethodFlag::UNPROTECTED ) ) = !(rhs0 % 2);
+		graph.getEdgeData( graph.addMultiEdge( inNode1, andNode, galois::MethodFlag::UNPROTECTED ) ) = !(rhs1 % 2);
 	}
 }
 

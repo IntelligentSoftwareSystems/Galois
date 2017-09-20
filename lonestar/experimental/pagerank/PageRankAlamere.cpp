@@ -37,12 +37,12 @@ struct PNode {
 };
 
 
-typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
+typedef typename galois::Graph::LC_CSR_Graph<PNode,void>
   ::template with_numa_alloc<true>::type
   ::template with_no_lockable<true>::type
   InnerGraph;
 
-typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
 typedef Graph::GraphNode GNode;
 
 class PageRankAlamere: public PageRankMain<Graph> {
@@ -59,22 +59,22 @@ public:
   }
   void initGraph(Graph& graph) {
 
-    Galois::Graph::readGraph(graph, inputFile, transposeFile);
+    galois::Graph::readGraph(graph, inputFile, transposeFile);
 
     // size_t numEdges = 0; 
     // size_t selfEdges = 0;
     ParCounter numEdges;
     ParCounter selfEdges;
 
-    Galois::StatTimer t_init("Time for initializing PageRank data: ");
+    galois::StatTimer t_init("Time for initializing PageRank data: ");
 
     t_init.start();
 
-    Galois::do_all_choice(Galois::Runtime::makeLocalRange(graph),
+    galois::do_all_choice(galois::Runtime::makeLocalRange(graph),
         [&] (GNode n) {
               unsigned out_deg = 0;
-              for (auto j = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED)
-                , endj = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); j != endj; ++j) {
+              for (auto j = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED)
+                , endj = graph.edge_end(n, galois::MethodFlag::UNPROTECTED); j != endj; ++j) {
                 GNode neigh = graph.getEdgeDst(j);
                 if (n != neigh) {
                   out_deg += 1;
@@ -85,20 +85,20 @@ public:
 
 
               if (DEBUG) {
-                int in_deg = std::distance(graph.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED)
-                , graph.in_edge_end(n, Galois::MethodFlag::UNPROTECTED));
+                int in_deg = std::distance(graph.in_edge_begin(n, galois::MethodFlag::UNPROTECTED)
+                , graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED));
                 std::cout << "Node: " << graph.idFromNode(n) << " has out degree: " << out_deg 
                   << ", in degree: " << in_deg << std::endl;
               }
 
-              graph.getData(n, Galois::MethodFlag::UNPROTECTED) = PNode(double(initVal), out_deg);
+              graph.getData(n, galois::MethodFlag::UNPROTECTED) = PNode(double(initVal), out_deg);
 
               numEdges += out_deg;
 
             },
         std::make_tuple(
-            Galois::loopname("init_loop"), 
-            Galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
+            galois::loopname("init_loop"), 
+            galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
 
     t_init.stop();
 
@@ -112,12 +112,12 @@ public:
 
     Graph& graph;
     const unsigned round;
-    Galois::GReduceLogicalAND& allConverged; 
+    galois::GReduceLogicalAND& allConverged; 
     
     PageRankOp(
         Graph& graph,
         const unsigned round,
-        Galois::GReduceLogicalAND& allConverged)
+        galois::GReduceLogicalAND& allConverged)
       : 
         graph(graph),
         round(round),
@@ -138,13 +138,13 @@ public:
         std::cout << "Processing Node: " << graph.idFromNode(src) << std::endl;
       }
 
-      for (auto ni = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED)
-          , endni = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); ni != endni; ++ni) {
+      for (auto ni = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED)
+          , endni = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED); ni != endni; ++ni) {
 
         GNode pred = graph.getInEdgeDst(ni);
 
         if (pred != src) { // non-self edge
-          const PNode& predData = graph.getData(pred, Galois::MethodFlag::UNPROTECTED);
+          const PNode& predData = graph.getData(pred, galois::MethodFlag::UNPROTECTED);
           sumRanks += predData.getScaledValue(round);
 
           if (DEBUG) {
@@ -155,7 +155,7 @@ public:
         }
       }
 
-      PNode& srcData = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      PNode& srcData = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       double updatedValue = randJmp + (1 - randJmp) * sumRanks;
 
@@ -180,13 +180,13 @@ public:
 
     while (true) {
 
-      Galois::GReduceLogicalAND allConverged;
+      galois::GReduceLogicalAND allConverged;
 
-      Galois::do_all_choice(Galois::Runtime::makeLocalRange(graph),
+      galois::do_all_choice(galois::Runtime::makeLocalRange(graph),
           PageRankOp(graph, round, allConverged), 
           std::make_tuple(
-            Galois::loopname("page_rank_inner"), 
-            Galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
+            galois::loopname("page_rank_inner"), 
+            galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
 
 
 
@@ -196,7 +196,7 @@ public:
         for (auto i = graph.begin(), endi = graph.end();
             i != endi; ++i) {
 
-          PNode& data = graph.getData(*i, Galois::MethodFlag::UNPROTECTED);
+          PNode& data = graph.getData(*i, galois::MethodFlag::UNPROTECTED);
 
           std::cout << "Node: " << graph.idFromNode(*i) << ", page ranke values: " << 
             data.getValue(round) << ", " << data.getValue(round + 1) << std::endl;

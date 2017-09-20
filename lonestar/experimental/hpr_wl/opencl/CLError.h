@@ -32,7 +32,7 @@ extern "C" {
 
 #ifndef CL_ERROR_HANDLER_H_
 #define CL_ERROR_HANDLER_H_
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 /////////////////////////////////////////////////////////////////
 inline const char* ocl_error_to_string(cl_int error) {

@@ -134,8 +134,8 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   string reduceOP, resetValExpr;
 
                   if(j.IS_VEC){
-                    reduceOP = "{Galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
-                    resetValExpr = "{Galois::resetVec(node." + j.FIELD_NAME + "); }";
+                    reduceOP = "{galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
+                    resetValExpr = "{galois::resetVec(node." + j.FIELD_NAME + "); }";
                   }
                   else {
                     reduceOP = "{node." + j.FIELD_NAME + "+= y;}";
@@ -163,7 +163,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   lhs->dump();
                   // It is min operation.
                   //string reduceOP = "if(node." + j.FIELD_NAME + " > y) { node." + j.FIELD_NAME + " = y;}";
-                  string reduceOP = "{ Galois::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{ galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -174,7 +174,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 else if(whileCAS_op){
                   whileCAS_op->dump();
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
-                  string reduceOP = "{Galois::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -184,7 +184,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 else if(atomicAdd_op){
                   llvm::outs() << "INSIDE  FIELD \n";
                   atomicAdd_op->dump();
-                  string reduceOP = "{ Galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{ galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
@@ -202,8 +202,8 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 }
                 else if(plusOP_vec){
                   string reduceOP, resetValExpr;
-                  reduceOP = "{Galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
-                  resetValExpr = "{Galois::resetVec(node." + j.FIELD_NAME + "); }";
+                  reduceOP = "{galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
+                  resetValExpr = "{galois::resetVec(node." + j.FIELD_NAME + "); }";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);

@@ -92,13 +92,13 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(Algo::pull));
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<PNode,void>
+  typedef galois::Graph::LC_CSR_Graph<PNode,void>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
   
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+  void readGraph(Graph& graph) { galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
@@ -132,7 +132,7 @@ struct SerialAlgo {
 
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-        PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+        PNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
         float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
         if (diff <= tolerance)
@@ -171,7 +171,7 @@ struct PullAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,float>
     ::with_compressed_node_ptr<true>::type
     ::with_no_lockable<true>::type
     ::with_numa_alloc<true>::type
@@ -180,13 +180,13 @@ struct PullAlgo {
 
   std::string name() const { return "Pull"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<size_t> small_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, transposeGraphName); 
+      galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -197,7 +197,7 @@ struct PullAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
     }
@@ -207,7 +207,7 @@ struct PullAlgo {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[1] = data.value[0];
     }
   };
@@ -219,19 +219,19 @@ struct PullAlgo {
 
     Process(PullAlgo* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto jj : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj);
         float w = graph.getEdgeData(jj);
 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) * w;
       }
 
@@ -250,7 +250,7 @@ struct PullAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -277,7 +277,7 @@ struct PullAlgo {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -291,27 +291,27 @@ struct PullAlgo2 {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
   
   //! [Define LC_InOut_Graph]
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   //! [Define LC_InOut_Graph]
   
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Pull2"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (symmetricGraph) {
-      Galois::Graph::readGraph(graph, filename);
+      galois::Graph::readGraph(graph, filename);
     } else if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName);
+      galois::Graph::readGraph(graph, filename, transposeGraphName);
     } else {
       GALOIS_DIE("Graph type not supported");
     }
@@ -321,10 +321,10 @@ struct PullAlgo2 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::UNPROTECTED), g.edge_end(n, galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
     }
   };
@@ -333,7 +333,7 @@ struct PullAlgo2 {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[1] = data.value[0];
     }
   };
@@ -345,20 +345,20 @@ struct PullAlgo2 {
 
     Process(PullAlgo2* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
 
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       //! [Access in-neighbors of LC_InOut_Graph]
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED);
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED);
           jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) / ddata.nout;
       }
       //! [Access in-neighbors of LC_InOut_Graph]
@@ -376,7 +376,7 @@ struct PullAlgo2 {
     unsigned int iteration = 0;
 
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -402,7 +402,7 @@ struct PullAlgo2 {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -431,21 +431,21 @@ struct Synch {
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
 
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Synch"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -456,10 +456,10 @@ struct Synch {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::UNPROTECTED), g.edge_end(n, galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
       data.id = idcount++;
     }
@@ -469,7 +469,7 @@ struct Synch {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value[1] = data.value[0];
     }
   };
@@ -481,20 +481,20 @@ struct Synch {
 
     Process(Synch* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
 
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       //std::cout<<sdata.id<<" picked up...\n";
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED);
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED);
           jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) / ddata.nout;
 	//std::cout<<"- id: "<<ddata.id<<"\n";
       }
@@ -512,7 +512,7 @@ struct Synch {
     unsigned int iteration = 0;
 
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -538,7 +538,7 @@ struct Synch {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      galois::do_all_local(graph, Copy(graph));
     }
   }
 };
@@ -555,20 +555,20 @@ struct PrtRsd {
     float getResidual() { return residual; }
   };
   
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "PrtRsd"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -579,11 +579,11 @@ struct PrtRsd {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
       data.id = idcount++;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::UNPROTECTED), g.edge_end(n, galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
     }
   };
@@ -594,7 +594,7 @@ struct PrtRsd {
      
     Process1(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
@@ -615,13 +615,13 @@ struct PrtRsd {
      
     Process2(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
       // scale the residual 
-      LNode& data = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       data.residual = alpha2*(1-alpha2)*data.residual;
     }
   }; //--- end of Process2
@@ -637,14 +637,14 @@ struct PrtRsd {
   struct Process3 {
     PrtRsd* self;
     Graph& graph;
-    Galois::Statistic& pre;
-    Galois::Statistic& post;
+    galois::Statistic& pre;
+    galois::Statistic& post;
      
-    Process3(PrtRsd* s, Graph& g, Galois::Statistic& _pre, Galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
+    Process3(PrtRsd* s, Graph& g, galois::Statistic& _pre, galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
 
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
+    void operator()(const UpdateRequest& srcRq, galois::UserContext<UpdateRequest>& ctx) {
       GNode src = srcRq.second;
-      LNode* node = &graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode* node = &graph.getData(src, galois::MethodFlag::UNPROTECTED);
       if ((node->residual < tolerance) || (amp*(int)node->residual != srcRq.first) ) {
         post += 1;
         return;
@@ -653,9 +653,9 @@ struct PrtRsd {
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank() / ddata.nout;
       }
 
@@ -664,9 +664,9 @@ struct PrtRsd {
       unsigned nopush = 0;
 
       // update residual (consider each out-going edge)
-      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto jj : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         float oldR = ddata.residual;
         ddata.residual += lres;
 	if(ddata.residual>tolerance && ((int)oldR != (int)ddata.residual || oldR <tolerance)) {
@@ -686,12 +686,12 @@ struct PrtRsd {
   }; //--- end of Process3
 
   void operator()(Graph& graph) {
-    Galois::Statistic pre("PrePrune");
-    Galois::Statistic post("PostPrune");
-    Galois::for_each_local(graph, Process1(this, graph));
-    Galois::for_each_local(graph, Process2(this, graph)); 
+    galois::Statistic pre("PrePrune");
+    galois::Statistic post("PostPrune");
+    galois::for_each_local(graph, Process1(this, graph));
+    galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp2: "<<amp2<<"\n";
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedLIFO<4> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 #ifdef GALOIS_USE_EXP
@@ -699,16 +699,16 @@ struct PrtRsd {
 #else
     typedef OBIM dOBIM;
 #endif
-    Galois::InsertBag<UpdateRequest> initialWL;
-    Galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
+    galois::InsertBag<UpdateRequest> initialWL;
+    galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
 	LNode& data = graph.getData(src);
         if(data.residual>tolerance){
 	  initialWL.push_back(std::make_pair(amp*(int)data.residual, src)); // max residual
         }
       });
-    Galois::StatTimer T("InnerTime");
+    galois::StatTimer T("InnerTime");
     T.start();
-    Galois::for_each_local(initialWL, Process3(this, graph, pre, post), Galois::wl<dOBIM>(), Galois::loopname("mainloop"));   
+    galois::for_each_local(initialWL, Process3(this, graph, pre, post), galois::wl<dOBIM>(), galois::loopname("mainloop"));   
     T.stop();
   }
 
@@ -728,21 +728,21 @@ struct PrtDeg {
     float getResidual() { return residual; }
   };
   
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+  typedef galois::Graph::LC_InlineEdge_Graph<LNode,void>
     :: with_numa_alloc<true>::type
     :: with_no_lockable<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "PrtDeg"; }
 
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -753,13 +753,13 @@ struct PrtDeg {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
       data.id = idcount++;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
+      int outs = std::distance(g.edge_begin(n, galois::MethodFlag::UNPROTECTED), g.edge_end(n, galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
-      int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED));
+      int ins = std::distance(g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED), g.in_edge_end(n, galois::MethodFlag::UNPROTECTED));
       data.deg = outs + ins;
     }
   };
@@ -770,16 +770,16 @@ struct PrtDeg {
      
     Process1(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
-      LNode& data = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       // for each out-going neighbour, add residuals
-      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto jj : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getInEdgeDst(jj);
-	LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+	LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 	ddata.residual = (float) ddata.residual + (float) 1/data.nout;   
       }
     }
@@ -791,13 +791,13 @@ struct PrtDeg {
      
     Process2(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       (*this)(src);
     }
 
     void operator()(const GNode& src) {
       // scale the residual 
-      LNode& data = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       data.residual = alpha2*(1-alpha2)*data.residual;
     }
   }; //--- end of Process2
@@ -816,9 +816,9 @@ struct PrtDeg {
      
     Process3(PrtDeg* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
+    void operator()(const UpdateRequest& srcRq, galois::UserContext<UpdateRequest>& ctx) {
       GNode src = srcRq.second;
-      LNode* node = &graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode* node = &graph.getData(src, galois::MethodFlag::UNPROTECTED);
       int tmp=(*node).residual*amp/(*node).deg; // degree biased
       if(tmp != srcRq.first){
 	return;
@@ -829,17 +829,17 @@ struct PrtDeg {
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank() / ddata.nout;
       }
       node->pagerank = alpha2*sum + (1-alpha2);
      
       // update residual (consider each out-going edge)
-      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto jj : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         ddata.residual = (float) ddata.residual + (float) node->residual*alpha2/node->nout;
 	if(ddata.residual>tolerance){
 	  ctx.push(std::make_pair(ddata.residual*amp/ddata.deg, dst)); // degree biased
@@ -853,21 +853,21 @@ struct PrtDeg {
 
   void operator()(Graph& graph) {
   
-    Galois::for_each_local(graph, Process1(this, graph));
-    Galois::for_each_local(graph, Process2(this, graph)); 
+    galois::for_each_local(graph, Process1(this, graph));
+    galois::for_each_local(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedLIFO<16> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-     Galois::InsertBag<UpdateRequest> initialWL;
+     galois::InsertBag<UpdateRequest> initialWL;
     for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-	LNode& data = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+	LNode& data = graph.getData(src, galois::MethodFlag::UNPROTECTED);
         if(data.residual>tolerance){
 	  initialWL.push_back(std::make_pair(data.residual*amp/data.deg, src)); // degree biased
         }
     }
-    Galois::for_each_local(initialWL, Process3(this, graph), Galois::wl<OBIM>());   
+    galois::for_each_local(initialWL, Process3(this, graph), galois::wl<OBIM>());   
   }
 
 };
@@ -885,15 +885,15 @@ struct PrtDeg {
 //! Transpose in-edges to out-edges
 //![WriteGraph]
 static void precomputePullData() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void>
+  typedef galois::Graph::LC_CSR_Graph<size_t, void>
     ::with_no_lockable<true>::type InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef Galois::Graph::FileGraphWriter OutputGraph;
+  typedef galois::Graph::FileGraphWriter OutputGraph;
   //typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  Galois::Graph::readGraph(input, filename); 
+  galois::Graph::readGraph(input, filename); 
 
   size_t node_id = 0;
   for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {
@@ -961,18 +961,18 @@ void run() {
 
   algo.readGraph(graph);
 
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "Target max delta: " << tolerance << "\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all_local(graph, typename Algo::Initialize(graph));
   algo(graph);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify)
     printTop(graph, 10);
@@ -980,14 +980,14 @@ void run() {
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
 
   if (outputPullFilename.size()) {
     precomputePullData();
     return 0;
   }
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::pull: run<PullAlgo>(); break;

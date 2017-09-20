@@ -27,7 +27,7 @@
 
 #include "boost/iterator/iterator_adaptor.hpp"
 
-namespace Galois {
+namespace galois {
 
 //! Modify an iterator so that *it == it
 template<typename Iterator>

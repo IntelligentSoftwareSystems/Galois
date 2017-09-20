@@ -39,7 +39,7 @@ typedef struct Node
 
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int
-typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
+typedef galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
 
 typedef struct ThreadWorkItem
 {
@@ -99,7 +99,7 @@ struct sgd_block
 	
 	void operator()(ThreadWorkItem& workItem)
 	{
-		Galois::Timer timer;
+		galois::Timer timer;
 		timer.start();
 		int updates = 0;
 		
@@ -122,8 +122,8 @@ struct sgd_block
 			Node& movie_data = g.getData(movie);
 			
 			//for each edge in the range
-			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+			Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+			Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 			if(edge_it == edge_end) last_edge_reached++;
 			for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 			{
@@ -133,8 +133,8 @@ struct sgd_block
 				if(user > userRangeEnd)
 					break;
 				
-				Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
-				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
+				Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
+				unsigned int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);	
 				
 				//do gradient step
 				doGradientUpdate(movie_data, user_data, edge_rating);
@@ -164,7 +164,7 @@ struct sgd_block_users
 	
 	void operator()(ThreadWorkItem& workItem)
 	{
-		Galois::Timer timer;
+		galois::Timer timer;
 		timer.start();
 		int updates = 0;
 		
@@ -197,8 +197,8 @@ struct sgd_block_users
 				unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
 				
 				//for each edge in the range
-				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+				Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+				Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 				if(edge_it == edge_end) last_edge_reached++;
 				for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 				{
@@ -208,8 +208,8 @@ struct sgd_block_users
 					if(user > currentBlockSliceEndUserId)
 						break;
 					
-					Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
+					Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
+					unsigned int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);	
 					
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating);
@@ -241,7 +241,7 @@ struct sgd_block_users_movies
 	
 	void operator()(ThreadWorkItem& workItem) const
 	{
-		Galois::Timer timer;
+		galois::Timer timer;
 		timer.start();
 		int updates = 0;
 		
@@ -281,8 +281,8 @@ struct sgd_block_users_movies
 					unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
 					
 					//for each edge in the range
-					Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-					Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+					Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+					Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 					for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 					{
 						Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -291,8 +291,8 @@ struct sgd_block_users_movies
 						if(user > currentBlockSliceEndUserId)
 							break;
 						
-						Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
-						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
+						Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
+						unsigned int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);	
 						
 						//do gradient step
 						doGradientUpdate(movie_data, user_data, edge_rating);
@@ -343,8 +343,8 @@ struct advance_edge_iterators
 			Node& movie_data = g.getData(movie);
 
 			//for each edge in the range
-			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+			Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+			Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 			for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 			{
 				Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -372,8 +372,8 @@ void count_ratings(Graph& g, unsigned threadCount)
 		Node& movie_data = g.getData(movie);
 
 		//for each edge in the range
-		Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-		Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+		Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+		Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 		for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 		{
 			Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -445,7 +445,7 @@ unsigned int initializeGraphData(Graph& g)
 		
 		//count number of movies we've seen; only movies nodes have edges
 		unsigned int num_edges = 
-			g.edge_end(gnode, Galois::MethodFlag::UNPROTECTED) - g.edge_begin(gnode, Galois::MethodFlag::UNPROTECTED);
+			g.edge_end(gnode, galois::MethodFlag::UNPROTECTED) - g.edge_begin(gnode, galois::MethodFlag::UNPROTECTED);
 		if(num_edges > 0)
 			numMovieNodes++;
 		
@@ -499,7 +499,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	//move the edge iterators of each movie to the start of the current block
 	//advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
 	//userRangeStart isn't needed after this point
-	Galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
+	galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
 	
 	unsigned long** updates = new unsigned long*[numWorkItems];
 	for(int i = 0; i < numWorkItems; i++)
@@ -515,7 +515,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 		{	
 			std::cout << "Update " << update << " Block " << j << std::endl;
 			//assign one ThreadWorkItem to each thread statically
-			Galois::do_all(workItems + 0, workItems + numWorkItems, sgd_block_users_movies(g));
+			galois::do_all(workItems + 0, workItems + numWorkItems, sgd_block_users_movies(g));
 
 			//move each thread's assignment of work one block to the right
 			//(for the same movie nodes, look at the next range of user nodes)
@@ -545,7 +545,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	}
 }
 
-typedef Galois::Substrate::SimpleLock spinlock;
+typedef galois::Substrate::SimpleLock spinlock;
 
 struct sgd_march
 {
@@ -555,7 +555,7 @@ struct sgd_march
 	
 	void operator()(ThreadWorkItem& workItem) const
 	{
-		Galois::Timer timer;
+		galois::Timer timer;
 		timer.start();
 		unsigned int updates = 0;
 		unsigned int conflicts = 0;
@@ -605,8 +605,8 @@ struct sgd_march
 				//printf("movie %d edge_offset %d\n", movie, movie_data.edge_offset);
 
 				//for each edge in the range
-				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
+				Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+				Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
 				for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 				{
 					Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -617,8 +617,8 @@ struct sgd_march
 						break;
 					//printf("okay user %d\n", user - NUM_MOVIE_NODES);
 					
-					Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
+					Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
+					unsigned int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);	
 					
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating);
@@ -704,8 +704,8 @@ void runSliceMarch(Graph& g, unsigned int threadCount, unsigned int usersPerBloc
 	//move the edge iterators of each movie to the start of the current block
 	//advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
 	//userRangeStart isn't needed after this point
-	Galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
-	Galois::do_all(workItems + 0, workItems + numWorkItems, sgd_march(g, locks));
+	galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
+	galois::do_all(workItems + 0, workItems + numWorkItems, sgd_march(g, locks));
 	
 	
 	/*for(unsigned int i = 0; i < numWorkItems; i++)
@@ -729,16 +729,16 @@ int main(int argc, char** argv)
 	unsigned int usersPerBlockSlice = atoi(argv[3]);
 
 	//how many threads Galois should use
-	Galois::setActiveThreads(threadCount);
+	galois::setActiveThreads(threadCount);
 
 	//prints out the number of conflicts at the end of the program
-	Galois::StatManager statManager;
+	galois::StatManager statManager;
 
 	//allocate local computation graph
 	Graph g;
 
 	//read structure of graph & edge weights; nodes not initialized
-    Galois::Graph::readGraph(g, inputFile);
+    galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
 	unsigned int numMovieNodes = initializeGraphData(g);
@@ -750,7 +750,7 @@ int main(int argc, char** argv)
 	NUM_MOVIE_NODES = numMovieNodes;
 	NUM_USER_NODES = numUserNodes;
 
-	Galois::StatTimer timer;
+	galois::StatTimer timer;
 	timer.start();
 	
 	//block the matrix, run columns within the blocks

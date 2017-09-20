@@ -3,7 +3,7 @@ std::vector<typename Graph::GraphNode> getDegSortedNodes(Graph& g) {
   std::vector<typename Graph::GraphNode> nodes;
   nodes.reserve(std::distance(g.begin(), g.end()));
   std::copy(g.begin(), g.end(), std::back_insert_iterator<decltype(nodes)>(nodes));
-  Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
+  galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
                             [&g](const typename Graph::GraphNode& lhs, 
                                  const typename  Graph::GraphNode& rhs) {
                               return std::distance(g.edge_begin(lhs), g.edge_end(lhs))
@@ -17,7 +17,7 @@ std::vector<typename Graph::GraphNode> getPRSortedNodes(Graph& g) {
   std::vector<typename Graph::GraphNode> nodes;
   nodes.reserve(std::distance(g.begin(), g.end()));
   std::copy(g.begin(), g.end(), std::back_insert_iterator<decltype(nodes)>(nodes));
-  Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
+  galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
                             [&g](const typename Graph::GraphNode& lhs, 
                                  const typename  Graph::GraphNode& rhs) {
                               return g.getData(lhs).getPageRank() > g.getData(rhs).getPageRank();
@@ -39,7 +39,7 @@ struct PPRAsyncRsd {
     float getPageRank(int x = 0) const { return value; }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>
     ::with_numa_alloc<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
@@ -47,7 +47,7 @@ struct PPRAsyncRsd {
   std::string name() const { return "PPRAsyncRsd"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
-    Galois::Graph::readGraph(graph, filename); 
+    galois::Graph::readGraph(graph, filename); 
   }
 
   struct Process2 {
@@ -55,7 +55,7 @@ struct PPRAsyncRsd {
      
     Process2(Graph& g): graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
       LNode& sdata = graph.getData(src);
       if (sdata.residual < tolerance){
         sdata.flag = false;
@@ -65,9 +65,9 @@ struct PPRAsyncRsd {
       // the node is processed
       sdata.flag = false;
       double sum = 0;
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         sum += ddata.value / std::distance(graph.edge_begin(dst), graph.edge_end(dst));
       }
       float value = alpha * sum + (sdata.seedset ? (1.0 - alpha) : 0.0);
@@ -77,9 +77,9 @@ struct PPRAsyncRsd {
         sdata.value = value;
         //std::cout << src << " " << sdata.value << "\n";
         // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+	  LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 	  ddata.residual += sdata.residual*alpha/std::distance(graph.edge_begin(src), graph.edge_end(src)); // update residual
 	  // if the node is not in the worklist and the residual is greater than tolerance
 	  if(!ddata.flag && ddata.residual>=tolerance) {
@@ -176,8 +176,8 @@ struct PPRAsyncRsd {
     graph.getData(seed).seedset = true;
     graph.getData(seed).value = 1 - alpha;
 
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process2(graph), Galois::wl<WL>());
+    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    galois::for_each_local(graph, Process2(graph), galois::wl<WL>());
   }
 };
 

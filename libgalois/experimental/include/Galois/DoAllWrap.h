@@ -47,7 +47,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-namespace Galois {
+namespace galois {
 
 enum DoAllTypes { 
   DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL, 
@@ -91,7 +91,7 @@ struct DoAllImpl<DO_ALL_OLD> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, 
                          const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen_old(range, func, 
+    galois::Runtime::do_all_gen_old(range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<false> ()), argsTuple));
   }
 };
@@ -101,7 +101,7 @@ struct DoAllImpl<DO_ALL_OLD_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go(const R& range, const F& func, 
                         const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen_old (range, func, 
+    galois::Runtime::do_all_gen_old (range, func, 
         std::tuple_cat(std::make_tuple(do_all_steal<true>()), argsTuple));
   }
 };
@@ -127,11 +127,11 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     const unsigned CHUNK_SIZE = 128;
     //const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
 
-    using WL_ty =  Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
+    using WL_ty =  galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T>;
 
-    Galois::Runtime::for_each_gen(range, FuncWrap<T, F> {func},
+    galois::Runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::tuple_cat(
-          std::make_tuple(Galois::wl<WL_ty>(), 
+          std::make_tuple(galois::wl<WL_ty>(), 
              does_not_need_push(),
              does_not_need_aborts()),
           argsTuple));
@@ -142,7 +142,7 @@ template <>
 struct DoAllImpl<DO_ALL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    Galois::Runtime::do_all_gen(range, func, argsTuple);
+    galois::Runtime::do_all_gen(range, func, argsTuple);
   }
 };
 
@@ -167,7 +167,7 @@ struct DoAllImpl<DO_ALL_RANGE> {
 
     assert(thread_ranges != nullptr);
 
-    Galois::Runtime::do_all_gen(Runtime::makeSpecificRange(range.begin(),
+    galois::Runtime::do_all_gen(Runtime::makeSpecificRange(range.begin(),
                                     range.end(), thread_ranges),
                                     func, argsTuple);
   }
@@ -239,7 +239,7 @@ struct DoAllImpl<DOALL_RANGE> {
       get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
     assert(thread_ranges != nullptr);
 
-    Galois::Runtime::do_all_gen(
+    galois::Runtime::do_all_gen(
       Runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
       func, 
       std::tuple_cat(std::make_tuple(do_all_steal<false>()), argsTuple)
@@ -288,6 +288,6 @@ void do_all_choice (const R& range, const F& func, const ArgsTuple& argsTuple) {
   do_all_choice (range, func, doAllKind, argsTuple);
 }
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_DOALL_WRAPPER_H

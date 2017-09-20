@@ -30,7 +30,7 @@
 
 #include "Galois/Runtime/Context.h"
 
-namespace Galois {
+namespace galois {
   namespace Graph {
 
     template<typename NodeTy, typename EdgeTy>
@@ -294,7 +294,7 @@ namespace Galois {
           return Starts[host].first + offset;
         }
 
-        void acquireNode(Runtime::gptr<NodeImplTy> node, Galois::MethodFlag mflag) {
+        void acquireNode(Runtime::gptr<NodeImplTy> node, galois::MethodFlag mflag) {
           acquire(node, mflag);
         }
 
@@ -477,6 +477,6 @@ namespace Galois {
       };
 
   } //namespace Graph
-} //namespace Galois
+} //namespace galois
 
 #endif

@@ -53,11 +53,11 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
@@ -154,10 +154,10 @@ class DEStwoPhase:
     void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       if (recvInfo.isReady (event)) {
-        graph.getData (recvInfo.node, Galois::MethodFlag::WRITE);
+        graph.getData (recvInfo.node, galois::MethodFlag::WRITE);
 
       } else {
-        Galois::Runtime::signalConflict ();
+        galois::Runtime::signalConflict ();
       }
     }
   };
@@ -249,7 +249,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -267,13 +267,13 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_ikdg (
-        Galois::Runtime::makeStandardRange(
+    galois::Runtime::for_each_ordered_ikdg (
+        galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
-        std::make_tuple (Galois::loopname("des-ikdg")));
+        std::make_tuple (galois::loopname("des-ikdg")));
         // ReadyTest (sobjInfoVec));
 
     std::cout << "Number of events processed= " << 

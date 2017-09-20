@@ -31,14 +31,14 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_COMPARATOR_H
 #define GALOIS_RUNTIME_CONTEXT_COMPARATOR_H
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_CONTEXT_COMPARATOR_H

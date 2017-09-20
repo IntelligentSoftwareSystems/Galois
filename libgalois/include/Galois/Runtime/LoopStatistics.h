@@ -24,7 +24,7 @@
  */
 #ifndef GALOIS_RUNTIME_LOOPSTATISTICS_H
 #define GALOIS_RUNTIME_LOOPSTATISTICS_H
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 // Usually instantiated per thread 

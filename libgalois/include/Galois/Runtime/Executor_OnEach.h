@@ -43,7 +43,7 @@
 
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template <typename FunctionTy, typename ArgsTy> 
@@ -91,6 +91,6 @@ void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

@@ -41,17 +41,17 @@
 #include <iostream>
 #include <fstream>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 extern unsigned activeThreads;
 } } //end namespaces
 
-using namespace Galois;
-using namespace Galois::Runtime;
+using namespace galois;
+using namespace galois::Runtime;
 
-static Galois::Runtime::StatCollector* SC;
+static galois::Runtime::StatCollector* SC;
 
-void Galois::Runtime::internal::setStatCollector(Galois::Runtime::StatCollector* sc) {
+void galois::Runtime::internal::setStatCollector(galois::Runtime::StatCollector* sc) {
   GALOIS_ASSERT(!(SC && sc), "StatCollector.cpp: Double Initialization of SC");
   SC = sc;
 }
@@ -61,19 +61,19 @@ StatCollector::StatCollector(const std::string& outfile): m_outfile(outfile) {}
 StatCollector::~StatCollector() {
 }
 
-const std::string* Galois::Runtime::StatCollector::getSymbol(const std::string& str) const {
+const std::string* galois::Runtime::StatCollector::getSymbol(const std::string& str) const {
   auto ii = symbols.find(str);
   if (ii == symbols.cend())
     return nullptr;
   return &*ii;
 }
 
-const std::string* Galois::Runtime::StatCollector::getOrInsertSymbol(const std::string& str) {
+const std::string* galois::Runtime::StatCollector::getOrInsertSymbol(const std::string& str) {
   auto ii = symbols.insert(str);
   return &*ii.first;
 }
 
-unsigned Galois::Runtime::StatCollector::getInstanceNum(const std::string& str) const {
+unsigned galois::Runtime::StatCollector::getInstanceNum(const std::string& str) const {
   auto s = getSymbol(str);
   if (!s)
     return 0;
@@ -83,7 +83,7 @@ unsigned Galois::Runtime::StatCollector::getInstanceNum(const std::string& str) 
   return ii->second;
 }
 
-void Galois::Runtime::StatCollector::addInstanceNum(const std::string& str) {
+void galois::Runtime::StatCollector::addInstanceNum(const std::string& str) {
   auto s = getOrInsertSymbol(str);
   auto ii = std::lower_bound(loopInstances.begin(), loopInstances.end(), s, [] (const StringPair<unsigned>& s1, const std::string* s2) { return s1.first < s2; } );
   if (ii == loopInstances.end() || s != ii->first) {
@@ -94,25 +94,25 @@ void Galois::Runtime::StatCollector::addInstanceNum(const std::string& str) {
   }
 }
 
-// using Galois::Runtime::StatCollector::RecordTy;
+// using galois::Runtime::StatCollector::RecordTy;
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(size_t value) :mode(StatCollector::RecordTy::INT), valueInt(value) {}
+galois::Runtime::StatCollector::RecordTy::RecordTy(size_t value) :mode(StatCollector::RecordTy::INT), valueInt(value) {}
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(double value) :mode(StatCollector::RecordTy::DOUBLE), valueDouble(value) {}
+galois::Runtime::StatCollector::RecordTy::RecordTy(double value) :mode(StatCollector::RecordTy::DOUBLE), valueDouble(value) {}
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string& value) :mode(StatCollector::RecordTy::STR), valueStr(value) {}
+galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string& value) :mode(StatCollector::RecordTy::STR), valueStr(value) {}
 
 size_t StatCollector::RecordTy::intVal(void) const { return valueInt; }
 double StatCollector::RecordTy::doubleVal(void) const { return valueDouble; }
 const std::string& StatCollector::RecordTy::strVal(void) const { return valueStr; }
 
-Galois::Runtime::StatCollector::RecordTy::~RecordTy() {
+galois::Runtime::StatCollector::RecordTy::~RecordTy() {
   using string_type = std::string;
   if (mode == RecordTy::STR)
     valueStr.~string_type();
 }
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.mode) {
+galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.mode) {
   switch(mode) {
     case RecordTy::INT: valueInt    = r.valueInt;    break;
     case RecordTy::DOUBLE: valueDouble = r.valueDouble; break;
@@ -120,7 +120,7 @@ Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.m
   }
 }
 
-void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
+void galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
   switch(mode) {
     case RecordTy::INT: out << valueInt;    break;
     case RecordTy::DOUBLE: out << valueDouble; break;
@@ -128,7 +128,7 @@ void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
   }
 }
 
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID) {
+void galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID) {
   MAKE_LOCK_GUARD(StatsLock);
   auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
@@ -138,7 +138,7 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
   }
 }
 
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID) {
+void galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID) {
   MAKE_LOCK_GUARD(StatsLock);
   auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
@@ -148,7 +148,7 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
   }
 }
 
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
+void galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
   MAKE_LOCK_GUARD(StatsLock);
   auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
   auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
@@ -158,8 +158,8 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
   }
 }
 
-boost::uuids::uuid Galois::Runtime::StatCollector::UUID;
-boost::uuids::uuid Galois::Runtime::StatCollector::getUUID(){
+boost::uuids::uuid galois::Runtime::StatCollector::UUID;
+boost::uuids::uuid galois::Runtime::StatCollector::getUUID(){
   if(UUID.is_nil()){
     boost::uuids::random_generator generator;
     UUID = generator();
@@ -170,7 +170,7 @@ boost::uuids::uuid Galois::Runtime::StatCollector::getUUID(){
   }
 }
 //assumne called serially
-void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
+void galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
   if (json)
     out << "[\n";
   else
@@ -188,7 +188,7 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
     out << "]\n";
 }
 
-void Galois::Runtime::StatCollector::printStats(void) {
+void galois::Runtime::StatCollector::printStats(void) {
   if (m_outfile == "") {
     printStatsForR(std::cout, false);
 
@@ -206,7 +206,7 @@ void Galois::Runtime::StatCollector::printStats(void) {
 //Assume called serially
 //still assumes int values
 //This ignores HostID.  Thus this is not safe for the network version
-void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
+void galois::Runtime::StatCollector::printStats(std::ostream& out) {
   std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
   unsigned maxThreadID = 0;
   //Find all loops and keys
@@ -239,51 +239,51 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   }
 }
 
-void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
+void galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);
 }
 
-void Galois::Runtime::reportLoopInstance(const char* loopname) {
+void galois::Runtime::reportLoopInstance(const char* loopname) {
   SC->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
 
-void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
+void galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
   SC->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value, TID, 0);
 }
-void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID) {
+void galois::Runtime::reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID) {
   SC->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
 		      value, TID, 0);
 }
 
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
+void galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
   SC->addToStat(loopname, category, value, TID, 0);
 }
 
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
+void galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID) {
   SC->addToStat(loopname, category, value, TID, 0);
 }
 
-void Galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const size_t value, unsigned TID, unsigned HostID) {
+void galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const size_t value, unsigned TID, unsigned HostID) {
   SC->addToStat(loopname, category, value, TID, HostID);
 }
 
-void Galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const double value, unsigned TID, unsigned HostID) {
+void galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const double value, unsigned TID, unsigned HostID) {
   SC->addToStat(loopname, category, value, TID, HostID);
 }
 
-void Galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
+void galois::Runtime::reportStatDist(const std::string& loopname, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
   SC->addToStat(loopname, category, value, TID, HostID);
 }
 
-void Galois::Runtime::reportPageAlloc(const char* category) {
-  for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
+void galois::Runtime::reportPageAlloc(const char* category) {
+  for (unsigned x = 0; x < galois::Runtime::activeThreads; ++x)
     reportStat("(NULL)", category, static_cast<unsigned long>(numPagePoolAllocForThread(x)), x);
 }
 
-void Galois::Runtime::reportNumaAlloc(const char* category) {
+void galois::Runtime::reportNumaAlloc(const char* category) {
   int nodes = Substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {
     //auto rStat = Stats.getRemote(x);

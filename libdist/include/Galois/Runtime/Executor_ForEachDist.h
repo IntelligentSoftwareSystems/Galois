@@ -69,7 +69,7 @@
 #include <utility>
 #include <iostream>
 
-namespace Galois {
+namespace galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
 
@@ -264,7 +264,7 @@ protected:
   }
 
   void runQueueSimple(ThreadLocalData& tld) {
-    Galois::optional<value_type> p;
+    galois::optional<value_type> p;
     while ((p = wl.pop())) {
       doProcess(*p, tld);
     }
@@ -272,7 +272,7 @@ protected:
 
   template<int limit, typename WL>
   void runQueue(ThreadLocalData& tld, WL& lwl) {
-    Galois::optional<typename WL::value_type> p;
+    galois::optional<typename WL::value_type> p;
     int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
@@ -613,16 +613,16 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
     //typedef typename BaseWorkListTy::value_type value_type_base;
     /** Construct new worklist **/
-    typedef Galois::InsertBag<value_type> Bag;
+    typedef galois::InsertBag<value_type> Bag;
     Bag bag;
     auto ytpl = get_tuple_without(wl_tag{}, tpl);
-    auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<Galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
+    auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
     std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
     //std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + helper_fn.get_run_identifier());
-    Galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
+    galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
 
     helper_fn.set_num_iter(0);
     Timer_for_each_impl.start();
@@ -632,9 +632,9 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
     Timer_for_each_impl.stop();
-    Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
+    galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), r.end() - r.begin(), 0);
 
-    typedef Galois::DGBag<value_type, decltype(helper_fn)> DBag;
+    typedef galois::DGBag<value_type, decltype(helper_fn)> DBag;
     DBag dbag(helper_fn, loopName);
     auto &local_wl = DBag::get();
 
@@ -643,7 +643,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
 
     dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
-    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+    std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
     dbag.sync();
 
@@ -653,7 +653,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     while(!dbag.canTerminate()) {
       helper_fn.set_num_iter(num_iterations);
 
-      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
+      //std::cout << "["<< galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 
       // call for_each again.
       Timer_for_each_impl.start();
@@ -666,20 +666,20 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
       }
       Timer_for_each_impl.stop();
-      Galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), local_wl.end() - local_wl.begin(), 0);
+      galois::Runtime::reportStat("(NULL)", "NUM_WORK_ITEMS_" + (helper_fn.get_run_identifier()), local_wl.end() - local_wl.begin(), 0);
 
       // Sync
       helper_fn.sync_graph();
 
       dbag.set(bag);
 #ifdef __GALOIS_DEBUG_WORKLIST__
-      std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
+      std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID << "] worklist size : " << std::distance(bag.begin(), bag.end()) << "\n";
 #endif
       dbag.sync();
 
       ++num_iterations;
     }
-    Galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
+    galois::Runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(helper_fn.get_run_num()), (unsigned long)num_iterations, 0);
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 
@@ -750,5 +750,5 @@ void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleT
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 #endif

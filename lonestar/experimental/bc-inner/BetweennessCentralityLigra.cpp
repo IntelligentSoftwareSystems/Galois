@@ -90,11 +90,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace Galois::Graph;
+  using namespace galois::Graph;
   if (symmetricGraph) {
-    Galois::Graph::readGraph(graph, filename);
+    galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -102,7 +102,7 @@ void readInOutGraph(Graph& graph) {
 
 #ifdef GALOIS_USE_EXP
 template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
   //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
   //behavor with std::atomic<int>
@@ -139,16 +139,16 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool visited;
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef typename galois::Graph::LC_CSR_Graph<SNode,void>
     ::template with_no_lockable<true>::type 
     ::template with_numa_alloc<true>::type InnerGraph;
 
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph> >::type
+          galois::Graph::OCImmutableEdgeGraph<SNode,void>,
+          galois::Graph::LC_InOut_Graph<InnerGraph> >::type
           Graph;
   typedef typename Graph::GraphNode GNode;
-  typedef Galois::GraphNodeBag<1024*4> Bag;
+  typedef galois::GraphNodeBag<1024*4> Bag;
 
   std::string name() const { return UseGraphChi ? "LigraChi" : "Ligra"; }
 
@@ -161,7 +161,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      SNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.numPaths.write(0.0);
       data.dependencies.write(0.0);
       data.visited = false;
@@ -171,13 +171,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct ForwardPass {
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return !graph.getData(n, Galois::MethodFlag::UNPROTECTED).visited; 
+      return !graph.getData(n, galois::MethodFlag::UNPROTECTED).visited; 
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      SNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
       float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths.read());
       return oldValue == 0.0;
@@ -187,20 +187,20 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct BackwardPass {
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return !graph.getData(n, Galois::MethodFlag::UNPROTECTED).visited; 
+      return !graph.getData(n, galois::MethodFlag::UNPROTECTED).visited; 
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      SNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       float oldValue = ddata.dependencies.atomicIncrement(sdata.dependencies.read());
       return oldValue == 0.0;
     }
   };
 
   void operator()(Graph& graph, GNode source) {
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::WorkList::dChunkedFIFO<256> WL;
     std::deque<Bag*> levels;
 
     graph.getData(source).visited = true;
@@ -214,50 +214,50 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       ++round;
       Bag* output = new Bag(graph.size());
       this->outEdgeMap(memoryLimit, graph, ForwardPass(), *frontier, *output, false);
-      //Galois::do_all_local(*output, [&](GNode n) {
-      //Galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      Galois::for_each_local(*output, [&](size_t id, Galois::UserContext<size_t>&) {
-        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
+      //galois::do_all_local(*output, [&](GNode n) {
+      //galois::do_all(output->begin(), output->end(), [&](GNode n) {
+      galois::for_each_local(*output, [&](size_t id, galois::UserContext<size_t>&) {
+        SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
         d.visited = true;
-        },Galois::wl<WL>()); 
+        },galois::wl<WL>()); 
       levels.push_back(output);
       frontier = output;
     }
 
     delete levels[round];
 
-    Galois::do_all_local(graph, [&](GNode n) {
-        SNode& d = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+    galois::do_all_local(graph, [&](GNode n) {
+        SNode& d = graph.getData(n, galois::MethodFlag::UNPROTECTED);
         d.numPaths.write(1.0/d.numPaths.read());
         d.visited = false;
     });
 
     frontier = levels[round-1];
 
-    //Galois::do_all_local(*frontier, [&](GNode n) {
-    Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
-      SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
+    //galois::do_all_local(*frontier, [&](GNode n) {
+    galois::for_each_local(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
+      SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
       d.visited = true;
       d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-      }, Galois::wl<WL>());
+      }, galois::wl<WL>());
 
     for (int r = round - 2; r >= 0; --r) {
       Bag output(graph.size());
       this->inEdgeMap(memoryLimit, graph, BackwardPass(), *frontier, output, false);
       delete frontier;
       frontier = levels[r];
-      //Galois::do_all_local(*frontier, [&](GNode n) {
-      Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
-        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
+      //galois::do_all_local(*frontier, [&](GNode n) {
+      galois::for_each_local(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
+        SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
         d.visited = true;
         d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-        }, Galois::wl<WL>());
+        }, galois::wl<WL>());
     }
 
     delete frontier;
 
-    Galois::do_all_local(graph, [&](GNode n) {
-      SNode& d = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+    galois::do_all_local(graph, [&](GNode n) {
+      SNode& d = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       d.dependencies.write((d.dependencies.read() - d.numPaths.read())
           / d.numPaths.read());
     });
@@ -276,17 +276,17 @@ void run() {
 
   initialize(algo, graph, source);
 
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all_local(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     int count = 0;
@@ -304,10 +304,10 @@ void run() {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
 #ifdef GALOIS_USE_EXP

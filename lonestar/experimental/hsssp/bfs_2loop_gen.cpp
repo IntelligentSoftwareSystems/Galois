@@ -115,7 +115,7 @@ struct InitializeGraph {
     		InitializeGraph_cuda(src_node, cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>("");
     _graph.sync_pull<SyncerPull_1>("");
@@ -125,7 +125,7 @@ struct InitializeGraph {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
     sdata.dist_old = std::numeric_limits<unsigned long long>::max()/4;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if((net.ID == 0) && (src == local_src_node)){
       sdata.dist_current = 0;
       sdata.dist_old = 0;
@@ -153,7 +153,7 @@ struct FirstItr_BFS {
     			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
     			else if (personality == CPU)
     		#endif
-    				{ Galois::atomicMin(node.dist_current, y);}
+    				{ galois::atomicMin(node.dist_current, y);}
     		}
     		static void reset (uint32_t node_id, struct NodeData & node ) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -169,13 +169,13 @@ struct FirstItr_BFS {
     		FirstItr_BFS_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), FirstItr_BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
+    galois::do_all(_graph.begin(), _graph.end(), FirstItr_BFS { &_graph }, galois::loopname("BFS"), galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
     _graph.sync_push<Syncer_0>("");
     
 
   }
 
-  void operator()(GNode src){/*, Galois::UserContext<GNode>& ctx) const {*/
+  void operator()(GNode src){/*, galois::UserContext<GNode>& ctx) const {*/
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.dist_current;
 
@@ -183,7 +183,7 @@ struct FirstItr_BFS {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned long long new_dist = 1 + sdist;
-      Galois::atomicMin(dnode.dist_current, new_dist);
+      galois::atomicMin(dnode.dist_current, new_dist);
     }
   }
 };
@@ -191,7 +191,7 @@ struct FirstItr_BFS {
 
 struct BFS {
   Graph* graph;
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  static galois::DGAccumulator<int> DGAccumulator_accum;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -214,7 +214,7 @@ struct BFS {
       			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
-      				{ Galois::atomicMin(node.dist_current, y);}
+      				{ galois::atomicMin(node.dist_current, y);}
       		}
       		static void reset (uint32_t node_id, struct NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -232,7 +232,7 @@ struct BFS {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
+      galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, galois::loopname("BFS"), galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
       _graph.sync_push<Syncer_0>("");
       ++iterations;
 
@@ -241,7 +241,7 @@ struct BFS {
       std::cout << "Iterations XXXXXXXXXXXXXX : " << iterations << "\n" ;
   }
 
-  void operator()(GNode src){/*, Galois::UserContext<GNode>& ctx) const {*/
+  void operator()(GNode src){/*, galois::UserContext<GNode>& ctx) const {*/
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.dist_current;
 
@@ -252,17 +252,17 @@ struct BFS {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
         unsigned long long new_dist = 1 +  sdist;
-        Galois::atomicMin(dnode.dist_current, new_dist);
+        galois::atomicMin(dnode.dist_current, new_dist);
       }
     }
   }
 };
-Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
+galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 
 
 /********Set source Node ************/
 void setSource(Graph& _graph){
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   if(net.ID == 0){
     auto& nd = _graph.getData(src_node);
     nd.dist_current = 0;
@@ -272,8 +272,8 @@ void setSource(Graph& _graph){
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_BFS1, T_BFS2, T_BFS3;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_BFS1, T_BFS2, T_BFS3;
 
     T_total.start();
 
@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS1 : " << T_BFS1.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "BFS::go run2 called  on " << net.ID << "\n";
@@ -315,7 +315,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS2 : " << T_BFS2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "BFS::go run3 called  on " << net.ID << "\n";
@@ -334,7 +334,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

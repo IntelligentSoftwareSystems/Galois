@@ -67,7 +67,7 @@ struct InitializeGraph {
 
      struct Syncer_0 {
     	static float extract( const struct PR_NodeData & node){ return node.residual; }
-    	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+    	static void reduce (struct PR_NodeData & node, float y) { galois::atomicAdd(node.residual, y);}
     	static void reset (struct PR_NodeData & node ) { node.residual = 0; }
     	typedef float ValTy;
     };
@@ -81,7 +81,7 @@ struct InitializeGraph {
     	static void setVal (struct PR_NodeData & node, unsigned int y) {node.nout = y; }
     	typedef unsigned int ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init"), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "0"));
     _graph.sync_push<Syncer_0>();
     _graph.sync_pull<SyncerPull_0>();
     _graph.sync_pull<SyncerPull_1>();
@@ -98,7 +98,7 @@ struct InitializeGraph {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        galois::atomicAdd(ddata.residual, delta);
       }
     }
   }
@@ -109,7 +109,7 @@ static uint32_t num_Hosts_recvd = 0;
 static bool didWork = false;
 static std::vector<bool> others_didWork_vec;
 
-static void didWork_landingPad(Galois::Runtime::RecvBuffer& buf){
+static void didWork_landingPad(galois::Runtime::RecvBuffer& buf){
   //receive didWork from all and decide.
   uint32_t x_id;
   bool x_didWork;
@@ -124,7 +124,7 @@ struct PageRank {
   void static go(Graph& _graph) {
      struct Syncer_0 {
     	static float extract( const struct PR_NodeData & node){ return node.residual; }
-    	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+    	static void reduce (struct PR_NodeData & node, float y) { galois::atomicAdd(node.residual, y);}
     	static void reset (struct PR_NodeData & node ) { node.residual = 0; }
     	typedef float ValTy;
     };
@@ -134,10 +134,10 @@ struct PageRank {
     	typedef float ValTy;
     };
 
-     Galois::Timer T_compute, T_comm, T_comm_push, T_comm_pull;
+     galois::Timer T_compute, T_comm, T_comm_push, T_comm_pull;
 
     T_compute.start(); 
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
+    galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, galois::loopname("pageRank"), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "0"));
     T_compute.stop();
 
     T_comm.start();
@@ -151,8 +151,8 @@ struct PageRank {
     T_comm.stop();
 
 
-    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
-    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)  T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
+    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)  T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
   
 
   }
@@ -167,7 +167,7 @@ struct PageRank {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+        auto dst_residual_old = galois::atomicAdd(ddata.residual, delta);
         if(!didWork && (dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
           didWork = true;
         }
@@ -180,8 +180,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
     T_total.start();
 
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
         if(x == net.ID)
           continue;
         //Exchange didWorks to decide if done.
-        Galois::Runtime::SendBuffer b;
+        galois::Runtime::SendBuffer b;
         gSerialize(b, net.ID, didWork);
         net.send(x,didWork_landingPad, b);
       }
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
         std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        //Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
       }
     }
     return 0;

@@ -67,12 +67,12 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 typedef int EdgeData;
 
-struct Node: public Galois::UnionFindNode<Node> {
+struct Node: public galois::UnionFindNode<Node> {
   std::atomic<EdgeData*> lightest;
-  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
+  Node(): galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>
+typedef galois::Graph::LC_CSR_Graph<Node,EdgeData>
   ::with_numa_alloc<true>::type
   ::with_no_lockable<true>::type Graph;
 
@@ -92,7 +92,7 @@ struct Edge {
   Edge(const GNode& s, const GNode& d, const EdgeData* w): src(s), dst(d), weight(w) { }
 };
 
-Galois::InsertBag<Edge> mst;
+galois::InsertBag<Edge> mst;
 EdgeData inf;
 EdgeData heaviest;
 
@@ -108,7 +108,7 @@ struct ParallelAlgo {
     WorkItem(const GNode& s, const GNode& d, const EdgeData* w, int c): edge(s, d, w), cur(c) { }
   };
 
-  typedef Galois::InsertBag<WorkItem> WL;
+  typedef galois::InsertBag<WorkItem> WL;
 
   WL wls[3];
   WL* current;
@@ -123,15 +123,15 @@ struct ParallelAlgo {
   template<bool useLimit, typename Context, typename Pending>
   static void findLightest(ParallelAlgo* self,
       const GNode& src, int cur, Context& ctx, Pending& pending) {
-    Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
+    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
     std::advance(ii, cur);
 
     for (; ii != ei; ++ii, ++cur) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       EdgeData& weight = graph.getEdgeData(ii);
       if (useLimit && weight > self->limit) {
         pending.push(WorkItem(src, dst, &weight, cur));
@@ -170,7 +170,7 @@ struct ParallelAlgo {
 
     template<typename Context,typename Pending>
     void operator()(const GNode& src, Context& ctx, Pending& pending) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       sdata.lightest = &inf;
       findLightest<false>(self, src, 0, ctx, pending);
     }
@@ -197,13 +197,13 @@ struct ParallelAlgo {
     template<typename Context, typename Pending>
     void operator()(const WorkItem& item, Context& ctx, Pending& pending) const {
       GNode src = item.edge.src;
-      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Node* rep = sdata.findAndCompress();
       int cur = item.cur;
 
       if (rep->lightest == item.edge.weight) {
         GNode dst = item.edge.dst;
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         if ((rep = sdata.merge(&ddata))) {
           rep->lightest = &inf;
           mst.push(Edge(src, dst, item.edge.weight));
@@ -243,18 +243,18 @@ struct ParallelAlgo {
   }
 
   void process() {
-    Galois::Statistic rounds("Rounds");
+    galois::Statistic rounds("Rounds");
 
     init();
 
-    Galois::do_all_local(graph, Initialize(this));
+    galois::do_all_local(graph, Initialize(this));
     while (true) {
       while (true) {
         rounds += 1;
 
         std::swap(current, next);
-        Galois::do_all_local(*current, Merge(this));
-        Galois::do_all_local(*current, Find(this));
+        galois::do_all_local(*current, Merge(this));
+        galois::do_all_local(*current, Find(this));
         current->clear();
 
         if (next->empty())
@@ -276,14 +276,14 @@ struct ParallelAlgo {
 
     init();
 
-    Galois::do_all_bs_local<Items>(graph,
+    galois::do_all_bs_local<Items>(graph,
         boost::fusion::make_vector(Merge(this), Find(this)),
         Initialize(this));
 
     while (!pending->empty()) {
       std::swap(next, pending);
 
-      Galois::do_all_bs_local<Items>(*next,
+      galois::do_all_bs_local<Items>(*next,
           boost::fusion::make_vector(Merge(this), Find(this)));
 
       next->clear();
@@ -327,7 +327,7 @@ struct is_bad_mst {
 
 struct CheckAcyclic {
   struct Accum {
-    Galois::GAccumulator<unsigned> roots;
+    galois::GAccumulator<unsigned> roots;
   };
 
   Accum* accum;
@@ -341,7 +341,7 @@ struct CheckAcyclic {
   bool operator()() {
     Accum a;
     accum = &a;
-    Galois::do_all_local(graph, *this);
+    galois::do_all_local(graph, *this);
     unsigned numRoots = a.roots.reduce();
     unsigned numEdges = std::distance(mst.begin(), mst.end());
     if (graph.size() - numRoots != numEdges) {
@@ -359,18 +359,18 @@ struct CheckAcyclic {
 
 struct SortEdges {
   struct Accum {
-    Galois::GReduceMax<EdgeData> heavy;
+    galois::GReduceMax<EdgeData> heavy;
   };
 
   Accum* accum;
 
   void operator()(const GNode& src) const {
     //! [sortEdgeByEdgeData]
-    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::UNPROTECTED);
+    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), galois::MethodFlag::UNPROTECTED);
     //! [sortEdgeByEdgeData]
 
-    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
     ptrdiff_t dist = std::distance(ii, ei);
     if (dist == 0)
       return;
@@ -381,7 +381,7 @@ struct SortEdges {
   EdgeData operator()() {
     Accum a;
     accum = &a;
-    Galois::do_all_local(graph, *this);
+    galois::do_all_local(graph, *this);
     return a.heavy.reduce();
   }
 };
@@ -398,8 +398,8 @@ void run() {
 }
 
 bool verify() {
-  if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
-    if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
+  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
+    if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
       CheckAcyclic c;
       return c();
     }
@@ -408,18 +408,18 @@ bool verify() {
 }
 
 void initializeGraph() {
-  Galois::Graph::FileGraph origGraph;
-  Galois::Graph::FileGraph symGraph;
+  galois::Graph::FileGraph origGraph;
+  galois::Graph::FileGraph symGraph;
   
   origGraph.fromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
-    Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
+    galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
     std::swap(symGraph, origGraph);
 
-  Galois::Graph::readGraph(graph, symGraph);
+  galois::Graph::readGraph(graph, symGraph);
   
-  Galois::StatTimer Tsort("InitializeSortTime");
+  galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();
   SortEdges sortEdges;
   heaviest = sortEdges();
@@ -438,17 +438,17 @@ void initializeGraph() {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer Tinitial("InitializeTime");
+  galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(Galois::Runtime::numPagePoolAllocTotal() * 10);
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::StatTimer T;
+  galois::preAlloc(galois::Runtime::numPagePoolAllocTotal() * 10);
+  galois::reportPageAlloc("MeminfoPre");
+  galois::StatTimer T;
   T.start();
   switch (algo) {
     case parallel: run<ParallelAlgo<false> >(); break;
@@ -456,13 +456,13 @@ int main(int argc, char** argv) {
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   T.stop();
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "MST weight: "
-    << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
+    << galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
         get_weight(), 0.0, std::plus<double>())
     << " ("
-    << Galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
+    << galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
         get_weight(), 0UL, std::plus<size_t>())
     << ")\n";
 

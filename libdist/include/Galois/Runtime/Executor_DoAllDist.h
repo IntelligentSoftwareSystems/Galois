@@ -51,7 +51,7 @@
 #include <mutex>
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
@@ -242,7 +242,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   do_all_impl( r, fn, dtpl);
 }
 
-template<typename RangeTy, typename FunctionTy, Galois::StatTimer GTimerTy, typename TupleTy>
+template<typename RangeTy, typename FunctionTy, galois::StatTimer GTimerTy, typename TupleTy>
 void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
@@ -257,7 +257,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string num_run_identifier = get_by_supertype<numrun_tag>(dtpl).value;
   std::string timer_do_all_str("DO_ALL_IMPL_" + loopName + "_" + num_run_identifier);
-  Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
+  galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
   Timer_do_all_impl.start();
 #endif
 
@@ -271,6 +271,6 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

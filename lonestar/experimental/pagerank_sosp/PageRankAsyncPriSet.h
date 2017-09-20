@@ -38,15 +38,15 @@ struct AsyncPriSet{
     }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncPriSet"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -56,18 +56,18 @@ struct AsyncPriSet{
   struct Process {
     Graph& graph;
     PRTy tolerance;
-    Galois::InsertBag<GNode>& nextWL;
-    Galois::Substrate::PerThreadStorage<Galois::OnlineStat>& stats;
+    galois::InsertBag<GNode>& nextWL;
+    galois::Substrate::PerThreadStorage<galois::OnlineStat>& stats;
     PRTy limit;
 
-    Process(Graph& g, PRTy t, Galois::InsertBag<GNode>& wl, Galois::Substrate::PerThreadStorage<Galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
+    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::Substrate::PerThreadStorage<galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
 
-    //    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    //    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
     void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
       sdata.inWL = 0;
 
-      auto resScale = outOnly ? nout(graph, src, Galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, src, Galois::MethodFlag::UNPROTECTED);
+      auto resScale = outOnly ? nout(graph, src, galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, src, galois::MethodFlag::UNPROTECTED);
       if ( sdata.residual / resScale < limit) {
         double R = sdata.residual;
         if (R >= tolerance) {
@@ -80,14 +80,14 @@ struct AsyncPriSet{
         return;
       }
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
+      galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       // the node is processed
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       sdata.value = pr;
-      auto src_nout = nout(graph, src, Galois::MethodFlag::UNPROTECTED);
+      auto src_nout = nout(graph, src, galois::MethodFlag::UNPROTECTED);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
       for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
@@ -99,7 +99,7 @@ struct AsyncPriSet{
         if (old + delta >= tolerance && !ddata.inWL) {
           if (0 ==ddata.inWL.exchange(1)) {
             nextWL.push(dst);
-            auto rs = outOnly ? nout(graph, dst, Galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, dst, Galois::MethodFlag::UNPROTECTED);
+            auto rs = outOnly ? nout(graph, dst, galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, dst, galois::MethodFlag::UNPROTECTED);
             stats.getLocal()->insert(old+delta / rs);
           }
         }
@@ -110,12 +110,12 @@ struct AsyncPriSet{
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
 
-    Galois::InsertBag<GNode> curWL;
-    Galois::InsertBag<GNode> nextWL;
-    Galois::Substrate::PerThreadStorage<Galois::OnlineStat> stats;
+    galois::InsertBag<GNode> curWL;
+    galois::InsertBag<GNode> nextWL;
+    galois::Substrate::PerThreadStorage<galois::OnlineStat> stats;
 
     //First do all the nodes once
-    Galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, 0.0), Galois::do_all_steal<true>());
+    galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, 0.0), galois::do_all_steal<true>());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -141,7 +141,7 @@ struct AsyncPriSet{
       if (count < 5000)
         limit = 0.0;
       //std::cout << "Count is " << count << " next limit is " << limit << " max is " << max << "\n";
-      Galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, limit), Galois::do_all_steal<true>());
+      galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, limit), galois::do_all_steal<true>());
     }
   }
 

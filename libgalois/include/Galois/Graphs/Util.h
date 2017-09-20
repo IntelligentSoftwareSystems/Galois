@@ -36,7 +36,7 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "Galois/Graphs/Details.h"
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -94,7 +94,7 @@ template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
   graph.allocateFrom(f);
 
-  Galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
+  galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
 }
 
 template<typename GraphTy>
@@ -111,8 +111,8 @@ void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag, FileGraph& f) {
   Aux aux;
   graph.allocateFrom(f, aux);
 
-  Galois::on_each(ReadGraphConstructNodesFrom<GraphTy, Aux>(graph, f, aux));
-  Galois::on_each(ReadGraphConstructEdgesFrom<GraphTy, Aux>(graph, f, aux));
+  galois::on_each(ReadGraphConstructNodesFrom<GraphTy, Aux>(graph, f, aux));
+  galois::on_each(ReadGraphConstructEdgesFrom<GraphTy, Aux>(graph, f, aux));
 }
 
 template<typename GraphTy>

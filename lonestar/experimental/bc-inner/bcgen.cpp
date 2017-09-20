@@ -157,14 +157,14 @@ void readFromFilesChangeEndianessAndWrite() {
   void *m = ft1.get<0>();
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = *fptr++;
-  uint64_t sw_version = Galois::bswap64(version);
+  uint64_t sw_version = galois::bswap64(version);
   fout.write((char*)(&sw_version), sizeof(sw_version));
   assert(version == 2);
   uint64_t numNodes = *fptr++;
   uint64_t numEdges = *fptr++;
-  uint64_t sw_numNodes = Galois::bswap64(numNodes);
+  uint64_t sw_numNodes = galois::bswap64(numNodes);
   fout.write((char*)(&sw_numNodes), sizeof(sw_numNodes));
-  uint64_t sw_numEdges = Galois::bswap64(numEdges);
+  uint64_t sw_numEdges = galois::bswap64(numEdges);
   fout.write((char*)(&sw_numEdges), sizeof(sw_numEdges));
 
   cerr << "Read numNodes " << numNodes << " numEdges: " << numEdges << endl; 
@@ -175,12 +175,12 @@ void readFromFilesChangeEndianessAndWrite() {
   fptr32 += idxArraysLen;
 
 	for (int i=0; i<idxArraysLen; ++i) {
-	  uint32_t sw_inIdx = Galois::bswap32(inIdx[i]);
+	  uint32_t sw_inIdx = galois::bswap32(inIdx[i]);
   	fout.write((char*)(&sw_inIdx), sizeof(sw_inIdx));
 	}
 
   if (idxArraysLen % 2) {
-    uint32_t t = Galois::bswap32(1); //dummy
+    uint32_t t = galois::bswap32(1); //dummy
     fout.write((char*)(&t), sizeof(t));
 		fptr32++;
 	}
@@ -188,11 +188,11 @@ void readFromFilesChangeEndianessAndWrite() {
   int * ins = (int *)fptr32; 
   fptr32 += numEdges;
 	for (unsigned int i=0; i<numEdges; ++i) {
-          uint32_t sw_ins = Galois::bswap32(ins[i]);
+          uint32_t sw_ins = galois::bswap32(ins[i]);
 		fout.write((char*)(&sw_ins), sizeof(sw_ins));
 	}
   if (numEdges % 2) {
-    uint32_t t = Galois::bswap32(1); //dummy
+    uint32_t t = galois::bswap32(1); //dummy
     fout.write((char*)(&t), sizeof(t));
 		fptr32 += 1;
 	}
@@ -200,11 +200,11 @@ void readFromFilesChangeEndianessAndWrite() {
   int * outIdx = (int *)fptr32;
   fptr32 += idxArraysLen;
 	for (int i=0; i<idxArraysLen; ++i) {
-		uint32_t sw_outIdx = Galois::bswap32(outIdx[i]);
+		uint32_t sw_outIdx = galois::bswap32(outIdx[i]);
 		fout.write((char*)(&sw_outIdx), sizeof(sw_outIdx));
 	}
   if (idxArraysLen % 2) {
-    uint32_t t = Galois::bswap32(1); //dummy
+    uint32_t t = galois::bswap32(1); //dummy
     fout.write((char*)(&t), sizeof(t));
 		fptr32++;
 	}
@@ -215,18 +215,18 @@ void readFromFilesChangeEndianessAndWrite() {
   void *m2 = ft2.get<0>();
   fptr = (uint64_t*)m2;
   version = *fptr++;
-  sw_version = Galois::bswap64(version);
+  sw_version = galois::bswap64(version);
   fout2.write((char*)(&sw_version), sizeof(sw_version));
   assert(version == 2);
   fptr32 = (uint32_t *)fptr;
   int * outs = (int *)fptr32;
   fptr32 += numEdges;
 	for (unsigned int i=0; i<numEdges; ++i) {
-		uint32_t sw_outs = Galois::bswap32(outs[i]);
+		uint32_t sw_outs = galois::bswap32(outs[i]);
 		fout2.write((char*)(&sw_outs), sizeof(sw_outs));
 	}
   if (numEdges % 2) {
-    uint32_t t = Galois::bswap32(1); //dummy
+    uint32_t t = galois::bswap32(1); //dummy
     fout2.write((char*)(&t), sizeof(t));
 		fptr32 += 1;
 	}

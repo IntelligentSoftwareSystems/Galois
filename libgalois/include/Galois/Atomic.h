@@ -34,7 +34,7 @@
 
 #include <iterator>
 
-namespace Galois {
+namespace galois {
 
 namespace AtomicImpl {
 /**
@@ -42,7 +42,7 @@ namespace AtomicImpl {
  */
 template<typename T, template <typename _> class W, bool CONCURRENT>
 class GAtomicImpl {
-  // Galois::Runtime::LL::CacheLineStorage<T> val;
+  // galois::Runtime::LL::CacheLineStorage<T> val;
   W<T> val;
 
 public:
@@ -104,7 +104,7 @@ public:
 // non-current version 
 template<typename T, template <typename _> class W>
 class GAtomicImpl<T, W, false> {
-  // Galois::Runtime::LL::CacheLineStorage<T> val;
+  // galois::Runtime::LL::CacheLineStorage<T> val;
   W<T> val;
 
 public:
@@ -326,9 +326,9 @@ public:
  */
 template <typename T, bool CONCURRENT=true>
 class GAtomicPadded: 
-    public AtomicImpl::GAtomicBase<T, Galois::Substrate::CacheLineStorage, CONCURRENT> {
+    public AtomicImpl::GAtomicBase<T, galois::Substrate::CacheLineStorage, CONCURRENT> {
 
-  typedef AtomicImpl::GAtomicBase<T, Galois::Substrate::CacheLineStorage, CONCURRENT> Super_ty;
+  typedef AtomicImpl::GAtomicBase<T, galois::Substrate::CacheLineStorage, CONCURRENT> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

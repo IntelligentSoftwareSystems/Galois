@@ -52,20 +52,20 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
-    typedef Galois::WorkList::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
+    typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
+    typedef galois::WorkList::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
 
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeStandardRange (wl.begin (), wl.end ()), 
+    galois::Runtime::for_each_ordered_level (
+        galois::Runtime::makeStandardRange (wl.begin (), wl.end ()), 
         GetLevel (), 
         std::less<unsigned> (),
         VisitNhood (graph),
         OpFunc (graph, numIter));
 
-    // Galois::for_each (first,
+    // galois::for_each (first,
         // OpFunc (graph, numIter),
-        // Galois::loopname ("bfs-level-exec"),
-        // Galois::wl<WL_ty> ());
+        // galois::loopname ("bfs-level-exec"),
+        // galois::wl<WL_ty> ());
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

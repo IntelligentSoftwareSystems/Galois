@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 #define GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 // TODO(ddn): Pull in and integrate in executors from exp
@@ -33,8 +33,8 @@ namespace Runtime {
 #if 0
 template <typename NhFunc, typename OpFunc>
 struct OrderedTraits {
-  static const bool NeedsPush = !Galois::DEPRECATED::does_not_need_push<OpFunc>::value;
-  static const bool HasFixedNeighborhood = Galois::DEPRECATED::has_fixed_neighborhood<NhFunc>::value;
+  static const bool NeedsPush = !galois::DEPRECATED::does_not_need_push<OpFunc>::value;
+  static const bool HasFixedNeighborhood = galois::DEPRECATED::has_fixed_neighborhood<NhFunc>::value;
 };
 #endif
 
@@ -73,6 +73,6 @@ void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhF
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

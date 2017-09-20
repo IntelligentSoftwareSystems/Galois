@@ -34,7 +34,7 @@
 
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename T = int>
@@ -77,12 +77,12 @@ private:
   }
 
   template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
-  Galois::optional<T> popGlobal(typename std::enable_if<Enable>::type* = 0) {
-    return Galois::optional<value_type>();
+  galois::optional<T> popGlobal(typename std::enable_if<Enable>::type* = 0) {
+    return galois::optional<value_type>();
   }
 
   template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
-  Galois::optional<T> popGlobal(typename std::enable_if<!Enable>::type* = 0) {
+  galois::optional<T> popGlobal(typename std::enable_if<!Enable>::type* = 0) {
     return global.pop();
   }
 
@@ -103,8 +103,8 @@ public:
     pushGlobal(range);
   }
 
-  Galois::optional<value_type> pop() {
-    Galois::optional<value_type> ret = local.getLocal()->pop();
+  galois::optional<value_type> pop() {
+    galois::optional<value_type> ret = local.getLocal()->pop();
     if (ret)
       return ret;
     return popGlobal();
@@ -113,6 +113,6 @@ public:
 GALOIS_WLCOMPILECHECK(LocalQueue)
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

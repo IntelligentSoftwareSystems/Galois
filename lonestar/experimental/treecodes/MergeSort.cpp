@@ -178,7 +178,7 @@ struct MergeGalois {
 template <typename T, typename C>
 void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp) {
 
-  Galois::Runtime::for_each_ordered_tree (
+  galois::Runtime::for_each_ordered_tree (
       IndexRange (0, L),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
       SplitGalois<T,C> (array, tmp_array, cmp),
@@ -225,11 +225,11 @@ struct MergeSortGaloisStack {
 template <typename T, typename C>
 void mergeSortGaloisStack (T* array, T* tmp_array, const size_t L, const C& cmp) {
   MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L};
-  Galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
+  galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
 }
 
 template <typename T, typename C>
-struct MergeGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+struct MergeGaloisGeneric: public galois::Runtime::TreeTaskBase {
   T* array;
   T* tmp_array;
   const C& cmp;
@@ -245,7 +245,7 @@ struct MergeGaloisGeneric: public Galois::Runtime::TreeTaskBase {
       size_t mid,
       size_t end)
     : 
-      Galois::Runtime::TreeTaskBase (),
+      galois::Runtime::TreeTaskBase (),
       array (array),
       tmp_array (tmp_array),
       cmp (cmp),
@@ -254,13 +254,13 @@ struct MergeGaloisGeneric: public Galois::Runtime::TreeTaskBase {
       end (end)
   {}
 
-  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+  virtual void operator () (galois::Runtime::TreeTaskContext& ctx) {
     mergeHalves (array, tmp_array, beg, mid, end, cmp);
   }
 };
 
 template <typename T, typename C>
-struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+struct SplitGaloisGeneric: public galois::Runtime::TreeTaskBase {
   T* array;
   T* tmp_array;
   const C& cmp;
@@ -274,7 +274,7 @@ struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
       size_t beg,
       size_t end)
     :
-      Galois::Runtime::TreeTaskBase (),
+      galois::Runtime::TreeTaskBase (),
       array (array),
       tmp_array (tmp_array),
       cmp (cmp),
@@ -283,7 +283,7 @@ struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
   {}
 
 
-  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+  virtual void operator () (galois::Runtime::TreeTaskContext& ctx) {
     if ((end - beg) > LEAF_SIZE) {
       size_t mid = (beg + end) / 2;
 
@@ -312,7 +312,7 @@ template <typename T, typename C>
 void mergeSortGaloisGeneric (T* array, T* tmp_array, const size_t L, const C& cmp) {
   SplitGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
   abort();
-  //FIXME: Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
+  //FIXME: galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
 }
 
 
@@ -337,7 +337,7 @@ void checkSorting (T* array, const size_t L, const C& cmp) {
 
 int main (int argc, char* argv[]) {
 
-  Galois::StatManager sm;
+  galois::StatManager sm;
   LonestarStart (argc, argv, name, desc, url);
   srand (0);
 
@@ -346,13 +346,13 @@ int main (int argc, char* argv[]) {
 
   initializeIntArray (array, length);
 
-  Galois::StatTimer t_copy ("copying time:");
+  galois::StatTimer t_copy ("copying time:");
   t_copy.start ();
   int* tmp_array = new int[length];
   std::copy (array + 0, array + length, tmp_array);
   t_copy.stop ();
 
-  Galois::StatTimer t;
+  galois::StatTimer t;
 
   t.start ();
   switch (algorithm) {
@@ -365,7 +365,7 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
-      //FIXME:      Galois::CilkInit();
+      //FIXME:      galois::CilkInit();
       mergeSortCilk (array, tmp_array, length, std::less<int> ());
       break;
 

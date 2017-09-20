@@ -117,7 +117,7 @@ struct RandomPartitioner {
          }
       }
       for (size_t i = 0; i < num_hosts; ++i) {
-         using namespace Galois::Graph;
+         using namespace galois::Graph;
          FileGraphWriter newGraph;
          newGraph.setNumNodes(vcInfo.hostGlobalToLocalMapping[i].size());
          newGraph.setNumEdges(newEdges[i].size());
@@ -222,7 +222,7 @@ struct RandomPartitioner {
             }      //End for neighbors
          }      //end for nodes
          std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size () << "\n";
-         using namespace Galois::Graph;
+         using namespace galois::Graph;
          FileGraphWriter newGraph;
          newGraph.setNumNodes(newNodeCounter);
          newGraph.setNumEdges(newEdges.size());

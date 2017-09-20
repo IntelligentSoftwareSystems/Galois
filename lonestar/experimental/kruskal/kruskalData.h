@@ -113,7 +113,7 @@ public:
 
 
 struct KNodeMin: public KNode {
-  Galois::GAtomic<const KEdge<KNodeMin>*> minEdge;
+  galois::GAtomic<const KEdge<KNodeMin>*> minEdge;
 
 public:
   KNodeMin (unsigned id): KNode (id), minEdge (NULL) {};

@@ -27,12 +27,12 @@
 
 class Cavity {
   //! [STL vector using PerIterAllocTy]
-  typedef std::vector<EdgeTuple,Galois::PerIterAllocTy::rebind<EdgeTuple>::other> ConnTy;
+  typedef std::vector<EdgeTuple,galois::PerIterAllocTy::rebind<EdgeTuple>::other> ConnTy;
   //! [STL vector using PerIterAllocTy]
 
   Tuple center;
   GNode centerNode;
-  std::vector<GNode,Galois::PerIterAllocTy::rebind<GNode>::other> frontier;
+  std::vector<GNode,galois::PerIterAllocTy::rebind<GNode>::other> frontier;
   // !the cavity itself
   PreGraph pre;
   // !what the new elements should look like
@@ -92,7 +92,7 @@ class Cavity {
   }
 
 public:
-  Cavity(Graphp g, Galois::PerIterAllocTy& cnx)
+  Cavity(Graphp g, galois::PerIterAllocTy& cnx)
     :frontier(cnx),
      pre(cnx),
      post(cnx),
@@ -163,7 +163,7 @@ public:
     }
   }
 
-  void update(GNode node, Galois::UserContext<GNode>& ctx) {
+  void update(GNode node, galois::UserContext<GNode>& ctx) {
     for (PreGraph::iterator ii = pre.begin(), ee = pre.end(); ii != ee; ++ii) 
       graph->removeNode(*ii);
     

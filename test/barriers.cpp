@@ -12,15 +12,15 @@ unsigned numThreads = 2;
 char bname[100];
 
 struct emp {
-  Galois::Substrate::Barrier& b;
+  galois::Substrate::Barrier& b;
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
-      // if (Galois::Runtime::LL::getTID() == 0)
+      // if (galois::Runtime::LL::getTID() == 0)
       //   usleep(100);
       b.wait();
     }
-    // std::cout << Galois::Runtime::LL::getTID() << " ";
+    // std::cout << galois::Runtime::LL::getTID() << " ";
   }
 
   template<typename T>
@@ -34,15 +34,15 @@ struct emp {
   }
 };
 
-void test(std::unique_ptr<Galois::Substrate::Barrier> b) {
+void test(std::unique_ptr<galois::Substrate::Barrier> b) {
   unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
-    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
     b->reinit(M);
-    Galois::Timer t;
+    galois::Timer t;
     t.start();
-    Galois::on_each(emp{*b.get()});
+    galois::on_each(emp{*b.get()});
     t.stop();
     std::cout << bname << "," << b->name() << "," << M << "," << t.get() << "\n";
     M -= 1;
@@ -55,10 +55,10 @@ int main(int argc, char** argv) {
   if (!iter)
     iter = 16*1024;
   if (argc > 2)
-    numThreads = Galois::Substrate::getThreadPool().getMaxThreads();
+    numThreads = galois::Substrate::getThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));
-  using namespace Galois::Substrate;
+  using namespace galois::Substrate;
   test(createPthreadBarrier(1));
   test(createCountingBarrier(1));
   test(createMCSBarrier(1));

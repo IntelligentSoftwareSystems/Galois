@@ -47,17 +47,17 @@
 
 
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 
 template <typename KNode_tp>
 struct WLfactory {
   typedef KEdge<KNode_tp> KE_ty;
 
-  typedef typename Galois::PerThreadVector<KE_ty*> EdgeList_ty;
-  typedef typename Galois::PerThreadVector<KNode_tp*> NodeList_ty;
+  typedef typename galois::PerThreadVector<KE_ty*> EdgeList_ty;
+  typedef typename galois::PerThreadVector<KNode_tp*> NodeList_ty;
 
-  typedef typename Galois::PerThreadVector<Markable<KE_ty*> > MarkableEdgeList_ty;
+  typedef typename galois::PerThreadVector<Markable<KE_ty*> > MarkableEdgeList_ty;
 };
 
 
@@ -87,10 +87,10 @@ void kruskalAdjNoCopy (
   typedef typename Flavor_tp::MatchLoopTy MatchLoopTy;
   typedef typename Flavor_tp::MergeLoopTy MergeLoopTy;
 
-  Galois::StatTimer t_arrange ("Time taken to arrange adjacency lists: ");
+  galois::StatTimer t_arrange ("Time taken to arrange adjacency lists: ");
 
   t_arrange.start ();
-  Galois::Runtime::do_all_coupled (nodes.begin (), nodes.end (), &arrangeWrapper<sorted_tp>, "adj_pre_arrange_loop");
+  galois::Runtime::do_all_coupled (nodes.begin (), nodes.end (), &arrangeWrapper<sorted_tp>, "adj_pre_arrange_loop");
   t_arrange.stop ();
 
 
@@ -101,7 +101,7 @@ void kruskalAdjNoCopy (
 
   Flavor_tp flavor (nodes, edges);
 
-  Galois::StatTimer t_init_fill ("Time spent in initializing per thread work-list: ");
+  galois::StatTimer t_init_fill ("Time spent in initializing per thread work-list: ");
   t_init_fill.start ();
   flavor.fillInitial (nodes, edges, matchList);
   t_init_fill.stop ();
@@ -117,17 +117,17 @@ void kruskalAdjNoCopy (
   Accumulator_ty mstSum;
   Accumulator_ty mergeIter;
 
-  Galois::TimeAccumulator matchTimer;
-  Galois::TimeAccumulator mergeTimer;
-  Galois::TimeAccumulator removeTimer;
+  galois::TimeAccumulator matchTimer;
+  galois::TimeAccumulator mergeTimer;
+  galois::TimeAccumulator removeTimer;
 
-  Galois::Runtime::beginSampling ();
+  galois::Runtime::beginSampling ();
 
   while (true) {
     ++round;
 
     matchTimer.start ();
-    Galois::Runtime::do_all_coupled (
+    galois::Runtime::do_all_coupled (
         matchList, 
         flavor.makeMatchLoop (mergeList, matchIter),
         "match_loop");
@@ -135,7 +135,7 @@ void kruskalAdjNoCopy (
 
 
     mergeTimer.start ();
-    Galois::Runtime::do_all_coupled (
+    galois::Runtime::do_all_coupled (
         mergeList,
         flavor.makeMergeLoop (mstSum, mergeIter),
         "merge_loop");
@@ -164,7 +164,7 @@ void kruskalAdjNoCopy (
     mergeList.clear_all ();
   }
 
-  Galois::Runtime::endSampling ();
+  galois::Runtime::endSampling ();
 
   totalWeight = mstSum.reduce ();
   totalIter = matchIter.reduce ();
@@ -331,7 +331,7 @@ void kruskalAdjCopyBased (
   typedef typename Flavor_tp::MergeLoopTy MergeLoopTy;
 
 
-  Galois::StatTimer t_arrange ("Time taken to arrange adjacency lists: ");
+  galois::StatTimer t_arrange ("Time taken to arrange adjacency lists: ");
 
   t_arrange.start ();
   // for (std::vector<KNode_tp*>::iterator i = nodes.begin (), ei = nodes.end ();
@@ -340,7 +340,7 @@ void kruskalAdjCopyBased (
     // kruskal::arrangeAdj<sorted_tp> (**i);
 // 
   // }
-  Galois::Runtime::do_all_coupled (nodes.begin (), nodes.end (), &arrangeWrapper<sorted_tp>, "adj_pre_arrange_loop");
+  galois::Runtime::do_all_coupled (nodes.begin (), nodes.end (), &arrangeWrapper<sorted_tp>, "adj_pre_arrange_loop");
   t_arrange.stop ();
 
 
@@ -366,13 +366,13 @@ void kruskalAdjCopyBased (
   Accumulator_ty mergeIter;
 
 
-  Galois::TimeAccumulator matchTimer;
-  Galois::TimeAccumulator mergeTimer;
+  galois::TimeAccumulator matchTimer;
+  galois::TimeAccumulator mergeTimer;
 
   bool first = true;
 
 
-  Galois::Runtime::beginSampling ();
+  galois::Runtime::beginSampling ();
 
   while (true) {
     ++round;
@@ -381,14 +381,14 @@ void kruskalAdjCopyBased (
 
     if (first) {
       first = false;
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           nodes.begin (), nodes.end (), 
           flavor.makeMatchLoop (*nextRoundList, mergeList, matchIter)
           , "match_loop");
 
     } else {
 
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           *matchList, 
           flavor.makeMatchLoop (*nextRoundList, mergeList, matchIter), 
           "match_loop");
@@ -399,7 +399,7 @@ void kruskalAdjCopyBased (
 
     mergeTimer.start ();
 
-    Galois::Runtime::do_all_coupled (mergeList, 
+    galois::Runtime::do_all_coupled (mergeList, 
         flavor.makeMergeLoop (*nextRoundList, mstSum, mergeIter), 
         "merge_loop");
 
@@ -438,7 +438,7 @@ void kruskalAdjCopyBased (
     
   }
 
-  Galois::Runtime::endSampling ();
+  galois::Runtime::endSampling ();
 
   totalIter = matchIter.reduce ();
   totalWeight = mstSum.reduce ();
@@ -814,7 +814,7 @@ private:
   friend class MatchLoopBoruvka;
   friend class MergeLoopBoruvka;
 
-  typedef Galois::GAtomic<KNode_tp*> MatchFlag;
+  typedef galois::GAtomic<KNode_tp*> MatchFlag;
 
   std::vector<MatchFlag> matchInfo;
 
@@ -1002,15 +1002,15 @@ protected:
   // Accumulator_ty mstSum (0);
   // Accumulator_ty mergeIter (0);
 // 
-  // Galois::TimeAccumulator matchTimer;
-  // Galois::TimeAccumulator mergeTimer;
+  // galois::TimeAccumulator matchTimer;
+  // galois::TimeAccumulator mergeTimer;
 // 
   // while (true) {
 // 
     // matchIter.reset (0);
     // matchTimer.start ();
 // 
-    // // Galois::for_each_wl<MatchListTy> (*matchList, flavor.makeMatchLoop (*nextRoundList, mergeList, matchIter), "match_loop");
+    // // galois::for_each_wl<MatchListTy> (*matchList, flavor.makeMatchLoop (*nextRoundList, mergeList, matchIter), "match_loop");
 // 
     // matchTimer.stop ();
     // totalIter += matchIter.get ();
@@ -1022,7 +1022,7 @@ protected:
     // mergeTimer.start ();
 // 
     // 
-    // // Galois::for_each_wl<MergeListTy> (mergeList, 
+    // // galois::for_each_wl<MergeListTy> (mergeList, 
         // // flavor.makeMergeLoop (*nextRoundList, mstSum, mergeIter), 
         // // "merge_loop");
 // 

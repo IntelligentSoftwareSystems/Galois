@@ -14,7 +14,7 @@
 
 #include "Node.h"
 
-//Galois::Runtime::LL::SimpleLock<true> foo;
+//galois::Runtime::LL::SimpleLock<true> foo;
 
 template<typename Context>
 void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
@@ -24,7 +24,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	// node-related work is here:
 	node.execute();
 
-	for(LCM_edge_iterator ii = graph->edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph->edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii)
+	for(LCM_edge_iterator ii = graph->edge_begin(src, galois::MethodFlag::UNPROTECTED), ei = graph->edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii)
 	{
 		GraphNode graphNode = graph->getEdgeDst(ii);
 		int nr_of_incoming_edges = atomic_dec(&(graphNode->getData().incomingEdges));
@@ -89,7 +89,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 {
 	AbstractProduction *production;
 	Vertex *S;
-	Galois::StatTimer TMain;
+	galois::StatTimer TMain;
     //TMain.start();
 	
 #ifdef WITH_PAPI
@@ -157,7 +157,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 
 
 
-	Galois::StatTimer timerMatrix("MATRIX GENERATION");
+	galois::StatTimer timerMatrix("MATRIX GENERATION");
 	timerMatrix.start();
 	std::vector<EquationSystem*> *tiers = matrixGenerator->CreateMatrixAndRhs(taskDescription);
 
@@ -176,7 +176,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	std::vector<EquationSystem *> *inputMatrices;
 	inputMatrices = tiers;
 
-	Galois::StatTimer timerSolution("SOLUTION");
+	galois::StatTimer timerSolution("SOLUTION");
 
 	struct timeval start_time; 
 	struct timeval end_time; 
@@ -212,7 +212,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
     }
 #endif
     if (taskDescription.scheduler == OLD) {
-        Galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this, Galois::wl<WL>());
+        galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this, galois::wl<WL>());
     } else if (taskDescription.scheduler == CILK) {
         // TODO: implement CILK
 

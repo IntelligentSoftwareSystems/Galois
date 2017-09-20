@@ -8,7 +8,7 @@ struct ReconvDrivenWindowing {
 	ReconvDrivenWindowing( aig::Graph & graph, int nInputs, int nOutputs, int nLevels ) 
 	: graph( graph ), nInputs( nInputs ), nOutputs( nOutputs ), nLevels( nLevels ) { }
 
-	void operator()( aig::GNode node, Galois::UserContext< aig::GNode > & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
 		
 		aig::NodeData & nodeData = graph.getData( node );
 		

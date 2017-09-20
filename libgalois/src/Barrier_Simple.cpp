@@ -35,7 +35,7 @@
 
 namespace {
 
-class OneWayBarrier: public Galois::Substrate::Barrier {
+class OneWayBarrier: public galois::Substrate::Barrier {
   std::mutex lock;
   std::condition_variable cond;
   unsigned count; 
@@ -64,7 +64,7 @@ public:
   virtual const char* name() const { return "OneWayBarrier"; }
 };
 
-class SimpleBarrier: public Galois::Substrate::Barrier {
+class SimpleBarrier: public galois::Substrate::Barrier {
   OneWayBarrier barrier1;
   OneWayBarrier barrier2;
   unsigned total;
@@ -81,10 +81,10 @@ public:
 
   virtual void wait() {
     barrier1.wait();
-    if (Galois::Substrate::ThreadPool::getTID() == 0)
+    if (galois::Substrate::ThreadPool::getTID() == 0)
       barrier1.reinit(total);
     barrier2.wait();
-    if (Galois::Substrate::ThreadPool::getTID() == 0)
+    if (galois::Substrate::ThreadPool::getTID() == 0)
       barrier2.reinit(total);
   }
 
@@ -94,7 +94,7 @@ public:
 
 } // end anonymous namespace
 
-std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createSimpleBarrier(unsigned int v) {
+std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createSimpleBarrier(unsigned int v) {
   return std::unique_ptr<Barrier>(new SimpleBarrier(v));
 }
 

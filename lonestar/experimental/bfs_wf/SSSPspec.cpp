@@ -25,13 +25,13 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_spec (
-        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+    galois::Runtime::for_each_ordered_spec (
+        galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFuncSpec (graph, numIter),
         std::make_tuple (
-          Galois::loopname ("sssp_spec")));
+          galois::loopname ("sssp_spec")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

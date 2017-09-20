@@ -71,7 +71,7 @@ struct InitializeGraph {
 
        struct Syncer_0 {
       	static float extract( const struct PR_NodeData & node){ return node.residual; }
-      	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+      	static void reduce (struct PR_NodeData & node, float y) { galois::atomicAdd(node.residual, y);}
       	static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
       	typedef float ValTy;
       };
@@ -85,7 +85,7 @@ struct InitializeGraph {
       	static void setVal (struct PR_NodeData & node, unsigned int y) {node.nout = y; }
       	typedef unsigned int ValTy;
       };
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init"), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
       _graph.sync_push<Syncer_0>();
       
       _graph.sync_pull<SyncerPull_0>();
@@ -105,7 +105,7 @@ struct InitializeGraph {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        Galois::atomicAdd(ddata.residual, delta);
+        galois::atomicAdd(ddata.residual, delta);
       }
     }
   }
@@ -113,12 +113,12 @@ struct InitializeGraph {
 /*
 
 template <typename GraphTy>
-struct Get_info_functor : public Galois::op_tag {
+struct Get_info_functor : public galois::op_tag {
   GraphTy &graph;
 
   struct Syncer_0 {
     static float extract( const struct PR_NodeData & node){ return node.residual; }
-    static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+    static void reduce (struct PR_NodeData & node, float y) { galois::atomicAdd(node.residual, y);}
     static void reset (struct PR_NodeData & node ) { node.residual = 0; }
     typedef float ValTy;
   };
@@ -152,11 +152,11 @@ struct Get_info_functor : public Galois::op_tag {
 
 
 template <typename GraphTy>
-struct Get_info_functor : public Galois::op_tag {
+struct Get_info_functor : public galois::op_tag {
 	GraphTy &graph;
 	struct Syncer_0 {
 		static float extract( const struct PR_NodeData & node){ return node.residual; }
-		static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+		static void reduce (struct PR_NodeData & node, float y) { galois::atomicAdd(node.residual, y);}
 		static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
 		typedef float ValTy;
 	};
@@ -188,15 +188,15 @@ struct PageRank {
 
   PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
-     using namespace Galois::WorkList;
+     using namespace galois::WorkList;
      typedef dChunkedFIFO<64> dChunk;
 
-     //Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
-     Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+     //galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
+     galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
 
   }
 
-  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+  void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
@@ -206,7 +206,7 @@ struct PageRank {
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+        auto dst_residual_old = galois::atomicAdd(ddata.residual, delta);
 
         //Schedule TOLERANCE threshold crossed.
           //std::cout << "out  : " << (dst_residual_old + delta) << "\n";
@@ -223,8 +223,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
     T_total.start();
 

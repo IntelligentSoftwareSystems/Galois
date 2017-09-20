@@ -44,7 +44,7 @@
 
 
 
-namespace Galois {
+namespace galois {
 
 #define NEW_SERIAL_BAG_IMPL 1
 
@@ -53,7 +53,7 @@ namespace Galois {
 template <typename T, const size_t SZ=0>
 class SerialBag {
 
-  using dbg = Galois::debug<0>;
+  using dbg = galois::debug<0>;
 
   using PageHeap = Runtime::PageHeap;
   using FSheap = Runtime::FixedSizeHeap;
@@ -800,6 +800,6 @@ public:
   }
 };
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_ALT_BAG_H

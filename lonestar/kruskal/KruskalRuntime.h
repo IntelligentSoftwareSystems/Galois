@@ -23,9 +23,9 @@ static cll::opt<bool> useCustomLocking (
 
 struct KruskalRuntime: public Kruskal {
 
-  using VecRep =  Galois::LazyDynamicArray<int, Galois::Runtime::SerialNumaAllocator<int> >;
-  using Lock = Galois::Runtime::Lockable;
-  using VecLock =  Galois::LazyDynamicArray<Lock, Galois::Runtime::SerialNumaAllocator<Lock> >;
+  using VecRep =  galois::LazyDynamicArray<int, galois::Runtime::SerialNumaAllocator<int> >;
+  using Lock = galois::Runtime::Lockable;
+  using VecLock =  galois::LazyDynamicArray<Lock, galois::Runtime::SerialNumaAllocator<Lock> >;
 
   struct EdgeCtxt: public Edge {
     int repSrc;
@@ -54,8 +54,8 @@ struct KruskalRuntime: public Kruskal {
       
 
       if (e.repSrc != e.repDst) {
-        Galois::Runtime::acquire (&lockVec[e.repSrc], Galois::MethodFlag::WRITE);
-        Galois::Runtime::acquire (&lockVec[e.repDst], Galois::MethodFlag::WRITE);
+        galois::Runtime::acquire (&lockVec[e.repSrc], galois::MethodFlag::WRITE);
+        galois::Runtime::acquire (&lockVec[e.repDst], galois::MethodFlag::WRITE);
       }
 
       findIter += 1;
@@ -70,14 +70,14 @@ struct KruskalRuntime: public Kruskal {
     VecRep repVec (numNodes);
 
 
-    Galois::StatTimer timeInit("kruska-init-Time");
+    galois::StatTimer timeInit("kruska-init-Time");
 
     timeInit.start ();
 
-    Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+    galois::Substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
-    Galois::do_all_choice (
-        Galois::Runtime::makeStandardRange(
+    galois::do_all_choice (
+        galois::Runtime::makeStandardRange(
           boost::counting_iterator<size_t>(0),
           boost::counting_iterator<size_t>(numNodes)),
         [&lockVec, &repVec] (size_t i) {
@@ -85,8 +85,8 @@ struct KruskalRuntime: public Kruskal {
           lockVec.initialize (i, Lock ());
         },
         std::make_tuple (
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> (),
-          Galois::loopname ("init-vectors")));
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> (),
+          galois::loopname ("init-vectors")));
 
 
     
@@ -108,11 +108,11 @@ struct KruskalRuntime: public Kruskal {
     auto edge_beg = boost::make_transform_iterator (edges.begin(), makeEdgeCtxt);
     auto edge_end = boost::make_transform_iterator (edges.end(), makeEdgeCtxt);
 
-    Galois::StatTimer runningTime("time for running MST loop:");
+    galois::StatTimer runningTime("time for running MST loop:");
 
     runningTime.start ();
     orderedLoop (
-        Galois::Runtime::makeStandardRange (edge_beg, edge_end),
+        galois::Runtime::makeStandardRange (edge_beg, edge_end),
         lockVec,
         repVec,
         mstSum, 

@@ -4,7 +4,7 @@
 
 #include "Galois/Runtime/Network.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 std::atomic<int> count;
 

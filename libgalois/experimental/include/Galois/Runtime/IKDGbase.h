@@ -18,7 +18,7 @@
 #include <utility>
 #include <functional>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace cll = llvm::cl;
@@ -60,7 +60,7 @@ public:
   template <typename R>
   void run (const R& range) const {
 
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this, &range] (const Ctxt* c) {
 
           auto beg_lesser = boost::make_filter_iterator (
@@ -79,8 +79,8 @@ public:
           }
         },
         std::make_tuple(
-          Galois::loopname("safety_test_loop"),
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
+          galois::loopname("safety_test_loop"),
+        galois::chunk_size<DEFAULT_CHUNK_SIZE>()));
   }
 };
 
@@ -351,24 +351,24 @@ protected:
 #ifndef NDEBUG
   const Ctxt* getMinCurrWL (void) const {
 
-    Substrate::PerThreadStorage<Galois::optional<const Ctxt*> > perThrdMin;
+    Substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMin;
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    galois::do_all_choice (makeLocalRange (*currWL),
         [this, &perThrdMin] (const Ctxt* c) {
-          Galois::optional<const Ctxt*>& m = *(perThrdMin.getLocal ());
+          galois::optional<const Ctxt*>& m = *(perThrdMin.getLocal ());
 
           if (!m || Base::ctxtCmp (c, *m)) { // c < *m
             m = c;
           }
         },
         std::make_tuple (
-            Galois::loopname ("getMinCurrWL"),
-            Galois::chunk_size<8> ()));
+            galois::loopname ("getMinCurrWL"),
+            galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
 
     for (unsigned i = 0; i < perThrdMin.size (); ++i) {
-      const Galois::optional<const Ctxt*>& m = *(perThrdMin.getRemote (i));
+      const galois::optional<const Ctxt*>& m = *(perThrdMin.getRemote (i));
 
       if (m) {
         if (!ret || Base::ctxtCmp (*m, ret)) { // ret < *m
@@ -383,24 +383,24 @@ protected:
 
   const Ctxt* getMaxCurrWL (void) const {
 
-    Substrate::PerThreadStorage<Galois::optional<const Ctxt*> > perThrdMax;
+    Substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMax;
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    galois::do_all_choice (makeLocalRange (*currWL),
         [this, &perThrdMax] (const Ctxt* c) {
-          Galois::optional<const Ctxt*>& m = *(perThrdMax.getLocal ());
+          galois::optional<const Ctxt*>& m = *(perThrdMax.getLocal ());
 
           if (!m || Base::ctxtCmp (*m, c)) { // *m < c
             m = c;
           } 
         },
         std::make_tuple (
-            Galois::loopname ("getMaxCurrWL"),
-            Galois::chunk_size<8> ()));
+            galois::loopname ("getMaxCurrWL"),
+            galois::chunk_size<8> ()));
 
     const Ctxt* ret = nullptr;
 
     for (unsigned i = 0; i < perThrdMax.size (); ++i) {
-      const Galois::optional<const Ctxt*>& m = *(perThrdMax.getRemote (i));
+      const galois::optional<const Ctxt*>& m = *(perThrdMax.getRemote (i));
 
       if (m) {
         if (!ret || Base::ctxtCmp (ret, *m)) { // ret < *m
@@ -418,7 +418,7 @@ protected:
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RUNTIME_IKDG_BASE_H
 

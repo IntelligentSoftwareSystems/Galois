@@ -56,7 +56,7 @@ using namespace llvm;
 using namespace std;
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
-#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
+#define __GALOIS_ACCUMULATOR_TYPE__ "galois::DGAccumulator"
 
 namespace {
   class GaloisFunctionsVisitor :
@@ -215,7 +215,7 @@ namespace {
   }
 
   /**
-   * Handles sync additions/other things for Galois::for_each calls
+   * Handles sync additions/other things for galois::for_each calls
    */
   // TODO(Loc) check this for correctness/sanity
   class FunctionForEachHandler : public MatchFinder::MatchCallback {
@@ -438,7 +438,7 @@ namespace {
           stringstream SSHelperStructFunctions;
           SSHelperStructFunctions 
             << "template <typename GraphTy>\n"
-            << "struct Get_info_functor : public Galois::op_tag {\n"
+            << "struct Get_info_functor : public galois::op_tag {\n"
             << "\tGraphTy &graph;\n";
           rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
           SSHelperStructFunctions.str(string());
@@ -547,12 +547,12 @@ namespace {
           kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
           kernelBefore << "\tif (personality == GPU_CUDA) {\n";
           kernelBefore << "\t\tauto& __sync_functor = Get_info_functor<Graph>(_graph);\n";
-          kernelBefore << "\t\ttypedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
+          kernelBefore << "\t\ttypedef galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
           kernelBefore << "\t\tDBag dbag(__sync_functor, \"" << className << "\");\n";
           kernelBefore << "\t\tauto& &local_wl = DBag::get();\n";
           kernelBefore << "\t\tstd::string impl_str(\"CUDA_FOR_EACH_IMPL_" 
             << className << "_\" + (_graph.get_run_identifier()));\n";
-          kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+          kernelBefore << "\t\tgalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
           kernelBefore << "\t\tunsigned long _num_work_items;\n";
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           if (!single_source.empty()) {
@@ -590,7 +590,7 @@ namespace {
           cudaKernelCall << "\t\t__sync_functor.sync_graph();\n";
           cudaKernelCall << "\t\tdbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);\n";
           cudaKernelCall << "\t\t#ifdef __GALOIS_DEBUG_WORKLIST__\n";
-          cudaKernelCall << "\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
+          cudaKernelCall << "\t\tstd::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] worklist size : \" << cuda_wl.num_out_items << \" duplication factor : \" << (double)cuda_wl.num_out_items/_graph.size() << \"\\n\";\n";
           cudaKernelCall << "\t\t#endif\n";
           cudaKernelCall << "\t\tdbag.sync();\n";
 
@@ -601,17 +601,17 @@ namespace {
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
           kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";
-          kernelBefore << "\t\t\tstd::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
+          kernelBefore << "\t\t\tstd::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] ERROR - worklist size insufficient; size : \" << cuda_wl.max_size << \" , expected : \" << cuda_wl.num_in_items << \"\\n\";\n";
           kernelBefore << "\t\t\texit(1);\n";
           kernelBefore << "\t\t}\n";
-          kernelBefore << "\t\t//std::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
+          kernelBefore << "\t\t//std::cout << \"[\" << galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
           kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
           kernelBefore << "\t\tstd::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);\n";
           kernelBefore << cudaKernelCall.str();
           kernelBefore << "\t\t++_num_iterations;\n";
           kernelBefore << "\t\t}\n";
-          kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);\n";
-          kernelBefore << "\t\tGalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + (_graph.get_run_identifier()), _num_work_items, 0);\n";
+          kernelBefore << "\t\tgalois::Runtime::reportStat(\"(NULL)\", \"NUM_ITERATIONS_\" + (_graph.get_run_identifier()), (unsigned long)_num_iterations, 0);\n";
+          kernelBefore << "\t\tgalois::Runtime::reportStat(\"(NULL)\", \"NUM_WORK_ITEMS_\" + (_graph.get_run_identifier()), _num_work_items, 0);\n";
           kernelBefore << "\t} else if (personality == CPU)\n";
           kernelBefore << "#endif\n";
 
@@ -634,16 +634,16 @@ namespace {
 
           if (!single_source.empty()) {
             SourceLocation ST_forEach_start = callFS->getSourceRange().getBegin().getLocWithOffset(0);
-            string galois_foreach = "Galois::for_each(";
+            string galois_foreach = "galois::for_each(";
             string iterator_range = "boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end)";
             rewriter.ReplaceText(ST_forEach_start, galois_foreach.length() + single_source.length(), galois_foreach + iterator_range);
           }
 
           //insert helperFunc in for_each call
           SourceLocation ST_forEach_end = callFS->getSourceRange().getEnd().getLocWithOffset(0);
-          //SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph), Galois::wl<dChunk>()";
+          //SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph), galois::wl<dChunk>()";
 
-          //Assumption:: User will give worklist Galois::wl in for_each.
+          //Assumption:: User will give worklist galois::wl in for_each.
           SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph)";
           rewriter.InsertText(ST_forEach_end, SSHelperStructFunctions.str(), true, true);
 
@@ -678,7 +678,7 @@ namespace {
           // of the structure
           SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
-          llvm::errs() << "Galois::do_all loop found\n";
+          llvm::errs() << "galois::do_all loop found\n";
 
 
           /*
@@ -957,7 +957,7 @@ namespace {
           kernelBefore << "\tif (personality == GPU_CUDA) {\n";
           kernelBefore << "\t\tstd::string impl_str(\"CUDA_DO_ALL_IMPL_" 
             << className << "_\" + (_graph.get_run_identifier()));\n";
-          kernelBefore << "\t\tGalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+          kernelBefore << "\t\tgalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           std::string accumulator;
           for (auto& decl : recordDecl->decls()) {
@@ -1002,7 +1002,7 @@ namespace {
           // TODO make sanity pass
           // replace do all call with single source call if necessary
           if (!single_source.empty()) {
-            string galois_doall = "Galois::do_all(";
+            string galois_doall = "galois::do_all(";
             string iterator_range = "boost::make_counting_iterator(__begin), "
                                     "boost::make_counting_iterator(__end)";
             rewriter.ReplaceText(ST_main,
@@ -1096,8 +1096,8 @@ namespace {
             callee(
               functionDecl(
                 anyOf(
-                  hasName("Galois::do_all"),
-                  hasName("Galois::do_all_local")
+                  hasName("galois::do_all"),
+                  hasName("galois::do_all_local")
                 )
               )
             ), 
@@ -1106,11 +1106,11 @@ namespace {
         );
 
         // TODO for each needed?
-        /** for Galois::for_each. Needs different treatment. **/
+        /** for galois::for_each. Needs different treatment. **/
         Matchers.addMatcher(
           callExpr(
             isExpansionInMainFile(), 
-            callee(functionDecl(hasName("Galois::for_each"))), 
+            callee(functionDecl(hasName("galois::for_each"))), 
             hasDescendant(
               declRefExpr(to(functionDecl(hasName("workList_version"))))
             ), 

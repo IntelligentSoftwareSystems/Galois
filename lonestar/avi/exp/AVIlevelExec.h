@@ -49,7 +49,7 @@
 
 class AVIlevelExec: public AVIabstractMain {
 protected:
-  typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
+  typedef galois::Graph::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 
@@ -121,14 +121,14 @@ protected:
 
     MeshInit& meshInit;
     GlobalVec& g;
-    Galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec;
+    galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& niter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        Galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
+        galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& niter)
       :
@@ -139,7 +139,7 @@ protected:
         niter(niter) 
     {}
 
-    void operator () (const Update& item, Galois::UserContext<Update>& ctx) const {
+    void operator () (const Update& item, galois::UserContext<Update>& ctx) const {
       // for debugging, remove later
       niter += 1;
       LocalVec& l = *perIterLocalVec.getLocal();
@@ -164,7 +164,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    Galois::Substrate::PerThreadStorage<LocalVec> perIterLocalVec;
+    galois::Substrate::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 
@@ -175,9 +175,9 @@ public:
 
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
-    // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeStandardRange (
+    // galois::for_each_ordered (
+    galois::Runtime::for_each_ordered_level (
+        galois::Runtime::makeStandardRange (
         boost::make_transform_iterator(elems.begin(), MakeUpdate()),
         boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         GetNextTS (), std::less<double> (), nhVisitor, p, "level-by-level-avi");

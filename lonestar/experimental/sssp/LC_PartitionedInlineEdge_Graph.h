@@ -33,7 +33,7 @@
 #include <boost/mpl/if.hpp>
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -117,8 +117,8 @@ public:
   typedef typename EdgeInfo::reference edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
   typedef EdgeInfo* edge_iterator;
-  typedef Galois::NoDerefIterator<NodeInfo*> iterator;
-  typedef Galois::NoDerefIterator<const NodeInfo*> const_iterator;
+  typedef galois::NoDerefIterator<NodeInfo*> iterator;
+  typedef galois::NoDerefIterator<const NodeInfo*> const_iterator;
   typedef iterator local_iterator;
   typedef const_iterator const_local_iterator;
 
@@ -150,7 +150,7 @@ protected:
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
-    Galois::Runtime::acquire(N, mflag);
+    galois::Runtime::acquire(N, mflag);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -202,13 +202,13 @@ public:
   }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     return ni->get();
    }
 
@@ -231,7 +231,7 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
         acquireNode(getDst(ii), mflag);
       }

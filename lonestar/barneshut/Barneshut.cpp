@@ -67,7 +67,7 @@ struct Body : public Node {
  * A node in an octree is either an internal node or a leaf.
  */
 struct Octree : public Node {
-  std::array<Galois::Substrate::PtrLock<Node>, 8> child;
+  std::array<galois::Substrate::PtrLock<Node>, 8> child;
   char cLeafs;
   char nChildren;
 
@@ -153,10 +153,10 @@ inline Point updateCenter(Point v, int index, double radius) {
   return v;
 }
 
-typedef Galois::InsertBag<Body> Bodies;
-typedef Galois::InsertBag<Body*> BodyPtrs;
+typedef galois::InsertBag<Body> Bodies;
+typedef galois::InsertBag<Body*> BodyPtrs;
 //FIXME: reclaim memory for multiple steps
-typedef Galois::InsertBag<Octree> Tree;
+typedef galois::InsertBag<Octree> Tree;
 
 
 
@@ -311,7 +311,7 @@ struct ComputeForces {
 
   template<typename Context>
   void iterate(Body& b, Context& cnx) {
-    std::deque<Frame, Galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
+    std::deque<Frame, galois::PerIterAllocTy::rebind<Frame>::other> stack(cnx.getPerIterAlloc());
     stack.push_back(Frame(top, root_dsq));
 
     while (!stack.empty()) {
@@ -376,13 +376,13 @@ template<typename Iter, typename Gen>
 void divide(const Iter& b, const Iter& e, Gen& gen) {
   if (std::distance(b,e) > 32) {
     std::sort(b,e, centerXCmp());
-    Iter m = Galois::split_range(b,e);
+    Iter m = galois::split_range(b,e);
     std::sort(b, m, centerYCmpInv());
     std::sort(m, e, centerYCmp());
-    divide(b, Galois::split_range(b, m), gen);
-    divide(Galois::split_range(b, m), m, gen);
-    divide(m, Galois::split_range(m, e), gen);
-    divide(Galois::split_range(m, e), e, gen);
+    divide(b, galois::split_range(b, m), gen);
+    divide(galois::split_range(b, m), m, gen);
+    divide(m, galois::split_range(m, e), gen);
+    divide(galois::split_range(m, e), e, gen);
   } else {
     std::shuffle(b, e, gen);
   }
@@ -441,11 +441,11 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   //sort and copy out
   divide(tmp.begin(), tmp.end(), gen);
 
-  Galois::do_all(tmp.begin(), tmp.end(), 
+  galois::do_all(tmp.begin(), tmp.end(), 
       [&pBodies, &bodies] (const Body& b) {
         pBodies.push_back(&(bodies.push_back(b)));
       },
-      Galois::loopname("InsertBody"));
+      galois::loopname("InsertBody"));
 }
 
 struct CheckAllPairs {
@@ -476,31 +476,31 @@ double checkAllPairs(Bodies& bodies, int N) {
   Bodies::iterator end(bodies.begin());
   std::advance(end, N);
   
-  return Galois::ParallelSTL::map_reduce(bodies.begin(), end,
+  return galois::ParallelSTL::map_reduce(bodies.begin(), end,
       CheckAllPairs(bodies),
       0.0,
       std::plus<double>()) / N;
 }
 
 void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
-  typedef Galois::WorkList::dChunkedLIFO<256> WL_;
-  typedef Galois::WorkList::AltChunkedLIFO<32> WL;
-  typedef Galois::WorkList::StableIterator<true> WLL;
+  typedef galois::WorkList::dChunkedLIFO<256> WL_;
+  typedef galois::WorkList::AltChunkedLIFO<32> WL;
+  typedef galois::WorkList::StableIterator<true> WLL;
 
-  Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc (galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
   for (int step = 0; step < ntimesteps; step++) {
 
     auto MB = [] (BoundingBox& lhs, const Point& rhs) { lhs.merge(rhs); };
 
     // Do tree building sequentially
-    Galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
-    Galois::do_all_local(pBodies, 
+    galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
+    galois::do_all_local(pBodies, 
         [&boxes] (const Body* b) {
           boxes.update(b->pos);
         },
-        Galois::loopname("reduceBoxes"), Galois::do_all_steal<true>());
+        galois::loopname("reduceBoxes"), galois::do_all_steal<true>());
 
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
@@ -509,14 +509,14 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     BuildOctree treeBuilder {t};
     Octree& top = t.emplace(box.center());
 
-    Galois::StatTimer T_build("BuildTime");
+    galois::StatTimer T_build("BuildTime");
     T_build.start();
-    Galois::do_all_local(pBodies,
+    galois::do_all_local(pBodies,
         [&] (Body* body) {
           treeBuilder.insert(body, &top, box.radius()); 
         }, 
-        Galois::timeit(),
-        Galois::loopname("BuildTree"));
+        galois::timeit(),
+        galois::loopname("BuildTree"));
     T_build.stop();
 
     //update centers of mass in tree
@@ -526,25 +526,25 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     ComputeForces cf(&top, box.diameter());
 
-    Galois::StatTimer T_compute("ComputeTime");
+    galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
-    Galois::for_each_local(pBodies, 
+    galois::for_each_local(pBodies, 
         [&] (Body* b, auto& cnx) {
           cf.computeForce(b, cnx);
         },
-        Galois::loopname("compute"), 
-        Galois::wl<WLL> (),
-        Galois::timeit(),
-        Galois::does_not_need_aborts (),
-        Galois::does_not_need_push (),
-        Galois::needs_per_iter_alloc ());
+        galois::loopname("compute"), 
+        galois::wl<WLL> (),
+        galois::timeit(),
+        galois::does_not_need_aborts (),
+        galois::does_not_need_push (),
+        galois::needs_per_iter_alloc ());
     T_compute.stop();
 
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
     //Done in compute forces
-    Galois::do_all_local(pBodies, 
+    galois::do_all_local(pBodies, 
         [] (Body* b) {
           Point dvel(b->acc);
           dvel *= config.dthf;
@@ -553,7 +553,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
           b->pos += velh * config.dtime;
           b->vel = velh + dvel;
         },
-        Galois::loopname("advance"));
+        galois::loopname("advance"));
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 
@@ -563,11 +563,11 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     std::cout << "\n";
   }
 
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 }
 
 int main(int argc, char** argv) {
-  Galois::SharedMemSys G;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   std::cout << config << "\n";
@@ -578,7 +578,7 @@ int main(int argc, char** argv) {
   BodyPtrs pBodies;
   generateInput(bodies, pBodies, nbodies, seed);
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   run(bodies, pBodies, nbodies);
   T.stop();

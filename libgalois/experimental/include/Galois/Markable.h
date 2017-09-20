@@ -42,7 +42,7 @@
 
 #include "Galois/Runtime/DoAllCoupled.h"
 
-namespace Galois {
+namespace galois {
 
 template <typename T>
 struct Markable {
@@ -111,8 +111,8 @@ struct RemoveMarked {
 template <typename WL>
 void removeMarked (WL& wl) {
 
-  Galois::do_all (
-  // Galois::Runtime::do_all_coupled (
+  galois::do_all (
+  // galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarked<WL> (wl),
@@ -143,8 +143,8 @@ struct RemoveMarkedStable: public RemoveMarked<WL> {
 template <typename WL>
 void removeMarkedStable (WL& wl) {
 
-  Galois::do_all (
-  // Galois::Runtime::do_all_coupled (
+  galois::do_all (
+  // galois::Runtime::do_all_coupled (
       boost::counting_iterator<unsigned> (0),
       boost::counting_iterator<unsigned> (wl.numRows ()),
       RemoveMarkedStable<WL> (wl),
@@ -153,7 +153,7 @@ void removeMarkedStable (WL& wl) {
 }
 
 
-} // end namespace Galois
+} // end namespace galois
 
 
 

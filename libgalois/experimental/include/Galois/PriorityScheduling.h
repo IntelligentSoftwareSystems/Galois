@@ -43,9 +43,9 @@ namespace Exp {
 __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
 //FIXME: using in a header
-using namespace Galois::Runtime;
-using namespace Galois::Substrate;
-using namespace Galois::WorkList;
+using namespace galois::Runtime;
+using namespace galois::Substrate;
+using namespace galois::WorkList;
 
 template<int CS, bool LF>
 struct PickInner;
@@ -93,20 +93,20 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-        Galois::gInfo("WorkList ", #__x);                    \
+        galois::gInfo("WorkList ", #__x);                    \
 	printed = true;							\
       }									\
-      Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<__x>()); \
+      galois::for_each(b,e,f,std::forward<Args>(args)..., galois::wl<__x>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-        Galois::gInfo("WorkList ", "NI_" #__x);              \
+        galois::gInfo("WorkList ", "NI_" #__x);              \
 	printed = true;							\
       }									\
-      Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<NoInlineFilter<__x>>()); \
+      galois::for_each(b,e,f,std::forward<Args>(args)..., galois::wl<NoInlineFilter<__x>>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2

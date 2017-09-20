@@ -35,7 +35,7 @@
 
 #include <string>
 
-namespace Galois {
+namespace galois {
 
 std::string getVersion();
 std::string getRevision();
@@ -44,6 +44,6 @@ int getVersionMinor();
 int getVersionPatch();
 int getCopyrightYear();
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif

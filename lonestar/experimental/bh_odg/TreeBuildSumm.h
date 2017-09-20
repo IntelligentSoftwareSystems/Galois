@@ -95,10 +95,10 @@ struct DestroyTree {
 
   void operator () (OctreeInternal<B>* root, TreeAlloc& treeAlloc) {
 
-    Galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
+    galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
 
     t_destroy.start ();
-    Galois::Runtime::for_each_ordered_tree (
+    galois::Runtime::for_each_ordered_tree (
         root,
         TopDown (),
         BottomUp {treeAlloc},
@@ -292,11 +292,11 @@ struct BuildTreeLockFree {
     treeAlloc.construct (root, box.center ());
     internalNodes.push_back (root);
 
-    typedef Galois::WorkList::dChunkedFIFO<64> WL_ty;
+    typedef galois::WorkList::dChunkedFIFO<64> WL_ty;
       
-    Galois::do_all (beg, end, 
+    galois::do_all (beg, end, 
         BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
-        Galois::do_all_steal<true>());
+        galois::do_all_steal<true>());
 
     return root;
   }
@@ -374,7 +374,7 @@ private:
 #ifdef HAVE_CILK
 struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
   TreeSummarizeCilk() {
-    if (!Galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+    if (!galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
       GALOIS_DIE("set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD");
     }
   }
@@ -439,9 +439,9 @@ struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
 
 struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
-  typedef Galois::GAtomic<unsigned> UnsignedAtomic;
+  typedef galois::GAtomic<unsigned> UnsignedAtomic;
   static const unsigned CHUNK_SIZE = 64;
-  typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WL_ty;
+  typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, unsigned> WL_ty;
 
   struct ODGnode {
     UnsignedAtomic numChild;
@@ -554,26 +554,26 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
     WL_ty wl;
-    typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef galois::WorkList::ExternalReference<WL_ty> WL;
     typedef typename WL_ty::value_type value_type;
     value_type* it = nullptr;
     std::vector<ODGnode> odgNodes;
 
-    Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
+    galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
 
     t_fill_wl.start ();
     fillWL (root, odgNodes, wl);
     t_fill_wl.stop ();
 
-    Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
+    galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    Galois::Runtime::beginSampling ();
+    galois::Runtime::beginSampling ();
     t_feach.start ();
 
-    // Galois::for_each_wl<Galois::Runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
-    Galois::for_each(it, it, SummarizeOp (odgNodes), Galois::loopname("tree_summ"), Galois::wl<WL>(&wl));
+    // galois::for_each_wl<galois::Runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
+    galois::for_each(it, it, SummarizeOp (odgNodes), galois::loopname("tree_summ"), galois::wl<WL>(&wl));
     t_feach.stop ();
-    Galois::Runtime::endSampling ();
+    galois::Runtime::endSampling ();
 
   }
 
@@ -634,7 +634,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
     std::vector<std::vector<InterNode*> > levelWL;
 
 
-    Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
+    galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
 
     t_fill_wl.start ();
     fillWL (root, levelWL);
@@ -649,21 +649,21 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
       (*statsFile) << "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE" << std::endl;
     }
 
-    Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
+    galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    Galois::Runtime::beginSampling ();
+    galois::Runtime::beginSampling ();
     t_feach.start ();
     for (unsigned i = levelWL.size (); i > 0;) {
       
       --i; // size - 1
 
       if (!levelWL[i].empty ()) {
-        Galois::Runtime::do_all_coupled (
-            Galois::Runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
+        galois::Runtime::do_all_coupled (
+            galois::Runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
             SummarizeOp (), 
             std::make_tuple (
-              Galois::loopname("level-hand"), 
-              Galois::chunk_size<32> ()));
+              galois::loopname("level-hand"), 
+              galois::chunk_size<32> ()));
 
 
         if (USE_PARAMETER) {
@@ -678,7 +678,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 
     }
     t_feach.stop ();
-    Galois::Runtime::endSampling ();
+    galois::Runtime::endSampling ();
 
     std::cout << "TreeSummarizeLevelByLevel: iterations = " << iter << std::endl;
 
@@ -697,20 +697,20 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   struct VisitNhood {
     static const unsigned CHUNK_SIZE = 32;
 
-    void acquire (TreeNode* n, Galois::MethodFlag f) {
-      Galois::Runtime::acquire (n, f);
+    void acquire (TreeNode* n, galois::MethodFlag f) {
+      galois::Runtime::acquire (n, f);
     }
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) {
 
       assert (!node->isLeaf ());
-      acquire (node, Galois::MethodFlag::WRITE);
+      acquire (node, galois::MethodFlag::WRITE);
 
       for (unsigned i = 0; i < 8; ++i) {
         TreeNode* c = node->getChild (i);
         if (c != NULL) {
-          acquire (c, Galois::MethodFlag::READ);
+          acquire (c, galois::MethodFlag::READ);
         }
       }
     }
@@ -746,13 +746,13 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    // Galois::Runtime::for_each_ordered_spec (
-        // Galois::Runtime::makeLocalRange (internalNodes),
+    // galois::Runtime::for_each_ordered_spec (
+        // galois::Runtime::makeLocalRange (internalNodes),
         // LevelComparator<TreeNode> (), 
         // VisitNhood (), 
         // OpFunc<true> (),
         // std::make_tuple (
-          // Galois::loopname ("tree_summ_spec")));
+          // galois::loopname ("tree_summ_spec")));
 
     std::abort();
   }
@@ -766,13 +766,13 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_ikdg (
-        Galois::Runtime::makeLocalRange (internalNodes),
+    galois::Runtime::for_each_ordered_ikdg (
+        galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), 
         Base::VisitNhood (), 
         Base::OpFunc<false> (),
         std::make_tuple (
-          Galois::loopname ("tree_summ_ikdg")));
+          galois::loopname ("tree_summ_ikdg")));
 
   }
 };
@@ -783,11 +783,11 @@ struct TreeSummarizeDataDAG: public TreeSummarizeTwoPhase {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_dag (
-        Galois::Runtime::makeLocalRange (internalNodes), 
+    galois::Runtime::for_each_ordered_dag (
+        galois::Runtime::makeLocalRange (internalNodes), 
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
-    // Galois::Runtime::for_each_ordered_dag_alt (
-        // Galois::Runtime::makeLocalRange (internalNodes), 
+    // galois::Runtime::for_each_ordered_dag_alt (
+        // galois::Runtime::makeLocalRange (internalNodes), 
         // LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
 
   }
@@ -824,10 +824,10 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
-    Galois::StatTimer tt;
+    galois::StatTimer tt;
     tt.start();
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeLocalRange (internalNodes),
+    galois::Runtime::for_each_ordered_level (
+        galois::Runtime::makeLocalRange (internalNodes),
         GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
     tt.stop();
 
@@ -887,26 +887,26 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     static const unsigned CHUNK_SIZE = 2;
-    // typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
-    typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    // typedef galois::WorkList::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    typedef galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
       std::cout << "KDG hand checking the tree. Timing may be off" << std::endl;
       checkTree (root);
     }
 
-    Galois::for_each (
+    galois::for_each (
         root,
         OpFunc (),
-        Galois::loopname ("kdg-hand"),
-        Galois::wl<WL_ty> ());
+        galois::loopname ("kdg-hand"),
+        galois::wl<WL_ty> ());
 
 
-    // Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
+    // galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
 // 
     // t_fill_wl.start ();
     // WL_ty wl;
-    // Galois::do_all_local (internalNodes,
+    // galois::do_all_local (internalNodes,
         // [&wl] (InterNode* n) {
           // unsigned c = n->numChild;
 // 
@@ -915,10 +915,10 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
             // wl.push (n);
           // }
         // },
-        // Galois::loopname("fill_init_wl"));
+        // galois::loopname("fill_init_wl"));
     // t_fill_wl.stop ();
 
-    // Galois::for_each_wl (wl, OpFunc (root), "tree_summ");
+    // galois::for_each_wl (wl, OpFunc (root), "tree_summ");
 
   }
 };
@@ -941,7 +941,7 @@ struct WorkItemSinglePass {
 template <typename PartList>
 struct PartitionSinglePass {
 
-  typedef Galois::FixedSizeAllocator<PartList> PartListAlloc;
+  typedef galois::FixedSizeAllocator<PartList> PartListAlloc;
 
   PartListAlloc partListAlloc;
   
@@ -1180,7 +1180,7 @@ namespace recursive {
     template <typename WorkItem, typename TreeAlloc, typename Partitioner>
     void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
 
-      Galois::Runtime::for_each_ordered_tree (
+      galois::Runtime::for_each_ordered_tree (
           initial,
           GaloisBuild<WorkItem, TreeAlloc, Partitioner> {treeAlloc, partitioner},
           GaloisSummarize<WorkItem> (),
@@ -1191,7 +1191,7 @@ namespace recursive {
 
     template <typename B>
     void operator () (OctreeInternal<B>* root) {
-      Galois::Runtime::for_each_ordered_tree (
+      galois::Runtime::for_each_ordered_tree (
           root,
           GaloisPassTopDown<B> (),
           &summarizeNode<B>,
@@ -1212,7 +1212,7 @@ struct BuildSummarizeRecursive: public TypeDefHelper<SerialNodeBase> {
   template <typename I, typename TreeAlloc>
   OctreeInternal<B>* operator () (const BoundingBox& box, I bodbeg, I bodend, TreeAlloc& treeAlloc) const {
 
-    typedef Galois::gdeque<Body<B>*> PartList;
+    typedef galois::gdeque<Body<B>*> PartList;
     typedef WorkItemSinglePass<B, PartList> WorkItem;
 
 
@@ -1252,20 +1252,20 @@ struct BuildLockFreeSummarizeRecursive {
     
     DummyBag _bag;
 
-    Galois::StatTimer t_build ("Time taken by tree build: ");
+    galois::StatTimer t_build ("Time taken by tree build: ");
     t_build.start ();
     BuildTreeLockFree<B> builder;
     OctreeInternal<B>* root = builder (box, bodbeg, bodend, treeAlloc, _bag);
     t_build.stop ();
 
-    Galois::StatTimer t_summ ("Time taken by tree summarization: ");
+    galois::StatTimer t_summ ("Time taken by tree summarization: ");
 
-    Galois::Runtime::beginSampling();
+    galois::Runtime::beginSampling();
     t_summ.start ();
     recursive::ChooseExecutor<EXEC_TYPE> f;
     f (root);
     t_summ.stop ();
-    Galois::Runtime::endSampling();
+    galois::Runtime::endSampling();
 
     return root;
   }
@@ -1279,7 +1279,7 @@ struct BuildSummarizeSeparate {
   typedef typename SM::Base_ty Base_ty;
   typedef BM<Base_ty> BuildMethod;
   typedef OctreeInternal<Base_ty> Node_ty;
-  typedef Galois::InsertBag<Node_ty*> InternalNodes;
+  typedef galois::InsertBag<Node_ty*> InternalNodes;
 
   BuildMethod buildMethod;
   SM summarizeMethod;
@@ -1289,7 +1289,7 @@ struct BuildSummarizeSeparate {
 
     InternalNodes internalNodes;
 
-    Galois::StatTimer t_build ("Time taken by tree build: ");
+    galois::StatTimer t_build ("Time taken by tree build: ");
     t_build.start ();
     Node_ty* root = buildMethod (box, bodbeg, bodend, treeAlloc, internalNodes);
     t_build.stop ();
@@ -1299,7 +1299,7 @@ struct BuildSummarizeSeparate {
       checkTreeBuild (root, box, std::distance (bodbeg, bodend));
     }
 
-    Galois::StatTimer t_summ ("Time taken by tree summarization: ");
+    galois::StatTimer t_summ ("Time taken by tree summarization: ");
 
     t_summ.start ();
     summarizeMethod (root, bodbeg, bodend, internalNodes);

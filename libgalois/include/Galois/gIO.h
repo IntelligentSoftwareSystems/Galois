@@ -42,7 +42,7 @@
 
 //FIXME: move to Runtime
 
-namespace Galois {
+namespace galois {
 
 //! Prints a string
 void gPrintStr(const std::string&);
@@ -100,10 +100,10 @@ void gError(Args... args) {
 
 void gFlush();
 
-#define GALOIS_SYS_DIE(...)   do { Galois::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
-#define GALOIS_DIE(...)       do { Galois::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_SYS_DIE(...)   do { galois::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_DIE(...)       do { galois::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 //! Like assert but unconditionally executed
-#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { Galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
+#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
 
 
 template <unsigned ENABLE> 
@@ -121,6 +121,6 @@ struct debug<0> {
 };
 
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif //_GIO_H

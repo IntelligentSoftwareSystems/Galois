@@ -4,11 +4,11 @@
 #include <iostream>
 #include <vector>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 typedef std::vector<int>::iterator IterTy;
 
-struct Counter : public Galois::Runtime::Lockable {
+struct Counter : public galois::Runtime::Lockable {
   int i;
 
   Counter(): i(0) {}
@@ -38,8 +38,8 @@ struct Adder {
   
   Adder(Counter* c = nullptr) :c(c) {}
   
-  void operator()(int& data, Galois::UserContext<int>&) {
-    acquire(c, Galois::ALL);
+  void operator()(int& data, galois::UserContext<int>&) {
+    acquire(c, galois::ALL);
     c->add(data);
     return;
   }
@@ -48,7 +48,7 @@ struct Adder {
 };
 
 struct Printer {
-  void operator()(int& data, Galois::UserContext<int>&) {
+  void operator()(int& data, galois::UserContext<int>&) {
     std::cout
       << "Printer: in host " << NetworkInterface::ID 
       << " and thread " << LL::getTID() 
@@ -61,7 +61,7 @@ void testSimple(int N) {
   auto begin = boost::counting_iterator<int>(0);
   auto end = boost::counting_iterator<int>(N);
 
-  Galois::for_each(begin, end, Printer());
+  galois::for_each(begin, end, Printer());
 }
 
 void testAdder(int N) {
@@ -70,11 +70,11 @@ void testAdder(int N) {
   Counter c;
   Adder adder(&c);
   
-  static_assert(Galois::Runtime::is_serializable<Counter>::value, "Counter not serializable");
+  static_assert(galois::Runtime::is_serializable<Counter>::value, "Counter not serializable");
 
-  Galois::for_each(begin, end, adder);
+  galois::for_each(begin, end, adder);
 
-  acquire(adder.c, Galois::ALL);
+  acquire(adder.c, galois::ALL);
   auto val_is = adder.c->i,
        val_sb = std::accumulate(begin, end, 0);
 
@@ -82,7 +82,7 @@ void testAdder(int N) {
 }
 
 int main(int argc, char *argv[]) {
-  Galois::StatManager M;
+  galois::StatManager M;
   int threads = 2;
   if (argc > 1)
     threads = atoi(argv[1]);
@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
   if (argc > 2)
     N = atoi(argv[2]);
 
-  Galois::setActiveThreads(threads);
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  galois::setActiveThreads(threads);
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   net.start();
   
   testSimple(N);

@@ -29,7 +29,7 @@
 
 #if 0
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 namespace {
 
@@ -37,7 +37,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
   static const int COMM_MIN = 1400; // bytes (sligtly smaller than an ethernet packet)
   static const int COMM_DELAY = 100; //microseconds
 
-  std::unique_ptr<Galois::Runtime::NetworkIO> netio;
+  std::unique_ptr<galois::Runtime::NetworkIO> netio;
 
   struct recvBuffer {
     std::deque<uint8_t> data;
@@ -220,7 +220,7 @@ public:
 
 } //namespace ""
 
-NetworkInterface& Galois::Runtime::makeNetworkRouted() {
+NetworkInterface& galois::Runtime::makeNetworkRouted() {
   static NetworkInterfaceRouted net;
   return net;
 }

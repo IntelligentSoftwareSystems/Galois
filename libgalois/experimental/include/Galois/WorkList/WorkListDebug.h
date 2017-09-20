@@ -35,7 +35,7 @@
 #include <fstream>
 #include <map>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 template<typename Indexer, typename realWL, typename T = int>
@@ -115,8 +115,8 @@ public:
     wl.push_initial(range);
   }
 
-  Galois::optional<value_type> pop() {
-    Galois::optional<value_type> ret = wl.pop();
+  galois::optional<value_type> pop() {
+    galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     p& P = *tracking.getLocal();
     unsigned int cclock = clock.data;
@@ -187,7 +187,7 @@ public:
 
   typedef typename realWL::value_type value_type;
 
-  LoadBalanceTracker() :Pr(Galois::getActiveThreads()) {}
+  LoadBalanceTracker() :Pr(galois::getActiveThreads()) {}
 
   ~LoadBalanceTracker() {
     std::ofstream file("tracking.csv", std::ofstream::trunc);
@@ -230,13 +230,13 @@ public:
     wl.push_initial(range);
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     p& P = *tracking.getLocal();
 
     if (P.epoch != P.newEpoch)
       updateEpoch(P);
 
-    Galois::optional<value_type> ret = wl.pop();
+    galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     unsigned num = ++P.values[P.epoch];
     if (num >= perEpoch)
@@ -279,13 +279,13 @@ public:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  Galois::optional<value_type> pop()  {
+  galois::optional<value_type> pop()  {
     return wl.pop();
   }
 };
 
 
 }
-} // end namespace Galois
+} // end namespace galois
 
 #endif

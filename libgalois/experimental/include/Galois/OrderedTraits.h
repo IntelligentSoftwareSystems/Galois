@@ -4,7 +4,7 @@
 #include "Galois/Traits.h"
 #include "Galois/gtuple.h"
 
-namespace Galois {
+namespace galois {
 
 struct enable_parameter_tag {};
 template <bool V=false>
@@ -36,7 +36,7 @@ struct needs_custom_locking: public trait_has_type<T>, needs_custom_locking_tag 
 // };
 
 
-} // end namespace Galois
+} // end namespace galois
 
 // TODO: add 
 #endif // GALOIS_ORDERED_TRAITS_H

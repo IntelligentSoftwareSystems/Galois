@@ -3,7 +3,7 @@
 
 #include "Galois/Runtime/Network.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 unsigned count = 0;
 

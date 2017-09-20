@@ -12,7 +12,7 @@ void check(const char* func, bool r) {
   }
 }
 
-void check(const char* func, const Galois::optional<int>& r, int exp) {
+void check(const char* func, const galois::optional<int>& r, int exp) {
   if (r && *r == exp)
     return;
   else if (!r)
@@ -24,7 +24,7 @@ void check(const char* func, const Galois::optional<int>& r, int exp) {
 
 
 void testPoll() {
-  Galois::PairingHeap<int> heap;
+  galois::PairingHeap<int> heap;
 
   for (int i = 0; i < 10; ++i) {
     if (i & 1) {
@@ -44,8 +44,8 @@ void testPoll() {
 }
 
 void testDecrease() {
-  Galois::PairingHeap<int> heap;
-  std::vector<Galois::PairingHeap<int>::Handle> handles;
+  galois::PairingHeap<int> heap;
+  std::vector<galois::PairingHeap<int>::Handle> handles;
 
   for (int i = 0; i < 10; ++i) {
     if (i & 1) {
@@ -69,8 +69,8 @@ void testDecrease() {
 }
 
 void testDelete() {
-  Galois::PairingHeap<int> heap;
-  std::vector<Galois::PairingHeap<int>::Handle> handles;
+  galois::PairingHeap<int> heap;
+  std::vector<galois::PairingHeap<int>::Handle> handles;
 
   for (int i = 0; i < 100; ++i) {
     handles.push_back(heap.add(i));
@@ -90,7 +90,7 @@ void testDelete() {
 }
 
 void testParallel1() {
-  Galois::FCPairingHeap<int> heap;
+  galois::FCPairingHeap<int> heap;
 
   for (int i = 0; i < 10; ++i) {
     if ((i & 0) == 0) {
@@ -108,8 +108,8 @@ void testParallel1() {
 }
 
 struct Process2 {
-  Galois::FCPairingHeap<int>* heap;
-  Process2(Galois::FCPairingHeap<int>& h) : heap(&h) { }
+  galois::FCPairingHeap<int>* heap;
+  Process2(galois::FCPairingHeap<int>& h) : heap(&h) { }
   Process2() = default;
 
   template<typename Context>
@@ -125,14 +125,14 @@ void testParallel2() {
     range.push_back(i);
   std::random_shuffle(range.begin(), range.end());
 
-  int numThreads = Galois::setActiveThreads(2);
+  int numThreads = galois::setActiveThreads(2);
   if (numThreads < 2) {
     assert(0 && "Unable to run with multiple threads");
     abort();
   }
 
-  Galois::FCPairingHeap<int> heap;
-  Galois::for_each(range.begin(), range.end(), Process2(heap));
+  galois::FCPairingHeap<int> heap;
+  galois::for_each(range.begin(), range.end(), Process2(heap));
 
   for (int i = 0; i < top; ++i) {
     check(__func__, heap.pollMin(), i);

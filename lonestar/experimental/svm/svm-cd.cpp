@@ -153,9 +153,9 @@ typedef struct Node {
 } Node;
 
 
-using Graph = Galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
+using Graph = galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
 using GNode = Graph::GraphNode;
-typedef Galois::InsertBag<GNode> Bag;
+typedef galois::InsertBag<GNode> Bag;
 
 /**         CONSTANTS AND PARAMETERS       **/
 unsigned NUM_SAMPLES = 0;
@@ -167,9 +167,9 @@ unsigned variableNodeToId(GNode variable_node) {
   return ((unsigned) variable_node) - NUM_SAMPLES;
 }
 
-Galois::Substrate::PerThreadStorage<double*> thread_weights;
-Galois::Substrate::PerPackageStorage<double*> package_weights;
-Galois::LargeArray<double> old_weights;
+galois::Substrate::PerThreadStorage<double*> thread_weights;
+galois::Substrate::PerPackageStorage<double*> package_weights;
+galois::LargeArray<double> old_weights;
 
 //undef to test specialization for dense feature space
 //#define DENSE
@@ -192,21 +192,21 @@ struct LogisticRegression {
   double C;
 
   LogisticRegression(Graph& _g, double _innereps, size_t *_newton_iter) : g(_g), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
 	C = creg;
 	alg_type = AlgoType::DCDLR;
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
 	Node& sample_data = g.getData(n);
 
     // Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-      dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
+      dot += weight * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -262,9 +262,9 @@ struct LogisticRegression {
 		if(d == 0) return;
 	}
 
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
 
       double delta = -d*g.getEdgeData(edge_it);
       var_data.w -= delta;
@@ -284,8 +284,8 @@ typedef struct {
   //double PGmax_new;
   //double PGmin_new;
   size_t active_size;
-  Galois::GReduceMax<double> PGmax_new;
-  Galois::GReduceMin<double> PGmin_new;
+  galois::GReduceMax<double> PGmax_new;
+  galois::GReduceMin<double> PGmin_new;
 
   std::vector<bool> isactive;
 } DCD_parameters;
@@ -303,20 +303,20 @@ struct linearSVM_DCD {
   DCD_parameters *params;
 
   linearSVM_DCD(Graph& _g, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
 
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
     Node& sample_data = g.getData(n);
 
     // Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-      dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
+      dot += weight * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -354,9 +354,9 @@ struct linearSVM_DCD {
     if ( d == 0.0 )
       return;
 
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
 
       double delta = -d*g.getEdgeData(edge_it);
       var_data.w -= delta;
@@ -378,7 +378,7 @@ struct linearSGD_Wild {
   double* baseEdgeData;
 #endif
   linearSGD_Wild(Graph& _g, double _lr) : g(_g), learningRate(_lr) {
-    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -386,16 +386,16 @@ struct linearSGD_Wild {
 #endif
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
     Node& sample_data = g.getData(n);
    	double invcreg = 1.0/creg; 
 	// Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-	  dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
+	  dot += weight * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -412,14 +412,14 @@ struct linearSGD_Wild {
 	else if ( algoType == AlgoType::SGDLR )
 		d = 1/(1+exp(dot*label));
 
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
 	  int varCount = var_data.field;
 	  double rfactor = var_data.QD;
 	  double delta = 0; 
 	  if ( bigUpdate == true)
-		  delta = learningRate * ( var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED));
+		  delta = learningRate * ( var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED));
 	  else
 		  delta = learningRate * ( var_data.w*rfactor);
       var_data.w -= delta;
@@ -437,7 +437,7 @@ struct linearSGD {
 
   Graph& g;
   double learningRate;
-  Galois::GAccumulator<size_t>& bigUpdates;
+  galois::GAccumulator<size_t>& bigUpdates;
   bool has_other;
 
 #ifdef DENSE
@@ -445,8 +445,8 @@ struct linearSGD {
   ptrdiff_t edgeOffset;
   double* baseEdgeData;
 #endif
-  linearSGD(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+  linearSGD(Graph& _g, double _lr, galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
+    has_other = galois::Substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -454,15 +454,15 @@ struct linearSGD {
 #endif
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
     double *packagew = *package_weights.getLocal();
     double *threadw = *thread_weights.getLocal();
     double *otherw = NULL;
-    Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
+    galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
     if (has_other) {
-      unsigned tid = Galois::Substrate::ThreadPool::getTID();
-      unsigned my_package = Galois::Substrate::ThreadPool::getPackage();
+      unsigned tid = galois::Substrate::ThreadPool::getTID();
+      unsigned my_package = galois::Substrate::ThreadPool::getPackage();
       unsigned next = my_package + 1;
       if (next >= 4)
         next -= 4;
@@ -491,9 +491,9 @@ struct linearSGD {
     for (cur = 0; cur < size; ) {
       int varCount = baseNodeData[cur].field;
 #else
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+      Node& var_data = g.getData(variable_node, galois::MethodFlag::UNPROTECTED);
       int varCount = var_data.field;
 #endif
 
@@ -622,8 +622,8 @@ struct linearSGD {
 typedef struct {
 	double Gmax_old;
 	double Gnorm1_init;
-  Galois::GReduceMax<double> Gmax_new;
-  Galois::GAccumulator<double> Gnorm1_new;
+  galois::GReduceMax<double> Gmax_new;
+  galois::GAccumulator<double> Gnorm1_new;
 } CD_parameters;
 
 // Primal CD for Lasso 
@@ -637,7 +637,7 @@ struct Lasso_CD {
 	  lambda = 0.5/creg;
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
     Node& var_data = g.getData(n);
 	double &w = var_data.w;
 
@@ -650,12 +650,12 @@ struct Lasso_CD {
 //		return;
 	// Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode sample_node = g.getEdgeDst(edge_it);
-      Node& sample_data = g.getData(sample_node, Galois::MethodFlag::UNPROTECTED);
+      Node& sample_data = g.getData(sample_node, galois::MethodFlag::UNPROTECTED);
 	  double r = sample_data.alpha;
-	  dot += r * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
-//	  printf("%d-%d %lf   ", n-NUM_SAMPLES, sample_node, g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED));
+	  dot += r * g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
+//	  printf("%d-%d %lf   ", n-NUM_SAMPLES, sample_node, g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED));
     }
 
 	double violation = 0;
@@ -696,10 +696,10 @@ struct Lasso_CD {
 //	printf("%d: %lf %lf %lf\n", n-NUM_SAMPLES-2, wold, wnew, delta);
 	if ( std::fabs(delta) > 1e-12 )
 	{
-    	for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    	for (auto edge_it : g.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
 			GNode sample_node = g.getEdgeDst(edge_it);
-			Node& sample_data = g.getData(sample_node, Galois::MethodFlag::UNPROTECTED);
-			sample_data.alpha += delta*g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
+			Node& sample_data = g.getData(sample_node, galois::MethodFlag::UNPROTECTED);
+			sample_data.alpha += delta*g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);
 		}
 		w = wnew;
     }
@@ -709,15 +709,15 @@ struct Lasso_CD {
 
 double getDualObjective(Graph& g, const std::vector<GNode>& trainingSamples, double* diag, const std::vector<double>& alpha) {
   // 0.5 * w^Tw + C * sum_i [max(0, 1 - y_i * w^T * x_i)]^2
-  Galois::GAccumulator<double> objective;
+  galois::GAccumulator<double> objective;
 
-  Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
+  galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
     Node& data = g.getData(n);
     int label = g.getData(n).field;
     objective += alpha[n] * (alpha[n] * diag[label + 1] - 2);
   });
   
-  Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+  galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
     double v = g.getData(i + NUM_SAMPLES).w;
     objective += v * v;
   });
@@ -732,7 +732,7 @@ void printParameters(const std::vector<GNode>& trainingSamples, const std::vecto
   std::cout << "Input Train label file: " << inputTrainLabelFilename << "\n";
   std::cout << "Input Test graph file: " << inputTestGraphFilename << "\n";
   std::cout << "Input Test label file: " << inputTestLabelFilename << "\n";
-  std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
+  std::cout << "Threads: " << galois::getActiveThreads() << "\n";
   std::cout << "Train Samples: " << NUM_SAMPLES << "\n";
   std::cout << "Test Samples: " << NUM_TEST_SAMPLES << "\n";
   std::cout << "Variables: " << NUM_VARIABLES << "\n";
@@ -815,15 +815,15 @@ unsigned loadLabels(Graph& g, std::string filename) {
 }
 
 size_t getNumCorrect(Graph& g_test, std::vector<GNode>& testing_samples, Graph& g_train) {
-  Galois::GAccumulator<size_t> correct;
+  galois::GAccumulator<size_t> correct;
 
   std::vector<double> w_vec(NUM_VARIABLES);
-  Galois::do_all(g_train.begin()+NUM_SAMPLES, g_train.end(), [&](GNode n) {
+  galois::do_all(g_train.begin()+NUM_SAMPLES, g_train.end(), [&](GNode n) {
 		  Node& data = g_train.getData(n);
 		  w_vec[n-NUM_SAMPLES] = data.w;
   });
 
-  Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
+  galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
     double sum = 0.0;
     Node& data = g_test.getData(n);
     int label = data.field;
@@ -847,10 +847,10 @@ size_t getNumCorrect(Graph& g_test, std::vector<GNode>& testing_samples, Graph& 
 }
 
 double getTestRMSE(Graph& g_test, std::vector<GNode>& testing_samples, Graph& g_train) {
-  Galois::GAccumulator<double> square_err;
+  galois::GAccumulator<double> square_err;
 
   std::vector<double> w_vec(NUM_VARIABLES);
-  Galois::do_all(g_train.begin()+NUM_SAMPLES, g_train.end(), [&](GNode n) {
+  galois::do_all(g_train.begin()+NUM_SAMPLES, g_train.end(), [&](GNode n) {
 		  Node& data = g_train.getData(n);
 		  w_vec[n-NUM_SAMPLES] = data.w;
   });
@@ -860,7 +860,7 @@ double getTestRMSE(Graph& g_test, std::vector<GNode>& testing_samples, Graph& g_
 	  wnorm += i*i;
 //  printf("wnorm: %lf, umvariables: %d\n", wnorm, NUM_VARIABLES);
 
-  Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
+  galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode n) {
     double sum = 0.0;
     Node& data = g_test.getData(n);
     double b = data.b;
@@ -885,9 +885,9 @@ double getTestRMSE(Graph& g_test, std::vector<GNode>& testing_samples, Graph& g_
 double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
   // 0.5 * w^Tw + C * sum_i loss(w^T * x_i, y_i)
   //// 0.5 * w^Tw + C * sum_i [max(0, 1 - y_i * w^T * x_i)]^2
-  Galois::GAccumulator<double> objective;
+  galois::GAccumulator<double> objective;
 
-  Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
+  galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
     double sum = 0.0;
     Node& data = g.getData(n);
     int label = data.field;
@@ -916,8 +916,8 @@ double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
     objective += o;
   });
   
-  Galois::GAccumulator<double> norm;
-  Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+  galois::GAccumulator<double> norm;
+  galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
     double v = g.getData(i + NUM_SAMPLES).w;
 	if ( algoType == AlgoType::CDLasso || algoType == AlgoType::GLMNETL1RLR)
 		norm += std::fabs(v);
@@ -929,9 +929,9 @@ double getPrimalObjective(Graph& g, const std::vector<GNode>& trainingSamples) {
 
 
 void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
-	Galois::TimeAccumulator accumTimer;
+	galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	Galois::StatTimer DcdTime("DcdTime");
+	galois::StatTimer DcdTime("DcdTime");
 
 	// Initialization for DCD
 	double diag[] = { 0.5/creg, 0, 0.5/creg };
@@ -956,7 +956,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 	// For LR
 	double innereps = 1e-2;
 	double innereps_min = 1e-8;//min(1e-8, eps);
-	Galois::StatTimer QDTime("QdTime");
+	galois::StatTimer QDTime("QdTime");
 	QDTime.start();
 	auto ts_begin = trainingSamples.begin();
 	auto ts_end = trainingSamples.end();
@@ -1018,19 +1018,19 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 		size_t newton_iter = 0; // used by dcd for LR
 		auto ts_begin = trainingSamples.begin();
 		auto ts_end = trainingSamples.end();
-		auto ln = Galois::loopname("LinearSVM");
-		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-		Galois::GAccumulator<size_t> bigUpdates;
+		auto ln = galois::loopname("LinearSVM");
+		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+		galois::GAccumulator<size_t> bigUpdates;
 
 
 		if(algoType == AlgoType::DCDLR) {
-			Galois::for_each(ts_begin, ts_end, LogisticRegression(g_train, innereps, &newton_iter), ln, wl);
+			galois::for_each(ts_begin, ts_end, LogisticRegression(g_train, innereps, &newton_iter), ln, wl);
 		} else if (useshrink){
 			cur_bag->clear();
 			printf("active set size: %d\n", active_set.size());
-			Galois::for_each(active_set.begin(), active_set.end(), linearSVM_DCD(g_train, &params, cur_bag), ln, wl);
+			galois::for_each(active_set.begin(), active_set.end(), linearSVM_DCD(g_train, &params, cur_bag), ln, wl);
 		} else {
-			Galois::for_each(ts_begin, ts_end, linearSVM_DCD(g_train, &params), ln, wl);
+			galois::for_each(ts_begin, ts_end, linearSVM_DCD(g_train, &params), ln, wl);
 		}
 
 		if ( useshrink == true)
@@ -1085,21 +1085,21 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 
 
 void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
-  Galois::TimeAccumulator accumTimer;
+  galois::TimeAccumulator accumTimer;
   accumTimer.start();
 
   //allocate storage for weights from previous iteration
   old_weights.create(NUM_VARIABLES);
   if (updateType == UpdateType::ReplicateByThread || updateType == UpdateType::Staleness) {
-    Galois::on_each([](unsigned tid, unsigned total) {
+    galois::on_each([](unsigned tid, unsigned total) {
       double *p = new double[NUM_VARIABLES];
       *thread_weights.getLocal() = p;
       std::fill(p, p + NUM_VARIABLES, 0);
     });
   }
   if (updateType == UpdateType::ReplicateByPackage) {
-    Galois::on_each([](unsigned tid, unsigned total) {
-        if (Galois::Substrate::getThreadPool().isLeader(tid)) {
+    galois::on_each([](unsigned tid, unsigned total) {
+        if (galois::Substrate::getThreadPool().isLeader(tid)) {
         double *p = new double[NUM_VARIABLES];
         *package_weights.getLocal() = p;
         std::fill(p, p + NUM_VARIABLES, 0);
@@ -1107,7 +1107,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     });
   }
 
-  Galois::StatTimer sgdTime("SgdTime");
+  galois::StatTimer sgdTime("SgdTime");
   
   unsigned iterations = maxIterations;
   double minObj = std::numeric_limits<double>::max();
@@ -1125,30 +1125,30 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     double learning_rate = 30/(100.0 + iter);
     auto ts_begin = trainingSamples.begin();
     auto ts_end = trainingSamples.end();
-    auto ln = Galois::loopname("LinearSVM");
-    auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-    Galois::GAccumulator<size_t> bigUpdates;
+    auto ln = galois::loopname("LinearSVM");
+    auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+    galois::GAccumulator<size_t> bigUpdates;
 
-    Galois::Timer flopTimer;
+    galois::Timer flopTimer;
     flopTimer.start();
 
     UpdateType type = updateType;
 
     switch (type) {
       case UpdateType::Wild:
-	        Galois::for_each(ts_begin, ts_end, linearSGD_Wild<UpdateType::Wild>(g_train, learning_rate), ln, wl);
+	        galois::for_each(ts_begin, ts_end, linearSGD_Wild<UpdateType::Wild>(g_train, learning_rate), ln, wl);
         break;
       case UpdateType::WildOrig:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::WildOrig>(g_train, learning_rate, bigUpdates), ln, wl);
+        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::WildOrig>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
       case UpdateType::ReplicateByPackage:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByPackage>(g_train, learning_rate, bigUpdates), ln, wl);
+        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByPackage>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
       case UpdateType::ReplicateByThread:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByThread>(g_train, learning_rate, bigUpdates), ln, wl);
+        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByThread>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
       case UpdateType::Staleness:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::Staleness>(g_train, learning_rate, bigUpdates), ln, wl);
+        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::Staleness>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
       default: abort();
     }
@@ -1169,9 +1169,9 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     if (type != UpdateType::Wild && type != UpdateType::WildOrig) {
       bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
       double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
-      unsigned num_threads = Galois::getActiveThreads();
-      unsigned num_packages = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
-      Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
+      unsigned num_threads = galois::getActiveThreads();
+      unsigned num_packages = galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+      galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
         unsigned n = byThread ? num_threads : num_packages;
         for (unsigned j = 1; j < n; j++) {
           double o = byThread ?
@@ -1181,11 +1181,11 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
         }
         localw[i] /=  n;
         GNode variable_node = (GNode) (i + NUM_SAMPLES);
-        Node& var_data = g_train.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
+        Node& var_data = g_train.getData(variable_node, galois::MethodFlag::UNPROTECTED);
         var_data.w = localw[i];
         old_weights[i] = var_data.w;
       });
-      Galois::on_each([&](unsigned tid, unsigned total) {
+      galois::on_each([&](unsigned tid, unsigned total) {
         switch (type) {
           case UpdateType::Staleness:
           case UpdateType::ReplicateByThread:
@@ -1193,7 +1193,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
               std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
           break;
           case UpdateType::ReplicateByPackage:
-            if (tid && Galois::Substrate::getThreadPool().isLeader(tid))
+            if (tid && galois::Substrate::getThreadPool().isLeader(tid))
               std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
           break;
           default: abort();
@@ -1227,9 +1227,9 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
 }
 
 void runCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
-	Galois::TimeAccumulator accumTimer;
+	galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	Galois::StatTimer CdTime("CdTime");
+	galois::StatTimer CdTime("CdTime");
 
 	unsigned iterations = maxIterations;
 	if (fixedIterations)
@@ -1289,15 +1289,15 @@ void runCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>&
 			}
 		}
 
-		auto ln = Galois::loopname("PrimalCD");
-		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
+		auto ln = galois::loopname("PrimalCD");
+		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
 
 		if (useshrink) {
 			cur_bag.clear();
 			printf("active set size: %d\n", active_set.size());
-			Galois::for_each(active_set.begin(), active_set.end(), Lasso_CD(g_train, &params, &cur_bag), ln, wl);
+			galois::for_each(active_set.begin(), active_set.end(), Lasso_CD(g_train, &params, &cur_bag), ln, wl);
 		} else {
-			Galois::for_each(variables.begin(), variables.end(), Lasso_CD(g_train, &params), ln, wl);
+			galois::for_each(variables.begin(), variables.end(), Lasso_CD(g_train, &params), ln, wl);
 		}
 
 		if (useshrink == true )
@@ -1345,8 +1345,8 @@ typedef struct {
 	double Gmax_old;
 	double Gnorm1_init;
 	double QP_Gmax_old;
-	Galois::GReduceMax<double> Gmax_new, QP_Gmax_new;
-	Galois::GAccumulator<double> Gnorm1_new, QP_Gnorm1_new;
+	galois::GReduceMax<double> Gmax_new, QP_Gmax_new;
+	galois::GAccumulator<double> Gnorm1_new, QP_Gnorm1_new;
 } GLMNET_parameters;
 
 //#define CACHING
@@ -1363,28 +1363,28 @@ struct glmnet_cd { // {{{
 	size_t nr_samples;
 	double nu;
 	glmnet_cd(Graph &_g, param_t &_p, Bag &bag, size_t _nr_samples): g_train(_g), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12){}
-	void operator()(GNode feat_j, Galois::UserContext<GNode>& ctx){
-		auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+	void operator()(GNode feat_j, galois::UserContext<GNode>& ctx){
+		auto &j_data = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 		auto &H = j_data.Hdiag;
 		auto &Grad_j = j_data.Grad;
 		auto &wpd_j = j_data.wpd;
 		auto &w_j = j_data.w;
 		double G = Grad_j + (wpd_j-w_j)*nu;
 #ifdef CACHING
-		Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
+		galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
                 
-                ptrdiff_t size = std::distance(g_train.edge_begin(feat_j, Galois::MethodFlag::UNPROTECTED), g_train.edge_end(feat_j, Galois::MethodFlag::UNPROTECTED));
+                ptrdiff_t size = std::distance(g_train.edge_begin(feat_j, galois::MethodFlag::UNPROTECTED), g_train.edge_end(feat_j, galois::MethodFlag::UNPROTECTED));
                 double** xTdAddrs = (double**) alloc.allocate(sizeof(*xTdAddrs) * size);
                 double* xTds = (double*) alloc.allocate(sizeof(*xTds) * size);
                 double* xijs = (double*) alloc.allocate(sizeof(*xijs) * size);
 #endif
                 int ii = 0;
-		for(auto &edge : g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
-			auto &x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+		for(auto &edge : g_train.out_edges(feat_j, galois::MethodFlag::UNPROTECTED)) {
+			auto &x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
 #ifdef CACHING
                         xijs[ii] = x_ij;
 #endif
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
 #ifdef CACHING
                         xTdAddrs[ii] = &self.xTd;
                         xTds[ii] = *xTdAddrs[ii];
@@ -1419,16 +1419,16 @@ struct glmnet_cd { // {{{
 		z = std::min(std::max(z,-10.0),10.0);
 		wpd_j += z;
                 ii = 0;
-		for(auto &edge : g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
+		for(auto &edge : g_train.out_edges(feat_j, galois::MethodFlag::UNPROTECTED)) {
 #ifdef CACHING
                         auto x_ij = xijs[ii];
 #else
-			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+			auto x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
 #endif
 #ifdef CACHING
 			*xTdAddrs[ii] = xTds[ii] + x_ij*z;
 #else
-			g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED).xTd += x_ij*z;
+			g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED).xTd += x_ij*z;
 #endif
                         ii += 1;
 		}
@@ -1443,17 +1443,17 @@ struct glmnet_qp_construct { // {{{
 	size_t nr_samples;
 	double nu;
 	glmnet_qp_construct(Graph &_g, param_t &_p, Bag& bag, size_t _nr_samples): g_train(_g), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12){}
-	void operator()(GNode feat_j, Galois::UserContext<GNode>& ctx){
-		auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+	void operator()(GNode feat_j, galois::UserContext<GNode>& ctx){
+		auto &j_data = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 		auto &w_j = j_data.w;
 		auto &Hdiag_j = j_data.Hdiag;
 		auto &Grad_j = j_data.Grad;
 		auto &xjneg_sum_j = j_data.xjneg_sum;
 		Hdiag_j = nu; Grad_j = 0;
 		double tmp = 0;
-		for(auto &edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
-			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
+		for(auto &edge: g_train.out_edges(feat_j, galois::MethodFlag::UNPROTECTED)) {
+			auto x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
 			Hdiag_j += x_ij*x_ij*self.D;
 			tmp += x_ij*self.tau;
 		}
@@ -1481,15 +1481,15 @@ struct glmnet_qp_construct { // {{{
 	}
 }; // }}}
 void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) { // {{{
-	Galois::TimeAccumulator accumTimer;
+	galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	Galois::StatTimer glmnetTime("GLMENT Time");
-	Galois::StatTimer cdTime("CD Time");
-	Galois::StatTimer FirstTime("First_Time");
-	Galois::StatTimer SecondTime("Second_Time");
-	Galois::StatTimer ThirdTime("Third_Time");
+	galois::StatTimer glmnetTime("GLMENT Time");
+	galois::StatTimer cdTime("CD Time");
+	galois::StatTimer FirstTime("First_Time");
+	galois::StatTimer SecondTime("Second_Time");
+	galois::StatTimer ThirdTime("Third_Time");
 
-	Galois::StatTimer ActiveSetTime("Third_Time");
+	galois::StatTimer ActiveSetTime("Third_Time");
 
 	unsigned max_newton_iter = fixedIterations? fixedIterations: maxIterations;
 	unsigned max_cd_iter = 1000;
@@ -1517,9 +1517,9 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		w_norm += fabs(w_j);
 		wpd_j = w_j;
 		xjneg_sum_j = 0;
-		for(auto edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
-			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
+		for(auto edge: g_train.out_edges(feat_j, galois::MethodFlag::UNPROTECTED)) {
+			auto x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
 			self.exp_wTx += w_j*x_ij;
 			if(self.y == -1) 
 				xjneg_sum_j += creg*x_ij;
@@ -1532,7 +1532,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 	printf("creg %lf init xx %lf\n", cc, xx);
 
 	for(auto &inst_node: trainingSamples) {
-		auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
+		auto &self = g_train.getData(inst_node, galois::MethodFlag::UNPROTECTED);
 		self.exp_wTx = exp(self.exp_wTx);
 		double tau_tmp = 1.0/(1.0+self.exp_wTx);
 		self.tau = creg*tau_tmp;
@@ -1562,22 +1562,22 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		FirstTime.start();
 
 		// Compute Newton direction -- Hessian and Gradient
-		auto ln = Galois::loopname("GLMENT-QPconstruction");
-		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-		Galois::for_each(active_set.begin(), active_set.end(), glmnet_qp_construct(g_train, params, cur_bag, nr_samples), ln, wl);
+		auto ln = galois::loopname("GLMENT-QPconstruction");
+		auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+		galois::for_each(active_set.begin(), active_set.end(), glmnet_qp_construct(g_train, params, cur_bag, nr_samples), ln, wl);
 		/*
-		Galois::do_all(active_set.begin(), active_set.end(),
+		galois::do_all(active_set.begin(), active_set.end(),
 		[&](GNode feat_j) { // {{{
-			auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+			auto &j_data = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 			auto &w_j = j_data.w;
 			auto &Hdiag_j = j_data.Hdiag;
 			auto &Grad_j = j_data.Grad;
 			auto &xjneg_sum_j = j_data.xjneg_sum;
 			Hdiag_j = nu; Grad_j = 0;
 			double tmp = 0;
-			for(auto &edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
-				auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
-				auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
+			for(auto &edge: g_train.out_edges(feat_j, galois::MethodFlag::UNPROTECTED)) {
+				auto x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
+				auto &self = g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED);
 				Hdiag_j += x_ij*x_ij*self.D;
 				tmp += x_ij*self.tau;
 			}
@@ -1619,7 +1619,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		// Compute Newton direction -- Coordinate Descet for QP
 		cdTime.start();
 		params.QP_Gmax_old = std::numeric_limits<double>::max();
-		Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED).xTd = 0.0;});
+		galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {g_train.getData(inst_node, galois::MethodFlag::UNPROTECTED).xTd = 0.0;});
 		auto init_original_active_set = [&]{
 			active_set.clear();
 			for(auto &feat_j : cur_bag)
@@ -1642,10 +1642,10 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
                         //XXX
 			//if(shuffleSamples)
 			//	std::shuffle(active_set.begin(), active_set.end(), gen);
-			auto ln = Galois::loopname("GLMENT-CDiteration");
-			auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-			//Galois::for_each(active_set.begin(), active_set.end(), glmnet_cd(g_train, params, cd_bag, nr_samples), ln, wl);
-			Galois::for_each_local(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
+			auto ln = galois::loopname("GLMENT-CDiteration");
+			auto wl = galois::wl<galois::WorkList::dChunkedFIFO<32>>();
+			//galois::for_each(active_set.begin(), active_set.end(), glmnet_cd(g_train, params, cd_bag, nr_samples), ln, wl);
+			galois::for_each_local(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
 
 			cd_iter++;
 			double tmp_QP_Gmax_new = params.QP_Gmax_new.reduce();
@@ -1678,19 +1678,19 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		ThirdTime.start();
 		// Perform Line Search 
 		// {{{
-		Galois::GAccumulator<double> delta_acc, w_norm_acc;
-		Galois::do_all(variables.begin(), variables.end(), //{{{
+		galois::GAccumulator<double> delta_acc, w_norm_acc;
+		galois::do_all(variables.begin(), variables.end(), //{{{
 				[&](GNode &feat_j){
-				auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+				auto &self = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 				delta_acc.update(self.Grad*(self.wpd-self.w));
 				if(self.wpd != 0) w_norm_acc.update(fabs(self.wpd));
 				});//}}}
 		double w_norm_new = w_norm_acc.reduce();
 		double delta = delta_acc.reduce()+(w_norm_new-w_norm);
 
-		Galois::GAccumulator<double> tmp_acc;
-		Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {
-			auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
+		galois::GAccumulator<double> tmp_acc;
+		galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {
+			auto &self = g_train.getData(inst_node, galois::MethodFlag::UNPROTECTED);
 			if(self.y == -1) tmp_acc.update(creg*self.xTd);
 		});
 		double negsum_xTd = tmp_acc.reduce();
@@ -1699,8 +1699,8 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++ ){
 			double cond = w_norm_new - w_norm + negsum_xTd - sigma*delta;
 			tmp_acc.reset();
-			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node){
-				auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
+			galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node){
+				auto &self = g_train.getData(inst_node, galois::MethodFlag::UNPROTECTED);
 				double exp_xTd = exp(self.xTd);
 				self.exp_wTx_new = self.exp_wTx*exp_xTd;
 				tmp_acc.update(creg*log((1+self.exp_wTx_new)/(exp_xTd+self.exp_wTx_new)));
@@ -1708,12 +1708,12 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			cond += tmp_acc.reduce();
 			if(cond <= 0.0) {
 				w_norm = w_norm_new;
-				Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-						auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+				galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
+						auto &self = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 						self.w = self.wpd;
 					});
-				Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){
-						auto &self = g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED);
+				galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){
+						auto &self = g_train.getData(inst_i, galois::MethodFlag::UNPROTECTED);
 						self.exp_wTx = self.exp_wTx_new;
 						double tau_tmp = 1/(1+self.exp_wTx);
 						self.tau = creg*tau_tmp;
@@ -1723,30 +1723,30 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			} else {
 				w_norm_new = 0;
 				tmp_acc.reset();
-				Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-						auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+				galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
+						auto &self = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 						self.wpd = (self.w+self.wpd)*0.5;
 						if(self.wpd != 0) tmp_acc.update(fabs(self.wpd));
 					});
 				w_norm_new = tmp_acc.reduce();
 				delta *= 0.5;
 				negsum_xTd *= 0.5;
-				Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).xTd *=0.5;});
+				galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, galois::MethodFlag::UNPROTECTED).xTd *=0.5;});
 			}
 		}
 		if(num_linesearch >= max_num_linesearch) {
-			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).exp_wTx = 0;});
+			galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, galois::MethodFlag::UNPROTECTED).exp_wTx = 0;});
 
-			Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-					auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
+			galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
+					auto &self = g_train.getData(feat_j, galois::MethodFlag::UNPROTECTED);
 					if(self.w != 0) {
 						for(auto &edge: g_train.out_edges(feat_j)) {
-						auto &x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
-						g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED).exp_wTx += self.w*x_ij;
+						auto &x_ij = g_train.getEdgeData(edge, galois::MethodFlag::UNPROTECTED);
+						g_train.getData(g_train.getEdgeDst(edge), galois::MethodFlag::UNPROTECTED).exp_wTx += self.w*x_ij;
 						}
 					}
 				});
-			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ auto &exp_wTx = g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).exp_wTx; exp_wTx = exp(exp_wTx);});
+			galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ auto &exp_wTx = g_train.getData(inst_i, galois::MethodFlag::UNPROTECTED).exp_wTx; exp_wTx = exp(exp_wTx);});
 		}
 		//}}} // end of line search
 
@@ -1774,11 +1774,11 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
  
   Graph g_train, g_test;
   // Load Training Data
-  Galois::Graph::readGraph(g_train, inputTrainGraphFilename);
+  galois::Graph::readGraph(g_train, inputTrainGraphFilename);
   if ( algoType == AlgoType::CDLasso )
 	  NUM_SAMPLES = loadb(g_train, inputTrainLabelFilename);
   else {
@@ -1790,7 +1790,7 @@ int main(int argc, char** argv) {
   assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
 
   // Load Testing Data
-  Galois::Graph::readGraph(g_test, inputTestGraphFilename);
+  galois::Graph::readGraph(g_test, inputTestGraphFilename);
   if ( algoType == AlgoType::CDLasso )
 	  NUM_TEST_SAMPLES = loadb(g_test, inputTestLabelFilename);
   else
@@ -1817,9 +1817,9 @@ int main(int argc, char** argv) {
     std::cout << "\n";
   }
   
-  Galois::preAlloc(numThreads * 10);
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::StatTimer timer;
+  galois::preAlloc(numThreads * 10);
+  galois::reportPageAlloc("MeminfoPre");
+  galois::StatTimer timer;
   timer.start();
   switch (algoType) {
 /*    case AlgoType::SGDL1: runPrimalSgd(g_train, g_test, gen, trainingSamples, testingSamples); break;
@@ -1833,7 +1833,7 @@ int main(int argc, char** argv) {
     default: abort();
   }
   timer.stop();
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   return 0;
 }

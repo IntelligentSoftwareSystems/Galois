@@ -38,7 +38,7 @@
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/Termination.h"
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 class SharedMemSubstrate {

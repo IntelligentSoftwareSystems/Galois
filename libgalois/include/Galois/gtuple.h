@@ -29,7 +29,7 @@
 #include <tuple>
 #include <cstring>
 
-namespace Galois {
+namespace galois {
 
 /** Is Derived a subtype of Base? */
 template<typename Base, typename Derived>

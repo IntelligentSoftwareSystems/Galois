@@ -35,15 +35,15 @@ struct AsyncPri{
     }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncPri"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -56,16 +56,16 @@ struct AsyncPri{
     PRPri(Graph& g, PRTy t) : graph(g), tolerance(t) {}
     int operator()(const GNode& src, PRTy d) const {
       if (outOnly)
-        d /= (1 + nout(graph, src, Galois::MethodFlag::UNPROTECTED));
+        d /= (1 + nout(graph, src, galois::MethodFlag::UNPROTECTED));
       else
-        d /= ninout(graph, src, Galois::MethodFlag::UNPROTECTED);
+        d /= ninout(graph, src, galois::MethodFlag::UNPROTECTED);
       d /= tolerance;
       if (d > 50)
         return -50;
       return -d; //d*amp; //std::max((int)floor(d*amp), 0);
     }      
     int operator()(const GNode& src) const {
-      PRTy d = graph.getData(src, Galois::MethodFlag::UNPROTECTED).residual;
+      PRTy d = graph.getData(src, galois::MethodFlag::UNPROTECTED).residual;
       return operator()(src, d);
     }
   };
@@ -83,14 +83,14 @@ struct AsyncPri{
 
     Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,t) { }
 
-    void operator()(const std::pair<GNode,int>& srcn, Galois::UserContext<std::pair<GNode,int>>& ctx) const {
+    void operator()(const std::pair<GNode,int>& srcn, galois::UserContext<std::pair<GNode,int>>& ctx) const {
       GNode src = srcn.first;
       LNode& sdata = graph.getData(src);
       
       if(sdata.residual < tolerance || pri(src) != srcn.second)
         return;
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
+      galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
@@ -114,19 +114,19 @@ struct AsyncPri{
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    typedef Galois::WorkList::dChunkedFIFO<32> WL;
-    typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
-    Galois::InsertBag<std::pair<GNode, int> > bag;
+    typedef galois::WorkList::dChunkedFIFO<32> WL;
+    typedef galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
+    galois::InsertBag<std::pair<GNode, int> > bag;
     PRPri pri(graph, tolerance);
-    // Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+    // galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });
-    // Galois::for_each_local(bag, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+    // galois::for_each_local(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
 
     auto fn = [&pri] (const GNode& node) { return std::make_pair(node, pri(node)); };
-    Galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),
+    galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),
                      boost::make_transform_iterator(graph.end(), std::ref(fn)),
-                     Process(graph, tolerance, amp), Galois::wl<OBIM>());
+                     Process(graph, tolerance, amp), galois::wl<OBIM>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {    

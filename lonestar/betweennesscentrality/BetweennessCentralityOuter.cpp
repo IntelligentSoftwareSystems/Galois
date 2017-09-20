@@ -51,7 +51,7 @@ static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node t
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 static llvm::cl::opt<bool> printAll("printAll", llvm::cl::desc("Print betweenness values for all nodes"));
 
-typedef Galois::Graph::LC_CSR_Graph<void, void>
+typedef galois::Graph::LC_CSR_Graph<void, void>
   ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -59,23 +59,23 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
-Galois::Substrate::PerThreadStorage<double*> CB;
-Galois::Substrate::PerThreadStorage<double*> perThreadSigma;
-Galois::Substrate::PerThreadStorage<int*> perThreadD;
-Galois::Substrate::PerThreadStorage<double*> perThreadDelta;
-Galois::Substrate::PerThreadStorage<Galois::gdeque<GNode>*> perThreadSucc;
+galois::Substrate::PerThreadStorage<double*> CB;
+galois::Substrate::PerThreadStorage<double*> perThreadSigma;
+galois::Substrate::PerThreadStorage<int*> perThreadD;
+galois::Substrate::PerThreadStorage<double*> perThreadDelta;
+galois::Substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
 
 struct Process {
   typedef int tt_does_not_need_aborts;
   typedef int tt_does_not_need_push;
 
-  void operator()(GNode& _req, Galois::UserContext<GNode>&) {
-    Galois::gdeque<GNode> SQ;
+  void operator()(GNode& _req, galois::UserContext<GNode>&) {
+    galois::gdeque<GNode> SQ;
 
     double* sigma = *perThreadSigma.getLocal();
     int* d = *perThreadD.getLocal();
     double* delta = *perThreadDelta.getLocal();
-    Galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+    galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
 
     //unsigned int QAt = 0;
     
@@ -88,7 +88,7 @@ struct Process {
     for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
       GNode _v = *qq;
       int v = _v;
-      for (auto ii : G->edges(_v, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : G->edges(_v, galois::MethodFlag::UNPROTECTED)) {
 	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
@@ -207,27 +207,27 @@ struct DeleteLocal {
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   G = &g;
-  Galois::Graph::readGraph(*G, filename);
+  galois::Graph::readGraph(*G, filename);
 
   NumNodes = G->size();
 
-  Galois::on_each(InitializeLocal());
+  galois::on_each(InitializeLocal());
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads * NumNodes / 1650);
-  Galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads * NumNodes / 1650);
+  galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>
     begin  = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
     end    = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
 
   boost::filter_iterator<HasOut,Graph::iterator> begin2 = 
-    iterLimit ? Galois::safe_advance(begin, end, (int)iterLimit) : end;
+    iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
   size_t iterations = std::distance(begin, begin2);
 
@@ -238,10 +238,10 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef Galois::WorkList::StableIterator<true> WL;
-  Galois::StatTimer T;
+  typedef galois::WorkList::StableIterator<true> WL;
+  galois::StatTimer T;
   T.start();
-  Galois::for_each(v.begin(), v.end(), Process(), Galois::wl<WL>());
+  galois::for_each(v.begin(), v.end(), Process(), galois::wl<WL>());
   T.stop();
 
   printBCValues(0, std::min(10, NumNodes), std::cout, 6);
@@ -252,10 +252,10 @@ int main(int argc, char** argv) {
   if (forceVerify || !skipVerify)
     verify();
 
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   // XXX(ddn): Could use unique_ptr but not supported on all our platforms :(
-  Galois::on_each(DeleteLocal());
+  galois::on_each(DeleteLocal());
 
   return 0;
 }

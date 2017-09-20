@@ -47,17 +47,17 @@ int main(int argc, char** argv) {
   unsigned int numThreads = atoi(argv[1]);
   int n = atoi(argv[2]);
 
-  numThreads = Galois::setActiveThreads(numThreads);
+  numThreads = galois::setActiveThreads(numThreads);
   std::cout << "Using " << numThreads << " threads and " << n << " iterations\n";
 
   std::cout << "Using a function object\n";
-  Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), HelloWorld());
+  galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), HelloWorld());
 
   std::cout << "Using a function pointer\n";
-  Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), &helloWorld);
+  galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), &helloWorld);
 
   std::cout << "Using a lambda\n";
-  Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), [] (int i) { std::cout << "Hello " << i << "\n"; });
+  galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), [] (int i) { std::cout << "Hello " << i << "\n"; });
 //! [do_all example]
 
   return 0;

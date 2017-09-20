@@ -5,14 +5,14 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <iostream>
 
-using namespace Galois::Graph;
+using namespace galois::Graph;
 typedef ThirdGraph<int, int, EdgeDirection::Out> Graph;
 typedef ThirdGraph<int, void, EdgeDirection::Un> UndirectedGraph;
 
 struct AddSelfLoop {
   template<typename T, typename Context>
   void operator()(const T& node, const Context&) {
-    Galois::Runtime::acquire(node, Galois::MethodFlag::ALL);
+    galois::Runtime::acquire(node, galois::MethodFlag::ALL);
     GALOIS_ASSERT(&*node);
     node->createEdge(node, node, node->getData());
   }
@@ -24,7 +24,7 @@ void testSerialAdd(int N) {
   for (int x = 0; x < N; ++x)
     g->addNode(g->createNode(x));
 
-  Galois::for_each(g->begin(), g->end(), AddSelfLoop());
+  galois::for_each(g->begin(), g->end(), AddSelfLoop());
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
@@ -55,7 +55,7 @@ struct AddNode {
 void testParallelAdd(int N) {
   Graph::pointer g = Graph::allocate();
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
@@ -94,7 +94,7 @@ struct AddRemoveNode {
 void testAddRemove(int N) {
   UndirectedGraph::pointer g = UndirectedGraph::allocate();
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddRemoveNode(g));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddRemoveNode(g));
 
   ptrdiff_t dist = std::distance(g->begin(), g->end());
   int expected = ((N + 1) / 2) * 2 + (N / 2);
@@ -111,7 +111,7 @@ void testAddRemove(int N) {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   int threads = 2;
   if (argc > 1)
     threads = atoi(argv[1]);
@@ -119,8 +119,8 @@ int main(int argc, char** argv) {
   if (argc > 2)
     N = atoi(argv[2]);
 
-  Galois::setActiveThreads(threads);
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  galois::setActiveThreads(threads);
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   net.start();
   
   testSerialAdd(N);

@@ -52,7 +52,7 @@
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
-namespace Galois {
+namespace galois {
 
 /**
  * explicit class to initialize the Galois Runtime
@@ -75,7 +75,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
  * range and T is the type of item.
  *
- * @tparam WLTy Worklist policy {@see Galois::WorkList}
+ * @tparam WLTy Worklist policy {@see galois::WorkList}
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
@@ -91,7 +91,7 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link Galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::WorkList}
  * @param i initial item
  * @param fn operator
  * @param args optional arguments to loop
@@ -107,7 +107,7 @@ void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link Galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::WorkList}
  * @param c locality-aware container
  * @param fn operator
  * @param args optional arguments to loop
@@ -180,12 +180,12 @@ void on_each(const FunctionTy& fn, const Args&... args) {
 /**
  * Preallocates hugepages on each thread.
  *
- * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
+ * @param num number of pages to allocate of size {@link galois::Runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
   static const bool DISABLE_PREALLOC = false;
   if (DISABLE_PREALLOC) {
-    Galois::gWarn("preAlloc disabled");
+    galois::gWarn("preAlloc disabled");
 
   } else {
     Runtime::preAlloc_impl(num);
@@ -245,5 +245,5 @@ void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, cons
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
-} //namespace Galois
+} //namespace galois
 #endif

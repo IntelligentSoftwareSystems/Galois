@@ -1,4 +1,4 @@
-void reconvDrivenBackCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & roots, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, Galois::PerIterAllocTy & allocator ) const {
+void reconvDrivenBackCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & roots, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, galois::PerIterAllocTy & allocator ) const {
 
 		GNodeSet currentRoots( allocator );	
 		//GNodeSet currentRoots( nBuckets, hasher, comparator, allocator );
@@ -19,7 +19,7 @@ void reconvDrivenBackCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & roo
 		int minCost = std::numeric_limits<int>::max();
 		bool onlyPOs = true;
 		for ( aig::GNode node : roots ) {
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 			if ( nodeData.type != aig::NodeType::PO ) {
 				int cost = rootCost( graph, node, window );
 				if ( minCost > cost ) {
@@ -41,7 +41,7 @@ void reconvDrivenBackCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & roo
 			window.insert( currentNode );
 
 			int fanout = std::distance( graph.out_edges( currentNode ).begin(), graph.out_edges( currentNode ).end() );
-			aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+			aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 
 			if ( fanout > 1 && (currentNodeData.type == aig::NodeType::AND) ) { // DagNodes are stored in a separated list taht is used to discover side outputs of window
 				dagNodes.insert( currentNode );

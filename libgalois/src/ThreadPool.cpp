@@ -37,7 +37,7 @@
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 extern void initPTS(unsigned);
@@ -46,7 +46,7 @@ extern void initPTS(unsigned);
 }
 
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
@@ -252,18 +252,18 @@ void ThreadPool::runDedicated(std::function<void(void)>& f) {
   child->wakeup(masterFastmode);
   while (!child->done) { asmPause(); }
   work = nullptr;
-  //FIXME: Galois::setActiveThreads(Galois::getActiveThreads());
+  //FIXME: galois::setActiveThreads(galois::getActiveThreads());
 }
 
 
-static Galois::Substrate::ThreadPool* TPOOL = nullptr;
+static galois::Substrate::ThreadPool* TPOOL = nullptr;
 
-void Galois::Substrate::internal::setThreadPool(ThreadPool* tp) {
+void galois::Substrate::internal::setThreadPool(ThreadPool* tp) {
   GALOIS_ASSERT(!(TPOOL && tp), "Double initialization of ThreadPool");
   TPOOL = tp;
 }
 
-Galois::Substrate::ThreadPool& Galois::Substrate::getThreadPool(void) {
+galois::Substrate::ThreadPool& galois::Substrate::getThreadPool(void) {
   GALOIS_ASSERT(TPOOL, "ThreadPool not initialized");
   return *TPOOL;
 }

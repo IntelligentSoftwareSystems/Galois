@@ -50,7 +50,7 @@
 #include <mutex>
 
 static void printString(bool error, bool newline, const std::string& prefix, const std::string& s) {
-  static Galois::Substrate::SimpleLock IOLock;
+  static galois::Substrate::SimpleLock IOLock;
   std::lock_guard<decltype(IOLock)> lock(IOLock);
   std::ostream& o = error ? std::cerr : std::cout;
   if (prefix.length()) 
@@ -60,8 +60,8 @@ static void printString(bool error, bool newline, const std::string& prefix, con
     o << "\n";
 }
 
-void Galois::gDebugStr(const std::string& s) {
-  static bool skip = Galois::Substrate::EnvCheck("GALOIS_DEBUG_SKIP");
+void galois::gDebugStr(const std::string& s) {
+  static bool skip = galois::Substrate::EnvCheck("GALOIS_DEBUG_SKIP");
   if (skip) return;
   static const unsigned TIME_STR_SIZE = 32;
   char time_str[TIME_STR_SIZE];
@@ -74,10 +74,10 @@ void Galois::gDebugStr(const std::string& s) {
   strftime(time_str, TIME_STR_SIZE, "[%H:%M:%S]", timeinfo);
 
   std::ostringstream os;
-  os << "[" << time_str << " " << std::setw(3) << Galois::Substrate::ThreadPool::getTID() << "] " << s;
+  os << "[" << time_str << " " << std::setw(3) << galois::Substrate::ThreadPool::getTID() << "] " << s;
 
-  if (Galois::Substrate::EnvCheck("GALOIS_DEBUG_TO_FILE")) {
-    static Galois::Substrate::SimpleLock dIOLock;
+  if (galois::Substrate::EnvCheck("GALOIS_DEBUG_TO_FILE")) {
+    static galois::Substrate::SimpleLock dIOLock;
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {
@@ -94,22 +94,22 @@ void Galois::gDebugStr(const std::string& s) {
   }
 }
 
-void Galois::gPrintStr(const std::string& s) {
+void galois::gPrintStr(const std::string& s) {
   printString(false, false, "", s);
 }
 
-void Galois::gInfoStr(const std::string& s) {
+void galois::gInfoStr(const std::string& s) {
   printString(false, true, "INFO", s);
 }
 
-void Galois::gWarnStr(const std::string& s) {
+void galois::gWarnStr(const std::string& s) {
   printString(false, true, "WARNING", s);
 }
 
-void Galois::gErrorStr(const std::string& s) {
+void galois::gErrorStr(const std::string& s) {
   printString(true, true, "ERROR", s);
 }
 
-void Galois::gFlush() {
+void galois::gFlush() {
   fflush(stdout);
 }

@@ -30,7 +30,7 @@
 #ifndef GALOIS_THREADS_H
 #define GALOIS_THREADS_H
 
-namespace Galois {
+namespace galois {
 
 /**
  * Sets the number of threads to use when running any Galois iterator. Returns

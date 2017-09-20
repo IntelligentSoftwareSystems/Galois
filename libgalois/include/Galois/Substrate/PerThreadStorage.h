@@ -45,7 +45,7 @@
 #include <vector>
 #include <utility>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 class PerBackend {
@@ -282,5 +282,5 @@ public:
 };
 
 }
-} // end namespace Galois
+} // end namespace galois
 #endif

@@ -53,18 +53,18 @@ static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of ite
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
+typedef galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
 int NumNodes;
 
-Galois::Runtime::PerThreadStorage<double*> CB;
+galois::Runtime::PerThreadStorage<double*> CB;
 
 template<typename T>
 struct PerIt {  
-  typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
+  typedef typename galois::PerIterAllocTy::rebind<T>::other Ty;
 };
 
 struct process {
@@ -72,7 +72,7 @@ struct process {
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_push;
 
-  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
+  void operator()(GNode& _req, galois::UserContext<GNode>& lwl) {
     typedef std::deque<GNode, PerIt<GNode>::Ty> GNdeque;
     GNdeque SQ(lwl.getPerIterAlloc());
     std::deque<double, PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
@@ -92,8 +92,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::edge_iterator
-          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+          ii = G->edge_begin(_v, galois::MethodFlag::NONE),
+          ee = G->edge_end(_v, galois::MethodFlag::NONE); ii != ee; ++ii) {
 	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
@@ -135,7 +135,7 @@ void verify() {
     bool firstTime = true;
     for (int i=0; i<NumNodes; ++i) {
       double bc = (*CB.getRemote(0))[i];
-      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+      for (unsigned int j = 1; j < galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
       if (firstTime) {
         sampleBC = bc;
@@ -161,7 +161,7 @@ void printBCcertificate() {
 
   for (int i=0; i<NumNodes; ++i) {
     double bc = (*CB.getRemote(0))[i];
-    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+    for (unsigned int j = 1; j < galois::getActiveThreads(); ++j)
       bc += (*CB.getRemote(j))[i];
     outf << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
@@ -178,36 +178,36 @@ struct HasOut: public std::unary_function<GNode,bool> {
 
 struct InitializeLocal {
   void operator()(unsigned, unsigned) {
-    *CB.getLocal() = (double*)Galois::Runtime::MM::pageAlloc(); 
+    *CB.getLocal() = (double*)galois::Runtime::MM::pageAlloc(); 
     std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
   }
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   G = &g;
-  Galois::Graph::readGraph(*G, filename);
+  galois::Graph::readGraph(*G, filename);
 
   NumNodes = G->size();
 
   //CB.resize(NumNodes);
   //FIXME
-  assert(Galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
-  Galois::on_each(InitializeLocal());
+  assert(galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
+  galois::on_each(InitializeLocal());
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads * Galois::Runtime::MM::numPageAllocTotal() / 3);
-  Galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads * galois::Runtime::MM::numPageAllocTotal() / 3);
+  galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>
     begin  = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
     end    = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
 
   boost::filter_iterator<HasOut,Graph::iterator> begin2 = 
-    iterLimit ? Galois::safe_advance(begin, end, (int)iterLimit) : end;
+    iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
   size_t iterations = std::distance(begin, begin2);
 
@@ -218,16 +218,16 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef Galois::WorkList::StableIterator<true> WLL;
-  Galois::StatTimer T;
+  typedef galois::WorkList::StableIterator<true> WLL;
+  galois::StatTimer T;
   T.start();
-  Galois::for_each<WLL>(v.begin(), v.end(), process());
+  galois::for_each<WLL>(v.begin(), v.end(), process());
   T.stop();
 
   if (!skipVerify) {
     for (int i=0; i<10; ++i) {
       double bc = (*CB.getRemote(0))[i];
-      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+      for (unsigned int j = 1; j < galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
       std::cout << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
     }
@@ -236,7 +236,7 @@ int main(int argc, char** argv) {
 #endif
   }
 
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (forceVerify || !skipVerify) {
     verify();

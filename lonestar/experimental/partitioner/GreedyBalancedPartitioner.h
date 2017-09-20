@@ -130,7 +130,7 @@ struct GBPartitioner {
     * Partitioning routine.
     * */
    void operator()(std::string & basename, OfflineGraph & g, size_t num_hosts) {
-      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total;
+      galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total;
 
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
       T_total.start();
@@ -227,7 +227,7 @@ struct GBPartitioner {
 
          }      //For each node
          std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size() << "\n";
-         using namespace Galois::Graph;
+         using namespace galois::Graph;
          FileGraphWriter newGraph;
          newGraph.setNumNodes(newNodeCounter);
          newGraph.setNumEdges(newEdges.size());

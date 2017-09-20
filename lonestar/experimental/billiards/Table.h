@@ -63,7 +63,7 @@ protected:
   unsigned numBalls;
   FP length;
   FP width;
-  std::vector<Galois::gstl::Vector<Event> > eventsPerBall;
+  std::vector<galois::gstl::Vector<Event> > eventsPerBall;
   
 
   std::vector<Cushion*> cushions;
@@ -591,16 +591,16 @@ protected:
   }
 
 
-  Galois::optional<Event>  computeHistCollisions (const BallOptim<Ball>* ball, const FP& endtime, const Event* prevEvent) const {
+  galois::optional<Event>  computeHistCollisions (const BallOptim<Ball>* ball, const FP& endtime, const Event* prevEvent) const {
 
-    Galois::optional<Event> minBallColl;
+    galois::optional<Event> minBallColl;
 
     for (BallOptim<Ball>* b: balls) {
       if (ball != b) {
         auto bw = b->getWrapper ();
         assert (bw);
 
-        Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bw->ballHistBeg (), bw->ballHistEnd (), endtime, prevEvent, nullptr); 
+        galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bw->ballHistBeg (), bw->ballHistEnd (), endtime, prevEvent, nullptr); 
 
         if (ballColl) {
           if (!minBallColl || (*ballColl < *minBallColl)) {
@@ -625,9 +625,9 @@ protected:
   }
 
   template <typename B2>
-  Galois::optional<Event>  computeHistCollisions (const B2* ball, const FP& endtime, const Event* prevEvent) const {
+  galois::optional<Event>  computeHistCollisions (const B2* ball, const FP& endtime, const Event* prevEvent) const {
 
-    return Galois::optional<Event> ();
+    return galois::optional<Event> ();
   }
 
   template <typename C>
@@ -635,9 +635,9 @@ protected:
 
     assert (ball);
 
-    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, prevEvent, nullptr);
+    galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, prevEvent, nullptr);
 
-    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, prevEvent, nullptr);
+    galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, prevEvent, nullptr);
 
     // // FIXME: fixing the pointer to balls for optimistic executor, which may read a checkpointed copy of the ball
     // if (ballColl) {
@@ -647,7 +647,7 @@ protected:
       // ballColl = Event::makeEvent (Event::BALL_COLLISION, balls [b1->getID ()], balls [b2->getID ()], ballColl->getTime (), ballColl->enclosingSector ());
     // }
 
-    Galois::optional<Event> histColl = computeHistCollisions (ball, endtime, prevEvent);
+    galois::optional<Event> histColl = computeHistCollisions (ball, endtime, prevEvent);
 
     if (histColl) {
       if (!ballColl || (*histColl < *ballColl)) {

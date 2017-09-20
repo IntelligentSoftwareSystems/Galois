@@ -50,7 +50,7 @@ double get_wsabieC(const multilabel_parameter *param) {
 
 void wsabie_model_projection(double *W, double *H, long nr_feats, long nr_labels, long k, double wsabieC) {
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_feats),
+	galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_feats),
             [&](int s) {
 #else
 #pragma omp parallel for schedule(static,50) shared(W)
@@ -63,7 +63,7 @@ void wsabie_model_projection(double *W, double *H, long nr_feats, long nr_labels
         }
 #endif
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_labels),
+	galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_labels),
             [&](int j) {
 #else
 #pragma omp parallel for schedule(static,50) shared(H)
@@ -128,7 +128,7 @@ void wsabie_updates(multilabel_problem *prob, multilabel_parameter *param, doubl
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
 #ifdef EXP_DOALL_GALOIS
-                      Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                      galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                           [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -227,7 +227,7 @@ void wsabie_updates_new_old(multilabel_problem *prob, multilabel_parameter *para
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
 #ifdef EXP_DOALL_GALOIS
-                      Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                      galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                           [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -344,7 +344,7 @@ void wsabie_updates_new(multilabel_problem *prob, multilabel_parameter *param, d
 				for(int t = 0; t < k; t++) 
 					hdiff[t] = steplength*(Hybar[t]-Hy[t]);
 #ifdef EXP_DOALL_GALOIS
-                                Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                                galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                                     [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -496,7 +496,7 @@ void wsabie_updates_new2(multilabel_problem *prob, multilabel_parameter *param, 
 			project_with_len(Hybar, k, wsabieC);
 
 #ifdef EXP_DOALL_GALOIS
-                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                        galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                             [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -639,7 +639,7 @@ void wsabie_updates_new4(multilabel_problem *prob, multilabel_parameter *param, 
 			project_with_len(Hybar, k, wsabieC);
 
 #ifdef EXP_DOALL_GALOIS
-                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                        galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                             [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -788,7 +788,7 @@ void wsabie_updates_new3(multilabel_problem *prob, multilabel_parameter *param, 
 			}
 
 #ifdef EXP_DOALL_GALOIS
-                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                        galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                             [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
@@ -943,7 +943,7 @@ void wsabie_updates_2(multilabel_problem *prob, multilabel_parameter *param, dou
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
 #ifdef EXP_DOALL_GALOIS
-                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                        galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
                             [&](long idx) {
 #else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)

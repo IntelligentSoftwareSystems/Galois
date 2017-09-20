@@ -41,7 +41,7 @@ class Cavity: private boost::noncopyable {
     Tuple tuple;
     InCircumcenter(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
-      Element& e = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      Element& e = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       return e.inCircle(tuple);
     }
   };
@@ -59,23 +59,23 @@ class Cavity: private boost::noncopyable {
     for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
         ei = searcher.inside.end(); ii != ei; ++ii) {
 
-      for (Graph::edge_iterator jj = graph.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED),
-          ej = graph.edge_end(*ii, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+      for (Graph::edge_iterator jj = graph.edge_begin(*ii, galois::MethodFlag::UNPROTECTED),
+          ej = graph.edge_end(*ii, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode n = graph.getEdgeDst(jj);
         // i.e., if (!e.boundary() && e.inCircle(point->t())) 
         if (std::find(searcher.matches.begin(), searcher.matches.end(), n)
             != searcher.matches.end())
           continue;
 
-        int index = graph.getEdgeData(graph.findEdge(n, *ii, Galois::MethodFlag::UNPROTECTED));
+        int index = graph.getEdgeData(graph.findEdge(n, *ii, galois::MethodFlag::UNPROTECTED));
         outside.push_back(std::make_pair(n, index));
 
-        Element& e = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+        Element& e = graph.getData(n, galois::MethodFlag::UNPROTECTED);
         Point* p2 = e.getPoint(index);
         Point* p3 = e.getPoint((index + 1) % 3);
 
-        p2->get(Galois::MethodFlag::WRITE);
-        p3->get(Galois::MethodFlag::WRITE);
+        p2->get(galois::MethodFlag::WRITE);
+        p3->get(galois::MethodFlag::WRITE);
       }
     }
   }
@@ -89,21 +89,21 @@ class Cavity: private boost::noncopyable {
       const GNode& n = ii->first;
       int& index = ii->second;
 
-      Element& e = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      Element& e = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
       Point* p2 = e.getPoint(index);
       Point* p3 = e.getPoint((index + 1) % 3);
 
       Element newE(point, p2, p3);
       GNode newNode = graph.createNode(newE);
-      graph.addNode(newNode, Galois::MethodFlag::UNPROTECTED);
+      graph.addNode(newNode, galois::MethodFlag::UNPROTECTED);
 
       point->addElement(newNode);
       p2->addElement(newNode);
       p3->addElement(newNode);
 
-      graph.getEdgeData(graph.addEdge(newNode, n, Galois::MethodFlag::UNPROTECTED)) = 1;
-      graph.getEdgeData(graph.addEdge(n, newNode, Galois::MethodFlag::UNPROTECTED)) = index;
+      graph.getEdgeData(graph.addEdge(newNode, n, galois::MethodFlag::UNPROTECTED)) = 1;
+      graph.getEdgeData(graph.addEdge(n, newNode, galois::MethodFlag::UNPROTECTED)) = index;
       
       newNodes.push_back(newNode);
     }
@@ -111,19 +111,19 @@ class Cavity: private boost::noncopyable {
     // Update new node connectivity
     for (unsigned i = 0; i < newNodes.size(); ++i) {
       const GNode& n1 = newNodes[i];
-      const Element& e1 = graph.getData(n1, Galois::MethodFlag::UNPROTECTED);
+      const Element& e1 = graph.getData(n1, galois::MethodFlag::UNPROTECTED);
       for (unsigned j = i + 1; j < newNodes.size(); ++j) {
 	if (i != j) {
 	  const GNode& n2 = newNodes[j];
-	  const Element& e2 = graph.getData(n2, Galois::MethodFlag::UNPROTECTED);
+	  const Element& e2 = graph.getData(n2, galois::MethodFlag::UNPROTECTED);
 	  
 	  for (int x = 2; x >= 1; --x) {
 	    for (int y = 2; y >= 1; --y) {
 	      if (e1.getPoint(x) == e2.getPoint(y)) {
 		int indexForNewNode = x & 2;
                 int indexForNode = y & 2;
-                graph.getEdgeData(graph.addEdge(n1, n2, Galois::MethodFlag::UNPROTECTED)) = indexForNewNode;
-                graph.getEdgeData(graph.addEdge(n2, n1, Galois::MethodFlag::UNPROTECTED)) = indexForNode;
+                graph.getEdgeData(graph.addEdge(n1, n2, galois::MethodFlag::UNPROTECTED)) = indexForNewNode;
+                graph.getEdgeData(graph.addEdge(n2, n1, galois::MethodFlag::UNPROTECTED)) = indexForNode;
 	      }
 	    }
 	  }
@@ -135,7 +135,7 @@ class Cavity: private boost::noncopyable {
   void removeElements() {
     for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.matches.begin(),
         ei = searcher.matches.end(); ii != ei; ++ii) {
-      graph.removeNode(*ii, Galois::MethodFlag::UNPROTECTED);
+      graph.removeNode(*ii, galois::MethodFlag::UNPROTECTED);
     }
   }
 

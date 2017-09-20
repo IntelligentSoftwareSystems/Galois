@@ -36,10 +36,10 @@
 #include "BilliardsLevelExec.h"
 
 class BilliardsSpec: public Billiards {
-  using Graph = Galois::Graph::FirstGraph<void*, void, true>;
+  using Graph = galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::PerThreadVector<Event>;
+  using AddListTy = galois::PerThreadVector<Event>;
 
 
   struct OpFunc {
@@ -75,7 +75,7 @@ class BilliardsSpec: public Billiards {
       if (notStale) {
         auto alloc = ctx.getPerIterAlloc ();
 
-        using BallAlloc = Galois::PerIterAllocTy::rebind<Ball>::other;
+        using BallAlloc = galois::PerIterAllocTy::rebind<Ball>::other;
         BallAlloc ballAlloc (alloc);
 
         b1 = ballAlloc.allocate (1);
@@ -111,7 +111,7 @@ class BilliardsSpec: public Billiards {
           }
         }
 
-        using AddListTy = std::vector<Event, Galois::PerIterAllocTy::rebind<Event>::other>;
+        using AddListTy = std::vector<Event, galois::PerIterAllocTy::rebind<Event>::other>;
         auto alloc = ctx.getPerIterAlloc ();
         AddListTy addList (alloc);
         table.addNextEvents (e, addList, endtime);
@@ -153,8 +153,8 @@ public:
 
     createLocks (table, graph, nodes);
 
-    Galois::Runtime::for_each_ordered_rob (
-        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::Runtime::for_each_ordered_rob (
+        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         BilliardsLevelExec::VisitNhood (graph, nodes),
         OpFunc (table, endtime, iter));

@@ -150,8 +150,8 @@ void generateInput(BodyCont& bodies, int nbodies, int seed) {
 }
 
 template<bool IsOn>
-struct ToggleTime: public Galois::StatTimer {
-  ToggleTime(const char* name): Galois::StatTimer(name) { }
+struct ToggleTime: public galois::StatTimer {
+  ToggleTime(const char* name): galois::StatTimer(name) { }
 };
 
 template<>
@@ -165,8 +165,8 @@ struct ToggleTime<false> {
 template <bool TrackTime, typename TB>
 Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
   typedef typename TB::Base_ty B;
-  typedef Galois::gdeque<Body<B>*> Bodies;
-  typedef Galois::FixedSizeAllocator<OctreeInternal<B> > TreeAlloc;
+  typedef galois::gdeque<Body<B>*> Bodies;
+  typedef galois::FixedSizeAllocator<OctreeInternal<B> > TreeAlloc;
   
 
   Config config;
@@ -181,7 +181,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 
   Point ret;
   for (int step = 0; step < ntimesteps; step++) {
-    typedef Galois::WorkList::dChunkedLIFO<256> WL;
+    typedef galois::WorkList::dChunkedLIFO<256> WL;
 
 
     ReducibleBox bbox;
@@ -199,8 +199,8 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     auto end = boost::make_transform_iterator (bodies.end (), GetPos ());
 
     t_bbox.start ();
-    Galois::do_all(beg, end,
-        ReduceBoxes (bbox), Galois::do_all_steal<true>());
+    galois::do_all(beg, end,
+        ReduceBoxes (bbox), galois::do_all_steal<true>());
     t_bbox.stop ();
 
     BoundingBox box(bbox.reduce ());
@@ -225,11 +225,11 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 // 
     // OctreeInternal<B>* top = build (box, bodies.begin (), bodies.end ());
 // 
-    // // Galois::for_each(bodies.begin(), bodies.end(),
-        // // BuildOctree<B>(top, box.radius()), Galois::wl<WL> ());
+    // // galois::for_each(bodies.begin(), bodies.end(),
+        // // BuildOctree<B>(top, box.radius()), galois::wl<WL> ());
 // 
     // // reset the number of threads
-    // Galois::setActiveThreads(numThreads);
+    // galois::setActiveThreads(numThreads);
 // 
     // ToggleTime<TrackTime> t_tree_summ ("Time taken by Tree Summarization: ");
 // 
@@ -242,10 +242,10 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
       ToggleTime<TrackTime> T_parallel("ParallelTime");
       T_parallel.start();
 
-      Galois::for_each(bodies.begin(), bodies.end(),
-          ComputeForces<B> (config, top, box.diameter()), Galois::wl<WL> ());
-      Galois::for_each(bodies.begin(),bodies.end(),
-          AdvanceBodies<B> (config), Galois::wl<WL> ());
+      galois::for_each(bodies.begin(), bodies.end(),
+          ComputeForces<B> (config, top, box.diameter()), galois::wl<WL> ());
+      galois::for_each(bodies.begin(),bodies.end(),
+          AdvanceBodies<B> (config), galois::wl<WL> ());
       T_parallel.stop();
     }
 
@@ -273,7 +273,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 } // end namespace bh
 
 int main(int argc, char** argv) {
-  Galois::StatManager sm;
+  galois::StatManager sm;
   LonestarStart(argc, argv, bh::name, bh::desc, bh::url);
 
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
   std::cout << "Num. of threads: " << numThreads << std::endl;
 
   bh::Point pos;
-  Galois::StatTimer T("total time:");
+  galois::StatTimer T("total time:");
 
   T.start();
   switch (bh::treeSummOpt) {
@@ -302,7 +302,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::CILK_TREE:
-      //FIXME:      Galois::CilkInit ();
+      //FIXME:      galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 
@@ -331,7 +331,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::RSUMM_CILK:
-      //FIXME:      Galois::CilkInit ();
+      //FIXME:      galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 

@@ -11,18 +11,18 @@
 #include "SSSP.h"
 
 template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct LNode: public SNode {
     bool visited;
   };
 
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
+  typedef typename galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
     ::template with_compressed_node_ptr<true>::type
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
+          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -49,8 +49,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference weight) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       
       while (true) {
         Dist newDist = sdata.dist + weight;
@@ -74,14 +74,14 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    Galois::Statistic roundStat("Rounds");
+    galois::Statistic roundStat("Rounds");
 
-    Galois::GraphNodeBagPair<> bags(graph.size());
+    galois::GraphNodeBagPair<> bags(graph.size());
 
     graph.getData(source).dist = 0;
 
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), source, bags.next());
-    Galois::do_all_local(bags.next(), ResetVisited(graph));
+    galois::do_all_local(bags.next(), ResetVisited(graph));
     
     unsigned rounds = 0;
     while (!bags.next().empty()) {
@@ -92,7 +92,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
          
       bags.swap();
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
-      Galois::do_all_local(bags.next(), ResetVisited(graph));
+      galois::do_all_local(bags.next(), ResetVisited(graph));
     }
 
     roundStat += rounds + 1;

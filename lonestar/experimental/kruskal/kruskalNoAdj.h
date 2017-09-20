@@ -50,15 +50,15 @@
 #include "kruskal.h"
 
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 
 template <typename KNode_tp>
 struct WLfactory {
 
   typedef KEdge<KNode_tp> Edge_ty;
-  typedef typename Galois::PerThreadVector<Edge_ty* > WL_ty;
-  typedef typename Galois::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
+  typedef typename galois::PerThreadVector<Edge_ty* > WL_ty;
+  typedef typename galois::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
 
 };
 
@@ -211,8 +211,8 @@ void kruskalNoAdjNonSrc (
   Accumulator_ty mergeIter;
   Accumulator_ty numUnions;
 
-  Galois::TimeAccumulator matchTimer;
-  Galois::TimeAccumulator mergeTimer;
+  galois::TimeAccumulator matchTimer;
+  galois::TimeAccumulator mergeTimer;
 
 
   typedef typename WLfactory<KNode_tp>::WL_ty WL_ty;
@@ -230,7 +230,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           edges.begin (), edges.end (),
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -239,7 +239,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           edges.begin (), edges.end (),
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -249,7 +249,7 @@ void kruskalNoAdjNonSrc (
 
       matchTimer.start ();
 
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           *currWorkList,
           FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -258,7 +258,7 @@ void kruskalNoAdjNonSrc (
 
       mergeTimer.start ();
 
-      Galois::Runtime::do_all_coupled (
+      galois::Runtime::do_all_coupled (
           *currWorkList,
           LinkUpLoop<KNode_tp> (*nextWorkList, round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -417,16 +417,16 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
   Accumulator_ty mergeIter;
   Accumulator_ty numUnions;
 
-  Galois::TimeAccumulator matchTimer;
-  Galois::TimeAccumulator mergeTimer;
-  Galois::TimeAccumulator removeTimer;
+  galois::TimeAccumulator matchTimer;
+  galois::TimeAccumulator mergeTimer;
+  galois::TimeAccumulator removeTimer;
 
   typedef typename WLfactory<KNode_tp>::WLmarkable_ty WL_ty;
 
 
   WL_ty workList;
 
-  Galois::StatTimer t_wl_init ("WorkList initialization time: ");
+  galois::StatTimer t_wl_init ("WorkList initialization time: ");
 
   t_wl_init.start ();
   workList.fill_init (edges.begin (), edges.end (), &WL_ty::Cont_ty::push_back);
@@ -440,7 +440,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     matchTimer.start ();
 
-    Galois::Runtime::do_all_coupled (
+    galois::Runtime::do_all_coupled (
         workList,
         FindLoop<KNode_tp> (matchIter), "match_loop");
 
@@ -451,7 +451,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
     // std::cout << "Starting merge_loop" << std::endl;
 
-    Galois::Runtime::do_all_coupled (
+    galois::Runtime::do_all_coupled (
         workList,
         UnionLoop<KNode_tp> (round, numUnions, mstSum, mergeIter), "merge_loop");
 
@@ -488,7 +488,7 @@ void kruskalNoAdjSrc (std::vector<KNode_tp*>& nodes,
 
   if (totalUnions < (nodes.size () - 1)) {
 
-    Galois::StatTimer t_serial ("Time for serially processing remainging edges");
+    galois::StatTimer t_serial ("Time for serially processing remainging edges");
 
     t_serial.start ();
 

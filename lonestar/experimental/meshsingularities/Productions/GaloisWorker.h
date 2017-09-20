@@ -15,7 +15,7 @@
 #include "papi.h"
 #endif
 
-typedef Galois::WorkList::dChunkedLIFO<1> WL;
+typedef galois::WorkList::dChunkedLIFO<1> WL;
 
 struct ProductionProcess {
 public:
@@ -30,7 +30,7 @@ private:
 	// returns effective size of memory allocated for matrices and RHS.
 	unsigned long getAllocatedSize(Vertex *root);
 	int atomic_dec(int *value);
-	//Galois::Runtime::PerPackageStorage<WL> pps;
+	//galois::Runtime::PerPackageStorage<WL> pps;
 	int leftRange(int tasks, int cpus, int i);
 	int rightRange(int tasks, int cpus, int i);
 };

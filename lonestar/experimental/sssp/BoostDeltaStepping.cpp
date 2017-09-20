@@ -61,13 +61,13 @@ static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep
 static cll::opt<bool> useBFS("bfs", cll::desc("Use BFS"), cll::init(false));
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  typedef Galois::Graph::LC_CSR_Graph<void, unsigned int> Graph;
+  typedef galois::Graph::LC_CSR_Graph<void, unsigned int> Graph;
   Graph g;
   
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
   std::vector<int> distanceS(boost::num_vertices(bg), 0);
   DistanceMap distance(distanceS.begin(), boost::get(boost::vertex_index, bg));
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   boost::dijkstra_shortest_paths(bg,
       boost::vertex(startNode, bg),

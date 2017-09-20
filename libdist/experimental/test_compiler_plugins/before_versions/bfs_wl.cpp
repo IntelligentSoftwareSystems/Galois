@@ -64,14 +64,14 @@ struct InitializeGraph {
   InitializeGraph(llvm::cl::opt<unsigned int>& _src_node, Graph* _graph) : local_src_node(_src_node), graph(_graph){}
   void static go(Graph& _graph) {
 
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, galois::loopname("InitGraph"));
 
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if((net.ID == 0) && (src == local_src_node)){
       sdata.dist_current = 0;
     }
@@ -83,14 +83,14 @@ struct BFS {
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
 
-      Galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), Galois::loopname("BFS"), Galois::workList_version());
+      galois::for_each(_graph.begin(), _graph.end(), BFS (&_graph), galois::loopname("BFS"), galois::workList_version());
 
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src, galois::UserContext<GNode>& ctx) const {
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.dist_current;
 
@@ -98,7 +98,7 @@ struct BFS {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned long long new_dist = 1 + sdist;
-      auto old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
+      auto old_dist = galois::atomicMin(dnode.dist_current, new_dist);
       if(old_dist > new_dist){
         ctx.push(graph->getGID(dst));
       }
@@ -108,7 +108,7 @@ struct BFS {
 
 /********Set source Node ************/
 void setSource(Graph& _graph){
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   if(net.ID == 0){
     auto& nd = _graph.getData(src_node);
     nd.dist_current = 0;
@@ -118,8 +118,8 @@ void setSource(Graph& _graph){
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_BFS1, T_BFS2, T_BFS3;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_BFS1, T_BFS2, T_BFS3;
 
     T_total.start();
 
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS1 : " << T_BFS1.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "BFS::go run2 called  on " << net.ID << "\n";
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS2 : " << T_BFS2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "BFS::go run3 called  on " << net.ID << "\n";
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+        galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
     return 0;

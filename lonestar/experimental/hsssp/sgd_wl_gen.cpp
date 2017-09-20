@@ -95,7 +95,7 @@ struct InitializeGraph{
     	static void setVal (struct SGD_NodeData & node, std::vector<double> y) {node.latent_vector = y; }
     	typedef std::vector<double> ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, Galois::loopname("SGD Init"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "updates" , "unsigned long"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "edge_offset" , "unsigned long"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "latent_vector" , "std::vector<double>"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, galois::loopname("SGD Init"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "updates" , "unsigned long"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "edge_offset" , "unsigned long"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "struct SGD_NodeData &", "latent_vector" , "std::vector<double>"));
     _graph.sync_pull<SyncerPull_0>();
     
     _graph.sync_pull<SyncerPull_1>();
@@ -127,7 +127,7 @@ void dummy_func(SGD_NodeData& user, SGD_NodeData& movie){
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 double calcPrediction (const SGD_NodeData& movie_data, const SGD_NodeData& user_data) {
-  double pred = Galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
+  double pred = galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
   double p = pred;
   pred = std::min (MAXVAL, pred);
   pred = std::max (MINVAL, pred);
@@ -137,12 +137,12 @@ double calcPrediction (const SGD_NodeData& movie_data, const SGD_NodeData& user_
 }
 
 template <typename GraphTy>
-struct Get_info_functor : public Galois::op_tag {
+struct Get_info_functor : public galois::op_tag {
 	GraphTy &graph;
 	struct Syncer_0 {
 		static class std::vector<double, class std::allocator<double> > extract( const struct SGD_NodeData & node){ return node.latent_vector; }
-		static void reduce (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {Galois::pairWiseAvg_vec(node.latent_vector, y); }
-		static void reset (struct SGD_NodeData & node ){Galois::resetVec(node.latent_vector); }
+		static void reduce (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {galois::pairWiseAvg_vec(node.latent_vector, y); }
+		static void reset (struct SGD_NodeData & node ){galois::resetVec(node.latent_vector); }
 		typedef class std::vector<double, class std::allocator<double> > ValTy;
 	};
 	struct SyncerPull_0 {
@@ -182,13 +182,13 @@ struct Sgd {
         }
       }
 
-      using namespace Galois::WorkList;
+      using namespace galois::WorkList;
       typedef dChunkedFIFO<64> dChunk;
-      Galois::for_each(_graph.begin(), _graph.end(), Sgd(&_graph, _step_size), Galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+      galois::for_each(_graph.begin(), _graph.end(), Sgd(&_graph, _step_size), galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{galois::resetVec(node.latent_vector); }"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
 
   }
 
-  void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
+  void operator()(WorkItem src, galois::UserContext<WorkItem>& ctx) const {
     SGD_NodeData& sdata= graph->getData(src);
     auto& movie_node = sdata.latent_vector;
 
@@ -200,7 +200,7 @@ struct Sgd {
       double edge_rating = graph->getEdgeData(dst);
 
       //doGradientUpdate
-     double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
+     double old_dp = galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
      double cur_error = edge_rating - old_dp;
      for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
        double prevUser = user_node[i];
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
 
     OfflineGraph g(inputFile);
 

@@ -41,7 +41,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace Galois {
+namespace galois {
 
 /**
  * Alternate implementation of {@link ChooseTwoLevelIterator}.
@@ -427,6 +427,6 @@ make_two_level_iterator(OuterIter outer_begin, OuterIter outer_end)
 }
 #endif
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif

@@ -31,7 +31,7 @@
 #ifndef GALOISGPU_OCL_ARRAYIMPL_H_
 #define GALOISGPU_OCL_ARRAYIMPL_H_
 
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 /*******************************************************************************
@@ -70,7 +70,7 @@ struct Array {
 #if 0
       allocation_flags = CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR;
       device_data = clCreateBuffer(device->context(), allocation_flags, sizeof(T) * num_elements, NULL, &err);
-      Galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
+      galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
       host_data = (T*) clEnqueueMapBuffer(device->command_queue(), device_data, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(T) * num_elements, 0, NULL, NULL, &err);
 #else
       host_data=  nullptr;
@@ -82,7 +82,7 @@ struct Array {
       }
       allocation_flags = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
       device_data = clCreateBuffer(device->context(), allocation_flags, sizeof(T) * num_elements, host_data, &err);
-      Galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
+      galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
 #endif
       ReportDataAllocation(device, sizeof(T) * num_elements, err);
    }
@@ -94,7 +94,7 @@ struct Array {
       if(host_data){
          free(host_data);
          host_data = nullptr;
-         Galois::OpenCL::CHECK_CL_ERROR(clReleaseMemObject(device_data),"Failed to release device memory object.");
+         galois::OpenCL::CHECK_CL_ERROR(clReleaseMemObject(device_data),"Failed to release device memory object.");
          ReportDataAllocation(device, -1 * sizeof(T) * num_elements);
       }
    }
@@ -171,7 +171,7 @@ struct Array {
       buff.size = num_items * sizeof(T);
       cl_int err;
       cl_mem res = clCreateSubBuffer(device_data, allocation_flags, CL_BUFFER_CREATE_TYPE_REGION, &buff, &err);
-      Galois::OpenCL::CHECK_CL_ERROR(err, "Failed to create sub-region!");
+      galois::OpenCL::CHECK_CL_ERROR(err, "Failed to create sub-region!");
       return res;
    }
 
@@ -179,6 +179,6 @@ protected:
 };
 
 } //end namespace OpenCL
-} //end namespace Galois
+} //end namespace galois
 
 #endif /* GALOISGPU_OCL_ARRAYIMPL_H_ */

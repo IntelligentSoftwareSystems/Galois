@@ -49,11 +49,11 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 
 
@@ -61,7 +61,7 @@ class DESlevelExec:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   using VecGNode = std::vector<GNode>;
-  using AddList_ty =  Galois::PerThreadVector<TypeHelper::Event_ty>;
+  using AddList_ty =  galois::PerThreadVector<TypeHelper::Event_ty>;
 
   VecGNode nodes;
 
@@ -78,7 +78,7 @@ class DESlevelExec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::WRITE);
+      graph.getData (n, galois::MethodFlag::WRITE);
     }
   };
 
@@ -144,7 +144,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::UNPROTECTED);
+      BaseSimObj_ty* so = graph.getData (*n, galois::MethodFlag::UNPROTECTED);
       nodes[so->getID ()] = *n;
     }
   }
@@ -154,9 +154,9 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeStandardRange (simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
+    // galois::for_each_ordered (
+    galois::Runtime::for_each_ordered_level (
+        galois::Runtime::makeStandardRange (simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         GetRecvTime (), std::less<des::SimTime> (), 
         NhoodVisitor (graph, nodes),
         OpFunc (graph, nodes, newEvents, nevents));

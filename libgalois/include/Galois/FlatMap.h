@@ -35,7 +35,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace Galois {
+namespace galois {
 
 //! Simple map data structure, based off a single array.
 template<
@@ -376,10 +376,10 @@ inline bool operator>=(const flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
 
 namespace std {
 
-/// See Galois::flat_map::swap().
+/// See galois::flat_map::swap().
 template<typename _Key, typename _Tp, typename _Compare, typename _Alloc>
-inline void swap(Galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
-		 Galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __y) {
+inline void swap(galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __x,
+		 galois::flat_map<_Key, _Tp, _Compare, _Alloc>& __y) {
   __x.swap(__y);
 }
 

@@ -5,7 +5,7 @@
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/Executor_ParaMeter.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
@@ -75,7 +75,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
-    Galois::do_all_choice (makeLocalRange (pending),
+    galois::do_all_choice (makeLocalRange (pending),
         [this] (const T& x) {
 
           Ctxt* c = Base::ctxtAlloc.allocate (1);
@@ -100,7 +100,7 @@ protected:
           Base::roundTasks += 1;
         },
         std::make_tuple (
-          Galois::loopname ("expandNhood"),
+          galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
 
     pending.clear_all_parallel ();
@@ -108,7 +108,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
 
-    Galois::optional<T> minElem;
+    galois::optional<T> minElem;
 
     if (Base::NEEDS_PUSH) {
       if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
@@ -117,7 +117,7 @@ protected:
     }
 
 
-    Galois::do_all_choice (makeLocalRange (scheduled),
+    galois::do_all_choice (makeLocalRange (scheduled),
         [this, &minElem] (Ctxt* c) {
 
           typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
@@ -159,7 +159,7 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname("applyOperator"),
+          galois::loopname("applyOperator"),
           chunk_size<OpFunc::CHUNK_SIZE>()));
 
     scheduled.clear_all_parallel();
@@ -167,12 +167,12 @@ protected:
 
   void serviceAborts(void) {
     if (ENABLE_PROF) {
-      Galois::do_all_choice (makeLocalRange(abortList),
+      galois::do_all_choice (makeLocalRange(abortList),
           [this] (Ctxt* c) {
             abortCtxt(c);
           }, 
           std::make_tuple (
-            Galois::loopname ("serviceAborts"),
+            galois::loopname ("serviceAborts"),
             chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
       abortList.clear_all_parallel();
@@ -181,12 +181,12 @@ protected:
 
   void performCommits(void) {
     if (ENABLE_PROF) {
-      Galois::do_all_choice (makeLocalRange(retireList),
+      galois::do_all_choice (makeLocalRange(retireList),
           [this] (Ctxt* c) {
             retireCtxt(c);
           }, 
           std::make_tuple (
-            Galois::loopname ("performCommits"),
+            galois::loopname ("performCommits"),
             chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
       retireList.clear_all_parallel();
@@ -210,12 +210,12 @@ public:
 
     if (Base::targetCommitRatio == 0.0) {
 
-      Galois::do_all_choice (range,
+      galois::do_all_choice (range,
           [this] (const T& x) {
             pending.push (x);
           }, 
           std::make_tuple (
-            Galois::loopname ("init-fill"),
+            galois::loopname ("init-fill"),
             chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
 
@@ -279,7 +279,7 @@ void for_each_ordered_kdg_spec_local_min_impl (const R& range, const Cmp& cmp, c
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
+    Substrate::getThreadPool().burnPower(galois::getActiveThreads ());
   }
 
   e.push_initial (range);

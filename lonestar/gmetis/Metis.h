@@ -35,8 +35,8 @@
 #include "Galois/Graphs/LC_Morph_Graph.h"
 
 class MetisNode;
-typedef Galois::Graph::LC_Morph_Graph<MetisNode, int> GGraph;
-typedef Galois::Graph::LC_Morph_Graph<MetisNode, int>::GraphNode GNode;
+typedef galois::Graph::LC_Morph_Graph<MetisNode, int> GGraph;
+typedef galois::Graph::LC_Morph_Graph<MetisNode, int>::GraphNode GNode;
 
 //algorithms
 enum InitialPartMode {GGP, GGGP, MGGGP};

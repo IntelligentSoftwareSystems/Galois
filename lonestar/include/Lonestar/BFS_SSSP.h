@@ -53,9 +53,9 @@ struct not_consistent {
 
 struct max_dist {
   Graph& g;
-  Galois::GReduceMax<Dist>& m;
+  galois::GReduceMax<Dist>& m;
 
-  max_dist(Graph& g, Galois::GReduceMax<Dist>& m) : g(g), m(m) {}
+  max_dist(Graph& g, galois::GReduceMax<Dist>& m) : g(g), m(m) {}
 
   void operator()(typename Graph::GraphNode n) const {
     Dist d = g.getData(n);
@@ -73,19 +73,19 @@ bool verify(Graph& graph, GNode source) {
   }
 
   std::atomic<size_t> notVisited(0);
-  Galois::do_all_local(graph, [&notVisited, &graph] (GNode n) { if (graph.getData(n) >= DIST_INFINITY) ++notVisited; });
+  galois::do_all_local(graph, [&notVisited, &graph] (GNode n) { if (graph.getData(n) >= DIST_INFINITY) ++notVisited; });
   if (notVisited)
     std::cerr << notVisited << " unvisited nodes; this is an error if the graph is strongly connected\n";
 
   std::atomic<bool> not_c;
-  Galois::do_all_local(graph, not_consistent<useOne>(graph, not_c));
+  galois::do_all_local(graph, not_consistent<useOne>(graph, not_c));
   if (not_c) {
     std::cerr << "node found with incorrect distance\n";
     return false;
   }
 
-  Galois::GReduceMax<Dist> m;
-  Galois::do_all_local(graph, max_dist(graph, m));
+  galois::GReduceMax<Dist> m;
+  galois::do_all_local(graph, max_dist(graph, m));
   std::cout << "max dist: " << m.reduce() << "\n";
   
   return true;

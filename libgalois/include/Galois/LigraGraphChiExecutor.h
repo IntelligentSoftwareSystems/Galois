@@ -4,25 +4,25 @@
 #include "LigraExecutor.h"
 #include "GraphChiExecutor.h"
 
-namespace Galois {
+namespace galois {
 //! Implementation of combination of Ligra and GraphChi DSL in Galois
 namespace LigraGraphChi {
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {
-  typedef Galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
+  typedef galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
   
   output.densify();
-  Galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
-      Galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,true>(wgraph, output, output, op),
+  galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+      galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,true>(wgraph, output, output, op),
       static_cast<Bag*>(0),
       size);
 }
 
 template<bool Forward,typename Graph, typename EdgeOperator,typename Bag>
 void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward) {
-  typedef Galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
+  typedef galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
 
   size_t count = input.getCount();
@@ -32,19 +32,19 @@ void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output
     if (denseForward) {
       abort(); // Never used now
       output.densify();
-      Galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
-        Galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,false>(wgraph, input, output, op),
+      galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+        galois::Ligra::hidden::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,false>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     } else {
-      Galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
-        Galois::Ligra::hidden::DenseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, input, output, op),
+      galois::GraphChi::hidden::vertexMap<false,false>(graph, wgraph,
+        galois::Ligra::hidden::DenseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     }
   } else {
-    Galois::GraphChi::hidden::vertexMap<true,false>(graph, wgraph,
-      Galois::Ligra::hidden::SparseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, output, op),
+    galois::GraphChi::hidden::vertexMap<true,false>(graph, wgraph,
+      galois::Ligra::hidden::SparseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, output, op),
       &input,
       size);
   }
@@ -81,7 +81,7 @@ struct ChooseExecutor {
 
   template<typename Graph>
   void checkIfInMemoryGraph(Graph& g, size_t size) {
-    if (Galois::GraphChi::hidden::fitsInMemory(g, size)) {
+    if (galois::GraphChi::hidden::fitsInMemory(g, size)) {
       g.keepInMemory();
     }
   }
@@ -91,12 +91,12 @@ template<>
 struct ChooseExecutor<false> {
   template<typename... Args>
   void inEdgeMap(size_t size, Args&&... args) {
-    Galois::Ligra::edgeMap<false>(std::forward<Args>(args)...);
+    galois::Ligra::edgeMap<false>(std::forward<Args>(args)...);
   }
 
   template<typename... Args>
   void outEdgeMap(size_t size, Args&&... args) {
-    Galois::Ligra::edgeMap<true>(std::forward<Args>(args)...);
+    galois::Ligra::edgeMap<true>(std::forward<Args>(args)...);
   }
 
   template<typename Graph>

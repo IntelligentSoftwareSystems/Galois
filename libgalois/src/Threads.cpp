@@ -25,19 +25,19 @@
 #include "Galois/Threads.h"
 
 #include <algorithm>
-namespace Galois {
+namespace galois {
 namespace Runtime {
 unsigned int activeThreads = 1;
 }
 }
 
-unsigned int Galois::setActiveThreads(unsigned int num) noexcept {
-  num = std::min(num, Galois::Substrate::getThreadPool().getMaxUsableThreads());
+unsigned int galois::setActiveThreads(unsigned int num) noexcept {
+  num = std::min(num, galois::Substrate::getThreadPool().getMaxUsableThreads());
   num = std::max(num, 1U);
-  Galois::Runtime::activeThreads = num;
+  galois::Runtime::activeThreads = num;
   return num;
 }
 
-unsigned int Galois::getActiveThreads() noexcept {
-  return Galois::Runtime::activeThreads;
+unsigned int galois::getActiveThreads() noexcept {
+  return galois::Runtime::activeThreads;
 }

@@ -17,11 +17,11 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 static cll::opt<int> startNode("startnode", cll::desc("Node to start reordering from."), cll::init(0));
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   Epetra_SerialComm comm;
-  Galois::Graph::FileGraph fileGraph;
+  galois::Graph::FileGraph fileGraph;
 
-  Galois::StatTimer Ttotal("TotalTime");
+  galois::StatTimer Ttotal("TotalTime");
   Ttotal.start();
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < nonzeros.size(); ++i) {
     double value = 1.0;
     int src = globalElements[i];
-    for (Galois::Graph::FileGraph::edge_iterator ii = fileGraph.edge_begin(src), ei = fileGraph.edge_end(src); ii != ei; ++ii) {
+    for (galois::Graph::FileGraph::edge_iterator ii = fileGraph.edge_begin(src), ei = fileGraph.edge_end(src); ii != ei; ++ii) {
       int dst = fileGraph.getEdgeDst(ii);
       A.InsertGlobalValues(globalElements[i], 1, &value, &dst);
     }
@@ -47,11 +47,11 @@ int main(int argc, char** argv) {
   A.FillComplete();
 
   // Reorder matrix
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   Ifpack_RCMReordering reordering;
   reordering.SetParameter("reorder: root node", startNode);
-  Galois::StatTimer Tcuthill("CuthillTime");
+  galois::StatTimer Tcuthill("CuthillTime");
   Tcuthill.start();
   IFPACK_CHK_ERR(reordering.Compute(A));
   Tcuthill.stop();

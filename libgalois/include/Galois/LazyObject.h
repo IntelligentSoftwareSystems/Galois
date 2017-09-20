@@ -40,7 +40,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace Galois {
+namespace galois {
 
 /**
  * Single object with specialization for void type. To take advantage of empty
@@ -106,7 +106,7 @@ public:
   typedef const T& const_reference;
   const static bool has_value = true;
   // Can't support incomplete T's but provide same interface as 
-  // {@link Galois::LargeArray} for consistency
+  // {@link galois::LargeArray} for consistency
   struct size_of {
     const static size_t value = sizeof(T);
   };

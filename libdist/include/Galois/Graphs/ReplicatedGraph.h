@@ -30,10 +30,10 @@
 #include "Galois/Runtime/PerHostStorage.h"
 #include "Galois/Runtime/Serialize.h"
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
-using namespace Galois::Runtime::Distributed;
+using namespace galois::Runtime::Distributed;
 
 template<typename NodeTy, typename EdgeTy>
 class ReplicatedGraph {
@@ -196,11 +196,11 @@ public:
   }
 
   void structureFromFile(const std::string& fname, bool symmetric) {
-    Galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, symmetric));
+    galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, symmetric));
   }
 
   void structureFromFile(const std::string& fname, const std::string& tname) {
-    Galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, tname));
+    galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, tname));
   }
 };
 

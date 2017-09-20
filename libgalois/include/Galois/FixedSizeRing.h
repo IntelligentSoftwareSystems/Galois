@@ -40,7 +40,7 @@
 #include <utility>
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 
 //! Unordered collection of bounded size
 template<typename T, unsigned ChunkSize, bool Concurrent>
@@ -142,7 +142,7 @@ public:
 
   reference back() { return front(); }
   const_reference back() const { return front(); }
-  Galois::optional<value_type> extract_back() { return extract_front(); }
+  galois::optional<value_type> extract_back() { return extract_front(); }
 
   bool pop_back() {
     return pop_front();
@@ -159,13 +159,13 @@ public:
   }
 
   template<bool C = Concurrent>
-  auto extract_front() -> typename std::enable_if<!C, Galois::optional<value_type>>::type {
+  auto extract_front() -> typename std::enable_if<!C, galois::optional<value_type>>::type {
     if (!empty()) {
-      Galois::optional<value_type> retval(back());
+      galois::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return galois::optional<value_type>();
   }
 
   //! returns true if something was popped
@@ -395,13 +395,13 @@ public:
     return *at(start);
   }
 
-  Galois::optional<value_type> extract_front() {
+  galois::optional<value_type> extract_front() {
     if (!empty()) {
-      Galois::optional<value_type> retval(front());
+      galois::optional<value_type> retval(front());
       pop_front();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return galois::optional<value_type>();
   }
 
   void pop_front() {
@@ -424,13 +424,13 @@ public:
     return *at((start + count - 1) % ChunkSize); 
   }
 
-  Galois::optional<value_type> extract_back() {
+  galois::optional<value_type> extract_back() {
     if (!empty()) {
-      Galois::optional<value_type> retval(back());
+      galois::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return Galois::optional<value_type>();
+    return galois::optional<value_type>();
   }
 
   void pop_back() {

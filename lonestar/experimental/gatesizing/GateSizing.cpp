@@ -60,12 +60,12 @@ void doGateSizing() {
 }
 
 int main(int argc, char** argv) {
-  Galois::SharedMemSys G;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   // do not call clear() unless you are constructing new instances
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
 
   CellLib cellLib;

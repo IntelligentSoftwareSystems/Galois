@@ -44,7 +44,7 @@
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
-namespace Galois {
+namespace galois {
 
 /**
  * explicit class to initialize the Galois Runtime
@@ -67,7 +67,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
  * range and T is the type of item.
  *
- * @tparam WLTy Worklist policy {@see Galois::WorkList}
+ * @tparam WLTy Worklist policy {@see galois::WorkList}
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
@@ -84,7 +84,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
  * is the type of item.
  *
- * @tparam WLTy Worklist policy {@link Galois::WorkList}
+ * @tparam WLTy Worklist policy {@link galois::WorkList}
  * @param i initial item
  * @param fn operator
  * @param args optional arguments to loop
@@ -97,5 +97,5 @@ public:
 // }
 
 
-} //namespace Galois
+} //namespace galois
 #endif

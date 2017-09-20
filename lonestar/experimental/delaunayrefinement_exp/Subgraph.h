@@ -35,14 +35,14 @@
 #include <algorithm>
 
 // Graph nodes
-typedef Galois::Graph::ThirdGraph<Element,void,Galois::Graph::EdgeDirection::Un> Graph;
+typedef galois::Graph::ThirdGraph<Element,void,galois::Graph::EdgeDirection::Un> Graph;
 typedef Graph::NodeHandle GNode;
 typedef typename Graph::pointer Graphp;
 
 // Worklist Graph nodes
-typedef Galois::Graph::ThirdGraph<GNode,void,Galois::Graph::EdgeDirection::Un> WLGraph;
+typedef galois::Graph::ThirdGraph<GNode,void,galois::Graph::EdgeDirection::Un> WLGraph;
 typedef WLGraph::NodeHandle WLGNode;
-typedef Galois::Runtime::gptr<WLGraph> WLGraphp;
+typedef galois::Runtime::gptr<WLGraph> WLGraphp;
 
 struct EdgeTuple {
   GNode src;
@@ -60,13 +60,13 @@ struct EdgeTuple {
  *  cavity  
  */
 class PreGraph {
-  typedef std::vector<GNode,Galois::PerIterAllocTy::rebind<GNode>::other> NodesTy;
+  typedef std::vector<GNode,galois::PerIterAllocTy::rebind<GNode>::other> NodesTy;
   NodesTy nodes;
 
 public:
   typedef NodesTy::iterator iterator;
 
-  explicit PreGraph(Galois::PerIterAllocTy& cnx): nodes(cnx) {}
+  explicit PreGraph(galois::PerIterAllocTy& cnx): nodes(cnx) {}
 
   bool containsNode(GNode N) {
     return std::find(nodes.begin(), nodes.end(), N) != nodes.end();
@@ -90,8 +90,8 @@ class PostGraph {
     TempEdge(size_t s, GNode d, const Edge& e): src(s), dst(d), edge(e) { }
   };
 
-  typedef std::vector<GNode,Galois::PerIterAllocTy::rebind<GNode>::other> NodesTy;
-  typedef std::vector<EdgeTuple,Galois::PerIterAllocTy::rebind<EdgeTuple>::other> EdgesTy;
+  typedef std::vector<GNode,galois::PerIterAllocTy::rebind<GNode>::other> NodesTy;
+  typedef std::vector<EdgeTuple,galois::PerIterAllocTy::rebind<EdgeTuple>::other> EdgesTy;
 
   //! the nodes in the graph before updating
   NodesTy nodes;
@@ -102,7 +102,7 @@ public:
   typedef NodesTy::iterator iterator;
   typedef EdgesTy::iterator edge_iterator;
 
-  explicit PostGraph(Galois::PerIterAllocTy& cnx): nodes(cnx), edges(cnx) { }
+  explicit PostGraph(galois::PerIterAllocTy& cnx): nodes(cnx), edges(cnx) { }
 
   void addNode(GNode n) {
     nodes.push_back(n);

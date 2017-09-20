@@ -52,7 +52,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace Exp {
@@ -62,7 +62,7 @@ struct SharerSet {
 
 public:
   using CtxtCmp = std::less<Ctxt*>;
-  using Cont = Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using Cont = galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
 
   Cont sharers;
 
@@ -94,8 +94,8 @@ public:
 template <typename Ctxt>
 struct SharerList {
 public:
-  using Cont =  Galois::concurrent_gslist<Ctxt*, 16>;
-  using FSHeap =  Galois::Runtime::FixedSizeHeap;
+  using Cont =  galois::concurrent_gslist<Ctxt*, 16>;
+  using FSHeap =  galois::Runtime::FixedSizeHeap;
 
   FSHeap heap;
   Cont sharers;
@@ -171,8 +171,8 @@ struct DAGcontext: public OrderedContextBase<T> {
   // typedef DAGnhoodItem<DAGcontext> NItem;
   using NItem = DAGnhoodItem<DAGcontext, SharerVec<DAGcontext> >;
   using NhoodMgr = PtrBasedNhoodMgr<NItem>;
-  using NhoodSet = Galois::gdeque<NItem*, 8>;
-  using AtomicBool = Galois::GAtomic<bool>;
+  using NhoodSet = galois::gdeque<NItem*, 8>;
+  using AtomicBool = galois::GAtomic<bool>;
 
 
   AtomicBool onWL;
@@ -187,7 +187,7 @@ struct DAGcontext: public OrderedContextBase<T> {
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -260,9 +260,9 @@ struct DAGcontext: public SimpleRuntimeContext {
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
 
 protected:
-  typedef Galois::ThreadSafeOrderedSet<DAGcontext*, std::less<DAGcontext*> > AdjSet;
+  typedef galois::ThreadSafeOrderedSet<DAGcontext*, std::less<DAGcontext*> > AdjSet;
   // TODO: change AdjList to array for quicker iteration
-  typedef Galois::gdeque<DAGcontext*, 8> AdjList;
+  typedef galois::gdeque<DAGcontext*, 8> AdjList;
   typedef std::atomic<int> ParCounter;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
@@ -286,7 +286,7 @@ public:
   const T& getElem () const { return elem; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -387,7 +387,7 @@ protected:
   CtxtWL allCtxts;
   CtxtWL initSources;
   PerThreadUserCtx userCtxts;
-  Galois::GAccumulator<size_t> numPush;
+  galois::GAccumulator<size_t> numPush;
 
 public:
 
@@ -405,12 +405,12 @@ public:
 
   ~DAGexecutor (void) {
 
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
-        "free_ctx", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "free_ctx", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
 
@@ -422,12 +422,12 @@ public:
     // 3. Find initial sources and run for_each
     //
 
-    Galois::StatTimer t_init ("Time to create the DAG: ");
+    galois::StatTimer t_init ("Time to create the DAG: ");
 
     std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
 
     t_init.start ();
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this] (const T& x) {
           Ctxt* ctxt = ctxtAlloc.allocate (1);
           assert (ctxt != NULL);
@@ -435,31 +435,31 @@ public:
 
           allCtxts.get ().push_back (ctxt);
 
-          Galois::Runtime::setThreadContext (ctxt);
+          galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctxt->elem, uctx);
-          Galois::Runtime::setThreadContext (NULL);
+          galois::Runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
-        }, "create_ctxt", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        }, "create_ctxt", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
-    Galois::do_all_choice (nhmgr.getAllRange(),
+    galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
         }, 
-        "sort_sharers", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
+        "sort_sharers", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+    galois::do_all_choice (galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           if (ctxt->isSrc ()) {
             ctxt->onWL = true;
             initSources.get ().push_back (ctxt);
           }
         }, 
-        "find-init-sources", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
+        "find-init-sources", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
 
@@ -471,14 +471,14 @@ public:
     StatTimer t_exec ("Time to execute the DAG: ");
 
     const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
 
     t_exec.start ();
 
-    Galois::for_each_local (initSources,
-        ApplyOperator {*this}, Galois::loopname {"apply_operator"}, Galois::wl<SrcWL_ty>());
+    galois::for_each_local (initSources,
+        ApplyOperator {*this}, galois::loopname {"apply_operator"}, galois::wl<SrcWL_ty>());
 
     std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
         numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
@@ -487,19 +487,19 @@ public:
   }
 
   void resetDAG (void) {
-    Galois::StatTimer t_reset ("Time to reset the DAG: ");
+    galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    // Galois::do_all_choice (allCtxts,
+    // galois::do_all_choice (allCtxts,
         // [] (Ctxt* ctxt) {
           // ctxt->reset();
         // },
-        // Galois::loopname("reset_dag"), Galois::do_all_steal<true>());
-    Galois::do_all_choice (nhmgr.getAllRange (),
+        // galois::loopname("reset_dag"), galois::do_all_steal<true>());
+    galois::do_all_choice (nhmgr.getAllRange (),
         [] (NItem* nitem) {
           nitem->reset();
         },
-        "reset_dag", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "reset_dag", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
         
     t_reset.stop ();
   }
@@ -536,7 +536,7 @@ void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& 
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_DAGEXEC_ALT_H

@@ -64,14 +64,14 @@ struct time_dir {
   timeTy d;
 };
 
-typedef Galois::Graph::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir> Graph;
+typedef galois::Graph::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir> Graph;
 typedef Graph::GraphNode GNode;
 
 struct EarlyArivalTime {
   Graph& graph;
   EarlyArivalTime(Graph& g) : graph(g) {}
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+  void operator()(GNode src, galois::UserContext<GNode>& ctx) {
+    const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
     auto& srcV = graph.getData(src, flag);
     
     for (auto ii : graph.edges(src, flag)) {
@@ -95,21 +95,21 @@ struct GNIndexer {
   Graph& g;
   GNIndexer(Graph& g) : g(g) {}
   unsigned long operator()(const GNode& val) const {
-    return g.getData(val, Galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed) >> stepShift;
+    return g.getData(val, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed) >> stepShift;
   }
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T("OverheadTime");
+  galois::StatTimer T("OverheadTime");
   T.start();
   
   Graph graph;
   GNode source, report;
 
-  Galois::Graph::readGraph(graph, filename); 
+  galois::Graph::readGraph(graph, filename); 
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
@@ -129,9 +129,9 @@ int main(int argc, char** argv) {
   size_t approxNodeData = graph.size() * 64;
   // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
   // Graph::edge_data_type) * 2;
-  Galois::preAlloc(numThreads +
-                   approxNodeData / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads +
+                   approxNodeData / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
   uint16_t t = 0;
   for (auto n : graph) {
@@ -145,21 +145,21 @@ int main(int argc, char** argv) {
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  Galois::do_all_local(graph, 
+  galois::do_all_local(graph, 
                        [&graph] (GNode n) { graph.getData(n) = std::numeric_limits<timeTy>::max(); } );
   graph.getData(source) = 0;
-  Galois::StatTimer Tmain;
+  galois::StatTimer Tmain;
   Tmain.start();
 
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<GNIndexer,dChunk> OBIM;
-  Galois::for_each(source, EarlyArivalTime{graph}, Galois::wl<OBIM>(GNIndexer{graph}), Galois::does_not_need_aborts<>());
+  galois::for_each(source, EarlyArivalTime{graph}, galois::wl<OBIM>(GNIndexer{graph}), galois::does_not_need_aborts<>());
   Tmain.stop();
   T.stop();
 
-  Galois::reportPageAlloc("MeminfoPost");
-  Galois::Runtime::reportNumaAlloc("NumaPost");
+  galois::reportPageAlloc("MeminfoPost");
+  galois::Runtime::reportNumaAlloc("NumaPost");
   
   std::cout << "Node " << reportNode << " has earliest time "
             << graph.getData(report) << "\n";

@@ -23,7 +23,7 @@ int main( int argc, char * argv[] ) {
 	}
 
 	const int nTHREADS = atoi( argv[1] );
-	int numThreads = Galois::setActiveThreads( nTHREADS );
+	int numThreads = galois::setActiveThreads( nTHREADS );
 
 	std::string verbosity( argv[2] );
 	int verbose;
@@ -44,7 +44,7 @@ int main( int argc, char * argv[] ) {
 		}
 	}
 
-	Galois::Timer T;
+	galois::Timer T;
 	aig::Aig aig;
 	std::string fileType( argv[3] );
 	std::string path( argv[4] );

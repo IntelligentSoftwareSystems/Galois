@@ -97,7 +97,7 @@
 #include <cstdlib>
 #include <cassert>
 
-namespace Galois {
+namespace galois {
 
 namespace TwoLevelIteratorImpl {
   template <typename Iter>
@@ -874,6 +874,6 @@ stl_two_level_crend (Outer beg, Outer end) {
 }
 
 
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_TWO_LEVEL_ITER_H

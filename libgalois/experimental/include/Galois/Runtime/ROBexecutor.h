@@ -56,7 +56,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
   // race conditions
@@ -88,7 +88,7 @@ template <typename T, typename Cmp, typename Exec>
 class ROBcontext: public OrderedContextBase<T> {
 
   using Base = OrderedContextBase<T>;
-  using NhoodList =  Galois::gdeque<Lockable*, 4>; // 2nd arg is chunk size
+  using NhoodList =  galois::gdeque<Lockable*, 4>; // 2nd arg is chunk size
 
 public:
 
@@ -106,7 +106,7 @@ public:
 
   // TODO: privatize
 public:
-  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE galois::GAtomic<State> state;
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<State> state;
   Exec& executor;
 
@@ -150,7 +150,7 @@ public:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE 
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
 
     for (bool succ = false; !succ; ) {
       typename Base::AcquireStatus acq = Base::tryAcquire (l);
@@ -312,12 +312,12 @@ class ROBexecutor: private boost::noncopyable {
   using CtxtDeq = PerThreadDeque<Ctxt*>;
   using CtxtVec = PerThreadVector<Ctxt*>;
 
-  using PendingQ = Galois::MinHeap<T, Cmp>;
+  using PendingQ = galois::MinHeap<T, Cmp>;
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, CtxtCmp>;
+  using ROB = galois::MinHeap<Ctxt*, CtxtCmp>;
 
-  using Lock_ty = Galois::Substrate::SimpleLock;
-  // using Lock_ty = Galois::Runtime::LL::PthreadLock<true>;
+  using Lock_ty = galois::Substrate::SimpleLock;
+  // using Lock_ty = galois::Runtime::LL::PthreadLock<true>;
 
 
   Cmp itemCmp;
@@ -388,7 +388,7 @@ public:
 
     assert (range.begin () != range.end ());
 
-    Galois::Runtime::do_all_impl (range,
+    galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
         pending.get ().push (x);
         });
@@ -397,7 +397,7 @@ public:
 
     const T& dummy = *pending[0].begin ();
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [&dummy,this] (const unsigned tid, const unsigned numT) {
           for (unsigned j = 0; j < WINDOW_SIZE_PER_THREAD; ++j) {
             Ctxt* ctx = ctxtAlloc.allocate (1);
@@ -542,13 +542,13 @@ private:
 
     assert (ctx != nullptr);
 
-    Galois::Runtime::setThreadContext (ctx);
+    galois::Runtime::setThreadContext (ctx);
     nhFunc (ctx->getActive (), ctx->userHandle);
 
     if (ctx->hasState (Ctxt::State::SCHEDULED)) {
       opFunc (ctx->getActive (), ctx->userHandle);
     }
-    Galois::Runtime::setThreadContext (nullptr);
+    galois::Runtime::setThreadContext (nullptr);
 
   }
 
@@ -802,7 +802,7 @@ public:
 
   ROBparamContext (const T& x, Exec& e, const size_t _step): Base (x, e), step (_step) {}
 
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag m) {
     for (bool succ = false; !succ; ) {
       typename Base::AcquireStatus acq = Base::tryAcquire (l);
 
@@ -870,9 +870,9 @@ class ROBparaMeter: private boost::noncopyable {
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
   using CtxtCmp = ContextComparator<Ctxt, Cmp>;
-  using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
+  using CtxtDeq = galois::PerThreadDeque<Ctxt*>;
 
-  using PendingQ = Galois::MinHeap<T, Cmp>;
+  using PendingQ = galois::MinHeap<T, Cmp>;
   using ROB = std::vector<Ctxt*>;
   using ExecutionRecords = std::vector<StepStats>;
 
@@ -962,13 +962,13 @@ public:
 
         ++totalIter;
 
-        Galois::Runtime::setThreadContext (ctx);
+        galois::Runtime::setThreadContext (ctx);
         nhFunc (ctx->getActive (), ctx->userHandle);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           opFunc (ctx->getActive (), ctx->userHandle);
         }
-        Galois::Runtime::setThreadContext (nullptr);
+        galois::Runtime::setThreadContext (nullptr);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           ctx->setState (Ctxt::State::READY_TO_COMMIT);
@@ -1159,7 +1159,7 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
   exec.push_initial (range);
   exec.execute ();
 
-  // Galois::Runtime::beginSampling ();
+  // galois::Runtime::beginSampling ();
 // 
   // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
 // 
@@ -1169,7 +1169,7 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 // 
     // getThreadPool ().run (activeThreads, std::ref(exec));
 // 
-    // Galois::Runtime::endSampling ();
+    // galois::Runtime::endSampling ();
 // 
     // exec.printStats ();
   // }
@@ -1177,7 +1177,7 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_RUNTIME_ROB_EXECUTOR_H
 

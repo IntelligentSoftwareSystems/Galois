@@ -53,7 +53,7 @@
 #include <cstddef>
 #include <cstdio>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 extern unsigned activeThreads;
@@ -212,7 +212,7 @@ class FreeListHeap : public SourceHeap {
   };
   FreeNode* head;
 
-  using dbg = Galois::debug<0>;
+  using dbg = galois::debug<0>;
 public:
   enum { AllocSize = SourceHeap::AllocSize };
 
@@ -602,7 +602,7 @@ class PageHeap: public StaticSingleInstance<PageHeap> {
 
   InnerHeap innerHeap;
 
-  using dbg = Galois::debug<0>;
+  using dbg = galois::debug<0>;
 
   PageHeap (): innerHeap () {
     dbg::print ("New instance of PageHeap: ", this);
@@ -1072,6 +1072,6 @@ public:
 };
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

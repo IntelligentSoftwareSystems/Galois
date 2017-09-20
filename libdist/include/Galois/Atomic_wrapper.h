@@ -25,7 +25,7 @@ using is_trivially_copyable = is_trivial<T>;
 //#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
 
-namespace Galois {
+namespace galois {
 
   template<class T>
     class CopyableAtomic : public std::atomic<T>

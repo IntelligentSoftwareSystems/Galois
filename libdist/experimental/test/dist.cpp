@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-using namespace Galois::Graph;
+using namespace galois::Graph;
 
 template<typename nd, typename ed, EdgeDirection dir>
 using G = ThirdGraph<nd,ed,dir>;

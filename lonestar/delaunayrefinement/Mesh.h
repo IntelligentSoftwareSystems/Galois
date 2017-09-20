@@ -38,7 +38,7 @@ struct is_bad {
   Graph* g;
   is_bad(Graph* _g): g(_g) {}
   bool operator()(const GNode& n) const {
-    return g->getData(n, Galois::MethodFlag::UNPROTECTED).isBad();
+    return g->getData(n, galois::MethodFlag::UNPROTECTED).isBad();
   }
 };
 
@@ -357,7 +357,7 @@ private:
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], Galois::MethodFlag::UNPROTECTED);
+        mesh->addEdge(node, edge_map[edge], galois::MethodFlag::UNPROTECTED);
         edge_map.erase(edge);
       }
     }
@@ -367,13 +367,13 @@ private:
   void divide(const Iter& b, const Iter& e) {
     if (std::distance(b,e) > 16) {
       std::sort(b,e, centerXCmp());
-      Iter m = Galois::split_range(b,e);
+      Iter m = galois::split_range(b,e);
       std::sort(b,m, centerYCmpInv());
       std::sort(m,e, centerYCmp());
-      divide(b, Galois::split_range(b,m));
-      divide(Galois::split_range(b,m), m);
-      divide(m,Galois::split_range(m,e));
-      divide(Galois::split_range(m,e), e);
+      divide(b, galois::split_range(b,m));
+      divide(galois::split_range(b,m), m);
+      divide(m,galois::split_range(m,e));
+      divide(galois::split_range(m,e), e);
     }
   }
 
@@ -382,7 +382,7 @@ private:
     divide(elements.begin(), elements.end());
 
     if (parallelAllocate) 
-      Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh), Galois::loopname("allocate"));
+      galois::do_all(elements.begin(), elements.end(), create_nodes(mesh), galois::loopname("allocate"));
     else
       std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
 

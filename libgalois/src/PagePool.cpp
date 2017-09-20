@@ -34,37 +34,37 @@
 #include "Galois/Runtime/PagePool.h"
 
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
-static Galois::Runtime::internal::PageAllocState<>* PA;
+static galois::Runtime::internal::PageAllocState<>* PA;
 
-void Galois::Runtime::internal::setPagePoolState(PageAllocState<>* pa) {
+void galois::Runtime::internal::setPagePoolState(PageAllocState<>* pa) {
   GALOIS_ASSERT(!(PA && pa), "PagePool.cpp: Double Initialization of PageAllocState");
   PA = pa;
 }
 
-int Galois::Runtime::numPagePoolAllocTotal() {
+int galois::Runtime::numPagePoolAllocTotal() {
   return PA->countAll();
 }
 
-int Galois::Runtime::numPagePoolAllocForThread(unsigned tid) {
+int galois::Runtime::numPagePoolAllocForThread(unsigned tid) {
   return PA->count(tid);
 }
 
-void* Galois::Runtime::pagePoolAlloc() {
+void* galois::Runtime::pagePoolAlloc() {
   return PA->pageAlloc();
 }
 
-void Galois::Runtime::pagePoolPreAlloc(unsigned num) {
+void galois::Runtime::pagePoolPreAlloc(unsigned num) {
   while (num--)
     PA->pagePreAlloc();
 }
 
-void Galois::Runtime::pagePoolFree(void* ptr) {
+void galois::Runtime::pagePoolFree(void* ptr) {
   PA->pageFree(ptr);
 }
 
-size_t Galois::Runtime::pagePoolSize() {
+size_t galois::Runtime::pagePoolSize() {
   return Substrate::allocSize();
 }
 

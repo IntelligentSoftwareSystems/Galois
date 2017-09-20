@@ -35,15 +35,15 @@ struct AsyncRsd {
     }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncRsd"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+      galois::Graph::readGraph(graph, filename, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -56,9 +56,9 @@ struct AsyncRsd {
 
     Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);      
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
+      galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       //PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.residual = 0;
@@ -83,8 +83,8 @@ struct AsyncRsd {
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
+    typedef galois::WorkList::dChunkedFIFO<16> WL;
+    galois::for_each_local(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {

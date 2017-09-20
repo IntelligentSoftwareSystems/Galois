@@ -77,20 +77,20 @@ const double COARSEN_FRACTION = 0.9;
  * KMetis Algorithm
  */
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
-  Galois::StatTimer TM;
+  galois::StatTimer TM;
   TM.start();
   unsigned meanWeight = ( (double)metisGraph->getTotalWeight()) / (double)nparts;
   //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   unsigned coarsenTo = 20 * nparts;
 
   if (verbose) std::cout << "Starting coarsening: \n";
-  Galois::StatTimer T("Coarsen");
+  galois::StatTimer T("Coarsen");
   T.start();
   MetisGraph* mcg = coarsen(metisGraph, coarsenTo, verbose);
   T.stop();
   if (verbose) std::cout << "Time coarsen: " << T.get() << "\n";
 
-  Galois::StatTimer T2("Partition");
+  galois::StatTimer T2("Partition");
   T2.start();
   std::vector<partInfo> parts;
   parts = partition(mcg, nparts, partMode);
@@ -110,7 +110,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
       default: abort();
     }
 
-  Galois::StatTimer T3("Refine");
+  galois::StatTimer T3("Refine");
   T3.start();
   refine(mcg, parts, 
       meanWeight - (unsigned)(meanWeight * imbalance), 
@@ -146,7 +146,7 @@ struct parallelInitMorphGraph {
     }
   }
 };
-typedef Galois::Graph::FileGraph FG;
+typedef galois::Graph::FileGraph FG;
 typedef FG::GraphNode FN;
 template<typename GNode, typename Weights>
 struct order_by_degree {
@@ -158,15 +158,15 @@ struct order_by_degree {
   bool operator()(const GNode& a, const GNode& b) {
     uint64_t wa = weights[a];
     uint64_t wb = weights[b];
-    int pa = graph.getData(a,Galois::MethodFlag::UNPROTECTED).getPart();
-    int pb = graph.getData(b,Galois::MethodFlag::UNPROTECTED).getPart();
+    int pa = graph.getData(a,galois::MethodFlag::UNPROTECTED).getPart();
+    int pb = graph.getData(b,galois::MethodFlag::UNPROTECTED).getPart();
     if (pa != pb) { 
       return pa < pb;
     }
     return wa < wb;
   }
 };
-typedef Galois::Substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
+typedef galois::Substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
 struct OrderGraph {
   GGraph &graph;
   PerThreadDegInfo &threadDegInfo;
@@ -175,8 +175,8 @@ struct OrderGraph {
   }
   template<typename Context>
   void operator()(int part, Context &lwl) {
-    auto flag = Galois::MethodFlag::UNPROTECTED;
-    typedef std::vector<std::pair<unsigned,GNode>, Galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
+    auto flag = galois::MethodFlag::UNPROTECTED;
+    typedef std::vector<std::pair<unsigned,GNode>, galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
     //copy and translate all edges
     GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
     for (auto n : graph) {
@@ -204,26 +204,26 @@ struct OrderGraph {
   }
 };
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   srand(-1);
   MetisGraph metisGraph;
   GGraph* graph = metisGraph.getGraph();
 
-  Galois::Graph::readGraph(*graph, filename);
+  galois::Graph::readGraph(*graph, filename);
 
-  Galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
+  galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
 
   graphStat(graph);
   std::cout << "\n";
 
   //printGraphBeg(*graph);
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(Galois::Runtime::numPagePoolAllocTotal() * 5);
+  galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(galois::Runtime::numPagePoolAllocTotal() * 5);
   Partition(&metisGraph, numPartitions);
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Total edge cut: " << computeCut(*graph) << "\n";
 
@@ -240,9 +240,9 @@ int main(int argc, char** argv) {
   }
   
   if (orderedfile != "" || permutationfile != "") { 
-    Galois::Graph::FileGraph g;
+    galois::Graph::FileGraph g;
     g.fromFile(filename);
-    typedef Galois::LargeArray<GNode> Permutation;
+    typedef galois::LargeArray<GNode> Permutation;
     Permutation perm; 
     perm.create(g.size());
     std::copy(graph->begin(),graph->end(), perm.begin());
@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
     for (unsigned int i=0;i<parts.size();i++){ 
       parts[i] = i;
     } 
-    Galois::for_each(parts.begin(), parts.end(), og, Galois::loopname("Order Graph"));
+    galois::for_each(parts.begin(), parts.end(), og, galois::loopname("Order Graph"));
     std::map<GNode,uint64_t> globalMap;
     for (unsigned int i = 0; i < threadDegInfo.size(); i++) { 
       std::map<GNode,uint64_t> &localMap(*threadDegInfo.getRemote(i));
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     }
     //compute inverse
     std::stable_sort(perm.begin(), perm.end(), fn);
-    Galois::LargeArray<uint64_t> perm2;
+    galois::LargeArray<uint64_t> perm2;
     perm2.create(g.size());
     //compute permutation
     id = 0; 
@@ -279,13 +279,13 @@ int main(int argc, char** argv) {
       //std::cout<<prevId <<" "<<id<<std::endl;
       id++;
     }
-    Galois::Graph::FileGraph out;
-    Galois::Graph::permute<int>(g, perm2, out);
+    galois::Graph::FileGraph out;
+    galois::Graph::permute<int>(g, perm2, out);
     if (orderedfile != "")
       out.toFile(orderedfile);
     if (permutationfile != "") {
       std::ofstream file(permutationfile.c_str());
-      Galois::LargeArray<uint64_t> transpose;
+      galois::LargeArray<uint64_t> transpose;
       transpose.create(g.size());
       uint64_t id = 0;
       for (auto ii = perm2.begin(), ei = perm2.end(); ii != ei; ++ii)

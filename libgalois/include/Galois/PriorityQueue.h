@@ -41,13 +41,13 @@
 
 #include "Galois/Mem.h"
 
-namespace Galois {
+namespace galois {
 
 /**
  * Thread-safe ordered set. Faster than STL heap operations (about 10%-15% faster on serially) and
  * can use scalable allocation, e.g., {@link FixedSizeAllocator}.
  */
-template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::FixedSizeAllocator<T> >
+template <typename T, typename Cmp=std::less<T>, typename Alloc=galois::FixedSizeAllocator<T> >
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
 
@@ -62,14 +62,14 @@ public:
   typedef typename container_type::const_iterator const_iterator;
   typedef typename container_type::const_reverse_iterator reverse_iterator;
   typedef typename container_type::const_reverse_iterator const_reverse_iterator;
-  typedef Galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::Substrate::SimpleLock Lock_ty;
 
 private:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   Set orderedSet;
 
 public:
-  template<typename _T, typename _Cmp=std::less<_T>, typename _Alloc=Galois::FixedSizeAllocator<_T> >
+  template<typename _T, typename _Cmp=std::less<_T>, typename _Alloc=galois::FixedSizeAllocator<_T> >
   using retype = ThreadSafeOrderedSet<_T, _Cmp, _Alloc>; // FIXME: loses Alloc and Cmp types
 
   explicit ThreadSafeOrderedSet(const Cmp& cmp=Cmp(), const Alloc& alloc=Alloc()):
@@ -295,7 +295,7 @@ public:
   typedef typename container_type::const_reverse_iterator const_reverse_iterator;
 
 protected:
-  typedef Galois::Substrate::SimpleLock Lock_ty;
+  typedef galois::Substrate::SimpleLock Lock_ty;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty mutex;
   container_type heap;

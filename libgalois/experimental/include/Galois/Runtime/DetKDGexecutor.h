@@ -37,7 +37,7 @@
 #include "Galois/Runtime/DAGexec.h"
 #include "Galois/Runtime/DAGexecAlt.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 enum KDGexecType {
@@ -50,8 +50,8 @@ enum KDGexecType {
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
 struct DetKDGexecutorAddRem {
 
-  typedef Galois::PerThreadBag<T> Bag_ty;
-  // typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
+  typedef galois::PerThreadBag<T> Bag_ty;
+  // typedef galois::Runtime::PerThreadVector<T> Bag_ty;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -92,7 +92,7 @@ struct DetKDGexecutorAddRem {
 
   void push (const T& elem) {
 
-    auto& elemData = graph.getData (elem, Galois::MethodFlag::UNPROTECTED);
+    auto& elemData = graph.getData (elem, galois::MethodFlag::UNPROTECTED);
 
     unsigned expected = rounds;
     const unsigned update = rounds + 1;
@@ -119,16 +119,16 @@ struct DetKDGexecutorAddRem {
   template <typename R>
   void execute (const R& range, KDGexecType kdgType) {
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range,
         [this] (const T& elem) {
           push (elem);
         }, 
         "push_initial",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     rounds = 0;
-    Galois::Timer t_exec;
+    galois::Timer t_exec;
     while (!nextWL->empty_all ()) {
       ++rounds;
       std::swap (currWL, nextWL);
@@ -138,7 +138,7 @@ struct DetKDGexecutorAddRem {
       switch (kdgType) {
         case KDG_R_ALT:
           for_each_ordered_dag_alt (
-              Galois::Runtime::makeLocalRange (*currWL),
+              galois::Runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -147,7 +147,7 @@ struct DetKDGexecutorAddRem {
 
         case KDG_R:
           for_each_ordered_dag (
-              Galois::Runtime::makeLocalRange (*currWL),
+              galois::Runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -156,7 +156,7 @@ struct DetKDGexecutorAddRem {
 
         case KDG_AR:
           for_each_ordered_lc (
-              Galois::Runtime::makeLocalRange (*currWL),
+              galois::Runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -165,7 +165,7 @@ struct DetKDGexecutorAddRem {
 
         case IKDG:
           for_each_ordered_2p_win (
-              Galois::Runtime::makeLocalRange (*currWL),
+              galois::Runtime::makeLocalRange (*currWL),
               cmp,
               nhoodVisitor,
               ApplyOperator{*this},
@@ -197,7 +197,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
 
-  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -205,14 +205,14 @@ void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoo
 
   executor.execute (initRange, kdgType);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 }
 
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
 struct DetKDG_AddRem_reuseDAG {
 
-  typedef Galois::PerThreadBag<T> Bag_ty;
-  // typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
+  typedef galois::PerThreadBag<T> Bag_ty;
+  // typedef galois::Runtime::PerThreadVector<T> Bag_ty;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -222,7 +222,7 @@ struct DetKDG_AddRem_reuseDAG {
   G& graph; 
   const char* loopname;
   unsigned rounds = 0; 
-  Galois::GAccumulator<size_t> numPushes;
+  galois::GAccumulator<size_t> numPushes;
   
 
   DetKDG_AddRem_reuseDAG (
@@ -250,7 +250,7 @@ struct DetKDG_AddRem_reuseDAG {
 
     template <typename C>
     void operator () (T elem, C& ctx) {
-      auto& edata = outer.graph.getData (elem, Galois::MethodFlag::UNPROTECTED);
+      auto& edata = outer.graph.getData (elem, galois::MethodFlag::UNPROTECTED);
 
       if (edata.onWL > 0) {
         outer.opFunc (elem, outer);
@@ -261,27 +261,27 @@ struct DetKDG_AddRem_reuseDAG {
 
   void push (const T& elem) {
     numPushes += 1;
-    auto& edata = graph.getData (elem, Galois::MethodFlag::UNPROTECTED);
+    auto& edata = graph.getData (elem, galois::MethodFlag::UNPROTECTED);
     ++(edata.onWL);
   }
 
   template <typename R>
   void execute (const R& initRange) {
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         initRange,
         [this] (T node) {
           push (node);
         }, 
         "push_initial",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     auto* dagExec = make_dag_executor (initRange, cmp, nhoodVisitor, ApplyOperator{*this}, loopname);
 
     dagExec->initialize(initRange);
 
 
-    Galois::Timer t_exec;
+    galois::Timer t_exec;
     rounds = 0;
     while (true) {
       ++rounds;
@@ -314,7 +314,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname) {
 
-  Galois::Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
+  galois::Substrate::getThreadPool().burnPower (galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -322,10 +322,10 @@ void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodF
 
   executor.execute (initRange);
 
-  Galois::Substrate::getThreadPool ().beKind ();
+  galois::Substrate::getThreadPool ().beKind ();
 }
 
 } //end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_KDG_EXECUTOR_H

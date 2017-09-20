@@ -60,23 +60,23 @@ struct Jacobi {
     Node(double b, double a, double w): BaseNode(b, a, w) { }
   };
 
-  typedef Galois::Graph::FirstGraph<Node,double,true> Graph;
+  typedef galois::Graph::FirstGraph<Node,double,true> Graph;
 
   Graph& graph;
 
   Jacobi(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = graph.getData(src, Galois::MethodFlag::WRITE);
+    Node& node = graph.getData(src, galois::MethodFlag::WRITE);
     node.x_prev = node.x;
 
     double sum = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::WRITE),
-        ei = graph.edge_end(src, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::WRITE),
+        ei = graph.edge_end(src, galois::MethodFlag::WRITE); ii != ei; ++ii) {
       Graph::GraphNode dst = graph.getEdgeDst(ii);
       assert(src != dst);
       double weight = graph.getEdgeData(ii);
-      sum += weight * graph.getData(dst, Galois::MethodFlag::UNPROTECTED).x;
+      sum += weight * graph.getData(dst, galois::MethodFlag::UNPROTECTED).x;
     }
     node.x = (node.b - sum) / node.weight;
   }
@@ -124,7 +124,7 @@ struct ConjugateGradient {
     Node(double b, double a, double w): BaseNode(b, a, w), r(b), p(b) { }
   };
 
-  typedef Galois::Graph::FirstGraph<Node,double,true> Graph;
+  typedef galois::Graph::FirstGraph<Node,double,true> Graph;
 
   Graph& graph;
 
@@ -134,7 +134,7 @@ struct ConjugateGradient {
     // rsold = r'*r
     double rs_old = 0.0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      double r = graph.getData(*ii, Galois::MethodFlag::UNPROTECTED).r;
+      double r = graph.getData(*ii, galois::MethodFlag::UNPROTECTED).r;
       rs_old += r * r;
     }
 
@@ -142,13 +142,13 @@ struct ConjugateGradient {
       // Ap = A*p
       for (Graph::iterator src = graph.begin(), 
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+        Node& node = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
         node.ap = 0;
-        for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::WRITE),
-            ei = graph.edge_end(*src, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
+        for (Graph::edge_iterator ii = graph.edge_begin(*src, galois::MethodFlag::WRITE),
+            ei = graph.edge_end(*src, galois::MethodFlag::WRITE); ii != ei; ++ii) {
           Graph::GraphNode dst = graph.getEdgeDst(ii);
           double weight = graph.getEdgeData(ii); 
-          node.ap += weight * graph.getData(dst, Galois::MethodFlag::UNPROTECTED).p;
+          node.ap += weight * graph.getData(dst, galois::MethodFlag::UNPROTECTED).p;
         }
         node.ap += node.weight * node.p;
       }
@@ -157,7 +157,7 @@ struct ConjugateGradient {
       double sum = 0;
       for (Graph::iterator src = graph.begin(), 
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+        Node& node = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
         sum += node.ap * node.p;
       }
       double alpha = rs_old / sum;
@@ -168,7 +168,7 @@ struct ConjugateGradient {
       double rs_new = 0;
       for (Graph::iterator src = graph.begin(),
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+        Node& node = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
         node.x += alpha * node.p;
         node.r -= alpha * node.ap;
         rs_new += node.r * node.r;
@@ -184,7 +184,7 @@ struct ConjugateGradient {
       // p = r + rs_new/rs_old * p
       for (Graph::iterator src = graph.begin(),
           esrc = graph.end(); src != esrc; ++src) {
-        Node& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+        Node& node = graph.getData(*src, galois::MethodFlag::UNPROTECTED);
         node.p = node.r + rs_new/rs_old * node.p;
       }
 
@@ -229,14 +229,14 @@ struct GBP {
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef Galois::Graph::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::Graph::FirstGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 
   GBP(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = src.getData(Galois::MethodFlag::UNPROTECTED);
+    Node& node = src.getData(galois::MethodFlag::UNPROTECTED);
 
     node.prev_x = node.x;
     node.prev_prec = node.cur_prec;
@@ -246,9 +246,9 @@ struct GBP {
     assert(J_i != 0);
 
     // Incoming edges
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
-      const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, galois::MethodFlag::WRITE),
+        edst = graph.neighbor_end(src, galois::MethodFlag::WRITE); dst != edst; ++dst) {
+      const Edge& edge = graph.getEdgeData(*dst, src, galois::MethodFlag::UNPROTECTED);
       mu_i += edge.mean;
       J_i += edge.prec;
     }
@@ -258,10 +258,10 @@ struct GBP {
     assert(!isnan(node.x));
     node.cur_prec = J_i;
 
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::UNPROTECTED),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::UNPROTECTED); dst != edst; ++dst) {
-      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
-      Edge& outEdge = graph.getEdgeData(src, dst, Galois::MethodFlag::UNPROTECTED);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, galois::MethodFlag::UNPROTECTED),
+        edst = graph.neighbor_end(src, galois::MethodFlag::UNPROTECTED); dst != edst; ++dst) {
+      Edge& inEdge = graph.getEdgeData(*dst, src, galois::MethodFlag::UNPROTECTED);
+      Edge& outEdge = graph.getEdgeData(src, dst, galois::MethodFlag::UNPROTECTED);
 
       double mu_i_j = mu_i - inEdge.mean;
       double J_i_j = J_i - inEdge.prec;
@@ -306,14 +306,14 @@ struct GBP {
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef Galois::Graph::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::Graph::FirstGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 
   GBP(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Node& node = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     
     node.x_prev = node.x;
 
@@ -325,10 +325,10 @@ struct GBP {
     // Variance can not be zero (must be a diagonally dominant matrix)!
     //  assert(A(i,i) ~= 0);
     //  J(i) = A(i,i) + sum(MJ(:,i));
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::WRITE),
-        ei = graph.edge_end(src, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::WRITE),
+        ei = graph.edge_end(src, galois::MethodFlag::WRITE); ii != ei; ++ii) {
       Graph::GraphNode dst = graph.getEdgeDst(ii);
-      const Edge& edge = graph.getEdgeData(graph.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED));
+      const Edge& edge = graph.getEdgeData(graph.findEdge(dst, src, galois::MethodFlag::UNPROTECTED));
       node.mean += edge.mean;
       node.prec += edge.prec;
     }
@@ -346,10 +346,10 @@ struct GBP {
     //      MJ(i,j) = (-A(j,i) / J_j) * A(i,j);
     //    end
     //  end
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+        ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       Graph::GraphNode dst = graph.getEdgeDst(ii);
-      Edge& inEdge = graph.getEdgeData(graph.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED));
+      Edge& inEdge = graph.getEdgeData(graph.findEdge(dst, src, galois::MethodFlag::UNPROTECTED));
       Edge& outEdge = graph.getEdgeData(ii);
       
       double mean_j = node.mean - inEdge.mean;
@@ -389,7 +389,7 @@ struct Cholesky {
     Node(double b, double a, double w): BaseNode(b, a, w) { }
   };
 
-  typedef Galois::Graph::FirstGraph<Node,double,true> Graph;
+  typedef galois::Graph::FirstGraph<Node,double,true> Graph;
 
   Graph& graph;
 
@@ -424,7 +424,7 @@ struct GenerateInput {
     Node(double _x): id(0), x(_x), b(0) { }
   };
 
-  typedef Galois::Graph::FirstGraph<Node,double,true> GenGraph;
+  typedef galois::Graph::FirstGraph<Node,double,true> GenGraph;
 
   GenerateInput(Graph& g, int N, int sparsity, int seed) {
     srand(seed);
@@ -577,7 +577,7 @@ static void start(int N, int sparsity, int seed) {
   typename Algo::Graph g;
   GenerateInput<typename Algo::Graph>(g, N, sparsity, seed);
   
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   Algo algo(g);
   algo();

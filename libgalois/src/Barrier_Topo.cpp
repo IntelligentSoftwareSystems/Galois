@@ -39,9 +39,9 @@
 
 namespace {
 
-class TopoBarrier : public Galois::Substrate::Barrier {
+class TopoBarrier : public galois::Substrate::Barrier {
   struct treenode {
-    //vpid is Galois::Runtime::LL::getTID()
+    //vpid is galois::Runtime::LL::getTID()
 
     //package binary tree
     treenode* parentpointer; //null of vpid == 0
@@ -56,11 +56,11 @@ class TopoBarrier : public Galois::Substrate::Barrier {
 
   };
 
-  Galois::Substrate::PerPackageStorage<treenode> nodes;
-  Galois::Substrate::PerThreadStorage<unsigned> sense;
+  galois::Substrate::PerPackageStorage<treenode> nodes;
+  galois::Substrate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
-    auto& tp = Galois::Substrate::getThreadPool();
+    auto& tp = galois::Substrate::getThreadPool();
     unsigned pkgs = tp.getCumulativeMaxPackage(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);
@@ -99,13 +99,13 @@ public:
   }
 
   virtual void wait() {
-    unsigned id = Galois::Substrate::ThreadPool::getTID();
+    unsigned id = galois::Substrate::ThreadPool::getTID();
     treenode& n = *nodes.getLocal();
     unsigned& s = *sense.getLocal();
-    bool leader = Galois::Substrate::ThreadPool::isLeader();
+    bool leader = galois::Substrate::ThreadPool::isLeader();
     //completion tree
     if (leader) {
-      while (n.childnotready) { Galois::Substrate::asmPause(); }
+      while (n.childnotready) { galois::Substrate::asmPause(); }
       n.childnotready = n.havechild;
       if (n.parentpointer) {
 	--n.parentpointer->childnotready;
@@ -117,7 +117,7 @@ public:
     //wait for signal
     if (id != 0) {
       while (n.parentsense != s) {
-	Galois::Substrate::asmPause();
+	galois::Substrate::asmPause();
       }
     }
     
@@ -139,7 +139,7 @@ public:
 
 }
 
-std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createTopoBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::Substrate::Barrier> galois::Substrate::createTopoBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new TopoBarrier(activeThreads));
 }
 

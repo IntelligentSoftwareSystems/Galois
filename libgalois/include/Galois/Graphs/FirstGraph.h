@@ -49,7 +49,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace Galois {
+namespace galois {
 //! Parallel graph data structures.
 namespace Graph {
 
@@ -131,7 +131,7 @@ struct UEdgeInfoBase<NTy, void, false> {
 
 template<typename ETy>
 struct EdgeFactory {
-  Galois::Runtime::FixedSizeAllocator<ETy> mem;
+  galois::Runtime::FixedSizeAllocator<ETy> mem;
   template<typename... Args>
   ETy* mkEdge(Args&&... args) {
     ETy* e = mem.allocate(1);
@@ -165,7 +165,7 @@ struct EdgeFactory<void> {
  *   ... // Definition of node data
  * };
  *
- * typedef Galois::Graph::FirstGraph<Node,int,true> Graph;
+ * typedef galois::Graph::FirstGraph<Node,int,true> Graph;
  * 
  * // Create graph
  * Graph g;
@@ -378,7 +378,7 @@ private:
 
     template<bool _A1 = HasNoLockable>
     void acquire(MethodFlag mflag, typename std::enable_if<!_A1>::type* = 0) {
-      Galois::Runtime::acquire(this, mflag);
+      galois::Runtime::acquire(this, mflag);
     }
 
     template<bool _A1 = HasNoLockable>
@@ -390,7 +390,7 @@ private:
   };
 
   //The graph manages the lifetimes of the data in the nodes and edges
-  typedef Galois::InsertBag<gNode> NodeListTy;
+  typedef galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
   FirstGraphImpl::EdgeFactory<EdgeTy> edgesF;
@@ -437,10 +437,10 @@ public:
 
 private:
   template<typename... Args>
-  edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+  edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    // Galois::Runtime::checkWrite(mflag, true);
+    // galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -457,10 +457,10 @@ private:
   }
 
   template<typename... Args>
-  edge_iterator createEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+  edge_iterator createEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    // Galois::Runtime::checkWrite(mflag, true);
+    // galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
@@ -482,16 +482,16 @@ private:
     typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
     typedef LargeArray<EdgeTy> ED;
     if (ED::has_value) {
-      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+      addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
-      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
+      addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
     }
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
   void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
-    addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
+    addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
 public:
@@ -509,22 +509,22 @@ public:
   /**
    * Adds a node to the graph.
    */
-  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
-    // Galois::Runtime::checkWrite(mflag, true);
+  void addNode(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) {
+    // galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     n->active = true;
   }
 
   //! Gets the node data for a node.
-  node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
+  node_data_reference getData(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     n->acquire(mflag);
     return n->getData();
   }
 
   //! Checks if a node is in the graph
-  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
+  bool containsNode(const GraphNode& n, galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     n->acquire(mflag);
     return n->active;
@@ -535,9 +535,9 @@ public:
    * for undirected graphs or outgoing edges for directed graphs.
    */
   //FIXME: handle edge memory
-  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  void removeNode(GraphNode n, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(n);
-    // Galois::Runtime::checkWrite(mflag, true);
+    // galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     gNode* N = n;
     if (N->active) {
@@ -555,9 +555,9 @@ public:
   /**
    * Resize the edges of the node. For best performance, should be done serially.
    */
-  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  void resizeEdges(GraphNode src, size_t size, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     src->acquire(mflag);
     src->resizeEdges(size);
    }
@@ -569,20 +569,20 @@ public:
    * value if desired.  This frees us from dealing with the void edge data
    * problem in this API
    */
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     return createEdgeWithReuse(src, dst, mflag);
   }
 
   //! Adds and initializes an edge to graph but does not check for duplicate edges
   template<typename... Args>
-  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     return createEdge(src, dst, mflag, std::forward<Args>(args)...);
   }
 
   //! Removes an edge from the graph
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  void removeEdge(GraphNode src, edge_iterator dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
-    // Galois::Runtime::checkWrite(mflag, true);
+    // galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     if (Directional && !InOut) {
       src->erase(dst.base());
@@ -596,7 +596,7 @@ public:
   }
 
   //! Finds if an edge between src and dst exists
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -614,7 +614,7 @@ public:
     return boost::make_filter_iterator(edge_predicate, ii, ei);
   }
 
-  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -646,7 +646,7 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  edge_iterator findInEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE, 
                            typename std::enable_if<_Undirected>::type* = 0)
   {
     // incoming neighbors are the same as outgoing neighbors in undirected graphs
@@ -655,7 +655,7 @@ public:
 
   // Find if an incoming edge between src and dst exists for directed in-out graphs
   template<bool _DirectedInOut = (Directional && InOut)>
-  in_edge_iterator findInEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  in_edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE, 
                               typename std::enable_if<_DirectedInOut>::type* = 0) 
   {
     assert(src);
@@ -678,20 +678,20 @@ public:
   /**
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.  It is an error to get
-   * edge data for inactive edges. By default, the mflag is Galois::MethodFlag::UNPROTECTED
+   * edge data for inactive edges. By default, the mflag is galois::MethodFlag::UNPROTECTED
    * because edge_begin() dominates this call and should perform the
    * appropriate locking.
    */
-  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+  edge_data_reference getEdgeData(edge_iterator ii, galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     assert(ii->first()->active);
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     ii->first()->acquire(mflag);
     return *ii->second();
   }
 
-  edge_data_reference getEdgeData(in_edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+  edge_data_reference getEdgeData(in_edge_iterator ii, galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     assert(ii->first()->active);
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     ii->first()->acquire(mflag);
     return *ii->second();
   }
@@ -707,24 +707,24 @@ public:
     return GraphNode(ii->first());
   }
 
-  void sortEdgesByDst(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) { 
+  void sortEdgesByDst(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) { 
     acquire(N, mflag);
     typedef typename gNode::EdgeInfo EdgeInfo;
     std::sort(N->begin(), N->end(), [=] (const EdgeInfo& e1, const EdgeInfo& e2) { return e1.first() < e2.first(); } );
   }
 
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
+    galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, galois::do_all_steal<true>());
   }
 
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node 
-  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     N->acquire(mflag);
 
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 	if (ii->first()->active && !ii->isInEdge())
 	  ii->first()->acquire(mflag);
@@ -734,13 +734,13 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  in_edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  in_edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
                                  typename std::enable_if<!_Undirected>::type* = 0) 
   {
     assert(N);
     N->acquire(mflag);
 
-    if (Galois::Runtime::shouldLock(mflag)) {
+    if (galois::Runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
 	if (ii->first()->active && ii->isInEdge())
 	  ii->first()->acquire(mflag);
@@ -750,14 +750,14 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
                               typename std::enable_if<_Undirected>::type* = 0) 
   {
     return edge_begin(N, mflag);
   }
 
   //! Returns the end of the neighbor iterator 
-  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -766,7 +766,7 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  in_edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE,
+  in_edge_iterator in_edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
                                typename std::enable_if<!_Undirected>::type* = 0)
   {
     assert(N);
@@ -777,25 +777,25 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE,
+  edge_iterator in_edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
                             typename std::enable_if<_Undirected>::type* = 0)
   {
     return edge_end(N, mflag);
   } 
 
-  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
                                                                 typename std::enable_if<!_Undirected>::type* = 0) 
   {
     return detail::make_no_deref_range(in_edge_begin(N, mflag), in_edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  Runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE, 
+  Runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
                                                                 typename std::enable_if<_Undirected>::type* = 0) 
   {
     return edges(N, mflag);
@@ -864,7 +864,7 @@ public:
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       aux[*ii] = createNode();
-      addNode(aux[*ii], Galois::MethodFlag::UNPROTECTED);
+      addNode(aux[*ii], galois::MethodFlag::UNPROTECTED);
     }
   }
 

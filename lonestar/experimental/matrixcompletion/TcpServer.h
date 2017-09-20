@@ -31,7 +31,7 @@ struct AuxData {
 
   void initialize() {
     updateMargins();
-    Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
+    galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     executor.execute(
         graph.begin(), graph.begin() + numItems,
         graph.begin() + numItems, graph.end(),
@@ -49,10 +49,10 @@ struct AuxData {
 
   void updateMargins() {
     typedef typename Graph::GraphNode GNode;
-    Galois::Timer elapsed;
+    galois::Timer elapsed;
 
     elapsed.start();
-    Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
+    galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     double norm1 = 1.0 / (graph.size() - numItems);
     double norm2 = 1.0 / (numItems);
     executor.executeDense(
@@ -67,7 +67,7 @@ struct AuxData {
           graph.getData(src).sum += e;
           graph.getData(dst).sum += e;
         }, true);
-    Galois::do_all_local(graph, [&](GNode n) {
+    galois::do_all_local(graph, [&](GNode n) {
       if (n < numItems)
         graph.getData(n).sum *= norm1;
       else
@@ -84,8 +84,8 @@ struct AuxData {
     for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++mm, ++id) {
       *mm = std::make_pair(graph.getData(*ii).sum, id);
     }
-    Galois::ParallelSTL::sort(margins.begin(), margins.begin() + numItems);
-    Galois::ParallelSTL::sort(margins.begin() + numItems, margins.end());
+    galois::ParallelSTL::sort(margins.begin(), margins.begin() + numItems);
+    galois::ParallelSTL::sort(margins.begin() + numItems, margins.end());
   }
 };
 
@@ -99,9 +99,9 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   AuxData<Graph>& auxData;
   std::ostream& out;
 
-  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor;
+  galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor;
   boost::asio::streambuf request;
-  Galois::Runtime::PerThreadStorage<std::stringstream> response;
+  galois::Runtime::PerThreadStorage<std::stringstream> response;
   std::stringstream sumResponse;
     
   std::string kind;
@@ -170,13 +170,13 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   }
 
   void writeNetworkInt(std::ostream& o, uint32_t v) {
-    v = Galois::convert_htobe32(v);
+    v = galois::convert_htobe32(v);
     o.write(reinterpret_cast<char*>(&v), sizeof(v));
   }
 
   void writeNetworkFloat(std::ostream& o, float v) {
     union { float as_float; uint32_t as_uint; } c = { v };
-    uint32_t value = Galois::convert_htobe32(c.as_uint);
+    uint32_t value = galois::convert_htobe32(c.as_uint);
     o.write(reinterpret_cast<char*>(&value), sizeof(value));
   }
 

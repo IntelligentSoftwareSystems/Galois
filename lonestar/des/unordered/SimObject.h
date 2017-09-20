@@ -72,8 +72,8 @@ protected:
   };
 
   typedef des::EventRecvTimeLocalTieBrkCmp<Event_ty> Cmp;
-  typedef typename Galois::ThreadSafeOrderedSet<Event_ty, Cmp> PQ;
-  // typedef typename Galois::ThreadSafeMinHeap<Event_ty, Cmp> PQ;
+  typedef typename galois::ThreadSafeOrderedSet<Event_ty, Cmp> PQ;
+  // typedef typename galois::ThreadSafeMinHeap<Event_ty, Cmp> PQ;
 
 
   static const bool DEBUG = false;
@@ -110,7 +110,7 @@ public:
     if (inputTimes[inIdx] > e.getRecvTime () 
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
-      Galois::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
+      galois::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
 
       assert (inputTimes[inIdx] <= e.getRecvTime ());
 
@@ -162,7 +162,7 @@ public:
         }
 
 
-        assert (graph.getData(myNode, Galois::MethodFlag::UNPROTECTED) == this); // should already own a lock
+        assert (graph.getData(myNode, galois::MethodFlag::UNPROTECTED) == this); // should already own a lock
         assert (event.getRecvObj () == this);
 
         typename Base::template OutDegIterator<G> beg = Base::make_begin (graph, myNode);

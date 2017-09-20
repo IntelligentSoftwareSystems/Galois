@@ -28,7 +28,7 @@
 
 #include "Galois/DoAllWrap.h"
 
-namespace Galois {
+namespace galois {
 
 void setDoAllImpl (const DoAllTypes& type) {
   doAllKind = type;
@@ -38,5 +38,5 @@ DoAllTypes getDoAllImpl (void) {
   return doAllKind;
 }
 
-} // end namespace Galois
+} // end namespace galois
 

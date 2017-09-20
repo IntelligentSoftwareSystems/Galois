@@ -32,7 +32,7 @@
 #define GALOISGPU_OCL_GPUARRAY_H_
 
 
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 /*******************************************************************************
  *
@@ -49,7 +49,7 @@ struct GPUArray {
    explicit GPUArray(size_t sz, CL_Device * d) :
          num_elements(sz),device(d) {
       DEBUG_CODE(
-            fprintf(stderr, "Allocating array %6.6g MB on device, total %6.6g\n", (num_elements*sizeof(T)/(float)(1024*1024)), (Galois::OpenCL::OpenCL_Setup::allocated_bytes/(float)(1024*1024)));)
+            fprintf(stderr, "Allocating array %6.6g MB on device, total %6.6g\n", (num_elements*sizeof(T)/(float)(1024*1024)), (galois::OpenCL::OpenCL_Setup::allocated_bytes/(float)(1024*1024)));)
       device_data = clCreateBuffer(device->context(), CL_MEM_READ_WRITE, sizeof(T) * num_elements, NULL, &err);
       ReportDataAllocation(device, sizeof(T)*num_elements);
    }
@@ -105,7 +105,7 @@ struct GPUArray {
 protected:
 };
 }//end namespace OpenCL
-}//end namespace Galois
+}//end namespace galois
 
 
 #endif /* GALOISGPU_OCL_GPUARRAY_H_ */

@@ -29,7 +29,7 @@
 #include "Galois/Runtime/FatPointer.h"
 #include "Galois/Runtime/Context.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template<typename T>
@@ -133,6 +133,6 @@ public:
 
 
 } //namespace Runtime
-} //namespace Galois
+} //namespace galois
 
 #endif //DISTSUPPORT

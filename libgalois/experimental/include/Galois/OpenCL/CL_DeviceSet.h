@@ -32,7 +32,7 @@
 #ifndef GALOISGPU_OCL_DEVICESET_H_
 #define GALOISGPU_OCL_DEVICESET_H_
 
-namespace Galois{
+namespace galois{
 namespace OpenCL{
 struct DeviceSet {
    std::vector<std::string> names;
@@ -81,7 +81,7 @@ struct DeviceSet {
    }
 };
 }//namespace OpenCL
-} // namespace Galois
+} // namespace galois
 
 
 

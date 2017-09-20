@@ -58,7 +58,7 @@
 #include <vector>
 #include <string.h>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 //XXX(ddn): Refactor to eliminate OCFileGraph
@@ -104,7 +104,7 @@ private:
   uint64_t edgeOffset;
 
   // graph reading speed variables
-  Galois::GAccumulator<uint64_t> numBytesReadIndex, numBytesReadEdgeDst, numBytesReadEdgeData;
+  galois::GAccumulator<uint64_t> numBytesReadIndex, numBytesReadEdgeDst, numBytesReadEdgeData;
 
 
   void move_assign(FileGraph&&);

@@ -82,11 +82,11 @@ void initialize(Algo& algo,
 
 template<typename Graph>
 void readInOutGraph(Graph& graph) {
-  using namespace Galois::Graph;
+  using namespace galois::Graph;
   if (symmetricGraph) {
-    Galois::Graph::readGraph(graph, filename);
+    galois::Graph::readGraph(graph, filename);
   } else if (transposeGraphName.size()) {
-    Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
     GALOIS_DIE("Graph type not supported");
   }
@@ -103,11 +103,11 @@ struct AsyncAlgo {
     SNode() :numPaths(-std::numeric_limits<float>::max()), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-//typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+//typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "async"; }
@@ -120,7 +120,7 @@ struct AsyncAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      SNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.numPaths = -std::numeric_limits<float>::max();
       data.dependencies = -std::numeric_limits<float>::max();
       data.dist = std::numeric_limits<int>::max();
@@ -137,20 +137,20 @@ struct AsyncAlgo {
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<bfsChunkSize> > OBIM;
+    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<bfsChunkSize> > OBIM;
 
     Graph& g;
     BFS(Graph& g) :g(g) {}
 
-    void operator()(WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
+    void operator()(WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
       GNode n = item.first;
       int newDist = item.second;
       if (newDist > g.getData(n).dist + 1)
         return;
       
-      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
 
         int oldDist;
         while (true) {
@@ -173,28 +173,28 @@ struct AsyncAlgo {
       static Graph* g;
       int operator()(const GNode& val) const {
         // //use out edges as that signifies how many people will wait on this node
-        // auto ii = g->edge_begin(val, Galois::MethodFlag::UNPROTECTED);
-        // auto ee = g->edge_end(val, Galois::MethodFlag::UNPROTECTED);
-        // bool big = Galois::safe_advance(ii, ee, 10) != ee;
-        // return 2 * g->getData(val, Galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
-        return g->getData(val, Galois::MethodFlag::UNPROTECTED).dist;
+        // auto ii = g->edge_begin(val, galois::MethodFlag::UNPROTECTED);
+        // auto ee = g->edge_end(val, galois::MethodFlag::UNPROTECTED);
+        // bool big = galois::safe_advance(ii, ee, 10) != ee;
+        // return 2 * g->getData(val, galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
+        return g->getData(val, galois::MethodFlag::UNPROTECTED).dist;
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
+    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     CountPaths(Graph& g) :g(g) { Indexer::g = &g; }
 
-    void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+    void operator()(GNode& n, galois::UserContext<GNode>& ctx) const {
+      SNode& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
       while (sdata.numPaths == -std::numeric_limits<float>::max()) {
         unsigned long np = 0;
         bool allready = true;
-        for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-               ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+        for (Graph::in_edge_iterator ii = g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
+               ee = g.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
           GNode dst = g.getInEdgeDst(ii);
-          SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
           if (ddata.dist + 1 == sdata.dist) {
             if (ddata.numPaths != -std::numeric_limits<float>::max()) {
               np += ddata.numPaths;
@@ -218,27 +218,27 @@ struct AsyncAlgo {
       static Graph* g;
       int operator()(const GNode& val) const {
         //use in edges as that signifies how many people will wait on this node
-        // auto ii = g->in_edge_begin(val, Galois::MethodFlag::UNPROTECTED);
-        // auto ee = g->in_edge_end(val, Galois::MethodFlag::UNPROTECTED);
-        // bool big = Galois::safe_advance(ii, ee, 10) != ee;
-        // return std::numeric_limits<int>::max() - 2 * g->getData(val, Galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
-        return std::numeric_limits<int>::max() - g->getData(val, Galois::MethodFlag::UNPROTECTED).dist;
+        // auto ii = g->in_edge_begin(val, galois::MethodFlag::UNPROTECTED);
+        // auto ee = g->in_edge_end(val, galois::MethodFlag::UNPROTECTED);
+        // bool big = galois::safe_advance(ii, ee, 10) != ee;
+        // return std::numeric_limits<int>::max() - 2 * g->getData(val, galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
+        return std::numeric_limits<int>::max() - g->getData(val, galois::MethodFlag::UNPROTECTED).dist;
       }
     };
 
-    typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
+    typedef galois::WorkList::OrderedByIntegerMetric<Indexer,galois::WorkList::dChunkedFIFO<ChunkSize> > OBIM;
 
     Graph& g;
     ComputeDep(Graph& g) :g(g) { Indexer::g = &g; }
 
-    void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+    void operator()(GNode& n, galois::UserContext<GNode>& ctx) const {
+      SNode& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
       while (sdata.dependencies == -std::numeric_limits<float>::max()) {
         float newDep = 0.0;
         bool allready = true;
-        for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           GNode dst = g.getEdgeDst(ii);
-          SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
           if (ddata.dist == sdata.dist + 1) {
             if (ddata.dependencies != -std::numeric_limits<float>::max()) {
               newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
@@ -256,26 +256,26 @@ struct AsyncAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    Galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
+    galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
-    Galois::do_all_local(graph, Initialize(graph), Galois::loopname("INIT"));
+    galois::do_all_local(graph, Initialize(graph), galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
     graph.getData(source).dist = 0;
-    //Galois::for_each(BFS::WorkItem(source, 1), BFS(graph), Galois::loopname("BFS"), Galois::wl<BFS::OBIM>());
+    //galois::for_each(BFS::WorkItem(source, 1), BFS(graph), galois::loopname("BFS"), galois::wl<BFS::OBIM>());
     HybridBFS<SNode, int> H;
     H(graph,source);
     Tbfs.stop();
     std::cout << "BFS DONE " << Tbfs.get() << "\n";
     Tcount.start();
     graph.getData(source).numPaths = 1;
-    Galois::for_each_local(graph, CountPaths(graph), Galois::loopname("COUNT"), Galois::wl<CountPaths::OBIM>());
+    galois::for_each_local(graph, CountPaths(graph), galois::loopname("COUNT"), galois::wl<CountPaths::OBIM>());
     Tcount.stop();
     std::cout << "COUNT DONE " << Tcount.get() << "\n";
     Tdep.start();
     graph.getData(source).dependencies = 0.0;
-    Galois::for_each(graph.begin(), graph.end(), ComputeDep(graph), Galois::loopname("DEP"), Galois::wl<ComputeDep::OBIM>());
+    galois::for_each(graph.begin(), graph.end(), ComputeDep(graph), galois::loopname("DEP"), galois::wl<ComputeDep::OBIM>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
   }
@@ -292,13 +292,13 @@ struct LeveledAlgo {
     SNode() :numPaths(~0UL), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+  typedef galois::Graph::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-//typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
+  typedef galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+//typedef galois::Graph::LC_CSR_Graph<SNode, void> Graph;
   typedef Graph::GraphNode GNode;
-  typedef Galois::InsertBag<GNode> Bag;
+  typedef galois::InsertBag<GNode> Bag;
 
   std::string name() const { return "Leveled"; }
 
@@ -310,7 +310,7 @@ struct LeveledAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      SNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.numPaths = 0;
       data.dependencies = 0.0; //std::numeric_limits<float>::lowest();
       data.dist = std::numeric_limits<int>::max();
@@ -327,10 +327,10 @@ struct LeveledAlgo {
     BFS(Graph& g, Bag& b) :g(g), b(b) {}
 
     void operator()(GNode& n) const {
-      auto& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
+      for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (ddata.dist.load(std::memory_order_relaxed) == std::numeric_limits<int>::max()) {
           if (std::numeric_limits<int>::max() == ddata.dist.exchange(sdata.dist + 1))
             b.push_back(dst);
@@ -341,10 +341,10 @@ struct LeveledAlgo {
             ddata.numPaths = ddata.numPaths + sdata.numPaths;
         }
       }
-      // for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-      //        ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+      // for (Graph::in_edge_iterator ii = g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
+      //        ee = g.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
       //   GNode dst = g.getInEdgeDst(ii);
-      //   SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      //   SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
       //   if (ddata.dist + 1 == sdata.dist)
       //     sdata.numPaths += ddata.numPaths;
       // }
@@ -359,12 +359,12 @@ struct LeveledAlgo {
     Counter(Graph& g) :g(g) {}
 
     void operator()(GNode& n) const {
-      auto& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
       unsigned long np = 0;
-      for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-             ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+      for (Graph::in_edge_iterator ii = g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
+             ee = g.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
         GNode dst = g.getInEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (ddata.dist + 1 == sdata.dist)
           np += ddata.numPaths;
       }
@@ -378,10 +378,10 @@ struct LeveledAlgo {
     ComputeDep(Graph& g) :g(g) {}
 
     void operator()(GNode& n) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      SNode& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
+      for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        SNode& ddata = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (ddata.dist == sdata.dist + 1)
           sdata.dependencies += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
       }
@@ -389,13 +389,13 @@ struct LeveledAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    Galois::StatTimer Tinit("InitTime");
-    Galois::StatTimer Tlevel("LevelTime");
-    Galois::StatTimer Tbfs("BFSTime");
-    Galois::StatTimer Tcount("CountTime");
-    Galois::StatTimer Tdep("DepTime");
+    galois::StatTimer Tinit("InitTime");
+    galois::StatTimer Tlevel("LevelTime");
+    galois::StatTimer Tbfs("BFSTime");
+    galois::StatTimer Tcount("CountTime");
+    galois::StatTimer Tdep("DepTime");
     Tinit.start();
-    Galois::do_all_local(graph, Initialize(graph), Galois::loopname("INIT"));
+    galois::do_all_local(graph, Initialize(graph), galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
 
@@ -408,8 +408,8 @@ struct LeveledAlgo {
     while (!levels.back()->empty()) {
       Bag* b = levels.back();
       levels.push_back(new Bag());
-      Galois::do_all_local(*b, BFS<>(graph, *levels.back()), Galois::loopname("BFS"), Galois::do_all_steal<true>());
-      //Galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
+      galois::do_all_local(*b, BFS<>(graph, *levels.back()), galois::loopname("BFS"), galois::do_all_steal<true>());
+      //galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
     levels.pop_back();
@@ -418,7 +418,7 @@ struct LeveledAlgo {
 
     Tdep.start();
     for (int i = levels.size() - 1; i > 0; --i)
-      Galois::do_all_local(*levels[i-1], ComputeDep(graph), Galois::loopname("DEPS"), Galois::do_all_steal<true>());
+      galois::do_all_local(*levels[i-1], ComputeDep(graph), galois::loopname("DEPS"), galois::do_all_steal<true>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
     while (!levels.empty()) {
@@ -440,17 +440,17 @@ void run() {
 
   initialize(algo, graph, source);
 
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoMid");
+  galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / galois::Runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoMid");
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
   algo(graph, source);
   T.stop();
   
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     int count = 0;
@@ -470,10 +470,10 @@ void run() {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
     case Algo::async: run<AsyncAlgo>();   break;

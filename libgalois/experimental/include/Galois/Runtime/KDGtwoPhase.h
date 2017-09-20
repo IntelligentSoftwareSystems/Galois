@@ -65,7 +65,7 @@
 #include <memory>
 
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 
@@ -142,12 +142,12 @@ public:
   void push_initial (const R& range) {
     if (ThisClass::targetCommitRatio == 0.0) {
 
-      Galois::do_all_choice (range,
+      galois::do_all_choice (range,
           [this] (const T& x) {
             ThisClass::getNextWL ().push_back (ctxtMaker (x));
           }, 
           std::make_tuple (
-            Galois::loopname ("init-fill"),
+            galois::loopname ("init-fill"),
             chunk_size<NhFunc::CHUNK_SIZE> ()));
 
 
@@ -176,7 +176,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
     // for stable case
 
-    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [this] (Ctxt* c) {
           typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
@@ -187,7 +187,7 @@ protected:
           ThisClass::roundTasks += 1;
         },
         std::make_tuple (
-          Galois::loopname ("expandNhood"),
+          galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
   }
 
@@ -204,7 +204,7 @@ protected:
     auto m_beg = boost::make_transform_iterator (ThisClass::getCurrWL ().begin_all (), GetActive ());
     auto m_end = boost::make_transform_iterator (ThisClass::getCurrWL ().end_all (), GetActive ());
 
-    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [m_beg, m_end, this] (Ctxt* c) {
           typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
@@ -214,7 +214,7 @@ protected:
           ThisClass::roundTasks += 1;
         },
         std::make_tuple (
-          Galois::loopname ("expandNhoodUnstable"),
+          galois::loopname ("expandNhoodUnstable"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
   }
 
@@ -231,7 +231,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
     assert (ThisClass::HAS_EXEC_FUNC);
 
-    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
       [this] (Ctxt* ctxt) {
 
         typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
@@ -242,8 +242,8 @@ protected:
         }
       },
       std::make_tuple (
-        Galois::loopname ("exec-sources"),
-        Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
+        galois::loopname ("exec-sources"),
+        galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
 
   }
 
@@ -254,7 +254,7 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
-    Galois::optional<T> minElem;
+    galois::optional<T> minElem;
 
     if (ThisClass::NEEDS_PUSH) {
       if (ThisClass::targetCommitRatio != 0.0 && !winWL.empty ()) {
@@ -263,7 +263,7 @@ protected:
     }
 
 
-    Galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
         [this, &minElem] (Ctxt* c) {
           bool commit = false;
 
@@ -313,7 +313,7 @@ protected:
           }
         },
         std::make_tuple (
-          Galois::loopname ("applyOperator"),
+          galois::loopname ("applyOperator"),
           chunk_size<OpFunc::CHUNK_SIZE> ()));
   }
 
@@ -378,7 +378,7 @@ void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& n
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
+    Substrate::getThreadPool().burnPower(galois::getActiveThreads ());
   }
 
   e.push_initial (range);
@@ -411,6 +411,6 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_RUNTIME_KDG_TWO_PHASE_H

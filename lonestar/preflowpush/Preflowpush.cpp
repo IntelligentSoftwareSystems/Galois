@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-typedef Galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type Graph;
+typedef galois::Graph::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 struct Config {
@@ -113,21 +113,21 @@ Config app;
 
 struct Indexer :std::unary_function<GNode, int> {
   int operator()(const GNode& n) const {
-    return -app.graph.getData(n, Galois::MethodFlag::UNPROTECTED).height;
+    return -app.graph.getData(n, galois::MethodFlag::UNPROTECTED).height;
   }
 };
 
 struct GLess :std::binary_function<GNode, GNode, bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = -app.graph.getData(lhs, Galois::MethodFlag::UNPROTECTED).height;
-    int rv = -app.graph.getData(rhs, Galois::MethodFlag::UNPROTECTED).height;
+    int lv = -app.graph.getData(lhs, galois::MethodFlag::UNPROTECTED).height;
+    int rv = -app.graph.getData(rhs, galois::MethodFlag::UNPROTECTED).height;
     return lv < rv;
   }
 };
 struct GGreater :std::binary_function<GNode, GNode, bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = -app.graph.getData(lhs, Galois::MethodFlag::UNPROTECTED).height;
-    int rv = -app.graph.getData(rhs, Galois::MethodFlag::UNPROTECTED).height;
+    int lv = -app.graph.getData(lhs, galois::MethodFlag::UNPROTECTED).height;
+    int rv = -app.graph.getData(rhs, galois::MethodFlag::UNPROTECTED).height;
     return lv > rv;
   }
 };
@@ -265,8 +265,8 @@ Graph::edge_iterator findEdgeLinear (Graph& g, GNode dst, Graph::edge_iterator b
 
 Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
 
-  auto i = g.edge_begin (src, Galois::MethodFlag::UNPROTECTED);
-  auto end_i = g.edge_end (src, Galois::MethodFlag::UNPROTECTED);
+  auto i = g.edge_begin (src, galois::MethodFlag::UNPROTECTED);
+  auto end_i = g.edge_end (src, galois::MethodFlag::UNPROTECTED);
 
   if ((end_i - i) < 32) { 
     return findEdgeLinear (g, dst, i, end_i);
@@ -347,32 +347,32 @@ template<DetAlgo version,bool useCAS=true>
 struct UpdateHeights {
 
   struct LocalState {
-    LocalState(UpdateHeights<version,useCAS>& self, Galois::PerIterAllocTy& alloc) { }
+    LocalState(UpdateHeights<version,useCAS>& self, galois::PerIterAllocTy& alloc) { }
   };
 
   typedef std::tuple<
-    Galois::needs_per_iter_alloc<>,
-    Galois::has_deterministic_local_state<LocalState>
+    galois::needs_per_iter_alloc<>,
+    galois::has_deterministic_local_state<LocalState>
   > function_traits;
 
   //struct IdFn {
   //  unsigned long operator()(const GNode& item) const {
-  //    return app.graph.getData(item, Galois::MethodFlag::UNPROTECTED).id;
+  //    return app.graph.getData(item, galois::MethodFlag::UNPROTECTED).id;
   //  }
   //};
 
   /**
    * Do reverse BFS on residual graph.
    */
-  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+  void operator()(const GNode& src, galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
 
       if (ctx.isFirstPass()) {
-        for (auto ii : app.graph.edges(src, Galois::MethodFlag::WRITE)) {
+        for (auto ii : app.graph.edges(src, galois::MethodFlag::WRITE)) {
           GNode dst = app.graph.getEdgeDst(ii);
           int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
           if (rdata > 0) {
-            app.graph.getData(dst, Galois::MethodFlag::WRITE);
+            app.graph.getData(dst, galois::MethodFlag::WRITE);
           }
         }
       }
@@ -380,17 +380,17 @@ struct UpdateHeights {
       if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE);
+        app.graph.getData(src, galois::MethodFlag::WRITE);
         ctx.cautiousPoint();
       }
     }
 
-    for (auto ii : app.graph.edges(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE)) {
+    for (auto ii : app.graph.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED : galois::MethodFlag::WRITE)) {
       GNode dst = app.graph.getEdgeDst(ii);
       int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
       if (rdata > 0) {
-        Node& node = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-        int newHeight = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED).height + 1;
+        Node& node = app.graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+        int newHeight = app.graph.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
         if (useCAS) {
           int oldHeight;
           while (newHeight < (oldHeight = node.height)) {
@@ -412,7 +412,7 @@ struct UpdateHeights {
 
 struct ResetHeights {
   void operator()(const GNode& src) const {
-    Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Node& node = app.graph.getData(src, galois::MethodFlag::UNPROTECTED);
     node.height = app.graph.size();
     node.current = 0;
     if (src == app.sink)
@@ -426,7 +426,7 @@ struct FindWork {
   FindWork(WLTy& w) : wl(w) {}
 
   void operator()(const GNode& src) const {
-    Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Node& node = app.graph.getData(src, galois::MethodFlag::UNPROTECTED);
     if (src == app.sink || src == app.source || node.height >= (int) app.graph.size())
       return;
     if (node.excess > 0) 
@@ -436,46 +436,46 @@ struct FindWork {
 
 template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
-  typedef Galois::WorkList::Deterministic<> DWL;
+  typedef galois::WorkList::Deterministic<> DWL;
 
-  Galois::StatTimer T1("ResetHeightsTime");
+  galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::do_all_local(app.graph, ResetHeights(), Galois::loopname("ResetHeights"));
+  galois::do_all_local(app.graph, ResetHeights(), galois::loopname("ResetHeights"));
   T1.stop();
 
-  Galois::StatTimer T("UpdateHeightsTime");
+  galois::StatTimer T("UpdateHeightsTime");
   T.start();
 
   switch (detAlgo) {
     case nondet:
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronous<>>());
-      //      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
+      galois::for_each(app.sink, UpdateHeights<nondet>(), galois::loopname("UpdateHeights"), galois::wl<galois::WorkList::BulkSynchronous<>>());
+      //      galois::for_each(app.sink, UpdateHeights<nondet>(), galois::loopname("UpdateHeights"));
       break;
     case detBase:
-      Galois::for_each(app.sink, UpdateHeights<detBase>(), 
-          Galois::wl<DWL>(),
-          Galois::loopname("UpdateHeights"));
+      galois::for_each(app.sink, UpdateHeights<detBase>(), 
+          galois::wl<DWL>(),
+          galois::loopname("UpdateHeights"));
       break;
     case detDisjoint:
-      Galois::for_each(app.sink, UpdateHeights<detDisjoint>(),
-          Galois::wl<DWL>(),
-          Galois::loopname("UpdateHeights"));
+      galois::for_each(app.sink, UpdateHeights<detDisjoint>(),
+          galois::wl<DWL>(),
+          galois::loopname("UpdateHeights"));
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
   T.stop();
 
-  Galois::StatTimer T2("FindWorkTime");
+  galois::StatTimer T2("FindWorkTime");
   T2.start();
-  Galois::do_all_local(app.graph, FindWork<IncomingWL>(incoming), Galois::loopname("FindWork"));
+  galois::do_all_local(app.graph, FindWork<IncomingWL>(incoming), galois::loopname("FindWork"));
   T2.stop();
 }
 
 void acquire(const GNode& src) {
   // LC Graphs have a different idea of locking
-  for (auto ii : app.graph.edges(src, Galois::MethodFlag::WRITE)) {
+  for (auto ii : app.graph.edges(src, galois::MethodFlag::WRITE)) {
     GNode dst = app.graph.getEdgeDst(ii);
-    app.graph.getData(dst, Galois::MethodFlag::WRITE);
+    app.graph.getData(dst, galois::MethodFlag::WRITE);
   }
 }
 
@@ -484,11 +484,11 @@ void relabel(const GNode& src) {
   int minEdge = 0;
 
   int current = 0;
-  for (auto ii : app.graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+  for (auto ii : app.graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
     GNode dst = app.graph.getEdgeDst(ii);
     int64_t cap = app.graph.getEdgeData(ii);
     if (cap > 0) {
-      const Node& dnode = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      const Node& dnode = app.graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       if (dnode.height < minHeight) {
         minHeight = dnode.height;
         minEdge = current;
@@ -500,7 +500,7 @@ void relabel(const GNode& src) {
   assert(minHeight != std::numeric_limits<int>::max());
   ++minHeight;
 
-  Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+  Node& node = app.graph.getData(src, galois::MethodFlag::UNPROTECTED);
   if (minHeight < (int) app.graph.size()) {
     node.height = minHeight;
     node.current = minEdge;
@@ -509,9 +509,9 @@ void relabel(const GNode& src) {
   }
 }
 
-bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
-  //Node& node = app.graph.getData(src, Galois::MethodFlag::WRITE);
-  Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+bool discharge(const GNode& src, galois::UserContext<GNode>& ctx) {
+  //Node& node = app.graph.getData(src, galois::MethodFlag::WRITE);
+  Node& node = app.graph.getData(src, galois::MethodFlag::UNPROTECTED);
   //int prevHeight = node.height;
   bool relabeled = false;
 
@@ -520,8 +520,8 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   }
 
   while (true) {
-    //Galois::MethodFlag flag = relabeled ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
-    Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+    //galois::MethodFlag flag = relabeled ? galois::MethodFlag::UNPROTECTED : galois::MethodFlag::WRITE;
+    galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
     bool finished = false;
     int current = node.current;
     Graph::edge_iterator
@@ -534,7 +534,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
       if (cap == 0)// || current < node.current) 
         continue;
 
-      Node& dnode = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      Node& dnode = app.graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       if (node.height - 1 != dnode.height) 
         continue;
 
@@ -573,19 +573,19 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
 }
 
 struct Counter {
-  Galois::GAccumulator<int> accum;
-  Galois::Substrate::PerThreadStorage<int> local;
+  galois::GAccumulator<int> accum;
+  galois::Substrate::PerThreadStorage<int> local;
 };
 
 template<DetAlgo version>
 struct Process {
   struct LocalState {
-    LocalState(Process<version>& self, Galois::PerIterAllocTy& alloc) { }
+    LocalState(Process<version>& self, galois::PerIterAllocTy& alloc) { }
   };
 
   struct DeterministicId {
     uintptr_t operator()(const GNode& item) const {
-      return app.graph.getData(item, Galois::MethodFlag::UNPROTECTED).id;
+      return app.graph.getData(item, galois::MethodFlag::UNPROTECTED).id;
     }
   };
 
@@ -607,15 +607,15 @@ struct Process {
   Counter& counter;
 
   typedef std::tuple<
-    Galois::needs_parallel_break<>,
-    Galois::needs_per_iter_alloc<>,
-    Galois::has_deterministic_local_state<LocalState>,
-    Galois::has_deterministic_id<DeterministicId>
+    galois::needs_parallel_break<>,
+    galois::needs_per_iter_alloc<>,
+    galois::has_deterministic_local_state<LocalState>,
+    galois::has_deterministic_id<DeterministicId>
   > function_traits;
 
   Process(Counter& c): counter(c) { }
 
-  void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode& src, galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
       if (ctx.isFirstPass()) {
         acquire(src);
@@ -623,7 +623,7 @@ struct Process {
       if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE);
+        app.graph.getData(src, galois::MethodFlag::WRITE);
         ctx.cautiousPoint();
       }
     }
@@ -640,7 +640,7 @@ struct Process {
 template<>
 struct Process<nondet> {
   typedef std::tuple<
-    Galois::needs_parallel_break<>
+    galois::needs_parallel_break<>
   > function_traits;
 
   Counter& counter;
@@ -649,7 +649,7 @@ struct Process<nondet> {
     limit = app.global_relabel_interval / numThreads;
   }
 
-  void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode& src, galois::UserContext<GNode>& ctx) {
     int increment = 1;
     acquire(src);
     if (discharge(src, ctx)) {
@@ -667,14 +667,14 @@ struct Process<nondet> {
 
 template<typename EdgeTy>
 void writePfpGraph(const std::string& inputFile, const std::string& outputFile) {
-  typedef Galois::Graph::FileGraph ReaderGraph;
+  typedef galois::Graph::FileGraph ReaderGraph;
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
   reader.fromFile(inputFile);
 
-  typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy> EdgeData;
+  typedef galois::Graph::FileGraphWriter Writer;
+  typedef galois::LargeArray<EdgeTy> EdgeData;
   typedef typename EdgeData::value_type edge_value_type;
 
   Writer p;
@@ -711,7 +711,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 
   EdgeTy one = 1;
   static_assert(sizeof(one) == sizeof(uint32_t), "Unexpected edge data size");
-  one = Galois::convert_le32toh(one);
+  one = galois::convert_le32toh(one);
 
   p.phase2();
   edgeData.create(numEdges);
@@ -733,7 +733,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   using Wnode = Writer::GraphNode;
 
   struct IdLess {
-    bool operator()(const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e1, const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e2) const {
+    bool operator()(const galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e1, const galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e2) const {
       return e1.dst < e2.dst;
     }
   };
@@ -747,7 +747,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 
 void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
-    Galois::Graph::readGraph(newApp->graph, inputFile);
+    galois::Graph::readGraph(newApp->graph, inputFile);
     for(auto ss : newApp->graph)
       for (auto ii : newApp->graph.edges(ss))
         newApp->graph.getEdgeData(ii) = 1;
@@ -761,7 +761,7 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
       }
       inputFile = pfpName;
     }
-    Galois::Graph::readGraph(newApp->graph, inputFile);
+    galois::Graph::readGraph(newApp->graph, inputFile);
 
     // Assume that input edge data has already been converted instead
 #if 0//def HAVE_BIG_ENDIAN
@@ -770,7 +770,7 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
       for (auto ii : newApp->graph.edges(ss)) {
         Graph::edge_data_type& cap = newApp->graph.getEdgeData(ii);
         static_assert(sizeof(cap) == sizeof(uint32_t), "Unexpected edge data size");
-        cap = Galois::convert_le32toh(cap);
+        cap = galois::convert_le32toh(cap);
       }
     }
 #endif
@@ -810,12 +810,12 @@ void initializePreflow(C& initial) {
 
 void checkSorting (void) {
   for (auto n : app.graph) {
-    Galois::optional<GNode> prevDst;
-    for (auto e : app.graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    galois::optional<GNode> prevDst;
+    for (auto e : app.graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
       GNode dst = app.graph.getEdgeDst (e);
       if (prevDst) {
-        Node& prevNode = app.graph.getData (*prevDst, Galois::MethodFlag::UNPROTECTED);
-        Node& currNode = app.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        Node& prevNode = app.graph.getData (*prevDst, galois::MethodFlag::UNPROTECTED);
+        Node& currNode = app.graph.getData (dst, galois::MethodFlag::UNPROTECTED);
         GALOIS_ASSERT (prevNode.id < currNode.id, "Adjacency list unsorted");
       }
       prevDst = dst;
@@ -825,36 +825,36 @@ void checkSorting (void) {
 
 
 void run() {
-  typedef Galois::WorkList::Deterministic<> DWL;
-  typedef Galois::WorkList::dChunkedFIFO<16> Chunk;
-  typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
+  typedef galois::WorkList::Deterministic<> DWL;
+  typedef galois::WorkList::dChunkedFIFO<16> Chunk;
+  typedef galois::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
-  Galois::InsertBag<GNode> initial;
+  galois::InsertBag<GNode> initial;
   initializePreflow(initial);
 
   while (initial.begin() != initial.end()) {
-    Galois::StatTimer T_discharge("DischargeTime");
+    galois::StatTimer T_discharge("DischargeTime");
     T_discharge.start();
     Counter counter;
     switch (detAlgo) {
       case nondet:
         if (useHLOrder) {
-          Galois::for_each_local(initial, Process<nondet>(counter), Galois::loopname("Discharge"), Galois::wl<OBIM>());
+          galois::for_each_local(initial, Process<nondet>(counter), galois::loopname("Discharge"), galois::wl<OBIM>());
         } else {
-          Galois::for_each_local(initial, Process<nondet>(counter), Galois::loopname("Discharge"));
+          galois::for_each_local(initial, Process<nondet>(counter), galois::loopname("Discharge"));
         }
         break;
       case detBase:
         {
           Process<detBase> fn(counter);
-          Galois::for_each_local(initial,
+          galois::for_each_local(initial,
               fn, 
-              Galois::loopname("Discharge"),
-              Galois::wl<DWL>(),
+              galois::loopname("Discharge"),
+              galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-              Galois::has_deterministic_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak())
+              galois::has_deterministic_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak())
 #else
-              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+              galois::make_trait_with_args<galois::has_deterministic_parallel_break>(fn.getParallelBreak())
 #endif
               );
         }
@@ -862,14 +862,14 @@ void run() {
       case detDisjoint:
         {
           Process<detDisjoint> fn(counter);
-          Galois::for_each_local(initial,
+          galois::for_each_local(initial,
               fn, 
-              Galois::loopname("Discharge"),
-              Galois::wl<DWL>(),
+              galois::loopname("Discharge"),
+              galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-              Galois::has_deterministic_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak())
+              galois::has_deterministic_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak())
 #else
-              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+              galois::make_trait_with_args<galois::has_deterministic_parallel_break>(fn.getParallelBreak())
 #endif
               );
         }
@@ -879,7 +879,7 @@ void run() {
     T_discharge.stop();
 
     if (app.should_global_relabel) {
-      Galois::StatTimer T_global_relabel("GlobalRelabelTime");
+      galois::StatTimer T_global_relabel("GlobalRelabelTime");
       T_global_relabel.start();
       initial.clear();
       globalRelabel(initial);
@@ -896,7 +896,7 @@ void run() {
 
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   bool serial = false;
   LonestarStart(argc, argv, name, desc, url);
 
@@ -914,7 +914,7 @@ int main(int argc, char** argv) {
   std::cout << "global relabel interval: " << app.global_relabel_interval << "\n";
   std::cout << "serial execution: " << (serial ? "yes" : "no") << "\n";
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   run();
   T.stop();

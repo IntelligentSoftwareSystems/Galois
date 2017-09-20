@@ -41,9 +41,9 @@
 #define cilk_sync
 #endif
 
-namespace Galois {
+namespace galois {
 
   void CilkInit (void);
 
-} // end namespace Galois
+} // end namespace galois
 #endif // GALOIS_CILK_INIT_H

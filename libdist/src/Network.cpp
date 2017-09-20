@@ -33,16 +33,16 @@
 #include <iostream>
 #include <mutex>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
-uint32_t Galois::Runtime::evilPhase = 1;
+uint32_t galois::Runtime::evilPhase = 1;
 
-uint32_t Galois::Runtime::NetworkInterface::ID = 0;
-uint32_t Galois::Runtime::NetworkInterface::Num = 1;
+uint32_t galois::Runtime::NetworkInterface::ID = 0;
+uint32_t galois::Runtime::NetworkInterface::Num = 1;
 
-uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
+uint32_t galois::Runtime::getHostID() { return NetworkInterface::ID; }
 
-Galois::Runtime::NetworkIO::~NetworkIO() {}
+galois::Runtime::NetworkIO::~NetworkIO() {}
 
 //anchor vtable
 NetworkInterface::~NetworkInterface() {}
@@ -127,7 +127,7 @@ NetworkBackend::~NetworkBackend() {
 
 NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
-NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+NetworkInterface& galois::Runtime::getSystemNetworkInterface() {
   //return makeNetworkRouted();
   return makeNetworkBuffered();
 }

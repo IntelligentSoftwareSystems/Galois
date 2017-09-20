@@ -31,7 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-namespace Galois {
+namespace galois {
   namespace Substrate {
 
     template<class T, T... I>

@@ -6,7 +6,7 @@
 #include <sstream>
 
 //TODO: move to libdist or delete
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 
@@ -14,7 +14,7 @@ template <typename WL, typename GraphTy>
 class WLdistributed: public WL {
   //typedef typename WL::value_type workItemTy;
   typedef typename WL::value_type value_type;
-  std::vector<Galois::InsertBag<uint64_t>> bag_vec;
+  std::vector<galois::InsertBag<uint64_t>> bag_vec;
   //std::vector<std::vector<uint64_t>> bag_vec;
   WL workList;
   std::deque<uint64_t> local_wl;
@@ -26,7 +26,7 @@ class WLdistributed: public WL {
 public:
 
   WLdistributed (GraphTy& _graph): workList(), graph(_graph) {
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     bag_vec.resize(net.Num);
   }
 
@@ -46,18 +46,18 @@ public:
    */
   void convertGID2LID_localWL() {
     uint32_t num = size();
-    Galois::do_all(boost::counting_iterator<uint32_t>(0),
+    galois::do_all(boost::counting_iterator<uint32_t>(0),
         boost::counting_iterator<uint32_t>(num),
         [&](uint32_t n) {
           local_wl[n] = graph.G2L(local_wl[n]);
         },
-        Galois::loopname("G2L_wl"),
-        Galois::numrun(graph.get_run_identifier())
+        galois::loopname("G2L_wl"),
+        galois::numrun(graph.get_run_identifier())
     );
   }
 
 
-  void insertToLocalWL(Galois::InsertBag<uint64_t>& bag){
+  void insertToLocalWL(galois::InsertBag<uint64_t>& bag){
     local_wl.insert(local_wl.end(), bag.begin(), bag.end());
     //assert(local_wl.size() == totalSize);
     bag.clear();
@@ -68,14 +68,14 @@ public:
   }
 
   void sync() {
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     std::string statSendBytes_str("WL_SEND_BYTES_" + graph.get_run_identifier());
     std::string timer_wl_send_recv_str("WL_SYNC_TIME_SEND_RECV_" + graph.get_run_identifier());
     std::string timer_wl_total_str("WL_SYNC_TIME_TOTAL_" + graph.get_run_identifier());
 
-    Galois::StatTimer StatTimer_total_sync(timer_wl_total_str.c_str());
-    Galois::StatTimer StatTimer_send_recv(timer_wl_send_recv_str.c_str());
-    Galois::Statistic send_bytes(statSendBytes_str);
+    galois::StatTimer StatTimer_total_sync(timer_wl_total_str.c_str());
+    galois::StatTimer StatTimer_send_recv(timer_wl_send_recv_str.c_str());
+    galois::Statistic send_bytes(statSendBytes_str);
 
     StatTimer_total_sync.start();
 
@@ -89,16 +89,16 @@ public:
 
     // sort out location of hosts for things that were pushed into our
     // worklist
-    Galois::on_each([&] (const unsigned tid, const unsigned numT) {
-        Galois::optional<value_type> p;
+    galois::on_each([&] (const unsigned tid, const unsigned numT) {
+        galois::optional<value_type> p;
         while (p = workList.pop()) {
           auto GID = graph.getGID(*p);
           assert(graph.getHostID(GID) < bag_vec.size());
           bag_vec[graph.getHostID(GID)].push(GID);
         }
-    }, Galois::loopname("worklist bags"));
+    }, galois::loopname("worklist bags"));
     //    uint64_t count = 0;
-    //    Galois::optional<value_type> p;
+    //    galois::optional<value_type> p;
     //    while (p = workList.pop()) {
     //      count++;
     //      auto GID = graph.getGID(*p);
@@ -135,15 +135,15 @@ public:
 
       // otherwise send off itmes to appropriate host
       size_t bagSize =  bag_vec[h].size();
-      Galois::Runtime::SendBuffer b;
-      Galois::Runtime::gSerialize(b, canTerminate);
-      Galois::Runtime::gSerialize(b, bag_vec[h]);
+      galois::Runtime::SendBuffer b;
+      galois::Runtime::gSerialize(b, canTerminate);
+      galois::Runtime::gSerialize(b, bag_vec[h]);
       send_bytes += b.size();
       //assert(b.size() == sizeof(uint64_t)*(bagSize + 2));
       //std::stringstream ss;
       //ss << net.ID << " ] : SENDING : " << bagSize << "\n";
       //std::cerr << ss.str();
-      net.sendTagged(h, Galois::Runtime::evilPhase, b);
+      net.sendTagged(h, galois::Runtime::evilPhase, b);
     }
     net.flush();
 
@@ -151,27 +151,27 @@ public:
     for (auto h = 0; h < net.Num; ++h) {
       if ((h == net.ID)) continue;
 
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase,nullptr)) p;
 
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
 
       bool other_canTerminate = true;
-      Galois::Runtime::gDeserialize(p->second, other_canTerminate);
+      galois::Runtime::gDeserialize(p->second, other_canTerminate);
       canTerminate = (other_canTerminate && canTerminate);
 
       // get stuff, insert to our list
       std::deque<uint64_t> s;
       //TODO avoid double copy
-      Galois::Runtime::gDeserialize(p->second, s);
+      galois::Runtime::gDeserialize(p->second, s);
       insertToLocalWL(s);
       //std::stringstream ss;
       //ss << net.ID << " ] : RECV : " << s.size() << " other CT : " << other_canTerminate << "\n";
       //std::cerr << ss.str();
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
     StatTimer_send_recv.stop();
 
     // Sort and remove duplicates from the worklist.
@@ -201,7 +201,7 @@ public:
     local_wl.assign(b,e);
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     return local_wl.pop_back();
   }
 
@@ -228,5 +228,5 @@ public:
 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 

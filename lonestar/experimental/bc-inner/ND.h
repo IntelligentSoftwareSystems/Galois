@@ -28,7 +28,7 @@ struct ND {
 #if USEPTHREADSM
   pthread_mutex_t spinLock;
 #else 
-  Galois::Substrate::SimpleLock spinLock;
+  galois::Substrate::SimpleLock spinLock;
 #endif
 #else
   unsigned char spinLock;

@@ -35,7 +35,7 @@ namespace hidden {
 
 static const unsigned DEFAULT_CHUNK_SIZE = 4;
 
-typedef Galois::GAccumulator<size_t> ParCounter;
+typedef galois::GAccumulator<size_t> ParCounter;
 
 namespace cll = llvm::cl;
 
@@ -61,11 +61,11 @@ public:
   
   void run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
-    Galois::StatManager sm;
+    galois::StatManager sm;
 
     G graph;
 
-    Galois::StatTimer t_input ("time to initialize input:");
+    galois::StatTimer t_input ("time to initialize input:");
 
     t_input.start ();
     initGraph (graph);
@@ -74,18 +74,18 @@ public:
     std::cout << "PageRank version: " << getVersion() << ", tolerance: " << tolerance << ", initVal: " << initVal << "Random Jump: " << randJmp  << std::endl;
     std::cout << "input file: " << static_cast<std::string>(inputFile) << ", nodes: " << graph.size() << ", edges: " << graph.sizeEdges() <<  std::endl;
 
-    Galois::reportPageAlloc("MeminfoPre");
-    Galois::StatTimer t_run;
+    galois::reportPageAlloc("MeminfoPre");
+    galois::StatTimer t_run;
     
     t_run.start ();
     const size_t activities = runPageRank (graph);
     t_run.stop ();
 
-    Galois::reportPageAlloc("MeminfoPost");
+    galois::reportPageAlloc("MeminfoPost");
 
     std::cout << "PageRank version: " << getVersion() << ", activities executed: " << activities << std::endl;
 
-    Galois::StatTimer t_verify ("Time to verify:");
+    galois::StatTimer t_verify ("Time to verify:");
     t_verify.start ();
     verify (graph);
     t_verify.stop ();

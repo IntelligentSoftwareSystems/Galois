@@ -17,24 +17,24 @@ int vectorSize = 1;
 
 int do_sort() {
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
   std::cout << "sort:\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);
     std::generate (V.begin(), V.end(), RandomNumber);
     std::vector<unsigned> C = V;
 
-    Galois::Timer t;
+    galois::Timer t;
     t.start();
-    Galois::ParallelSTL::sort(V.begin(), V.end());
+    galois::ParallelSTL::sort(V.begin(), V.end());
     t.stop();
     
-    Galois::Timer t2;
+    galois::Timer t2;
     t2.start();
     std::sort(C.begin(), C.end());
     t2.stop();
@@ -68,12 +68,12 @@ int do_sort() {
 
 int do_count_if() {
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
   std::cout << "count_if:\n";
 
   while (M) {
     
-    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);
@@ -81,12 +81,12 @@ int do_count_if() {
 
     unsigned x1,x2;
 
-    Galois::Timer t;
+    galois::Timer t;
     t.start();
-    x1 = Galois::ParallelSTL::count_if(V.begin(), V.end(), IsOddS());
+    x1 = galois::ParallelSTL::count_if(V.begin(), V.end(), IsOddS());
     t.stop();
     
-    Galois::Timer t2;
+    galois::Timer t2;
     t2.start();
     x2 = std::count_if(V.begin(), V.end(), IsOddS());
     t2.stop();
@@ -109,11 +109,11 @@ struct mymax : std:: binary_function<T,T,T> {
 
 int do_accumulate() {
 
-  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
+  unsigned M = galois::Substrate::getThreadPool().getMaxThreads();
   std::cout << "accumulate:\n";
 
   while (M) {
-    Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); //galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
     std::vector<unsigned> V(vectorSize);
@@ -121,12 +121,12 @@ int do_accumulate() {
 
     unsigned x1,x2;
 
-    Galois::Timer t;
+    galois::Timer t;
     t.start();
-    x1 = Galois::ParallelSTL::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    x1 = galois::ParallelSTL::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
     t.stop();
     
-    Galois::Timer t2;
+    galois::Timer t2;
     t2.start();
     x2 = std::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
     t2.stop();

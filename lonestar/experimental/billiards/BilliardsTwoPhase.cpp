@@ -43,13 +43,13 @@ public:
     AddListTy addList;
     Accumulator iter;
 
-    Galois::Runtime::for_each_ordered_ikdg (
-        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::Runtime::for_each_ordered_ikdg (
+        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodSafetyTest (),
         ExecSources (),
         AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints), 
-        std::make_tuple (Galois::loopname ("billiards-ikdg")));
+        std::make_tuple (galois::loopname ("billiards-ikdg")));
 
     return iter.reduce ();
 

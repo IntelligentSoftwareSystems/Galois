@@ -92,14 +92,14 @@ struct NodeData {
 };
 ////////////////////////////////////////////
 typedef NodeData NodeDataType;
-typedef Galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
+typedef galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
 bool hasChanged = false;
 
 //////////////////////////////////////////////////////////////////////////////////////
 //struct CUDA_Context *cuda_ctx;
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
+typedef galois::OpenCL::LC_LinearArray_Graph<galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
 struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
@@ -107,7 +107,7 @@ struct OPENCL_Context<DeviceGraph> dOp;
 struct InitializeGraph {
    Graph* g;
    void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
+      galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, galois::loopname("init"));
    }
    void operator()(GNode src) const {
       NodeDataType & sdata = g->getData(src);
@@ -121,7 +121,7 @@ struct InitializeGraph {
 struct PrintNodes {
    Graph * g;
    void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, PrintNodes { &_g }, Galois::loopname("PrintNodes"));
+      galois::do_all(_g.begin(), _g.begin() + num, PrintNodes { &_g }, galois::loopname("PrintNodes"));
    }
    void operator()(GNode src) const {
       NodeDataType & sdata = g->getData(src);
@@ -136,9 +136,9 @@ struct SSSP {
 
    void static go(Graph& _g, unsigned num) {
       //Perform computation
-      Galois::do_all(_g.begin(), _g.begin() + num, SSSP { &_g }, Galois::loopname("SSSP"));
+      galois::do_all(_g.begin(), _g.begin() + num, SSSP { &_g }, galois::loopname("SSSP"));
       //Do commit
-      Galois::do_all(_g.begin(), _g.begin() + num, [&](GNode src){_g.getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);}, Galois::loopname("SSSP-Commit"));
+      galois::do_all(_g.begin(), _g.begin() + num, [&](GNode src){_g.getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);}, galois::loopname("SSSP-Commit"));
    }
 
    void operator()(GNode src) const {
@@ -217,7 +217,7 @@ void setNodeValue(PGraph* p, unsigned GID, int v) {
  * where the node data is to be set.
  **********************************************************************************/
 
-void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCells(galois::Runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -301,25 +301,25 @@ void loadGraphNonCPU(PGraph &g) {
 void recvChangeFlag(bool otherFlag) {
    hasChanged |= otherFlag;
 }
-void sendChangeFlag(Galois::Runtime::NetworkInterface & net) {
-   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
+void sendChangeFlag(galois::Runtime::NetworkInterface & net) {
+   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, recvChangeFlag, hasChanged);
 }
 /*********************************************************************************
  *
  **********************************************************************************/
 void inner_main() {
-   auto& net = Galois::Runtime::getSystemNetworkInterface();
-   Galois::StatManager statManager;
-   Galois::Timer alg_timer, kernel_timer, init_timer;
+   auto& net = galois::Runtime::getSystemNetworkInterface();
+   galois::StatManager statManager;
+   galois::Timer alg_timer, kernel_timer, init_timer;
    float alg_time=0, kernel_time=0, init_time=0;
 
-   auto& barrier = Galois::Runtime::getHostBarrier() ;//getSystemBarrier();
-   const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
+   auto& barrier = galois::Runtime::getHostBarrier() ;//getSystemBarrier();
+   const unsigned my_host_id = galois::Runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
-   if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[Galois::Runtime::NetworkInterface::ID]) {
+   if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
+      switch (personality_set.c_str()[galois::Runtime::NetworkInterface::ID]) {
       case 'g':
          personality = GPU_CUDA;
          break;
@@ -339,11 +339,11 @@ void inner_main() {
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-//      cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
+//      cuda_ctx = get_CUDA_context(galois::Runtime::NetworkInterface::ID);
 //      if (!init_CUDA_context(cuda_ctx, gpudevice))
 //         return;
    } else if (personality == GPU_OPENCL) {
-      Galois::OpenCL::cl_env.init(cldevice.Value);
+      galois::OpenCL::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
@@ -356,8 +356,8 @@ void inner_main() {
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g.g, g.numNodes);
-      if (g.getHost((src_node.Value)) == Galois::Runtime::NetworkInterface::ID) {
-         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, Galois::Runtime::NetworkInterface::ID);
+      if (g.getHost((src_node.Value)) == galois::Runtime::NetworkInterface::ID) {
+         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::Runtime::NetworkInterface::ID);
          NodeData & ndata = g.g.getData(src_node);
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
@@ -366,8 +366,8 @@ void inner_main() {
 //      initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
       dOp.init(g.numOwned, g.numNodes);
-      if (g.getHost((src_node.Value)) == Galois::Runtime::NetworkInterface::ID) {
-         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, Galois::Runtime::NetworkInterface::ID);
+      if (g.getHost((src_node.Value)) == galois::Runtime::NetworkInterface::ID) {
+         fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, galois::Runtime::NetworkInterface::ID);
          dOp.getData(src_node).dist[dOp.getData(src_node).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
       }
    }
@@ -378,12 +378,12 @@ void inner_main() {
    init_timer.stop();
    init_time = init_timer.get();
    //send pGraph pointers
-   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
-      net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
+   for (uint32_t x = 0; x < galois::Runtime::NetworkInterface::Num; ++x)
+      net.sendAlt(x, setRemotePtr, galois::Runtime::NetworkInterface::ID, &g);
 
    //Ask for cells
    for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, galois::Runtime::NetworkInterface::ID);
 #if _HETERO_DEBUG_
    std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
 #endif
@@ -433,7 +433,7 @@ void inner_main() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
    if (verify) {
       std::stringstream ss;
-      ss << personality_str(personality) << "_" << my_host_id << "_of_" << Galois::Runtime::NetworkInterface::Num << "_distances.csv";
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << galois::Runtime::NetworkInterface::Num << "_distances.csv";
       std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {
@@ -480,8 +480,8 @@ void inner_main() {
  ********************************************************************************************/
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
-   auto& net = Galois::Runtime::getSystemNetworkInterface();
+   galois::OpenCL::CLContext * ctx = galois::OpenCL::getCLContext();
+   auto& net = galois::Runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }

@@ -15,7 +15,7 @@ template<typename Graph>
 void readInOutGraph(Graph& graph);
 
 template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
+struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;
@@ -26,12 +26,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     bool isRep() { return id == comp; }
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+  typedef typename galois::Graph::LC_CSR_Graph<LNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::Graph::OCImmutableEdgeGraph<LNode,void>,
+          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -42,7 +42,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
 
     Initialize(Graph& g, Bag& b): graph(g), bag(b) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
       bag.push(n, graph.sizeEdges() / graph.size());
     }
@@ -52,12 +52,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Graph& graph;
 
     Copy(Graph& g): graph(g) { }
-    void operator()(size_t n, Galois::UserContext<size_t>&) {
+    void operator()(size_t n, galois::UserContext<size_t>&) {
       (*this)(n);
     }
     void operator()(size_t id) {
       GNode n = graph.nodeFromId(id);
-      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.oldComp = data.comp;
     }
   };
@@ -68,8 +68,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
       typename LNode::component_type orig = ddata.comp;
       while (true) {
@@ -91,14 +91,14 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   }
 
   void operator()(Graph& graph) {
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
-    typedef Galois::GraphNodeBagPair<> BagPair;
+    typedef galois::WorkList::dChunkedFIFO<256> WL;
+    typedef galois::GraphNodeBagPair<> BagPair;
     BagPair bags(graph.size());
 
-    Galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
+    galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
     while (!bags.next().empty()) {
       bags.swap();
-      Galois::for_each_local(bags.cur(), Copy(graph), Galois::wl<WL>());
+      galois::for_each_local(bags.cur(), Copy(graph), galois::wl<WL>());
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
     } 
   }

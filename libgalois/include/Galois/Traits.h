@@ -20,12 +20,12 @@
  *
  * @section Description
  *
- * Optional properties (type traits) for {@link Galois::for_each()}, {@link
- * Galois::do_all()}, etc. can be supplied in two ways.
+ * Optional properties (type traits) for {@link galois::for_each()}, {@link
+ * galois::do_all()}, etc. can be supplied in two ways.
  *
  * First, by passing an argument to the corresponding method call:
  * \code
- * Galois::for_each(v.begin(), v.end(), fn, Galois::needs_parallel_break<>());
+ * galois::for_each(v.begin(), v.end(), fn, galois::needs_parallel_break<>());
  * \endcode
  *
  * Second, by providing a specially named nested type
@@ -33,11 +33,11 @@
  * #include <tuple>
  *
  * struct MyClass { 
- *   typedef std::tuple<Galois::needs_parallel_break<>> function_traits;
+ *   typedef std::tuple<galois::needs_parallel_break<>> function_traits;
  * };
  *
  * int main() {
- *   Galois::for_each(v.begin(), v.end(), MyClass {});
+ *   galois::for_each(v.begin(), v.end(), MyClass {});
  * \endcode
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
@@ -51,7 +51,7 @@
 #include <type_traits>
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 
 //! @section Trait classifications
 
@@ -292,7 +292,7 @@ struct has_neighborhood_visitor: public trait_has_value<T>, has_neighborhood_vis
 
 /**
  * Indicates the operator has a function that allows a {@link
- * Galois::for_each} loop to be exited deterministically.
+ * galois::for_each} loop to be exited deterministically.
  *
  * The function should have the signature <code>bool()</code>. 
  *
@@ -388,8 +388,8 @@ namespace HIDDEN {
 /**
  * specify chunk size for do_all_coupled & do_all_choice at compile time or
  * at runtime
- * For compile time, use the template argument, e.g., Galois::chunk_size<16> ()
- * Additionally, user may provide a runtime argument, e.g, Galois::chunk_size<16> (8)
+ * For compile time, use the template argument, e.g., galois::chunk_size<16> ()
+ * Additionally, user may provide a runtime argument, e.g, galois::chunk_size<16> (8)
  *
  * Currently, only do_all_coupled can take advantage of the runtime argument. 
  * TODO: allow runtime provision/tuning of chunk_size in other loop executors
@@ -412,7 +412,7 @@ struct chunk_size:
 };
 
 struct default_chunk_size: public chunk_size<16> {};
-} // close namespace Galois
+} // close namespace galois
 
 
 #endif

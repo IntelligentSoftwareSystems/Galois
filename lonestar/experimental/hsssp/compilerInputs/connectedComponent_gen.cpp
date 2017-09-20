@@ -61,7 +61,7 @@ struct InitializeGraph {
 
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init")); 
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init")); 
   }
 
   void operator()(GNode src) const {
@@ -78,7 +78,7 @@ struct LabelPropAlgo {
   LabelPropAlgo(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), LabelPropAlgo { &_graph }, Galois::loopname("LabelPropAlgo"));
+    galois::do_all(_graph.begin(), _graph.end(), LabelPropAlgo { &_graph }, galois::loopname("LabelPropAlgo"));
   }
 
   void operator()(GNode src)const {
@@ -91,7 +91,7 @@ struct LabelPropAlgo {
 //      auto& d_comp = dnode.comp;
 //      uint32_t old_comp = d_comp;
       uint32_t new_comp = s_comp;
-      Galois::atomicMin(dnode.comp, new_comp);
+      galois::atomicMin(dnode.comp, new_comp);
 /*      while(d_comp > new_comp) {
        d_comp.compare_exchange_strong(old_comp, new_comp);
       }*/
@@ -104,8 +104,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_labelProp;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_hGraph_init, T_init, T_labelProp;
 
     T_total.start();
 

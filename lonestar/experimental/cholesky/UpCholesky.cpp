@@ -11,10 +11,10 @@
 
 #include <float.h>              // For DBL_DIG, significant digits in double
 
-typedef Galois::Graph::LC_CSR_Graph<unsigned int, double> Graph;
+typedef galois::Graph::LC_CSR_Graph<unsigned int, double> Graph;
 typedef Graph::GraphNode GNode;
 
-typedef Galois::Graph::LC_Morph_Graph<unsigned int, double> OutGraph;
+typedef galois::Graph::LC_Morph_Graph<unsigned int, double> OutGraph;
 
 Graph graph;
 OutGraph outgraph;
@@ -32,7 +32,7 @@ struct SelfEdges {              // FIXME
     selfedges = (Graph::edge_iterator *)malloc(sizeof(Graph::edge_iterator)*graph.size());
     if ( !selfedges ) abort();
   }
-  void operator()(GNode &node/*, Galois::UserContext<GNode>& ctx*/) const {
+  void operator()(GNode &node/*, galois::UserContext<GNode>& ctx*/) const {
     unsigned n = graph.getData(node);
     for ( Graph::edge_iterator ii = graph.edge_begin(node),
             ie = graph.edge_end(node); ii != ie; ii++ ) {
@@ -61,7 +61,7 @@ struct ETree {
     parent = (unsigned *)malloc(sizeof(unsigned)*graph.size());
     if ( !parent ) abort();
   }
-  void operator()(GNode& node/*, Galois::UserContext<GNode>& ctx*/) const {
+  void operator()(GNode& node/*, galois::UserContext<GNode>& ctx*/) const {
     unsigned n = graph.getData(node);
     parent[n] = INVALID;
     ancestor[n] = INVALID;
@@ -163,34 +163,34 @@ struct PerThread {
     }
   }
 };
-Galois::Substrate::PerThreadStorage<PerThread> *pts = NULL;
+galois::Substrate::PerThreadStorage<PerThread> *pts = NULL;
 ETree *etree = NULL;
 SelfEdges *selfedges = NULL;
 
 struct UpCholesky {
-  void operator()(GNode &node/*, Galois::UserContext<GNode>& ctx*/) const {
+  void operator()(GNode &node/*, galois::UserContext<GNode>& ctx*/) const {
     PerThread *mypts = pts->getLocal();
 
     // Get self-edge
-    Graph::edge_iterator node_self = selfedges->get(graph.getData(node, Galois::MethodFlag::UNPROTECTED)); // FIXME
+    Graph::edge_iterator node_self = selfedges->get(graph.getData(node, galois::MethodFlag::UNPROTECTED)); // FIXME
     assert(graph.getEdgeDst(node_self) == node);
     double node_self_data = graph.getEdgeData(node_self,
-                                              Galois::MethodFlag::UNPROTECTED);
+                                              galois::MethodFlag::UNPROTECTED);
 
     // Get output node
-    unsigned node_id = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+    unsigned node_id = graph.getData(node, galois::MethodFlag::UNPROTECTED);
     OutGraph::GraphNode node_out = outnodes[node_id];
     //printf("STARTING %u\n", node_id);
 
     // Explode dense column
     double *densecol = mypts->densecol;
-    for ( Graph::edge_iterator ii = graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED),
-            ie = graph.edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ie; ii++ ) {
+    for ( Graph::edge_iterator ii = graph.edge_begin(node, galois::MethodFlag::UNPROTECTED),
+            ie = graph.edge_end(node, galois::MethodFlag::UNPROTECTED); ii != ie; ii++ ) {
       // FIXME: skip self-edge
       if ( ii == node_self ) continue;
       assert(ii != node_self);
-      unsigned dest = graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED);
-      densecol[dest] = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
+      unsigned dest = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
+      densecol[dest] = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
     }
 
     // Find non-zero pattern of row
@@ -211,8 +211,8 @@ struct UpCholesky {
       OutGraph::edge_iterator ji = outgraph.edge_begin(colnode_out),
         je = outgraph.edge_end(colnode_out);
       assert(ji != je);
-      assert(outgraph.getData(outgraph.getEdgeDst(ji), Galois::MethodFlag::UNPROTECTED) == colnode);
-      double col_self_data = outgraph.getEdgeData(ji, Galois::MethodFlag::UNPROTECTED);
+      assert(outgraph.getData(outgraph.getEdgeDst(ji), galois::MethodFlag::UNPROTECTED) == colnode);
+      double col_self_data = outgraph.getEdgeData(ji, galois::MethodFlag::UNPROTECTED);
       ji++;
 
       // Divide by diagonal entry of the column
@@ -224,10 +224,10 @@ struct UpCholesky {
 
       // Do update along column
       for ( ; ji != je; ji++ ) {
-        unsigned jdest = outgraph.getData(outgraph.getEdgeDst(ji), Galois::MethodFlag::UNPROTECTED);
+        unsigned jdest = outgraph.getData(outgraph.getEdgeDst(ji), galois::MethodFlag::UNPROTECTED);
         assert(jdest != colnode);
         //printf("  %u\n", jdest);
-        double jdata = outgraph.getEdgeData(ji, Galois::MethodFlag::UNPROTECTED);
+        double jdata = outgraph.getEdgeData(ji, galois::MethodFlag::UNPROTECTED);
         double delta = x * jdata;
         densecol[jdest] -= delta;
       }
@@ -237,7 +237,7 @@ struct UpCholesky {
       {
         //printf("Writing %u -> %u == %f\n", colnode, node_id, x);
         OutGraph::edge_iterator oi = outgraph.addEdge(outnodes[colnode],
-                                                      node_out, Galois::MethodFlag::WRITE);
+                                                      node_out, galois::MethodFlag::WRITE);
         outgraph.getEdgeData(oi) = x;
       }
     }
@@ -250,7 +250,7 @@ struct UpCholesky {
     {
       //printf("Writing %u -> %u == %f\n", node_id, node_id, node_self_data);
       OutGraph::edge_iterator oi = outgraph.addEdge(node_out, node_out,
-                                                    Galois::MethodFlag::WRITE);
+                                                    galois::MethodFlag::WRITE);
       outgraph.getEdgeData(oi) = node_self_data;
     }
   }
@@ -306,13 +306,13 @@ struct TreeExecModel {
     /*
     for ( unsigned i = 0; i < rootnodes.size(); i++ ) {
       // Get pointer to given node
-      Galois::Runtime::for_each_ordered_tree(rootnodes[i],
+      galois::Runtime::for_each_ordered_tree(rootnodes[i],
                                              GaloisDivide(this),
                                              GaloisConquer(),
                                              "UpCholeskyTree");
     }
     */
-    Galois::Runtime::for_each_ordered_tree(rootnodes[0],
+    galois::Runtime::for_each_ordered_tree(rootnodes[0],
                                            GaloisDivide(this, &rootnodes),
                                            GaloisConquer(),
                                            "UpCholeskyTree");
@@ -344,10 +344,10 @@ bool outputTextEdgeData(const char* ofile, GraphType& G) {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
-  Galois::Graph::readGraph(graph, filename);
+  galois::Graph::readGraph(graph, filename);
   {
     unsigned i = 0;
     unsigned nedges[graph.size()];
@@ -371,13 +371,13 @@ int main(int argc, char **argv) {
     }
   }
 
-  pts = new Galois::Substrate::PerThreadStorage<PerThread>();
+  pts = new galois::Substrate::PerThreadStorage<PerThread>();
   etree = new ETree();
   selfedges = new SelfEdges();
   selfedges->find();
   etree->build();
 
-  Galois::StatTimer T("NumericTime");
+  galois::StatTimer T("NumericTime");
   papi_start();
   T.start();
 #if 0

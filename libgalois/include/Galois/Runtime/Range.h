@@ -31,7 +31,7 @@
 
 #include <iterator>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 extern unsigned int activeThreads;
@@ -58,7 +58,7 @@ public:
   /* const */ T& get_container() const { return *container; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return Galois::block_range(begin(), end(), Substrate::ThreadPool::getTID(), activeThreads);
+    return galois::block_range(begin(), end(), Substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -92,7 +92,7 @@ public:
   iterator end() const { return ei; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return Galois::block_range(ii, ei, Substrate::ThreadPool::getTID(), activeThreads);
+    return galois::block_range(ii, ei, Substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -222,5 +222,5 @@ inline SpecificRange<IterTy> makeSpecificRange(IterTy begin,
 }
 
 }
-} // end namespace Galois
+} // end namespace galois
 #endif

@@ -31,11 +31,11 @@
 #ifndef GALOIS_DISTBAG_H
 #define GALOIS_DISTBAG_H
 
-namespace Galois {
+namespace galois {
 
 template<typename ValueTy, typename FunctionTy>
 class DGBag {
-  Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+  galois::Runtime::NetworkInterface& net = galois::Runtime::getSystemNetworkInterface();
 
   const FunctionTy &helper_fn;
   std::string loopName;
@@ -46,7 +46,7 @@ class DGBag {
   static std::vector<ValueTy> workItem_recv_vec;
   static std::vector<bool> hosts_didWork_vec;
 
-  static void recv_BagItems(uint32_t src, Galois::Runtime::RecvBuffer& buf){
+  static void recv_BagItems(uint32_t src, galois::Runtime::RecvBuffer& buf){
     bool x_didWork;
     unsigned x_ID;
     //XXX: Why pair?
@@ -64,7 +64,7 @@ class DGBag {
     num_Hosts_recvd = 0;
     hosts_didWork_vec.clear();
     workItem_recv_vec.clear();
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
   }
 
 public: 
@@ -75,7 +75,7 @@ public:
   void set(InsertBag<ValueTy> &bag) {
     //std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
-    Galois::StatTimer StatTimer_init(init_str.c_str());
+    galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
     didWork = !bag.empty();
@@ -89,7 +89,7 @@ public:
 
   void set_local(int* array, size_t size) {
     std::string init_str("DISTRIBUTED_BAG_INIT_" + loopName + "_" + (helper_fn.get_run_identifier()));
-    Galois::StatTimer StatTimer_init(init_str.c_str());
+    galois::StatTimer StatTimer_init(init_str.c_str());
     StatTimer_init.start();
     init_sync();
     didWork = (size > 0);
@@ -103,20 +103,20 @@ public:
   void sync() {
     //std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     std::string sync_str("DISTRIBUTED_BAG_SYNC_" + loopName + "_" + (helper_fn.get_run_identifier()));
-    Galois::StatTimer StatTimer_sync(sync_str.c_str());
+    galois::StatTimer StatTimer_sync(sync_str.c_str());
     StatTimer_sync.start();
 
     //std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     std::string work_bytes_str("WORKLIST_BYTES_SENT_" + loopName + "_" + (helper_fn.get_run_identifier()));
-    Galois::Statistic num_work_bytes(work_bytes_str.c_str());
+    galois::Statistic num_work_bytes(work_bytes_str.c_str());
     //send things to other hosts.
     for(auto x = 0U; x < net.Num; ++x){
       if(x == net.ID)
         continue;
-      Galois::Runtime::SendBuffer b;
+      galois::Runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
       num_work_bytes += b.size();
-      net.sendTagged(x, Galois::Runtime::evilPhase, b);
+      net.sendTagged(x, galois::Runtime::evilPhase, b);
       //net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
@@ -125,14 +125,14 @@ public:
     for(auto x = 0U; x < net.Num; ++x) {
       if(x == net.ID)
         continue;
-      decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
+      decltype(net.recieveTagged(galois::Runtime::evilPhase,nullptr)) p;
       do {
         net.handleReceives();
-        p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::Runtime::evilPhase, nullptr);
       } while (!p);
       recv_BagItems(p->first, p->second);
     }
-    ++Galois::Runtime::evilPhase;
+    ++galois::Runtime::evilPhase;
 
     //while(num_Hosts_recvd < (net.Num - 1)){
       //net.handleReceives();
@@ -143,7 +143,7 @@ public:
     std::unique(workItem_recv_vec.begin(), workItem_recv_vec.end());
     //std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + std::to_string(helper_fn.get_run_num()));
     std::string work_item_str("NUM_WORK_ITEMS_" + loopName + "_" + helper_fn.get_run_identifier());
-    Galois::Statistic num_work_items(work_item_str.c_str());
+    galois::Statistic num_work_items(work_item_str.c_str());
     num_work_items += workItem_recv_vec.size();
 
     assert((hosts_didWork_vec.size() == (net.Num - 1)));

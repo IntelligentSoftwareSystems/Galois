@@ -176,15 +176,15 @@ typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // bitsets for tracking updates
-Galois::DynamicBitSet bitset_to_add;
-Galois::DynamicBitSet bitset_to_add_float;
-Galois::DynamicBitSet bitset_num_shortest_paths;
-Galois::DynamicBitSet bitset_num_successors;
-Galois::DynamicBitSet bitset_num_predecessors;
-Galois::DynamicBitSet bitset_trim;
-Galois::DynamicBitSet bitset_current_length;
-Galois::DynamicBitSet bitset_propogation_flag;
-Galois::DynamicBitSet bitset_dependency;
+galois::DynamicBitSet bitset_to_add;
+galois::DynamicBitSet bitset_to_add_float;
+galois::DynamicBitSet bitset_num_shortest_paths;
+galois::DynamicBitSet bitset_num_successors;
+galois::DynamicBitSet bitset_num_predecessors;
+galois::DynamicBitSet bitset_trim;
+galois::DynamicBitSet bitset_current_length;
+galois::DynamicBitSet bitset_propogation_flag;
+galois::DynamicBitSet bitset_dependency;
 
 // sync structures
 #include "gen_sync.hh"
@@ -207,19 +207,19 @@ struct InitializeGraph {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
           "CUDA_DO_ALL_IMPL_InitializeGraph"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(
+    galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
-      Galois::loopname("InitializeGraph"), 
-      //Galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("InitializeGraph"), 
+      //galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
+      galois::timeit(),
+      galois::no_stats()
     );
   }
 
@@ -265,7 +265,7 @@ struct InitializeIteration {
           "CUDA_DO_ALL_IMPL_InitializeIteration"
         );
 
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         InitializeIteration_cuda(
           *allNodes.begin(), *allNodes.end(),
@@ -274,13 +274,13 @@ struct InitializeIteration {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(
+    galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
-      Galois::loopname("InitializeIteration"), 
-      //Galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("InitializeIteration"), 
+      //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
+      galois::timeit(),
+      galois::no_stats()
     );
   }
 
@@ -334,20 +334,20 @@ struct FirstIterationSSSP {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
           "CUDA_DO_ALL_IMPL_SSSP"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         FirstIterationSSSP_cuda(__begin, __end, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(
+    galois::do_all(
       boost::make_counting_iterator(__begin), 
       boost::make_counting_iterator(__end), 
       FirstIterationSSSP(&_graph),
-      Galois::loopname("SSSP"),
-      //Galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("SSSP"),
+      //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
+      galois::timeit(),
+      galois::no_stats()
     );
 
     // Next op will read src, current length
@@ -381,7 +381,7 @@ struct FirstIterationSSSP {
       uint32_t new_dist = 1 + src_data.current_length;
       #endif
 
-      Galois::atomicMin(dst_data.current_length, new_dist);
+      galois::atomicMin(dst_data.current_length, new_dist);
 
       bitset_current_length.set(dst);
     }
@@ -391,12 +391,12 @@ struct FirstIterationSSSP {
 /* Sub struct for running SSSP (beyond 1st iteration) */
 struct SSSP {
   Graph* graph;
-  Galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  SSSP(Graph* _graph, Galois::DGAccumulator<uint32_t>& dga) : 
+  SSSP(Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
     graph(_graph), DGAccumulator_accum(dga) { }
 
-  void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     FirstIterationSSSP::go(_graph);
 
     // starts at 1 since FirstSSSP takes care of the first one
@@ -416,7 +416,7 @@ struct SSSP {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_SSSP")
           "CUDA_DO_ALL_IMPL_SSSP"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
         SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, cuda_ctx);
@@ -425,14 +425,14 @@ struct SSSP {
       } else if (personality == CPU)
     #endif
       {
-      Galois::do_all_local(
+      galois::do_all_local(
         nodesWithEdges,
         SSSP(&_graph, dga), 
-        Galois::loopname("SSSP"), 
-        //Galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
-        Galois::do_all_steal<true>(),
-        Galois::timeit(),
-        Galois::no_stats()
+        galois::loopname("SSSP"), 
+        //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
+        galois::do_all_steal<true>(),
+        galois::timeit(),
+        galois::no_stats()
       );
       }
 
@@ -490,7 +490,7 @@ struct SSSP {
         uint32_t new_dist = 1 + src_data.current_length;
         #endif
 
-        uint32_t old = Galois::atomicMin(dst_data.current_length, new_dist);
+        uint32_t old = galois::atomicMin(dst_data.current_length, new_dist);
 
         if (old > new_dist) {
           bitset_current_length.set(dst);
@@ -519,7 +519,7 @@ struct PredAndSucc {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PredAndSucc")
           "CUDA_DO_ALL_IMPL_PredAndSucc"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         PredAndSucc_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                          infinity, cuda_ctx);
@@ -527,14 +527,14 @@ struct PredAndSucc {
       } else if (personality == CPU)
     #endif
     {
-    Galois::do_all_local(
+    galois::do_all_local(
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
-      Galois::loopname("PredAndSucc"),
-      //Galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
-      Galois::do_all_steal<true>(),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("PredAndSucc"),
+      //galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
+      galois::do_all_steal<true>(),
+      galois::timeit(),
+      galois::no_stats()
     );
     }
 
@@ -580,8 +580,8 @@ struct PredAndSucc {
 
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
           // dest on shortest path with this node as predecessor
-          Galois::add(src_data.num_successors, (unsigned int)1);
-          Galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
+          galois::add(src_data.num_successors, (unsigned int)1);
+          galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
 
           bitset_num_successors.set(src);
           bitset_num_predecessors.set(dst);
@@ -614,7 +614,7 @@ struct NumShortestPathsChanges {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPathsChanges")
           "CUDA_DO_ALL_IMPL_NumShortestPathsChanges"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         // TODO local infinity needed
         NumShortestPathsChanges_cuda(
@@ -625,13 +625,13 @@ struct NumShortestPathsChanges {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(
+    galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(), 
       NumShortestPathsChanges{infinity, &_graph}, 
-      Galois::loopname("NumShortestPathsChanges"), 
-      //Galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("NumShortestPathsChanges"), 
+      //galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
+      galois::timeit(),
+      galois::no_stats()
     );
 
     // predecessors does not require syncing as syncing trim accomplishes the
@@ -685,16 +685,16 @@ struct NumShortestPaths {
   const uint64_t local_current_src_node;
 
   Graph* graph;
-  Galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
   NumShortestPaths(const uint32_t &_local_infinity,
                    const uint64_t &_local_current_src_node,
-                   Graph* _graph, Galois::DGAccumulator<uint32_t>& dga) : 
+                   Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
      local_infinity(_local_infinity), 
      local_current_src_node(_local_current_src_node), 
      graph(_graph), DGAccumulator_accum(dga) {}
 
-  void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
@@ -711,7 +711,7 @@ struct NumShortestPaths {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPaths")
           "CUDA_DO_ALL_IMPL_NumShortestPaths"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
         NumShortestPaths_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -721,14 +721,14 @@ struct NumShortestPaths {
       } else if (personality == CPU)
     #endif
       { 
-        Galois::do_all_local(
+        galois::do_all_local(
           nodesWithEdges,
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
-          Galois::loopname("NumShortestPaths"),
-          //Galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          Galois::do_all_steal<true>(),
-          Galois::timeit(),
-          Galois::no_stats()
+          galois::loopname("NumShortestPaths"),
+          //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
+          galois::do_all_steal<true>(),
+          galois::timeit(),
+          galois::no_stats()
         );
       }
 
@@ -807,9 +807,9 @@ struct NumShortestPaths {
 
           if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
-            Galois::atomicAdd(dst_data.to_add, paths_to_add);
+            galois::atomicAdd(dst_data.to_add, paths_to_add);
             // increment dst trim so it can decrement predecessor
-            Galois::atomicAdd(dst_data.trim, (unsigned int)1);
+            galois::atomicAdd(dst_data.trim, (unsigned int)1);
 
             bitset_to_add.set(dst);
             bitset_trim.set(dst);
@@ -841,12 +841,12 @@ struct PropogationFlagUpdate {
 
     // TODO gpu code
 
-    Galois::do_all(
+    galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       PropogationFlagUpdate(infinity, &_graph), 
-      Galois::loopname("PropogationFlagUpdate"),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("PropogationFlagUpdate"),
+      galois::timeit(),
+      galois::no_stats()
     );
 
     // note that only nodes with succ == 0 will have their flags sync'd
@@ -899,7 +899,7 @@ struct DependencyPropChanges {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropChanges")
           "CUDA_DO_ALL_IMPL_DependencyPropChanges"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         DependencyPropChanges_cuda(
           *nodesWithEdges.begin(), 
@@ -909,13 +909,13 @@ struct DependencyPropChanges {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-    Galois::do_all(
+    galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
-      Galois::loopname("DependencyPropChanges"),
-      //Galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
-      Galois::timeit(),
-      Galois::no_stats()
+      galois::loopname("DependencyPropChanges"),
+      //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
+      galois::timeit(),
+      galois::no_stats()
     );
 
     // need reduce set for flag
@@ -966,18 +966,18 @@ struct DependencyPropogation {
   const uint32_t &local_infinity;
   const uint64_t &local_current_src_node;
   Graph* graph;
-  Galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
   DependencyPropogation(const uint32_t &_local_infinity,
                         const uint64_t &_local_current_src_node,
-                        Graph* _graph, Galois::DGAccumulator<uint32_t>& dga) : 
+                        Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
       local_infinity(_local_infinity),
       local_current_src_node(_local_current_src_node),
       graph(_graph),
       DGAccumulator_accum(dga) {}
 
   /* Look at all nodes to do propogation until no more work is done */
-  void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
@@ -994,7 +994,7 @@ struct DependencyPropogation {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
           "CUDA_DO_ALL_IMPL_DependencyPropogation"
         );
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
         DependencyPropogation_cuda(
@@ -1006,14 +1006,14 @@ struct DependencyPropogation {
       } else if (personality == CPU)
     #endif
     {
-      Galois::do_all_local(
+      galois::do_all_local(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
-        Galois::loopname("DependencyPropogation"),
-        //Galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        Galois::do_all_steal<true>(),
-        Galois::timeit(),
-        Galois::no_stats()
+        galois::loopname("DependencyPropogation"),
+        //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
+        galois::do_all_steal<true>(),
+        galois::timeit(),
+        galois::no_stats()
       );
     }
                     
@@ -1087,13 +1087,13 @@ struct DependencyPropogation {
               // dest on shortest path with this node as predecessor
               if ((src_data.current_length + edge_weight) == dst_data.current_length) {
                 // increment my trim for later use to decrement successor
-                Galois::atomicAdd(src_data.trim, (unsigned int)1);
+                galois::atomicAdd(src_data.trim, (unsigned int)1);
 
                 assert(src_data.num_shortest_paths != 0);
                 assert(dst_data.num_shortest_paths != 0);
 
                 // update my to_add_float (which is later used to update dependency)
-                Galois::add(src_data.to_add_float, 
+                galois::add(src_data.to_add_float, 
                 (((float)src_data.num_shortest_paths / 
                       (float)dst_data.num_shortest_paths) * 
                  (float)(1.0 + dst_data.dependency)));
@@ -1120,7 +1120,7 @@ struct BC {
 
   BC(Graph* _graph) : graph(_graph){}
 
-  void static go(Graph& _graph, Galois::DGAccumulator<uint32_t>& dga){
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga){
     uint64_t loop_end = 1;
     bool use_random = false;
 
@@ -1139,7 +1139,7 @@ struct BC {
       if (singleSourceBC) {
         // only 1 source; specified start source in command line
         assert(loop_end == 1);
-        Galois::gDebug("This is single source node BC");
+        galois::gDebug("This is single source node BC");
         current_src_node = startSource;
       } else if (use_random) {
         // number of sources non-zero, so use random sources
@@ -1150,7 +1150,7 @@ struct BC {
         current_src_node = i;
       }
 
-      //Galois::gDebug("Current source node for BC is ", current_src_node);
+      //galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (_graph.id == 0) {
@@ -1164,21 +1164,21 @@ struct BC {
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
-      //Galois::gDebug("Init done");
+      //galois::gDebug("Init done");
 
       // get SSSP on the current graph
       SSSP::go(_graph, dga);
-      //Galois::gDebug("SSSP done");
+      //galois::gDebug("SSSP done");
 
       _graph.set_num_iter(0);
 
       // calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
-      //Galois::gDebug("PredAndSucc done");
+      //galois::gDebug("PredAndSucc done");
 
       // calculate the number of shortest paths for each node
       NumShortestPaths::go(_graph, dga);
-      //Galois::gDebug("NumShortestPaths done");
+      //galois::gDebug("NumShortestPaths done");
 
       _graph.set_num_iter(0);
 
@@ -1186,7 +1186,7 @@ struct BC {
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph, dga);
-      //Galois::gDebug("DepPropogation done");
+      //galois::gDebug("DepPropogation done");
 
       _graph.set_num_iter(0);
 
@@ -1198,19 +1198,19 @@ struct BC {
       if (personality == GPU_CUDA) {
         //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
-        Galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      Galois::do_all(
+      galois::do_all(
         nodesWithEdges.begin(), nodesWithEdges.end(), 
         BC(&_graph), 
-        Galois::loopname("BC"),
-        //Galois::loopname(_graph.get_run_identifier("BC").c_str()),
-        Galois::timeit(),
-        Galois::no_stats()
+        galois::loopname("BC"),
+        //galois::loopname(_graph.get_run_identifier("BC").c_str()),
+        galois::timeit(),
+        galois::no_stats()
       );
     }
   }
@@ -1221,7 +1221,7 @@ struct BC {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.dependency > 0) {
-      Galois::add(src_data.betweeness_centrality, src_data.dependency);
+      galois::add(src_data.betweeness_centrality, src_data.dependency);
     }
   }
 };
@@ -1236,14 +1236,14 @@ struct Sanity {
   static float current_max;
   static float current_min;
 
-  Galois::DGAccumulator<float>& DGAccumulator_max;
-  Galois::DGAccumulator<float>& DGAccumulator_min;
-  Galois::DGAccumulator<double>& DGAccumulator_sum;
+  galois::DGAccumulator<float>& DGAccumulator_max;
+  galois::DGAccumulator<float>& DGAccumulator_min;
+  galois::DGAccumulator<double>& DGAccumulator_sum;
 
   Sanity(Graph* _graph,
-      Galois::DGAccumulator<float>& _DGAccumulator_max,
-      Galois::DGAccumulator<float>& _DGAccumulator_min,
-      Galois::DGAccumulator<double>& _DGAccumulator_sum
+      galois::DGAccumulator<float>& _DGAccumulator_max,
+      galois::DGAccumulator<float>& _DGAccumulator_min,
+      galois::DGAccumulator<double>& _DGAccumulator_sum
   ) : 
     graph(_graph),
     DGAccumulator_max(_DGAccumulator_max),
@@ -1251,9 +1251,9 @@ struct Sanity {
     DGAccumulator_sum(_DGAccumulator_sum) {}
 
   void static go(Graph& _graph,
-    Galois::DGAccumulator<float>& DGA_max,
-    Galois::DGAccumulator<float>& DGA_min,
-    Galois::DGAccumulator<double>& DGA_sum
+    galois::DGAccumulator<float>& DGA_max,
+    galois::DGAccumulator<float>& DGA_min,
+    galois::DGAccumulator<double>& DGA_sum
   ) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -1267,15 +1267,15 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-    Galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(_graph.begin(), _graph.end(), 
                    Sanity(
                      &_graph,
                      DGA_max,
                      DGA_min,
                      DGA_sum
                    ), 
-                   Galois::loopname("Sanity"),
-                   Galois::no_stats());
+                   galois::loopname("Sanity"),
+                   galois::no_stats());
 
     DGA_max = current_max;
     DGA_min = current_min;
@@ -1319,17 +1319,17 @@ float Sanity::current_min = std::numeric_limits<float>::max() / 4;
 
 int main(int argc, char** argv) {
   try {
-    Galois::DistMemSys G;
+    galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      Galois::Runtime::reportParam("BC", "Max Iterations", 
+      galois::Runtime::reportParam("BC", "Max Iterations", 
                                   (unsigned long)maxIterations);
     }
 
-    Galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
+    galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
                       StatTimer_total("TIMER_TOTAL"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
@@ -1337,7 +1337,7 @@ int main(int argc, char** argv) {
 
     std::vector<unsigned> scalefactor;
   #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = Galois::Runtime::getHostID();
+    const unsigned my_host_id = galois::Runtime::getHostID();
     int gpu_device = gpudevice;
 
     if (num_nodes == -1) num_nodes = net.Num;
@@ -1345,7 +1345,7 @@ int main(int argc, char** argv) {
 
     // Parse arg string when running on multiple hosts and update/override 
     // personality with corresponding value.
-    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
+    if (personality_set.length() == galois::Runtime::NetworkInterface::Num) {
       switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
         case 'g':
           personality = GPU_CUDA;
@@ -1417,7 +1417,7 @@ int main(int argc, char** argv) {
       MarshalGraph m = (*h_graph).getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m, net.Num);
     } else if (personality == GPU_OPENCL) {
-      //Galois::OpenCL::cl_env.init(cldevice.Value);
+      //galois::OpenCL::cl_env.init(cldevice.Value);
     }
   #endif
 
@@ -1438,20 +1438,20 @@ int main(int argc, char** argv) {
     StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
     StatTimer_graph_init.stop();
-    Galois::Runtime::getHostBarrier().wait();
+    galois::Runtime::getHostBarrier().wait();
 
     // shared DG accumulator among all steps
-    Galois::DGAccumulator<uint32_t> dga;
+    galois::DGAccumulator<uint32_t> dga;
 
     // sanity dg accumulators
-    Galois::DGAccumulator<float> dga_max;
-    Galois::DGAccumulator<float> dga_min;
-    Galois::DGAccumulator<double> dga_sum;
+    galois::DGAccumulator<float> dga_max;
+    galois::DGAccumulator<float> dga_min;
+    galois::DGAccumulator<double> dga_sum;
 
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] BC::go run " << run << " called\n";
       std::string timer_str("TIMER_" + std::to_string(run));
-      Galois::StatTimer StatTimer_main(timer_str.c_str());
+      galois::StatTimer StatTimer_main(timer_str.c_str());
 
       StatTimer_main.start();
         BC::go(*h_graph, dga);
@@ -1469,7 +1469,7 @@ int main(int argc, char** argv) {
 
       // re-init graph for next run
       if ((run + 1) != numRuns) {
-        Galois::Runtime::getHostBarrier().wait();
+        galois::Runtime::getHostBarrier().wait();
         (*h_graph).reset_num_iter(run + 1);
 
       #ifdef __GALOIS_HET_CUDA__
@@ -1499,7 +1499,7 @@ int main(int argc, char** argv) {
         }
 
         InitializeGraph::go((*h_graph));
-        Galois::Runtime::getHostBarrier().wait();
+        galois::Runtime::getHostBarrier().wait();
       }
     }
 
@@ -1516,7 +1516,7 @@ int main(int argc, char** argv) {
             // outputs betweenness centrality
             sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     (*h_graph).getData(*ii).betweeness_centrality);
-            Galois::Runtime::printOutput(v_out);
+            galois::Runtime::printOutput(v_out);
           }
         }
 #ifdef __GALOIS_HET_CUDA__
@@ -1526,7 +1526,7 @@ int main(int argc, char** argv) {
             sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
                     get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
 
-            Galois::Runtime::printOutput(v_out);
+            galois::Runtime::printOutput(v_out);
             memset(v_out, '\0', 40);
         }
       }

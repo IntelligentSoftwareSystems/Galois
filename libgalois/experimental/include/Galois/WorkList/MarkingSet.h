@@ -35,7 +35,7 @@
 #include "Galois/WorkList/Separator.h"
 #include "Galois/Timer.h"
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 namespace detail {
@@ -46,7 +46,7 @@ struct MarkingWorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;
   Marker marker;
-  Galois::Statistic* duplicate;
+  galois::Statistic* duplicate;
 
 public:
   typedef T value_type;
@@ -55,12 +55,12 @@ public:
 
   MarkingWorkSetMaster(const Marker& m = Marker()): marker(m)
   {
-    duplicate = new Galois::Statistic("SchedulerDuplicates");
+    duplicate = new galois::Statistic("SchedulerDuplicates");
   }
 
   template<typename... Args>
   MarkingWorkSetMaster(const Marker& m, Separator dummy, Args... args)
-    :scheduler(std::forward<Args>(args)...), marker(m), duplicate(new Galois::Statistic("SchedulerDuplicates"))
+    :scheduler(std::forward<Args>(args)...), marker(m), duplicate(new galois::Statistic("SchedulerDuplicates"))
   {
   }
 
@@ -93,9 +93,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  Galois::optional<value_type> pop() {
-    auto defaultRetVal = Galois::optional<value_type>();
-    Galois::optional<value_type> retval = scheduler.pop();
+  galois::optional<value_type> pop() {
+    auto defaultRetVal = galois::optional<value_type>();
+    galois::optional<value_type> retval = scheduler.pop();
 
     if(retval == defaultRetVal)
       return defaultRetVal;
@@ -117,6 +117,6 @@ using dChunkedMarkingSetFIFO = detail::MarkingWorkSetMaster<T, Marker, dChunkedF
 GALOIS_WLCOMPILECHECK(dChunkedMarkingSetFIFO);
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

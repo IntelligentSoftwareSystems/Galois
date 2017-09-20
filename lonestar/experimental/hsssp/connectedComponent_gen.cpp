@@ -71,7 +71,7 @@ struct InitializeGraph {
        static void setVal (uint32_t id, struct CC_NodeData & node, uint32_t y) {node.comp = y; }
     	typedef uint32_t ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "id" , "uint32_t"), Galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "comp" , "uint32_t"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, galois::loopname("Init"), galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "id" , "uint32_t"), galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "comp" , "uint32_t"));
     _graph.sync_pull<SyncerPull_0>("");
     
     _graph.sync_pull<SyncerPull_1>("");
@@ -81,7 +81,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     CC_NodeData& sdata = graph->getData(src);
     sdata.id = graph->getGID(src);
-    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID <<"] sdata.id : " << sdata.id << "\n";
+    //std::cout << "[" << galois::Runtime::getSystemNetworkInterface().ID <<"] sdata.id : " << sdata.id << "\n";
     sdata.comp = sdata.id.load();
   }
 };
@@ -93,11 +93,11 @@ struct LabelPropAlgo {
   void static go(Graph& _graph) {
      struct Syncer_0 {
        static uint32_t extract(uint32_t id,  const struct CC_NodeData & node){ return node.comp; }
-       static void reduce (uint32_t id, struct CC_NodeData & node, uint32_t y) {Galois::atomicMin(node.comp, y);}
+       static void reduce (uint32_t id, struct CC_NodeData & node, uint32_t y) {galois::atomicMin(node.comp, y);}
        static void reset (uint32_t id, struct CC_NodeData & node ) { node.comp = std::numeric_limits<uint32_t>::max(); }
     	typedef uint32_t ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), LabelPropAlgo { &_graph }, Galois::loopname("LabelPropAlgo"), Galois::write_set("sync_push", "this->graph", "struct CC_NodeData &", "struct std::atomic<unsigned int> &" , "comp", "uint32_t" , "{Galois::min(node.comp, y);}",  "std::numeric_limits<uint32_t>::max()"));
+    galois::do_all(_graph.begin(), _graph.end(), LabelPropAlgo { &_graph }, galois::loopname("LabelPropAlgo"), galois::write_set("sync_push", "this->graph", "struct CC_NodeData &", "struct std::atomic<unsigned int> &" , "comp", "uint32_t" , "{galois::min(node.comp, y);}",  "std::numeric_limits<uint32_t>::max()"));
     _graph.sync_push<Syncer_0>("");
     
   }
@@ -124,8 +124,8 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_labelProp;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_labelProp;
 
     T_total.start();
 

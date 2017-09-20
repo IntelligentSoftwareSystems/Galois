@@ -43,7 +43,7 @@ void testContainerA(T&& x, U&& y) {
 
 template<typename T, typename U>
 void testContainerAA(T&& x, U&& y) {
-  Galois::Runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
+  galois::Runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
 
   T a = std::move(x);
   T b;
@@ -69,28 +69,28 @@ void testContainerC(T&& x, U&& y) {
 }
 
 int main() {
-  //test(Galois::FixedSizeBag<MoveOnly>());
-  //test(Galois::ConcurrentFixedSizeBag<MoveOnly>());
-  //test(Galois::FixedSizeRing<MoveOnly>());
-  test(Galois::gdeque<MoveOnly>());
-  test(Galois::gslist<MoveOnly>());
-  test(Galois::concurrent_gslist<MoveOnly>());
-  test(Galois::InsertBag<MoveOnly>());
-  test(Galois::LargeArray<MoveOnly>());
-  test(Galois::Substrate::PerPackageStorage<MoveOnly>());
-  test(Galois::Substrate::PerThreadStorage<MoveOnly>());
+  //test(galois::FixedSizeBag<MoveOnly>());
+  //test(galois::ConcurrentFixedSizeBag<MoveOnly>());
+  //test(galois::FixedSizeRing<MoveOnly>());
+  test(galois::gdeque<MoveOnly>());
+  test(galois::gslist<MoveOnly>());
+  test(galois::concurrent_gslist<MoveOnly>());
+  test(galois::InsertBag<MoveOnly>());
+  test(galois::LargeArray<MoveOnly>());
+  test(galois::Substrate::PerPackageStorage<MoveOnly>());
+  test(galois::Substrate::PerThreadStorage<MoveOnly>());
 #ifdef GALOIS_USE_EXP
-  test(Galois::concurrent_flat_map<int, MoveOnly>());
+  test(galois::concurrent_flat_map<int, MoveOnly>());
 #endif
 
-  testContainerA(Galois::gdeque<MoveOnly>(), MoveOnly());
-  testContainerAA(Galois::gslist<MoveOnly>(), MoveOnly());
-  //testContainerAA(Galois::concurrent_gslist<MoveOnly>(), MoveOnly());
-  testContainerA(Galois::InsertBag<MoveOnly>(), MoveOnly());
+  testContainerA(galois::gdeque<MoveOnly>(), MoveOnly());
+  testContainerAA(galois::gslist<MoveOnly>(), MoveOnly());
+  //testContainerAA(galois::concurrent_gslist<MoveOnly>(), MoveOnly());
+  testContainerA(galois::InsertBag<MoveOnly>(), MoveOnly());
 #ifdef GALOIS_USE_EXP
-  testContainerB(Galois::concurrent_flat_map<int, MoveOnly>(), std::make_pair(1, MoveOnly()));
+  testContainerB(galois::concurrent_flat_map<int, MoveOnly>(), std::make_pair(1, MoveOnly()));
 #endif
-  testContainerC(Galois::gdeque<MoveOnly>(), MoveOnly());
+  testContainerC(galois::gdeque<MoveOnly>(), MoveOnly());
 
   return 0;
 }

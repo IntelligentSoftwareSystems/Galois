@@ -46,10 +46,10 @@ public:
 
 typedef int EdgeData;
 
-typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData> Graph;
-typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::GraphNode GraphNode;
-typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::iterator LCM_iterator;
-typedef Galois::Graph::LC_Morph_Graph<Node,EdgeData>::edge_iterator LCM_edge_iterator;
+typedef galois::Graph::LC_Morph_Graph<Node,EdgeData> Graph;
+typedef galois::Graph::LC_Morph_Graph<Node,EdgeData>::GraphNode GraphNode;
+typedef galois::Graph::LC_Morph_Graph<Node,EdgeData>::iterator LCM_iterator;
+typedef galois::Graph::LC_Morph_Graph<Node,EdgeData>::edge_iterator LCM_edge_iterator;
 
 
 #endif /* NODE_H_ */

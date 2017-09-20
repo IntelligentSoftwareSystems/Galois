@@ -1,4 +1,4 @@
-namespace Galois {
+namespace galois {
 
   class VecBool {
     std::vector<uint8_t> vec;
@@ -72,4 +72,4 @@ namespace Galois {
 
   };
 
-}//namespace Galois ends
+}//namespace galois ends

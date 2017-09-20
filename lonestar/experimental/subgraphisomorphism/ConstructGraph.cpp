@@ -74,7 +74,7 @@ void printGraph(Graph& g) {
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   if(rndSeedByTime) {
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     numEdges = maxNumEdges;
   }
 
-  Galois::Graph::FirstGraph<int, void, true> g;
+  galois::Graph::FirstGraph<int, void, true> g;
   constructGraph(g);
   printGraph(g);
 

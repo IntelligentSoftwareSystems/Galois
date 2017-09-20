@@ -71,7 +71,7 @@ class AbstractMain {
 
 public:
 
-  typedef Galois::Graph::FirstGraph<typename SimInit_tp::BaseSimObj_ty*, void, true> Graph;
+  typedef galois::Graph::FirstGraph<typename SimInit_tp::BaseSimObj_ty*, void, true> Graph;
   typedef typename Graph::GraphNode GNode;
 
 
@@ -105,7 +105,7 @@ public:
    */
   void run(int argc, char* argv[]) {
 
-    Galois::StatManager sm;
+    galois::StatManager sm;
     LonestarStart(argc, argv, name, desc, url);
 
     SimInit_tp simInit(netlistFile);
@@ -120,12 +120,12 @@ public:
 
     initRemaining (simInit, graph);
 
-    Galois::preAlloc (256 * Galois::getActiveThreads ());
+    galois::preAlloc (256 * galois::getActiveThreads ());
         // + (simInit.getInitEvents().size() * graph.size()));
 
-    Galois::reportPageAlloc("MeminfoPre");
+    galois::reportPageAlloc("MeminfoPre");
 
-    Galois::StatTimer t;
+    galois::StatTimer t;
 
     t.start ();
 
@@ -133,7 +133,7 @@ public:
 
     t.stop ();
 
-    Galois::reportPageAlloc("MeminfoPost");
+    galois::reportPageAlloc("MeminfoPost");
 
     if (!skipVerify) {
       simInit.verify ();

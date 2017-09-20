@@ -46,7 +46,7 @@
 #include <boost/mpl/if.hpp>
 #include <algorithm>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 struct read_default_graph_tag { };
@@ -108,14 +108,14 @@ template<>
 struct LocalIteratorFeature<false> {
   uint64_t localBegin(uint64_t numNodes) const {
     unsigned int id = Substrate::ThreadPool::getTID();
-    unsigned int num = Galois::getActiveThreads();
+    unsigned int num = galois::getActiveThreads();
     uint64_t begin = (numNodes + num - 1) / num * id;
     return std::min(begin, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
     unsigned int id = Substrate::ThreadPool::getTID();
-    unsigned int num = Galois::getActiveThreads();
+    unsigned int num = galois::getActiveThreads();
     uint64_t end = (numNodes + num - 1) / num * (id + 1);
     return std::min(end, numNodes);
   }
@@ -244,7 +244,7 @@ struct NodeInfoBaseTypes<void, HasLockable> {
 //! Specializations for void node data
 template<typename NodeTy, bool HasLockable>
 class NodeInfoBase:
-  public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type,
+  public boost::mpl::if_c<HasLockable,galois::Runtime::Lockable,NoLockable>::type,
   public NodeInfoBaseTypes<NodeTy, HasLockable> 
 {
   NodeTy data;
@@ -257,7 +257,7 @@ public:
 
 template<bool HasLockable>
 struct NodeInfoBase<void, HasLockable>:
-  public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type,
+  public boost::mpl::if_c<HasLockable,galois::Runtime::Lockable,NoLockable>::type,
   public NodeInfoBaseTypes<void, HasLockable> 
 {
   typename NodeInfoBase::reference getData() { return 0; }
@@ -273,7 +273,7 @@ public:
   };
 
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
-    Galois::Runtime::acquire(&outOfLineLocks[n], mflag);
+    galois::Runtime::acquire(&outOfLineLocks[n], mflag);
   }
   void outOfLineAllocateLocal(size_t numNodes) {
     outOfLineLocks.allocateLocal(numNodes);

@@ -38,7 +38,7 @@
 #include <memory>
 #include <vector>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 namespace detail {
@@ -64,6 +64,6 @@ LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads,
 
 
 } // namespace Substrate
-} // namespace Galois
+} // namespace galois
 
 #endif //GALOIS_SUBSTRATE_NUMAMEM

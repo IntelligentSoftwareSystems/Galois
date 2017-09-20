@@ -59,26 +59,26 @@ static const uint32_t removed = 0x1;
 //   set LSB of an edge weight to indicate the removal of the edge.
 //   << 1 to track # triangles an edge supports, 
 //   >> 1 when computing edge supports
-typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
   ::template with_numa_alloc<true>::type 
   ::template with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 typedef std::pair<GNode, GNode> Edge;
-typedef Galois::InsertBag<Edge> EdgeVec;
+typedef galois::InsertBag<Edge> EdgeVec;
 
 void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to removed
-  Galois::do_all_local(
+  galois::do_all_local(
     g, 
     [&g] (typename Graph::GraphNode N) { 
-      for (auto e: g.edges(N, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(N, galois::MethodFlag::UNPROTECTED)) {
         g.getEdgeData(e) = removed;
       }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 }
 
@@ -130,7 +130,7 @@ void readTruss(Graph& g) {
 void printGraph(Graph& g) {
   for (auto n: g) {
     std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n) continue;
       std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
@@ -139,12 +139,12 @@ void printGraph(Graph& g) {
 }
 
 std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
-  Galois::GAccumulator<size_t> numNodes, numEdges;
+  galois::GAccumulator<size_t> numNodes, numEdges;
 
-  Galois::do_all_local(g, 
+  galois::do_all_local(g, 
     [&g, &numNodes, &numEdges] (GNode n) {
       size_t numN = 0;
-      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
           if (g.getEdgeDst(e) > n) {
             numEdges += 1;
@@ -154,7 +154,7 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
       }
       numNodes += numN;
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 
   return std::make_pair(numNodes.reduce(), numEdges.reduce());
@@ -162,10 +162,10 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
 
 bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
   size_t numValidEqual = 0;
-  auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-    srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-    dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-    dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
+  auto srcI = g.edge_begin(src, galois::MethodFlag::UNPROTECTED), 
+    srcE = g.edge_end(src, galois::MethodFlag::UNPROTECTED), 
+    dstI = g.edge_begin(dst, galois::MethodFlag::UNPROTECTED), 
+    dstE = g.edge_end(dst, galois::MethodFlag::UNPROTECTED);
 
   while (true) {
     // find the first valid edge
@@ -199,7 +199,7 @@ bool isSupportNoLessThanJ(Graph& g, GNode src, GNode dst, unsigned int j) {
 }
 
 int main(int argc, char **argv) {
-//  Galois::StatManager statManager;
+//  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   if (2 > trussNum) {
@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
   Graph g;
   EdgeVec work, shouldBeInvalid, shouldBeValid;
 
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);
@@ -230,22 +230,22 @@ int main(int argc, char **argv) {
 
   // symmetry breaking: 
   // consider only edges (i, j) where i < j
-  Galois::do_all_local(g, 
+  galois::do_all_local(g, 
     [&g, &work] (GNode n) {
-      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         auto dst = g.getEdgeDst(e);
         if (dst > n) {
           work.push_back(std::make_pair(n, dst));
         }
       }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 
   // pick out the following:
   // 1. valid edges whose support < trussNum-2
   // 2. removed edges whose support >= trussNum-2
-  Galois::do_all_local(work, 
+  galois::do_all_local(work, 
     [&g, &shouldBeInvalid, &shouldBeValid] (Edge e) {
        bool isSupportEnough = isSupportNoLessThanJ(g, e.first, e.second, trussNum-2);
        bool isRemoved = g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) & 0x1;
@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
          shouldBeValid.push_back(e);
        }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 
   auto numShouldBeInvalid = std::distance(shouldBeInvalid.begin(), shouldBeInvalid.end());

@@ -29,7 +29,7 @@
 #include <mutex>
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -367,7 +367,7 @@ bool RemoteDirectory::metadata::doClearContended() {
   return recalled != ~0U;
 }
 
-std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
+std::ostream& galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
   static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
   return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",recalled:" << md.recalled << ",th:" << md.th << " ,notifySize " << md.notifyList.size() ;
 }
@@ -758,12 +758,12 @@ void LocalDirectory::metadata::doClearContended() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-LocalDirectory& Galois::Runtime::getLocalDirectory() {
+LocalDirectory& galois::Runtime::getLocalDirectory() {
   static LocalDirectory obj;
   return obj;
 }
 
-RemoteDirectory& Galois::Runtime::getRemoteDirectory() {
+RemoteDirectory& galois::Runtime::getRemoteDirectory() {
   static RemoteDirectory obj;
   return obj;
 }

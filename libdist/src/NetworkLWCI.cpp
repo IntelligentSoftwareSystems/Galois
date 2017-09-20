@@ -66,7 +66,7 @@ struct mpiMessage {
     rank(r), tag(t), buf(std::move(b))  {};
 };
 
-class NetworkIOLWCI : public Galois::Runtime::NetworkIO {
+class NetworkIOLWCI : public galois::Runtime::NetworkIO {
 
   static int getID() {
     return lc_id(mv);
@@ -159,9 +159,9 @@ public:
 
 };
 
-std::tuple<std::unique_ptr<Galois::Runtime::NetworkIO>,uint32_t,uint32_t> Galois::Runtime::makeNetworkIOLWCI() {
+std::tuple<std::unique_ptr<galois::Runtime::NetworkIO>,uint32_t,uint32_t> galois::Runtime::makeNetworkIOLWCI() {
   uint32_t ID, NUM;
-  std::unique_ptr<Galois::Runtime::NetworkIO> n{new NetworkIOLWCI(ID, NUM)};
+  std::unique_ptr<galois::Runtime::NetworkIO> n{new NetworkIOLWCI(ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 

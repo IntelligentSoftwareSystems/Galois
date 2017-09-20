@@ -32,7 +32,7 @@
 
 #include <string>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 //! Return true if the Enviroment variable is set
@@ -44,6 +44,6 @@ bool EnvCheck(const std::string&, int& val);
 bool EnvCheck(const std::string&, std::string& val);
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

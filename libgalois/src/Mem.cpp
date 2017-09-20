@@ -39,7 +39,7 @@
 #include <map>
 #include <mutex>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 //Anchor the class
 SystemHeap::SystemHeap() {
@@ -63,7 +63,7 @@ SizedHeapFactory::getHeap(const size_t size) {
   typedef SizedHeapFactory::HeapMap HeapMap;
 
   if (!localHeaps) {
-    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
+    std::lock_guard<galois::Substrate::SimpleLock> ll(lock);
     localHeaps = new HeapMap;
     allLocalHeaps.push_front(localHeaps);
   }
@@ -73,7 +73,7 @@ SizedHeapFactory::getHeap(const size_t size) {
     return lentry;
 
   {
-    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
+    std::lock_guard<galois::Substrate::SimpleLock> ll(lock);
     auto& gentry = heaps[size];
     if (!gentry)
       gentry = new SizedHeap();

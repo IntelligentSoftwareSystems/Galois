@@ -26,7 +26,7 @@
 
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 struct foo: public Lockable {
   int x;
@@ -35,14 +35,14 @@ struct foo: public Lockable {
     return os << "{" << v.x << "," << v.y << "}";
   }
   foo(int _x, int _y) :x(_x), y(_y) {}
-  foo(Galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
+  foo(galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
   foo() = default;
 
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+  void serialize(galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s, x, y);
   }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+  void deserialize(galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s, x, y);
   }
 };

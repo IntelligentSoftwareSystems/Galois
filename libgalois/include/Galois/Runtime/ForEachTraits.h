@@ -34,21 +34,21 @@
 
 #include <tuple>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace DEPRECATED {
 
 template<typename FunctionTy>
 class ForEachTraits {
   // special_decay of std::ref(t) is T& so apply twice
-  typedef typename Galois::DEPRECATED::special_decay<typename Galois::DEPRECATED::special_decay<FunctionTy>::type>::type Fn;
+  typedef typename galois::DEPRECATED::special_decay<typename galois::DEPRECATED::special_decay<FunctionTy>::type>::type Fn;
 public:
   enum {
-    NeedsStats = !Galois::DEPRECATED::does_not_need_stats<Fn>::value,
-    NeedsBreak = Galois::DEPRECATED::needs_parallel_break<Fn>::value,
-    NeedsPush = !Galois::DEPRECATED::does_not_need_push<Fn>::value,
-    NeedsPIA = Galois::DEPRECATED::needs_per_iter_alloc<Fn>::value,
-    NeedsAborts = !Galois::DEPRECATED::does_not_need_aborts<Fn>::value
+    NeedsStats = !galois::DEPRECATED::does_not_need_stats<Fn>::value,
+    NeedsBreak = galois::DEPRECATED::needs_parallel_break<Fn>::value,
+    NeedsPush = !galois::DEPRECATED::does_not_need_push<Fn>::value,
+    NeedsPIA = galois::DEPRECATED::needs_per_iter_alloc<Fn>::value,
+    NeedsAborts = !galois::DEPRECATED::does_not_need_aborts<Fn>::value
   };
 };
 

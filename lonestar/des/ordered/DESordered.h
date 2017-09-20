@@ -54,11 +54,11 @@
 
 namespace des_ord {
 
-typedef Galois::GAccumulator<size_t> Accumulator_ty;
+typedef galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
+typedef galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
@@ -154,7 +154,7 @@ class DESordered:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE);
+      graph.getData (recvInfo.node, galois::MethodFlag::WRITE);
     }
   };
 
@@ -238,7 +238,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -256,15 +256,15 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_ar (
-        Galois::Runtime::makeStandardRange(
+    galois::Runtime::for_each_ordered_ar (
+        galois::Runtime::makeStandardRange(
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
         ReadyTest (sobjInfoVec), 
         std::make_tuple(
-          Galois::loopname("des_main_loop")));
+          galois::loopname("des_main_loop")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

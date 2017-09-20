@@ -92,10 +92,10 @@ struct FixThreads: public tbb::task_scheduler_observer {
     observe(true);
   }
   virtual void on_scheduler_entry(bool is_worker) {
-    Galois::Runtime::LL::initTID();
-    unsigned id = Galois::Runtime::LL::getTID();
-    Galois::Runtime::initPTS();
-    Galois::Runtime::LL::bindThreadToProcessor(id);
+    galois::Runtime::LL::initTID();
+    unsigned id = galois::Runtime::LL::getTID();
+    galois::Runtime::initPTS();
+    galois::Runtime::LL::bindThreadToProcessor(id);
   }
 };
 #else
@@ -205,7 +205,7 @@ struct OctreeInternal: public Octree {
   }
 };
 
-struct Body: public Octree, public Galois::Runtime::Lockable {
+struct Body: public Octree, public galois::Runtime::Lockable {
   Point vel;
   Point acc;
   Point oldacc;
@@ -313,12 +313,12 @@ inline void updateCenter(Point& p, int index, double radius) {
 }
 
 // XXX numa vector
-typedef Galois::gdeque<Body> Bodies;
-typedef Galois::gdeque<Body*> BodyPtrs;
+typedef galois::gdeque<Body> Bodies;
+typedef galois::gdeque<Body*> BodyPtrs;
 
 struct BuildOctreeCilk {
-  typedef Galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
-  typedef Galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
+  typedef galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
+  typedef galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
 
   BodyPtrsAlloc& bodyPtrsAlloc;
   OctreeInternalAlloc& octreeInternalAlloc;
@@ -435,7 +435,7 @@ struct ComputeCenterOfMass {
 // void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>&) {
+  void operator()(galois::TaskContext<PipelineTy>&) {
     Point accum;
     double mass = 0.0;
 
@@ -473,8 +473,8 @@ struct ComputeCenterOfMass {
 };
 
 struct BuildOctree {
-  typedef Galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
-  typedef Galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
+  typedef galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
+  typedef galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
 
   BodyPtrsAlloc& bodyPtrsAlloc;
   OctreeInternalAlloc& octreeInternalAlloc;
@@ -482,12 +482,12 @@ struct BuildOctree {
   BodyPtrs::iterator eb;
   OctreeInternal* node;
   double radius;
-  Galois::Task parent;
+  galois::Task parent;
 
   BuildOctree(BodyPtrsAlloc& a1, OctreeInternalAlloc& a2,
       BodyPtrs::iterator _bb, BodyPtrs::iterator _eb, 
       OctreeInternal* n, double r,
-      Galois::Task p):
+      galois::Task p):
     bodyPtrsAlloc(a1),
     octreeInternalAlloc(a2),
     bb(_bb), eb(_eb),
@@ -496,7 +496,7 @@ struct BuildOctree {
 //  void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     typedef std::array<int,8> Counts;
     typedef std::array<BodyPtrs*,8> Bags;
 
@@ -517,7 +517,7 @@ struct BuildOctree {
 
     radius *= 0.5;
 
-    Galois::Task after = ctx.addTask2(ComputeCenterOfMass(node));
+    galois::Task after = ctx.addTask2(ComputeCenterOfMass(node));
     if (parent)
       ctx.addDependence(after, parent);
 
@@ -536,7 +536,7 @@ struct BuildOctree {
       octreeInternalAlloc.construct(new_node, new_pos, node);
       node->child[i] = new_node;
 
-      Galois::Task t = ctx.addTask1(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc,
+      galois::Task t = ctx.addTask1(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc,
             bags[i]->begin(), bags[i]->end(), new_node, radius, after));
       ctx.addDependence(t, after);
       ctx.markDeferred(after);
@@ -568,7 +568,7 @@ struct Sort {
 //  void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     for (int i = 0; i < 8; i++) {
       Octree* child = node->child[i];
       if (child == NULL)
@@ -628,7 +628,7 @@ struct ComputeForceIndirect {
   };
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     std::deque<Frame*> stack;
     std::deque<Frame> backing;
 
@@ -725,7 +725,7 @@ struct ComputeForceBlockedContinuation {
  // void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     Point delta;
     for (int i = 0; i < blockSizeY && node != NULL; ++i) {
       Octree* n = *next;
@@ -752,7 +752,7 @@ struct ComputeForceBlockedContinuation {
 };
 
 struct ComputeForceBlocked {
-  //typedef Galois::gdeque<Body*,32> Bodies;
+  //typedef galois::gdeque<Body*,32> Bodies;
   typedef std::array<Body*,MaxBlockSizeX> Bodies;
   Bodies bodies;
   OctreeInternal* top;
@@ -771,8 +771,8 @@ struct ComputeForceBlocked {
   };
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
-    typedef Galois::gdeque<Frame> Stack;
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
+    typedef galois::gdeque<Frame> Stack;
     typedef std::array<Stack,MaxBlockSizeX> Stacks; // XXX
 
     Stacks stacks;
@@ -846,8 +846,8 @@ struct ComputeForceOrig {
   };
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
-    Galois::gdeque<Frame> stack;
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
+    galois::gdeque<Frame> stack;
     stack.push_back(Frame(node, dsq));
 
     Point delta;
@@ -893,7 +893,7 @@ struct FinishForceTree {
   FinishForceTree(Point* p): parent(p) { }
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     for (Accs::iterator ii = accs.begin(), ei = accs.end(); ii != ei; ++ii) {
       *parent += *ii;
     }
@@ -901,21 +901,21 @@ struct FinishForceTree {
 };
 
 struct ComputeForceTree {
-  typedef std::list<Galois::Task,Galois::PerIterAllocTy::rebind<Galois::Task>::other> Tasks;
+  typedef std::list<galois::Task,galois::PerIterAllocTy::rebind<galois::Task>::other> Tasks;
 
   Point* acc;
   Body* body;
   OctreeInternal* node;
   double dsq;
-  Galois::Task parent;
+  galois::Task parent;
 
-  ComputeForceTree(Point* a, Body* b, OctreeInternal* n, double d, Galois::Task p): 
+  ComputeForceTree(Point* a, Body* b, OctreeInternal* n, double d, galois::Task p): 
     acc(a), body(b), node(n), dsq(d), parent(p) { }
   
   void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void recurse(Galois::TaskContext<PipelineTy>& ctx, OctreeInternal* node, double dsq, int depth, Tasks& tasks) {
+  void recurse(galois::TaskContext<PipelineTy>& ctx, OctreeInternal* node, double dsq, int depth, Tasks& tasks) {
     Point delta;
     computeDelta(delta, body, node);
 
@@ -926,7 +926,7 @@ struct ComputeForceTree {
       return;
     }
 
-    Galois::Runtime::Task::GTask<FinishForceTree>* after = NULL;
+    galois::Runtime::Task::GTask<FinishForceTree>* after = NULL;
 
     double new_dsq = dsq * 0.25;
     
@@ -951,7 +951,7 @@ struct ComputeForceTree {
           tasks.push_back(after);
         }
 
-        Galois::Task t = 
+        galois::Task t = 
           ctx.addTask1(ComputeForceTree(&after->task.accs[i], body, static_cast<OctreeInternal*>(next), new_dsq, after));
         ctx.addDependence(t, after);
         ctx.markDeferred(after);
@@ -960,11 +960,11 @@ struct ComputeForceTree {
   }
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     Tasks tasks(ctx.getPerIterAlloc());
     recurse(ctx, node, dsq, 3, tasks); // XXX
-    //Galois::Task prev = { };
-    Galois::Task prev = 0;
+    //galois::Task prev = { };
+    galois::Task prev = 0;
     //for (Tasks::reverse_iterator ii = tasks.rbegin(), ei = tasks.rend(); ii != ei; ++ii) { //XXX
     for (Tasks::iterator ii = tasks.begin(), ei = tasks.end(); ii != ei; ++ii) {
       if (prev)
@@ -986,7 +986,7 @@ struct ComputeForceUnroll {
   void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void recurse(Galois::TaskContext<PipelineTy>& ctx, OctreeInternal* node, double dsq, int depth) {
+  void recurse(galois::TaskContext<PipelineTy>& ctx, OctreeInternal* node, double dsq, int depth) {
     Point delta;
     computeDelta(delta, body, node);
 
@@ -1019,8 +1019,8 @@ struct ComputeForceUnroll {
   }
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
-    Galois::Runtime::acquire(body, Galois::MethodFlag::WRITE);
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
+    galois::Runtime::acquire(body, galois::MethodFlag::WRITE);
     recurse(ctx, node, dsq, 4);
   }
 };
@@ -1037,9 +1037,9 @@ struct ComputeForceBase {
   void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>& ctx) {
+  void operator()(galois::TaskContext<PipelineTy>& ctx) {
     Point delta;
-    Galois::Runtime::acquire(body, Galois::MethodFlag::WRITE);
+    galois::Runtime::acquire(body, galois::MethodFlag::WRITE);
     computeDelta(delta, body, node);
 
     double psq = delta.dist2();
@@ -1091,7 +1091,7 @@ struct ComputeForceTaskOrig {
     for (; ii != ei; ++ii, ++count) {
       int tid = count / block;
       Body* body = *ii;
-      Galois::gdeque<Frame> stack;
+      galois::gdeque<Frame> stack;
       stack.push_back(Frame(top, dsq));
 
       Point delta;
@@ -1148,7 +1148,7 @@ struct ComputeForceTaskBlocked {
 
   template<typename IterTy,typename OutTy>
   void generateTasks(double dsq, OctreeInternal* top, IterTy ii, IterTy ei, OutTy& out) {
-    typedef Galois::gdeque<Frame> Stack;
+    typedef galois::gdeque<Frame> Stack;
     typedef std::array<Stack,MaxBlockSizeX> Stacks;
 
     Stacks stacks;
@@ -1227,7 +1227,7 @@ struct AdvanceBody {
   void inspect() { } // XXX
 
   template<typename PipelineTy>
-  void operator()(Galois::TaskContext<PipelineTy>&) {
+  void operator()(galois::TaskContext<PipelineTy>&) {
     for (int i = 0; i < 3; ++i) {
       body->vel[i] += (body->acc[i] - body->oldacc[i]) * config.dthf;
     }
@@ -1333,8 +1333,8 @@ struct DoComputeForce {
 
   template<typename IterTy>
   void operator()(double dsq, OctreeInternal* top, IterTy begin, IterTy end) {
-    typedef Galois::Pipeline<WLTy,ComputeForceTy> P;
-    Galois::for_each_task<P>(
+    typedef galois::Pipeline<WLTy,ComputeForceTy> P;
+    galois::for_each_task<P>(
         boost::make_transform_iterator(begin, MakeComputeForce(top, dsq)),
         boost::make_transform_iterator(end, MakeComputeForce(top, dsq)),
         "MakeComputeForce");
@@ -1386,11 +1386,11 @@ struct DoComputeForce<ComputeForceBlocked,WLTy,Enable> {
 
   template<typename IterTy>
   void operator()(double dsq, OctreeInternal* top, IterTy begin, IterTy end) {
-    typedef Galois::Pipeline<WLTy,ComputeForceBlocked> P;
+    typedef galois::Pipeline<WLTy,ComputeForceBlocked> P;
     typedef blocked_iterator<IterTy> BlockedIt;
     typedef typename std::iterator_traits<BlockedIt>::value_type value_type;
 
-    Galois::for_each_task<P>(
+    galois::for_each_task<P>(
         boost::make_transform_iterator(BlockedIt(begin, end, blockSizeX),
           MakeComputeForce<value_type>(top, dsq)),
         boost::make_transform_iterator(BlockedIt(end, end, blockSizeX),
@@ -1414,8 +1414,8 @@ struct DoComputeForce<ComputeForceTree,WLTy,Enable> {
 
   template<typename IterTy>
   void operator()(double dsq, OctreeInternal* top, IterTy begin, IterTy end) {
-    typedef Galois::Pipeline<WLTy,ComputeForceTree,FinishForceTree> P;
-    Galois::for_each_task<P>(
+    typedef galois::Pipeline<WLTy,ComputeForceTree,FinishForceTree> P;
+    galois::for_each_task<P>(
         boost::make_transform_iterator(begin, MakeComputeForce(top, dsq)),
         boost::make_transform_iterator(end, MakeComputeForce(top, dsq)),
         "MakeComputeForce");
@@ -1496,11 +1496,11 @@ struct Refine {
 
   Refine(const IterTy& ii, const IterTy& ei, size_t dist): ii(ii), ei(ei), dist(dist) { }
 
-  void operator()(const IterTy& cur, Galois::UserContext<IterTy>&) {
+  void operator()(const IterTy& cur, galois::UserContext<IterTy>&) {
     IterTy next = skip(cur, dist);
     if (improvement(cur, next)) {
-      Galois::Runtime::acquire((*cur).body, Galois::MethodFlag::WRITE);
-      Galois::Runtime::acquire((*next).body, Galois::MethodFlag::WRITE);
+      galois::Runtime::acquire((*cur).body, galois::MethodFlag::WRITE);
+      galois::Runtime::acquire((*next).body, galois::MethodFlag::WRITE);
       std::swap(*cur, *next);
     }
   }
@@ -1526,7 +1526,7 @@ template<typename OutTy>
 void refine(OutTy& out) {
   typedef typename OutTy::iterator Iter;
   double newDelta = 
-    Galois::ParallelSTL::map_reduce(
+    galois::ParallelSTL::map_reduce(
             passthrough<Iter>(out.begin()),
             passthrough<Iter>(out.end()),
             ComputeRefineDelta<Iter>(out.end()),
@@ -1544,11 +1544,11 @@ void refine(OutTy& out) {
 
     for (size_t d = out.size() >> 1; d != 0; d = d >> 1) {
     //for (size_t d = 1024; d != 0; d = d >> 1) { // XXX
-      Galois::for_each(passthrough<Iter>(out.begin()), passthrough<Iter>(out.end()),
+      galois::for_each(passthrough<Iter>(out.begin()), passthrough<Iter>(out.end()),
           Refine<Iter>(out.begin(), out.end(), d));
     }
     oldDelta = newDelta;
-    newDelta = Galois::ParallelSTL::map_reduce(
+    newDelta = galois::ParallelSTL::map_reduce(
         passthrough<Iter>(out.begin()),
         passthrough<Iter>(out.end()),
         ComputeRefineDelta<Iter>(out.end()),
@@ -1573,7 +1573,7 @@ struct DoComputeForce<ComputeForceTy,WLTy,typename boost::enable_if<has_task<Com
 
   template<typename IterTy>
   void operator()(double dsq, OctreeInternal* top, IterTy begin, IterTy end) {
-    //typedef Galois::gdeque<typename ComputeForceTy::Task> Deque; // XXX
+    //typedef galois::gdeque<typename ComputeForceTy::Task> Deque; // XXX
     typedef std::vector<typename ComputeForceTy::Task> Deque;
     typedef std::vector<Deque> Outs;
 
@@ -1582,13 +1582,13 @@ struct DoComputeForce<ComputeForceTy,WLTy,typename boost::enable_if<has_task<Com
 
     outs.resize(numThreads);
 
-    Galois::StatTimer genTime("GenerateTasksTime");
+    galois::StatTimer genTime("GenerateTasksTime");
     genTime.start();
     W.generateTasks(dsq, top, begin, end, outs);
     genTime.stop();
 
     if (useTaskRefine) {
-      Galois::StatTimer refineTime("RefineTasksTime");
+      galois::StatTimer refineTime("RefineTasksTime");
       refineTime.start();
       for (int i = 0; i < numThreads; ++i) {
         std::cout << "Refine " << i << "\n";
@@ -1597,9 +1597,9 @@ struct DoComputeForce<ComputeForceTy,WLTy,typename boost::enable_if<has_task<Com
       refineTime.stop();
     }
     
-    Galois::StatTimer computeTime("ParallelComputeForceTime");
+    galois::StatTimer computeTime("ParallelComputeForceTime");
     computeTime.start();
-    Galois::on_each(Wrapper<Outs>(W, outs), Galois::loopname("MakeComputeForce"));
+    galois::on_each(Wrapper<Outs>(W, outs), galois::loopname("MakeComputeForce"));
     computeTime.stop();
   }
 };
@@ -1645,7 +1645,7 @@ double checkAllPairs(Bodies& bodies, int N) {
   Bodies::iterator end(bodies.begin());
   std::advance(end, N);
   
-  return Galois::ParallelSTL::map_reduce(bodies.begin(), end,
+  return galois::ParallelSTL::map_reduce(bodies.begin(), end,
       CheckAllPairs(bodies),
       0.0,
       std::plus<double>()) / N;
@@ -1670,20 +1670,20 @@ void sort(Bodies& bodies) {
   octreeInternalAlloc.construct(top, OctreeInternal(box.center(), static_cast<Octree*>(0)));
 
   // XXX
-  typedef Galois::Pipeline<Galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
-  Galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, 
+  typedef galois::Pipeline<galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+  galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, 
         ptrs.begin(), ptrs.end(), top, box.radius(), 0), "Sort1");
 
   if (false) {
-    typedef Galois::InsertBag<Body> Bag;
-    typedef Galois::Pipeline<Galois::WorkList::dChunkedFIFO<>, Sort<Bag> > P2;
+    typedef galois::InsertBag<Body> Bag;
+    typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>, Sort<Bag> > P2;
     Bag bag;
-    Galois::for_each_task<P2>(Sort<Bag>(top, bag), "Sort2");
+    galois::for_each_task<P2>(Sort<Bag>(top, bag), "Sort2");
     //delete top;
     bodies.clear();
     std::copy(bag.begin(), bag.end(), std::back_inserter(bodies));
   } else {
-    typedef Galois::gdeque<Body> Bag;
+    typedef galois::gdeque<Body> Bag;
     Bag bag;
     Sort<Bag> sorter(top, bag);
     sorter(top);
@@ -1713,25 +1713,25 @@ void run(Bodies& bodies) {
     OctreeInternal* top = octreeInternalAlloc.allocate(1);
     octreeInternalAlloc.construct(top, box.center(), static_cast<Octree*>(0));
 
-    Galois::StatTimer Toctree("BuildOctreeTime");
+    galois::StatTimer Toctree("BuildOctreeTime");
     Toctree.start();
     if (useCilkTreeBuild) {
       BuildOctreeCilk c(bodyPtrsAlloc, octreeInternalAlloc);
       c.buildOctree(ptrs.begin(), ptrs.end(), top, box.radius());
     } else if (allocateFIFO) {
-      typedef Galois::Pipeline<Galois::WorkList::dChunkedFIFO<>,BuildOctree,ComputeCenterOfMass> P1;
-      Galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
+      typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+      galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
     } else {
-      typedef Galois::Pipeline<Galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
-      Galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
+      typedef galois::Pipeline<galois::WorkList::dChunkedLIFO<>,BuildOctree,ComputeCenterOfMass> P1;
+      galois::for_each_task<P1>(BuildOctree(bodyPtrsAlloc, octreeInternalAlloc, ptrs.begin(), ptrs.end(), top, box.radius(), 0), "BuildOctree");
     }
     Toctree.stop();
 
-    typedef Galois::WorkList::dChunkedFIFO<> FIFO;
-    typedef Galois::WorkList::dChunkedLIFO<> LIFO;
-    typedef Galois::WorkList::LocalWorklist<Galois::WorkList::GFIFO<> > LocalFIFO;
+    typedef galois::WorkList::dChunkedFIFO<> FIFO;
+    typedef galois::WorkList::dChunkedLIFO<> LIFO;
+    typedef galois::WorkList::LocalWorklist<galois::WorkList::GFIFO<> > LocalFIFO;
 
-    Galois::StatTimer T("ComputeForceTime");
+    galois::StatTimer T("ComputeForceTime");
     T.start();
     // XXX Use octree to align bodies in next version of bodies vector
     double dsq = box.diameter() * box.diameter() * config.itolsq;
@@ -1753,8 +1753,8 @@ void run(Bodies& bodies) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
 
-    typedef Galois::Pipeline<Galois::WorkList::dChunkedFIFO<>,AdvanceBody> P3;
-    Galois::for_each_task<P3>(
+    typedef galois::Pipeline<galois::WorkList::dChunkedFIFO<>,AdvanceBody> P3;
+    galois::for_each_task<P3>(
         boost::make_transform_iterator(ptrs.begin(), MakeAdvanceBody(&new_bodies)),
         boost::make_transform_iterator(ptrs.end(), MakeAdvanceBody(&new_bodies)),
         "AdvanceBody");
@@ -1776,7 +1776,7 @@ void run(Bodies& bodies) {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   // FixThreads fixThreads;
@@ -1795,10 +1795,10 @@ int main(int argc, char** argv) {
   generateInput(bodies, nbodies, seed);
   sort(bodies);
 
-  Galois::reportPageAlloc("MemPre");
-  Galois::StatTimer T;
+  galois::reportPageAlloc("MemPre");
+  galois::StatTimer T;
   T.start();
   run(bodies);
   T.stop();
-  Galois::reportPageAlloc("MemPost");
+  galois::reportPageAlloc("MemPost");
 }

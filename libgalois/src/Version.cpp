@@ -32,26 +32,26 @@
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 
-std::string Galois::getVersion() {
+std::string galois::getVersion() {
   return STR(GALOIS_VERSION);
 }
 
-std::string Galois::getRevision() {
+std::string galois::getRevision() {
   return "unknown";
 }
 
-int Galois::getVersionMajor() {
+int galois::getVersionMajor() {
   return GALOIS_VERSION_MAJOR;
 }
 
-int Galois::getVersionMinor() {
+int galois::getVersionMinor() {
   return GALOIS_VERSION_MINOR;
 }
 
-int Galois::getVersionPatch() {
+int galois::getVersionPatch() {
   return GALOIS_VERSION_PATCH;
 }
 
-int Galois::getCopyrightYear() {
+int galois::getCopyrightYear() {
   return GALOIS_COPYRIGHT_YEAR;
 }

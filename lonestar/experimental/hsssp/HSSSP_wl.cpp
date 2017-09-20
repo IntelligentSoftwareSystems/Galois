@@ -67,7 +67,7 @@ struct InitializeGraph {
     	static void setVal (struct NodeData & node, int y) {node.dist_current = y; }
     	typedef int ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "", "dist_current" , "int"));
+    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitGraph"), galois::write_set("sync_pull", "this->graph", "struct NodeData &", "", "dist_current" , "int"));
     _graph.sync_pull<SyncerPull_0>();
 
   }
@@ -102,12 +102,12 @@ LET'S DO IT.
 
 */
 template <typename GraphTy>
-struct Get_info_functor : public Galois::op_tag {
+struct Get_info_functor : public galois::op_tag {
   GraphTy &graph;
 
     struct Syncer_0 {
     	static int extract(const struct NodeData & node){ return node.dist_current; }
-    	static void reduce (struct NodeData & node, int y) {Galois::min(node.dist_current, y);}
+    	static void reduce (struct NodeData & node, int y) {galois::min(node.dist_current, y);}
     	static void reset (struct NodeData & node ) { /*node.dist_current = std::numeric_limits<int>::max();*/ }
     	typedef int ValTy;
     };
@@ -136,22 +136,22 @@ struct SSSP {
 
   SSSP(Graph* _g):graph(_g){}
   void static go(Graph& _graph){
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
 
     //XXX: Need a better way to fix this!!
-    if(Galois::Runtime::getSystemNetworkInterface().ID == 0)
+    if(galois::Runtime::getSystemNetworkInterface().ID == 0)
       _graph.getData(src_node).dist_current = 0;
     else
       _graph.getData(src_node).dist_current = std::numeric_limits<int>::max()/4;
 
-    Galois::for_each(WorkItem(src_node), SSSP(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+    galois::for_each(WorkItem(src_node), SSSP(&_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
   }
 
-  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+  void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {
     //GNode src = item.first;
     NodeData& snode = graph->getData(src);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    auto& net = galois::Runtime::getSystemNetworkInterface();
     auto& sdist = snode.dist_current;
 
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
@@ -174,8 +174,8 @@ struct SSSP {
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
     T_total.start();
 

@@ -36,7 +36,7 @@
 
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 
 template<typename T, int ChunkSize, bool Concurrent> 
 class gslist_base {
@@ -161,13 +161,13 @@ public:
   //! External allocator must be able to allocate this type
   typedef Block block_type;
   typedef T value_type;
-  typedef Galois::TwoLevelIteratorA<
+  typedef galois::TwoLevelIteratorA<
     outer_iterator<Block>,
     typename Block::iterator,
     std::forward_iterator_tag, 
     GetBegin,
     GetEnd> iterator;
-  typedef Galois::TwoLevelIteratorA<
+  typedef galois::TwoLevelIteratorA<
     outer_iterator<const Block>,
     typename Block::const_iterator,
     std::forward_iterator_tag, 
@@ -197,19 +197,19 @@ public:
   }
 
   iterator begin() {
-    return Galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).first;
+    return galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).first;
   }
 
   iterator end() {
-    return Galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).second;
+    return galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).second;
   }
 
   const_iterator begin() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).first;
+    return galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).first;
   }
 
   const_iterator end() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).second;
+    return galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).second;
   }
 
   bool empty() const {

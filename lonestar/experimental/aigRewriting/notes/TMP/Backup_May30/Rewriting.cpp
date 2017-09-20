@@ -30,12 +30,12 @@
 namespace algorithm {
 
 // ################################################## AUXILIARY STRUCTS AND CLASSES ################################################## //
-Galois::GAccumulator<size_t> windowHistogram[ WIN_BUCKET_NUM ];
-Galois::GAccumulator<size_t> fanoutHistogram[ FANOUT_BUCKET_NUM ];
+galois::GAccumulator<size_t> windowHistogram[ WIN_BUCKET_NUM ];
+galois::GAccumulator<size_t> fanoutHistogram[ FANOUT_BUCKET_NUM ];
 
 
-typedef std::unordered_set< aig::GNode, std::hash<aig::GNode>, std::equal_to<aig::GNode>, Galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeSet;
-typedef std::deque< aig::GNode, Galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeDeque;
+typedef std::unordered_set< aig::GNode, std::hash<aig::GNode>, std::equal_to<aig::GNode>, galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeSet;
+typedef std::deque< aig::GNode, galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeDeque;
 typedef Functional::FunctionPool FunctionPool;
 typedef Functional::word word;
 
@@ -65,15 +65,15 @@ void dumpWindowDot( std::string dotText, std::string label );
 struct FromPI {
 	
 	aig::Graph & graph;
-	Galois::InsertBag< aig::GNode > & workList;
+	galois::InsertBag< aig::GNode > & workList;
   
-	FromPI( aig::Graph & graph, Galois::InsertBag< aig::GNode > & workList ) : graph( graph ), workList( workList ) { }
+	FromPI( aig::Graph & graph, galois::InsertBag< aig::GNode > & workList ) : graph( graph ), workList( workList ) { }
   
 	void operator()( aig::GNode pi ) const {
 			
 		for ( auto outEdge : graph.out_edges( pi ) ) {
 			aig::GNode outNode = graph.getEdgeDst( outEdge );
-			aig::NodeData & outNodeData = graph.getData( outNode, Galois::MethodFlag::WRITE );
+			aig::NodeData & outNodeData = graph.getData( outNode, galois::MethodFlag::WRITE );
 			if ( outNodeData.scheduled == false ) {
 				workList.push( outNode );
 				outNodeData.scheduled = true;
@@ -86,16 +86,16 @@ struct FromPI {
 struct FromDagNodes {
 	
 	aig::Graph & graph;
-	Galois::InsertBag< aig::GNode > & workList;
+	galois::InsertBag< aig::GNode > & workList;
 	int maxFanout;
   
-	FromDagNodes( aig::Graph & graph, Galois::InsertBag< aig::GNode > & workList, int nFanout ) : graph( graph ), workList( workList ) { 
+	FromDagNodes( aig::Graph & graph, galois::InsertBag< aig::GNode > & workList, int nFanout ) : graph( graph ), workList( workList ) { 
 		maxFanout = nFanout;
 	}
   
 	void operator()( aig::GNode node ) const {
 			
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::WRITE );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );
 		int nodeFanout = std::distance( graph.out_edges( node ).begin(), graph.out_edges( node ).end() );
 
 		//if ( (nodeData.type == aig::NodeType::AND) && (nodeFanout > 1) && (nodeFanout <= maxFanout) ) {
@@ -115,7 +115,7 @@ struct RDWindowing {
 	typedef int tt_does_not_need_aborts;
     typedef int tt_does_not_need_push;
 	typedef int tt_needs_per_iter_alloc;
-	typedef Galois::PerIterAllocTy Alloc;
+	typedef galois::PerIterAllocTy Alloc;
 
 	aig::Graph & graph;
 	int nInputs;
@@ -130,13 +130,13 @@ struct RDWindowing {
 					nLevels( nLevels ), 
 					cutSizeLimit( cutSizeLimit ) { }
 					
-	void operator()( aig::GNode node, Galois::UserContext< aig::GNode > & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
 
-		if ( !graph.containsNode( node, Galois::MethodFlag::READ ) ) {
+		if ( !graph.containsNode( node, galois::MethodFlag::READ ) ) {
 			return;
 		}
 				
-		Galois::PerIterAllocTy & allocator = ctx.getPerIterAlloc();
+		galois::PerIterAllocTy & allocator = ctx.getPerIterAlloc();
 
 		GNodeSet start( allocator );
 		GNodeSet dagNodes( allocator );
@@ -170,7 +170,7 @@ struct RDWindowing {
 		addInfoWindowHistogram( window );
 
 		if ( VERBOSE ) {
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 			std::cout << "Reconvergence Driven Windowing for node: " << nodeData.id << std::endl;
 			printSet( graph, window, "W" );
 			printSet( graph, dagNodes, "D" );
@@ -179,7 +179,7 @@ struct RDWindowing {
 		}
 
 		if ( DUMPDOT ) {
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 			std::string dotText = buildDot( graph, window, leaves, roots );
 			dumpWindowDot( dotText, std::to_string( nodeData.id ) );
 		}
@@ -210,7 +210,7 @@ struct RDWindowing {
 			window.insert( currentNode );
 		
 			int fanout = std::distance( graph.out_edges( currentNode ).begin(), graph.out_edges( currentNode ).end() );
-			aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+			aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 
 			if ( fanout > 1 && (currentNodeData.type == aig::NodeType::AND) ) { // DagNodes are stored in a separated list taht is used to discover side outputs of window
 				dagNodes.insert( currentNode );
@@ -221,7 +221,7 @@ struct RDWindowing {
 	}
 
 	// ITER
-	void collectNodesTFO_iter( aig::Graph & graph, GNodeSet & sources, GNodeSet & window, GNodeSet & dagNodes, int maxLevel, Galois::PerIterAllocTy & allocator ) const {
+	void collectNodesTFO_iter( aig::Graph & graph, GNodeSet & sources, GNodeSet & window, GNodeSet & dagNodes, int maxLevel, galois::PerIterAllocTy & allocator ) const {
 
 		GNodeDeque deque( allocator );
 		int level, lastInLevel, sizeBefore, counter;
@@ -269,7 +269,7 @@ struct RDWindowing {
 	void collectRoots( aig::Graph & graph, GNodeSet & window, GNodeSet & roots ) const {
 
 		for ( aig::GNode node : window ) {
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 			if ( nodeData.type == aig::NodeType::PO ) {
 				roots.insert( node );
 			}
@@ -287,7 +287,7 @@ struct RDWindowing {
 
 	// ##################################################################### RDCUT ###################################################################################
 	// REC
-	void reconvDrivenCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & leaves, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, Galois::PerIterAllocTy & allocator ) const {
+	void reconvDrivenCut( aig::Graph & graph, GNodeSet & sources, GNodeSet & leaves, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, galois::PerIterAllocTy & allocator ) const {
 
 		GNodeSet currentWindow( allocator );
 		GNodeSet currentLeaves( allocator );
@@ -309,7 +309,7 @@ struct RDWindowing {
 		int minCost = std::numeric_limits<int>::max();
 		bool onlyPIs = true;
 		for ( aig::GNode node : leaves ) {
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 			if ( nodeData.type != aig::NodeType::PI ) {
 				int cost = leafCost( graph, node, currentWindow );
 				if ( minCost > cost ) {
@@ -330,7 +330,7 @@ struct RDWindowing {
 			currentWindow.insert( currentNode );
 
 			int fanout = std::distance( graph.out_edges( currentNode ).begin(), graph.out_edges( currentNode ).end() );
-			aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+			aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 
 			if ( fanout > 1 && (currentNodeData.type == aig::NodeType::AND) ) { // DagNodes are stored in a separated list taht is used to discover side outputs of window
 				dagNodes.insert( currentNode );
@@ -341,7 +341,7 @@ struct RDWindowing {
 	}
 
 	// ITET
-	void reconvDrivenCut_iter( aig::Graph & graph, GNodeSet & sources, GNodeSet & leaves, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, Galois::PerIterAllocTy & allocator ) const {
+	void reconvDrivenCut_iter( aig::Graph & graph, GNodeSet & sources, GNodeSet & leaves, GNodeSet & window, GNodeSet & dagNodes, int cutSizeLimit, galois::PerIterAllocTy & allocator ) const {
 
 		GNodeSet currentWindow( allocator );
 		GNodeSet currentLeaves( allocator );
@@ -357,7 +357,7 @@ struct RDWindowing {
 				int minCost = std::numeric_limits<int>::max();
 				bool onlyPIs = true;
 				for ( aig::GNode node : currentLeaves ) {
-					aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+					aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 					if ( nodeData.type != aig::NodeType::PI ) {
 						int cost = leafCost( graph, node, currentWindow );
 						if ( minCost > cost ) {
@@ -379,7 +379,7 @@ struct RDWindowing {
 					currentWindow.insert( currentNode );
 
 					int fanout = std::distance( graph.out_edges( currentNode ).begin(), graph.out_edges( currentNode ).end() );
-					aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+					aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 
 					if ( fanout > 1 && (currentNodeData.type == aig::NodeType::AND) ) { // DagNodes are stored in a separated list taht is used to discover side outputs of window
 						dagNodes.insert( currentNode );
@@ -429,7 +429,7 @@ struct RDWindowing {
 		}
 	}
 
-	void checkLeaves( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSet & dagNodes, Galois::PerIterAllocTy & allocator ) const {
+	void checkLeaves( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSet & dagNodes, galois::PerIterAllocTy & allocator ) const {
 
 		for ( aig::GNode node : leaves ) {
 			if ( window.count( node ) != 0 ) {
@@ -445,7 +445,7 @@ struct RDWindowing {
 
 		for ( aig::GNode node : leaves ) {
 		
-			aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+			aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 
 			if ( nodeData.type != aig::NodeType::PI ) {
 
@@ -597,7 +597,7 @@ void optimize( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, GNodeSe
 void findWindowExpSup( aig::Graph & graph, GNodeSet & leaves, GNodeSet & roots, std::unordered_map< int, std::pair< std::string, std::unordered_set< int > > > & expSupMap ) {
 
 	for ( aig::GNode leave : leaves ) {	
-		aig::NodeData & leaveData = graph.getData( leave, Galois::MethodFlag::READ );
+		aig::NodeData & leaveData = graph.getData( leave, galois::MethodFlag::READ );
 		std::unordered_set< int > support;
 		support.insert( leaveData.id );
 		std::string expression = ("i"+std::to_string( leaveData.id ));
@@ -610,7 +610,7 @@ void findWindowExpSup( aig::Graph & graph, GNodeSet & leaves, GNodeSet & roots, 
 		findExpSup( graph, leaves, root, expSupMap );
 
 		//if ( VERBOSE ) {
-			aig::NodeData & rootData = graph.getData( root, Galois::MethodFlag::READ );
+			aig::NodeData & rootData = graph.getData( root, galois::MethodFlag::READ );
 			std::cout << "ID: " << rootData.id << " -> Value: " << expSupMap[ rootData.id ].first << std::endl;
 		//}
 	}
@@ -624,7 +624,7 @@ void findExpSup( aig::Graph & graph, GNodeSet & leaves, aig::GNode & currentNode
 	for ( auto inEdge : graph.in_edges( currentNode ) ) {
 
 		aig::GNode inNode = graph.getEdgeDst( inEdge );
-		aig::NodeData & inNodeData = graph.getData( inNode, Galois::MethodFlag::READ );
+		aig::NodeData & inNodeData = graph.getData( inNode, galois::MethodFlag::READ );
 		bool inEdgeData = graph.getEdgeData( inEdge );
 
 		auto it = expSupMap.find( inNodeData.id );
@@ -654,7 +654,7 @@ void findExpSup( aig::Graph & graph, GNodeSet & leaves, aig::GNode & currentNode
 		support.insert( element.second.begin(), element.second.end() );
 	}
 
-	aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+	aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 	auto pair = std::make_pair( expression, support );
 	expSupMap.insert( std::make_pair( currentNodeData.id, pair ) );
 }
@@ -667,7 +667,7 @@ void buildWindowFunctions( aig::Graph & graph, GNodeSet & window, GNodeSet & lea
 	std::unordered_map< int, word* > computedFunctions;
 
 	for ( aig::GNode leave : leaves ) {	
-		aig::NodeData & leaveData = graph.getData( leave, Galois::MethodFlag::READ );
+		aig::NodeData & leaveData = graph.getData( leave, galois::MethodFlag::READ );
 		varSet.push_back( "i"+std::to_string( leaveData.id ) );
 	}
 
@@ -677,7 +677,7 @@ void buildWindowFunctions( aig::Graph & graph, GNodeSet & window, GNodeSet & lea
 	Functional::startTruthTable( varSet, varMasks, functionPool );
 
 	for ( auto leave : leaves ) {
-		aig::NodeData & leaveData = graph.getData( leave, Galois::MethodFlag::READ );
+		aig::NodeData & leaveData = graph.getData( leave, galois::MethodFlag::READ );
 		auto it = varMasks.find( ("i"+std::to_string( leaveData.id )) );
 		computedFunctions.insert( std::make_pair( leaveData.id, it->second ) );
 	}
@@ -688,7 +688,7 @@ void buildWindowFunctions( aig::Graph & graph, GNodeSet & window, GNodeSet & lea
 
 	if ( VERBOSE ) {
 		for ( auto root: roots ) {
-			aig::NodeData & rootData = graph.getData( root, Galois::MethodFlag::READ );
+			aig::NodeData & rootData = graph.getData( root, galois::MethodFlag::READ );
 			std::cout << "ID: " << rootData.id << " -> Value: " << Functional::toHex( computedFunctions[ rootData.id ], nWords ) << std::endl;
 		}
 	}
@@ -696,7 +696,7 @@ void buildWindowFunctions( aig::Graph & graph, GNodeSet & window, GNodeSet & lea
 
 word * buildFunction( aig::Graph & graph, GNodeSet & leaves, aig::GNode & currentNode, std::unordered_map< int, Functional::word* > & computedFunctions, FunctionPool & functionPool, int nWords ) {
 
-	aig::NodeData & currentNodeData = graph.getData( currentNode, Galois::MethodFlag::READ );
+	aig::NodeData & currentNodeData = graph.getData( currentNode, galois::MethodFlag::READ );
 	auto it = computedFunctions.find( currentNodeData.id );
 	
 	if ( it != computedFunctions.end() ) {
@@ -772,11 +772,11 @@ ReconvDrivenWindowing::~ReconvDrivenWindowing() { }
 
 void ReconvDrivenWindowing::run( int nOutputs, int nInputs, int nLevels, int nFanout, int cutSizeLimit, int verbose ) {
 	
-	Galois::InsertBag< aig::GNode > workList;
+	galois::InsertBag< aig::GNode > workList;
 
 	// PREPROCESS //
-	// Galois::do_all( this->aig.getInputNodes().begin(), this->aig.getInputNodes().end(), FromPI( this->aig.getGraph(), workList ) ); // Starting from PIs
-	Galois::do_all( this->aig.getGraph().begin(), this->aig.getGraph().end(), FromDagNodes( this->aig.getGraph(), workList, nFanout ) ); // Starting from DAG nodes
+	// galois::do_all( this->aig.getInputNodes().begin(), this->aig.getInputNodes().end(), FromPI( this->aig.getGraph(), workList ) ); // Starting from PIs
+	galois::do_all( this->aig.getGraph().begin(), this->aig.getGraph().end(), FromDagNodes( this->aig.getGraph(), workList, nFanout ) ); // Starting from DAG nodes
 
 	if ( verbose == 1 ) {
 		std::cout << std::distance(workList.begin(), workList.end()) << ";";
@@ -788,8 +788,8 @@ void ReconvDrivenWindowing::run( int nOutputs, int nInputs, int nLevels, int nFa
 	}
 
 	// PROCESS //
-	Galois::for_each( workList.begin(), workList.end(), RDWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels, cutSizeLimit ) ); // Active nodes from Worklist
-	//Galois::for_each( this->aig.getGraph().begin(), this->aig.getGraph().end(), RDWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels ) ); // Graph Topology-Driven
+	galois::for_each( workList.begin(), workList.end(), RDWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels, cutSizeLimit ) ); // Active nodes from Worklist
+	//galois::for_each( this->aig.getGraph().begin(), this->aig.getGraph().end(), RDWindowing( this->aig.getGraph(), nInputs, nOutputs, nLevels ) ); // Graph Topology-Driven
 
 	if ( verbose == 3 ) {
 		for ( int i = 0; i < WIN_BUCKET_NUM; i++ ) {
@@ -828,7 +828,7 @@ void printSet( aig::Graph & graph, GNodeSet & S, std::string label ) {
 
 	std::cout << label << " = { ";
 	for ( aig::GNode s : S ) {
-		aig::NodeData & sData = graph.getData( s, Galois::MethodFlag::READ );
+		aig::NodeData & sData = graph.getData( s, galois::MethodFlag::READ );
 		std::cout << sData.id << " ";
 	}
 	std::cout << "}" << std::endl;
@@ -840,7 +840,7 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 	
 	for ( aig::GNode node: leaves ) {
 		// Write Nodes
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 		inputs << "\"" << nodeData.id << "\"";
 		inputs << " [shape=circle, height=1, width=1, penwidth=5 style=filled, fillcolor=\"#ff8080\", fontsize=20]" << std::endl;
 		// Write Edges
@@ -848,8 +848,8 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 			aig::GNode dstNode = graph.getEdgeDst( edge );
 			auto itW = window.find( dstNode );
 			if ( itW != window.end() ) {
-				aig::NodeData & dstData = graph.getData( dstNode, Galois::MethodFlag::READ );
-				bool polarity = graph.getEdgeData( edge, Galois::MethodFlag::READ );
+				aig::NodeData & dstData = graph.getData( dstNode, galois::MethodFlag::READ );
+				bool polarity = graph.getEdgeData( edge, galois::MethodFlag::READ );
 				edges << "\"" << nodeData.id << "\" -> \"" << dstData.id << "\"";
 				if ( polarity ) {
 					edges << " [penwidth = 3, color=blue]" << std::endl;
@@ -863,7 +863,7 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 	
 	for ( aig::GNode node: window ) {
 		// Write Nodes
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 		auto itR = roots.find( node );
 		if ( itR != roots.end() ) {
 			outputs << "\"" << nodeData.id << "\"";
@@ -883,8 +883,8 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 			aig::GNode dstNode = graph.getEdgeDst( edge );
 			auto itW = window.find( dstNode );
 			if ( itW != window.end() ) {
-				aig::NodeData & dstData = graph.getData( dstNode, Galois::MethodFlag::READ );
-				bool polarity = graph.getEdgeData( edge, Galois::MethodFlag::READ );
+				aig::NodeData & dstData = graph.getData( dstNode, galois::MethodFlag::READ );
+				bool polarity = graph.getEdgeData( edge, galois::MethodFlag::READ );
 				edges << "\"" << nodeData.id << "\" -> \"" << dstData.id << "\"";
 				if ( polarity ) {
 					edges << " [penwidth = 3, color=blue]" << std::endl;
@@ -903,7 +903,7 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 	dot << edges.str();
 	dot << "{ rank=source;";
 	for ( aig::GNode node: leaves ) {
-		aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+		aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 		dot << " \"" << nodeData.id << "\"";
 	}
 	dot << " }" << std::endl;
@@ -911,7 +911,7 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 	/* It is commented for better visualization of the graph */
 	// dot << "{ rank=sink;";
 	// for ( aig::GNode node: roots ) {
-	// 	aig::NodeData & nodeData = graph.getData( node, Galois::MethodFlag::READ );
+	// 	aig::NodeData & nodeData = graph.getData( node, galois::MethodFlag::READ );
 	// 	dot << " \"" << nodeData.id << "\"";
 	// }
 	// dot << " }" << std::endl;
@@ -922,7 +922,7 @@ std::string buildDot( aig::Graph & graph, GNodeSet & window, GNodeSet & leaves, 
 	return dot.str();
 }
 
-void circuitToDot( aig::Aig & aig, std::string label, Galois::PerIterAllocTy & allocator ) {
+void circuitToDot( aig::Aig & aig, std::string label, galois::PerIterAllocTy & allocator ) {
 
 	GNodeSet window( allocator );
 	GNodeSet leaves( allocator );
@@ -930,7 +930,7 @@ void circuitToDot( aig::Aig & aig, std::string label, Galois::PerIterAllocTy & a
 
 	for ( auto it = aig.getGraph().begin(); it != aig.getGraph().end(); it++ ) {
 		aig::GNode currentNode = (*it);
-		aig::NodeData & currentNodeData = aig.getGraph().getData( currentNode, Galois::MethodFlag::READ );
+		aig::NodeData & currentNodeData = aig.getGraph().getData( currentNode, galois::MethodFlag::READ );
 		if ( (currentNodeData.type != aig::NodeType::PI) && (currentNodeData.type != aig::NodeType::CONST) ) {
 			window.insert( currentNode );
 		}

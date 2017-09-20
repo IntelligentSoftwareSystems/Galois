@@ -29,13 +29,13 @@
 #ifndef GALOIS_RUNTIME_DET_PARTITIONERS_H
 #define GALOIS_RUNTIME_DET_PARTITIONERS_H
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template <typename G, typename M>
 struct GreedyPartitioner {
 
-  using ParCounter = Galois::GAccumulator<size_t>;
+  using ParCounter = galois::GAccumulator<size_t>;
   using PartCounters = std::vector<ParCounter>;
   using GNode = typename G::GraphNode;
 
@@ -53,8 +53,8 @@ struct GreedyPartitioner {
 
   PartCounters  partSizes;
   const size_t perThrdSizeLim;
-  Galois::PerThreadVector<NborStat> perThrdNborStats;
-  Galois::PerThreadVector<size_t> perThrdPartSizes;
+  galois::PerThreadVector<NborStat> perThrdNborStats;
+  galois::PerThreadVector<size_t> perThrdPartSizes;
 
 
   GreedyPartitioner (
@@ -66,7 +66,7 @@ struct GreedyPartitioner {
       dagManager (dagManager),
       numPart (numPart),
       partSizes (numPart),
-      perThrdSizeLim ((graph.size () + numPart)/ (Galois::getActiveThreads () * numPart))
+      perThrdSizeLim ((graph.size () + numPart)/ (galois::getActiveThreads () * numPart))
   {
     for (unsigned i = 0; i < perThrdNborStats.numRows (); ++i) {
       perThrdNborStats.get (i).clear ();
@@ -91,7 +91,7 @@ struct GreedyPartitioner {
           for (auto i = range.local_begin (), end_i = range.local_end ();
             i != end_i; ++i) {
 
-            auto& nd = graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
+            auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
             GALOIS_ASSERT (nd.partition == -1);
 
             nd.partition = currP;
@@ -117,7 +117,7 @@ struct GreedyPartitioner {
           for (auto i = range.local_begin (), end_i = range.local_end ();
             i != end_i; ++i) {
 
-            auto& nd = graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
+            auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
             GALOIS_ASSERT (nd.partition == -1);
 
             nd.partition = counter % numPart;
@@ -128,7 +128,7 @@ struct GreedyPartitioner {
 
   void assignPartition (GNode src) {
 
-    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+    auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
     if (sd.partition != -1) {
       return;
@@ -192,11 +192,11 @@ struct GreedyPartitioner {
 
   void partition (void) {
 
-    Galois::StatTimer ptime ("partition time");
+    galois::StatTimer ptime ("partition time");
     ptime.start ();
 
 
-    Galois::PerThreadBag<GNode, 64> sources;
+    galois::PerThreadBag<GNode, 64> sources;
 
     dagManager.initDAG ();
     dagManager.collectSources (sources);
@@ -213,7 +213,7 @@ struct GreedyPartitioner {
   template <typename A>
   void initCoarseAdj (A& adjMatrix) {
 
-    Galois::StatTimer t("time initCoarseAdj");
+    galois::StatTimer t("time initCoarseAdj");
 
     t.start ();
 
@@ -227,14 +227,14 @@ struct GreedyPartitioner {
 
           bool boundary = false;
 
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
           GALOIS_ASSERT (sd.partition != -1);
 
           partSizes[sd.partition] += 1;
 
           auto visitAdjClosure = [this, &sd, &boundary, &adjMatrix] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
             GALOIS_ASSERT (dd.partition != -1);
             if (dd.partition != sd.partition) {
@@ -280,7 +280,7 @@ struct GreedyPartitioner {
 
 template <typename G, typename M>
 struct BFSpartitioner {
-  using ParCounter = Galois::GAccumulator<size_t>;
+  using ParCounter = galois::GAccumulator<size_t>;
   using PartCounters = std::vector<ParCounter>;
   using GNode = typename G::GraphNode;
 
@@ -315,7 +315,7 @@ struct BFSpartitioner {
 
 
       if (partSizes[i].reduceRO () < partSizeLim) {
-        auto& nd = graph.getData (*iter, Galois::MethodFlag::UNPROTECTED);
+        auto& nd = graph.getData (*iter, galois::MethodFlag::UNPROTECTED);
         nd.partition = i;
         partSizes [i] += 1;
 
@@ -329,13 +329,13 @@ struct BFSpartitioner {
   template <typename I>
   void bfsTraversal (I beg, I end) {
 
-    using WL = Galois::WorkList::dChunkedFIFO<32>;
-    // using WL = Galois::WorkList::AltChunkedFIFO<8>;
+    using WL = galois::WorkList::dChunkedFIFO<32>;
+    // using WL = galois::WorkList::AltChunkedFIFO<8>;
 
-    Galois::for_each (beg, end,
-        [this] (GNode src, Galois::UserContext<GNode>& ctxt) {
+    galois::for_each (beg, end,
+        [this] (GNode src, galois::UserContext<GNode>& ctxt) {
 
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           GALOIS_ASSERT (sd.partition != -1);
           size_t psize = partSizes[sd.partition].reduceRO ();
 
@@ -344,7 +344,7 @@ struct BFSpartitioner {
 
           if (addMore) {
             auto addMoreClosure = [this, &sd, &ctxt] (GNode dst) {
-              auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+              auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
               if (dd.partition == -1) {
                 dd.partition = sd.partition;
@@ -353,22 +353,22 @@ struct BFSpartitioner {
               }
             };
 
-            dagManager.applyToAdj (src, addMoreClosure, Galois::MethodFlag::UNPROTECTED);
+            dagManager.applyToAdj (src, addMoreClosure, galois::MethodFlag::UNPROTECTED);
           }
 
           
         },
-        Galois::loopname ("partition_bfs"),
-        Galois::wl<WL> ());
+        galois::loopname ("partition_bfs"),
+        galois::wl<WL> ());
   }
 
   template <typename R, typename W>
   void filterUnpartitioned (const R& range, W& unpartitioned) {
 
     assert (unpartitioned.empty_all ());
-    Galois::Runtime::do_all_coupled (range,
+    galois::Runtime::do_all_coupled (range,
         [this, &unpartitioned] (GNode n) {
-          auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+          auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
           if (nd.partition == -1) {
             unpartitioned.push_back (n);
           }
@@ -378,13 +378,13 @@ struct BFSpartitioner {
 
   void partition (void) {
 
-    Galois::StatTimer ptime ("partition time");
+    galois::StatTimer ptime ("partition time");
     ptime.start ();
 
-    Galois::PerThreadBag<GNode, 64>* currRemaining = new PerThreadBag<GNode, 64> ();
-    Galois::PerThreadBag<GNode, 64>* nextRemaining = new PerThreadBag<GNode, 64> ();
+    galois::PerThreadBag<GNode, 64>* currRemaining = new PerThreadBag<GNode, 64> ();
+    galois::PerThreadBag<GNode, 64>* nextRemaining = new PerThreadBag<GNode, 64> ();
 
-    Galois::gdeque<GNode, 64> sources;
+    galois::gdeque<GNode, 64> sources;
 
     bool first = true;
     unsigned rounds = 0;
@@ -427,7 +427,7 @@ struct BFSpartitioner {
 
   unsigned countComponents (void) {
 
-    Galois::StatTimer cctime ("countComponents time");
+    galois::StatTimer cctime ("countComponents time");
     cctime.start ();
 
     std::vector<unsigned> componentIDs (graph.size (), 0);
@@ -443,8 +443,8 @@ struct BFSpartitioner {
 
       componentIDs[*nextSource] = numComp;
       GNode init[] = { *nextSource };
-      Galois::for_each ( &init[0], &init[1], 
-          [this, &componentIDs, &numComp] (GNode n, Galois::UserContext<GNode>& ctxt) {
+      galois::for_each ( &init[0], &init[1], 
+          [this, &componentIDs, &numComp] (GNode n, galois::UserContext<GNode>& ctxt) {
 
             assert (componentIDs[n] != 0);
 
@@ -458,8 +458,8 @@ struct BFSpartitioner {
             dagManager.applyToAdj (n, visitAdjClosure);
 
           },
-          Galois::loopname ("find_component_bfs"),
-          Galois::wl<Galois::WorkList::dChunkedFIFO<32> > ());
+          galois::loopname ("find_component_bfs"),
+          galois::wl<galois::WorkList::dChunkedFIFO<32> > ());
       
 
       // find next Source
@@ -518,7 +518,7 @@ struct CyclicPartitioner: public GreedyPartitioner<G, M> {
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif //  GALOIS_RUNTIME_DET_PARTITIONERS_H

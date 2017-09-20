@@ -33,12 +33,12 @@
 #include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/LoopStatistics.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace BulkSynchronousImpl {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
-struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
+struct FixedSizeRingAdaptor: public galois::FixedSizeRing<T,ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
 
   reference cur() { return isLIFO ? this->front() : this->back();  }
@@ -251,7 +251,7 @@ class Executor {
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct ThreadLocalData {
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<needsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
@@ -295,10 +295,10 @@ class Executor {
     //FIXME:    clearReleasable(); 
     switch (result) {
     case 0: break;
-    case Galois::Runtime::CONFLICT:
+    case galois::Runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case Galois::Runtime::BREAK:
+    case galois::Runtime::BREAK:
     default:
       abort();
     }

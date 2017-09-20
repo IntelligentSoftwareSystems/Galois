@@ -62,7 +62,7 @@ static cll::opt<ExecType> execType (
 
 class AVIodgOrdered: public AVIabstractMain {
 protected:
-  typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
+  typedef galois::Graph::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 
@@ -158,7 +158,7 @@ protected:
       createSyncFiles(createSyncFiles),
       niter(niter) { }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
 
@@ -192,20 +192,20 @@ public:
 
     switch (execType) {
       case useAddRem:
-        Galois::Runtime::for_each_ordered_ar (
-            Galois::Runtime::makeStandardRange (
+        galois::Runtime::for_each_ordered_ar (
+            galois::Runtime::makeStandardRange (
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
               Comparator(), nhVisitor, p,
-              std::make_tuple (Galois::loopname ("avi-kdg-ar")));
+              std::make_tuple (galois::loopname ("avi-kdg-ar")));
         break;
       case useTwoPhase:
-        Galois::Runtime::for_each_ordered_ikdg (
-            Galois::Runtime::makeStandardRange (
+        galois::Runtime::for_each_ordered_ikdg (
+            galois::Runtime::makeStandardRange (
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
               Comparator(), nhVisitor, p,
-              std::make_tuple (Galois::loopname ("avi-ikdg")));
+              std::make_tuple (galois::loopname ("avi-ikdg")));
         break;
       default:
         GALOIS_DIE("Unknown executor type");

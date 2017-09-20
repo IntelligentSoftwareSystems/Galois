@@ -5,7 +5,7 @@
 #include <vector>
 #include <iostream>
 
-typedef Galois::Graph::LC_Dist<std::pair<int, int>, int> Graph;
+typedef galois::Graph::LC_Dist<std::pair<int, int>, int> Graph;
 typedef Graph::GraphNode GNode;
 
 struct AddSelfLoop {
@@ -18,7 +18,7 @@ struct AddSelfLoop {
 
   template<typename T, typename Context>
   void operator()(const T& n, const Context&) {
-    Galois::Runtime::acquire(n, Galois::MethodFlag::ALL);
+    galois::Runtime::acquire(n, galois::MethodFlag::ALL);
     graph->addEdge(n, n, graph->at(n).first);
   }
 };
@@ -33,7 +33,7 @@ void testSerialAdd(int N) {
     g->at(n) = std::make_pair(i, i);
   }
 
-  Galois::for_each_local(g, AddSelfLoop(g));
+  galois::for_each_local(g, AddSelfLoop(g));
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
@@ -53,7 +53,7 @@ struct AddNode {
   AddNode(Graph::pointer g): graph(g) { }
   AddNode() { }
 
-  void operator()(const int& i, const Galois::UserContext<int>&) {
+  void operator()(const int& i, const galois::UserContext<int>&) {
     Graph::GraphNode n = graph->begin()[i];
     graph->at(n) = std::make_pair(i, i);
     graph->addEdge(n, n, graph->at(n).first);
@@ -65,7 +65,7 @@ void testParallelAdd(int N) {
   std::vector<unsigned> counts(N, numEdges);
   Graph::pointer g = Graph::allocate(counts);
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
@@ -95,7 +95,7 @@ struct Grid {
     return graph->begin()[i*N+j];
   }
 
-  void operator()(const Graph::GraphNode& n, Galois::UserContext<Graph::GraphNode>& ctx) {
+  void operator()(const Graph::GraphNode& n, galois::UserContext<Graph::GraphNode>& ctx) {
     int x = graph->at(n).first;
     int i = x / N;
     int j = x % N;
@@ -136,8 +136,8 @@ void testGrid(int N) {
 
   GALOIS_ASSERT(N > 0);
 
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N*N), AddNode(g));
-  Galois::for_each_local(g, Grid(g, N));
+  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N*N), AddNode(g));
+  galois::for_each_local(g, Grid(g, N));
   
   if (!printGraph)
     GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N * N);
@@ -166,7 +166,7 @@ void testGrid(int N) {
 
 int main(int argc, char *argv[])
 {
-  Galois::StatManager M;
+  galois::StatManager M;
 
   int threads = 2;
   if (argc > 1)
@@ -175,8 +175,8 @@ int main(int argc, char *argv[])
   if (argc > 2)
     N = atoi(argv[2]);
   
-  Galois::setActiveThreads(threads);
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  galois::setActiveThreads(threads);
+  auto& net = galois::Runtime::getSystemNetworkInterface();
   net.start();
 
   testSerialAdd(N);

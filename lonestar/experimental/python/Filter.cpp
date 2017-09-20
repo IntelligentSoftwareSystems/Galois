@@ -9,11 +9,11 @@
 template<bool isFullMatch>
 struct RegExMatch {
   Graph& g;
-  Galois::InsertBag<GNode>& bag;
+  galois::InsertBag<GNode>& bag;
   KeyAltTy key;
   std::regex regex;
 
-  RegExMatch(Graph& g, Galois::InsertBag<GNode>& bag, KeyAltTy key, std::regex regex)
+  RegExMatch(Graph& g, galois::InsertBag<GNode>& bag, KeyAltTy key, std::regex regex)
     : g(g), bag(bag), key(key), regex(regex) 
   {}
 
@@ -38,19 +38,19 @@ struct RegExMatch {
 };
 
 NodeList filterNode(Graph *g, const KeyAltTy key, const ValAltTy value, bool isFullMatch) {
-//  Galois::StatManager statManager;
-  Galois::InsertBag<GNode> bag;
+//  galois::StatManager statManager;
+  galois::InsertBag<GNode> bag;
 
-//  Galois::StatTimer T;
+//  galois::StatTimer T;
 //  T.start();
 
 //  std::cout << "regex = " << value << std::endl;
   std::regex regex(value);
 
   if (isFullMatch) {
-    Galois::do_all_local(*g, RegExMatch<true>{*g, bag, key, regex}, Galois::do_all_steal<true>());
+    galois::do_all_local(*g, RegExMatch<true>{*g, bag, key, regex}, galois::do_all_steal<true>());
   } else {
-    Galois::do_all_local(*g, RegExMatch<false>{*g, bag, key, regex}, Galois::do_all_steal<true>());
+    galois::do_all_local(*g, RegExMatch<false>{*g, bag, key, regex}, galois::do_all_steal<true>());
   }
 
 //  T.stop();

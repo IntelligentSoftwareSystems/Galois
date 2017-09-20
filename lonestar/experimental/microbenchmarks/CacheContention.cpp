@@ -64,9 +64,9 @@ static unsigned int globalAtomicCounter = 0;
 static volatile unsigned int globalCounter = 0;
 
 struct Contention {
-  Galois::Substrate::Barrier& barrier;
+  galois::Substrate::Barrier& barrier;
 
-  Contention(Galois::Substrate::Barrier& b): barrier(b) {}
+  Contention(galois::Substrate::Barrier& b): barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned int upper = timesAdd / numThreads;
@@ -152,12 +152,12 @@ struct Contention {
 };
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
-  Galois::on_each(Contention(Galois::Runtime::getBarrier(Galois::Runtime::activeThreads)), Galois::loopname("Contention"));
+  galois::on_each(Contention(galois::Runtime::getBarrier(galois::Runtime::activeThreads)), galois::loopname("Contention"));
   T.stop();
 
   if(algo == Algo::nonAtomicRMW || algo == Algo::writeGlobal) {

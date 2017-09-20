@@ -5,10 +5,10 @@
 #include <map>
 
 int main(int argc, char** argv) {
-  typedef Galois::Runtime::FixedSizeHeap Heap;
+  typedef galois::Runtime::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
-  typedef Galois::Substrate::PerThreadStorage<HeapPtr> Heaps;
-  typedef Galois::concurrent_gslist<int> Collection;
+  typedef galois::Substrate::PerThreadStorage<HeapPtr> Heaps;
+  typedef galois::concurrent_gslist<int> Collection;
   int numThreads = 2;
   unsigned size = 100;
   if (argc > 1)
@@ -20,12 +20,12 @@ int main(int argc, char** argv) {
   if (size <= 0)
     size = 10000;
 
-  Galois::setActiveThreads(numThreads);
+  galois::setActiveThreads(numThreads);
 
   Heaps heaps;
   Collection c;
 
-  Galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned id, unsigned total) {
     HeapPtr& hp = *heaps.getLocal();
     hp = std::move(HeapPtr(new Heap(sizeof(Collection::block_type))));
     for (unsigned i = 0; i < size; ++i)
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   }
   GALOIS_ASSERT(counter.size() == size);
 
-  Galois::on_each([&](unsigned id, unsigned total) {
+  galois::on_each([&](unsigned id, unsigned total) {
     while (c.pop_front(Collection::promise_to_dealloc()))
       ;
   });

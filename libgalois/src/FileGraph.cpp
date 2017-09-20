@@ -70,7 +70,7 @@ void* mmap_big(Args... args) {
 typedef off_t offset_t;
 #endif
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 //File format V1:
@@ -342,7 +342,7 @@ void FileGraph::fromFile(const std::string& filename) {
 template<typename Mappings>
 static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
   // mmap needs page-aligned offsets
-  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Substrate::allocSize() - 1);
+  offset_t aligned = offset & ~static_cast<offset_t>(galois::Substrate::allocSize() - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
   void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
@@ -354,9 +354,9 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
 
 static void pageInterleaved(void* ptr, uint64_t length, uint32_t hugePageSize,
                             unsigned int numThreads) {
-  Galois::Substrate::getThreadPool().run(numThreads, 
+  galois::Substrate::getThreadPool().run(numThreads, 
    [ptr, length, hugePageSize, numThreads] () {
-      auto myID = Galois::Substrate::ThreadPool::getTID();
+      auto myID = galois::Substrate::ThreadPool::getTID();
 
       volatile char* cptr = reinterpret_cast<volatile char*>(ptr);
 
@@ -430,7 +430,7 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
 
   // do interleaved numa allocation with current number of threads
   if (numaMap) {
-    unsigned int numThreads = Galois::Runtime::activeThreads;
+    unsigned int numThreads = galois::Runtime::activeThreads;
     const size_t hugePageSize = 2 * 1024 * 1024; // 2MB
 
     void* ptr;
@@ -486,7 +486,7 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
 -> GraphRange {
   std::vector<unsigned> dummy;
   // note this calls into another findIndex (not the one directly above)....
-  return Galois::Graph::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
+  return galois::Graph::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
                                                 edgeSize, id, total, outIdx, 
                                                 dummy, nodeOffset, edgeOffset);
 
@@ -522,7 +522,7 @@ auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
   size_t eb = findIndex(0, 1, ea, bb, numNodes);
 
   if (true) {
-    Galois::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, 
+    galois::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, 
                   "], [", aa, " ", ea, " ", ea - aa, "]");
   }
 

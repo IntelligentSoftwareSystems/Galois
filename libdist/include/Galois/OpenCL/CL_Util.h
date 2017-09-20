@@ -49,7 +49,7 @@ extern "C" {
 //////////////////////////////////////////
 #ifndef GOPT_CL_UTIL_H_
 #define GOPT_CL_UTIL_H_
-namespace Galois {
+namespace galois {
 namespace OpenCL {
 
 

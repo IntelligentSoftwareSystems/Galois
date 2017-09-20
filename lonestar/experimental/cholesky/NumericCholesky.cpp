@@ -73,7 +73,7 @@ struct Node {
 typedef double edgedata;
 //typedef float edgedata;
 
-typedef Galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
+typedef galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -91,8 +91,8 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 
 // Adapted from preflowpush/Preflowpush.cpp
 Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
-  Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-                       ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED);
+  Graph::edge_iterator ii = g.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+                       ei = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
   *hasEdge = false;
   for (; ii != ei; ++ii) {
     if (g.getEdgeDst(ii) == dst) {
@@ -126,8 +126,8 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
  */
 struct Cmp {
   bool operator()(const GNode& node1, const GNode& node2) const {
-    Node &node1d = graph.getData(node1, Galois::MethodFlag::UNPROTECTED);
-    Node &node2d = graph.getData(node2, Galois::MethodFlag::UNPROTECTED);
+    Node &node1d = graph.getData(node1, galois::MethodFlag::UNPROTECTED);
+    Node &node2d = graph.getData(node2, galois::MethodFlag::UNPROTECTED);
     int pos1 = -1, pos2 = -1;
 
     // Check the total ordering to determine if item1 <= item2
@@ -153,7 +153,7 @@ struct Cmp {
 struct NhFunc {
   /*
   typedef int tt_has_fixed_neighborhood;
-  static_assert(Galois::has_fixed_neighborhood<NhFunc>::value, "Oops!");
+  static_assert(galois::has_fixed_neighborhood<NhFunc>::value, "Oops!");
   */
 
   template<typename C>
@@ -172,13 +172,13 @@ struct NhFunc {
  */
 struct DemoAlgo {
   //typedef int tt_does_not_need_push;
-  //static_assert(Galois::does_not_need_push<DemoAlgo>::value, "Oops!");
+  //static_assert(galois::does_not_need_push<DemoAlgo>::value, "Oops!");
 
-  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode node, galois::UserContext<GNode>& ctx) {
     // Find self-edge for this node, update it
     bool hasEdge = false;
     edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
-                                         Galois::MethodFlag::UNPROTECTED);
+                                         galois::MethodFlag::UNPROTECTED);
     assert(hasEdge);
     assert(factor > 0);
     factor = sqrt(factor);
@@ -200,7 +200,7 @@ struct DemoAlgo {
       GNode dst = graph.getEdgeDst(ii);
       Node &dstd = graph.getData(dst);
       if ( !dstd.seen && dst != node ) {
-        edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
+        edgedata &ed = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
         ed /= factor;
         //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
         //std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
@@ -215,7 +215,7 @@ struct DemoAlgo {
       GNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
       if ( srcd.seen || src == node ) continue;
-      edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::UNPROTECTED);
+      edgedata& eds = graph.getEdgeData(iis, galois::MethodFlag::UNPROTECTED);
 
       // Enumerate all other neighbors
       for (Graph::edge_iterator iid = graph.edge_begin(node),
@@ -231,8 +231,8 @@ struct DemoAlgo {
         if ( !hasEdge ) continue;
 
         // Update the weight of the bridge edge
-        edgedata &edd = graph.getEdgeData(iid, Galois::MethodFlag::UNPROTECTED),
-          &edb = graph.getEdgeData(bridge, Galois::MethodFlag::UNPROTECTED);
+        edgedata &edd = graph.getEdgeData(iid, galois::MethodFlag::UNPROTECTED),
+          &edb = graph.getEdgeData(bridge, galois::MethodFlag::UNPROTECTED);
         edb -= eds*edd;
 
         //printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);
@@ -252,8 +252,8 @@ struct DemoAlgo {
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
     if (ii != ei) { // Ensure there is at least one node in the graph.
-      Galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
-      //Galois::for_each(ii, ei, *this);
+      galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
+      //galois::for_each(ii, ei, *this);
     }
   }
 };
@@ -265,8 +265,8 @@ bool verify() {
   std::cout << "\n\n\nPlease verify by comparing choleskyedges.txt against expected contents.\n\n\n\n"; 
   return true;
   /*
-  if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
-    if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
+  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
+    if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
       CheckAcyclic c;
       return c();
     }
@@ -279,21 +279,21 @@ template<typename Algo>
 void run() {
   Algo algo;
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   algo();
   T.stop();
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  Galois::StatTimer Tinitial("InitializeTime");
+  galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
 
   // Load filled graph with edge data
-  Galois::Graph::readGraph(graph, inputFilename.c_str());
+  galois::Graph::readGraph(graph, inputFilename.c_str());
   std::cout << "Num nodes: " << graph.size() << "\n";
 
   // Assign IDs to each node
@@ -329,15 +329,15 @@ int main(int argc, char** argv) {
 
   Tinitial.stop();
 
-  //Galois::preAlloc(numThreads);
-  Galois::reportPageAlloc("MeminfoPre");
+  //galois::preAlloc(numThreads);
+  galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
     //case asynchronous: run<AsynchronousAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify && !verify()) {
     std::cerr << "verification failed\n";

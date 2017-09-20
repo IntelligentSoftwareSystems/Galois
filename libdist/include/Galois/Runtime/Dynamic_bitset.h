@@ -12,11 +12,11 @@
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
 
-namespace Galois {
+namespace galois {
 
   class DynamicBitSet {
 
-    std::vector<Galois::CopyableAtomic<uint64_t>> bitvec;
+    std::vector<galois::CopyableAtomic<uint64_t>> bitvec;
     size_t num_bits;
     static constexpr uint32_t bits_uint64 = sizeof(uint64_t)*CHAR_BIT;
 
@@ -24,11 +24,11 @@ namespace Galois {
 
     DynamicBitSet() : num_bits(0) {}
 
-    const std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() const{
+    const std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() const{
       return bitvec;
     }
  
-    std::vector<Galois::CopyableAtomic<uint64_t>>& get_vec() {
+    std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() {
       return bitvec;
     }
 
@@ -152,18 +152,18 @@ namespace Galois {
     typedef int tt_is_copyable;
   };
 
-  static Galois::DynamicBitSet EmptyBitset;
+  static galois::DynamicBitSet EmptyBitset;
 
   struct InvalidBitsetFnTy {
     static bool is_valid() {
       return false;
     }
-    static Galois::DynamicBitSet& get() {
+    static galois::DynamicBitSet& get() {
       return EmptyBitset;
     }
     // inclusive range
     static void reset_range(size_t begin, size_t end) {
     }
   };
-} // namespace Galois
+} // namespace galois
 #endif

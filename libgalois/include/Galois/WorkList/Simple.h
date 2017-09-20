@@ -37,7 +37,7 @@
 #include <deque>
 #include <mutex>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 //! Simple Container Wrapper worklist (not scalable).
@@ -72,8 +72,8 @@ public:
       push(range.begin(), range.end());
   }
 
-  Galois::optional<value_type> pop() {
-    Galois::optional<value_type> retval;
+  galois::optional<value_type> pop() {
+    galois::optional<value_type> retval;
     std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
     if (!wl.empty()) {
       if (popBack) {
@@ -92,13 +92,13 @@ template<typename T = int>
 using FIFO = Wrapper<T, std::deque<T>, false >;
 
 template<typename T = int>
-using GFIFO = Wrapper<T, Galois::gdeque<T>, false >;
+using GFIFO = Wrapper<T, galois::gdeque<T>, false >;
 
 template<typename T = int>
 using LIFO = Wrapper<T, std::deque<T>, true >;
 
 template<typename T = int>
-using GLIFO = Wrapper<T, Galois::gdeque<T>, true >;
+using GLIFO = Wrapper<T, galois::gdeque<T>, true >;
 
 
 GALOIS_WLCOMPILECHECK(FIFO)
@@ -108,6 +108,6 @@ GALOIS_WLCOMPILECHECK(GLIFO)
 
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

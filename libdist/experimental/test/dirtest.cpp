@@ -2,7 +2,7 @@
 #include "Galois/Runtime/Directory.h"
 
 using namespace std;
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 struct simple :public Lockable {
   int member;

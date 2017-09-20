@@ -44,7 +44,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace Galois {
+namespace galois {
 
 /**
  * Unordered collection of elements. This data structure supports scalable
@@ -67,7 +67,7 @@ public:
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
+    galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
     unsigned int thr;
     header* p;
     U* v;
@@ -121,7 +121,7 @@ public:
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
 
-    Iterator(Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
+    Iterator(galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
       hd(h), thr(t), p(0), v(0)
     {
       // find first valid item
@@ -131,8 +131,8 @@ public:
   };
 
 private:
-  Galois::Runtime::FixedSizeHeap heap;
-  Galois::Substrate::PerThreadStorage<PerThread> heads;
+  galois::Runtime::FixedSizeHeap heap;
+  galois::Substrate::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
     PerThread& hpair = *heads.getLocal();
@@ -161,7 +161,7 @@ private:
     if (BlockSize) {
       return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromHeap(Galois::Runtime::pagePoolAlloc(), Galois::Runtime::pagePoolSize());
+      return newHeaderFromHeap(galois::Runtime::pagePoolAlloc(), galois::Runtime::pagePoolSize());
     }
   }
 
@@ -176,7 +176,7 @@ private:
         if (BlockSize)
           heap.deallocate(h2);
         else
-          Galois::Runtime::pagePoolFree(h2);
+          galois::Runtime::pagePoolFree(h2);
       }
       hpair.second = 0;
     }
@@ -228,8 +228,8 @@ public:
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
   
-  local_iterator local_begin() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID()); }
-  local_iterator local_end() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID() + 1); }
+  local_iterator local_begin() { return local_iterator(&heads, galois::Substrate::ThreadPool::getTID()); }
+  local_iterator local_end() { return local_iterator(&heads, galois::Substrate::ThreadPool::getTID() + 1); }
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {

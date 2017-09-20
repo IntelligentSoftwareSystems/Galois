@@ -57,11 +57,11 @@ class BilliardsPOsortedVec;
 
 class BilliardsPOunsorted: public Billiards<BilliardsPOunsorted, Table<Ball> > {
 
-  typedef Galois::Markable<Event> MEvent;
-  typedef Galois::PerThreadVector<MEvent> WLTy;
-  typedef Galois::PerThreadVector<Event> ILTy;
+  typedef galois::Markable<Event> MEvent;
+  typedef galois::PerThreadVector<MEvent> WLTy;
+  typedef galois::PerThreadVector<Event> ILTy;
 
-  typedef Galois::PerThreadVector<Event> AddListTy;
+  typedef galois::PerThreadVector<Event> AddListTy;
 
   friend class BilliardsPOsortedVec;
 
@@ -78,24 +78,24 @@ public:
 
   virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
+    galois::Substrate::getThreadPool().burnPower (galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
-    Galois::do_all_choice (
-        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::do_all_choice (
+        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
         std::make_tuple(
-          Galois::loopname("fill_init"),
-          Galois::chunk_size<32> ()));
+          galois::loopname("fill_init"),
+          galois::chunk_size<32> ()));
 
 
     size_t i = runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
 
-    Galois::Substrate::getThreadPool ().beKind ();
+    galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }
@@ -105,8 +105,8 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  Galois::Runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
-  // Galois::Runtime::do_all_coupled (
+  galois::Runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
+  // galois::Runtime::do_all_coupled (
       // boost::counting_iterator<unsigned> (0),
       // boost::counting_iterator<unsigned> (workList.numRows ()), 
       // _CleanupFunc (workList, currStep),
@@ -119,10 +119,10 @@ static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, b
     // TODO: Explain separation of simulating events and adding
     // new events
 
-    Galois::TimeAccumulator findTimer;
-    Galois::TimeAccumulator simTimer;
-    Galois::TimeAccumulator addTimer;
-    Galois::TimeAccumulator sweepTimer;
+    galois::TimeAccumulator findTimer;
+    galois::TimeAccumulator simTimer;
+    galois::TimeAccumulator addTimer;
+    galois::TimeAccumulator sweepTimer;
 
     ILTy indepList;
 
@@ -139,11 +139,11 @@ static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, b
       // printf ("currStep = %d, workList.size () = %zd\n", currStep, workList.size_all ());
 
       findTimer.start ();
-      Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
+      galois::do_all_choice (galois::Runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
           std::make_tuple(
-            Galois::loopname("find_indep_events"), 
-            Galois::chunk_size<1> ()));
+            galois::loopname("find_indep_events"), 
+            galois::chunk_size<1> ()));
 
       findTimer.stop ();
 
@@ -157,12 +157,12 @@ static size_t runSimInternal (Tbl_t& table, WLTy& workList, const FP& endtime, b
       simTimer.stop ();
 
       addTimer.start ();
-      // Galois::Runtime::do_all_coupled (indepList, 
-      Galois::do_all_choice (Galois::Runtime::makeLocalRange (indepList), 
+      // galois::Runtime::do_all_coupled (indepList, 
+      galois::do_all_choice (galois::Runtime::makeLocalRange (indepList), 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), 
           std::make_tuple(
-            Galois::loopname("add_next_events"), 
-            Galois::chunk_size<1> ()));
+            galois::loopname("add_next_events"), 
+            galois::chunk_size<1> ()));
       addTimer.stop ();
 
 
@@ -381,31 +381,31 @@ public:
 
   virtual size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
-    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+    galois::Substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
-    Galois::do_all_choice (
-        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+    galois::do_all_choice (
+        galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
         std::make_tuple(
-          Galois::loopname("fill_init"), 
-          Galois::chunk_size<32> ()));
+          galois::loopname("fill_init"), 
+          galois::chunk_size<32> ()));
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
       // std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
     // }
-    Galois::on_each (
+    galois::on_each (
         [&workList] (const unsigned tid, const unsigned numT) {
           unsigned r = tid;
           assert (r < workList.numRows ());
            std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
 
         },
-        Galois::loopname("initsort"));
+        galois::loopname("initsort"));
 
 
 
@@ -414,7 +414,7 @@ public:
            BilliardsPOunsorted::AddNextEvents, RemoveAndSortEvents> 
              (table, workList, endtime, enablePrints);
 
-    Galois::Substrate::getThreadPool ().beKind ();
+    galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }

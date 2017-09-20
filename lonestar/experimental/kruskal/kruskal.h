@@ -90,18 +90,18 @@ protected:
 
   void readGraph (const std::string& filename, VecKNode_ty& nodes, Edges_ty& edges) {
 
-    typedef Galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
+    typedef galois::Graph::LC_CSR_Graph<unsigned, unsigned> InGraph;
     typedef InGraph::GraphNode InGNode;
 
     InGraph ingraph;
-    Galois::Graph::readGraph(ingraph, filename);
+    galois::Graph::readGraph(ingraph, filename);
 
     // numbering nodes 0..N-1, where N is number of nodes
     // in the graph
     unsigned idCntr = 0;
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
-      ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED) = idCntr;
+      ingraph.getData (*n, galois::MethodFlag::UNPROTECTED) = idCntr;
       ++idCntr;
     }
 
@@ -114,14 +114,14 @@ protected:
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
 
-      InGNode src = ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED);
+      InGNode src = ingraph.getData (*n, galois::MethodFlag::UNPROTECTED);
 
       if (nodes[src] == NULL) {
         nodes[src] = new KNode_tp (src);
       }
 
-      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
-          ende = ingraph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
+      for (InGraph::edge_iterator e = ingraph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
+          ende = ingraph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
         InGNode dst = ingraph.getEdgeDst (*e);
 
@@ -241,7 +241,7 @@ protected:
 public:
 
   virtual void run (int argc, char* argv[]) {
-    Galois::StatManager stat;
+    galois::StatManager stat;
     LonestarStart (argc, argv, name, desc, url);
 
     //TODO
@@ -273,7 +273,7 @@ public:
 
     initRemaining (nodes, edgesVec);
     
-    Galois::StatTimer t ("Time taken by runMST: ");
+    galois::StatTimer t ("Time taken by runMST: ");
 
     t.start ();
     runMST (nodes, edgesVec, mstWeight, totalIter);
@@ -448,7 +448,7 @@ private:
 
 
   bool verify (const VecKNode_ty& nodes, const Edges_ty& edges, const size_t kruskalSum) const {
-    Galois::StatTimer pt("Prim's Time:");
+    galois::StatTimer pt("Prim's Time:");
     pt.start ();
     size_t primSum = runPrim (nodes, edges);
     pt.stop ();

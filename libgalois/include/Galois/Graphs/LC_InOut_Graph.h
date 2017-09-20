@@ -38,7 +38,7 @@
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at_c.hpp>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 /**
@@ -143,7 +143,7 @@ public:
   LC_InOut_Graph(): asymmetric(false) { }
 
   edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) { 
-    // Galois::Runtime::checkWrite(mflag, false);
+    // galois::Runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
     } else {
@@ -162,14 +162,14 @@ public:
   in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
-      if (Galois::Runtime::shouldLock(mflag)) {
+      if (galois::Runtime::shouldLock(mflag)) {
         for (edge_iterator ii = this->raw_begin(N), ei = this->raw_end(N); ii != ei; ++ii) {
           this->acquireNode(this->getEdgeDst(ii), mflag);
         }
       }
       return in_edge_iterator(this->raw_begin(N));
     } else {
-      if (Galois::Runtime::shouldLock(mflag)) {
+      if (galois::Runtime::shouldLock(mflag)) {
         for (typename InGraph::edge_iterator ii = inGraph.raw_begin(inGraphNode(N)),
             ei = inGraph.raw_end(inGraphNode(N)); ii != ei; ++ii) {
           this->acquireNode(nodeFromId(inGraph.getId(inGraph.getEdgeDst(ii))), mflag);
@@ -253,7 +253,7 @@ public:
    * Sorts incoming edges of all nodes. Comparison is by getInEdgeDst(e).
    */
   void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    Galois::do_all_local(*this, [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, Galois::do_all_steal<true>());
+    galois::do_all_local(*this, [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, galois::do_all_steal<true>());
   }
 
   size_t idFromNode(GraphNode N) {

@@ -25,7 +25,7 @@
  * reserved.
  *
  * @section Description
- * Initializes the components of Galois::Runtime library
+ * Initializes the components of galois::Runtime library
  *
  * @author M. Amber Hassaan<ahassaan@ices.utexas.edu>
  */
@@ -39,13 +39,13 @@
 
 #include <string>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 template <typename SM>
-class SharedMemRuntime: public Galois::Substrate::SharedMemSubstrate {
+class SharedMemRuntime: public galois::Substrate::SharedMemSubstrate {
 
-  using Base = Galois::Substrate::SharedMemSubstrate;
+  using Base = galois::Substrate::SharedMemSubstrate;
 
   internal::PageAllocState<> m_pa;
   SM m_sm;
@@ -69,7 +69,7 @@ public:
 };
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif// GALOIS_RUNTIME_INIT_H

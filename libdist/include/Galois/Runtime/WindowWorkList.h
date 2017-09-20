@@ -39,12 +39,12 @@
 #include <boost/noncopyable.hpp>
 
 
-namespace Galois {
+namespace galois {
 namespace Runtime { 
 
 template <typename T, typename Cmp>
 class SortedRangeWindowWL: private boost::noncopyable {
-  using PerThrdWL = Galois::PerThreadVector<T>;
+  using PerThrdWL = galois::PerThreadVector<T>;
   using Iter = typename PerThrdWL::local_iterator;
   using Range = std::pair<Iter, Iter>;
 
@@ -65,18 +65,18 @@ public:
 
     GAccumulator<size_t> count;
 
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
         }, 
         std::make_tuple (
-        Galois::loopname ("initfill"),
-        Galois::chunk_size<16> ()));
+        galois::loopname ("initfill"),
+        galois::chunk_size<16> ()));
 
     init_sz = count.reduce ();
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           std::sort (m_wl[tid].begin (), m_wl[tid].end (), cmp);
         }
@@ -104,10 +104,10 @@ public:
   }
 
 
-  Galois::optional<T> getMin (void) const {
+  galois::optional<T> getMin (void) const {
     unsigned numT = getActiveThreads ();
 
-    Galois::optional<T> minElem;
+    galois::optional<T> minElem;
 
     for (unsigned i = 0; i < numT; ++i) {
       const Range& r = *wlRange.getRemote (i);
@@ -134,7 +134,7 @@ public:
       return;
     }
 
-    const size_t numT = Galois::getActiveThreads ();
+    const size_t numT = galois::getActiveThreads ();
 
     const size_t numPerThrd = (newSize - origSize) / numT;
 
@@ -170,7 +170,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      Galois::Runtime::on_each_impl (
+      galois::Runtime::on_each_impl (
           [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal ());
 
@@ -216,7 +216,7 @@ class WindowWLbase: private boost::noncopyable {
 
 protected:
 
-  using dbg = Galois::debug<0>;
+  using dbg = galois::debug<0>;
 
   Cmp cmp;
   PerThrdWL m_wl;
@@ -232,18 +232,18 @@ public:
   template <typename R>
   void initfill (const R& range) {
 
-    Galois::do_all_choice (range,
+    galois::do_all_choice (range,
         [this] (const T& x) {
           push (x);
         }, 
         std::make_tuple (
-          Galois::loopname ("initfill"),
-          Galois::chunk_size<16> ()));
+          galois::loopname ("initfill"),
+          galois::chunk_size<16> ()));
 
   }
 
-  Galois::optional<T> getMin (void) const {
-    Galois::optional<T> ret;
+  galois::optional<T> getMin (void) const {
+    galois::optional<T> ret;
 
     unsigned numT = getActiveThreads ();
 
@@ -287,7 +287,7 @@ public:
       return;
     }
 
-    const size_t numT = Galois::getActiveThreads ();
+    const size_t numT = galois::getActiveThreads ();
 
     const size_t numPerThrd = (newSize - origSize) / numT;
 
@@ -295,15 +295,15 @@ public:
     // windowLim is calculated by computing the max of max element pushed by each
     // thread. In this case, the max element is the one pushed in last 
 
-    Substrate::PerThreadStorage<Galois::optional<T> > perThrdLastPop;
+    Substrate::PerThreadStorage<galois::optional<T> > perThrdLastPop;
 
     Derived* d = static_cast<Derived*> (this);
     assert(d);
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, d, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
 
-          Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
+          galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
 
 
           int lim = std::min (m_wl.get ().size (), numPerThrd);
@@ -325,10 +325,10 @@ public:
 
     // // compute the max of last element pushed into any workList rows
     //
-    Galois::optional<T> windowLim;
+    galois::optional<T> windowLim;
 
     for (unsigned i = 0; i < numT; ++i) {
-      const Galois::optional<T>& lp = *(perThrdLastPop.getRemote (i));
+      const galois::optional<T>& lp = *(perThrdLastPop.getRemote (i));
 
       if (lp) {
         if (!windowLim || cmp (*windowLim, *lp)) {
@@ -362,7 +362,7 @@ public:
       Derived* d = static_cast<Derived*> (this);
       assert(d);
 
-      Galois::Runtime::on_each_impl (
+      galois::Runtime::on_each_impl (
           [this, d, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
             while (!m_wl.get ().empty ()) {
@@ -380,7 +380,7 @@ public:
           , "poll_part_2");
 
 
-      Galois::optional<T> min  = d->getMin ();
+      galois::optional<T> min  = d->getMin ();
       if (min) {
         assert (cmp (*windowLim, *min));
       }
@@ -404,7 +404,7 @@ template <typename T, typename Cmp>
 class PQwindowWL: public WindowWLbase<T, Cmp, PerThreadMinHeap<T, Cmp>, PQwindowWL<T, Cmp> > {
 
 
-  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = galois::PerThreadMinHeap<T, Cmp>;
   using Base = WindowWLbase<T, Cmp, PerThrdWL, PQwindowWL>;
 
   template <typename, typename, typename, typename> 
@@ -444,8 +444,8 @@ template <typename T, typename Cmp>
 class SetWindowWL: public WindowWLbase<T, Cmp, PerThreadSet<T, Cmp>, SetWindowWL<T, Cmp> > {
 
 
-  // using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
-  using PerThrdWL = Galois::PerThreadSet<T, Cmp>;
+  // using PerThrdWL = galois::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = galois::PerThreadSet<T, Cmp>;
   using Base = WindowWLbase<T, Cmp, PerThrdWL, SetWindowWL>;
 
   template <typename, typename, typename, typename> 
@@ -495,7 +495,7 @@ public:
 
   template <typename R>
   void initfill (const R& range) {
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, range] (const unsigned tid, const unsigned numT) {
           m_wl.getLocal ()->initfill (range.local_begin (), range.local_end ());
         }, "initfill");
@@ -504,7 +504,7 @@ public:
   template <typename WL>
   void poll (WL& workList, const size_t numElems) {
 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [this, &workList, numElems] (const unsigned tid, const unsigned numT) {
           const size_t numPerThrd = numElems / numT;
           m_wl.getLocal ()->poll (workList, numPerThrd);
@@ -527,7 +527,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      Galois::Runtime::on_each_impl (
+      galois::Runtime::on_each_impl (
           [this, &workList, windowLim] (const unsigned tid, const unsigned numT) {
             m_wl.getLocal ()->partition (workList, *windowLim);
           }, "poll_part_2");
@@ -551,7 +551,7 @@ public:
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif // GALOIS_RUNTIME_WINDOW_WORKLIST_H

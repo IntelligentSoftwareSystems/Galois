@@ -67,7 +67,7 @@ static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc(
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 
-typedef Galois::Graph::LC_CSR_Graph<void, void> Graph;
+typedef galois::Graph::LC_CSR_Graph<void, void> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph* G;
@@ -124,13 +124,13 @@ struct TempState  {
   }
 };
 
-Galois::Substrate::PerThreadStorage<TempState*> state;
+galois::Substrate::PerThreadStorage<TempState*> state;
 
 void computeSucSize() {
   sucSize.resize(NumNodes);
   for (Graph::iterator ii = G->begin(), ee = G->end(); ii != ee; ++ii)
-    sucSize[*ii] = std::distance(G->edge_begin(*ii, Galois::MethodFlag::UNPROTECTED),
-				 G->edge_end(*ii, Galois::MethodFlag::UNPROTECTED));
+    sucSize[*ii] = std::distance(G->edge_begin(*ii, galois::MethodFlag::UNPROTECTED),
+				 G->edge_end(*ii, galois::MethodFlag::UNPROTECTED));
 }
 
 struct popstate {
@@ -141,7 +141,7 @@ struct popstate {
 
 
 struct process {
-  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
+  void operator()(GNode& _req, galois::UserContext<GNode>& lwl) {
     TempState* tmp = *state.getLocal();
     tmp->reset();
     GNode* SQ = tmp->SQG;
@@ -163,8 +163,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::edge_iterator
-          ii = G->edge_begin(_v, Galois::MethodFlag::UNPROTECTED),
-          ee = G->edge_end(_v, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+          ii = G->edge_begin(_v, galois::MethodFlag::UNPROTECTED),
+          ee = G->edge_end(_v, galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
 	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {
@@ -253,12 +253,12 @@ struct HasOut: public std::unary_function<GNode,bool> {
 };
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   G = &g;
-  Galois::Graph::readGraph(*G, filename); 
+  galois::Graph::readGraph(*G, filename); 
   NumNodes = G->size();
   computeSucSize();
 
@@ -281,13 +281,13 @@ int main(int argc, char** argv) {
   std::vector<GNode> tmp;
   std::copy(begin, end, std::back_inserter(tmp));
 
-  Galois::on_each(popstate());
+  galois::on_each(popstate());
 
-  typedef Galois::WorkList::dChunkedLIFO<8> WL;
-  //typedef Galois::WorkList::AltChunkedLIFO<32> CA;
-  Galois::StatTimer T;
+  typedef galois::WorkList::dChunkedLIFO<8> WL;
+  //typedef galois::WorkList::AltChunkedLIFO<32> CA;
+  galois::StatTimer T;
   T.start();
-  Galois::for_each(tmp.begin(), tmp.end(), process(), Galois::wl<WL>());
+  galois::for_each(tmp.begin(), tmp.end(), process(), galois::wl<WL>());
   T.stop();
 
   if (forceVerify || !skipVerify) {
@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
   }
   std::cerr << "Application done...\n";
 
-  Galois::StatTimer tt("cleanup");
+  galois::StatTimer tt("cleanup");
   tt.start();
   //cleanupData();
   tt.stop();

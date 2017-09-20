@@ -3,7 +3,7 @@
 #include "Galois/Graphs/Graph.h"
 #include <iostream>
 
-typedef Galois::Graph::LC_CSR_Graph<int, void> Graph;
+typedef galois::Graph::LC_CSR_Graph<int, void> Graph;
 typedef Graph::GraphNode GNode;
 
 //! [Id]
@@ -16,19 +16,19 @@ struct DeterministicId {
 
 struct Matching {
   Graph& graph;
-  Galois::GAccumulator<int>& size;
+  galois::GAccumulator<int>& size;
 
-  void operator()(GNode x, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode x, galois::UserContext<GNode>& ctx) const {
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       if (graph.getData(dst) != 0)
         return;
     }
 
-    graph.getData(x, Galois::MethodFlag::WRITE); 
+    graph.getData(x, galois::MethodFlag::WRITE); 
     ctx.cautiousPoint();
     
-    graph.getData(x, Galois::MethodFlag::WRITE) = 1;
+    graph.getData(x, galois::MethodFlag::WRITE) = 1;
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       graph.getData(dst) = 1;
@@ -41,13 +41,13 @@ struct Matching {
 struct MatchingWithLocalState {
   struct LocalState {
     bool toMark;
-    LocalState(MatchingWithLocalState& self, Galois::PerIterAllocTy& alloc): toMark(false) { }
+    LocalState(MatchingWithLocalState& self, galois::PerIterAllocTy& alloc): toMark(false) { }
   };
   
   Graph& graph;
-  Galois::GAccumulator<int>& size;
+  galois::GAccumulator<int>& size;
 
-  void operator()(GNode x, Galois::UserContext<GNode>& ctx) const { 
+  void operator()(GNode x, galois::UserContext<GNode>& ctx) const { 
     LocalState* p = (LocalState*) ctx.getLocalState();
     if (!ctx.isFirstPass()) {
       // operator is being resumed; use p
@@ -74,42 +74,42 @@ struct MatchingWithLocalState {
 
 void runLocalStateMatching(const std::string& name) {
   Graph graph;
-  Galois::Graph::readGraph(graph, name);
-  Galois::GAccumulator<int> size;
+  galois::Graph::readGraph(graph, name);
+  galois::GAccumulator<int> size;
 
-  Galois::for_each_local(graph,
+  galois::for_each_local(graph,
       MatchingWithLocalState { graph, size },
-      Galois::wl<Galois::WorkList::Deterministic<>>(),
-      Galois::has_deterministic_local_state<MatchingWithLocalState::LocalState>(),
-      Galois::needs_per_iter_alloc<>(),
-      Galois::has_deterministic_id<DeterministicId>());
+      galois::wl<galois::WorkList::Deterministic<>>(),
+      galois::has_deterministic_local_state<MatchingWithLocalState::LocalState>(),
+      galois::needs_per_iter_alloc<>(),
+      galois::has_deterministic_id<DeterministicId>());
   std::cout << "Deterministic matching (with local state) size: " << size.reduce() << "\n";
 }
 //! [Local state]
 
 void runDetMatching(const std::string& name) {
   Graph graph;
-  Galois::Graph::readGraph(graph, name);
-  Galois::GAccumulator<int> size;
+  galois::Graph::readGraph(graph, name);
+  galois::GAccumulator<int> size;
 
-  Galois::for_each(graph.begin(), graph.end(), Matching { graph, size },
-      Galois::wl<Galois::WorkList::Deterministic<>>());
+  galois::for_each(graph.begin(), graph.end(), Matching { graph, size },
+      galois::wl<galois::WorkList::Deterministic<>>());
   std::cout << "Deterministic matching size: " << size.reduce() << "\n";
 }
 
 void runNDMatching(const std::string& name) {
   Graph graph;
-  Galois::Graph::readGraph(graph, name);
-  Galois::GAccumulator<int> size;
+  galois::Graph::readGraph(graph, name);
+  galois::GAccumulator<int> size;
 
-  Galois::for_each(graph.begin(), graph.end(), Matching { graph, size });
+  galois::for_each(graph.begin(), graph.end(), Matching { graph, size });
   std::cout << "Non-deterministic matching size: " << size.reduce() << "\n";
 }
 
 int main(int argc, char** argv) {
   GALOIS_ASSERT(argc > 1);
 
-  Galois::setActiveThreads(2);
+  galois::setActiveThreads(2);
   runNDMatching(argv[1]);
   runDetMatching(argv[1]);
   runLocalStateMatching(argv[1]);

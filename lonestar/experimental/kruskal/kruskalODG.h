@@ -89,10 +89,10 @@ private:
   struct ODGnode;
 
   static const unsigned CHUNK_SIZE = 16;
-  typedef Galois::Runtime::WorkList::ChunkedFIFO<CHUNK_SIZE, ODGnode*> WLTy;
+  typedef galois::Runtime::WorkList::ChunkedFIFO<CHUNK_SIZE, ODGnode*> WLTy;
 
-  typedef Galois::GAccumulator<size_t> Accumulator;
-  typedef Galois::Runtime::PerCPU < std::vector<ODGnode*> > VecPerThrd;
+  typedef galois::GAccumulator<size_t> Accumulator;
+  typedef galois::Runtime::PerCPU < std::vector<ODGnode*> > VecPerThrd;
 
   struct ODGnode {
 
@@ -100,7 +100,7 @@ private:
 
     size_t id;
     KEdge* activeElem;
-    Galois::GAtomic<unsigned> indeg;
+    galois::GAtomic<unsigned> indeg;
   private:
     OutSet outNeigh;
     PaddedLock<true> lock;
@@ -303,7 +303,7 @@ protected:
     Accumulator numIter;
 
 
-    Galois::for_each <WLTy> (initWL.begin (), initWL.end (), LoopBody (addListPerThrd, mstSum, numIter));
+    galois::for_each <WLTy> (initWL.begin (), initWL.end (), LoopBody (addListPerThrd, mstSum, numIter));
 
     mstWeight = mstSum.get ();
     totalIter = numIter.get ();

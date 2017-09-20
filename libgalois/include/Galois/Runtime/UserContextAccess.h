@@ -26,14 +26,14 @@
 
 #include "Galois/UserContext.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 //! Backdoor to allow runtime methods to access private data in UserContext
 template<typename T>
-class UserContextAccess : public Galois::UserContext<T> {
+class UserContextAccess : public galois::UserContext<T> {
 public:
-  typedef Galois::UserContext<T> SuperTy;
+  typedef galois::UserContext<T> SuperTy;
   typedef typename SuperTy::PushBufferTy PushBufferTy;
   typedef typename SuperTy::FastPushBack FastPushBack;
 
@@ -64,6 +64,6 @@ public:
 };
 
 }
-} // end namespace Galois
+} // end namespace galois
 
 #endif

@@ -15,14 +15,14 @@
       }
 #endif
 
-uint32_t random_edge_assignment(uint64_t src, uint64_t dst, Galois::VecBool& bitset, uint32_t numHosts){
+uint32_t random_edge_assignment(uint64_t src, uint64_t dst, galois::VecBool& bitset, uint32_t numHosts){
 
  uint32_t rand_number = rand() % numHosts;
  return rand_number;
 
 }
 
-uint32_t balanced_edge_assignment(uint64_t src, uint64_t dst, Galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
+uint32_t balanced_edge_assignment(uint64_t src, uint64_t dst, galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
   uint32_t min_load_host = ~0;
   uint64_t load = 0;
   uint32_t minEdge = ~0;
@@ -50,7 +50,7 @@ uint32_t balanced_edge_assignment(uint64_t src, uint64_t dst, Galois::VecBool& b
     return minEdge;
 }
 
-uint32_t balanced_edge_assignment2(uint64_t src, uint64_t dst, Galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
+uint32_t balanced_edge_assignment2(uint64_t src, uint64_t dst, galois::VecBool& bitset, uint32_t numHosts, std::vector<uint64_t>& numEdges_per_host){
 
   std::vector<uint32_t> intersection_vec, union_vec;
   for(uint32_t k = 0; k < numHosts; ++k){

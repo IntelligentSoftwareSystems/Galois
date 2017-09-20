@@ -42,7 +42,7 @@ class DESunorderedSerial: public des_unord::DESunorderedBase {
 
   /**
    * Run loop.
-   * Does not use Galois::Runtime or Galois worklists
+   * Does not use galois::Runtime or Galois worklists
    *
    * To ensure uniqueness of items on the workList, we keep a list of boolean flags for each node,
    * which indicate whether the node is on the workList. When adding a node to the workList, the
@@ -68,18 +68,18 @@ class DESunorderedSerial: public des_unord::DESunorderedBase {
       GNode activeNode = workList.front ();
       workList.pop_front ();
 
-      SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::MethodFlag::UNPROTECTED));
+      SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, galois::MethodFlag::UNPROTECTED));
 
       maxPending = std::max (maxPending, srcObj->numPendingEvents ());
 
       numEvents += srcObj->simulate(graph, activeNode);
 
 
-      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::UNPROTECTED)
-          , ei = graph.edge_end (activeNode, Galois::MethodFlag::UNPROTECTED); i != ei; ++i) {
+      for (Graph::edge_iterator i = graph.edge_begin (activeNode, galois::MethodFlag::UNPROTECTED)
+          , ei = graph.edge_end (activeNode, galois::MethodFlag::UNPROTECTED); i != ei; ++i) {
 
         GNode dst = graph.getEdgeDst(i);
-        SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::MethodFlag::UNPROTECTED));
+        SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, galois::MethodFlag::UNPROTECTED));
 
         if (dstObj->isActive ()) {
           if (!onWLflags[dstObj->getID ()]) {

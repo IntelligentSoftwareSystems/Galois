@@ -199,7 +199,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //sdata.Field1 = sdata.contrib_Field1;
                   std::string str_using_new_field = "\nif(" + str_varName_getData_src + "." + new_field_name + "){";
                   str_using_new_field += "\n" + str_varName_getData_src + "." + field_entry.FIELD_NAME + " = " + str_varName_getData_src + "." + new_field_name + ";";
-                  std::string str_reset_new_field = std::string("\nGalois::reset(" + str_varName_getData_src + "." + new_field_name + " , " + field_entry.RESET_VALTYPE + "(" + std::to_string(0) + ")" + ");\n}\n");
+                  std::string str_reset_new_field = std::string("\ngalois::reset(" + str_varName_getData_src + "." + new_field_name + " , " + field_entry.RESET_VALTYPE + "(" + std::to_string(0) + ")" + ");\n}\n");
 
                   str_using_new_field += str_reset_new_field;
                   rewriter.InsertText(edgeForLoop_loc, str_using_new_field, true, true);
@@ -263,8 +263,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
                   if(is_vector){
                     // FIXME: do not pass entire string; pass only the command like add_vec
-                    reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
-                    resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
+                    reduceOP = "{galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
+                    resetValExpr = "{galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
                   }
                   else {
                     reduceOP = "add";
@@ -373,8 +373,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(plusOP_vec){
                   string reduceOP, resetValExpr;
                   // FIXME: do not pass entire string; pass only the command like add_vec
-                  reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
-                  resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
+                  reduceOP = "{galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
+                  resetValExpr = "{galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);

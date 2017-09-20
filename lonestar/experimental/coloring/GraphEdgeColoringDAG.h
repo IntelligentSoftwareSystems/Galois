@@ -23,7 +23,7 @@ struct NodeDataDAG {
    std::atomic<unsigned> indegree;
    unsigned priority;
    unsigned id;
-//   typename Galois::gdeque<std::pair<unsigned, EdgeDataDAG*> > pred_data;
+//   typename galois::gdeque<std::pair<unsigned, EdgeDataDAG*> > pred_data;
 
    NodeDataDAG(unsigned _id = 0) :
          indegree(0), priority(0), id(_id) {
@@ -31,7 +31,7 @@ struct NodeDataDAG {
 
 };
 ////////////////////////////////////////////////////////////
-typedef Galois::Graph::LC_CSR_Graph<NodeDataDAG, EdgeDataDAG*>::with_numa_alloc<true>::type
+typedef galois::Graph::LC_CSR_Graph<NodeDataDAG, EdgeDataDAG*>::with_numa_alloc<true>::type
 // ::with_no_lockable<true>::type Graph;
 ::with_no_lockable<false>::type Graph;
 
@@ -41,7 +41,7 @@ typedef Graph::GraphNode GNode;
 class GraphEdgeColoringDAG: public GraphColoringBase<Graph> {
    static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-   typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
+   typedef galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
    typedef typename Graph::GraphNode GN;
    typedef typename Graph::node_data_type NodeData;
    typedef typename Graph::edge_data_type EdgeData;
@@ -53,23 +53,23 @@ class GraphEdgeColoringDAG: public GraphColoringBase<Graph> {
 public:
    /////////////////////////////////////////////////////////////
    void readGraph(void) {
-      /*     typedef Galois::Graph::FileGraph FileGraph;
+      /*     typedef galois::Graph::FileGraph FileGraph;
        FileGraph filegraph;
        filegraph.fromFile(filename);
        graph.allocateFrom(filegraph);
        */
-      Galois::Graph::readGraph(graph, filename);
+      galois::Graph::readGraph(graph, filename);
       const size_t numNodes = graph.size();
-      Galois::GAccumulator<size_t> numEdges;
-      Galois::FixedSizeAllocator<EdgeDataType> heap;
+      galois::GAccumulator<size_t> numEdges;
+      galois::FixedSizeAllocator<EdgeDataType> heap;
 
-      Galois::StatTimer t_init("initialization time: ");
+      galois::StatTimer t_init("initialization time: ");
 
       t_init.start();
       /*
        * Go over each node and allocate edges on one side (src<dst).
        * */
-      Galois::on_each([&] (const unsigned tid, const unsigned numT) {
+      galois::on_each([&] (const unsigned tid, const unsigned numT) {
 
          size_t num_per = (numNodes + numT - 1) / numT;
          size_t beg = tid * num_per;
@@ -82,50 +82,50 @@ public:
          std::advance (it_end, (end - beg));
 
          for (; it_beg != it_end; ++it_beg) {
-            // graph.getData (*it_beg, Galois::MethodFlag::UNPROTECTED) = NodeData (beg++);
+            // graph.getData (*it_beg, galois::MethodFlag::UNPROTECTED) = NodeData (beg++);
             GN src = *it_beg;
-            auto* ndptr = &(graph.getData (src, Galois::MethodFlag::UNPROTECTED));
+            auto* ndptr = &(graph.getData (src, galois::MethodFlag::UNPROTECTED));
             ndptr->~NodeData();
             new (ndptr) NodeData (beg++);
-            NodeData & nd = graph.getData(src,Galois::MethodFlag::UNPROTECTED);
+            NodeData & nd = graph.getData(src,galois::MethodFlag::UNPROTECTED);
 
-            for(auto eit = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED); eit!=graph.edge_end(src,Galois::MethodFlag::UNPROTECTED); ++eit) {
+            for(auto eit = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED); eit!=graph.edge_end(src,galois::MethodFlag::UNPROTECTED); ++eit) {
                GN dst = graph.getEdgeDst(eit);
 
                if(src < dst ) {
                   EdgeDataType * edata= heap.allocate(1);
                   new (edata) EdgeDataType();
-                  graph.getEdgeData(eit,Galois::MethodFlag::UNPROTECTED) = edata;
-                  auto & dst = graph.getData(graph.getEdgeDst(eit), Galois::MethodFlag::UNPROTECTED);
-                  graph.getEdgeData(eit, Galois::MethodFlag::UNPROTECTED)->color = 0;
+                  graph.getEdgeData(eit,galois::MethodFlag::UNPROTECTED) = edata;
+                  auto & dst = graph.getData(graph.getEdgeDst(eit), galois::MethodFlag::UNPROTECTED);
+                  graph.getEdgeData(eit, galois::MethodFlag::UNPROTECTED)->color = 0;
                   NodeData &dd = graph.getData(graph.getEdgeDst(eit));
 //                  dd.pred_data.push_back(std::pair<unsigned, EdgeData>(ndptr->id,edata) );
                }
             }
 
             size_t deg = std::distance (
-                  graph.edge_begin (*it_beg, Galois::MethodFlag::UNPROTECTED),
-                  graph.edge_end (*it_beg, Galois::MethodFlag::UNPROTECTED));
+                  graph.edge_begin (*it_beg, galois::MethodFlag::UNPROTECTED),
+                  graph.edge_end (*it_beg, galois::MethodFlag::UNPROTECTED));
 
             numEdges.update (deg);
          }
-      }, Galois::loopname("initialize"));
+      }, galois::loopname("initialize"));
       /////////////////////////////////////////////////////////////////
       /*
        * Now update the edges for edge-directions missed in first stage.
        *
        * */
-      Galois::do_all(graph.begin(), graph.end(), [&](GN src) {
-         NodeData & sd = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-         for(auto e = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED); e!=graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ++e) {
+      galois::do_all(graph.begin(), graph.end(), [&](GN src) {
+         NodeData & sd = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+         for(auto e = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED); e!=graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ++e) {
             GN dst = graph.getEdgeDst(e);
             NodeData & dd = graph.getData(dst);
             if(src > dst) {
                bool found = false;
-               for(auto d_e = graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED); d_e != graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED); ++d_e) {
+               for(auto d_e = graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED); d_e != graph.edge_end(dst, galois::MethodFlag::UNPROTECTED); ++d_e) {
                   if(graph.getEdgeDst(d_e)==src) {
                      found = true;
-                     graph.getEdgeData(e,Galois::MethodFlag::UNPROTECTED) = graph.getEdgeData(d_e, Galois::MethodFlag::UNPROTECTED);
+                     graph.getEdgeData(e,galois::MethodFlag::UNPROTECTED) = graph.getEdgeData(d_e, galois::MethodFlag::UNPROTECTED);
                      break;
                   }
                }
@@ -135,7 +135,7 @@ public:
 
          }
 
-      }, Galois::loopname("de-duplicate"));
+      }, galois::loopname("de-duplicate"));
 
       // color 0 is reserved as uncolored value
       // therefore, we put in at least 1 entry to handle the
@@ -160,7 +160,7 @@ public:
     * reflect this.
     * */
    void colorEdges(GN src) {
-      auto& sd = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      auto& sd = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       auto& forbiddenColors = perThrdColorVec.get(); //my colors
       auto& forbiddenNbrColors = perThrdNbrColorVec.get(); //per-edge destination colors
 
@@ -169,16 +169,16 @@ public:
        * Update forbidden colors with edges already colored, and also check already colored edges for
        * potential conflicts, attempting to resolve them locally.
        * */
-      for (auto e = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+      for (auto e = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
          GN dst = graph.getEdgeDst(e);
-         auto & dd = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-         unsigned color = graph.getEdgeData(e, Galois::MethodFlag::UNPROTECTED)->color;
+         auto & dd = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+         unsigned color = graph.getEdgeData(e, galois::MethodFlag::UNPROTECTED)->color;
          if (color != 0) { //Already colord.
             if (forbiddenColors.size() <= color) { //Resize if necessary
                forbiddenColors.resize(color + 1, (unsigned) -1);
             }
             if (forbiddenColors[color] != -1) { //if already taken, reset color
-               graph.getEdgeData(e, Galois::MethodFlag::UNPROTECTED)->color = 0;
+               graph.getEdgeData(e, galois::MethodFlag::UNPROTECTED)->color = 0;
             } else
                //update forbidden colors.
                forbiddenColors[color] = sd.id;
@@ -187,7 +187,7 @@ public:
       /*
        * Now actually go over the edges and color them.
        * */
-      for (auto e = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+      for (auto e = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
          forbiddenNbrColors.resize(forbiddenColors.size(), -1);  //reset nbr colors
          std::copy(forbiddenColors.begin(), forbiddenColors.end(), forbiddenNbrColors.begin());  //copy from my-colors
@@ -196,7 +196,7 @@ public:
          EdgeData & edata = graph.getEdgeData(e);
          if (edata->color == 0) { //uncolored
             //Go over edges of dst.
-            for (auto e_d = graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED); e_d != graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED); ++e_d) {
+            for (auto e_d = graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED); e_d != graph.edge_end(dst, galois::MethodFlag::UNPROTECTED); ++e_d) {
                EdgeData &d_eData = graph.getEdgeData(e_d);
                //If edge color is larger than currently assigned, update
                //both colors
@@ -240,27 +240,27 @@ public:
          return;
       }
 
-      Galois::StatTimer t_verify("verification time: ");
+      galois::StatTimer t_verify("verification time: ");
 
       t_verify.start();
 
-      Galois::GReduceLogicalOR foundError;
-      Galois::GReduceMax<unsigned> maxColor;
+      galois::GReduceLogicalOR foundError;
+      galois::GReduceMax<unsigned> maxColor;
 
-      Galois::do_all_choice(Galois::Runtime::makeLocalRange(graph), [&] (GN src) {
-         auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-         for (auto e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
-               e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+      galois::do_all_choice(galois::Runtime::makeLocalRange(graph), [&] (GN src) {
+         auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
+         for (auto e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
+               e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
             GN dst = graph.getEdgeDst (e);
-            auto & dd = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+            auto & dd = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
             EdgeData & eData = graph.getEdgeData(e);
             if(eData->color==0) {
                std::fprintf(stderr, "ERROR! : Edge %d not assigned color \n", sd.id);
                foundError.update(true);
             }
-            //auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-            for(auto e_in = graph.edge_begin(dst,Galois::MethodFlag::UNPROTECTED); e_in!=graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED); ++e_in) {
+            //auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
+            for(auto e_in = graph.edge_begin(dst,galois::MethodFlag::UNPROTECTED); e_in!=graph.edge_end(dst, galois::MethodFlag::UNPROTECTED); ++e_in) {
                EdgeData & in_eData = graph.getEdgeData(e_in);
                GN o_dst = graph.getEdgeDst(e_in);
                if(o_dst!=src && eData->color == in_eData->color) {
@@ -275,7 +275,7 @@ public:
 
          }
 
-      }, "check-edge-coloring", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
+      }, "check-edge-coloring", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
       std::printf("Graph-edges colored with %d colors\n", maxColor.reduce());
 
@@ -289,13 +289,13 @@ public:
    }
 
    void printNode(GN n) {
-      std::fprintf(stderr, "Node[%zd]:{", graph.getData(n, Galois::MethodFlag::UNPROTECTED).id);
+      std::fprintf(stderr, "Node[%zd]:{", graph.getData(n, galois::MethodFlag::UNPROTECTED).id);
       for (auto eit = graph.edge_begin(n); eit != graph.edge_end(n); ++eit) {
          GN dst = graph.getEdgeDst(eit);
          std::fprintf(stderr, "%zd(%d),", graph.getEdgeData(eit)->color, graph.getData(dst).id);
       }
 //      std::fprintf(stderr, "}PredColors {\n");
-//      for (auto e : graph.getData(n, Galois::MethodFlag::UNPROTECTED).pred_data) {
+//      for (auto e : graph.getData(n, galois::MethodFlag::UNPROTECTED).pred_data) {
 //         std::fprintf(stderr, "%zd, ", e.second->color);
 //      }
       std::fprintf(stderr, "}\n");
@@ -323,16 +323,16 @@ protected:
    void initDAG(W& initWork) {
       NodeDataComparator cmp;
 
-      Galois::do_all_choice(Galois::Runtime::makeLocalRange(graph), [&] (GNode src) {
-         auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      galois::do_all_choice(galois::Runtime::makeLocalRange(graph), [&] (GNode src) {
+         auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
 
          // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
 
             unsigned addAmt = 0;
-            for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
-                  e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+            for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
+                  e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
                GNode dst = graph.getEdgeDst (e);
-               auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+               auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
 
                if (cmp (dd, sd)) { // dd < sd
                   ++addAmt;
@@ -348,7 +348,7 @@ protected:
                assert (sd.indegree == 0);
                initWork.push (src);
             }
-         }, "init-dag", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
+         }, "init-dag", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
    }
    ////////////////////////////////////////////////////////////
@@ -361,15 +361,15 @@ protected:
 
          Graph& graph = outer.graph;
 
-         auto& sd = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+         auto& sd = graph.getData(src, galois::MethodFlag::UNPROTECTED);
          assert(sd.indegree == 0);
 
          outer.colorEdges(src);
 
-         for (Graph::edge_iterator e = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+         for (Graph::edge_iterator e = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), e_end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
             GNode dst = graph.getEdgeDst(e);
-            auto& dd = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+            auto& dd = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
             // std::printf ("Neighbor %d has indegree %d\n", dd.id, unsigned(dd.indegree));
             unsigned x = --(dd.indegree);
             if (x == 0) {
@@ -382,22 +382,22 @@ protected:
    ////////////////////////////////////////////////////////////
    void colorDAG(void) {
 
-      Galois::InsertBag<GNode> initWork;
+      galois::InsertBag<GNode> initWork;
 
-      Galois::StatTimer t_dag_init("dag initialization time: ");
+      galois::StatTimer t_dag_init("dag initialization time: ");
 
       t_dag_init.start();
       initDAG(initWork);
       t_dag_init.stop();
 
-      typedef Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
+      typedef galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
       std::printf("Number of initial sources: %zd\n", std::distance(initWork.begin(), initWork.end()));
 
-      Galois::StatTimer t_dag_color("dag edge-coloring time: ");
+      galois::StatTimer t_dag_color("dag edge-coloring time: ");
 
       t_dag_color.start();
-      Galois::for_each_local(initWork, ColorNodeEdgeDAG { *this }, Galois::loopname("edge-color-DAG"), Galois::wl<WL_ty>());
+      galois::for_each_local(initWork, ColorNodeEdgeDAG { *this }, galois::loopname("edge-color-DAG"), galois::wl<WL_ty>());
       t_dag_color.stop();
    }
    ////////////////////////////////////////////////////////////
@@ -410,8 +410,8 @@ protected:
       template<typename C>
       void operator ()(GNode src, C&) {
          Graph& graph = outer.graph;
-         NodeData& sd = graph.getData(src, Galois::MethodFlag::WRITE);
-         for (Graph::edge_iterator e = graph.edge_begin(src, Galois::MethodFlag::WRITE), e_end = graph.edge_end(src, Galois::MethodFlag::WRITE); e != e_end; ++e) {
+         NodeData& sd = graph.getData(src, galois::MethodFlag::WRITE);
+         for (Graph::edge_iterator e = graph.edge_begin(src, galois::MethodFlag::WRITE), e_end = graph.edge_end(src, galois::MethodFlag::WRITE); e != e_end; ++e) {
             GNode dst = graph.getEdgeDst(e);
          }
       }
@@ -435,14 +435,14 @@ protected:
          Graph& graph;
 
          bool operator ()(GNode ln, GNode rn) const {
-            const auto& ldata = graph.getData(ln, Galois::MethodFlag::UNPROTECTED);
-            const auto& rdata = graph.getData(rn, Galois::MethodFlag::UNPROTECTED);
+            const auto& ldata = graph.getData(ln, galois::MethodFlag::UNPROTECTED);
+            const auto& rdata = graph.getData(rn, galois::MethodFlag::UNPROTECTED);
             return NodeDataComparator::compare(ldata, rdata);
          }
       };
 
       ////////////////////////////////////////////////////////////
-      Galois::Runtime::for_each_ordered_2p_param(Galois::Runtime::makeLocalRange(graph), NodeComparator { graph }, VisitNhood { *this }, ApplyOperator { *this },
+      galois::Runtime::for_each_ordered_2p_param(galois::Runtime::makeLocalRange(graph), NodeComparator { graph }, VisitNhood { *this }, ApplyOperator { *this },
             "coloring-ordered-param");
    }
 
@@ -461,20 +461,20 @@ protected:
 public:
    virtual void color_edges(int argc, char* argv[]) {
          LonestarStart(argc, argv, name, desc, url);
-         Galois::StatManager sm;
+         galois::StatManager sm;
 
          readGraph();
 
-         Galois::preAlloc(Galois::getActiveThreads() + 2 * sizeof(NodeData) * graph.size() / Galois::Runtime::MM::hugePageSize);
-         Galois::reportPageAlloc("MeminfoPre");
+         galois::preAlloc(galois::getActiveThreads() + 2 * sizeof(NodeData) * graph.size() / galois::Runtime::MM::hugePageSize);
+         galois::reportPageAlloc("MeminfoPre");
 
-         Galois::StatTimer t;
+         galois::StatTimer t;
 
          t.start();
          colorGraph();
          t.stop();
 
-         Galois::reportPageAlloc("MeminfoPost");
+         galois::reportPageAlloc("MeminfoPost");
 
          verify();
       }

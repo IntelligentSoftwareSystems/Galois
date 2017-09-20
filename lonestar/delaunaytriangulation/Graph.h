@@ -34,7 +34,7 @@
 #include <vector>
 #include <deque>
 
-typedef Galois::Graph::FirstGraph<Element,char,true> Graph;
+typedef galois::Graph::FirstGraph<Element,char,true> Graph;
 typedef Graph::GraphNode GNode;
 
 //! Factor out common graph traversals
@@ -66,8 +66,8 @@ struct Searcher: private boost::noncopyable {
     Graph& g;
     DetLess(Graph& x): g(x) { }
     bool operator()(GNode a, GNode b) const {
-      Element& e1 = g.getData(a, Galois::MethodFlag::UNPROTECTED);
-      Element& e2 = g.getData(b, Galois::MethodFlag::UNPROTECTED);
+      Element& e1 = g.getData(a, galois::MethodFlag::UNPROTECTED);
+      Element& e2 = g.getData(b, galois::MethodFlag::UNPROTECTED);
       
       for (int i = 0; i < 3; ++i) {
         uintptr_t v1 = (i < 2 || !e1.boundary()) ? reinterpret_cast<uintptr_t>(e1.getPoint(i)) : 0;
@@ -89,7 +89,7 @@ struct Searcher: private boost::noncopyable {
 
   template<typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
-    typedef Galois::optional<GNode> SomeGNode;
+    typedef galois::optional<GNode> SomeGNode;
     typedef typename Alloc::template rebind<std::pair<GNode,SomeGNode>>::other WorklistAlloc;
     typedef std::deque<std::pair<GNode,SomeGNode>, WorklistAlloc> Worklist;
 
@@ -103,7 +103,7 @@ struct Searcher: private boost::noncopyable {
 
       wl.pop_front();
 
-      if (!graph.containsNode(cur, Galois::MethodFlag::WRITE))
+      if (!graph.containsNode(cur, galois::MethodFlag::WRITE))
         continue;
 
       if (marker.hasMark(cur))
@@ -130,8 +130,8 @@ struct Searcher: private boost::noncopyable {
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::MethodFlag::WRITE),
-            ee = graph.edge_end(cur, Galois::MethodFlag::WRITE);
+        for (Graph::edge_iterator ii = graph.edge_begin(cur, galois::MethodFlag::WRITE),
+            ee = graph.edge_end(cur, galois::MethodFlag::WRITE);
             ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, SomeGNode(cur)));

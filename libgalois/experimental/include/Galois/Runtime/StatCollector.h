@@ -42,7 +42,7 @@
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 class StatCollector {
@@ -101,7 +101,7 @@ protected:
   
   std::string m_outfile;
   std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
-  Galois::Substrate::SimpleLock StatsLock;
+  galois::Substrate::SimpleLock StatsLock;
 
 public:
 
@@ -151,6 +151,6 @@ namespace internal {
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif

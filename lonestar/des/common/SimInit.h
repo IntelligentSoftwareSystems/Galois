@@ -184,7 +184,7 @@ protected:
     for (typename std::vector<BaseSimObj_ty*>::const_iterator i = simObjs.begin (), ei = simObjs.end (); i != ei; ++i) {
       BaseSimObj_ty* so = *i;
       GNode n = graph.createNode(so);
-      graph.addNode(n, Galois::MethodFlag::UNPROTECTED);
+      graph.addNode(n, galois::MethodFlag::UNPROTECTED);
       ++numNodes;
     }
   }
@@ -207,7 +207,7 @@ protected:
     for (typename std::vector<GNode>::iterator i = allNodes.begin (), ei = allNodes.end (); i != ei; ++i) {
       GNode& src = *i;
 
-      SimGate_tp* sg = dynamic_cast<SimGate_tp*> (graph.getData (src, Galois::MethodFlag::UNPROTECTED));
+      SimGate_tp* sg = dynamic_cast<SimGate_tp*> (graph.getData (src, galois::MethodFlag::UNPROTECTED));
       assert (sg != NULL);
       const LogicGate& srcGate = sg->getImpl ();
 
@@ -215,7 +215,7 @@ protected:
 
       for (typename std::vector<GNode>::iterator j = allNodes.begin (), ej = allNodes.end (); j != ej; ++j) {
         GNode& dst = *j;
-        SimGate_tp* dg = dynamic_cast<SimGate_tp*> (graph.getData (dst, Galois::MethodFlag::UNPROTECTED));
+        SimGate_tp* dg = dynamic_cast<SimGate_tp*> (graph.getData (dst, galois::MethodFlag::UNPROTECTED));
         assert (dg != NULL);
         const LogicGate& dstGate = dg->getImpl ();
 
@@ -223,7 +223,7 @@ protected:
           assert (&srcGate != &dstGate); // disallowing self loops
           if (graph.findEdge(src, dst) == graph.edge_end(src)) {
             ++numEdges;
-            graph.addEdge (src, dst, Galois::MethodFlag::UNPROTECTED);
+            graph.addEdge (src, dst, galois::MethodFlag::UNPROTECTED);
           }
 
         }

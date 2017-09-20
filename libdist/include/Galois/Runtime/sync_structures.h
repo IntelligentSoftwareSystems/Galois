@@ -272,7 +272,7 @@ struct Reduce_add_##fieldname {\
       return true;\
     }\
     assert(personality == CPU);\
-    { Galois::add(node.fieldname, y); return true;}\
+    { galois::add(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -295,7 +295,7 @@ struct Reduce_add_##fieldname {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, (ValTy)0);\
     }\
     else if (personality == CPU)\
-    Galois::set(node.fieldname, (ValTy)0);\
+    galois::set(node.fieldname, (ValTy)0);\
   }\
 }
 #else
@@ -322,7 +322,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::add(node.fieldname, y); return true;}\
+    { galois::add(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -335,7 +335,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static void reset (uint32_t node_id, struct NodeData &node) {\
-    Galois::set(node.fieldname, (ValTy)0);\
+    galois::set(node.fieldname, (ValTy)0);\
   }\
 }
 #endif
@@ -383,7 +383,7 @@ struct Reduce_add_##fieldname {\
       return true;\
     }\
     assert(personality == CPU);\
-    { Galois::add(fieldname[node_id], y); return true;}\
+    { galois::add(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -406,7 +406,7 @@ struct Reduce_add_##fieldname {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, (ValTy)0);\
     }\
     else if (personality == CPU)\
-    Galois::set(fieldname[node_id], (ValTy)0);\
+    galois::set(fieldname[node_id], (ValTy)0);\
   }\
 }
 #else
@@ -433,7 +433,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::add(fieldname[node_id], y); return true;}\
+    { galois::add(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -446,7 +446,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static void reset (uint32_t node_id, struct NodeData &node) {\
-    Galois::set(fieldname[node_id], (ValTy)0);\
+    galois::set(fieldname[node_id], (ValTy)0);\
   }\
 }
 #endif
@@ -498,7 +498,7 @@ struct Reduce_set_##fieldname {\
       return true;\
     }\
     assert(personality == CPU);\
-    { Galois::set(node.fieldname, y); return true;}\
+    { galois::set(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -543,7 +543,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::set(node.fieldname, y); return true;}\
+    { galois::set(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -603,7 +603,7 @@ struct Reduce_set_##fieldname {\
       return true;\
     }\
     assert(personality == CPU);\
-    { Galois::set(fieldname[node_id], y); return true;}\
+    { galois::set(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -648,7 +648,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::set(fieldname[node_id], y); return true;}\
+    { galois::set(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -711,7 +711,7 @@ struct Reduce_min_##fieldname {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
     }\
     assert(personality == CPU);\
-    { return y < Galois::min(node.fieldname, y); }\
+    { return y < galois::min(node.fieldname, y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -756,7 +756,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { return y < Galois::min(node.fieldname, y); }\
+    { return y < galois::min(node.fieldname, y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -815,7 +815,7 @@ struct Reduce_min_##fieldname {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
     }\
     assert(personality == CPU);\
-    { return y < Galois::min(fieldname[node_id], y); }\
+    { return y < galois::min(fieldname[node_id], y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -860,7 +860,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { return y < Galois::min(fieldname[node_id], y); }\
+    { return y < galois::min(fieldname[node_id], y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -920,7 +920,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
       return true;\
     }\
     assert(personality == CPU);\
-    { Galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
+    { galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -939,7 +939,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static void reset (uint32_t node_id, struct NodeData &node) {\
-    { Galois::resetVec(node.fieldname); }\
+    { galois::resetVec(node.fieldname); }\
   }\
 }
 #else
@@ -966,7 +966,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
+    { galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -979,7 +979,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static void reset (uint32_t node_id, struct NodeData &node) {\
-    { Galois::resetVec(node.fieldname); }\
+    { galois::resetVec(node.fieldname); }\
   }\
 }
 #endif
@@ -1199,7 +1199,7 @@ struct Bitset_##fieldname {\
     return true;\
   }\
 \
-  static Galois::DynamicBitSet& get() {\
+  static galois::DynamicBitSet& get() {\
     if (personality == GPU_CUDA) \
       get_bitset_##fieldname##_cuda(cuda_ctx,\
         (unsigned long long int *)bitset_##fieldname.get_vec().data());\
@@ -1222,7 +1222,7 @@ struct Bitset_##fieldname {\
     return true;\
   }\
 \
-  static Galois::DynamicBitSet& get() {\
+  static galois::DynamicBitSet& get() {\
     return bitset_##fieldname;\
   }\
 \

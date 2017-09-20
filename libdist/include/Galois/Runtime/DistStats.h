@@ -36,18 +36,18 @@
 
 #include <string>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 class StatRecvHelper;
 
-class DistStatManager: public Galois::Runtime::StatManager {
+class DistStatManager: public galois::Runtime::StatManager {
 
-  friend class Galois::Runtime::StatRecvHelper;
+  friend class galois::Runtime::StatRecvHelper;
 
-  using Base = Galois::Runtime::StatManager;
+  using Base = galois::Runtime::StatManager;
 
-  using Str = Galois::gstl::Str;
+  using Str = galois::gstl::Str;
 
   using Base::SEP;
 
@@ -109,7 +109,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
   using HostTotalTypes = HostTotalTypesImpl<>;
 
   template <typename T>
-  using ThrdVals = Galois::gstl::Vector<T>;
+  using ThrdVals = galois::gstl::Vector<T>;
 
   template <typename T>
   using HostStatVal = std::tuple<unsigned, T, StatTotal::Type, const ThrdVals<T>&>;
@@ -119,7 +119,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
     using Base = hidden::VecStat<T>;
     using ThrdStats = hidden::VecStat<T>;
-    using PerHostThrdStats = Galois::gstl::Map<unsigned, ThrdStats>;
+    using PerHostThrdStats = galois::gstl::Map<unsigned, ThrdStats>;
 
     PerHostThrdStats perHostThrdStats;
 
@@ -145,7 +145,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
     void printHostVals(std::ostream& out, const Str& region, const Str& category) const {
 
-      out << StatManager::statKind<T>() << SEP << Galois::Runtime::getHostID() << SEP;
+      out << StatManager::statKind<T>() << SEP << galois::Runtime::getHostID() << SEP;
 
       out << region << SEP << category << SEP;
 
@@ -208,7 +208,7 @@ class DistStatManager: public Galois::Runtime::StatManager {
 
       for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
 
-        out << StatManager::statKind<T>() << SEP << Galois::Runtime::getHostID() << SEP;
+        out << StatManager::statKind<T>() << SEP << galois::Runtime::getHostID() << SEP;
 
         out << Base::region(i) << SEP << Base::category(i) << SEP;
 
@@ -284,7 +284,7 @@ inline void reportDistStat(const S1& region, const S2& category, const T& value,
 
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 
 #endif// GALOIS_RUNTIME_DIST_STATS_H

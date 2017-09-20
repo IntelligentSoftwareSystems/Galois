@@ -33,13 +33,13 @@ typedef vGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 
-Galois::DGAccumulator<int> DGAccumulator_accum;
+galois::DGAccumulator<int> DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
+    auto& net = galois::Runtime::getSystemNetworkInterface();
+    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
     Graph hg(inputFile, partFolder, net.ID, net.Num);
 

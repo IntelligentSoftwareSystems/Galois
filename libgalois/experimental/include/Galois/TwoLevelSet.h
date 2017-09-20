@@ -36,7 +36,7 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/UnorderedSet.h"
 
-namespace Galois {
+namespace galois {
 
 /**
  * Thread-safe two-level set
@@ -124,10 +124,10 @@ public:
 };
 
 template<typename T>
-using ThreadSafeTwoLevelSet = ThreadSafeTwoLevelSetMaster<T, Galois::ThreadSafeOrderedSet<T> >;
+using ThreadSafeTwoLevelSet = ThreadSafeTwoLevelSetMaster<T, galois::ThreadSafeOrderedSet<T> >;
 
 template<typename T>
-using ThreadSafeTwoLevelHash = ThreadSafeTwoLevelSetMaster<T, Galois::ThreadSafeUnorderedSet<T> >;
+using ThreadSafeTwoLevelHash = ThreadSafeTwoLevelSetMaster<T, galois::ThreadSafeUnorderedSet<T> >;
 }
 
 #endif

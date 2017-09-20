@@ -96,8 +96,8 @@ static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding 
 // TODO(ddn): switch to this graph for FF and ABMP algos when we fix reading
 // graphs
 template<typename NodeTy,typename EdgeTy>
-struct BipartiteGraph: public Galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
-  typedef Galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> Super;
+struct BipartiteGraph: public galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
+  typedef galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
 
   NodeList A;
@@ -105,8 +105,8 @@ struct BipartiteGraph: public Galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
 };
 
 template<typename NodeTy,typename EdgeTy>
-struct MFBipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
-  typedef Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
+struct MFBipartiteGraph: public galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
+  typedef galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
 
   NodeList A;
@@ -258,23 +258,23 @@ struct MatchingFF {
   typedef std::vector<Edge> SerialRevs;
   typedef std::vector<GraphNode> SerialReached;
 
-  typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> ParallelRevs;
+  typedef std::vector<Edge, typename galois::PerIterAllocTy::rebind<Edge>::other> ParallelRevs;
   typedef std::vector<GraphNode,
-          typename Galois::PerIterAllocTy::rebind<GraphNode>::other> ParallelReached;
+          typename galois::PerIterAllocTy::rebind<GraphNode>::other> ParallelReached;
 
   typedef InstanceWrapper<SerialRevs,ParallelRevs,Concurrent> RevsWrapper;
   typedef InstanceWrapper<SerialReached,ParallelReached,Concurrent> ReachedWrapper;
 
-  typedef std::deque<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Queue;
-  typedef std::vector<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
+  typedef std::deque<GraphNode, typename galois::PerIterAllocTy::rebind<GraphNode>::other> Queue;
+  typedef std::vector<GraphNode, typename galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
   
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
+  static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
   std::string name() { return std::string(Concurrent ? "Concurrent" : "Serial") + " Ford-Fulkerson"; }
 
-  bool findAugmentingPath(G& g, const GraphNode& root, Galois::UserContext<GraphNode>& ctx,
+  bool findAugmentingPath(G& g, const GraphNode& root, galois::UserContext<GraphNode>& ctx,
       typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached) {
     Queue queue(ctx.getPerIterAlloc());
     Preds preds(ctx.getPerIterAlloc());
@@ -291,7 +291,7 @@ struct MatchingFF {
 
       for (auto ii : g.edges(src, flag)) {
         GraphNode dst = g.getEdgeDst(ii);
-        node_data_type& ddst = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        node_data_type& ddst = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (ddst.reached)
           continue;
         
@@ -306,7 +306,7 @@ struct MatchingFF {
           ddst.free = false;
           GraphNode cur = dst;
           while (cur != root) {
-            GraphNode pred = preds[g.getData(cur, Galois::MethodFlag::UNPROTECTED).pred];
+            GraphNode pred = preds[g.getData(cur, galois::MethodFlag::UNPROTECTED).pred];
             revs.push_back(Edge(pred, cur));
             cur = pred;
           }
@@ -316,10 +316,10 @@ struct MatchingFF {
           for (auto jj : g.edges(dst, flag)) {
             GraphNode cur = g.getEdgeDst(jj);
 
-            g.getData(cur, Galois::MethodFlag::UNPROTECTED).pred = preds.size();
+            g.getData(cur, galois::MethodFlag::UNPROTECTED).pred = preds.size();
             preds.push_back(dst);
 
-            g.getData(cur, Galois::MethodFlag::UNPROTECTED).reached = true;
+            g.getData(cur, galois::MethodFlag::UNPROTECTED).reached = true;
             reached.push_back(cur);
             
             queue.push_back(cur);
@@ -351,27 +351,27 @@ struct MatchingFF {
 
     void clear() {
       for (typename ReachedWrapper::Type::iterator ii = reached.begin(), ei = reached.end(); ii != ei; ++ii) {
-        assert(g.getData(*ii, Galois::MethodFlag::UNPROTECTED).reached);
-        g.getData(*ii, Galois::MethodFlag::UNPROTECTED).reached = false;
+        assert(g.getData(*ii, galois::MethodFlag::UNPROTECTED).reached);
+        g.getData(*ii, galois::MethodFlag::UNPROTECTED).reached = false;
       }
       reached.clear();
     }
   };
 
-  void operator()(G& g, const GraphNode& src, Galois::UserContext<GraphNode>& ctx,
+  void operator()(G& g, const GraphNode& src, galois::UserContext<GraphNode>& ctx,
       typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached) {
 
     ReachedCleanup cleanup(g, reached);
 
     if (findAugmentingPath(g, src, ctx, revs, reached)) {
-      g.getData(src, Galois::MethodFlag::UNPROTECTED).free = false;
+      g.getData(src, galois::MethodFlag::UNPROTECTED).free = false;
 
       // Reverse edges in augmenting path
       for (typename RevsWrapper::Type::iterator jj = revs.begin(), ej = revs.end(); jj != ej; ++jj) {
-        auto edge = g.findEdge(jj->first, jj->second, Galois::MethodFlag::UNPROTECTED);
+        auto edge = g.findEdge(jj->first, jj->second, galois::MethodFlag::UNPROTECTED);
         assert(edge != g.edge_end(jj->first));
-        g.removeEdge(jj->first, edge, Galois::MethodFlag::UNPROTECTED);
-        g.addEdge(jj->second, jj->first, Galois::MethodFlag::UNPROTECTED);
+        g.removeEdge(jj->first, edge, galois::MethodFlag::UNPROTECTED);
+        g.addEdge(jj->second, jj->first, galois::MethodFlag::UNPROTECTED);
       }
       revs.clear();
 
@@ -379,9 +379,9 @@ struct MatchingFF {
     }
   }
 
-  //! Main entry point for Galois::for_each
+  //! Main entry point for galois::for_each
   struct Process {
-    typedef std::tuple<Galois::needs_per_iter_alloc<>> function_traits;
+    typedef std::tuple<galois::needs_per_iter_alloc<>> function_traits;
 
     MatchingFF<G,Concurrent>& parent;
     G& g;
@@ -391,7 +391,7 @@ struct MatchingFF {
     Process(MatchingFF<G,Concurrent>& _parent, G& _g, SerialRevs& revs, SerialReached& reached):
       parent(_parent), g(_g), serialRevs(revs), serialReached(reached) { }
 
-    void operator()(const GraphNode& node, Galois::UserContext<GraphNode>& ctx) {
+    void operator()(const GraphNode& node, galois::UserContext<GraphNode>& ctx) {
       if (!g.getData(node, flag).free)
         return;
 
@@ -408,8 +408,8 @@ struct MatchingFF {
     SerialRevs revs;
     SerialReached reached;
 
-    Galois::setActiveThreads(Concurrent ? numThreads : 1);
-    Galois::for_each(g.A.begin(), g.A.end(), Process(*this, g, revs, reached));
+    galois::setActiveThreads(Concurrent ? numThreads : 1);
+    galois::for_each(g.A.begin(), g.A.end(), Process(*this, g, revs, reached));
   }
 };
 
@@ -435,10 +435,10 @@ struct MatchingABMP {
   typedef typename G::edge_iterator edge_iterator;
   typedef typename G::node_data_type node_data_type;
   typedef typename GraphTypes<G>::Edge Edge;
-  typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> Revs;
+  typedef std::vector<Edge, typename galois::PerIterAllocTy::rebind<Edge>::other> Revs;
   typedef std::pair<GraphNode,unsigned> WorkItem;
 
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
+  static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
@@ -469,7 +469,7 @@ struct MatchingABMP {
   }
 
   bool nextEdge(G& g, const GraphNode& src, GraphNode& next) {
-    node_data_type& dsrc = g.getData(src, Galois::MethodFlag::UNPROTECTED);
+    node_data_type& dsrc = g.getData(src, galois::MethodFlag::UNPROTECTED);
     unsigned l = dsrc.layer - 1;
 
     // Start search where we last left off
@@ -477,7 +477,7 @@ struct MatchingABMP {
     edge_iterator ei = g.edge_end(src, flag);
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
-    for (; ii != ei && g.getData(g.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED).layer != l;
+    for (; ii != ei && g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED).layer != l;
         ++ii, ++dsrc.next) {
       ;
     }
@@ -491,7 +491,7 @@ struct MatchingABMP {
   }
 
   //! Returns true if we've added a new element
-  bool operator()(G& g, const GraphNode& root, Galois::UserContext<WorkItem>& ctx) {
+  bool operator()(G& g, const GraphNode& root, galois::UserContext<WorkItem>& ctx) {
     Revs revs(ctx.getPerIterAlloc());
 
     GraphNode cur = root;
@@ -500,17 +500,17 @@ struct MatchingABMP {
 
     while (true) {
       GraphNode next;
-      if (g.getData(cur, Galois::MethodFlag::UNPROTECTED).free && g.getData(cur, Galois::MethodFlag::UNPROTECTED).layer == 0) {
-        assert(g.getData(root, Galois::MethodFlag::UNPROTECTED).free);
+      if (g.getData(cur, galois::MethodFlag::UNPROTECTED).free && g.getData(cur, galois::MethodFlag::UNPROTECTED).layer == 0) {
+        assert(g.getData(root, galois::MethodFlag::UNPROTECTED).free);
         // (1) Breakthrough
-        g.getData(cur, Galois::MethodFlag::UNPROTECTED).free = g.getData(root, Galois::MethodFlag::UNPROTECTED).free = false;
+        g.getData(cur, galois::MethodFlag::UNPROTECTED).free = g.getData(root, galois::MethodFlag::UNPROTECTED).free = false;
         
         // Reverse edges in augmenting path
         for (typename Revs::iterator ii = revs.begin(), ei = revs.end(); ii != ei; ++ii) {
-          auto edge = g.findEdge(ii->first, ii->second, Galois::MethodFlag::UNPROTECTED);
+          auto edge = g.findEdge(ii->first, ii->second, galois::MethodFlag::UNPROTECTED);
           assert(edge != g.edge_end(ii->first));
-          g.removeEdge(ii->first, edge, Galois::MethodFlag::UNPROTECTED);
-          g.addEdge(ii->second, ii->first, Galois::MethodFlag::UNPROTECTED);
+          g.removeEdge(ii->first, edge, galois::MethodFlag::UNPROTECTED);
+          g.addEdge(ii->second, ii->first, galois::MethodFlag::UNPROTECTED);
         }
         //revs.clear();
         if (revs.size() > 1024) {
@@ -524,9 +524,9 @@ struct MatchingABMP {
         cur = next;
       } else {
         // (3) Retreat
-        unsigned& layer = g.getData(cur, Galois::MethodFlag::UNPROTECTED).layer;
+        unsigned& layer = g.getData(cur, galois::MethodFlag::UNPROTECTED).layer;
         layer += 2;
-        g.getData(cur, Galois::MethodFlag::UNPROTECTED).next = 0;
+        g.getData(cur, galois::MethodFlag::UNPROTECTED).next = 0;
         if (revs.empty()) {
           ctx.push(std::make_pair(cur, layer));
           return true;
@@ -538,7 +538,7 @@ struct MatchingABMP {
   }
 
   struct Process {
-    typedef std::tuple<Galois::needs_per_iter_alloc<>,Galois::needs_parallel_break<>> function_traits;
+    typedef std::tuple<galois::needs_per_iter_alloc<>,galois::needs_parallel_break<>> function_traits;
     MatchingABMP<G,Concurrent>& parent;
     G& g;
     unsigned& maxLayer;
@@ -547,7 +547,7 @@ struct MatchingABMP {
     Process(MatchingABMP<G,Concurrent>& p, G& _g, unsigned& m, size_t& s):
       parent(p), g(_g), maxLayer(m), size(s) { }
     
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) {
       unsigned curLayer = item.second;
       if (curLayer > maxLayer) {
         //std::cout << "Reached max layer: " << curLayer << "\n";
@@ -565,7 +565,7 @@ struct MatchingABMP {
   };
 
   void operator()(G& g) {
-    Galois::StatTimer t("serial");
+    galois::StatTimer t("serial");
     t.start();
     std::vector<WorkItem> initial;
     for (typename NodeList::iterator ii = g.A.begin(), ei = g.A.end(); ii != ei; ++ii) {
@@ -577,15 +577,15 @@ struct MatchingABMP {
 
     unsigned maxLayer = (unsigned) (0.1*sqrt(std::distance(g.begin(), g.end())));
     size_t size = initial.size();
-    Galois::setActiveThreads(Concurrent ? numThreads : 1);
+    galois::setActiveThreads(Concurrent ? numThreads : 1);
     
-    using namespace Galois::WorkList;
+    using namespace galois::WorkList;
 
     typedef ChunkedFIFO<1024> Chunk;
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    Galois::for_each(initial.begin(), initial.end(), Process(*this, g, maxLayer, size), Galois::wl<OBIM>());
+    galois::for_each(initial.begin(), initial.end(), Process(*this, g, maxLayer, size), galois::wl<OBIM>());
     
     t.start();
     MatchingFF<G,false> algo;
@@ -624,7 +624,7 @@ struct MatchingMF {
   typedef typename G::iterator iterator;
   typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_data_type edge_data_type;
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
+  static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
   static const bool canRunIteratively = false;
 
   /**
@@ -649,7 +649,7 @@ struct MatchingMF {
     edge2.cap += amount;
   }
 
-  bool discharge(G& g, const GraphNode& src, Galois::UserContext<GraphNode>& ctx,
+  bool discharge(G& g, const GraphNode& src, galois::UserContext<GraphNode>& ctx,
       const GraphNode& source, const GraphNode& sink, unsigned numNodes) {
     node_data_type& node = g.getData(src, flag);
     //unsigned prevHeight = node.height;
@@ -660,7 +660,7 @@ struct MatchingMF {
     }
 
     while (true) {
-      Galois::MethodFlag f = relabeled ? Galois::MethodFlag::UNPROTECTED : flag;
+      galois::MethodFlag f = relabeled ? galois::MethodFlag::UNPROTECTED : flag;
       bool finished = false;
       int current = -1;
 
@@ -671,13 +671,13 @@ struct MatchingMF {
         if (edge.cap == 0 || current < node.current) 
           continue;
 
-        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        node_data_type& dnode = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (node.height - 1 != dnode.height) 
           continue;
 
         // Push flow
         int amount = std::min(static_cast<int>(node.excess), edge.cap);
-        reduceCapacity(edge, g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED)), amount);
+        reduceCapacity(edge, g.getEdgeData(g.findEdge(dst, src, galois::MethodFlag::UNPROTECTED)), amount);
 
         // Only add once
         if (dst != sink && dst != source && dnode.excess == 0) 
@@ -710,12 +710,12 @@ struct MatchingMF {
     int minEdge;
 
     int current = -1;
-    for (auto ii : g.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto ii : g.edges(src, galois::MethodFlag::UNPROTECTED)) {
       ++current;
       GraphNode dst = g.getEdgeDst(ii);
       int cap = g.getEdgeData(ii).cap;
       if (cap > 0) {
-        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        node_data_type& dnode = g.getData(dst, galois::MethodFlag::UNPROTECTED);
         if (dnode.height < minHeight) {
           minHeight = dnode.height;
           minEdge = current;
@@ -726,13 +726,13 @@ struct MatchingMF {
     assert(minHeight != std::numeric_limits<unsigned>::max());
     ++minHeight;
 
-    node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
+    node_data_type& node = g.getData(src, galois::MethodFlag::UNPROTECTED);
     node.height = minHeight;
     node.current = minEdge;
   }
 
   struct Process {
-    typedef std::tuple<Galois::needs_parallel_break<>> function_traits;
+    typedef std::tuple<galois::needs_parallel_break<>> function_traits;
 
     MatchingMF<G,Concurrent>& parent;
     G& g;
@@ -753,7 +753,7 @@ struct MatchingMF {
       parent(p), g(_g), source(_source), sink(_sink), numNodes(_numNodes),
       globalRelabelInterval(i), shouldGlobalRelabel(s), counter(0) { }
 
-    void operator()(const GraphNode& src, Galois::UserContext<GraphNode>& ctx) {
+    void operator()(const GraphNode& src, galois::UserContext<GraphNode>& ctx) {
       int increment = 1;
       if (parent.discharge(g, src, ctx, source, sink, numNodes)) {
         increment += BETA;
@@ -774,12 +774,12 @@ struct MatchingMF {
 
     UpdateHeights(G& _g): g(_g) { }
     //! Do reverse BFS on residual graph.
-    void operator()(const GraphNode& src, Galois::UserContext<GraphNode>& ctx) {
-      for (auto ii : g.edges(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag)) {
+    void operator()(const GraphNode& src, galois::UserContext<GraphNode>& ctx) {
+      for (auto ii : g.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED : flag)) {
         GraphNode dst = g.getEdgeDst(ii);
-        if (g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED)).cap > 0) {
-          node_data_type& node = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
-          unsigned newHeight = g.getData(src, Galois::MethodFlag::UNPROTECTED).height + 1;
+        if (g.getEdgeData(g.findEdge(dst, src, galois::MethodFlag::UNPROTECTED)).cap > 0) {
+          node_data_type& node = g.getData(dst, galois::MethodFlag::UNPROTECTED);
+          unsigned newHeight = g.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
           if (useCAS) {
             unsigned oldHeight;
             while (newHeight < (oldHeight = node.height)) {
@@ -804,21 +804,21 @@ struct MatchingMF {
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
+      node_data_type& node = g.getData(src, galois::MethodFlag::UNPROTECTED);
       node.height = numNodes;
       node.current = 0;
       if (src == sink)
         node.height = 0;
     }
 
-    Galois::StatTimer T("BfsTime");
+    galois::StatTimer T("BfsTime");
     T.start();
-    Galois::for_each(sink, UpdateHeights<false>(g), Galois::does_not_need_stats<>());
+    galois::for_each(sink, UpdateHeights<false>(g), galois::does_not_need_stats<>());
     T.stop();
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
+      node_data_type& node = g.getData(src, galois::MethodFlag::UNPROTECTED);
       if (src == sink || src == source)
         continue;
       if (node.excess > 0) 
@@ -854,22 +854,22 @@ struct MatchingMF {
     for (auto src : g.A) {
       for (auto ii : g.edges(src)) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, src, galois::MethodFlag::WRITE)) = edge_data_type(0);
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::WRITE)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::WRITE)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(source, *src, galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(*src, source, galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::WRITE)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(*src, sink, galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(sink, *src, galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 
@@ -889,7 +889,7 @@ struct MatchingMF {
   }
 
   void operator()(G& g) {
-    Galois::StatTimer t("serial");
+    galois::StatTimer t("serial");
 
     t.start();
     GraphNode source;
@@ -903,9 +903,9 @@ struct MatchingMF {
     t.stop();
 
     bool shouldGlobalRelabel = false;
-    Galois::setActiveThreads(Concurrent ? numThreads : 1);
+    galois::setActiveThreads(Concurrent ? numThreads : 1);
     while (!initial.empty()) {
-      Galois::for_each(initial.begin(), initial.end(), 
+      galois::for_each(initial.begin(), initial.end(), 
           Process(*this, g, source, sink, numNodes, interval, shouldGlobalRelabel));
 
       if (!shouldGlobalRelabel)
@@ -1022,10 +1022,10 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
     << " seed: " << seed
     << "\n";
 
-  Galois::Graph::FileGraphWriter p;
+  galois::Graph::FileGraphWriter p;
   p.setNumNodes(numA + numB);
   p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(Galois::LargeArray<edge_data_type>::size_of::value);
+  p.setSizeofEdgeData(galois::LargeArray<edge_data_type>::size_of::value);
 
   for (int phase = 0; phase < 2; ++phase) {
     if (phase == 0)
@@ -1079,7 +1079,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
 
   // Leave edge data uninitialized
   p.finish<edge_data_type>();
-  Galois::Graph::readGraph(g, p);
+  galois::Graph::readGraph(g, p);
 }
 
 /**
@@ -1091,7 +1091,7 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
  */
 template<typename G>
 void readInput(const std::string& filename, G& g) {
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
 }
 
 template<template<typename,bool> class Algo, typename G>
@@ -1154,7 +1154,7 @@ void start(int N, int numEdges, int numGroups) {
 
   std::cout << "Starting " << algo.name() << "\n";
 
-  Galois::StatTimer t;
+  galois::StatTimer t;
 
   while (true) {
     t.start();
@@ -1199,7 +1199,7 @@ void start() {
 }
 
 int main(int argc, char** argv) {
-  Galois::StatManager M;
+  galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
   switch (executionType) {

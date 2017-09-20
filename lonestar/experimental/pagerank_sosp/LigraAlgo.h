@@ -11,26 +11,26 @@
 #include "PageRankOld.h"
 
 template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
+struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+  typedef typename galois::Graph::LC_CSR_Graph<PNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
     InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<PNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
+          galois::Graph::OCImmutableEdgeGraph<PNode,void>,
+          galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return UseGraphChi ? "LigraChi" : "Ligra"; }
   
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<float> sum_delta;
+  galois::GReduceMax<float> max_delta;
+  galois::GAccumulator<size_t> small_delta;
+  galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    Galois::Graph::readGraph(graph, filename); 
+    galois::Graph::readGraph(graph, filename); 
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }
 
@@ -38,7 +38,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      PNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      PNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
       data.value = 1.0;
       data.accum.write(0.0);
     }
@@ -50,10 +50,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      int neighbors = std::distance(graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          graph.edge_end(src, Galois::MethodFlag::UNPROTECTED));
-      PNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      PNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      int neighbors = std::distance(graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+          graph.edge_end(src, galois::MethodFlag::UNPROTECTED));
+      PNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       float delta = sdata.value / neighbors;
       
       ddata.accum.atomicIncrement(delta);
@@ -66,7 +66,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& graph;
     UpdateNode(LigraAlgo* s, Graph& g): self(s), graph(g) { }
     void operator()(GNode src) const {
-      PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      PNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       float value = (1.0 - alpha) * sdata.accum.read() + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff <= tolerance)
@@ -79,13 +79,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph) { 
-    Galois::GraphNodeBagPair<> bags(graph.size());
+    galois::GraphNodeBagPair<> bags(graph.size());
 
     unsigned iteration = 0;
 
     // Initialize
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
-    Galois::do_all_local(graph, UpdateNode(this, graph));
+    galois::do_all_local(graph, UpdateNode(this, graph));
 
     while (true) {
       iteration += 1;
@@ -106,7 +106,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
       //this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
-      Galois::do_all_local(graph, UpdateNode(this, graph));
+      galois::do_all_local(graph, UpdateNode(this, graph));
     }
     
     if (iteration >= maxIterations) {

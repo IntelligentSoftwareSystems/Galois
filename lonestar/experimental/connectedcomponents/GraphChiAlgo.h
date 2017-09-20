@@ -14,7 +14,7 @@ extern llvm::cl::opt<unsigned int> memoryLimit;
 template<typename Graph>
 void readInOutGraph(Graph& graph);
 
-struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
+struct GraphChiAlgo: public galois::LigraGraphChi::ChooseExecutor<true> {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;
@@ -24,9 +24,9 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
     bool isRep() { return id == comp; }
   };
 
-  typedef Galois::Graph::OCImmutableEdgeGraph<LNode,void> Graph;
+  typedef galois::Graph::OCImmutableEdgeGraph<LNode,void> Graph;
   typedef Graph::GraphNode GNode;
-  typedef Galois::GraphNodeBagPair<> BagPair;
+  typedef galois::GraphNodeBagPair<> BagPair;
 
   template<typename G>
   void readGraph(G& graph) {
@@ -39,7 +39,7 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
 
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
     }
   };
@@ -56,38 +56,38 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
     //! Add the next edge between components to the worklist
     template<typename GTy>
     void operator()(GTy& graph, const GNode& src) const {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
       typename LNode::component_type m = sdata.comp;
 
-      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (typename GTy::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         m = std::min(m, ddata.comp);
       }
 
-      for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED),
+          ei = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getInEdgeDst(ii);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         m = std::min(m, ddata.comp);
       }
 
       if (m != sdata.comp) {
         sdata.comp = m;
-        for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-            ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+        for (typename GTy::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
-          LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           if (m < ddata.comp) {
             next.push(graph.idFromNode(dst), 1);
           }
         }
-        for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-            ei = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+        for (typename GTy::in_edge_iterator ii = graph.in_edge_begin(src, galois::MethodFlag::UNPROTECTED),
+            ei = graph.in_edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           GNode dst = graph.getInEdgeDst(ii);
-          LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           if (m < ddata.comp) {
             next.push(graph.idFromNode(dst), 1);
           }
@@ -99,11 +99,11 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
   void operator()(Graph& graph) {
     BagPair bags(graph.size());
 
-    Galois::do_all_local(graph, Initialize(graph));
-    Galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
+    galois::do_all_local(graph, Initialize(graph));
+    galois::GraphChi::vertexMap(graph, Process(bags.next()), memoryLimit);
     while (!bags.next().empty()) {
       bags.swap();
-      Galois::GraphChi::vertexMap(graph, Process(bags.next()), bags.cur(), memoryLimit);
+      galois::GraphChi::vertexMap(graph, Process(bags.next()), bags.cur(), memoryLimit);
     } 
   }
 };

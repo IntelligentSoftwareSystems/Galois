@@ -51,7 +51,7 @@ constexpr decltype(auto) apply(F&& f, Tuple&& t) {
 #include <boost/optional.hpp>
 #endif
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 typedef SerializeBuffer SendBuffer;

@@ -35,17 +35,17 @@
 #include "Galois/Substrate/Termination.h"
 
 // vtable anchoring
-Galois::Substrate::TerminationDetection::~TerminationDetection(void) {}
+galois::Substrate::TerminationDetection::~TerminationDetection(void) {}
 
-static Galois::Substrate::TerminationDetection* TERM = nullptr;
+static galois::Substrate::TerminationDetection* TERM = nullptr;
 
-void Galois::Substrate::internal::setTermDetect(Galois::Substrate::TerminationDetection* t) {
+void galois::Substrate::internal::setTermDetect(galois::Substrate::TerminationDetection* t) {
   GALOIS_ASSERT(!(TERM && t), "Double initialization of TerminationDetection");
   TERM = t;
 }
 
 
-Galois::Substrate::TerminationDetection& Galois::Substrate::getSystemTermination(unsigned activeThreads) {
+galois::Substrate::TerminationDetection& galois::Substrate::getSystemTermination(unsigned activeThreads) {
   TERM->init(activeThreads);
   return *TERM;
 }

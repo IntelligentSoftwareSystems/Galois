@@ -78,14 +78,14 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to valid
-  Galois::do_all_local(
+  galois::do_all_local(
     g, 
     [&g] (typename Graph::GraphNode N) { 
-      for (auto e: g.edges(N, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(N, galois::MethodFlag::UNPROTECTED)) {
         g.getEdgeData(e) = valid;
       }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 }
 
@@ -94,7 +94,7 @@ template<typename Graph>
 void printGraph(Graph& g) {
   for (auto n: g) {
     std::cout << "node " << n << std::endl;
-    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto d = g.getEdgeDst(e);
       if (d >= n) continue;
       std::cout << "  edge to " << d << ((g.getEdgeData(e) & removed) ? " removed" : "") << std::endl;
@@ -104,18 +104,18 @@ void printGraph(Graph& g) {
 
 template<typename G>
 size_t countValidNodes(G& g) {
-  Galois::GAccumulator<size_t> numNodes;
+  galois::GAccumulator<size_t> numNodes;
 
-  Galois::do_all_local(g, 
+  galois::do_all_local(g, 
     [&g, &numNodes] (typename G::GraphNode n) {
-      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
           numNodes += 1;
           break;
         }
       }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 
   return numNodes.reduce();
@@ -123,17 +123,17 @@ size_t countValidNodes(G& g) {
 
 template<typename G>
 size_t countValidEdges(G& g) {
-  Galois::GAccumulator<size_t> numEdges;
+  galois::GAccumulator<size_t> numEdges;
 
-  Galois::do_all_local(g, 
+  galois::do_all_local(g, 
     [&g, &numEdges] (typename G::GraphNode n) {
-      for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         if (n < g.getEdgeDst(e) && !(g.getEdgeData(e) & removed)) {
           numEdges += 1;
         }
       }
     },
-    Galois::do_all_steal<true>()
+    galois::do_all_steal<true>()
   );
 
   return numEdges.reduce();
@@ -153,7 +153,7 @@ void reportKTruss(Graph& g) {
   }
 
   for (auto n: g) {
-    for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+    for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
       auto dst = g.getEdgeDst(e);
       if (n < dst && (g.getEdgeData(e) & 0x1) != removed) {
         of << n << " " << dst << std::endl;
@@ -165,10 +165,10 @@ void reportKTruss(Graph& g) {
 template<typename G>
 bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode dst, unsigned int j) {
   size_t numValidEqual = 0;
-  auto srcI = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), 
-    srcE = g.edge_end(src, Galois::MethodFlag::UNPROTECTED), 
-    dstI = g.edge_begin(dst, Galois::MethodFlag::UNPROTECTED), 
-    dstE = g.edge_end(dst, Galois::MethodFlag::UNPROTECTED);
+  auto srcI = g.edge_begin(src, galois::MethodFlag::UNPROTECTED), 
+    srcE = g.edge_end(src, galois::MethodFlag::UNPROTECTED), 
+    dstI = g.edge_begin(dst, galois::MethodFlag::UNPROTECTED), 
+    dstE = g.edge_end(dst, galois::MethodFlag::UNPROTECTED);
 
   while (true) {
     // find the first valid edge
@@ -208,13 +208,13 @@ bool isSupportNoLessThanJ(G& g, typename G::GraphNode src, typename G::GraphNode
 // 4. Go back to 1.
 struct BSPTrussJacobiAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   typedef std::pair<GNode, GNode> Edge;
-  typedef Galois::InsertBag<Edge> EdgeVec;
+  typedef galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "bsp"; }
 
@@ -243,22 +243,22 @@ struct BSPTrussJacobiAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    Galois::do_all_local(g, 
+    galois::do_all_local(g, 
       [&g, cur] (GNode n) {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             cur->push_back(std::make_pair(n, dst));
           }
         }
       },
-      Galois::do_all_steal<true>()
+      galois::do_all_steal<true>()
     );
 
     while (true) {
-      Galois::do_all_local(*cur, 
+      galois::do_all_local(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
-        Galois::do_all_steal<true>()
+        galois::do_all_steal<true>()
       );
 
       if (0 == std::distance(unsupported.begin(), unsupported.end())) {
@@ -266,12 +266,12 @@ struct BSPTrussJacobiAlgo {
       }
 
       // mark unsupported edges as removed
-      Galois::do_all_local(unsupported, 
+      galois::do_all_local(unsupported, 
         [&g] (Edge e) {
           g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
           g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
         },
-        Galois::do_all_steal<true>()
+        galois::do_all_steal<true>()
       );
 
       unsupported.clear();
@@ -287,13 +287,13 @@ struct BSPTrussJacobiAlgo {
 // 3. Go back to 3.
 struct BSPTrussAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   typedef std::pair<GNode, GNode> Edge;
-  typedef Galois::InsertBag<Edge> EdgeVec;
+  typedef galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "bsp"; }
 
@@ -326,24 +326,24 @@ struct BSPTrussAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    Galois::do_all_local(g, 
+    galois::do_all_local(g, 
       [&g, cur] (GNode n) {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             cur->push_back(std::make_pair(n, dst));
           }
         }
       },
-      Galois::do_all_steal<true>()
+      galois::do_all_steal<true>()
     );
     curSize = std::distance(cur->begin(), cur->end());
 
     // remove unsupported edges until no more edges can be removed
     while (true) {
-      Galois::do_all_local(*cur, 
+      galois::do_all_local(*cur, 
         KeepSupportedEdges{g, k-2, *next},
-        Galois::do_all_steal<true>()
+        galois::do_all_steal<true>()
       );
       nextSize = std::distance(next->begin(), next->end());
 
@@ -362,7 +362,7 @@ struct BSPTrussAlgo {
 template<typename G>
 bool isValidDegreeNoLessThanJ(G& g, typename G::GraphNode n, unsigned int j) {
   size_t numValid = 0;
-  for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+  for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
     if (!(g.getEdgeData(e) & removed)) {
       numValid += 1;
       if (numValid >= j) {
@@ -379,12 +379,12 @@ bool isValidDegreeNoLessThanJ(G& g, typename G::GraphNode n, unsigned int j) {
 // 3. Go back to 1.
 struct BSPCoreAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  typedef Galois::InsertBag<GNode> NodeVec;
+  typedef galois::InsertBag<GNode> NodeVec;
 
   std::string name() { return "bspCore"; }
 
@@ -400,7 +400,7 @@ struct BSPCoreAlgo {
       if (isValidDegreeNoLessThanJ(g, n, j)) {
         s.push_back(n);
       } else {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           g.getEdgeData(g.findEdgeSortedByDst(n, dst)) = removed;
           g.getEdgeData(g.findEdgeSortedByDst(dst, n)) = removed;
@@ -414,9 +414,9 @@ struct BSPCoreAlgo {
     NodeVec *cur = &work[0], *next = &work[1];
     size_t curSize = g.size(), nextSize;
 
-    Galois::do_all_local(g, 
+    galois::do_all_local(g, 
       KeepValidNodes{g, k, *next}, 
-      Galois::do_all_steal<true>()
+      galois::do_all_steal<true>()
     );
     nextSize = std::distance(next->begin(), next->end());
 
@@ -425,9 +425,9 @@ struct BSPCoreAlgo {
       curSize = nextSize;
       std::swap(cur, next);
 
-      Galois::do_all_local(*cur, 
+      galois::do_all_local(*cur, 
         KeepValidNodes{g, k, *next}, 
-        Galois::do_all_steal<true>()
+        galois::do_all_steal<true>()
       );
       nextSize = std::distance(next->begin(), next->end());
     }
@@ -439,7 +439,7 @@ struct BSPCoreAlgo {
 // 2. Compute k-truss from k-1 core
 struct BSPCoreThenTrussAlgo {
   // set LSB of an edge weight to indicate the removal of the edge.
-  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -451,7 +451,7 @@ struct BSPCoreThenTrussAlgo {
       return;
     }
 
-    Galois::StatTimer TCore("Reduce_to_(k-1)-core");
+    galois::StatTimer TCore("Reduce_to_(k-1)-core");
     TCore.start();
 
     BSPCoreAlgo bspCore;
@@ -459,7 +459,7 @@ struct BSPCoreThenTrussAlgo {
 
     TCore.stop();
 
-    Galois::StatTimer TTruss("Reduce_to_k-truss");
+    galois::StatTimer TTruss("Reduce_to_k-truss");
     TTruss.start();
 
     BSPTrussAlgo bspTrussIm;
@@ -470,14 +470,14 @@ struct BSPCoreThenTrussAlgo {
 }; // end struct BSPCoreThenTrussAlgo
 
 template<typename T>
-using PerIterAlloc = typename Galois::PerIterAllocTy::rebind<T>::other;
+using PerIterAlloc = typename galois::PerIterAllocTy::rebind<T>::other;
 
 template<typename G>
 std::deque<typename G::GraphNode, PerIterAlloc<typename G::GraphNode> >
 getValidCommonNeighbors(
   G& g,
   typename G::GraphNode src, typename G::GraphNode dst, 
-  Galois::PerIterAllocTy& a, Galois::MethodFlag flag = Galois::MethodFlag::WRITE)
+  galois::PerIterAllocTy& a, galois::MethodFlag flag = galois::MethodFlag::WRITE)
 {
   using GNode = typename G::GraphNode;
 
@@ -524,12 +524,12 @@ struct AsyncTrussTxAlgo {
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
   //   >> 1 when computing edge supports
-  typedef Galois::Graph::LC_CSR_Graph<void, uint32_t>
+  typedef galois::Graph::LC_CSR_Graph<void, uint32_t>
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   typedef std::pair<GNode, GNode> Edge;
-  typedef Galois::InsertBag<Edge> EdgeVec;
+  typedef galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "asyncTx"; }
 
@@ -541,10 +541,10 @@ struct AsyncTrussTxAlgo {
     PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r)
       : g(g), j(j), r(r) {}
 
-    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
       std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors
-        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), Galois::MethodFlag::UNPROTECTED);
+        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), galois::MethodFlag::UNPROTECTED);
       auto numValidCommonNeighbors = commonNeighbors.size();
 
       g.getEdgeData(g.findEdgeSortedByDst(src, dst)) = (numValidCommonNeighbors << 1);
@@ -561,7 +561,7 @@ struct AsyncTrussTxAlgo {
 
     PropagateEdgeRemoval(Graph& g, unsigned int j): g(g), j(j) {}
 
-    void removeUnsupportedEdge(GNode src, GNode dst, Galois::UserContext<Edge>& ctx) {
+    void removeUnsupportedEdge(GNode src, GNode dst, galois::UserContext<Edge>& ctx) {
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
 
@@ -573,7 +573,7 @@ struct AsyncTrussTxAlgo {
       }
     }
 
-    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
 
       // lock src's neighbors
@@ -618,30 +618,30 @@ struct AsyncTrussTxAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    Galois::do_all_local(g, 
+    galois::do_all_local(g, 
       [&g, &work] (GNode n) {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             work.push_back(std::make_pair(n, dst));
           }
         }
       },
-      Galois::do_all_steal<true>()
+      galois::do_all_steal<true>()
     );
 
-    Galois::for_each_local(work, 
+    galois::for_each_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
-      Galois::loopname("PickUnsupportedEdges"),
-      Galois::does_not_need_aborts<>(),
-      Galois::does_not_need_push<>(),
-      Galois::needs_per_iter_alloc<>()
+      galois::loopname("PickUnsupportedEdges"),
+      galois::does_not_need_aborts<>(),
+      galois::does_not_need_push<>(),
+      galois::needs_per_iter_alloc<>()
     );
 
-    Galois::for_each_local(unsupported,
+    galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
-      Galois::loopname("PropagateEdgeRemoval"),
-      Galois::needs_per_iter_alloc<>()
+      galois::loopname("PropagateEdgeRemoval"),
+      galois::needs_per_iter_alloc<>()
     );
   } // end operator()
 }; // end AsyncTrussTxAlgo
@@ -657,13 +657,13 @@ struct AsyncTrussTxAlgo {
   //   set LSB of an edge weight to indicate the removal of the edge.
   //   << 1 to track # triangles an edge supports, 
   //   >> 1 when computing edge supports
-  typedef Galois::Graph::LC_CSR_Graph<void, std::atomic<uint32_t> >
+  typedef galois::Graph::LC_CSR_Graph<void, std::atomic<uint32_t> >
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   typedef std::pair<GNode, GNode> Edge;
-  typedef Galois::InsertBag<Edge> EdgeVec;
+  typedef galois::InsertBag<Edge> EdgeVec;
 
   std::string name() { return "async"; }
 
@@ -675,10 +675,10 @@ struct AsyncTrussTxAlgo {
     PickUnsupportedEdges(Graph& g, unsigned int j, EdgeVec& r)
       : g(g), j(j), r(r) {}
 
-    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
       std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors
-        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), Galois::MethodFlag::UNPROTECTED);
+        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), galois::MethodFlag::UNPROTECTED);
       auto numValidCommonNeighbors = commonNeighbors.size();
 
       g.getEdgeData(g.findEdgeSortedByDst(src, dst)) = (numValidCommonNeighbors << 1);
@@ -695,7 +695,7 @@ struct AsyncTrussTxAlgo {
 
     PropagateEdgeRemoval(Graph& g, unsigned int j): g(g), j(j) {}
 
-    void removeUnsupportedEdge(GNode src, GNode dst, Galois::UserContext<Edge>& ctx) {
+    void removeUnsupportedEdge(GNode src, GNode dst, galois::UserContext<Edge>& ctx) {
       auto& oeData = g.getEdgeData(g.findEdgeSortedByDst(src, dst));
       auto& ieData = g.getEdgeData(g.findEdgeSortedByDst(dst, src));
 
@@ -707,7 +707,7 @@ struct AsyncTrussTxAlgo {
       }
     }
 
-    void operator()(Edge e, Galois::UserContext<Edge>& ctx) {
+    void operator()(Edge e, galois::UserContext<Edge>& ctx) {
       auto src = e.first, dst = e.second;
 
       // lock nodes within 2 hops from src
@@ -733,7 +733,7 @@ struct AsyncTrussTxAlgo {
 
       // propagate edge removal
       std::deque<GNode, PerIterAlloc<GNode> > commonNeighbors
-        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), Galois::MethodFlag::UNPROTECTED);
+        = getValidCommonNeighbors(g, src, dst, ctx.getPerIterAlloc(), galois::MethodFlag::UNPROTECTED);
       for (auto n: commonNeighbors) {
         removeUnsupportedEdge(((n < src) ? n : src), ((n < src) ? src: n), ctx);
         removeUnsupportedEdge(((n < dst) ? n : dst), ((n < dst) ? dst: n), ctx);
@@ -750,30 +750,30 @@ struct AsyncTrussTxAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    Galois::do_all_local(g, 
+    galois::do_all_local(g, 
       [&g, &work] (GNode n) {
-        for (auto e: g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
+        for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
           if (dst > n) {
             work.push_back(std::make_pair(n, dst));
           }
         }
       },
-      Galois::do_all_steal<true>()
+      galois::do_all_steal<true>()
     );
 
-    Galois::for_each_local(work, 
+    galois::for_each_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
-      Galois::loopname("PickUnsupportedEdges"),
-      Galois::does_not_need_aborts<>(),
-      Galois::does_not_need_push<>(),
-      Galois::needs_per_iter_alloc<>()
+      galois::loopname("PickUnsupportedEdges"),
+      galois::does_not_need_aborts<>(),
+      galois::does_not_need_push<>(),
+      galois::needs_per_iter_alloc<>()
     );
 
-    Galois::for_each_local(unsupported,
+    galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
-      Galois::loopname("PropagateEdgeRemoval"),
-      Galois::needs_per_iter_alloc<>()
+      galois::loopname("PropagateEdgeRemoval"),
+      galois::needs_per_iter_alloc<>()
     );
   } // end operator()
 }; // end AsyncTrussAlgo
@@ -783,9 +783,9 @@ void run() {
   Algo algo;
   typename Algo::Graph g;
 
-  Galois::reportPageAlloc("MeminfoPre");
+  galois::reportPageAlloc("MeminfoPre");
 
-  Galois::Graph::readGraph(g, filename);
+  galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes" << std::endl;
 
   initialize(g);
@@ -793,16 +793,16 @@ void run() {
 
   std::cout << "Running " << algo.name() << " algorithm for maximal " << trussNum << "-truss" << std::endl;
 
-  Galois::StatTimer T;
+  galois::StatTimer T;
   T.start();
   algo(g, trussNum);
   T.stop();
-  Galois::reportPageAlloc("MeminfoPost");
+  galois::reportPageAlloc("MeminfoPost");
   reportKTruss(g);
 }
 
 int main(int argc, char **argv) {
-  Galois::StatManager statManager;
+  galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   if (2 > trussNum) {
@@ -810,7 +810,7 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  Galois::StatTimer T("TotalTime");
+  galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
   case bspJacobi: 

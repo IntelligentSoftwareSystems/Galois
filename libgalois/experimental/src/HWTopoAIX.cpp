@@ -46,7 +46,7 @@
 #include <sys/processor.h>
 #include <sys/thread.h>
 
-using namespace Galois::Substrate;
+using namespace galois::Substrate;
 
 namespace {
 
@@ -261,49 +261,49 @@ static Policy& getPolicy() {
 
 } //namespace
 
-bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
+bool galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(size_t(id) < getPolicy().virtmap.size());
   return bindToProcessor(getPolicy().virtmap[id]);
 }
 
-unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+unsigned galois::Runtime::LL::getProcessorForThread(int id) {
   assert(size_t(id) < getPolicy().virtmap.size());
   return getPolicy().virtmap[id];
 }
 
-unsigned Galois::Runtime::LL::getMaxThreads() {
+unsigned galois::Runtime::LL::getMaxThreads() {
   return getPolicy().numThreads;
 }
 
-unsigned Galois::Runtime::LL::getMaxCores() {
+unsigned galois::Runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned Galois::Runtime::LL::getMaxPackages() {
+unsigned galois::Runtime::LL::getMaxPackages() {
   return getPolicy().numPackages;
 }
 
-unsigned Galois::Runtime::LL::getPackageForThread(int id) {
+unsigned galois::Runtime::LL::getPackageForThread(int id) {
   assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().packages[id];
 }
 
-unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::Runtime::LL::getMaxPackageForThread(int id) {
   assert(size_t(id) < getPolicy().maxPackage.size());
   return getPolicy().maxPackage[id];
 }
 
-bool Galois::Runtime::LL::isPackageLeader(int id) {
+bool galois::Runtime::LL::isPackageLeader(int id) {
   assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]] == id;
 }
 
-unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
+unsigned galois::Runtime::LL::getLeaderForThread(int id) {
   assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]];
 }
 
-unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::Runtime::LL::getLeaderForPackage(int id) {
   assert(size_t(id) < getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }

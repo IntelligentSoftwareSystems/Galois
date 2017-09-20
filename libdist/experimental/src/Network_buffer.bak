@@ -26,8 +26,8 @@
 
 #include <mutex>
 
-using namespace Galois;
-using namespace Galois::Runtime;
+using namespace galois;
+using namespace galois::Runtime;
 
 namespace {
 
@@ -198,7 +198,7 @@ public:
 }
 
 #ifdef USE_BUF
-NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+NetworkInterface& galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceBuffer net;
   return net;
 }

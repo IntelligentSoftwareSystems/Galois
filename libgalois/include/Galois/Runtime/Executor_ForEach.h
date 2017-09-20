@@ -58,7 +58,7 @@
 #include <memory>
 #include <utility>
 
-namespace Galois {
+namespace galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
 
@@ -257,7 +257,7 @@ protected:
   }
 
   void runQueueSimple(ThreadLocalData& tld) {
-    Galois::optional<value_type> p;
+    galois::optional<value_type> p;
     while ((p = wl.pop())) {
       doProcess(*p, tld);
     }
@@ -265,7 +265,7 @@ protected:
 
   template<int limit, typename WL>
   void runQueue(ThreadLocalData& tld, WL& lwl) {
-    Galois::optional<typename WL::value_type> p;
+    galois::optional<typename WL::value_type> p;
     int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
@@ -591,5 +591,5 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 #endif

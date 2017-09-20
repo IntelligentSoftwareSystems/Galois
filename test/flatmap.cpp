@@ -44,12 +44,12 @@ struct Fn2 {
 template<typename MapTy>
 void timeMapParallel(std::string c, const std::vector<int>& keys) {
   MapTy m;
-  Galois::Timer t1, t2;
+  galois::Timer t1, t2;
   t1.start();
-  Galois::do_all(keys.begin(), keys.end(), Fn1<MapTy> { &m });
+  galois::do_all(keys.begin(), keys.end(), Fn1<MapTy> { &m });
   t1.stop();
   t2.start();
-  Galois::do_all(keys.begin(), keys.end(), Fn2<MapTy> { &m });
+  galois::do_all(keys.begin(), keys.end(), Fn2<MapTy> { &m });
   t2.stop();
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
 }
@@ -57,7 +57,7 @@ void timeMapParallel(std::string c, const std::vector<int>& keys) {
 template<typename MapTy>
 void timeMap(std::string c, const std::vector<int>& keys) {
   MapTy m;
-  Galois::Timer t1, t2;
+  galois::Timer t1, t2;
   t1.start();
   for (auto& x : keys) {
     m[x] = element(x);
@@ -133,22 +133,22 @@ void timeTests(std::string prefix, const std::vector<int>& keys) {
   for (int i = 0; i < 3; ++i)
     timeMap<std::map<int, element>>(prefix + "std::map", keys);
   for (int i = 0; i < 3; ++i)
-    timeMap<Galois::flat_map<int, element>>(prefix + "flat_map", keys);
+    timeMap<galois::flat_map<int, element>>(prefix + "flat_map", keys);
 #ifdef GALOIS_USE_EXP
   for (int i = 0; i < 3; ++i)
-    timeMap<Galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map", keys);
+    timeMap<galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map", keys);
   for (int i = 0; i < 3; ++i)
-    timeMapParallel<Galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map (parallel)", keys);
+    timeMapParallel<galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map (parallel)", keys);
 #endif
 }
 
 int main(int argc, char** argv) {
   testMap<std::map<int, element>>();
-  testMap<Galois::flat_map<int, element>>();
+  testMap<galois::flat_map<int, element>>();
 #ifdef GALOIS_USE_EXP
-  testMap<Galois::concurrent_flat_map<int, element>>();
+  testMap<galois::concurrent_flat_map<int, element>>();
 #endif
-  Galois::setActiveThreads(8);
+  galois::setActiveThreads(8);
 
   int size = 100;
   if (argc > 1)

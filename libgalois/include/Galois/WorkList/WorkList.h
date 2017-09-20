@@ -42,7 +42,7 @@
 #include "OwnerComputes.h"
 #include "StableIterator.h"
 
-namespace Galois {
+namespace galois {
 /**
  * Scheduling policies for Galois iterators. Unless you have very specific
  * scheduling requirement, {@link dChunkedLIFO} or {@link dChunkedFIFO} is a
@@ -54,7 +54,7 @@ namespace Galois {
  * {@link for_each()}. For example,
  *
  * \code
- * Galois::for_each(begin, end, fn, Galois::wl<Galois::WorkList::dChunkedFIFO<32>>());
+ * galois::for_each(begin, end, fn, galois::wl<galois::WorkList::dChunkedFIFO<32>>());
  * \endcode
  */
 namespace WorkList {
@@ -96,7 +96,7 @@ public:
   void push_initial(const RangeTy&);
 
   //! Pops a value from the queue.
-  Galois::optional<value_type> pop();
+  galois::optional<value_type> pop();
 
   /**
    * (optional) Returns true if the worklist is empty. Called infrequently
@@ -108,6 +108,6 @@ public:
 
 } // end namespace anonymous
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

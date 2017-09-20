@@ -38,7 +38,7 @@
 #include "Galois/UserContext.h"
 #include "Galois/WorkList/Chunked.h"
 
-namespace Galois {
+namespace galois {
 //! Parallel versions of STL library algorithms.
 // TODO: rename to gstl?
 namespace ParallelSTL {
@@ -70,7 +70,7 @@ struct find_if_helper {
   typedef int tt_does_not_need_aborts;
   typedef int tt_needs_parallel_break;
 
-  typedef Galois::optional<InputIterator> ElementTy;
+  typedef galois::optional<InputIterator> ElementTy;
   typedef Substrate::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;
@@ -88,10 +88,10 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
 {
   typedef find_if_helper<InputIterator,Predicate> HelperTy;
   typedef typename HelperTy::AccumulatorTy AccumulatorTy;
-  typedef Galois::WorkList::dChunkedFIFO<256> WL;
+  typedef galois::WorkList::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, Galois::wl<WL>());
+  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, galois::wl<WL>());
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -254,16 +254,16 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     std::sort(first, last, comp);
     return;
   }
-  typedef Galois::WorkList::dChunkedFIFO<1> WL;
+  typedef galois::WorkList::dChunkedFIFO<1> WL;
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   
-  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp), Galois::wl<WL>());
+  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp), galois::wl<WL>());
 }
 
 template<class RandomAccessIterator>
 void sort(RandomAccessIterator first, RandomAccessIterator last) {
-  Galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
+  galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
 }
 
 template <class InputIterator, class T, typename BinaryOperation>
@@ -289,7 +289,7 @@ struct map_reduce_helper {
   Substrate::PerThreadStorage<T>& init;
   MapFn fn;
   ReduceFn reduce;
-  map_reduce_helper(Galois::Substrate::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
+  map_reduce_helper(galois::Substrate::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
     :init(i), fn(fn), reduce(reduce) {}
   template<typename U>
   void operator()(U&& v) const {
@@ -299,10 +299,10 @@ struct map_reduce_helper {
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  Galois::Substrate::PerThreadStorage<T> reduced;
+  galois::Substrate::PerThreadStorage<T> reduced;
   do_all(first, last,
          map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
-  //         Galois::loopname("map_reduce"));
+  //         galois::loopname("map_reduce"));
   for (unsigned i = 0; i < reduced.size(); ++i)
     init = reduce(init, *reduced.getRemote(i));
   return init;

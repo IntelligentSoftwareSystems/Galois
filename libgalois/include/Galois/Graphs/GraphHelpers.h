@@ -37,7 +37,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 ///**
@@ -258,5 +258,5 @@ divideNodesBinarySearch(NodeType numNodes,
 
 
 } // end namespace Graph
-} // end namespace Galois
+} // end namespace galois
 #endif

@@ -36,14 +36,14 @@
 
 static void endPeriod() {
   int val;
-  if (Galois::Substrate::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
+  if (galois::Substrate::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
     exit(val);
   }
 }
 
 static void beginPeriod() {
   int val;
-  if (Galois::Substrate::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
+  if (galois::Substrate::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
     exit(val);
   }
 }
@@ -54,17 +54,17 @@ static void beginPeriod() {
 namespace vtune {
 static bool isOn;
 static void begin() {
-  if (!isOn && Galois::Substrate::ThreadPool::getTID() == 0)
+  if (!isOn && galois::Substrate::ThreadPool::getTID() == 0)
     __itt_resume();
   isOn = true;
-  Galois::gDebug("vtune sampling started");
+  galois::gDebug("vtune sampling started");
 }
 
 static void end() {
-  if (isOn && Galois::Substrate::ThreadPool::getTID() == 0)
+  if (isOn && galois::Substrate::ThreadPool::getTID() == 0)
     __itt_pause();
   isOn = false;
-  Galois::gDebug("vtune sampling stopped");
+  galois::gDebug("vtune sampling stopped");
 }
 }
 #else
@@ -81,13 +81,13 @@ static void end() {}
 namespace hpctoolkit {
 static bool isOn;
 static void begin() {
-  if (!isOn && Galois::Substrate::ThreadPool::getTID() == 0)
+  if (!isOn && galois::Substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_start();
   isOn = true;
 }
 
 static void end() {
-  if (isOn && Galois::Substrate::ThreadPool::getTID() == 0)
+  if (isOn && galois::Substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_stop();
   isOn = false;
 }
@@ -124,7 +124,7 @@ static_assert(sizeof(papiEvents)/sizeof(*papiEvents) == sizeof(papiNames)/sizeof
     "PAPI Events != PAPI Names");
 
 static unsigned long galois_get_thread_id() {
-  return Galois::Substrate::ThreadPool::getTID();
+  return galois::Substrate::ThreadPool::getTID();
 }
 
 static void begin(bool mainThread) {
@@ -189,7 +189,7 @@ static void end(bool mainThread) {
     GALOIS_DIE(PAPI_strerror(rv));
 
   for (unsigned i = 0; i < sizeof(papiNames)/sizeof(*papiNames); ++i)
-    Galois::Runtime::reportStat_Tsum("PAPI-Prof", papiNames[i], papiResults[i]);
+    galois::Runtime::reportStat_Tsum("PAPI-Prof", papiNames[i], papiResults[i]);
 
 }
 
@@ -201,22 +201,22 @@ static void end(bool) {}
 }
 #endif
 
-void Galois::Runtime::beginThreadSampling() {
+void galois::Runtime::beginThreadSampling() {
   papi::begin(false);
 }
 
-void Galois::Runtime::endThreadSampling() {
+void galois::Runtime::endThreadSampling() {
   papi::end(false);
 }
 
-void Galois::Runtime::beginSampling() {
+void galois::Runtime::beginSampling() {
   beginPeriod();
   papi::begin(true);
   vtune::begin();
   hpctoolkit::begin();
 }
 
-void Galois::Runtime::endSampling() {
+void galois::Runtime::endSampling() {
   hpctoolkit::end();
   vtune::end();
   papi::end(true);

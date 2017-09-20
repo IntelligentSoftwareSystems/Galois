@@ -154,8 +154,8 @@ class Verifier {
 
 public:
   bool verify(Graph* g) {
-    return Galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
-      && Galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
+    return galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
+      && galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
       && checkReachability(g);
   }
 };

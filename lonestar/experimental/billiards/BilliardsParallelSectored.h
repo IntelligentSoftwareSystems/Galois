@@ -15,7 +15,7 @@ struct DepTestUtils {
   static void testOnRange (const CR& crange, const Cmp& cmp, const char* const loopname) {
 
     using C_ptr = typename CR::value_type;
-    Galois::do_all_choice (crange,
+    galois::do_all_choice (crange,
         [&] (C_ptr ctxt) {
 
           bool indep = true;
@@ -33,7 +33,7 @@ struct DepTestUtils {
           }
         },
         loopname,
-        Galois::chunk_size<COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<COARSE_CHUNK_SIZE> ());
 
   }
 
@@ -89,12 +89,12 @@ struct ThreadLocalTest {
   template <typename CR, typename Cmp>
   void operator () (const CR& crange, const Cmp& cmp) {
     using C_ptr = typename CR::value_type;
-    using Bag_ty = Galois::PerThreadBag<C_ptr, 64>;
+    using Bag_ty = galois::PerThreadBag<C_ptr, 64>;
 
     Bag_ty localSafeEvents;
 
     // TODO: try do-all with fine grained work items. 
-    Galois::Runtime::on_each_impl (
+    galois::Runtime::on_each_impl (
         [&] (const unsigned tid, const unsigned numT) {
 
           DepTestUtils::selfTestRange (crange.begin_local (), crange.end_local (), cmp, localSafeEvents);
@@ -103,7 +103,7 @@ struct ThreadLocalTest {
         , "thread-local-safety-test");
 
 
-    DepTestUtils::testOnRange (Galois::Runtime::makeLocalRange (localSafeEvents), cmp, "thread-local-round-2");
+    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (localSafeEvents), cmp, "thread-local-round-2");
 
   }
 };
@@ -116,13 +116,13 @@ struct SectorLocalTest {
   template <typename CR, typename Cmp>
   void operator () (const CR& crange, const Cmp& cmp) {
     using C_ptr = typename CR::value_type;
-    using Bag_ty = Galois::PerThreadBag<C_ptr, 64>;
+    using Bag_ty = galois::PerThreadBag<C_ptr, 64>;
 
     const size_t numSectors = table.getNumSectors ();
 
     std::vector<Bag_ty> sectorBags (numSectors);
 
-    Galois::do_all_choice (crange,
+    galois::do_all_choice (crange,
         [&] (C_ptr ctxt) {
           
           const Event& e = ctxt->getElem ();
@@ -132,14 +132,14 @@ struct SectorLocalTest {
           sectorBags [secID].push (ctxt);
         },
         "bin-by-sector",
-        Galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    auto secRange = Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+    auto secRange = galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
         boost::counting_iterator<size_t> (numSectors));
 
     Bag_ty perSectorSafeEvents;
 
-    Galois::do_all_choice (secRange,
+    galois::do_all_choice (secRange,
         [&] (const size_t secID) {
           DepTestUtils::selfTestRange (
             sectorBags[secID].begin (), 
@@ -148,10 +148,10 @@ struct SectorLocalTest {
             perSectorSafeEvents);
         },
         "per-sector-test",
-        Galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
 
-    DepTestUtils::testOnRange (Galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
+    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
 
 
   }
@@ -167,13 +167,13 @@ struct SectorLocalThreadLocalTest {
   template <typename CR, typename Cmp>
   void operator () (const CR& crange, const Cmp& cmp) {
     using C_ptr = typename CR::value_type;
-    using Bag_ty = Galois::PerThreadBag<C_ptr, 64>;
+    using Bag_ty = galois::PerThreadBag<C_ptr, 64>;
 
     const size_t numSectors = table.getNumSectors ();
 
     std::vector<Bag_ty> sectorBags (numSectors);
 
-    Galois::do_all_choice (crange,
+    galois::do_all_choice (crange,
         [] (C_ptr ctxt) {
           
           const Event& e = ctxt->getElem ();
@@ -183,15 +183,15 @@ struct SectorLocalThreadLocalTest {
           sectorBags [secID].push (ctxt);
         },
         "bin-by-sector",
-        Galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    auto secRange = Galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
+    auto secRange = galois::Runtime::makeStandardRange (boost::counting_iterator<size_t> (0),
         boost::counting_iterator<size_t> (numSectors));
 
     
     std::vector<Bag_ty> perThrdSectorLocalEvents;
 
-    const size_t numT = Galois::getActiveThreads ();
+    const size_t numT = galois::getActiveThreads ();
     using ThrdSecPair = std::pair<size_t, size_t>;
     std::vector<ThrdSecPair> thrdSecPairs;
 
@@ -202,13 +202,13 @@ struct SectorLocalThreadLocalTest {
     }
 
 
-    Galois::do_all_choice (Galois::Runtime::makeStandardRange (thrdSecPairs.begin (), thrdSecPairs.end ()),
+    galois::do_all_choice (galois::Runtime::makeStandardRange (thrdSecPairs.begin (), thrdSecPairs.end ()),
         [&] (const ThrdSecPair& p) {
           const size_t secID = p.first;
           const size_t tid = p.second;
 
           assert (secID < numSectors);
-          assert (tid < Galois::getActiveThreads ());
+          assert (tid < galois::getActiveThreads ());
 
 
           DepTestUtils::selfTestRange (
@@ -218,11 +218,11 @@ struct SectorLocalThreadLocalTest {
             perThrdSectorLocalEvents[secID]);
         },
         "thread-local-per-sector-test",
-        Galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
     Bag_ty perSectorSafeEvents;
 
-    Galois::do_all_choice (secRange,
+    galois::do_all_choice (secRange,
         [&] (const size_t secID) {
           DepTestUtils::selfTestRange (
             perThrdSectorLocalEvents[secID].begin (), 
@@ -231,9 +231,9 @@ struct SectorLocalThreadLocalTest {
             perSectorSafeEvents);
         },
         "per-sector-test",
-        Galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
+        galois::chunk_size<DepTestUtils::COARSE_CHUNK_SIZE> ());
 
-    DepTestUtils::testOnRange (Galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
+    DepTestUtils::testOnRange (galois::Runtime::makeLocalRange (perSectorSafeEvents), cmp, "inter-sector-test");
 
   }
 

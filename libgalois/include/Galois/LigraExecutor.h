@@ -3,7 +3,7 @@
 
 #include "Galois/Galois.h"
 
-namespace Galois {
+namespace galois {
 //! Implementation of Ligra DSL in Galois
 namespace Ligra {
 
@@ -20,11 +20,11 @@ struct Transposer {
   }
 
   in_edge_iterator in_edge_begin(Graph& g, GNode n) {
-    return g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+    return g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED);
   }
 
   in_edge_iterator in_edge_end(Graph& g, GNode n) {
-    return g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED);
+    return g.in_edge_end(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getInEdgeData(Graph& g, in_edge_iterator ii) {
@@ -36,11 +36,11 @@ struct Transposer {
   }
 
   edge_iterator edge_begin(Graph& g, GNode n) {
-    return g.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+    return g.edge_begin(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_iterator edge_end(Graph& g, GNode n) {
-    return g.edge_end(n, Galois::MethodFlag::UNPROTECTED);
+    return g.edge_end(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getEdgeData(Graph& g, edge_iterator ii) {
@@ -60,11 +60,11 @@ struct Transposer<Graph,false> {
   }
 
   in_edge_iterator in_edge_begin(Graph& g, GNode n) {
-    return g.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+    return g.edge_begin(n, galois::MethodFlag::UNPROTECTED);
   }
 
   in_edge_iterator in_edge_end(Graph& g, GNode n) {
-    return g.edge_end(n, Galois::MethodFlag::UNPROTECTED);
+    return g.edge_end(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getInEdgeData(Graph& g, in_edge_iterator ii) {
@@ -76,11 +76,11 @@ struct Transposer<Graph,false> {
   }
 
   edge_iterator edge_begin(Graph& g, GNode n) {
-    return g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+    return g.in_edge_begin(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_iterator edge_end(Graph& g, GNode n) {
-    return g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED);
+    return g.in_edge_end(n, galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getEdgeData(Graph& g, edge_iterator ii) {
@@ -106,7 +106,7 @@ struct DenseOperator: public Transposer<Graph,Forward> {
   DenseOperator(Graph& g, Bag& i, Bag& o, EdgeOperator op): 
     graph(g), input(i), output(o), op(op) { }
 
-  void operator()(GNode n, Galois::UserContext<GNode>&) {
+  void operator()(GNode n, galois::UserContext<GNode>&) {
     (*this)(n);
   }
 
@@ -144,7 +144,7 @@ struct DenseForwardOperator: public Transposer<Graph,Forward> {
   DenseForwardOperator(Graph& g, Bag& i, Bag& o, EdgeOperator op): 
     graph(g), input(i), output(o), op(op) { }
 
-  void operator()(GNode n, Galois::UserContext<GNode>&) {
+  void operator()(GNode n, galois::UserContext<GNode>&) {
     (*this)(n);
   }
 
@@ -180,7 +180,7 @@ struct SparseOperator: public Transposer<Graph,Forward> {
   SparseOperator(Graph& g, Bag& o, EdgeOperator op, GNode s = GNode()):
     graph(g), output(o), op(op), source(s) { }
 
-  void operator()(size_t n, Galois::UserContext<size_t>&) {
+  void operator()(size_t n, galois::UserContext<size_t>&) {
     (*this)(n);
   }
 
@@ -196,7 +196,7 @@ struct SparseOperator: public Transposer<Graph,Forward> {
     }
   }
 
-  void operator()(edge_iterator ii, Galois::UserContext<edge_iterator>&) {
+  void operator()(edge_iterator ii, galois::UserContext<edge_iterator>&) {
     (*this)(ii);
   }
 
@@ -213,25 +213,25 @@ struct SparseOperator: public Transposer<Graph,Forward> {
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, Bag& output) {
   output.densify();
-  Galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
+  galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
 }
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Bag& output) {
   if (Forward) {
-    Galois::for_each(graph.out_edges(single, Galois::MethodFlag::UNPROTECTED).begin(),
-        graph.out_edges(single, Galois::MethodFlag::UNPROTECTED).end(),
+    galois::for_each(graph.out_edges(single, galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(single, galois::MethodFlag::UNPROTECTED).end(),
         hidden::SparseOperator<Graph,Bag,EdgeOperator,true>(graph, output, op, single));
   } else {
-    Galois::for_each(graph.in_edges(single, Galois::MethodFlag::UNPROTECTED).begin(),
-        graph.in_edges(single, Galois::MethodFlag::UNPROTECTED).end(),
+    galois::for_each(graph.in_edges(single, galois::MethodFlag::UNPROTECTED).begin(),
+        graph.in_edges(single, galois::MethodFlag::UNPROTECTED).end(),
         hidden::SparseOperator<Graph,Bag,EdgeOperator,false>(graph, output, op, single));
   }
 }
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward) {
-  using namespace Galois::WorkList;
+  using namespace galois::WorkList;
   size_t count = input.getCount();
 
   if (!denseForward && count > graph.sizeEdges() / 20) {
@@ -241,15 +241,15 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
       abort(); // Never executed
       output.densify();
       typedef dChunkedFIFO<256*4> WL;
-      Galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), Galois::wl<WL>());
+      galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), galois::wl<WL>());
     } else {
       typedef dChunkedFIFO<256> WL;
-      Galois::for_each_local(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), Galois::wl<WL>());
+      galois::for_each_local(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), galois::wl<WL>());
     }
   } else {
     //std::cout << "(S) Count " << count << "\n"; // XXX
     typedef dChunkedFIFO<64> WL;
-    Galois::for_each_local(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), Galois::wl<WL>());
+    galois::for_each_local(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), galois::wl<WL>());
   }
 }
 

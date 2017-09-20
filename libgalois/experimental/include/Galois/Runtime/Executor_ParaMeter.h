@@ -53,7 +53,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
   extern llvm::cl::opt<bool> useParaMeterOpt;
@@ -103,7 +103,7 @@ class ParaMeterExecutor {
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct IterationContext {
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
 
     void resetUserCtx() {
@@ -122,7 +122,7 @@ class ParaMeterExecutor {
     WorkListTy* next;
 
     void copyWL(WorkListTy& wl) {
-      for (Galois::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
+      for (galois::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
         curr->push(*item);
       }
     }
@@ -195,7 +195,7 @@ class ParaMeterExecutor {
       //
       size_t numIter = 0;
 
-      Galois::optional<value_type> item;
+      galois::optional<value_type> item;
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 
@@ -206,11 +206,11 @@ class ParaMeterExecutor {
         } catch (ConflictFlag flag) {
           clearConflictLock();
           switch (flag) {
-            case Galois::Runtime::CONFLICT:
+            case galois::Runtime::CONFLICT:
               doabort = true;
               break;
 
-            case Galois::Runtime::BREAK:
+            case galois::Runtime::BREAK:
               GALOIS_DIE("can't handle breaks yet");
               break;
 
@@ -355,7 +355,7 @@ void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) 
 
   using T = typename R::values_type;
 
-  auto tpl = Galois::get_default_trait_values(argsTuple,
+  auto tpl = galois::get_default_trait_values(argsTuple,
       std::make_tuple (loopname_tag {}),
       std::make_tuple (default_loopname {}));
 
@@ -391,7 +391,7 @@ public:
 namespace Runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
-class ForEachExecutor<Galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
+class ForEachExecutor<galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
   public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> 
 {
   typedef ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> SuperTy;

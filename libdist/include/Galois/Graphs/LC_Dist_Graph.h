@@ -27,7 +27,7 @@
 #include <vector>
 #include <iostream>
 
-namespace Galois {
+namespace galois {
 namespace Graph {
 
 template<typename NodeTy, typename EdgeTy>
@@ -193,7 +193,7 @@ class LC_Dist {
     return Starts[host].first + offset;
   }
 
-  void acquireNode(Runtime::gptr<NodeImplTy> node, Galois::MethodFlag mflag) {
+  void acquireNode(Runtime::gptr<NodeImplTy> node, galois::MethodFlag mflag) {
     acquire(node, mflag);
   }
 
@@ -317,6 +317,6 @@ public:
 };
 
 } //namespace Graph
-} //namespace Galois
+} //namespace galois
 
 #endif

@@ -58,7 +58,7 @@
 #include <iostream>
 #include <unordered_map>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 
 namespace cll = llvm::cl;
@@ -72,8 +72,8 @@ class NhoodItem: public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<NhoodItem, Ctxt, CtxtCmp>;
 
 public:
-  // using PQ =  Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
-  using PQ =  Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp>;
+  // using PQ =  galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using PQ =  galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp>;
   using Factory = OrdLocFactoryBase<NhoodItem, Ctxt, CtxtCmp>;
 
 protected:
@@ -124,8 +124,8 @@ public:
   typedef ContextComparator<MyType, Cmp> CtxtCmp; 
   typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
-  typedef Galois::GAtomic<bool> AtomicBool;
-  // typedef Galois::gdeque<NItem*, 4> NhoodList;
+  typedef galois::GAtomic<bool> AtomicBool;
+  // typedef galois::gdeque<NItem*, 4> NhoodList;
   // typedef llvm::SmallVector<NItem*, 8> NhoodList;
   typedef typename gstl::Vector<NItem*> NhoodList;
   // typedef std::vector<NItem*> NhoodList;
@@ -149,7 +149,7 @@ public:
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -278,8 +278,8 @@ protected:
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
-  // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  typedef galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  // typedef galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
   // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
@@ -298,7 +298,7 @@ protected:
   using PerThreadUserCtxt = typename Base::PerThreadUserCtxt;
 
 
-  using Accumulator =  Galois::GAccumulator<size_t>;
+  using Accumulator =  galois::GAccumulator<size_t>;
 
   struct CreateCtxtExpandNhood {
     KDGaddRemAsyncExec& exec;
@@ -336,7 +336,7 @@ protected:
 
     KDGaddRemAsyncExec& exec;
     WinWL& winWL;
-    const Galois::optional<T>& minWinWL;
+    const galois::optional<T>& minWinWL;
     Accumulator& nsrc;
     Accumulator& ntotal;;
 
@@ -458,40 +458,40 @@ public:
 
     addCtxtWL.clear_all_parallel ();
 
-    Galois::do_all_choice (
+    galois::do_all_choice (
         range, 
         CreateCtxtExpandNhood {*this, nInit},
         std::make_tuple (
-          Galois::loopname ("create_contexts"),
-          Galois::chunk_size<NhFunc::CHUNK_SIZE> ()));
+          galois::loopname ("create_contexts"),
+          galois::chunk_size<NhFunc::CHUNK_SIZE> ()));
 
-    Galois::do_all_choice (makeLocalRange(this->addCtxtWL),
+    galois::do_all_choice (makeLocalRange(this->addCtxtWL),
         [this, &sources] (Ctxt* ctxt) {
           if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
             sources.get ().push_back (ctxt);
           }
         },
         std::make_tuple (
-          Galois::loopname ("find_sources"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("find_sources"),
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
   }
 
   template <typename A>
   void applyOperator (CtxtWL& sources, A op) {
 
-    Galois::for_each_local(sources,
+    galois::for_each_local(sources,
         op,
-        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+        galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
 
-    Galois::do_all_choice (makeLocalRange(ctxtDelQ),
+    galois::do_all_choice (makeLocalRange(ctxtDelQ),
         [this] (Ctxt* ctxt) {
           ThisClass::ctxtAlloc.destroy (ctxt);
           ThisClass::ctxtAlloc.deallocate (ctxt, 1);
         },
         std::make_tuple (
-          Galois::loopname ("delete_all_ctxt"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          galois::loopname ("delete_all_ctxt"),
+          galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     Runtime::on_each_impl (
         [this, &sources] (const unsigned tid, const unsigned numT) {
@@ -508,10 +508,10 @@ public:
     Accumulator nInitCtxt;
     Accumulator nsrc;
 
-    Galois::TimeAccumulator t_create;
-    Galois::TimeAccumulator t_find;
-    Galois::TimeAccumulator t_for;
-    Galois::TimeAccumulator t_destroy;
+    galois::TimeAccumulator t_create;
+    galois::TimeAccumulator t_find;
+    galois::TimeAccumulator t_for;
+    galois::TimeAccumulator t_destroy;
 
     t_create.start ();
     expandNhoodpickSources (range, initSrc, nInitCtxt);
@@ -520,7 +520,7 @@ public:
     // TODO: code to find global min goes here
 
     DummyWinWL winWL;
-    Galois::optional<T> minWinWL; // should remain uninitialized 
+    galois::optional<T> minWinWL; // should remain uninitialized 
 
     t_for.start ();
     applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
@@ -566,7 +566,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
   void applyOperator (void) {
 
-    Galois::optional<T> minWinWL;
+    galois::optional<T> minWinWL;
 
     if (ThisClass::NEEDS_PUSH && ThisClass::targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin ();
@@ -581,12 +581,12 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
     if (ThisClass::targetCommitRatio == 0.0) {
 
-      Galois::do_all_choice (range,
+      galois::do_all_choice (range,
           [this] (const T& x) {
             pending.push (x);
           }, 
           std::make_tuple (
-            Galois::loopname ("init-fill"),
+            galois::loopname ("init-fill"),
             chunk_size<NhFunc::CHUNK_SIZE> ()));
 
 
@@ -687,6 +687,6 @@ void for_each_ordered_ar (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
 }
 
 } // end namespace Runtime
-} // end namespace Galois
+} // end namespace galois
 
 #endif //  GALOIS_RUNTIME_KDG_ADD_REM_H

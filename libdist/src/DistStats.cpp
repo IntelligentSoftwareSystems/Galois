@@ -30,10 +30,10 @@
 #include "Galois/Runtime/DistStats.h"
 #include "Galois/Runtime/Serialize.h"
 
-using namespace Galois::Runtime;
+using namespace galois::Runtime;
 
 DistStatManager* internal::distSysStatManager(void) {
-  Galois::Runtime::StatManager* sm = internal::sysStatManager();
+  galois::Runtime::StatManager* sm = internal::sysStatManager();
 
   assert(sm && "StatManager not initialized");
 
@@ -51,31 +51,31 @@ inline static DistStatManager* dsm(void) {
 DistStatManager::DistStatManager(const std::string& outfile): StatManager(outfile) {}
 
 
-class Galois::Runtime::StatRecvHelper {
+class galois::Runtime::StatRecvHelper {
 
 public:
 
-    static void recvAtHost_0_hostTotalTy(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
+    static void recvAtHost_0_hostTotalTy(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
         , StatTotal::Type totalTy) {
 
 
       dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
     }
 
-    static void recvAtHost_0_int(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
-        , int64_t thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<int64_t> thrdVals) {
+    static void recvAtHost_0_int(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
+        , int64_t thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<int64_t> thrdVals) {
 
       dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
 
-    static void recvAtHost_0_fp(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
-        , double thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<double> thrdVals) {
+    static void recvAtHost_0_fp(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
+        , double thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<double> thrdVals) {
 
       dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
 
-    static void recvAtHost_0_str(uint32_t hostID, Galois::gstl::Str region, Galois::gstl::Str category
-        , Galois::gstl::Str thrdTotal,  StatTotal::Type totalTy, const Galois::gstl::Vector<Galois::gstl::Str> thrdVals) {
+    static void recvAtHost_0_str(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
+        , galois::gstl::Str thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<galois::gstl::Str> thrdVals) {
 
       dsm()->addRecvdParam(hostID, region, category, thrdTotal, totalTy, thrdVals);
     }
@@ -111,7 +111,7 @@ void DistStatManager::combineAtHost_0_helper(void) {
       Str cat;
       int64_t thrdTotal;
       StatTotal::Type totalTy;
-      Galois::gstl::Vector<int64_t> thrdVals;
+      galois::gstl::Vector<int64_t> thrdVals;
 
       Base::readIntStat(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
@@ -128,7 +128,7 @@ void DistStatManager::combineAtHost_0_helper(void) {
       Str cat;
       double thrdTotal;
       StatTotal::Type totalTy;
-      Galois::gstl::Vector<double> thrdVals;
+      galois::gstl::Vector<double> thrdVals;
 
       Base::readFPstat(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
@@ -145,7 +145,7 @@ void DistStatManager::combineAtHost_0_helper(void) {
       Str cat;
       Str thrdTotal;
       StatTotal::Type totalTy;
-      Galois::gstl::Vector<Str> thrdVals;
+      galois::gstl::Vector<Str> thrdVals;
 
       Base::readParam(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
@@ -170,19 +170,19 @@ void DistStatManager::combineAtHost_0(void) {
     combineAtHost_0_helper();
   }
 
-  Galois::Runtime::getHostBarrier().wait();
+  galois::Runtime::getHostBarrier().wait();
 
   if (getHostID() != 0) {
     combineAtHost_0_helper();
   }
 
-  Galois::Runtime::getHostBarrier().wait();
+  galois::Runtime::getHostBarrier().wait();
 
 
 }
 
 bool DistStatManager::printingHostVals(void) {
-  return Galois::Substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
+  return galois::Substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
 }
 
 StatTotal::Type DistStatManager::findHostTotalTy(const Str& region, const Str& category, const StatTotal::Type& thrdTotalTy) const {

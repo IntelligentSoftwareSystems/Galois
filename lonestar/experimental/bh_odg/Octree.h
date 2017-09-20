@@ -21,7 +21,7 @@ protected:
 // summarization are only the internal nodes and not the leaves. 
 // 
 
-struct SpecNodeBase: public Galois::Runtime::Lockable {
+struct SpecNodeBase: public galois::Runtime::Lockable {
   unsigned level;
 
   SpecNodeBase (): level (0) {}
@@ -58,7 +58,7 @@ struct LevelComparator {
 
 struct KDGNodeBase {
 
-  // typedef Galois::GAtomic<unsigned> UnsignedAtomic;
+  // typedef galois::GAtomic<unsigned> UnsignedAtomic;
 
   // KDGNodeBase* parent;
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
@@ -287,8 +287,8 @@ void compareTrees (const OctreeInternal<B1>* ref, const OctreeInternal<B2>* obs)
 template <typename B>
 struct BuildOctreeTopDown {
 
-  typedef Galois::gdeque<B*,4096> PartList;
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<PartList> PartListAlloc;
+  typedef galois::gdeque<B*,4096> PartList;
+  typedef galois::Runtime::MM::FSBGaloisAllocator<PartList> PartListAlloc;
 
   template <typename I>
   struct WorkItem {

@@ -29,7 +29,7 @@
 
 #include "Galois/Timer.h"
 
-using namespace Galois;
+using namespace galois;
 
 void Timer::start() {
   startT = clockTy::now();

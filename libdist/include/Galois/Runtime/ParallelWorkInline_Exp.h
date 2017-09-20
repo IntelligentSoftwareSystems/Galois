@@ -39,12 +39,12 @@
 
 #include <xmmintrin.h>
 
-namespace Galois {
+namespace galois {
 namespace Runtime {
 namespace Exp {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
-struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
+struct FixedSizeRingAdaptor: public galois::FixedSizeRing<T,ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
 
   reference cur() { return isLIFO ? this->front() : this->back();  }
@@ -278,7 +278,7 @@ class BSInlineExecutor {
   typedef Worklist<value_type,CHUNK_SIZE> WLTy;
 
   struct ThreadLocalData {
-    Galois::Runtime::UserContextAccess<value_type> facing;
+    galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
@@ -288,7 +288,7 @@ class BSInlineExecutor {
   FunctionTy function;
   PreFunc preFunc;
   const char* loopname;
-  Galois::Substrate::Barrier& barrier;
+  galois::Substrate::Barrier& barrier;
   Substrate::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
@@ -323,10 +323,10 @@ class BSInlineExecutor {
     //FIXME: clearReleasable(); 
     switch (result) {
     case 0: break;
-    case Galois::Runtime::CONFLICT:
+    case galois::Runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
-    case Galois::Runtime::BREAK:
+    case galois::Runtime::BREAK:
     default:
       abort();
     }

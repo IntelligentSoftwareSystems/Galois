@@ -45,7 +45,7 @@
 #include <utility>
 #include <type_traits>
 
-namespace Galois {
+namespace galois {
 
 /**
  * This is a container that encapsulates space for a constant size array.  The

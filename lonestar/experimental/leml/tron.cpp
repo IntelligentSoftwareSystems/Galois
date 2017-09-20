@@ -198,7 +198,7 @@ int TRON::trcg(double delta, double *g, double *s, double *r)
 	double rTr, rnewTrnew, alpha, beta, cgtol;
 
 #ifdef EXP_DOALL_GALOIS
-	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(n),
+	galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(n),
             [&](int i) {
 #else
 #pragma omp parallel for 

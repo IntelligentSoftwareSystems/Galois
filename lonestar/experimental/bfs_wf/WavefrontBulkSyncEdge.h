@@ -22,7 +22,7 @@ protected:
     Update (GNode node, ND_ty level): node (node), level (level) {}
   };
 
-  typedef Galois::PerThreadVector<Update> WL_ty;
+  typedef galois::PerThreadVector<Update> WL_ty;
 
   struct PftchFunc {
     typedef int tt_does_not_need_aborts;
@@ -59,8 +59,8 @@ protected:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Update& up, C& wl) {
       bool updated = false;
-      if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-        graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
+      if (graph.getData (up.node, galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+        graph.getData (up.node, galois::MethodFlag::UNPROTECTED) = up.level;
         updated = true;
       }
 
@@ -72,7 +72,7 @@ protected:
               wl.push (dst, dstLevel);
               //wl.emplace(dst, dstLevel);
             },
-            Galois::MethodFlag::UNPROTECTED);
+            galois::MethodFlag::UNPROTECTED);
       }
     }
   };
@@ -84,9 +84,9 @@ protected:
 #if 1
 
       Update init[1] = { Update (startNode, 0) };
-      // Galois::for_each ( &init[0], &init[1], OpFunc (graph), Galois::wl<Galois::WorkList::BulkSynchronousInline <> > ());
-      Galois::Runtime::do_all_coupled_bs (Galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
-      // Galois::Runtime::for_each_coupled_bs (Galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
+      // galois::for_each ( &init[0], &init[1], OpFunc (graph), galois::wl<galois::WorkList::BulkSynchronousInline <> > ());
+      galois::Runtime::do_all_coupled_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
+      // galois::Runtime::for_each_coupled_bs (galois::Runtime::makeStandardRange (&init[0], &init[1]), OpFunc (graph), "WavefrontBulkSyncEdge"); 
 
 #else
 
@@ -100,7 +100,7 @@ protected:
         std::swap (currWL, nextWL);
         nextWL->clear_all ();
 
-        Galois::do_all_choice (*currWL, OpFunc (graph, *nextWL));
+        galois::do_all_choice (*currWL, OpFunc (graph, *nextWL));
       }
 
       delete currWL;

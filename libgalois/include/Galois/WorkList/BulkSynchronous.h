@@ -29,7 +29,7 @@
 
 #include <atomic>
 
-namespace Galois {
+namespace galois {
 namespace WorkList {
 
 /**
@@ -86,9 +86,9 @@ private:
     some.get() = true;
   }
 
-  Galois::optional<value_type> pop() {
+  galois::optional<value_type> pop() {
     TLD& tld = *tlds.getLocal();
-    Galois::optional<value_type> r;
+    galois::optional<value_type> r;
     
     while (true) {
       if (isEmpty)
@@ -118,6 +118,6 @@ private:
 GALOIS_WLCOMPILECHECK(BulkSynchronous)
 
 } // end namespace WorkList
-} // end namespace Galois
+} // end namespace galois
 
 #endif

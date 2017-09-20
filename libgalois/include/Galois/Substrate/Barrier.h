@@ -39,7 +39,7 @@
 #include <memory>
 #include <functional>
 
-namespace Galois {
+namespace galois {
 namespace Substrate {
 
 class Barrier {
@@ -118,6 +118,6 @@ void setBarrierInstance(BarrierInstance<>* bi);
 
 
 } // end namespace Substrate
-} // end namespace Galois
+} // end namespace galois
 
 #endif

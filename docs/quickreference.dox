@@ -7,15 +7,15 @@
 
 \subsection loop_types Loop Types
 
-- \b Galois::for_each(I beg, I end, const F& operator, Galois::wl<WorkListType>(), Galois::loopname("loopname")
+- \b galois::for_each(I beg, I end, const F& operator, galois::wl<WorkListType>(), galois::loopname("loopname")
 
-- \b Galois::do_all(I beg, I end, const F& operator, Galois::loopname("loopname")
+- \b galois::do_all(I beg, I end, const F& operator, galois::loopname("loopname")
 
-- \b Galois::for_each_local(I beg, I end, const F& operator, Galois::wl<WorkListType>(), Galois::loopname("loopname")
+- \b galois::for_each_local(I beg, I end, const F& operator, galois::wl<WorkListType>(), galois::loopname("loopname")
 
-- \b Galois::do_all_local(I beg, I end, const F& operator, Galois::loopname("loopname")
+- \b galois::do_all_local(I beg, I end, const F& operator, galois::loopname("loopname")
 
-- \b Galois::on_each(const F& operator, Galois::loopname("loopname")
+- \b galois::on_each(const F& operator, galois::loopname("loopname")
 
 
 
@@ -28,13 +28,13 @@
 - \b on_each operator implements `void operator () (unsigned TID, unsigned numThreads) {...}`
 
 \subsection worklist WorkList Types
-Specified as a template argument to {@link Galois::wl}
+Specified as a template argument to {@link galois::wl}
 
-- Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>
+- galois::WorkList::dChunkedFIFO<CHUNK_SIZE>
 
-- Galois::WorkList::dChunkedLIFO<CHUNK_SIZE>
+- galois::WorkList::dChunkedLIFO<CHUNK_SIZE>
 
-- Galois::WorkList::OBIM<WorkListType>
+- galois::WorkList::OBIM<WorkListType>
 
 \section graph Graph
 
@@ -64,27 +64,27 @@ Specified as a template argument to {@link Galois::wl}
 
 \subsection method_flag Method Flags
 
-{@link Galois::MethodFlag} passed optionally to graph functions
+{@link galois::MethodFlag} passed optionally to graph functions
 
- - {@link Galois::MethodFlag::UNPROTECTED}: access to shared data is not protected. User
+ - {@link galois::MethodFlag::UNPROTECTED}: access to shared data is not protected. User
    responsible/aware of concurrent accesses
 
- - {@link Galois::MethodFlag::WRITE}: Runtime monitors access to shared data, and
+ - {@link galois::MethodFlag::WRITE}: Runtime monitors access to shared data, and
    allows only one iteration to acquire ownership of the data element (e.g., node
    or edge in the graph) being accessed. 
 
- - {@link Galois::MethodFlag::READ}: Runtime may allow multiple iterations to
+ - {@link galois::MethodFlag::READ}: Runtime may allow multiple iterations to
    read the shared data element. 
 
 \section data_structures Other Data Structures
 
 \section util Utility Functions
-  - {@link Galois::getActiveThreads} returns number of actually running threads
+  - {@link galois::getActiveThreads} returns number of actually running threads
 
-  - {@link Galois::setActiveThreads} sets the number of running threads. Should only be
+  - {@link galois::setActiveThreads} sets the number of running threads. Should only be
     called at the beginning of the `main` function.
 
-  - {@link Galois::Runtime::LL::getMaxThreads()} returns the maximum number of
+  - {@link galois::Runtime::LL::getMaxThreads()} returns the maximum number of
     threads (usually number of cores or number of hyper-threads) supported by hardware 
 
 \section allocators Allocators

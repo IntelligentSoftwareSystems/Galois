@@ -23,7 +23,7 @@
  */
 #include "Galois/UserContext.h"
 
-namespace Galois {
+namespace galois {
 
 template<typename IterTy,typename FunctionTy, typename... Args>
 void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args);
