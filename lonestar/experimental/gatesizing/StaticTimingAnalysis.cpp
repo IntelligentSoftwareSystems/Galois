@@ -156,6 +156,26 @@ struct ComputeArrivalTimeAndPower {
   Graph& g;
   ComputeArrivalTimeAndPower(Graph& g): g(g) {}
 
+  void updateEdgeDelay(Edge& eData, float pinC) {
+    auto wire = eData.wire;
+    auto wireDeg = wire->leaves.size();
+
+    // for balanced-case RC tree
+    auto wireR = wire->wireLoad->wireResistance(wireDeg) / (float)(wireDeg);
+    auto wireC = wire->wireLoad->wireCapacitance(wireDeg) / (float)(wireDeg);
+    auto wireDelay = wireR * (wireC + pinC);
+
+    eData.riseDelay = wireDelay;
+    eData.fallDelay = wireDelay;
+  }
+
+  void updateGateInputAndPrimaryOutput(Node& data, Node& inData, Edge& eData) {
+    data.rise.slew = inData.rise.slew;
+    data.rise.arrivalTime = inData.rise.arrivalTime + eData.riseDelay;
+    data.fall.slew = inData.fall.slew;
+    data.fall.arrivalTime = inData.fall.arrivalTime + eData.fallDelay;
+  }
+
   void updateGateOutput(TimingPowerInfo& info, float pinC, float netC, float& edgeDelay,
     std::string inPinName, TimingPowerInfo& inPosInfo, TimingPowerInfo& inNegInfo,
     CellPin::MapOfTableSet& delayTables,
@@ -218,12 +238,10 @@ struct ComputeArrivalTimeAndPower {
       // primary output
       if (data.isOutput) {
         for (auto ie: g.in_edges(n)) {
+          auto& ieData = g.getEdgeData(ie);
           auto& inData = g.getData(g.getEdgeDst(ie));
-          data.rise.slew = inData.rise.slew;
-          data.rise.arrivalTime = inData.rise.arrivalTime;
-          data.fall.slew = inData.fall.slew;
-          data.fall.arrivalTime = inData.fall.arrivalTime;
-        }     
+          updateGateInputAndPrimaryOutput(data, inData, ieData);
+        }
       }
       // primary input
       else {
@@ -241,28 +259,14 @@ struct ComputeArrivalTimeAndPower {
       auto pin = data.pin;
       auto pinC = pin->gate->cell->inPins.at(pin->name)->capacitance;
       for (auto ie: g.in_edges(n)) {
+        auto& ieData = g.getEdgeData(ie);
         auto& inData = g.getData(g.getEdgeDst(ie));
-        data.rise.slew = inData.rise.slew;
-        data.rise.arrivalTime = inData.rise.arrivalTime;
-        data.fall.slew = inData.fall.slew;
-        data.fall.arrivalTime = inData.fall.arrivalTime;
 
-        // consider wire delay if not connected to primary (input) port
+        // don't consider wire delay for primary inputs
         if (!inData.isPrimary) {
-          auto& ieData = g.getEdgeData(ie);
-          auto wire = ieData.wire;
-          auto wireDeg = wire->leaves.size();
-
-          // for balanced-case RC tree
-          auto wireR = wire->wireLoad->wireResistance(wireDeg) / (float)(wireDeg);
-          auto wireC = wire->wireLoad->wireCapacitance(wireDeg) / (float)(wireDeg);
-          auto wireDelay = wireR * (wireC + pinC);
-
-          ieData.riseDelay = wireDelay;
-          ieData.fallDelay = wireDelay;
-          data.rise.arrivalTime += wireDelay;
-          data.fall.arrivalTime += wireDelay;
+          updateEdgeDelay(ieData, pinC);
         }
+        updateGateInputAndPrimaryOutput(data, inData, ieData);
       }
 
       for (auto oe: g.edges(n)) {
