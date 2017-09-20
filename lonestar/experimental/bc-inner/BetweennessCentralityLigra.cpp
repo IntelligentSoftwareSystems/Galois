@@ -102,7 +102,7 @@ void readInOutGraph(Graph& graph) {
 
 #ifdef GALOIS_USE_EXP
 template<bool UseGraphChi>
-struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
   //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
   //behavor with std::atomic<int>

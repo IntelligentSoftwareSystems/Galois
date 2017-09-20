@@ -15,7 +15,7 @@ template<typename Graph>
 void readInOutGraph(Graph& graph);
 
 template<bool UseGraphChi>
-struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
+struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi>  {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;

@@ -14,7 +14,7 @@ extern llvm::cl::opt<unsigned int> memoryLimit;
 template<typename Graph>
 void readInOutGraph(Graph& graph);
 
-struct GraphChiAlgo: public galois::LigraGraphChi::ChooseExecutor<true> {
+struct GraphChiAlgo: public galois::ligraGraphChi::ChooseExecutor<true> {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;

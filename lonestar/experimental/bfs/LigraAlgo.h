@@ -11,7 +11,7 @@
 #include "BFS.h"
 
 template<bool UseGraphChi>
-struct LigraBFS: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraBFS: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
   typedef typename galois::graphs::LC_CSR_Graph<SNode,void>
     ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;

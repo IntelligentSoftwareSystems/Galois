@@ -11,7 +11,7 @@
 #include "SSSP.h"
 
 template<bool UseGraphChi>
-struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
   struct LNode: public SNode {
     bool visited;
   };

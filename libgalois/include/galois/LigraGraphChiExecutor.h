@@ -6,7 +6,7 @@
 
 namespace galois {
 //! Implementation of combination of Ligra and GraphChi DSL in Galois
-namespace LigraGraphChi {
+namespace ligraGraphChi {
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {

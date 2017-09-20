@@ -9,7 +9,7 @@
 
 namespace galois {
 //! Implementation of GraphChi DSL in Galois
-namespace graphsChi {
+namespace graphChi {
 
 namespace hidden {
 

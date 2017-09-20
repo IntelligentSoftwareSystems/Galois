@@ -11,7 +11,7 @@
 #include "PageRankOld.h"
 
 template<bool UseGraphChi>
-struct LigraAlgo: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
   typedef typename galois::graphs::LC_CSR_Graph<PNode,void>
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type
