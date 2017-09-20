@@ -33,7 +33,7 @@
 #include "galois/FixedSizeRing.h"
 #include "galois/Substrate/PaddedLock.h"
 #include "galois/runtime/Mem.h"
-#include "galois/WorkList/WorkListHelpers.h"
+#include "galois/worklists/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 
 namespace galois {

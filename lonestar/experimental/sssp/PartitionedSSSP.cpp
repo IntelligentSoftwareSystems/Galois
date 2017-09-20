@@ -33,7 +33,7 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
-#include "galois/WorkList/Partitioned.h"
+#include "galois/worklists/Partitioned.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 

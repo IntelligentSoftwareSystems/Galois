@@ -42,7 +42,7 @@
 #include "galois/AltBag.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 #include "galois/runtime/Context.h"
 #include "galois/runtime/OrderedLockable.h"
 #include "galois/runtime/Executor_DoAll.h"

@@ -36,7 +36,7 @@
 
 #include "galois/graphs/Graph.h"
 #include "galois/runtime/LevelExecutor.h"
-#include "galois/WorkList/WorkListExperimental.h"
+#include "galois/worklists/WorkListExperimental.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"

@@ -59,7 +59,7 @@ struct checker {
 };
 
 #define GALOIS_WLCOMPILECHECK(name) checker<name<> > ck_##name;
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 
 int main(int argc, char** argv) {
   if (argc > 1)

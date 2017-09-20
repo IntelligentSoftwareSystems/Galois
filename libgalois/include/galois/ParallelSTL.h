@@ -36,7 +36,7 @@
 #include "galois/NoDerefIterator.h"
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
-#include "galois/WorkList/Chunked.h"
+#include "galois/worklists/Chunked.h"
 
 namespace galois {
 //! Parallel versions of STL library algorithms.

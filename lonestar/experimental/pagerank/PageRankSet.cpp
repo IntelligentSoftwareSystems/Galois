@@ -44,8 +44,8 @@
 #include <set>
 
 #include "PageRank.h"
-#include "galois/WorkList/WorkSet.h"
-#include "galois/WorkList/MarkingSet.h"
+#include "galois/worklists/WorkSet.h"
+#include "galois/worklists/MarkingSet.h"
 
 namespace cll = llvm::cl;
 

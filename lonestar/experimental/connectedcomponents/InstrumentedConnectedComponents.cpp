@@ -48,8 +48,8 @@
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #include "GraphChiAlgo.h"
-#include "galois/WorkList/WorkSet.h"
-#include "galois/WorkList/MarkingSet.h"
+#include "galois/worklists/WorkSet.h"
+#include "galois/worklists/MarkingSet.h"
 #endif
 
 #include <ostream>

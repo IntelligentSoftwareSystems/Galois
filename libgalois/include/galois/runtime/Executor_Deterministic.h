@@ -49,7 +49,7 @@
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>

@@ -42,7 +42,7 @@
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/Support.h"
 #include "galois/gIO.h"
-#include "galois/WorkList/Simple.h"
+#include "galois/worklists/Simple.h"
 
 #include <algorithm>
 #include <cstdio>

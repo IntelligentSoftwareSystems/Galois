@@ -29,7 +29,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTALT_H
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
-#include "galois/WorkList/Simple.h"
+#include "galois/worklists/Simple.h"
 #include "galois/Substrate/CompilerSpecific.h"
 
 namespace galois {

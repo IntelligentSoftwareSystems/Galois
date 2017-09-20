@@ -34,8 +34,8 @@
 #ifndef GALOIS_PRIORITYSCHEDULING_WORKLIST_H
 #define GALOIS_PRIORITYSCHEDULING_WORKLIST_H
 
-#include "galois/WorkList/WorkList.h"
-#include "galois/WorkList/WorkListExperimental.h"
+#include "galois/worklists/WorkList.h"
+#include "galois/worklists/WorkListExperimental.h"
 #include "galois/gIO.h"
 
 namespace Exp {

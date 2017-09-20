@@ -33,7 +33,7 @@
 #include "galois/DoAllWrap.h"
 #include "galois/PerThreadContainer.h"
 
-#include "galois/WorkList/ExternalReference.h"
+#include "galois/worklists/ExternalReference.h"
 
 #include "bfs.h"
 

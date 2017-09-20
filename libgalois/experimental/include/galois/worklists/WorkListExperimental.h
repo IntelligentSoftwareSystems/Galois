@@ -36,8 +36,8 @@
 #include "galois/optional.h"
 #include "galois/Queue.h"
 
-#include "galois/WorkList/WorkList.h"
-#include "galois/WorkList/WorkListDebug.h"
+#include "galois/worklists/WorkList.h"
+#include "galois/worklists/WorkListDebug.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/Termination.h"
 #include "galois/Substrate/ThreadPool.h"

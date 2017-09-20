@@ -30,7 +30,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "galois/WorkList/WorkListExperimental.h"
+#include "galois/worklists/WorkListExperimental.h"
 #endif
 
 #include <iostream>

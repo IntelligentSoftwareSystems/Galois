@@ -52,7 +52,7 @@
 #include "galois/Timer.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 #include "galois/runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 

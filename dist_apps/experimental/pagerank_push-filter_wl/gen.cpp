@@ -43,7 +43,7 @@
 #include "galois/runtime/dGraph_hybridCut.h"
 
 #include "galois/DistAccumulator.h"
-#include "galois/WorkList/WorkListDist.h"
+#include "galois/worklists/WorkListDist.h"
 
 #include "galois/runtime/dGraphLoader.h"
 

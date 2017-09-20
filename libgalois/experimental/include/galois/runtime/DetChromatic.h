@@ -38,8 +38,8 @@
 
 #include "galois/graphs/Graph.h"
 
-#include "galois/WorkList/WorkListWrapper.h"
-#include "galois/WorkList/ExternalReference.h"
+#include "galois/worklists/WorkListWrapper.h"
+#include "galois/worklists/ExternalReference.h"
 
 #include <atomic>
 #include <vector>

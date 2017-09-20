@@ -49,7 +49,7 @@
 #include "galois/runtime/Mem.h"
 #include "galois/runtime/IKDGbase.h"
 
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 
 #include "galois/gIO.h"
 

@@ -6,8 +6,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "galois/WorkList/WorkListAlt.h"
-#include "galois/WorkList/WorkListDebug.h"
+#include "galois/worklists/WorkListAlt.h"
+#include "galois/worklists/WorkListDebug.h"
 
 #include "galois/graphs/Graph3.h"
 #include "galois/runtime/DistSupport.h"

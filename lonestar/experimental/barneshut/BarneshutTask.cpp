@@ -26,7 +26,7 @@
 #include "galois/gdeque.h"
 #include "galois/Bag.h" // XXX
 #include "galois/runtime/TaskWork.h"
-#include "galois/WorkList/WorkListAlt.h"
+#include "galois/worklists/WorkListAlt.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

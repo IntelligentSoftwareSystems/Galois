@@ -31,7 +31,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
-#include "galois/WorkList/WorkListDebug.h"
+#include "galois/worklists/WorkListDebug.h"
 #endif
 
 #include <atomic>

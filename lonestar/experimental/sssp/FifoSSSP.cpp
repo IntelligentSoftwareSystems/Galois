@@ -35,8 +35,8 @@
 #include "galois/graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/WorkList/WorkSet.h"
-#include "galois/WorkList/MarkingSet.h"
+#include "galois/worklists/WorkSet.h"
+#include "galois/worklists/MarkingSet.h"
 
 #include <iostream>
 #include <deque>

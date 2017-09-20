@@ -29,7 +29,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/FileGraph.h"
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"

@@ -30,7 +30,7 @@
 #include <functional>
 
 #include "galois/runtime/LevelExecutor.h"
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 
 #include "bfs.h"
 #include "bfsParallel.h"

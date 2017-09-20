@@ -34,7 +34,7 @@
 #include "galois/Galois.h"
 #include "galois/Accumulator.h"
 #include "galois/Atomic.h"
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 #include "galois/gIO.h"
 
 #include "DESunorderedBase.h"

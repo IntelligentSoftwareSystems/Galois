@@ -29,8 +29,8 @@
 #ifndef GALOIS_WORKLIST_PARTITIONED_H
 #define GALOIS_WORKLIST_PARTITIONED_H
 
-#include "galois/WorkList/Simple.h"
-#include "galois/WorkList/WorkListHelpers.h"
+#include "galois/worklists/Simple.h"
+#include "galois/worklists/WorkListHelpers.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/CacheLineStorage.h"
 

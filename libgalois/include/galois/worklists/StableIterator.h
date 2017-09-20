@@ -35,7 +35,7 @@
 #define GALOIS_WORKLIST_STABLEITERATOR_H
 
 #include "galois/gstl.h"
-#include "galois/WorkList/Chunked.h"
+#include "galois/worklists/Chunked.h"
 
 namespace galois {
 namespace worklists {

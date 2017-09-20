@@ -34,8 +34,8 @@
 #include "galois/runtime/Substrate.h"
 #include "galois/Substrate/PerThreadStorage.h"
 #include "galois/Substrate/Termination.h"
-#include "galois/WorkList/Chunked.h"
-#include "galois/WorkList/WorkListHelpers.h"
+#include "galois/worklists/Chunked.h"
+#include "galois/worklists/WorkListHelpers.h"
 
 #include <deque>
 #include <limits>

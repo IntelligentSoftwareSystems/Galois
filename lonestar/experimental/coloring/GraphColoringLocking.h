@@ -3,7 +3,7 @@
 
 #include "GraphColoringBase.h"
 
-#include "galois/WorkList/ExternalReference.h"
+#include "galois/worklists/ExternalReference.h"
 
 struct NodeData {
   unsigned color;

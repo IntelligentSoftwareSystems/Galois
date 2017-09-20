@@ -38,8 +38,8 @@
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
-#include "galois/WorkList/AltChunked.h"
-#include "galois/WorkList/ExternalReference.h"
+#include "galois/worklists/AltChunked.h"
+#include "galois/worklists/ExternalReference.h"
 
 #include <atomic>
 

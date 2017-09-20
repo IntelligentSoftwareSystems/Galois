@@ -30,7 +30,7 @@
 #define GALOIS_WORKLIST_LOCALQUEUE_H
 
 #include <boost/mpl/if.hpp>
-#include "galois/WorkList/Simple.h"
+#include "galois/worklists/Simple.h"
 
 #include <type_traits>
 

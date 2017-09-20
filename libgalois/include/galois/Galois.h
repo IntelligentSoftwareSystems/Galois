@@ -39,7 +39,7 @@
 #include "galois/runtime/Executor_Ordered.h"
 #include "galois/runtime/Mem.h"
 
-#include "galois/WorkList/WorkList.h"
+#include "galois/worklists/WorkList.h"
 
 #ifdef GALOIS_USE_EXP
 //#include "galois/runtime/Executor_BulkSynchronous.h"

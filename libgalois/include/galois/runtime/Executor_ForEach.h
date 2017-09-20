@@ -50,8 +50,8 @@
 #include "galois/Substrate/Termination.h"
 #include "galois/Substrate/ThreadPool.h"
 #include "galois/runtime/UserContextAccess.h"
-#include "galois/WorkList/Chunked.h"
-#include "galois/WorkList/Simple.h"
+#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Simple.h"
 
 #include <algorithm>
 #include <functional>
