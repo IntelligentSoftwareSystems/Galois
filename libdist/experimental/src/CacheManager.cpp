@@ -25,7 +25,7 @@
 
 using namespace galois::runtime;
 
-static __thread ResolveCache* thread_resolve = nullptr;
+static thread_local ResolveCache* thread_resolve = nullptr;
 
 ////////////////////////////////////////////////////////////////////////////////
 
