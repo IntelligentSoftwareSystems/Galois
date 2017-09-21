@@ -169,11 +169,11 @@ struct ComputeArrivalTimeAndPower {
     eData.fallDelay = wireDelay;
   }
 
-  void updateGateInputAndPrimaryOutput(Node& data, Node& inData, Edge& eData) {
+  void updateGateInputAndPrimaryOutput(Node& data, Node& inData) {
     data.rise.slew = inData.rise.slew;
-    data.rise.arrivalTime = inData.rise.arrivalTime + eData.riseDelay;
+    data.rise.arrivalTime = inData.rise.arrivalTime;
     data.fall.slew = inData.fall.slew;
-    data.fall.arrivalTime = inData.fall.arrivalTime + eData.fallDelay;
+    data.fall.arrivalTime = inData.fall.arrivalTime;
   }
 
   void updateGateOutput(TimingPowerInfo& info, float pinC, float netC, float& edgeDelay,
@@ -238,9 +238,7 @@ struct ComputeArrivalTimeAndPower {
       // primary output
       if (data.isOutput) {
         for (auto ie: g.in_edges(n)) {
-          auto& ieData = g.getEdgeData(ie);
-          auto& inData = g.getData(g.getEdgeDst(ie));
-          updateGateInputAndPrimaryOutput(data, inData, ieData);
+          updateGateInputAndPrimaryOutput(data, g.getData(g.getEdgeDst(ie)));
         }
       }
       // primary input
@@ -259,14 +257,16 @@ struct ComputeArrivalTimeAndPower {
       auto pin = data.pin;
       auto pinC = pin->gate->cell->inPins.at(pin->name)->capacitance;
       for (auto ie: g.in_edges(n)) {
-        auto& ieData = g.getEdgeData(ie);
         auto& inData = g.getData(g.getEdgeDst(ie));
+        updateGateInputAndPrimaryOutput(data, inData);
 
         // don't consider wire delay for primary inputs
         if (!inData.isPrimary) {
+          auto& ieData = g.getEdgeData(ie);
           updateEdgeDelay(ieData, pinC);
+          data.rise.arrivalTime += ieData.riseDelay;
+          data.fall.arrivalTime += ieData.fallDelay;
         }
-        updateGateInputAndPrimaryOutput(data, inData, ieData);
       }
 
       for (auto oe: g.edges(n)) {
