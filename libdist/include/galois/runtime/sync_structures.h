@@ -20,6 +20,8 @@
  *
  * @section Description
  *
+ * TODO info about flags
+ *
  * Macros for easy construction of sync structures for distributed Galois 
  * programs. Define a reductions for all fields as well as a broadcast. If
  * using bitsets, then define the bitset as well (see the bitset section
@@ -170,59 +172,6 @@ public:
     _d2d = false;
     bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
-};
-
-// Deprecated; use the class above with the sync on demand call that takes
-// flags as an argument
-#define GALOIS_SYNC_STRUCTURE_FLAGS(fieldname)\
-static uint8_t _##fieldname##_s2s = false;\
-static uint8_t _##fieldname##_s2d = false;\
-static uint8_t _##fieldname##_d2s = false;\
-static uint8_t _##fieldname##_d2d = false;\
-\
-struct Flags_##fieldname {\
-  static bool src_to_src() {\
-    return _##fieldname##_s2s;\
-  }\
-\
-  static bool src_to_dst() {\
-    return _##fieldname##_s2d;\
-  }\
-\
-  static bool dst_to_src() {\
-    return _##fieldname##_d2s;\
-  }\
-\
-  static bool dst_to_dst() {\
-    return _##fieldname##_d2d;\
-  }\
-\
-  static void set_write_src() {\
-    _##fieldname##_s2s = true;\
-    _##fieldname##_s2d = true;\
-  }\
-\
-  static void set_write_dst() {\
-    _##fieldname##_d2s = true;\
-    _##fieldname##_d2d = true;\
-  }\
-\
-  static void set_write_any() {\
-    _##fieldname##_s2s = true;\
-    _##fieldname##_s2d = true;\
-    _##fieldname##_d2s = true;\
-    _##fieldname##_d2d = true;\
-  }\
-\
-  static void clear_read_src() {\
-    _##fieldname##_s2s = false;\
-    _##fieldname##_d2s = false;\
-  }\
-\
-  static void clear_read_dst() {\
-    _##fieldname##_s2d = false;\
-    _##fieldname##_d2d = false;\
-  }\
 };
 
 ////////////////////////////////////////////////////////////////////////////////
