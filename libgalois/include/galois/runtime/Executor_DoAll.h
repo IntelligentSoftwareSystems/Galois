@@ -514,10 +514,12 @@ public:
 
   ~DoAllStealingExec () {
     // executed serially
+    #ifndef NDEBUG
     for (unsigned i = 0; i < workers.size (); ++i) {
       auto& ctx = *(workers.getRemote (i));
       assert (!ctx.hasWork () &&  "Unprocessed work left");
     }
+    #endif
 
     // printStats ();
   }
