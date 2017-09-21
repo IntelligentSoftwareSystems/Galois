@@ -93,7 +93,7 @@ public:
   using fatPointerBase::getObj;
 
   struct thisHost_t {};
-  static thisHost_t thisHost;
+  //static thisHost_t thisHost;
 
   constexpr fatPointerImpl() noexcept :fatPointerBase(0, 0) {}
   constexpr fatPointerImpl(uint32_t h, uintptr_t p) noexcept :fatPointerBase(h,p) {}

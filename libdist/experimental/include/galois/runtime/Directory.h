@@ -96,13 +96,17 @@ public:
 //Base class for common directory operations
 class BaseDirectory {
 public:
-
   template<typename T>
   class typeHelperImpl : public detail::typeHelper {
+    static typeHelperImpl* th; 
+
   public:
     static typeHelperImpl* get() {
-      static typeHelperImpl th;
-      return &th;
+      if (th == nullptr) {
+        th = new typeHelperImpl();
+      }
+
+      return th;
     }
 
     virtual void deserialize(RecvBuffer&, Lockable*) const;
@@ -121,6 +125,7 @@ protected:
   bool dirOwns(Lockable*);
 };
 
+typeHelperImpl* BaseDirectory::typeHelperImpl::th = nullptr;
 
 /**
  * Manages local objects sent to remote hosts
