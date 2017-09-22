@@ -1,24 +1,23 @@
 #include <string>
 
 #include "CellLib.h"
+#include "Verilog.h"
+#include "CircuitGraph.h"
 
 #ifndef GALOIS_SYNOPSIS_DESIGN_CONSTRAINTS_H
 #define GALOIS_SYNOPSIS_DESIGN_CONSTRAINTS_H
 
 struct SDC {
-  float targetDelay;
-  float primaryInputRiseSlew, primaryInputFallSlew;
-  float primaryOutputTotalPinC, primaryOutputTotalNetC;
-
   CellLib *cellLib;
+  VerilogModule *vModule;
+  CircuitGraph *graph;
 
-  SDC();
+  float targetDelay;
+
+  SDC(CellLib *lib, VerilogModule *m, CircuitGraph *g);
   ~SDC();
 
-  void read(std::string inName, CellLib *lib);
-  void clear();
-  void printDebug();
+  void setConstraints(std::string inName);
 };
 
 #endif // GALOIS_SYNOPSIS_DESIGN_CONSTRAINTS_H
-

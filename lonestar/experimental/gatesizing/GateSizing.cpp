@@ -78,16 +78,16 @@ int main(int argc, char** argv) {
 //  vModule.printDebug();
   std::cout << "parsed verilog module" << std::endl;
 
-  SDC sdc;
-  sdc.read(sdcFile, &cellLib);
-//  sdc.printDebug();
-  std::cout << "parsed sdc file" << std::endl;
-
   CircuitGraph graph;
   graph.construct(vModule);
-  graph.initialize(sdc);
+  graph.initialize();
 //  graph.print();
   std::cout << "constructed circuit graph" << std::endl;
+
+  SDC sdc(&cellLib, &vModule, &graph);
+  sdc.setConstraints(sdcFile);
+//  graph.print();
+  std::cout << "set constraints from sdc file to circuit graph" << std::endl;
 
   doStaticTimingAnalysis(graph);
   graph.print();
