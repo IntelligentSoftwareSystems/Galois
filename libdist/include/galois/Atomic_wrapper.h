@@ -3,27 +3,7 @@
 
 #include <atomic>
 #include <type_traits>
-
-#ifndef _GALOIS_EXTRA_TRAITS_
-#define _GALOIS_EXTRA_TRAITS_
-//from libc++, clang specific
-namespace std {
-#ifdef __clang__
-// not required for clang 3.8.0 : may be required for older versions 
-//template <class T> struct is_trivially_copyable;
-//template <class _Tp> struct is_trivially_copyable
-//  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
-//{};
-#else
-#if __GNUC__ < 5
-template<class T>
-using is_trivially_copyable = is_trivial<T>;
-#endif
-#endif
-}
-#endif
-//#define __is_trivially_copyable(type)  __has_trivial_copy(type)
-
+#include "Galois/Runtime/Extra_dist_traits.h"
 
 namespace galois {
 
