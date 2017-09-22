@@ -66,6 +66,7 @@
 #include "callback_handlers/loop_transform_handler.h"
 #include "callback_handlers/sync_pull_call_handler.h"
 #include "callback_handlers/operator_split_handler.h"
+#include "callback_handlers/add_new_variable_handler.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -312,9 +313,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, 
-                Matchers_gen, Matchers_gen_field, Matchers_2LT, 
-                Matchers_syncpull_field, Matchers_splitOperator;
+    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT, Matchers_syncpull_field, Matchers_splitOperator, Matchers_addNewVariable;
     FunctionCallHandler functionCallHandler;
     FindOperatorHandler findOperator;
     CallExprHandler callExprHandler;
@@ -326,22 +325,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     SyncPullInsideForEdgeLoopHandler syncPullEdge_handler;
     LoopTransformHandler loopTransform_handler;
     OperatorSplitHandler operatorSplit_handler;
+    AddNewVariableHandler addNewVariable_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, 
-                            std::set<std::string> ParsedTemplates, 
-                            Rewriter &R): 
-        Instance(Instance), ParsedTemplates(ParsedTemplates), 
-        Visitor(new GaloisFunctionsVisitor(&Instance)), 
-        functionCallHandler(R, &info), findOperator(&Instance), 
-        callExprHandler(&Instance, &info), typedefHandler(&info), 
-        f_handler(&Instance, &info, R), 
-        insideForLoop_handler(&Instance, &info, R), 
-        insideForLoopField_handler(&Instance, &info), 
-        loopTransform_handler(R, &info), syncPull_handler(&Instance, &info),
-        syncPullEdge_handler(&Instance, &info), 
-        operatorSplit_handler(R, &info) 
-    {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info, R), insideForLoop_handler(&Instance, &info, R), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info), operatorSplit_handler(R, &info), addNewVariable_handler(R, &info) {
+
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
       //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
@@ -993,20 +981,44 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
 
+      /* MATCHER : TO add the  new variables to NodeData and Initialization *************************/
+      for(auto i : info.newVariables_map){
+        if(i.second.size()){
+          for(auto j : i.second){
+            llvm::outs() << "FOIRRR : " << j.FIELD_NAME << " : " << i.first  << "\n";
+            std::string str_nodeData_struct = "nodeData_struct_" + j.FIELD_NAME + "_" + i.first;
+            std::string str_varDecl_getData_src = "varDecl_getData_src_" + j.FIELD_NAME + "_" + i.first;
+            //StatementMatcher nodeData_struct_matcher = expr(isExpansionInMainFile(), hasDescendant(recordDecl(hasName("NodeData")).bind(str_nodeData_struct)));
+            auto nodeData_struct_matcher = recordDecl(isExpansionInMainFile(), hasName("NodeData")).bind(str_nodeData_struct);
+            auto InitializeGraph_struct_matcher = recordDecl(isExpansionInMainFile(), hasName("InitializeGraph"),hasDescendant(methodDecl(hasName("operator()"),
+                                                                                                                                               hasDescendant(varDecl(hasDescendant(memberCallExpr(
+                                                                                                                                                      callee(functionDecl(
+                                                                                                                                                                  hasName("getData")))))).bind(str_varDecl_getData_src))                                             )) );
+
+            //StatementMatcher nodeData_struct_matcher = recordDecl(isExpansionInMainFile(), hasName("NodeData")).bind(str_nodeData_struct);
+
+            //Matchers_addNewVariable.addMatcher(nodeData_struct_matcher, &addNewVariable_handler);
+            Matchers_addNewVariable.addMatcher(InitializeGraph_struct_matcher, &addNewVariable_handler);
+          }
+        }
+      }
+
+      Matchers_addNewVariable.matchAST(Context);
+
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
       for (auto& i : info.reductionOps_map) {
         for(auto& j : i.second) {
           llvm::outs() << " INSIDE LOOP : j.NODE_NAME : " << j.NODE_NAME << " for : " << i.first <<"\n";
           //if(j.IS_REFERENCED && j.IS_REFERENCE) {
-            string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + j.FIELD_NAME + i.first;
-            string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
-            string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
-            string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + j.FIELD_NAME + i.first;
+          string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
-            /** Only need sync_pull if modified **/
-              llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
-              if(j.SYNC_TYPE == "sync_pull_maybe"){
-                StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+          /** Only need sync_pull if modified **/
+          llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
+          if(j.SYNC_TYPE == "sync_pull_maybe"){
+            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
                 StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
                 StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
                 StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));

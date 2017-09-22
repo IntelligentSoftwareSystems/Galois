@@ -70,6 +70,12 @@
     string OPERATOR_BODY;
   };
 
+  struct New_variable_entry {
+    string FIELD_NAME;
+    string FIELD_TYPE;
+    string INIT_VAL;
+  };
+
   class InfoClass {
     public:
       map<string, vector<Graph_entry>> graphs_map;
@@ -79,6 +85,7 @@
       map<string, vector<ReductionOps_entry>> reductionOps_map;
       map<string, vector<FirstIter_struct_entry>> FirstItr_struct_map;
       map<string, vector<SyncFlag_entry>>syncFlags_map;
+      map<string, vector<New_variable_entry>>newVariables_map;
   };
 
 

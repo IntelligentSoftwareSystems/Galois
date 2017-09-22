@@ -228,6 +228,15 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
+                  //Add new variable to be constructed later.
+                  New_variable_entry new_variable_entry;
+                  new_variable_entry.FIELD_NAME = new_field_name;
+                  new_variable_entry.FIELD_TYPE = field_entry.RESET_VALTYPE;
+                  new_variable_entry.INIT_VAL = "0";
+
+                  if(!newVariable_entry_exists(new_variable_entry, info->newVariables_map[i.first])){
+                    info->newVariables_map[i.first].push_back(new_variable_entry);
+                  }
                   break;
                 }
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op) {

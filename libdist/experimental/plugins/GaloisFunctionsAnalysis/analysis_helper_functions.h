@@ -129,6 +129,21 @@ bool syncFlags_entry_exists(EntryTy entry, vector<EntryTy> entry_vec){
   return false;
 }
 
+/** Check for a duplicate entry in the map **/
+template <typename EntryTy>
+bool newVariable_entry_exists(EntryTy entry, vector<EntryTy> entry_vec){
+  if(entry_vec.size() == 0){
+    return false;
+  }
+  for(auto it : entry_vec){
+    if((it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE)){
+      return true;
+    }
+  }
+  return false;
+}
+
+
 
 bool is_vector_type(string inputStr, string& Type, string& Num_ele) {
   /** Check if type is suppose to be a vector **/
