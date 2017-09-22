@@ -252,8 +252,8 @@ struct FirstItr_BFS{
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     #endif
 
-    galois::runtime::reportStat("(NULL)", 
-       _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
+    galois::runtime::reportStat_Tsum("BFS", 
+       _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin);
   }
 
   void operator()(GNode src) const {
@@ -350,16 +350,16 @@ struct BFS {
       //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
       //            Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      galois::runtime::reportStat("(NULL)", 
+      galois::runtime::reportStat_Tsum("BFS", 
         _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
-        (unsigned long)dga.read_local(), 0);
+        (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat("(NULL)", 
+      galois::runtime::reportStat_Serial("BFS", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations, 0);
+        (unsigned long)_num_iterations);
     }
   }
 
@@ -455,16 +455,16 @@ uint32_t BFSSanityCheck::current_max = 0;
 
 int main(int argc, char** argv) {
   try {
-    galois::DistMemSys G(getStatsFile());
+    galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
-      galois::runtime::reportStat("(NULL)", "Source Node ID", 
-                                  (unsigned long long)src_node, 0);
+      galois::runtime::reportParam("BFS", "Max Iterations", 
+                                  (unsigned long)maxIterations);
+      galois::runtime::reportParam("BFS", "Source Node ID", 
+                                  (unsigned long long)src_node);
       #if __OPT_VERSION__ == 1
       printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
@@ -610,10 +610,6 @@ int main(int argc, char** argv) {
 #endif
     }
     }
-    galois::runtime::getHostBarrier().wait();
-    G.printDistStats();
-    galois::runtime::getHostBarrier().wait();
-
 
     return 0;
   } catch(const char* c) {
