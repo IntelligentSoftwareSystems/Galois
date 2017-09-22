@@ -32,31 +32,12 @@
 #include <tuple>
 
 #include <boost/mpl/has_xxx.hpp>
+#include "galois/runtime/Extra_dist_traits.h"
 
 #include <galois/gdeque.h>
 #include <galois/runtime/Dynamic_bitset.h>
 #include <galois/Atomic_wrapper.h>
 #include "galois/Bag.h"
-
-#ifndef _GALOIS_EXTRA_TRAITS_
-#define _GALOIS_EXTRA_TRAITS_
-
-//from libc++, clang specific
-namespace std {
-#ifdef __clang__
-template <class T> struct is_trivially_copyable;
-template <class _Tp> struct is_trivially_copyable
-  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
-{};
-#else
-#if __GNUC__ < 5
-template<class T>
-using is_trivially_copyable = is_trivial<T>;
-#endif
-#endif
-}
-#endif
-//#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
 namespace galois {
 namespace runtime {
@@ -66,24 +47,6 @@ namespace runtime {
 //already constructed object with the deserializes version (inplace
 //deserialization with default constructor)
 //We can also use this to update original objects during writeback
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
-template<typename T>
-struct has_serialize : public has_tt_has_serialize<T> {};
-
-BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_copyable)
-//! User assertion that class is trivially copyable
-template<typename T>
-struct is_copyable :  public has_tt_is_copyable<T> {};
-
-template<typename T>
-struct is_serializable {
-  static const bool value = has_serialize<T>::value || is_copyable<T>::value || std::is_trivially_copyable<T>::value;
-};
-
-template<typename T>
-struct is_memory_copyable {
-  static const bool value = is_copyable<T>::value || std::is_trivially_copyable<T>::value;
-};
 
 class DeSerializeBuffer;
 
@@ -223,7 +186,7 @@ public:
 };
 
 
-namespace detail {
+namespace internal {
 
 template<typename T>
 __attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
@@ -294,15 +257,15 @@ inline size_t adder(size_t a) { return a; }
 template<typename... Args>
 inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(args...); }
 
-} //detail
+} //internal
 
 template<typename... Args>
 static inline size_t gSized(Args&&... args) {
-  return detail::adder(detail::gSizedObj(args)...);
+  return internal::adder(internal::gSizedObj(args)...);
 }
 
 
-namespace detail {
+namespace internal {
 
 template<typename T>
 inline void gSerializeObj(SerializeBuffer& buf, const T& data,
@@ -424,7 +387,7 @@ inline void gSerializeObj(SerializeBuffer& buf, galois::InsertBag<T>& bag){
 }
 
 
-} //detail
+} //internal
 
 template<typename T>
 struct LazyRef { size_t off; };
@@ -433,7 +396,7 @@ template<typename Seq>
 static inline LazyRef<typename Seq::value_type> gSerializeLazySeq(SerializeBuffer& buf, unsigned num, Seq*) {
   static_assert(is_memory_copyable<typename Seq::value_type>::value, "Not POD Sequence");
   typename Seq::size_type size = num;
-  detail::gSerializeObj(buf, size);
+  internal::gSerializeObj(buf, size);
   size_t tsize = sizeof(typename Seq::value_type);
   return LazyRef<typename Seq::value_type>{buf.encomber(tsize*num)};
 }
@@ -448,7 +411,7 @@ static inline void gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned 
 template<typename T1, typename... Args>
 static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
   buf.reserve(gSized(t1, args...));
-  detail::gSerializeObj(buf, std::forward<T1>(t1));
+  internal::gSerializeObj(buf, std::forward<T1>(t1));
   gSerialize(buf, std::forward<Args>(args)...);
 }
 
@@ -456,7 +419,7 @@ static inline void gSerialize(SerializeBuffer&) {}
 
 //template<typename... Args>
 //void gSerialize(SerializeBuffer& buf, Args&&... args) {
-//  int dummy[sizeof...(Args)] = { (detail::gSerializeObj(buf, std::forward<Args>(args)), 0)...};
+//  int dummy[sizeof...(Args)] = { (internal::gSerializeObj(buf, std::forward<Args>(args)), 0)...};
 //}
 
 
@@ -464,7 +427,7 @@ static inline void gSerialize(SerializeBuffer&) {}
 //Deserialize support
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace detail {
+namespace internal {
 
 template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
@@ -567,7 +530,7 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data)
   gDeserializeObj(buf, data.get_vec());
 }
 
-} //namespace detail
+} //namespace internal
 
 
 //SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
@@ -577,7 +540,7 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data)
 
 template<typename T1, typename... Args>
 void gDeserialize(DeSerializeBuffer& buf, T1&& t1, Args&&... args) {
-  detail::gDeserializeObj(buf, std::forward<T1>(t1));
+  internal::gDeserializeObj(buf, std::forward<T1>(t1));
   gDeserialize(buf, std::forward<Args>(args)...);
 }
 
