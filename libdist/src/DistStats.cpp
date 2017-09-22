@@ -247,4 +247,6 @@ void DistStatManager::printStats(std::ostream& out) {
     fpDistStats.print(out);
     strDistStats.print(out);
   }
+  // all hosts must wait for host 0 to finish printing stats
+  galois::runtime::getHostBarrier().wait();
 }
