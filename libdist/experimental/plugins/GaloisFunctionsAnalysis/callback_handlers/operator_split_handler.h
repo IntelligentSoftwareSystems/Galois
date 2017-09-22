@@ -32,8 +32,6 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-namespace{
-
 class OperatorSplitHandler : public MatchFinder::MatchCallback {
   private:
     Rewriter &rewriter;
@@ -174,6 +172,4 @@ class OperatorSplitHandler : public MatchFinder::MatchCallback {
       }
     }
 };
-
-}//namespace
 #endif//_PLUGIN_ANALYSIS_TWO_LOOP_TRANSFORM_H

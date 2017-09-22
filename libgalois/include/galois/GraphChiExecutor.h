@@ -11,7 +11,7 @@ namespace galois {
 //! Implementation of GraphChi DSL in Galois
 namespace graphChi {
 
-namespace hidden {
+namespace internal {
 
 template<bool PassWrappedGraph>
 struct DispatchOperator {
@@ -252,14 +252,14 @@ template<typename Graph, typename VertexOperator>
 void vertexMap(Graph& graph, VertexOperator op, size_t size) {
   galois::graphs::BindSegmentGraph<Graph> wgraph(graph);
   
-  hidden::vertexMap<false,true>(graph, wgraph, op, static_cast<GraphNodeBag<>*>(0), size);
+  internal::vertexMap<false,true>(graph, wgraph, op, static_cast<GraphNodeBag<>*>(0), size);
 }
 
 template<typename Graph, typename VertexOperator, typename Bag>
 void vertexMap(Graph& graph, VertexOperator op, Bag& input, size_t size) {
   galois::graphs::BindSegmentGraph<Graph> wgraph(graph);
   
-  hidden::vertexMap<true,true>(graph, wgraph, op, &input, size);
+  internal::vertexMap<true,true>(graph, wgraph, op, &input, size);
 }
 
 } // end namespace

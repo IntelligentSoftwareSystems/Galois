@@ -42,7 +42,7 @@
 namespace galois {
 namespace worklists {
 
-namespace detail {
+namespace internal {
 
 template<typename T,
 	 typename Scheduler = dChunkedFIFO<64, T>, 
@@ -100,22 +100,22 @@ public:
   }
 };
 
-}  // end namespace detail
+}  // end namespace internal
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedOrderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
+using dChunkedOrderedSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedOrderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedUnorderedSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
+using dChunkedUnorderedSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedUnorderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelHashFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
+using dChunkedTwoLevelHashFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedTwoLevelHashFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelSetFIFO = detail::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
+using dChunkedTwoLevelSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
 GALOIS_WLCOMPILECHECK(dChunkedTwoLevelSetFIFO);
 
 } // end namespace worklists

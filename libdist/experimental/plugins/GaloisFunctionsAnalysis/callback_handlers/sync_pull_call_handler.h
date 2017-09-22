@@ -32,7 +32,6 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-namespace {
 class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
   private:
     ASTContext* astContext;
@@ -159,7 +158,5 @@ class SyncPullInsideForEdgeLoopHandler : public MatchFinder::MatchCallback {
       }
     }
 };
-
-}//namespace
 
 #endif//_PLUGIN_ANALYSIS_SYNC_PULL_CALL_H

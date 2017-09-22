@@ -173,7 +173,7 @@ protected:
     ThisClass::endRound ();
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (internal::DummyExecFunc*) {
     // for stable case
 
     galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
@@ -224,7 +224,7 @@ protected:
     expandNhoodImpl (&this->exFunc); 
   }
 
-  inline void executeSourcesImpl (HIDDEN::DummyExecFunc*) {
+  inline void executeSourcesImpl (internal::DummyExecFunc*) {
   }
 
   template <typename F>
@@ -407,7 +407,7 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {
 
-  for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
+  for_each_ordered_ikdg (range, cmp, nhFunc, internal::DummyExecFunc (), opFunc, argsTuple);
 }
 
 } // end namespace runtime

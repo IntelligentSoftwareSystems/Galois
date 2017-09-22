@@ -34,7 +34,7 @@
 namespace galois {
 namespace runtime {
 
-namespace details {
+namespace internal {
 struct dser_t {};
 struct tser_t {};
 }
@@ -43,7 +43,7 @@ class DeSerializeBuffer;
 template<typename T>
 T gDeserializeObj(DeSerializeBuffer&);
 
-namespace details {
+namespace internal {
 
 class remoteObj {
   std::atomic<unsigned> refs;
@@ -60,9 +60,9 @@ class remoteObjImpl : public remoteObj {
 public:
   //  remoteObjImpl(DeSerializeBuffer& buf) :obj{std::move(gDeserializeObj<T>(buf))} {}
   template<typename U = void>
-  remoteObjImpl(DeSerializeBuffer& buf, details::dser_t* p) :obj{buf} {}
+  remoteObjImpl(DeSerializeBuffer& buf, internal::dser_t* p) :obj{buf} {}
   template<typename U = void>
-  remoteObjImpl(DeSerializeBuffer& buf, details::tser_t* p) {
+  remoteObjImpl(DeSerializeBuffer& buf, internal::tser_t* p) {
     gDeserialize(buf, obj);
   }
 
@@ -75,7 +75,7 @@ public:
 
 class ResolveCache {
   std::unordered_map<fatPointer, void*> addrs;
-  std::deque<details::remoteObj*> objs;
+  std::deque<internal::remoteObj*> objs;
  
 public:
   ~ResolveCache() { reset(); }
@@ -85,13 +85,13 @@ public:
 
 
 class CacheManager {
-  std::unordered_map<fatPointer, details::remoteObj*> remoteObjects;
+  std::unordered_map<fatPointer, internal::remoteObj*> remoteObjects;
   LL::SimpleLock Lock;
-  std::deque<details::remoteObj*> garbage;
+  std::deque<internal::remoteObj*> garbage;
 
   //! resolve a value to a reference count incremented metadata
   //! used by ResolveCache
-  details::remoteObj* resolveIncRef(fatPointer);
+  internal::remoteObj* resolveIncRef(fatPointer);
 
   friend class ResolveCache;
   friend class RemoteDirectory;
@@ -102,25 +102,25 @@ public:
   void create(fatPointer ptr, DeSerializeBuffer& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     std::lock_guard<LL::SimpleLock> lgr(Lock);
-    details::remoteObj*& obj = remoteObjects[ptr];
+    internal::remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
     //FIXME: need to do RO lock
-    typename std::conditional<has_serialize<T>::value, details::dser_t, details::tser_t>::type* P = 0;
-    obj = new details::remoteObjImpl<T>(buf, P);
+    typename std::conditional<has_serialize<T>::value, internal::dser_t, internal::tser_t>::type* P = 0;
+    obj = new internal::remoteObjImpl<T>(buf, P);
   }
 
   template<typename T>
   void create(fatPointer ptr, T&& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     std::lock_guard<LL::SimpleLock> lgr(Lock);
-    details::remoteObj*& obj = remoteObjects[ptr];
+    internal::remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
     //FIXME: need to do RO lock
-    obj = new details::remoteObjImpl<T>(std::forward<T>(buf));
+    obj = new internal::remoteObjImpl<T>(std::forward<T>(buf));
   }
 
   //! Does not write back. That must be handled by the directory

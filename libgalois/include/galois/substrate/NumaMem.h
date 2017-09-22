@@ -41,14 +41,14 @@
 namespace galois {
 namespace substrate {
 
-namespace detail {
+namespace internal {
 struct largeFreer {
   size_t bytes;
   void operator()(void* ptr) const;
 };
-}//namespace detail
+}//namespace internal
 
-typedef std::unique_ptr<void, detail::largeFreer> LAptr;
+typedef std::unique_ptr<void, internal::largeFreer> LAptr;
 
 LAptr largeMallocLocal(size_t bytes); // fault in locally
 LAptr largeMallocFloating(size_t bytes); // leave numa mapping undefined

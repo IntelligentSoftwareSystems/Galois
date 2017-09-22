@@ -53,18 +53,18 @@ struct read_default_graph_tag { };
 struct read_with_aux_graph_tag { };
 struct read_lc_inout_graph_tag { };
 
-namespace detail {
+namespace internal {
 
 template<typename, typename, typename, typename,typename>
 struct EdgeSortReference;
 
 }
 
-//! Proxy object for {@link detail::EdgeSortIterator}
+//! Proxy object for {@link internal::EdgeSortIterator}
 template<typename GraphNode, typename EdgeTy>
 class EdgeSortValue: public StrictObject<EdgeTy> {
   template<typename, typename, typename, typename,typename>
-  friend struct detail::EdgeSortReference;
+  friend struct internal::EdgeSortReference;
 
   GraphNode rawDst;
 
@@ -82,7 +82,7 @@ public:
 };
 
 //! Implementation details for graphs
-namespace detail {
+namespace internal {
 
 template<bool Enable>
 class LocalIteratorFeature {

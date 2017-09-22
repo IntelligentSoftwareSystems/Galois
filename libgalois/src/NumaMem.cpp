@@ -151,7 +151,7 @@ static void largeFree(void* ptr, size_t bytes) {
   freePages(ptr, bytes/allocSize());
 }
 
-void galois::substrate::detail::largeFreer::operator()(void* ptr) const {
+void galois::substrate::internal::largeFreer::operator()(void* ptr) const {
   largeFree(ptr, bytes);
 }
 
@@ -182,21 +182,21 @@ LAptr galois::substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
     // true = round robin paging
     pageIn(data, bytes, allocSize(), numThreads, true);
 
-  return LAptr{data, detail::largeFreer{bytes}};
+  return LAptr{data, internal::largeFreer{bytes}};
 }
 
 LAptr galois::substrate::largeMallocLocal(size_t bytes) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
   // Get a prefaulted allocation
-  return LAptr{allocPages(bytes/allocSize(), true), detail::largeFreer{bytes}};
+  return LAptr{allocPages(bytes/allocSize(), true), internal::largeFreer{bytes}};
 }
 
 LAptr galois::substrate::largeMallocFloating(size_t bytes) {
   // round up to hugePageSize
   bytes = roundup(bytes, allocSize());
   // Get a non-prefaulted allocation
-  return LAptr{allocPages(bytes/allocSize(), false), detail::largeFreer{bytes}};
+  return LAptr{allocPages(bytes/allocSize(), false), internal::largeFreer{bytes}};
 }
 
 LAptr galois::substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
@@ -207,7 +207,7 @@ LAptr galois::substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
   if (data)
     // false = blocked paging
     pageIn(data, bytes, allocSize(), numThreads, false);
-  return LAptr{data, detail::largeFreer{bytes}};
+  return LAptr{data, internal::largeFreer{bytes}};
 }
 
 /** 
@@ -237,7 +237,7 @@ LAptr galois::substrate::largeMallocSpecified(size_t bytes,
     pageInSpecified(data, bytes, allocSize(), numThreads, threadRanges, 
                     elementSize);
 
-  return LAptr{data, detail::largeFreer{bytes}};
+  return LAptr{data, internal::largeFreer{bytes}};
 }
 // Explicit template declarations since the template is defined in the .h
 // file

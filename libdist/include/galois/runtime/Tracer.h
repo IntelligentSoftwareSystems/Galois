@@ -33,7 +33,7 @@
 namespace galois {
 namespace runtime {
 
-namespace detail {
+namespace internal {
 
 static inline void traceImpl(std::ostringstream& os) {
   os << "\n";
@@ -88,11 +88,11 @@ void print_recv_impl(std::vector<uint8_t>, size_t, unsigned);
 extern bool doTrace;
 extern bool initTrace;
 
-} // namespace detail
+} // namespace internal
 
 template<typename T, typename A>
-detail::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
-  return detail::vecPrinter<T,A>(v);
+internal::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
+  return internal::vecPrinter<T,A>(v);
 };
 
 #ifdef NDEBUG
@@ -104,14 +104,14 @@ static inline void trace(Args&& ...) {}
 
 template<typename... Args>
 static inline void trace(Args&&... args) {
-  if (!detail::initTrace) {
-    detail::doTrace = substrate::EnvCheck("GALOIS_DEBUG_TRACE");
-    detail::initTrace = true;
+  if (!internal::initTrace) {
+    internal::doTrace = substrate::EnvCheck("GALOIS_DEBUG_TRACE");
+    internal::initTrace = true;
   }
-  if (detail::doTrace) {
+  if (internal::doTrace) {
     std::ostringstream os;
-    detail::traceImpl(os, std::forward<Args>(args)...);
-    detail::printTrace(os);
+    internal::traceImpl(os, std::forward<Args>(args)...);
+    internal::printTrace(os);
   }
 }
 
@@ -120,12 +120,12 @@ static inline void trace(Args&&... args) {
 template<typename... Args>
 static inline void printOutput(const char* format, Args&&... args) {
     std::ostringstream os;
-    detail::traceFormatImpl(os, format, std::forward<Args>(args)...);
-    detail::print_output_impl(os);
+    internal::traceFormatImpl(os, format, std::forward<Args>(args)...);
+    internal::print_output_impl(os);
 }
 
 static inline void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
-  detail::print_send_impl(vec, len, host);
+  internal::print_send_impl(vec, len, host);
 }
 
 } // namespace runtime

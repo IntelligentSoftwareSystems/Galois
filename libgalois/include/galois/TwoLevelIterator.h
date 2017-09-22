@@ -99,7 +99,7 @@
 
 namespace galois {
 
-namespace TwoLevelIteratorImpl {
+namespace internal {
   template <typename Iter>
   void safe_decrement (Iter& it, const Iter& beg, const Iter& end
       , std::forward_iterator_tag) {
@@ -339,7 +339,7 @@ protected:
     assert (!FwdBase::outerAtBegin ());
     assert (!FwdBase::outerEmpty ());
 
-    TwoLevelIteratorImpl::safe_decrement (FwdBase::m_outer, FwdBase::m_beg_outer, FwdBase::m_end_outer);
+    internal::safe_decrement (FwdBase::m_outer, FwdBase::m_beg_outer, FwdBase::m_end_outer);
 
     // FwdBase::m_inner = FwdBase::innerEnd ();
     FwdBase::setInnerAtEnd ();
@@ -576,7 +576,7 @@ public:
   }
 };
 
-namespace TwoLevelIteratorImpl {
+namespace internal {
 
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn, typename Cat>
 struct ByCategory {};
@@ -634,7 +634,7 @@ private:
   typedef typename std::iterator_traits<Inner>::iterator_category CatInner;
 
 public:
-  typedef typename TwoLevelIteratorImpl::ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, CatInner>::type type;
+  typedef typename internal::ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, CatInner>::type type;
 };
 
 //! Creates two level iterator
@@ -663,7 +663,7 @@ make_two_level_end (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn inne
   return Ret_ty (beg, end, end, innerBegFn, innerEndFn);
 }
 
-namespace TwoLevelIteratorImpl {
+namespace internal {
   template <typename C>
   struct GetBegin: public std::unary_function<C&, typename C::iterator> {
     inline typename C::iterator operator () (C& c) const {
@@ -794,8 +794,8 @@ namespace TwoLevelIteratorImpl {
   struct ChooseStlTwoLevelIterImpl {
 
     typedef typename std::iterator_traits<Outer>::value_type C;
-    static const TwoLevelIteratorImpl::StlIterKind KIND = TwoLevelIteratorImpl::GetStlIterKind<C, Inner>::value;
-    typedef TwoLevelIteratorImpl::ChooseStlIter<C, Inner, KIND> CStl;
+    static const internal::StlIterKind KIND = internal::GetStlIterKind<C, Inner>::value;
+    typedef internal::ChooseStlIter<C, Inner, KIND> CStl;
     typedef typename CStl::InnerBegFn InnerBegFn;
     typedef typename CStl::InnerEndFn InnerEndFn;
     typedef typename ChooseTwoLevelIterator<Outer, Inner, InnerBegFn, InnerEndFn>::type type;
@@ -822,55 +822,55 @@ namespace TwoLevelIteratorImpl {
 //! Type function to select appropriate two-level iterator
 template <typename Outer, typename Inner>
 struct ChooseStlTwoLevelIterator {
-  typedef typename TwoLevelIteratorImpl::ChooseStlTwoLevelIterImpl<Outer, Inner>::type type;
+  typedef typename internal::ChooseStlTwoLevelIterImpl<Outer, Inner>::type type;
 };
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::type 
+typename internal::StlInnerIsIterator<Outer>::type 
 stl_two_level_begin (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::make (beg, end, beg);
+  return internal::StlInnerIsIterator<Outer>::make (beg, end, beg);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::type
+typename internal::StlInnerIsIterator<Outer>::type
 stl_two_level_end (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsIterator<Outer>::make (beg, end, end);
+  return internal::StlInnerIsIterator<Outer>::make (beg, end, end);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::type
+typename internal::StlInnerIsConstIterator<Outer>::type
 stl_two_level_cbegin (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::make (beg, end, beg);
+  return internal::StlInnerIsConstIterator<Outer>::make (beg, end, beg);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::type 
+typename internal::StlInnerIsConstIterator<Outer>::type 
 stl_two_level_cend (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsConstIterator<Outer>::make (beg, end, end);
+  return internal::StlInnerIsConstIterator<Outer>::make (beg, end, end);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::type
+typename internal::StlInnerIsRvrsIterator<Outer>::type
 stl_two_level_rbegin (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::make (beg, end, beg);
+  return internal::StlInnerIsRvrsIterator<Outer>::make (beg, end, beg);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::type
+typename internal::StlInnerIsRvrsIterator<Outer>::type
 stl_two_level_rend (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsRvrsIterator<Outer>::make (beg, end, end);
+  return internal::StlInnerIsRvrsIterator<Outer>::make (beg, end, end);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::type
+typename internal::StlInnerIsConstRvrsIterator<Outer>::type
 stl_two_level_crbegin (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::make (beg, end, beg);
+  return internal::StlInnerIsConstRvrsIterator<Outer>::make (beg, end, beg);
 }
 
 template <typename Outer>
-typename TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::type
+typename internal::StlInnerIsConstRvrsIterator<Outer>::type
 stl_two_level_crend (Outer beg, Outer end) {
-  return TwoLevelIteratorImpl::StlInnerIsConstRvrsIterator<Outer>::make (beg, end, end);
+  return internal::StlInnerIsConstRvrsIterator<Outer>::make (beg, end, end);
 }
 
 

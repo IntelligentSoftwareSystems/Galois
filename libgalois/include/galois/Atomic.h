@@ -36,7 +36,7 @@
 
 namespace galois {
 
-namespace AtomicImpl {
+namespace internal {
 /**
  * Common implementation.
  */
@@ -305,8 +305,8 @@ struct DummyWrapper {
  * retain atomic RMW semantics.
  */
 template <typename T, bool CONCURRENT=true>
-class GAtomic: public AtomicImpl::GAtomicBase <T, AtomicImpl::DummyWrapper, CONCURRENT> {
-  typedef AtomicImpl::GAtomicBase<T, AtomicImpl::DummyWrapper, CONCURRENT> Super_ty;
+class GAtomic: public internal::GAtomicBase <T, internal::DummyWrapper, CONCURRENT> {
+  typedef internal::GAtomicBase<T, internal::DummyWrapper, CONCURRENT> Super_ty;
 
 public:
   GAtomic(): Super_ty() {}
@@ -326,9 +326,9 @@ public:
  */
 template <typename T, bool CONCURRENT=true>
 class GAtomicPadded: 
-    public AtomicImpl::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> {
+    public internal::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> {
 
-  typedef AtomicImpl::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> Super_ty;
+  typedef internal::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

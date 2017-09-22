@@ -35,7 +35,6 @@ using namespace llvm;
 using namespace std;
 
 static const TypeMatcher AnyType = anything();
-namespace{
 /*COMMAN MATCHER STATEMENTS  :*************** To match Galois style getData calls  *************************************/
       StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData")))).bind("getData_callExpr");
       StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
@@ -185,8 +184,4 @@ namespace{
                                               ).bind(str_loopName);
         return returnMatcher;
       }
-
-
-}//namespace
-
 #endif #_PLUGIN_ANALYSIS_AST_COMMON_MATCHERS_H

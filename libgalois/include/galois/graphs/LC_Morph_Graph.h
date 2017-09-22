@@ -50,7 +50,7 @@ template<typename NodeTy, typename EdgeTy,
   typename FileEdgeTy=EdgeTy>
 class LC_Morph_Graph:
     private boost::noncopyable,
-    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
@@ -79,9 +79,9 @@ public:
 
 protected:
   class NodeInfo;
-  typedef detail::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
+  typedef internal::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
   typedef galois::InsertBag<NodeInfo> Nodes;
-  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
+  typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
   
   struct EdgeHolder {
     EdgeInfo* begin;
@@ -89,8 +89,8 @@ protected:
     EdgeHolder* next;
   };
 
-  class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
-    typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> Super;
+  class NodeInfo: public internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
+    typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> Super;
     friend class LC_Morph_Graph;
 
     EdgeInfo* edgeBegin;
@@ -236,15 +236,15 @@ public:
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   /**
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
+  internal::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
   }
   
   template<typename... Args>

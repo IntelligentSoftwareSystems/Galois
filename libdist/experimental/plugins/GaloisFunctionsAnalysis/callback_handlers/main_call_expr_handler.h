@@ -33,8 +33,6 @@ using namespace clang;
 using namespace clang::ast_matchers;
 using namespace std;
 
-namespace{
-
 class CallExprHandler : public MatchFinder::MatchCallback {
     private:
       ASTContext* astContext;
@@ -180,8 +178,6 @@ class CallExprHandler : public MatchFinder::MatchCallback {
           }
         }
       }
-  };
-
-}//namespace
+};
 
 #endif//_PLUGIN_ANALYSIS_MAIN_CALL_EXPR_H

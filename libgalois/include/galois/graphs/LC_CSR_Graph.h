@@ -74,8 +74,8 @@ template<typename NodeTy, typename EdgeTy,
   typename FileEdgeTy=EdgeTy>
 class LC_CSR_Graph:
  private boost::noncopyable,
- private detail::LocalIteratorFeature<UseNumaAlloc>,
- private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+ private internal::LocalIteratorFeature<UseNumaAlloc>,
+ private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
@@ -116,8 +116,8 @@ public:
 protected:
   typedef LargeArray<EdgeTy> EdgeData;
   typedef LargeArray<uint32_t> EdgeDst;
-  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
-  typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
+  typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
+  typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
   typedef LargeArray<uint64_t> EdgeIndData;
   typedef LargeArray<NodeInfo> NodeData;
 
@@ -148,7 +148,7 @@ protected:
   // used to track division of edges among threads
   std::vector<uint64_t> threadRangesEdge;
 
-  typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
+  typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
  
   edge_iterator raw_begin(GraphNode N) const {
     return edge_iterator((N == 0) ? 0 : edgeIndData[N-1]);
@@ -333,7 +333,7 @@ public:
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, 
       MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, 
@@ -350,7 +350,7 @@ public:
                            MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), 
-              detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+              internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**

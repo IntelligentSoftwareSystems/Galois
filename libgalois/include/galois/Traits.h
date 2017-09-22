@@ -87,7 +87,7 @@ auto make_trait_with_args(Args... args) -> TT<Args...> {
   return TT<Args...>(args...);
 }
 
-namespace HIDDEN {
+namespace internal {
 
 template<typename Tuple, typename TagsTuple, int... Is>
 struct indices_of_non_matching_tags_aux {
@@ -129,7 +129,7 @@ struct indices_of_non_matching_tags<Tuple, TagsTuple, int_seq<I, Is...> > {
  */
 template<typename S, typename T, typename D,
   typename Seq = typename make_int_seq<std::tuple_size<T>::value>::type,
-  typename ResSeq = typename HIDDEN::indices_of_non_matching_tags<S,T,Seq>::type>
+  typename ResSeq = typename internal::indices_of_non_matching_tags<S,T,Seq>::type>
 typename tuple_elements<D, ResSeq>::type
 get_default_trait_values(S source, T tags, D defaults)
 {
@@ -368,7 +368,7 @@ struct chunk_size_tag {
 };
 
 
-namespace HIDDEN {
+namespace internal {
   template <unsigned V, unsigned MIN, unsigned MAX> 
   struct bring_within_limits {
   private:
@@ -399,10 +399,10 @@ namespace HIDDEN {
 
 template <unsigned SZ> 
 struct chunk_size: 
-  // public trait_has_svalue<unsigned, HIDDEN::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
+  // public trait_has_svalue<unsigned, internal::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
   public trait_has_value<unsigned>, chunk_size_tag {    
 
-  static const unsigned value = HIDDEN::regulate_chunk_size<SZ>::value;
+  static const unsigned value = internal::regulate_chunk_size<SZ>::value;
 
   unsigned regulate (const unsigned cs) const {
     return std::min (std::max (unsigned (chunk_size_tag::MIN), cs), unsigned (chunk_size_tag::MAX));

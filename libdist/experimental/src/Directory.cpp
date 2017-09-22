@@ -37,7 +37,7 @@ using namespace galois::runtime;
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename metadata>
-metadata& detail::MetaHolder<metadata>::getMD(fatPointer ptr, typeHelper* th) {
+metadata& internal::MetaHolder<metadata>::getMD(fatPointer ptr, typeHelper* th) {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   auto ii = md.find(ptr);
   if (ii == md.end())
@@ -47,7 +47,7 @@ metadata& detail::MetaHolder<metadata>::getMD(fatPointer ptr, typeHelper* th) {
 }
 
 template<typename metadata>
-metadata*  detail::MetaHolder<metadata>::getMD_ifext(fatPointer ptr) {
+metadata*  internal::MetaHolder<metadata>::getMD_ifext(fatPointer ptr) {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   auto ii = md.find(ptr);
   if (ii != md.end()) {
@@ -58,12 +58,12 @@ metadata*  detail::MetaHolder<metadata>::getMD_ifext(fatPointer ptr) {
 }
 
 template<typename metadata>
-size_t detail::MetaHolder<metadata>::mapSize(){
+size_t internal::MetaHolder<metadata>::mapSize(){
   return md.size();
 }
 
 template<typename metadata>
-void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
+void  internal::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
   //FIXME: will deadlock
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   assert(md.find(ptr) != md.end());
@@ -72,7 +72,7 @@ void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL:
 }
 
 template<typename metadata>
-void detail::MetaHolder<metadata>::dump() {
+void internal::MetaHolder<metadata>::dump() {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   for(auto &pair : md) {
     std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
@@ -80,7 +80,7 @@ void detail::MetaHolder<metadata>::dump() {
   }
 }
 template<typename metadata>
-void detail::MetaHolder<metadata>::dump(std::ofstream& dumpFileName) {
+void internal::MetaHolder<metadata>::dump(std::ofstream& dumpFileName) {
   //std::lock_guard<LL::SimpleLock> lg(md_lock);
   for(auto &pair : md) {
    // std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
@@ -199,7 +199,7 @@ void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_l
   }
 }
 
-void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, RecvBuffer& buf) {
+void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, internal::typeHelper* th, RecvBuffer& buf) {
   assert(flag == RW || flag == RO);
   decltype(metadata::notifyList) nl;
 
@@ -228,14 +228,14 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
     considerObject(*md, ptr, lg);
 }
 
-void RemoteDirectory::fetchImpl(metadata& md, fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended, std::unique_lock<LL::SimpleLock>& lg) {
+void RemoteDirectory::fetchImpl(metadata& md, fatPointer ptr, ResolveFlag flag, internal::typeHelper* th, bool setContended, std::unique_lock<LL::SimpleLock>& lg) {
   assert(!ptr.isLocal());
   ResolveFlag requestFlag = md.fetch(flag, setContended);
   if (requestFlag != INV)
     th->request(ptr.getHost(), ptr, NetworkInterface::ID, requestFlag);
 }
 
-void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended) {
+void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, internal::typeHelper* th, bool setContended) {
   assert(!ptr.isLocal());
   metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
@@ -263,7 +263,7 @@ bool RemoteDirectory::notify(fatPointer ptr, ResolveFlag flag,
 // Remote Directory Metadata
 ////////////////////////////////////////////////////////////////////////////////
 
-RemoteDirectory::metadata::metadata(detail::typeHelper* th) 
+RemoteDirectory::metadata::metadata(internal::typeHelper* th) 
   :state(INVALID), contended(false), recalled(~0U), th(th)
 {}
 
@@ -445,7 +445,7 @@ void RemoteDirectory::dump(std::ofstream& dumpFileName){
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, 
-                                    detail::typeHelper* th, RecvBuffer& buf) {
+                                    internal::typeHelper* th, RecvBuffer& buf) {
   assert(ptr.isLocal());
   Lockable* obj = ptr.getPtr<Lockable>();
   metadata& md = dir.getMD(ptr, th);
@@ -470,7 +470,7 @@ void LocalDirectory::clearContended(fatPointer ptr) {
   considerObject(*md, ptr, lg);
 }
 
-void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended) {
+void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, internal::typeHelper* th, bool setContended) {
   //FIXME: deal with RO
   assert(ptr.isLocal());
   metadata* md = setContended ? &dir.getMD(ptr, th) : dir.getMD_ifext(ptr);
@@ -484,7 +484,7 @@ void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, detail::typeHel
   considerObject(*md, ptr, lg);
 }
 
-void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, detail::typeHelper* th) {
+void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, internal::typeHelper* th) {
   assert(ptr.isLocal());
   metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);

@@ -408,7 +408,7 @@ public:
 
 
 
-namespace HIDDEN {
+namespace internal {
   
   struct DummyExecFunc {
     static const unsigned CHUNK_SIZE = 1;
@@ -426,7 +426,7 @@ protected:
 
   static const bool NEEDS_CUSTOM_LOCKING = exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
   static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value 
-    || !std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value;
+    || !std::is_same<ExFunc, internal::DummyExecFunc>::value;
 
   static const bool ENABLE_PARAMETER = get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
   static const bool NEEDS_PUSH = !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;

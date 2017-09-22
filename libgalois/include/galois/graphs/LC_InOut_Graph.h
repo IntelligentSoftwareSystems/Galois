@@ -198,8 +198,8 @@ public:
     }
   }
 
-  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
+  internal::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }
 
   /**
@@ -212,11 +212,11 @@ public:
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       std::sort(this->edge_sort_begin(N), this->edge_sort_end(N),
-          detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,typename GraphTy::edge_data_type>,CompTy>(comp));
+          internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,typename GraphTy::edge_data_type>,CompTy>(comp));
     } else {
       std::sort(inGraph.edge_sort_begin(inGraphNode(N)),
           inGraph.edge_sort_end(inGraphNode(N)),
-          detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,typename GraphTy::edge_data_type>,CompTy>(comp));
+          internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,typename GraphTy::edge_data_type>,CompTy>(comp));
     }
   }
 

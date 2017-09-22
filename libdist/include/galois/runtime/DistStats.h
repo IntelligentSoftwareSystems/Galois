@@ -72,7 +72,7 @@ class DistStatManager: public galois::runtime::StatManager {
       const StatTotal::Type& totalTy(void) const { return m_totalTy; }
     };
 
-    using TMap = hidden::BasicStatMap<DummyStat>;
+    using TMap = internal::BasicStatMap<DummyStat>;
 
     bool merged = false;
     substrate::PerThreadStorage<TMap> perThrdMap;
@@ -115,10 +115,10 @@ class DistStatManager: public galois::runtime::StatManager {
   using HostStatVal = std::tuple<unsigned, T, StatTotal::Type, const ThrdVals<T>&>;
 
   template <typename T>
-  struct HostStat: public hidden::VecStat<T> {
+  struct HostStat: public internal::VecStat<T> {
 
-    using Base = hidden::VecStat<T>;
-    using ThrdStats = hidden::VecStat<T>;
+    using Base = internal::VecStat<T>;
+    using ThrdStats = internal::VecStat<T>;
     using PerHostThrdStats = galois::gstl::Map<unsigned, ThrdStats>;
 
     PerHostThrdStats perHostThrdStats;
@@ -189,9 +189,9 @@ class DistStatManager: public galois::runtime::StatManager {
   };
 
   template <typename T>
-  struct DistStatCombiner: public hidden::BasicStatMap<HostStat<T> > {
+  struct DistStatCombiner: public internal::BasicStatMap<HostStat<T> > {
 
-    using Base = hidden::BasicStatMap<HostStat<T> >;
+    using Base = internal::BasicStatMap<HostStat<T> >;
 
     static constexpr const char* htotalName(const StatTotal::Type& type) {
       switch(type) {

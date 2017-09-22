@@ -110,8 +110,8 @@ template<typename NodeTy, typename EdgeTy,
   typename FileEdgeTy=EdgeTy>
 class LC_CSR_MIC_Graph:
     private boost::noncopyable,
-    private detail::LocalIteratorFeature<UseNumaAlloc>,
-    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private internal::LocalIteratorFeature<UseNumaAlloc>,
+    private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
@@ -144,8 +144,8 @@ public:
 protected:
   typedef LargeArray<EdgeTy> EdgeData;
   typedef LargeArray<uint32_t> EdgeDst;
-  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
-  typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
+  typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
+  typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
   typedef LargeArray<uint64_t> EdgeIndData;
   typedef LargeArray<NodeInfo> NodeData;
 
@@ -173,7 +173,7 @@ protected:
   uint64_t numNodes;
   uint64_t numEdges;
 
-  typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
+  typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
 
   EdgeIndex raw_begin(GraphNode N) const {
     assert (N < edgeIndData.size ());
@@ -454,8 +454,8 @@ public:
     return raw_end(N);
   }
 
-  detail::EdgesIterator<LC_CSR_MIC_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<LC_CSR_MIC_Graph>(*this, N, mflag);
+  internal::EdgesIterator<LC_CSR_MIC_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::EdgesIterator<LC_CSR_MIC_Graph>(*this, N, mflag);
   }
 
   /**
@@ -464,7 +464,7 @@ public:
   template<typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+    std::sort(edge_sort_begin(N), edge_sort_end(N), internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**

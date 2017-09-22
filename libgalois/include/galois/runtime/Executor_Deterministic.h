@@ -69,7 +69,7 @@
 namespace galois {
 namespace runtime {
 //! Implementation of deterministic execution
-namespace DeterministicImpl {
+namespace internal {
 
 extern __thread SizedHeapFactory::SizedHeap* dagListHeap;
 
@@ -1627,10 +1627,10 @@ namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>:
-  public DeterministicImpl::Executor<DeterministicImpl::Options<T, FunctionTy, ArgsTy>>
+  public internal::Executor<internal::Options<T, FunctionTy, ArgsTy>>
 {
-  typedef DeterministicImpl::Options<T, FunctionTy, ArgsTy> OptionsTy;
-  typedef DeterministicImpl::Executor<OptionsTy> SuperTy;
+  typedef internal::Options<T, FunctionTy, ArgsTy> OptionsTy;
+  typedef internal::Executor<OptionsTy> SuperTy;
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(OptionsTy(f, args)) { }
 };
 

@@ -304,8 +304,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<MemScalGraph>(*this, N, mflag);
+  internal::EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::EdgesIterator<MemScalGraph>(*this, N, mflag);
   }
 
   /**
