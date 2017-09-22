@@ -41,7 +41,7 @@
 
 namespace galois {
 namespace runtime {
-namespace Exp {
+namespace exp {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public galois::FixedSizeRing<T,ChunkSize> {
