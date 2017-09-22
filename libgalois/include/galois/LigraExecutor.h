@@ -7,7 +7,7 @@ namespace galois {
 //! Implementation of Ligra DSL in Galois
 namespace Ligra {
 
-namespace hidden {
+namespace internal {
 template<typename Graph,bool Forward>
 struct Transposer {
   typedef typename Graph::GraphNode GNode;
@@ -213,7 +213,7 @@ struct SparseOperator: public Transposer<Graph,Forward> {
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, Bag& output) {
   output.densify();
-  galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
+  galois::for_each_local(graph, internal::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,true>(graph, output, output, op));
 }
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
@@ -221,11 +221,11 @@ void edgeMap(Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Ba
   if (Forward) {
     galois::for_each(graph.out_edges(single, galois::MethodFlag::UNPROTECTED).begin(),
         graph.out_edges(single, galois::MethodFlag::UNPROTECTED).end(),
-        hidden::SparseOperator<Graph,Bag,EdgeOperator,true>(graph, output, op, single));
+        internal::SparseOperator<Graph,Bag,EdgeOperator,true>(graph, output, op, single));
   } else {
     galois::for_each(graph.in_edges(single, galois::MethodFlag::UNPROTECTED).begin(),
         graph.in_edges(single, galois::MethodFlag::UNPROTECTED).end(),
-        hidden::SparseOperator<Graph,Bag,EdgeOperator,false>(graph, output, op, single));
+        internal::SparseOperator<Graph,Bag,EdgeOperator,false>(graph, output, op, single));
   }
 }
 
@@ -241,15 +241,15 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
       abort(); // Never executed
       output.densify();
       typedef dChunkedFIFO<256*4> WL;
-      galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), galois::wl<WL>());
+      galois::for_each_local(graph, internal::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), galois::wl<WL>());
     } else {
       typedef dChunkedFIFO<256> WL;
-      galois::for_each_local(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), galois::wl<WL>());
+      galois::for_each_local(graph, internal::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), galois::wl<WL>());
     }
   } else {
     //std::cout << "(S) Count " << count << "\n"; // XXX
     typedef dChunkedFIFO<64> WL;
-    galois::for_each_local(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), galois::wl<WL>());
+    galois::for_each_local(input, internal::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), galois::wl<WL>());
   }
 }
 

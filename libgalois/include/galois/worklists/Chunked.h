@@ -42,7 +42,7 @@ extern unsigned activeThreads;
 }
 namespace worklists {
 
-namespace detail {
+namespace internal {
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool, template<typename> class PS, typename TQ>
 struct squeue {
@@ -265,7 +265,7 @@ public:
   }
 };
 
-} // namespace detail
+} // namespace internal
 
 /**
  * Chunked FIFO. A global FIFO of chunks of some fixed size.
@@ -273,7 +273,7 @@ public:
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using ChunkedFIFO = detail::ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent>;
+using ChunkedFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
 /**
@@ -282,7 +282,7 @@ GALOIS_WLCOMPILECHECK(ChunkedFIFO)
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using ChunkedLIFO = detail::ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent>;
+using ChunkedLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(ChunkedLIFO)
 
 /**
@@ -291,7 +291,7 @@ GALOIS_WLCOMPILECHECK(ChunkedLIFO)
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedFIFO = detail::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
+using dChunkedFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 
 /**
@@ -300,7 +300,7 @@ GALOIS_WLCOMPILECHECK(dChunkedFIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedLIFO = detail::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
+using dChunkedLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
 /**
@@ -310,7 +310,7 @@ GALOIS_WLCOMPILECHECK(dChunkedLIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedBag = detail::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
+using dChunkedBag = internal::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 

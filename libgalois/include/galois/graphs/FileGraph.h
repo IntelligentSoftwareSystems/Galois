@@ -188,7 +188,7 @@ public:
   edge_iterator edge_end(GraphNode N);
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
-    return detail::make_no_deref_range(edge_begin(N), edge_end(N));
+    return internal::make_no_deref_range(edge_begin(N), edge_end(N));
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N) {
@@ -204,7 +204,7 @@ public:
       typedef LargeArray<uint32_t> EdgeDst;
       typedef LargeArray<EdgeTy> EdgeData;
   
-      typedef detail::EdgeSortIterator<GraphNode, uint64_t,
+      typedef internal::EdgeSortIterator<GraphNode, uint64_t,
                                        EdgeDst,EdgeData,Convert32> edge_sort_iterator;
   
       EdgeDst edgeDst(outs, numEdges);
@@ -217,13 +217,13 @@ public:
                                (uint32_t*)raw_neighbor_end(N)), 
                              &edgeDst, &ed);
       std::sort(begin, end, 
-                detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
+                internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
                                             CompTy>(comp));
     } else if (graphVersion == 2) {
       typedef LargeArray<uint64_t> EdgeDst;
       typedef LargeArray<EdgeTy> EdgeData;
   
-      typedef detail::EdgeSortIterator<GraphNode, uint64_t,
+      typedef internal::EdgeSortIterator<GraphNode, uint64_t,
                                        EdgeDst,EdgeData,Convert64> edge_sort_iterator;
   
       EdgeDst edgeDst(outs, numEdges);
@@ -236,7 +236,7 @@ public:
                                (uint64_t*)raw_neighbor_end(N)), 
                              &edgeDst, &ed);
       std::sort(begin, end, 
-                detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
+                internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,
                                             CompTy>(comp));
     } else {
       GALOIS_DIE("unknown file version at sortEdgesByEdgeData", graphVersion);
@@ -252,7 +252,7 @@ public:
     if (graphVersion == 1) {
       typedef LargeArray<uint32_t> EdgeDst;
       typedef LargeArray<EdgeTy> EdgeData;
-      typedef detail::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
+      typedef internal::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
                                        Convert32> edge_sort_iterator;
 
       EdgeDst edgeDst(outs, numEdges);
@@ -268,7 +268,7 @@ public:
     } else if (graphVersion == 2) {
       typedef LargeArray<uint64_t> EdgeDst;
       typedef LargeArray<EdgeTy> EdgeData;
-      typedef detail::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
+      typedef internal::EdgeSortIterator<GraphNode, uint64_t, EdgeDst, EdgeData,
                                        Convert64> edge_sort_iterator;
 
       EdgeDst edgeDst(outs, numEdges);

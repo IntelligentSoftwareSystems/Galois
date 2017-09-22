@@ -59,8 +59,8 @@ template<typename NodeTy, typename EdgeTy,
   typename FileEdgeTy=EdgeTy>
 class LC_Linear_Graph:
     private boost::noncopyable,
-    private detail::LocalIteratorFeature<UseNumaAlloc>,
-    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private internal::LocalIteratorFeature<UseNumaAlloc>,
+    private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
@@ -89,13 +89,13 @@ public:
 
 protected:
   class NodeInfo;
-  typedef detail::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
+  typedef internal::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
   typedef LargeArray<NodeInfo*> Nodes;
-  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
+  typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
 
   class NodeInfo:
-      public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable>,
-      public detail::IntrusiveId<typename boost::mpl::if_c<HasId,uint32_t,void>::type> {
+      public internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable>,
+      public internal::IntrusiveId<typename boost::mpl::if_c<HasId,uint32_t,void>::type> {
     friend class LC_Linear_Graph;
     int numEdges;
 
@@ -245,7 +245,7 @@ public:
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
@@ -258,7 +258,7 @@ public:
   template<typename CompTy>
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(N->edgeBegin(), N->edgeEnd(), detail::EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
+    std::sort(N->edgeBegin(), N->edgeEnd(), internal::EdgeSortCompWrapper<EdgeInfo,CompTy>(comp));
   }
 
   /**

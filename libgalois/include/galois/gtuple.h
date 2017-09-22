@@ -87,17 +87,17 @@ template<unsigned... I>
 template<size_t... I>
   using index_seq = integer_seq<size_t, I...>;
 
-namespace HIDDEN {
+namespace internal {
 template<class S1, class S2> struct log_construct;
 
 template<typename T, T... I1, T... I2>
 struct log_construct<integer_seq<T, I1...>, integer_seq<T, I2...>>: 
   integer_seq<T, I1..., (sizeof...(I1)+I2)...> {};
-} // end hidden
+} // end internal
 
 template<typename T, T N>
 struct make_integer_seq:
-  HIDDEN::log_construct<typename make_integer_seq<T, N/2>::type, typename make_integer_seq<T, N - N/2>::type>::type {};
+  internal::log_construct<typename make_integer_seq<T, N/2>::type, typename make_integer_seq<T, N - N/2>::type>::type {};
 
 template<> struct make_integer_seq<int, 0> : integer_seq<int> {};
 template<> struct make_integer_seq<int, 1> : integer_seq<int, 0> {};
@@ -188,7 +188,7 @@ struct exists_by_supertype {
   static const bool value = (subtype_index_nodup<T, Tuple>::value != std::tuple_size<Tuple>::value);
 };
 
-namespace HIDDEN {
+namespace internal {
 
 template<typename T, typename... Args, int I0, int... Is>
 auto tuple_cdr_impl(const std::tuple<T, Args...>& tuple, int_seq<I0, Is...>) -> std::tuple<Args...> {
@@ -204,15 +204,15 @@ auto tuple_cdr_impl(std::tuple<T, Args...>&& tuple, int_seq<I0, Is...>) -> std::
 
 template<typename T, typename... Args>
 auto tuple_cdr(const std::tuple<T, Args...>& tpl) -> std::tuple<Args...> {
-  return HIDDEN::tuple_cdr_impl(tpl, typename make_int_seq<sizeof...(Args)+1>::type {});
+  return internal::tuple_cdr_impl(tpl, typename make_int_seq<sizeof...(Args)+1>::type {});
 }
 
 template<typename T, typename... Args>
 auto tuple_cdr(std::tuple<T, Args...>&& tpl) -> std::tuple<Args...>&& {
-  return std::move(HIDDEN::tuple_cdr_impl(tpl, typename make_int_seq<sizeof...(Args)+1>::type {}));
+  return std::move(internal::tuple_cdr_impl(tpl, typename make_int_seq<sizeof...(Args)+1>::type {}));
 }
 
-namespace HIDDEN {
+namespace internal {
 
 template<typename Seq, bool...>
 struct true_indices_impl {
@@ -233,7 +233,7 @@ struct true_indices_impl<int_seq<I, Is...>, B, Bs...> {
  * Return indices of true elements.
  */
 template<bool... Bs>
-struct true_indices: public HIDDEN::true_indices_impl<typename make_int_seq<sizeof...(Bs)>::type, Bs...> { };
+struct true_indices: public internal::true_indices_impl<typename make_int_seq<sizeof...(Bs)>::type, Bs...> { };
 
 }
 #endif

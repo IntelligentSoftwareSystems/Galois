@@ -40,8 +40,8 @@ template<typename NodeTy, typename EdgeTy, typename DerivedTy,
   typename GraphNodeTy, typename IteratorTy, typename EdgeIteratorTy,
   bool HasNoLockable = false>
 class LC_Adaptor_Graph:
-  private detail::OutOfLineLockableFeature<HasNoLockable>, 
-  private detail::LocalIteratorFeature<false> {
+  private internal::OutOfLineLockableFeature<HasNoLockable>, 
+  private internal::LocalIteratorFeature<false> {
 public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
@@ -50,8 +50,8 @@ public:
   typedef GraphNodeTy GraphNode;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
-  typedef typename detail::EdgeInfoBase<void*,EdgeTy>::reference edge_data_reference;
-  typedef typename detail::NodeInfoBase<NodeTy,false>::reference node_data_reference;
+  typedef typename internal::EdgeInfoBase<void*,EdgeTy>::reference edge_data_reference;
+  typedef typename internal::NodeInfoBase<NodeTy,false>::reference node_data_reference;
   typedef EdgeIteratorTy edge_iterator;
   typedef IteratorTy iterator;
   typedef iterator const_iterator;
@@ -113,8 +113,8 @@ public:
     return derived().get_edge_end(N);
   }
 
-  detail::EdgesIterator<LC_Adaptor_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<LC_Adaptor_Graph>(*this, N, mflag);
+  internal::EdgesIterator<LC_Adaptor_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::EdgesIterator<LC_Adaptor_Graph>(*this, N, mflag);
   }
 };
 

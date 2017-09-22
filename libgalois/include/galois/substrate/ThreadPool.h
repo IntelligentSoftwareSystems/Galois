@@ -48,7 +48,7 @@
 namespace galois {
 namespace substrate {
 
-namespace detail {
+namespace internal {
 
 template<typename tpl, int s, int r>
 struct ExecuteTupleImpl {
@@ -151,7 +151,7 @@ public:
       std::tuple<Args...> cmds;
 
       void operator()(){
-        detail::ExecuteTupleImpl<std::tuple<Args...>, 0, std::tuple_size<std::tuple<Args...>>::value>::execute(this->cmds);
+        internal::ExecuteTupleImpl<std::tuple<Args...>, 0, std::tuple_size<std::tuple<Args...>>::value>::execute(this->cmds);
       }
       ExecuteTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };

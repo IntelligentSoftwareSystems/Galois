@@ -228,7 +228,7 @@ constexpr const char* StatTotalImpl<_UNUSED>::NAMES[];
 
 using StatTotal = StatTotalImpl<>;
 
-namespace hidden {
+namespace internal {
 
 template <typename Stat_tp>
 struct BasicStatMap {
@@ -400,7 +400,7 @@ struct ScalarStat {
 template <typename T>
 using ScalarStatManager = BasicStatMap<ScalarStat<T> >;
 
-} // end namespace hidden
+} // end namespace internal
 
 #define STAT_MANAGER_IMPL 0// 0 or 1 or 2
 
@@ -429,12 +429,12 @@ private:
   template <typename T>
   struct StatManagerImpl {
 
-    using MergedStats = hidden::VecStatManager<T>;
+    using MergedStats = internal::VecStatManager<T>;
     using const_iterator = typename MergedStats::const_iterator;
     using Stat = typename MergedStats::Stat;
 
 
-    substrate::PerThreadStorage<hidden::ScalarStatManager<T> > perThreadManagers;
+    substrate::PerThreadStorage<internal::ScalarStatManager<T> > perThreadManagers;
     MergedStats result;
     bool merged = false;
 

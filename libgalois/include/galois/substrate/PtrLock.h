@@ -46,7 +46,7 @@
 namespace galois {
 namespace substrate {
 
-namespace detail {
+namespace internal {
 void ptr_slow_lock(std::atomic<uintptr_t>& l);
 }
 
@@ -83,7 +83,7 @@ public:
     return;
 
   slow_path:
-    detail::ptr_slow_lock(_lock);
+    internal::ptr_slow_lock(_lock);
   }
 
   inline void unlock() {

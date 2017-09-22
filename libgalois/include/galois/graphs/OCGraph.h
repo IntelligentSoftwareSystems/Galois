@@ -107,7 +107,7 @@ public:
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
@@ -130,8 +130,8 @@ public:
     return graph.in_edge_end(segment, N, mflag);
   }
 
-  detail::InEdgesIterator<BindSegmentGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::InEdgesIterator<BindSegmentGraph>(*this, N, mflag);
+  internal::InEdgesIterator<BindSegmentGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::InEdgesIterator<BindSegmentGraph>(*this, N, mflag);
   }
 
   size_t idFromNode(GraphNode N) {
@@ -260,8 +260,8 @@ template<typename NodeTy, typename EdgeTy,
   //bool UseNumaAlloc=false, // XXX: implement this
   bool HasOutOfLineLockable=false>
 class OCImmutableEdgeGraph:
-    private detail::LocalIteratorFeature<false>,
-    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private internal::LocalIteratorFeature<false>,
+    private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
 public:
   template<bool _has_id>
   struct with_id {
@@ -296,7 +296,7 @@ public:
   typedef read_oc_immutable_edge_graph_tag read_tag;
 
 private:
-  typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
+  typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
   typedef LargeArray<NodeInfo> NodeData;
 
   NodeData nodeData;

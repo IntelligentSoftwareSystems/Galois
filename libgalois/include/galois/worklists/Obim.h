@@ -44,7 +44,7 @@
 namespace galois {
 namespace worklists {
 
-namespace detail {
+namespace internal {
 
 template<typename T, typename Index, bool UseBarrier>
 class OrderedByIntegerMetricData { 
@@ -158,8 +158,8 @@ template<class Indexer = DummyIndexer<int>, typename Container = dChunkedFIFO<>,
   bool Concurrent=true>
 struct OrderedByIntegerMetric :
   private boost::noncopyable,
-  public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>,
-  public detail::OrderedByIntegerMetricComparator<Index, UseDescending>
+  public internal::OrderedByIntegerMetricData<T, Index, UseBarrier>,
+  public internal::OrderedByIntegerMetricComparator<Index, UseDescending>
 {
   //static_assert(std::is_integral<Index>::value, "only integral index types supported");
 
@@ -195,10 +195,10 @@ struct OrderedByIntegerMetric :
 
 private:
   typedef typename Container::template rethread<Concurrent> CTy;
-  typedef detail::OrderedByIntegerMetricComparator<Index, UseDescending> Comparator;
+  typedef internal::OrderedByIntegerMetricComparator<Index, UseDescending> Comparator;
   typedef typename Comparator::template with_local_map<CTy*>::type LMapTy;
 
-  struct ThreadData: public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
+  struct ThreadData: public internal::OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
     LMapTy local;
     Index curIndex;
     Index scanStart;

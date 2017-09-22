@@ -50,7 +50,7 @@
 namespace galois {
 namespace runtime {
 
-namespace details {
+namespace internal {
 
 template <typename R, typename F, typename ArgsTuple>
 class DoAllStealingExec {
@@ -590,7 +590,7 @@ struct ChooseDoAllImpl {
   template <typename R, typename F, typename ArgsT>
   static void call(const R& range, const F& func, const ArgsT& argsTuple) {
 
-    details::DoAllStealingExec<R, F, ArgsT> exec (range, func, argsTuple);
+    internal::DoAllStealingExec<R, F, ArgsT> exec (range, func, argsTuple);
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
@@ -649,7 +649,7 @@ template <> struct ChooseDoAllImpl<false> {
 };
 
 
-} // end namespace details
+} // end namespace internal
 
 
 template <typename R, typename F, typename ArgsTuple>
@@ -673,7 +673,7 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   static constexpr bool STEAL = get_type_by_supertype<do_all_steal_tag, ArgsT>::type::value;
 
-  details::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
+  internal::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
 
   timer.stop();
 }
