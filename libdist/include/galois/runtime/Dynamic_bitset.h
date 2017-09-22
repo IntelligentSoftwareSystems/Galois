@@ -11,17 +11,13 @@
 
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
-
 namespace galois {
-
   class DynamicBitSet {
-
     std::vector<galois::CopyableAtomic<uint64_t>> bitvec;
     size_t num_bits;
-    static constexpr uint32_t bits_uint64 = sizeof(uint64_t)*CHAR_BIT;
+    static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
 
   public:
-
     DynamicBitSet() : num_bits(0) {}
 
     const std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() const{
@@ -32,7 +28,7 @@ namespace galois {
       return bitvec;
     }
 
-    void resize(uint64_t n){
+    void resize(uint64_t n) {
       assert(bits_uint64 == 64); // compatibility with other devices
       num_bits = n;
       bitvec.resize((n + bits_uint64 - 1)/bits_uint64);
@@ -132,7 +128,7 @@ namespace galois {
     }
 
 #if 0
-    void reset(size_t index){
+    void reset(size_t index) {
       size_t bit_index = index/bits_uint64;
       uint64_t bit_offset = 1;
       bit_offset <<= (index%bits_uint64);
@@ -155,13 +151,15 @@ namespace galois {
   static galois::DynamicBitSet EmptyBitset;
 
   struct InvalidBitsetFnTy {
+
     static bool is_valid() {
       return false;
     }
+
     static galois::DynamicBitSet& get() {
       return EmptyBitset;
     }
-    // inclusive range
+
     static void reset_range(size_t begin, size_t end) {
     }
   };

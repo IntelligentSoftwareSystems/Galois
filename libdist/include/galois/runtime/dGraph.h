@@ -1346,7 +1346,7 @@ public:
     unsigned num_requests = 0;
 
     #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-    static std::vector<std::vector<typename FnTy::ValTy> > sb;
+    static std::vector<std::vector<typename FnTy::ValTy>> sb;
     #else
     static std::vector<std::vector<uint64_t>> sb;
     #endif
@@ -1520,9 +1520,9 @@ public:
     unsigned num_requests = 0;
 
     #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-    static std::vector< std::vector<typename FnTy::ValTy> > sb;
+    static std::vector<std::vector<typename FnTy::ValTy>> sb;
     #else
-    static std::vector< std::vector<uint64_t> > sb;
+    static std::vector<std::vector<uint64_t>> sb;
     #endif
     sb.resize(net.Num);
     std::vector<uint8_t> bs[net.Num];
@@ -1585,9 +1585,9 @@ public:
     galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, SyncReduce_send_bytes);
 
     #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-    static std::vector<std::vector<typename FnTy::ValTy> > rb;
+    static std::vector<std::vector<typename FnTy::ValTy>> rb;
     #else
-    static std::vector<std::vector<uint64_t> > rb;
+    static std::vector<std::vector<uint64_t>> rb;
     #endif
     rb.resize(net.Num);
     std::vector<uint8_t> b[net.Num];
