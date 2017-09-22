@@ -178,23 +178,23 @@ struct ComputeArrivalTimeAndPower {
 
   void updateGateOutput(TimingPowerInfo& info, float pinC, float netC, float& edgeDelay,
     std::string inPinName, TimingPowerInfo& inPosInfo, TimingPowerInfo& inNegInfo,
-    CellPin::MapOfTableSet& delayTables,
-    CellPin::MapOfTableSet& transitionTables,
-    CellPin::MapOfTableSet& powerTables)
+    CellPin::MapOfTableSet& delayMap,
+    CellPin::MapOfTableSet& transitionMap,
+    CellPin::MapOfTableSet& powerMap)
   {
-    auto posTablesI = delayTables.find({inPinName, TIMING_SENSE_POSITIVE_UNATE});
+    auto posMapI = delayMap.find({inPinName, TIMING_SENSE_POSITIVE_UNATE});
     std::vector<float> posVTotalC = {inPosInfo.slew, pinC + netC};
     std::pair<float, std::string> pos = {-std::numeric_limits<float>::infinity(), ""};
-    if (posTablesI != delayTables.end()) {
-      pos = extractMaxFromTableSet(posTablesI->second, posVTotalC);
+    if (posMapI != delayMap.end()) {
+      pos = extractMaxFromTableSet(posMapI->second, posVTotalC);
     }
     float posArrivalTime = inPosInfo.arrivalTime + pos.first;
 
-    auto negTablesI = delayTables.find({inPinName, TIMING_SENSE_NEGATIVE_UNATE});
+    auto negMapI = delayMap.find({inPinName, TIMING_SENSE_NEGATIVE_UNATE});
     std::vector<float> negVTotalC = {inNegInfo.slew, pinC + netC};
     std::pair<float, std::string> neg = {-std::numeric_limits<float>::infinity(), ""};
-    if (negTablesI != delayTables.end()) {
-      neg = extractMaxFromTableSet(negTablesI->second, negVTotalC);
+    if (negMapI != delayMap.end()) {
+      neg = extractMaxFromTableSet(negMapI->second, negVTotalC);
     }
     float negArrivalTime = inNegInfo.arrivalTime + neg.first;
 
@@ -211,13 +211,13 @@ struct ComputeArrivalTimeAndPower {
       // update critical path
       edgeDelay = delay;
       info.arrivalTime = arrivalTime;
-      info.slew = transitionTables.at({inPinName, t}).at(when)->lookup(vTotalC);
+      info.slew = extractMaxFromTableSet(transitionMap.at({inPinName, t}), vTotalC).first;
 
       // power follows critical path
-      auto power = powerTables.at({inPinName, t}).at(when);
+      auto& powerTables = powerMap.at({inPinName, t});
       std::vector<float> vPinC = {inInfo.slew, pinC};
-      info.internalPower = power->lookup(vPinC);
-      info.netPower = power->lookup(vTotalC) - info.internalPower;
+      info.internalPower = extractMaxFromTableSet(powerTables, vPinC).first;
+      info.netPower = extractMaxFromTableSet(powerTables, vTotalC).first - info.internalPower;
     }
   }
 
