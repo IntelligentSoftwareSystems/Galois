@@ -4,7 +4,6 @@
 #include "galois/graphs/FirstGraph.h"
 
 #include "Verilog.h"
-#include "Sdc.h"
 
 #ifndef GALOIS_CIRCUIT_GRAPH_H
 #define GALOIS_CIRCUIT_GRAPH_H
@@ -38,10 +37,9 @@ struct CircuitGraph {
 
 public:
   void construct(VerilogModule& vModule);
-  void initialize(SDC& sdc);
+  void initialize();
   void print();
   std::pair<size_t, size_t> getStatistics();
 };
 
 #endif // GALOIS_CIRCUIT_GRAPH_H
-

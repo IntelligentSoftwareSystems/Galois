@@ -46,4 +46,3 @@ struct VerilogModule {
 };
 
 #endif // GALOIS_VERILOG_H
-

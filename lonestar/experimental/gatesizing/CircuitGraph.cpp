@@ -80,11 +80,9 @@ void CircuitGraph::construct(VerilogModule& vModule) {
       g.getEdgeData(e).wire = wire;
     }
   }
-
-  nodeMap.clear();
 } // end CircuitGraph::construct()
 
-void CircuitGraph::initialize(SDC& sdc) {
+void CircuitGraph::initialize() {
   for (auto n: g) {
     auto& data = g.getData(n, unprotected);
     data.precondition = 0;
@@ -118,8 +116,6 @@ void CircuitGraph::initialize(SDC& sdc) {
     auto pi = g.getEdgeDst(oe);
     auto& data = g.getData(pi, unprotected);
     data.isPrimary = true;
-    data.rise.slew = sdc.primaryInputRiseSlew;
-    data.fall.slew = sdc.primaryInputFallSlew;
     if (data.pin->name != "1'b0") {
       data.rise.arrivalTime = 0.0;
     }
@@ -135,10 +131,6 @@ void CircuitGraph::initialize(SDC& sdc) {
     auto& data = g.getData(po, unprotected);
     data.isPrimary = true;
     data.isOutput = true;
-    data.totalPinC = sdc.primaryOutputTotalPinC;
-    data.totalNetC = sdc.primaryOutputTotalNetC;
-    data.rise.requiredTime = sdc.targetDelay;
-    data.fall.requiredTime = sdc.targetDelay;
   }
 
   for (auto n: g) {
@@ -151,7 +143,7 @@ void CircuitGraph::initialize(SDC& sdc) {
           data.isOutput = true;
 
           // wires are not changing, so initialize here
-          auto wire = g.getEdgeData(g.edge_begin(n)).wire;
+          auto wire = pin->wire;
           data.totalNetC = wire->wireLoad->wireCapacitance(wire->leaves.size());
         }
       }
