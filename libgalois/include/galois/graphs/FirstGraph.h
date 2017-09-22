@@ -53,7 +53,7 @@ namespace galois {
 //! Parallel graph data structures.
 namespace graphs {
 
-namespace FirstGraphImpl {
+namespace internal {
 /**
  * Wrapper class to have a valid type on void edges
  */
@@ -268,7 +268,7 @@ private:
   class gNode;
   struct gNodeTypes: public detail::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
-    typedef FirstGraphImpl::UEdgeInfoBase<gNode, EdgeTy, Directional&!InOut> EdgeInfo;
+    typedef internal::UEdgeInfoBase<gNode, EdgeTy, Directional&!InOut> EdgeInfo;
     
     //! The storage type for edges
     typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
@@ -393,7 +393,7 @@ private:
   typedef galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
-  FirstGraphImpl::EdgeFactory<EdgeTy> edgesF;
+  internal::EdgeFactory<EdgeTy> edgesF;
 
   //Helpers for iterator classes
   struct is_node : public std::unary_function<gNode&, bool>{
