@@ -1243,6 +1243,42 @@ public:
   }
 
   /**
+   * Reports master/mirror stats.
+   * Assumes that communication has already occured so that the host
+   * calling it actually has the info required.
+   * 
+   * @param global_total_mirror_nodes number of mirror nodes on all hosts
+   * @param global_total_owned_nodes number of "owned" nodes on all hosts
+   */
+  void report_master_mirror_stats(uint64_t global_total_mirror_nodes,
+                                  uint64_t global_total_owned_nodes) {
+    float replication_factor = (float)(global_total_mirror_nodes + totalNodes) /
+                               (float)totalNodes;
+    galois::runtime::reportStat_Serial("dGraph", 
+        "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
+
+    float replication_factor_new = (float)(global_total_mirror_nodes + 
+                                           global_total_owned_nodes - 
+                                           total_isolatedNodes) /
+                                   (float)(global_total_owned_nodes - 
+                                           total_isolatedNodes);
+
+    galois::runtime::reportStat_Serial("dGraph", 
+        "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
+        replication_factor_new);
+
+    galois::runtime::reportStat_Serial("dGraph", 
+        "TOTAL_NODES_" + get_run_identifier(), totalNodes);
+    galois::runtime::reportStat_Serial("dGraph", 
+        "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
+    galois::runtime::reportStat_Serial("dGraph", 
+        "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
+        global_total_mirror_nodes);
+    galois::runtime::reportStat_Serial("dGraph", 
+        "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
+  }
+
+  /**
    * Send statistics about master/mirror nodes to each host, and
    * report the statistics.
    */
@@ -1280,32 +1316,10 @@ public:
     }
     ++galois::runtime::evilPhase;
 
-    // print
+    // report stats
     if (net.ID == 0) {
-      float replication_factor = (float)(global_total_mirror_nodes + totalNodes) /
-                                 (float)totalNodes;
-      galois::runtime::reportStat_Serial("dGraph", 
-          "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
-
-      float replication_factor_new = (float)(global_total_mirror_nodes + 
-                                             global_total_owned_nodes - 
-                                             total_isolatedNodes) /
-                                     (float)(global_total_owned_nodes - 
-                                             total_isolatedNodes);
-
-      galois::runtime::reportStat_Serial("dGraph", 
-          "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
-          replication_factor_new);
-
-      galois::runtime::reportStat_Serial("dGraph", 
-          "TOTAL_NODES_" + get_run_identifier(), totalNodes);
-      galois::runtime::reportStat_Serial("dGraph", 
-          "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
-      galois::runtime::reportStat_Serial("dGraph", 
-          "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
-          global_total_mirror_nodes);
-      galois::runtime::reportStat_Serial("dGraph", 
-          "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
+      report_master_mirror_stats(global_total_mirror_nodes, 
+                                 global_total_owned_nodes);
     }
   }
 
@@ -2108,21 +2122,35 @@ public:
 
 private:
   /**
-   * TODO
+   * Given a bitset, determine the indices of the bitset that are currently
+   * set.
+   *
+   * @tparam syncType either reduce or broadcast; only used to name the timer
+   * @param loopName string used to name the timer for this function
+   * @param bitset_comm the bitset to get the offsets of
+   * @param offsets output: the offset vector that will contain indices into
+   * the bitset that are set
+   * @param bit_set_count output: will be set to the number of bits set in the
+   * bitset
    */
   template<SyncType syncType>
   void get_offsets_from_bitset(const std::string &loopName, 
                                const galois::DynamicBitSet &bitset_comm, 
                                std::vector<unsigned int> &offsets, 
                                size_t &bit_set_count) {
+    // timer creation
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str());
+
     StatTimer_offsets.start();
+
+
     auto activeThreads = galois::getActiveThreads();
     std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
 
+    // count how many bits are set on each thread
     galois::on_each(
       [&](unsigned tid, unsigned nthreads) {
         // TODO use block_range instead
@@ -2143,27 +2171,38 @@ private:
       }
     );
 
+    // calculate prefix sum of bits per thread
     for (unsigned int i = 1; i < activeThreads; ++i) {
       t_prefix_bit_counts[i] += t_prefix_bit_counts[i - 1];
     }
-
+    // total num of set bits
     bit_set_count = t_prefix_bit_counts[activeThreads - 1];
 
+    // calculate the indices of the set bits and save them to the offset
+    // vector
     if (bit_set_count > 0) {
       offsets.resize(bit_set_count);
       galois::on_each(
         [&](unsigned tid, unsigned nthreads) {
           // TODO use block_range instead
+          // TODO this is same calculation as above; maybe refactor it
+          // into function?
           unsigned int block_size = bitset_comm.size() / nthreads;
           if ((bitset_comm.size() % nthreads) > 0) ++block_size;
           assert((block_size * nthreads) >= bitset_comm.size());
+
           unsigned int start = tid*block_size;
           unsigned int end = (tid+1)*block_size;
           if (end > bitset_comm.size()) end = bitset_comm.size();
+
           unsigned int count = 0;
           unsigned int t_prefix_bit_count;
-          if (tid == 0) t_prefix_bit_count = 0;
-          else t_prefix_bit_count = t_prefix_bit_counts[tid-1];
+          if (tid == 0) {
+            t_prefix_bit_count = 0;
+          } else {
+            t_prefix_bit_count = t_prefix_bit_counts[tid - 1];
+          }
+
           for (unsigned int i = start; i < end; ++i) {
             if (bitset_comm.test(i)) {
               offsets[t_prefix_bit_count + count] = i;
@@ -2178,6 +2217,22 @@ private:
 
   /**
    * TODO
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done;
+   * only used to get the size of the type being synchronized in this function
+   * @tparam syncType type of synchronization this function is being called 
+   * for; only used to name a timer
+   *
+   * @param loopName loopname used to name the timer for the function
+   * @param indices A vector that contains the local ids of the nodes that
+   * you want to potentially synchronize
+   * @param bitset_compute Contains the full bitset of all nodes in this
+   * graph
+   * @param bitset_comm OUTPUT: bitset that marks which indices in the passed
+   * in indices array need to be synchronized
+   * @param offsets OUTPUT: contains indices into bitset_comm that are set 
+   * @param bit_set_cout OUTPUT: contains number of bits set in bitset_comm
+   * @param data_mode TODO
    */
   template<typename FnTy, SyncType syncType>
   void get_bitset_and_offsets(const std::string &loopName,
@@ -2191,6 +2246,8 @@ private:
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
       std::string doall_str(syncTypeStr + "_BITSET_" + loopName);
 
+      // determine which local nodes in the indices array need to be 
+      // sychronized
       galois::do_all(boost::counting_iterator<unsigned int>(0),
                      boost::counting_iterator<unsigned int>(indices.size()),
                      [&](unsigned int n) {
@@ -2202,13 +2259,16 @@ private:
                      galois::loopname(get_run_identifier(doall_str).c_str()),
                      galois::no_stats());
 
+      // get the number of set bits and the offsets into the comm bitset
       get_offsets_from_bitset<syncType>(loopName, bitset_comm, offsets,
                                         bit_set_count);
     }
 
+    // TODO refactor into another function; not really part of offset/bitset
+    // determination
     if (enforce_data_mode != noData) {
       data_mode = enforce_data_mode;
-    } else { // auto
+    } else { // == noData; set appropriately
       if (bit_set_count == 0) {
         data_mode = noData;
       } else if ((bit_set_count * sizeof(unsigned int)) <
@@ -2611,7 +2671,8 @@ private:
                                bit_set_comm, offsets, val_vec, bit_set_count,
                                data_mode);
 
-      // GPUs have a batch function they can use; CPUs do not
+      // GPUs have a batch function they can use; CPUs do not; therefore, 
+      // CPUS always enter this if block
       if (!batch_succeeded) {
         const galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get();
 
