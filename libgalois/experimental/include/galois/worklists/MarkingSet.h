@@ -38,7 +38,7 @@
 namespace galois {
 namespace worklists {
 
-namespace detail {
+namespace internal {
 
 template<typename T, typename Marker, 
 	 typename Scheduler = dChunkedFIFO<64, T> >
@@ -110,10 +110,10 @@ public:
   }
 };
 
-}  // end namespace detail
+}  // end namespace internal
 
 template<typename Marker, int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedMarkingSetFIFO = detail::MarkingWorkSetMaster<T, Marker, dChunkedFIFO<ChunkSize,T,Concurrent> >;
+using dChunkedMarkingSetFIFO = internal::MarkingWorkSetMaster<T, Marker, dChunkedFIFO<ChunkSize,T,Concurrent> >;
 GALOIS_WLCOMPILECHECK(dChunkedMarkingSetFIFO);
 
 } // end namespace worklists

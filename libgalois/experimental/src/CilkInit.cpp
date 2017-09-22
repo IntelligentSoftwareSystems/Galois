@@ -41,7 +41,7 @@
 #endif
 
 #ifdef HAVE_CILK 
-namespace detail {
+namespace internal {
 
 static bool initialized = false;
 
@@ -84,15 +84,15 @@ static void initOne (BusyBarrier& busybarrier, unsigned tid) {
   busybarrier.wait (); 
 }
 
-} // end namespace detail
+} // end namespace internal
 
 void galois::CilkInit (void) {
 
-  if (detail::initialized) { 
+  if (internal::initialized) { 
     return ;
   } else {
 
-    detail::initialized = true;
+    internal::initialized = true;
 
     unsigned numT = getActiveThreads ();
 
@@ -120,7 +120,7 @@ void galois::CilkInit (void) {
       // std::abort ();
     // }
 
-    detail::BusyBarrier busybarrier (numT);
+    internal::BusyBarrier busybarrier (numT);
 
     for (unsigned i = 0; i < numT; ++i) {
       cilk_spawn initOne (busybarrier, i);

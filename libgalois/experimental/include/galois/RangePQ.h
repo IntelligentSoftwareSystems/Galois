@@ -150,7 +150,7 @@ public:
 };
 
 
-namespace hidden {
+namespace internal {
 
   template <typename T>
   struct Identity {
@@ -172,9 +172,9 @@ namespace hidden {
 
 
 template <typename T, typename Cmp>
-class RangePQTreeBased: public hidden::TypeHelper<T,Cmp>::Tree {
+class RangePQTreeBased: public internal::TypeHelper<T,Cmp>::Tree {
 
-  using THelper = hidden::TypeHelper<T, Cmp>;
+  using THelper = internal::TypeHelper<T, Cmp>;
   using RBuf = typename THelper::RBuf;
   using RBufAlloc = typename THelper::RBufAlloc;
   using RBufPtrAlloc = typename THelper::RBufPtrAlloc;
@@ -243,9 +243,9 @@ public:
 };
 
 template <typename T, typename Cmp>
-class RangePQSetBased: public hidden::TypeHelper<T, Cmp>::Set {
+class RangePQSetBased: public internal::TypeHelper<T, Cmp>::Set {
 
-  using THelper = hidden::TypeHelper<T, Cmp>;
+  using THelper = internal::TypeHelper<T, Cmp>;
   using RBuf = typename THelper::RBuf;
   using RBufAlloc = typename THelper::RBufAlloc;
   using RBufPtrAlloc = typename THelper::RBufPtrAlloc;
@@ -300,7 +300,7 @@ public:
 template <typename T, typename Cmp, typename PQImpl> 
 class PartialPQBase {
 
-  using THelper = hidden::TypeHelper<T, Cmp>;
+  using THelper = internal::TypeHelper<T, Cmp>;
   using RBuf = typename THelper::RBuf;
   using RBufAlloc = typename THelper::RBufAlloc;
 

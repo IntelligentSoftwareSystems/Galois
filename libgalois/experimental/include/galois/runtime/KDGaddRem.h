@@ -264,12 +264,12 @@ struct SourceTest <void> {
 
 // TODO: remove template parameters that can be passed to execute
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt>
-class KDGaddRemAsyncExec: public IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+class KDGaddRemAsyncExec: public IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
 
   using ThisClass = KDGaddRemAsyncExec;
 
 protected:
-  using Base = IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Base = IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
 
   // important paramters
   // TODO: add capability to the interface to express these constants
@@ -447,7 +447,7 @@ public:
       NhoodMgr& nhmgr,
       const SourceTest& sourceTest)
     :
-      Base (cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple),
+      Base (cmp, nhFunc, internal::DummyExecFunc (), opFunc, argsTuple),
       nhmgr (nhmgr),
       sourceTest (sourceTest)
   {}

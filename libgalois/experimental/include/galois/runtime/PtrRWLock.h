@@ -52,7 +52,7 @@ namespace LL {
 /// uses the low order bit for the lock flag
 /// Copying a lock is unsynchronized (relaxed ordering)
 
-namespace details {
+namespace internal {
 
 class PtrRWLockBase {
   std::atomic<uintptr_t> _lock;
@@ -173,10 +173,10 @@ public:
   }
 };
 
-} // namespace details
+} // namespace internal
 
 template<typename T>
-class PtrRWLock : public details::PtrRWLockBase {
+class PtrRWLock : public internal::PtrRWLockBase {
   //  static_assert(alignof(T) > 2, "Insufficient spare bits");
 public:
   constexpr PtrRWLock() : PtrRWLockBase() {}

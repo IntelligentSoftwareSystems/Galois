@@ -2163,7 +2163,7 @@ template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _
 void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
 
-  for_each_ordered_optim (range, cmp, nhFunc, HIDDEN::DummyExecFunc(), opFunc, argsTuple);
+  for_each_ordered_optim (range, cmp, nhFunc, internal::DummyExecFunc(), opFunc, argsTuple);
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
@@ -2175,7 +2175,7 @@ void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFu
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
-  for_each_ordered_pessim (range, cmp, nhFunc, HIDDEN::DummyExecFunc(), opFunc, argsTuple);
+  for_each_ordered_pessim (range, cmp, nhFunc, internal::DummyExecFunc(), opFunc, argsTuple);
 }
 
 
@@ -2211,7 +2211,7 @@ void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
-  for_each_ordered_spec (range, cmp, nhFunc, HIDDEN::DummyExecFunc(), opFunc, argsTuple);
+  for_each_ordered_spec (range, cmp, nhFunc, internal::DummyExecFunc(), opFunc, argsTuple);
 }
 
 

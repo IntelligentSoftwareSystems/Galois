@@ -9,12 +9,12 @@ namespace galois {
 namespace runtime {
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
-class KDGspecLocalMinExecutor: public IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> >{
+class KDGspecLocalMinExecutor: public IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> >{
 
 protected:
 
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using Base = IKDGbase <T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Base = IKDGbase <T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
 
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
@@ -38,7 +38,7 @@ public:
       const OpFunc& opFunc,
       const ArgsTuple& argsTuple)
     :
-      Base (cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple),
+      Base (cmp, nhFunc, internal::DummyExecFunc (), opFunc, argsTuple),
       winWL (cmp)
   {}
 

@@ -46,7 +46,7 @@
 
 namespace galois {
 
-namespace detail {
+namespace internal {
 
 // TODO(ddn): super slow right now
 // TODO(ddn): implement gc of log
@@ -408,7 +408,7 @@ template<
   class _Compare = std::less<_Key>,
   bool _HasCopy = std::is_copy_constructible<_Tp>::value
   >
-struct concurrent_flat_map: public detail::concurrent_flat_map_impl<_Key, _Tp, _Compare> {
+struct concurrent_flat_map: public internal::concurrent_flat_map_impl<_Key, _Tp, _Compare> {
   typedef typename concurrent_flat_map::base_type base;
 
   concurrent_flat_map(const _Compare& c = _Compare()): base(c) { }
@@ -437,7 +437,7 @@ template<
   class _Tp,
   class _Compare
   >
-struct concurrent_flat_map<_Key, _Tp, _Compare, false>: public detail::concurrent_flat_map_impl<_Key, _Tp, _Compare> {
+struct concurrent_flat_map<_Key, _Tp, _Compare, false>: public internal::concurrent_flat_map_impl<_Key, _Tp, _Compare> {
   typedef typename concurrent_flat_map::base_type base;
 
   concurrent_flat_map(const _Compare& c = _Compare()): base(c) { }
