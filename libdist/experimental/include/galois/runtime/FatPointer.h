@@ -34,7 +34,7 @@
 namespace galois {
 namespace runtime {
 
-namespace detail {
+namespace internal {
 
 //Really fat pointer
 class simpleFatPointer {
@@ -140,10 +140,10 @@ size_t hash_value(const fatPointerImpl<T>& v) {
   return v.hash_value();
 }
 
-} // namespace detail
+} // namespace internal
 
-typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
-//typedef detail::fatPointerImpl<detail::simpleFatPointer> fatPointer;
+typedef internal::fatPointerImpl<internal::amd64FatPointer> fatPointer;
+//typedef internal::fatPointerImpl<internal::simpleFatPointer> fatPointer;
 
 } // namespace runtime
 } // namespace galois

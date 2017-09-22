@@ -30,11 +30,11 @@ static thread_local ResolveCache* thread_resolve = nullptr;
 ////////////////////////////////////////////////////////////////////////////////
 
 //ancor vtable
-details::remoteObj::~remoteObj() {}
+internal::remoteObj::~remoteObj() {}
 
 ////////////////////////////////////////////////////////////////////////////////
 
-details::remoteObj* CacheManager::resolveIncRef(fatPointer ptr) {
+internal::remoteObj* CacheManager::resolveIncRef(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
   std::lock_guard<LL::SimpleLock> lgr(Lock);
   auto ii = remoteObjects.find(ptr);
@@ -79,7 +79,7 @@ size_t CacheManager::CM_size(){
 void* ResolveCache::resolve(fatPointer ptr) {
   void* a = addrs[ptr];
   if (!a) {
-    details::remoteObj* r = getCacheManager().resolveIncRef(ptr);
+    internal::remoteObj* r = getCacheManager().resolveIncRef(ptr);
     if (r) {
       a = addrs[ptr] = r->getObj();
       objs.push_back(r);
