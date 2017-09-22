@@ -1115,14 +1115,14 @@ float Sanity::current_min = std::numeric_limits<float>::max() / 4;
 
 int main(int argc, char** argv) {
   try {
-    galois::DistMemSys G(getStatsFile());
+    galois::DistMemSys G;
     DistBenchStart(argc, argv, name, desc, url);
 
     {
     auto& net = galois::runtime::getSystemNetworkInterface();
     if (net.ID == 0) {
-      galois::runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
+      galois::runtime::reportParam("BC", "Max Iterations", 
+                                  (unsigned long)maxIterations);
       #if __OPT_VERSION__ == 1
       printf("Version 1 of optimization\n");
       #elif __OPT_VERSION__ == 2
