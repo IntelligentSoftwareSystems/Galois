@@ -32,8 +32,6 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-namespace{
-
 class LoopTransformHandler : public MatchFinder::MatchCallback {
   private:
     Rewriter &rewriter;
@@ -195,6 +193,4 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
       }
     }
 };
-
-}//namespace
 #endif//_PLUGIN_ANALYSIS_TWO_LOOP_TRANSFORM_H

@@ -32,8 +32,6 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-namespace{
-
 class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
   private:
       ASTContext* astContext;
@@ -410,6 +408,5 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
         }
       }
 };
-}//namespace
 
 #endif //_PLUGIN_ANALYSIS_FIELD_INSIDE_FORLOOP_H

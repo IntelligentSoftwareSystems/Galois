@@ -32,8 +32,6 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-
-namespace {
 class FieldUsedInForLoop : public MatchFinder::MatchCallback {
   private:
       ASTContext* astContext;
@@ -216,6 +214,5 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
         }
       }
 };
-}//namespace
 
 #endif//_PLUGIN_ANALYSIS_FIELD_USED_IN_FORLOOP_H
