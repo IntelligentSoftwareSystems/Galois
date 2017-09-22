@@ -154,10 +154,16 @@ namespace galois {
   }
 
   template<typename Ty>
+  void addArray(Ty& a_arr, Ty& b_arr) {
+    for(unsigned i = 0; i < a_arr.size(); ++i) {
+      a_arr[i] = (a_arr[i] + b_arr[i]);
+    }
+  }
+
+  template<typename Ty>
   void resetVec(std::vector<Ty>& a_vec) {
     std::for_each(a_vec.begin(), a_vec.end(),[](Ty &ele){ele = 0;} ); 
   }
-
 
 
   //like std::inner_product

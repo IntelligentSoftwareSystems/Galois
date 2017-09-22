@@ -933,6 +933,46 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
 }
 #endif
 
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(fieldname, fieldtype) \
+struct Reduce_pair_wise_add_array_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return node.fieldname;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  unsigned long long int *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { Galois::addArray(node.fieldname, y); return true;}\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           unsigned long long int *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+    { Galois::resetVec(node.fieldname); }\
+  }\
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Broadcast
