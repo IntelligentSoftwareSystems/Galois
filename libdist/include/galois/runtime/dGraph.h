@@ -3053,12 +3053,12 @@ private:
     bool use_bitset = true;
 
     if (currentBVFlag != nullptr) {
-      if (readLocation == readSource && src_invalid(currentBVFlag)) {
+      if (readLocation == readSource && src_invalid(*currentBVFlag)) {
         use_bitset = false;
         *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
         currentBVFlag = nullptr;
       } else if (readLocation == readDestination &&
-                 dst_invalid(currentBVFlag)) {
+                 dst_invalid(*currentBVFlag)) {
         use_bitset = false;
         *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
         currentBVFlag = nullptr;
@@ -3274,10 +3274,205 @@ public:
   }
 
   /**
+   * Generic Sync on demand handler. Should NEVER get to this (hence
+   * the galois die).
+   */
+  template<ReadLocation rl, typename ReduceFnTy, typename BroadcastFnTy,
+           typename BitsetFnTy>
+  struct SyncOnDemandHandler {
+    // note this call function signature is diff. from specialized versions:
+    // will cause compile time error if this struct is used (which is what
+    // we want)
+    void call() {
+      GALOIS_DIE("Invalid read location for sync on demand");
+    }
+  };
+
+  /**
+   * Sync on demand handler specialized for read source.
+   *
+   * @tparam ReduceFnTy specify how to do reductions
+   * @tparam BroadcastFnTy specify how to do broadcasts
+   * @tparam BitsetFnTy tells program what data needs to be sync'd
+   */
+  template<typename ReduceFnTy, typename BroadcastFnTy,
+           typename BitsetFnTy>
+  struct SyncOnDemandHandler<readSource, ReduceFnTy, BroadcastFnTy, 
+                             BitsetFnTy> {
+    /**
+     * Based on sync flags, handles syncs for cases when you need to read
+     * at source
+     *
+     * @param g The graph to sync
+     * @param fieldFlags the flags structure specifying what needs to be 
+     * sync'd
+     * @param loopName loopname used to name timers
+     * @param bvFlag Copy of the bitvector status (valid/invalid at particular
+     * locations)
+     */
+    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+                     const BITVECTOR_STATUS& bvFlag) {
+      if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
+        g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.src_to_src()) {
+        g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.dst_to_src()) {
+        g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      }
+  
+      fieldFlags.clear_read_src();
+    }
+  };
+
+  /**
+   * Sync on demand handler specialized for read destination.
+   *
+   * @tparam ReduceFnTy specify how to do reductions
+   * @tparam BroadcastFnTy specify how to do broadcasts
+   * @tparam BitsetFnTy tells program what data needs to be sync'd
+   */
+  template<typename ReduceFnTy, typename BroadcastFnTy,
+           typename BitsetFnTy>
+  struct SyncOnDemandHandler<readDestination, ReduceFnTy, BroadcastFnTy,
+                             BitsetFnTy> {
+    /**
+     * Based on sync flags, handles syncs for cases when you need to read
+     * at destination
+     *
+     * @param g The graph to sync
+     * @param fieldFlags the flags structure specifying what needs to be 
+     * sync'd
+     * @param loopName loopname used to name timers
+     * @param bvFlag Copy of the bitvector status (valid/invalid at particular
+     * locations)
+     */
+    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+                     const BITVECTOR_STATUS& bvFlag) {
+      if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
+        g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.src_to_dst()) {
+        g->sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      } else if (fieldFlags.dst_to_dst()) {
+        g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      }
+  
+      fieldFlags.clear_read_dst();
+    }
+  };
+
+  /**
+   * Sync on demand handler specialized for read any.
+   *
+   * @tparam ReduceFnTy specify how to do reductions
+   * @tparam BroadcastFnTy specify how to do broadcasts
+   * @tparam BitsetFnTy tells program what data needs to be sync'd
+   */
+  template<typename ReduceFnTy, typename BroadcastFnTy,
+           typename BitsetFnTy>
+  struct SyncOnDemandHandler<readAny, ReduceFnTy, BroadcastFnTy,
+                             BitsetFnTy> {
+    /**
+     * Based on sync flags, handles syncs for cases when you need to read
+     * at both source and destination
+     *
+     * @param g The graph to sync
+     * @param fieldFlags the flags structure specifying what needs to be 
+     * sync'd
+     * @param loopName loopname used to name timers
+     * @param bvFlag Copy of the bitvector status (valid/invalid at particular
+     * locations)
+     */
+    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+                     const BITVECTOR_STATUS& bvFlag) {
+      bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
+      bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
+
+      if (!(src_write && dst_write)) {
+        // src or dst write flags aren't set (potentially both are not set),
+        // but it's NOT the case that both are set, meaning "any" isn't
+        // required in the "from"; can work at granularity of just src
+        // write or dst wrte
+
+        if (src_write) {
+          if (fieldFlags.src_to_src() && fieldFlags.src_to_dst()) {
+            if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
+              g->sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else if (src_invalid(bvFlag)) {
+              // src invalid bitset; sync individually so it can be called
+              // without bitset
+              g->sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+              g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else if (dst_invalid(bvFlag)) {
+              // dst invalid bitset; sync individually so it can be called
+              // without bitset
+              g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+              g->sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else {
+              GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
+            }
+          } else if (fieldFlags.src_to_src()) {
+            g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // src to dst is set
+            g->sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        } else if (dst_write) {
+          if (fieldFlags.dst_to_src() && fieldFlags.dst_to_dst()) {
+            if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
+              g->sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else if (src_invalid(bvFlag)) {
+              g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+              g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else if (dst_invalid(bvFlag)) {
+              g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+              g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            } else {
+              GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
+            }
+          } else if (fieldFlags.dst_to_src()) {
+            g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else { // dst to dst is set
+            g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          }
+        }
+
+        // note the "no flags are set" case will enter into this block
+        // as well, and it is correctly handled by doing nothing since
+        // both src/dst_write will be false
+      } else {
+        // it is the case that both src/dst write flags are set, so "any"
+        // is required in the "from"; what remains to be determined is
+        // the use of src, dst, or any for the destination of the sync
+        bool src_read = fieldFlags.src_to_src() || fieldFlags.dst_to_src();
+        bool dst_read = fieldFlags.src_to_dst() || fieldFlags.dst_to_dst();
+
+        if (src_read && dst_read) {
+          if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
+            g->sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (src_invalid(bvFlag)) {
+            g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else if (dst_invalid(bvFlag)) {
+            g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+            g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          } else {
+            GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
+          }
+        } else if (src_read) {
+          g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // dst_read
+          g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
+      }
+
+      fieldFlags.clear_read_src();
+      fieldFlags.clear_read_dst();
+    }
+  };
+
+  /**
    * Given a structure that contains flags signifying what needs to be
-   * synchronized, sync_on_demand will call an appropriate sync call to
-   * synchronize what is necessary based on the read location of the
-   * field.
+   * synchronized, sync_on_demand will synchronize what is necessary based 
+   * on the read location of the * field. 
    *
    * @tparam readLocation Location in which field will need to be read
    * @tparam ReduceFnTy reduce sync structure for the field
@@ -3297,123 +3492,16 @@ public:
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
 
-    // FIXME/TODO can be a bit more precise with clearing flags, but this
-    // should be correct/sufficient for now
-    if (readLocation == readSource) {
-      if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
-        sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (fieldFlags.src_to_src()) {
-        sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (fieldFlags.dst_to_src()) {
-        sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      }
+    // call a template-specialized function depending on the read location
+    SyncOnDemandHandler<readLocation, ReduceFnTy, BroadcastFnTy, BitsetFnTy>::
+          call(this, fieldFlags, loopName, *currentBVFlag);
 
-      fieldFlags.clear_read_src();
-    } else if (readLocation == readDestination) {
-      if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
-        sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (fieldFlags.src_to_dst()) {
-        sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (fieldFlags.dst_to_dst()) {
-        sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      }
-
-      fieldFlags.clear_read_dst();
-    } else if (readLocation == readAny) {
-      bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
-      bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
-
-      if (!(src_write && dst_write)) {
-        // src or dst write flags aren't set (potentially both are not set),
-        // but it's NOT the case that both are set, meaning "any" isn't
-        // required in the "from"; can work at granularity of just src
-        // write or dst wrte
-
-        if (src_write) {
-          if (fieldFlags.src_to_src() && fieldFlags.src_to_dst()) {
-            if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
-              sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (src_invalid(currentBVFlag)) {
-              // src invalid bitset; sync individually so it can be called
-              // without bitset
-              sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-              sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (dst_invalid(currentBVFlag)) {
-              // dst invalid bitset; sync individually so it can be called
-              // without bitset
-              sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-              sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else {
-              GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
-            }
-          } else if (fieldFlags.src_to_src()) {
-            sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else { // src to dst is set
-            sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          }
-        } else if (dst_write) {
-          if (fieldFlags.dst_to_src() && fieldFlags.dst_to_dst()) {
-            if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
-              sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (src_invalid(currentBVFlag)) {
-              sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-              sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (dst_invalid(currentBVFlag)) {
-              sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-              sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else {
-              GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
-            }
-          } else if (fieldFlags.dst_to_src()) {
-            sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else { // dst to dst is set
-            sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          }
-        }
-
-        // note the "no flags are set" case will enter into this block
-        // as well, and it is correctly handled by doing nothing since
-        // both src/dst_write will be false
-
-      } else {
-        // it is the case that both src/dst write flags are set, so "any"
-        // is required in the "from"; what remains to be determined is
-        // the use of src, dst, or any for the destination of the sync
-        bool src_read = fieldFlags.src_to_src() || fieldFlags.dst_to_src();
-        bool dst_read = fieldFlags.src_to_dst() || fieldFlags.dst_to_dst();
-
-        if (src_read && dst_read) {
-          if (*currentBVFlag == BITVECTOR_STATUS::NONE_INVALID) {
-            sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (src_invalid(currentBVFlag)) {
-            sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (dst_invalid(currentBVFlag)) {
-            sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else {
-            GALOIS_DIE("Invalid bitvector flag setting in sync_on_demand");
-          }
-        } else if (src_read) {
-          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-        } else { // dst_read
-          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-        }
-      }
-
-      fieldFlags.clear_read_src();
-      fieldFlags.clear_read_dst();
-    } else {
-     GALOIS_DIE("Invalid readLocation in sync_on_demand");
-    }
-
-    // set to null pointer if it didn't already happen elsewhere
     currentBVFlag = nullptr;
 
     StatTimer_sync.stop();
   }
 
-  
+
   // just like any other sync_*, this is expected to be a collective call
   // but it does not synchronize with other hosts
   // nonetheless, it should be called same number of times on all hosts

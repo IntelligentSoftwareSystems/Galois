@@ -65,14 +65,14 @@ enum BITVECTOR_STATUS {
   BOTH_INVALID
 };
 
-bool src_invalid(BITVECTOR_STATUS* bv_flag) {
-  return (*bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
-          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+bool src_invalid(BITVECTOR_STATUS bv_flag) {
+  return (bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
+          bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
-bool dst_invalid(BITVECTOR_STATUS* bv_flag) {
-  return (*bv_flag == BITVECTOR_STATUS::DST_INVALID || 
-          *bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
+bool dst_invalid(BITVECTOR_STATUS bv_flag) {
+  return (bv_flag == BITVECTOR_STATUS::DST_INVALID || 
+          bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
 void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
