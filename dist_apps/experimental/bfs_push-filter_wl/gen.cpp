@@ -199,7 +199,7 @@ struct BFS {
     using namespace galois::worklists;
 
     DIST_WL dist_wl(_graph);
-    if(_graph.isOwned(src_node))
+    if(_graph.isLocal(src_node))
       dist_wl.push_initial(_graph.getLID(src_node));
 
     unsigned _num_iterations = 0;
