@@ -96,7 +96,7 @@ static float getPrimaryInputSlew(FileReader& fRd, SDC *sdc) {
 }
 
 static void setArrivalTimeAndSlewByDrivingCell(std::vector<GNode>& nodes, Cell *drivingCell, std::string pinName, float slew, SDC *sdc) {
-  if (slew = 0.0) {
+  if (0.0 == slew) {
     return;
   }
 
@@ -146,7 +146,7 @@ static void setArrivalTimeAndSlewByDrivingCell(std::vector<GNode>& nodes, Cell *
                    ((isPos) ? data.rise : data.fall) : 
                    ((isPos) ? data.fall : data.rise);
     info.arrivalTime = delay.first;
-    info.slew = transTables.at(delay.second)->lookup(vTotalC);
+    info.slew = extractMaxFromTableSet(transTables, vTotalC).first;
   }
 }
 
