@@ -38,7 +38,7 @@
 #include "galois/runtime/DistStats.h"
 
 #include "galois/runtime/GlobalObj.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include <vector>
 #include <set>
 #include <algorithm>
@@ -148,6 +148,9 @@ enum ReadLocation { readSource, readDestination, readAny };
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
          bool BSPEdge = false>
 class hGraph: public GlobalObject {
+
+  constexpr static const char* const GRNAME = "dGraph";
+
 public:
   typedef typename std::conditional<
     BSPNode, std::pair<NodeTy, NodeTy>, NodeTy
@@ -740,7 +743,7 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string set_timer_str("SYNC_SET_" + get_run_identifier(loopName));
     std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str());
+    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
     StatTimer_set.start();
 
     uint32_t num = masterNodes[from_id].size();
@@ -818,7 +821,7 @@ public:
    * different parts of the graph by exchanging master/mirror information.
    */
   void setup_communication() {
-    galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
+    galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
 
     // barrier so that all hosts start the timer together
     galois::runtime::getHostBarrier().wait();
@@ -855,7 +858,7 @@ public:
     // report masters/mirrors to/from other hosts as statistics
     for (auto x = 0U; x < masterNodes.size(); ++x) {
       std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
-      galois::runtime::reportStat_Tsum("dGraph", master_nodes_str, 
+      galois::runtime::reportStat_Tsum(GRNAME, master_nodes_str, 
                                        masterNodes[x].size());
     }
 
@@ -863,7 +866,7 @@ public:
     for (auto x = 0U; x < mirrorNodes.size(); ++x) {
       std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
       if (x == id) continue;
-      galois::runtime::reportStat_Tsum("dGraph", mirror_nodes_str, 
+      galois::runtime::reportStat_Tsum(GRNAME, mirror_nodes_str, 
                                        mirrorNodes[x].size());
       totalMirrorNodes += mirrorNodes[x].size();
     }
@@ -1254,7 +1257,7 @@ public:
                                   uint64_t global_total_owned_nodes) {
     float replication_factor = (float)(global_total_mirror_nodes + totalNodes) /
                                (float)totalNodes;
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
     float replication_factor_new = (float)(global_total_mirror_nodes + 
@@ -1263,18 +1266,18 @@ public:
                                    (float)(global_total_owned_nodes - 
                                            total_isolatedNodes);
 
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
         replication_factor_new);
 
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "TOTAL_NODES_" + get_run_identifier(), totalNodes);
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
         global_total_mirror_nodes);
-    galois::runtime::reportStat_Serial("dGraph", 
+    galois::runtime::reportStat_Serial(GRNAME, 
         "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
   }
 
@@ -1337,16 +1340,16 @@ public:
                                   loopName + "_" + std::to_string(num_run));
     std::string timer_str("SIMULATE_MPI_BROADCAST_" + loopName + "_" + 
                           std::to_string(num_run));
-    galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str());
+    galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str(), GRNAME);
     std::string timer_barrier_str("SIMULATE_MPI_BROADCAST_BARRIER_" + 
                                   loopName + "_" + std::to_string(num_run));
-    galois::StatTimer StatTimerBarrier_syncBroadcast(timer_barrier_str.c_str());
+    galois::StatTimer StatTimerBarrier_syncBroadcast(timer_barrier_str.c_str(), GRNAME);
     std::string extract_timer_str("SIMULATE_MPI_BROADCAST_EXTRACT_" + 
                                   loopName + "_" + std::to_string(num_run));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
     std::string set_timer_str("SIMULATE_MPI_BROADCAST_SET_" + loopName + 
                               "_" + std::to_string(num_run));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str());
+    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
 
     size_t SyncBroadcast_send_bytes = 0;
 
@@ -1423,7 +1426,7 @@ public:
                   MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
-      galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, 
+      galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, 
                                        SyncBroadcast_send_bytes);
 
       #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1512,16 +1515,16 @@ public:
                                   "_" + std::to_string(num_run));
     std::string timer_str("SIMULATE_MPI_REDUCE_" + loopName + "_" + 
                           std::to_string(num_run));
-    galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
+    galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
     std::string timer_barrier_str("SIMULATE_MPI_REDUCE_BARRIER_" + loopName + 
                                   "_" + std::to_string(num_run));
-    galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str());
+    galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str(), GRNAME);
     std::string extract_timer_str("SIMULATE_MPI_REDUCE_EXTRACT_" + loopName + 
                                   "_" + std::to_string(num_run));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
     std::string set_timer_str("SIMULATE_MPI_REDUCE_SET_" + loopName + "_" + 
                               std::to_string(num_run));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str());
+    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
 
     size_t SyncReduce_send_bytes = 0;
     #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1596,7 +1599,7 @@ public:
       }
     }
 
-    galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, SyncReduce_send_bytes);
+    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, SyncReduce_send_bytes);
 
     #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
     static std::vector<std::vector<typename FnTy::ValTy>> rb;
@@ -1675,7 +1678,7 @@ public:
   #endif
   void simulate_bare_mpi_broadcast_serialized() {
     //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-    galois::StatTimer StatTimer_syncBroadcast("SIMULATE_MPI_BROADCAST");
+    galois::StatTimer StatTimer_syncBroadcast("SIMULATE_MPI_BROADCAST", GRNAME);
     size_t SyncBroadcast_send_bytes = 0;
 
     #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1731,7 +1734,7 @@ public:
                 &requests[num_requests++]);
     }
 
-    galois::runtime::reportStat_Tsum("dGraph", 
+    galois::runtime::reportStat_Tsum(GRNAME, 
         "SIMULATE_MPI_BROADCAST_SEND_BYTES", SyncBroadcast_send_bytes);
     galois::runtime::RecvBuffer rb[net.Num];
 
@@ -1792,7 +1795,7 @@ public:
   #endif
   void simulate_bare_mpi_reduce_serialized() {
     //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
-    galois::StatTimer StatTimer_syncReduce("SIMULATE_MPI_REDUCE");
+    galois::StatTimer StatTimer_syncReduce("SIMULATE_MPI_REDUCE", GRNAME);
     size_t SyncReduce_send_bytes = 0;
 
     #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -1850,7 +1853,7 @@ public:
                 &requests[num_requests++]);
     }
 
-    galois::Runtime::reportStat_Tsum("dGraph", "SIMULATE_MPI_REDUCE_SEND_BYTES", 
+    galois::Runtime::reportStat_Tsum(GRNAME, "SIMULATE_MPI_REDUCE_SEND_BYTES", 
                                      SyncReduce_send_bytes);
 
     galois::Runtime::RecvBuffer rb[net.Num];
@@ -1983,7 +1986,7 @@ public:
     #else
     void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncRecvApplyPull;
     #endif
-    galois::StatTimer StatTimer_syncBroadcast("SIMULATE_NET_BROADCAST");
+    galois::StatTimer StatTimer_syncBroadcast("SIMULATE_NET_BROADCAST", GRNAME);
 
 
     #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -2036,7 +2039,7 @@ public:
     // Will force all messages to be processed before continuing
     net.flush();
 
-    galois::runtime::reportStat_Tsum("dGraph", 
+    galois::runtime::reportStat_Tsum(GRNAME, 
                                      "SIMULATE_NET_BROADCAST_SEND_BYTES", 
                                      SyncBroadcast_send_bytes);
     galois::runtime::getHostBarrier().wait();
@@ -2052,7 +2055,7 @@ public:
     #else
     void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncRecvApplyPush;
     #endif
-    galois::StatTimer StatTimer_syncReduce("SIMULATE_NET_REDUCE");
+    galois::StatTimer StatTimer_syncReduce("SIMULATE_NET_REDUCE", GRNAME);
     size_t SyncReduce_send_bytes = 0;
 
     #ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -2106,7 +2109,7 @@ public:
       // Will force all messages to be processed before continuing
       net.flush();
 
-      galois::runtime::reportStat_Tsum("dGraph", 
+      galois::runtime::reportStat_Tsum(GRNAME, 
                                        "SIMULATE_NET_REDUCE_SEND_BYTES", 
                                        SyncReduce_send_bytes);
 
@@ -2142,7 +2145,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str());
+    galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str(), GRNAME);
 
     StatTimer_offsets.start();
 
@@ -2604,7 +2607,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2636,7 +2639,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + "_" + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Serial("dGraph", metadata_str, 1);
+    galois::runtime::reportStat_Serial(GRNAME, metadata_str, 1);
   }
   
   /**
@@ -2655,7 +2658,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2700,7 +2703,7 @@ private:
         std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + 
                                        get_run_identifier(loopName));
                                      
-        galois::runtime::reportStat_Tsum("dGraph", statSavedBytes_str, 
+        galois::runtime::reportStat_Tsum(GRNAME, statSavedBytes_str, 
                                          (redundant_size - bit_set_size));
       }
 
@@ -2731,7 +2734,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Serial("dGraph", metadata_str, 1);
+    galois::runtime::reportStat_Serial(GRNAME, metadata_str, 1);
   }
   
   /**
@@ -2742,7 +2745,7 @@ private:
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
-                                         get_run_identifier(loopName)).c_str());
+                                         get_run_identifier(loopName)).c_str(), GRNAME);
 
     StatTimer_SendTime.start();
 
@@ -2767,7 +2770,7 @@ private:
       std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + 
                                     get_run_identifier(loopName));
 
-      galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, b.size());
+      galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, b.size());
 
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
@@ -2791,7 +2794,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string set_timer_str(syncTypeStr + "_SET_" + 
                               get_run_identifier(loopName));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str());
+    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
 
     StatTimer_set.start();
 
@@ -2880,7 +2883,7 @@ private:
 
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
-                                         get_run_identifier(loopName)).c_str());
+                                         get_run_identifier(loopName)).c_str(), GRNAME);
 
     StatTimer_RecvTime.start();
 
@@ -2928,10 +2931,10 @@ private:
     std::string doall_str("LAMBDA::SENDRECV_" + 
                           get_run_identifier(loopName));
 
-    galois::StatTimer StatTimer_send(send_timer_str.c_str());
-    galois::StatTimer StatTimer_tryrecv(tryrecv_timer_str.c_str());
-    galois::StatTimer StatTimer_RecvTime(recv_timer_str.c_str());
-    galois::StatTimer StatTimer_mainLoop(loop_timer_str.c_str());
+    galois::StatTimer StatTimer_send(send_timer_str.c_str(), GRNAME);
+    galois::StatTimer StatTimer_tryrecv(tryrecv_timer_str.c_str(), GRNAME);
+    galois::StatTimer StatTimer_RecvTime(recv_timer_str.c_str(), GRNAME);
+    galois::StatTimer StatTimer_mainLoop(loop_timer_str.c_str(), GRNAME);
 
     StatTimer_mainLoop.start();
 
@@ -3012,7 +3015,7 @@ private:
         galois::no_stats());
     }
 
-    galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, 
+    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, 
                                      sendbytes_count.load());
     StatTimer_mainLoop.stop();
 
@@ -3065,7 +3068,7 @@ private:
     #endif
 
     std::string timer_str("REDUCE_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
+    galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
     StatTimer_syncReduce.start();
 
     #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
@@ -3103,7 +3106,7 @@ private:
     #endif
 
     std::string timer_str("BROADCAST_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str());
+    galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str(), GRNAME);
 
     StatTimer_syncBroadcast.start();
 
@@ -3302,7 +3305,7 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
-    galois::StatTimer StatTimer_sync(timer_str.c_str());
+    galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
     StatTimer_sync.start();
 
     if (writeLocation == writeSource) {
@@ -3548,7 +3551,7 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_sync(timer_str.c_str());
+    galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
     StatTimer_sync.start();
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
@@ -3677,9 +3680,9 @@ public:
                                   get_run_identifier(loopName));
     std::string doall_str("LAMBDA::REDUCE_" + get_run_identifier(loopName));
 
-    galois::StatTimer StatTimer_syncReduce(timer_str.c_str());
-    galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str());
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+    galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
+    galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str(), GRNAME);
+    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
 
     std::string statChkPtBytes_str("CHECKPOINT_BYTES_REDUCE_" + 
                                    get_run_identifier(loopName));
@@ -3688,7 +3691,7 @@ public:
     std::string checkpoint_timer_str("TIME_CHECKPOINT_REDUCE_MEM_" +
                                      get_run_identifier(loopName));
 
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
 
     StatTimer_syncReduce.start();
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -3756,9 +3759,9 @@ public:
     // Will force all messages to be processed before continuing
     net.flush();
 
-    galois::runtime::reportStat_Tsum("dGraph", statSendBytes_str, 
+    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, 
         SyncReduce_send_bytes);
-    galois::runtime::reportStat_Tsum("dGraph", statChkPtBytes_str, 
+    galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, 
         checkpoint_bytes);
 
     // receive
@@ -3790,8 +3793,8 @@ public:
     std::string checkpoint_timer_str("TIME_CHECKPOINT_" + get_run_identifier());
     std::string checkpoint_fsync_timer_str("TIME_CHECKPOINT_FSYNC_" + 
                                            get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
-    galois::StatTimer StatTimer_checkpoint_fsync(checkpoint_fsync_timer_str.c_str());
+    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
+    galois::StatTimer StatTimer_checkpoint_fsync(checkpoint_fsync_timer_str.c_str(), GRNAME);
 
     StatTimer_checkpoint.start();
 
@@ -3819,7 +3822,7 @@ public:
     #endif
 
 
-    galois::runtime::reportStat_Tsum("dGraph", statChkPtBytes_str, 
+    galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, 
         val_vec.size() * sizeof(typename FnTy::ValTy));
 
     //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
@@ -3832,15 +3835,15 @@ public:
                                  std::to_string(net.Num) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
-    galois::runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #else
     std::string chkPt_fileName = "/dev/shm/CheckPointFiles_fsync_" + 
                                  std::to_string(net.Num) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
-    galois::runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #endif
-    galois::runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #else
 
     #ifdef __CHECKPOINT_NO_FSYNC__
@@ -3848,13 +3851,13 @@ public:
                                  std::to_string(net.Num) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
-    galois::runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #else
     std::string chkPt_fileName = "CheckPointFiles_fsync_" + 
                                  std::to_string(net.Num) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
-    galois::runtime::reportParam("dGraph", "CHECKPOINT_FILE_LOC_", chkPt_fileName);
+    galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #endif
     #endif
 
@@ -3941,15 +3944,15 @@ public:
 
     std::string checkpoint_timer_str("TIME_CHECKPOINT_TOTAL_MEM_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
 
     std::string checkpoint_timer_send_str("TIME_CHECKPOINT_TOTAL_MEM_SEND_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint_send(checkpoint_timer_send_str.c_str());
+    galois::StatTimer StatTimer_checkpoint_send(checkpoint_timer_send_str.c_str(), GRNAME);
 
     std::string checkpoint_timer_recv_str("TIME_CHECKPOINT_TOTAL_MEM_recv_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint_recv(checkpoint_timer_recv_str.c_str());
+    galois::StatTimer StatTimer_checkpoint_recv(checkpoint_timer_recv_str.c_str(), GRNAME);
 
     StatTimer_checkpoint.start();
 
@@ -3976,7 +3979,7 @@ public:
     }
     #endif
 
-    galois::runtime::reportStat_Tsum("dGraph", statChkPtBytes_str, b.size());
+    galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, b.size());
     // send to your neighbor on your left.
     net.sendTagged((net.ID + 1) % net.Num, galois::runtime::evilPhase, b);
 
@@ -4011,7 +4014,7 @@ public:
 
     std::string checkpoint_timer_str("TIME_CHECKPOINT_MEM_APPLY" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str());
+    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
     StatTimer_checkpoint.start();
 
     uint32_t from_id;
@@ -4478,4 +4481,6 @@ public:
     graph_LID_dimacs.close();
   }
 };
+template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>
+constexpr const char* const hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge>::GRNAME;
 #endif //_GALOIS_DIST_HGRAPH_H

@@ -34,7 +34,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/Dist/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "galois/Dist/hGraph.h"
 #include "galois/DistAccumulator.h"
 

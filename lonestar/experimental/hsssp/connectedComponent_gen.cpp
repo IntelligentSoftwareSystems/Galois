@@ -34,7 +34,7 @@
 
 #include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/hGraph.h"
 
 static const char* const name = "Connected Component Label Propagation - Compiler Generated Distributed Heterogeneous";

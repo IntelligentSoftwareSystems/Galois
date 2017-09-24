@@ -176,6 +176,8 @@ void DistStatManager::combineAtHost_0(void) {
     combineAtHost_0_helper();
   }
 
+  getSystemNetworkInterface().flush();
+
   galois::runtime::getHostBarrier().wait();
 
 

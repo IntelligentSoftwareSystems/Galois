@@ -23,7 +23,7 @@
  */
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 

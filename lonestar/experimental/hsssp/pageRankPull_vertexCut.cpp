@@ -33,7 +33,7 @@
 
 #include "galois/runtime/CompilerHelperFunctions.h"
 
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/vGraph.h"
 #include "galois/DistAccumulator.h"
 

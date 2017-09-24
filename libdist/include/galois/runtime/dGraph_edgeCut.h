@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include "galois/runtime/dGraph.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "galois/Galois.h"
 #include "galois/DoAllWrap.h"
 

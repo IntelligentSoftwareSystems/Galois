@@ -39,7 +39,7 @@
 #include "galois/Threads.h"
 
 #include "galois/runtime/GlobalObj.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/Cuda/cuda_mtypes.h"

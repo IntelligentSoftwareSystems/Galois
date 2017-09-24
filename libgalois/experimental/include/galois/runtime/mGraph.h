@@ -42,7 +42,7 @@
 #include "galois/Threads.h"
 
 #include "galois/runtime/GlobalObj.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 
 #include "galois/FlatMap.h"
 

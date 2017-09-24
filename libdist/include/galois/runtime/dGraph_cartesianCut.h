@@ -31,7 +31,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include "galois/runtime/dGraph.h"
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/Serialize.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/DoAllWrap.h"

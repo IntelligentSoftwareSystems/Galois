@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "galois/runtime/OfflineGraph.h"
+#include "galois/graphs/OfflineGraph.h"
 #include "hGraph.h"
 
 #include <iostream>
