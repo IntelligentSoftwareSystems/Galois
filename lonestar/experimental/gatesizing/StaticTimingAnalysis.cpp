@@ -144,12 +144,9 @@ struct ComputeRequiredTime {
 }; // end struct ComputeRequiredTime
 
 static void computeRequiredTime(Graph& g, GNode dummySink) {
-  galois::StatTimer TRequiredTime("RequiredTime");
-  TRequiredTime.start();
   galois::InsertBag<GNode> work;
   work.push_back(dummySink);
-  galois::for_each_local(work, ComputeRequiredTime{g}, galois::loopname("ComputeRequiredTime"));
-  TRequiredTime.stop();
+  galois::for_each_local(work, ComputeRequiredTime{g}, galois::loopname("ComputeRequiredTime"), galois::timeit());
 }
 
 struct ComputeArrivalTimeAndPower {
@@ -221,7 +218,7 @@ struct ComputeArrivalTimeAndPower {
     }
   }
 
-  void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
     auto& data = g.getData(n);
 
     if (data.isDummy) {
@@ -334,13 +331,10 @@ struct SetForwardPrecondition {
 };
 
 static void computeArrivalTimeAndPower(Graph& g, GNode dummySrc) {
-  galois::StatTimer TArrivalTimeAndPower("ArrivalTimeAndPower");
-  TArrivalTimeAndPower.start();
   galois::do_all_local(g, SetForwardPrecondition{g}, galois::do_all_steal<true>());
   galois::InsertBag<GNode> work;
   work.push_back(dummySrc);
-  galois::for_each_local(work, ComputeArrivalTimeAndPower{g}, galois::loopname("ComputeArrivalTimeAndPower"));
-  TArrivalTimeAndPower.stop();
+  galois::for_each_local(work, ComputeArrivalTimeAndPower{g}, galois::loopname("ComputeArrivalTimeAndPower"), galois::timeit());
 }
 
 void doStaticTimingAnalysis(CircuitGraph& graph) {
