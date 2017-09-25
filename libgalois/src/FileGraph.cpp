@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -72,16 +72,15 @@ typedef off_t offset_t;
 
 namespace galois {
 namespace graphs {
-
-//File format V1:
-//version (1 or 2) {uint64_t LE}
-//EdgeType size {uint64_t LE}
-//numNodes {uint64_t LE}
-//numEdges {uint64_t LE}
-//outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint32_t LE or uint64_t LE for ver == 2}
-//potential padding (32bit max) to Re-Align to 64bits
-//EdgeType[numEdges] {EdgeType size}
+// Graph file format:
+// version (1 or 2) {uint64_t LE}
+// EdgeType size {uint64_t LE}
+// numNodes {uint64_t LE}
+// numEdges {uint64_t LE}
+// outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+// outedges[numEdges] {uint32_t LE or uint64_t LE for ver == 2}
+// potential padding (32bit max) to Re-Align to 64bits
+// EdgeType[numEdges] {EdgeType size}
 
 /**
  * Default file graph constructor which initializes fields to null values.
@@ -123,6 +122,9 @@ FileGraph& FileGraph::operator=(FileGraph&& other) {
   return *this;
 }
 
+/**
+ * Destructor. Un-mmaps mmap'd things and closes opened files.
+ */
 FileGraph::~FileGraph() {
   for (auto& m : mappings)
     munmap(m.ptr, m.len);
@@ -187,8 +189,19 @@ void FileGraph::fromMem(void* m, uint64_t node_offset, uint64_t edge_offset,
   }
 }
 
-static size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeData,
-                           int graphVersion) {
+/**
+ * Calculate the total size needed for all data.
+ *
+ * @param numNodes number of nodes to make space for
+ * @param numEdges number of edges to make space for
+ * @param sizeofEdgeData the size taken by 1 edge for its edge data
+ * @param graphVersion the graph version of the file being loaded (determines
+ * the size of edge ids)
+ *
+ * @returns Total size in bytes needed to store graph data
+ */
+static size_t rawBlockSize(size_t numNodes, size_t numEdges, 
+                           size_t sizeofEdgeData, int graphVersion) {
   // header size: version, sizeof_edge_data, numNodes, numEdges, all uint64_t
   size_t bytes = sizeof(uint64_t) * 4; 
 
@@ -211,12 +224,38 @@ static size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeDa
   return bytes;
 }
 
+/**
+ * Loads a graph from another file graph
+ *
+ * @param g FileGraph to load from
+ * @param sizeof_edge_data Size of edge data (for 1 edge)
+ *
+ * @returns Pointer to the edge data array of the newly loaded file graph
+ */
 void* FileGraph::fromGraph(FileGraph& g, size_t sizeof_edge_data) {
   return fromArrays(g.outIdx, g.numNodes, g.outs, g.numEdges, g.edgeData, 
                     sizeof_edge_data, g.nodeOffset, g.edgeOffset, true, 
                     g.graphVersion);
 }
 
+/**
+ * Loads a graph from a bunch of data arrays.
+ *
+ * @param out_idx Array that maps node ids to indices into the edge dest array
+ * @param num_nodes Number of nodes in the graph
+ * @param outs The edge destination array
+ * @param sizeof_edge_data Size of edge data (for 1 edge)
+ * @param node_offset Number of nodes to ignore from the beginning in the newly
+ * loaded graph (i.e. if non-zero, we are loading a subgraph)
+ * @param edge_offset Number of edges to ignore from beginning; should correspond
+ * to node_offset
+ * @param converted Bool specifying if array data has been converted to the
+ * appropriate type
+ * @param oGraphVersion The graph version underlying the arrays that are being
+ * passed in
+ *
+ * @returns Pointer to the edge data array of the newly loaded file graph
+ */
 void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs, 
                             uint64_t num_edges, char* edge_data, 
                             size_t sizeof_edge_data, uint64_t node_offset, 
@@ -306,7 +345,8 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes, void* outs,
 }
 
 /**
- * Given a file name, mmap the graph into memory.
+ * Given a file name, mmap the entire file into memory. Should
+ * be a graph with some specific layout.
  *
  * @param filename Graph file to load
  */
@@ -352,6 +392,15 @@ static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& ma
   return static_cast<char*>(base) + alignment;
 }
 
+/**
+ * Makes multiple threads page in specific portions of a buffer of memory.
+ * Useful for NUMA-aware architectures.
+ *
+ * @param ptr buffer to page in
+ * @param length amount of data to page in
+ * @param hugePageSize size of a huge page (what is being paged in)
+ * @param numThreads number of threads to use when paging in memory
+ */
 static void pageInterleaved(void* ptr, uint64_t length, uint32_t hugePageSize,
                             unsigned int numThreads) {
   galois::substrate::getThreadPool().run(numThreads, 
@@ -375,6 +424,10 @@ static void pageInterleaved(void* ptr, uint64_t length, uint32_t hugePageSize,
 /**
  * Loads/mmaps particular portions of a graph corresponding to a node
  * range and edge range into memory.
+ *
+ * Note that it makes the object work on a LOCAL scale (i.e. there are
+ * now local ids corresponding to the subgraph). Most functions will
+ * still handle global ids, though. (see below)
  *
  * @param filename File to load
  * @param nrange Node range to load
@@ -466,13 +519,27 @@ void FileGraph::partFromFile(const std::string& filename, NodeRange nrange,
   }
 }
 
-// Note this is the original find index; kept for divideByEdge
+/**
+ * Given some target size and lower/upper bounds, attempt to return a node
+ * id that will hit the target size (size comes from nodes + edges up to the
+ * candidate id).
+ *
+ * @param nodeSize Weight of nodes
+ * @param edgeSize Weight of edges
+ * @param targetSize Size that returned node id should attempt to hit
+ * @param lb Lower bound of nodes to consider
+ * @param ub Upper bound of nodes to consider
+ *
+ * @returns A node id that hits the target size (or gets close to it)
+ */
 size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, 
                             size_t lb, size_t ub) {
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
-    size_t num_edges = *edge_begin(mid) - edgeOffset;
-    size_t size = num_edges * edgeSize + (mid - nodeOffset) * nodeSize;
+    // edge begin assumes global id, so add nodeoffset to it as we work with
+    // local ids
+    size_t num_edges = *edge_begin(mid + nodeOffset); 
+    size_t size = (num_edges * edgeSize) + (mid * nodeSize);
     if (size < targetSize)
       lb = mid + 1;
     else
@@ -481,36 +548,42 @@ size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize,
   return lb;
 }
 
-auto 
+/**
+ * Given a division and a total number of divisions, return a range for that
+ * particular division to work on. (i.e. this divides labor among divisions
+ * depending on how much weight is given to nodes/edges).
+ *
+ * @param nodeSize Weight of nodes
+ * @param edgeSize Weight of edges
+ * @param id Division id
+ * @param total Total number of divisions
+ *
+ * @returns A node range and an edge range specifying division "id"'s assigned
+ * nodes/edges
+ */
+auto
 FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
 -> GraphRange {
-  std::vector<unsigned> dummy;
-  // note this calls into another findIndex (not the one directly above)....
+  std::vector<unsigned> dummy_scale_factor; // dummy passed in to function call
+
   return galois::graphs::divideNodesBinarySearch(numNodes, numEdges, nodeSize, 
                                                 edgeSize, id, total, outIdx, 
-                                                dummy, nodeOffset, edgeOffset);
-
-  //size_t size = numNodes * nodeSize + numEdges * edgeSize;
-  //size_t block = (size + total - 1) / total;
-  //size_t aa = numEdges;
-  //size_t ea = numEdges;
-  //size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
-  //size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
-  //if (bb != eb) {
-  //  aa = *edge_begin(bb);
-  //  ea = *edge_end(eb-1);
-  //}
-  //if (false) {
-  //  substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
-  //}
-  //return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+                                                dummy_scale_factor, edgeOffset);
 }
 
 /**
  * Divides nodes only considering edges.
  *
- * Note that it may potentially not return all nodes in the graph (it will 
- * return up to the last node with edges).
+ * IMPORTANT: Note that it may potentially not return all nodes in the graph 
+ * (it will return up to the last node with edges).
+ *
+ * @param nodeSize Weight of nodes
+ * @param edgeSize Weight of edges
+ * @param id Division id
+ * @param total Total number of divisions
+ *
+ * @returns A node range and an edge range specifying division "id"'s assigned
+ * nodes/edges
  */
 auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, 
                              size_t total) -> std::pair<NodeRange, EdgeRange> {
@@ -518,6 +591,9 @@ auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
   size_t block = (size + total - 1) / total;
   size_t aa = block*id;
   size_t ea = std::min(block * (id + 1), static_cast<size_t>(numEdges));
+
+  // note these use local node ids (numNodes is made local by partFromFile if
+  // it was called)
   size_t bb = findIndex(0, 1, aa, 0, numNodes);
   size_t eb = findIndex(0, 1, ea, bb, numNodes);
 
@@ -531,7 +607,7 @@ auto FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
 }
 
 /**
- * Write current contents to a file
+ * Write current contents of mappings to a file
  *
  * @param file File to write to
  */
@@ -561,8 +637,17 @@ void FileGraph::toFile(const std::string& file) {
   close(fd);
 }
 
-// TODO verify
+/**
+ * Get the local edge id of the edge with a specific source and destination
+ * if it exists.
+ *
+ * @param src Global source id of edge to find
+ * @param dst Global destination id of edge to find
+ * @returns the local edge id of the edge (src, dst) if it exists, otherwise
+ * return ~0
+ */
 uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) {
+  // loop through all neighbors of src, looking for a match with dst
   if (graphVersion == 1) {
     for (auto ii = (uint32_t*)raw_neighbor_begin(src), 
               ei = (uint32_t*)raw_neighbor_end(src); 
@@ -602,8 +687,19 @@ static void pageInReadOnly(void* buf, size_t len, size_t stride) {
     ptr[i];
 }
 
+/**
+ * Page in a portion of the loaded graph data based based on division of labor
+ * by nodes.
+ *
+ * @param id ID of unit of thread/unit of execution that will page in pages
+ * @param total Total number of threads/units of execution to split page in
+ * work among
+ * @param sizeofEdgeData Size of the loaded edge data 
+ */
 void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
   size_t edgeSize = 0;
+
+  // different graph version have different edge sizes
   if (graphVersion == 1) {
     edgeSize = sizeof(uint32_t);
   } else if (graphVersion == 2) {
@@ -612,19 +708,25 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
     GALOIS_DIE("unknown file version at pageInByNode", graphVersion);
   }
 
+  // determine which nodes this id is responsible for paging in
   auto r = divideByNode(sizeof(uint64_t), sizeofEdgeData + edgeSize, id, 
                         total).first;
   
-  size_t ebegin = *edge_begin(*r.first);
+  // get begin edge and end edge locations
+  // add node offset because edge_begin assumes a global id while divideByNode
+  // returns LOCAL ids (same below with edge_end)
+  size_t ebegin = *edge_begin(*r.first + nodeOffset);
   size_t eend = ebegin;
-  if (r.first != r.second)
-    eend = *edge_end(*r.second - 1);
 
+  if (r.first != r.second)
+    eend = *edge_end(*r.second - 1 + nodeOffset);
+
+  // page in the outIdx array
   pageInReadOnly(outIdx + *r.first, 
                  std::distance(r.first, r.second) * sizeof(*outIdx), 
                  runtime::pagePoolSize());
 
-  // TODO verify
+  // page in outs array
   if (graphVersion == 1) {
     pageInReadOnly((uint32_t*)outs + ebegin, 
                    (eend - ebegin) * sizeof(uint32_t), 
@@ -635,12 +737,18 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
                    runtime::pagePoolSize());
   }
 
+  // page in edge data
   pageInReadOnly(edgeData + ebegin * sizeofEdgeData, 
                  (eend - ebegin) * sizeofEdgeData, 
                  runtime::pagePoolSize());
 }
 
-// TODO verify
+/**
+ * Gets a pointer to the first neighbor of node N.
+ * 
+ * @param N global node id of neighbor begin to get
+ * @returns pointer to global id of first neighbor of node N
+ */
 void* FileGraph::raw_neighbor_begin(GraphNode N) {
   if (graphVersion == 1) {
     return &(((uint32_t*)outs)[*edge_begin(N)]);
@@ -653,7 +761,13 @@ void* FileGraph::raw_neighbor_begin(GraphNode N) {
   return nullptr;
 }
 
-// TODO verify
+/**
+ * Gets a pointer to the end of node N's neighbors in the edge destination 
+ * array.
+ * 
+ * @param N global node id of neighbor end to get
+ * @returns pointer to end of node N's neighbors in edge destination array.
+ */
 void* FileGraph::raw_neighbor_end(GraphNode N) {
   if (graphVersion == 1) {
     return &(((uint32_t*)outs)[*edge_end(N)]);
@@ -666,6 +780,13 @@ void* FileGraph::raw_neighbor_end(GraphNode N) {
   return nullptr;
 }
 
+/**
+ * Returns the index to the beginning of global node N's outgoing edges
+ * in the outgoing edges array.
+ *
+ * @param N global node id of edge begin to get
+ * @returns Iterator to first edge of node N
+ */
 FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) {
   size_t idx = 0;
   if (N > nodeOffset) {
@@ -680,6 +801,13 @@ FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) {
   return edge_iterator(idx);
 }
 
+/**
+ * Returns the index to the end of global node N's outgoing edges
+ * in the outgoing edges array.
+ *
+ * @param N global node id of edge end to get
+ * @returns Iterator to end of node N's edges
+ */
 FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) {
   size_t idx = 0;
   if (N >= nodeOffset) {
@@ -694,7 +822,12 @@ FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) {
   return edge_iterator(idx);
 }
 
-// TODO verify
+/**
+ * Gets the destination of some edge.
+ *
+ * @param it local edge id of edge destination to get
+ * @returns a global node id representing the destination of the edge
+ */
 FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) {
   if (graphVersion == 1) {
     numBytesReadEdgeDst += 4;
@@ -711,33 +844,81 @@ FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) {
 }
 
 // TODO CURRENTLY ONLY VERSION 1 SUPPORT
+/**
+ * Returns an iterator to the beginning of the node destination 
+ * array.
+ *
+ * @returns iterator to beginning of the node destination array of the
+ * loaded graph (local)
+ */
 FileGraph::node_id_iterator FileGraph::node_id_begin() const {
   return boost::make_transform_iterator(&((uint32_t*)outs)[0], 
                                         Convert32());
 }
 
 // TODO CURRENTLY ONLY VERSION 1 SUPPORT
+/**
+ * Returns an iterator to the end of the node destination 
+ * array.
+ *
+ * @returns iterator to end of the node destination array of the loaded
+ * graph (local)
+ */
 FileGraph::node_id_iterator FileGraph::node_id_end() const {
   return boost::make_transform_iterator(&((uint32_t*)outs)[numEdges], 
                                         Convert32());
 }
 
+/**
+ * Returns an iterator to the beginning of the array specifying
+ * the index into the destination array where a particular node's
+ * edges begin.
+ *
+ * @return iterator to beginning of edge index array of the loaded graph
+ */
 FileGraph::edge_id_iterator FileGraph::edge_id_begin() const {
   return boost::make_transform_iterator(&outIdx[0], Convert64());
 }
 
+/**
+ * Returns an iterator to the end of the array specifying
+ * the index into the destination array where a particular node's
+ * edges begin.
+ *
+ * @return iterator to end of edge index array of the loaded graph
+ */
 FileGraph::edge_id_iterator FileGraph::edge_id_end() const {
   return boost::make_transform_iterator(&outIdx[numNodes], Convert64());
 }
 
+/**
+ * Determines if an edge with source N1 and destination N2 existed
+ * in the currently loaded (local) graph.
+ *
+ * @param N1 global node id of neighbor 1 (source)
+ * @param N1 global node id of neighbor 2 (destination)
+ *
+ * @returns true if edge (N1, N2) exists locally, false otherwise
+ */
 bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2) {
   return getEdgeIdx(N1,N2) != ~static_cast<uint64_t>(0);
 }
 
+/**
+ * Gets the first node of the loaded graph.
+ *
+ * @returns An iterator to the first node of the graph. Note it is a GLOBAL id.
+ */
 FileGraph::iterator FileGraph::begin() const {
   return iterator(nodeOffset);
 }
 
+/**
+ * Gets the end of the nodes of the loaded graph.
+ *
+ * @returns An iterator to the end of the nodes of the graph (of the 
+ * loaded part of the graph).
+ */
 FileGraph::iterator FileGraph::end() const {
   return iterator(nodeOffset + numNodes);
 }
