@@ -312,7 +312,7 @@ public:
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::loopname("EdgeLoading"),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -377,7 +377,7 @@ private:
         }
       },
       galois::loopname("CalculateIndegree"),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -507,7 +507,7 @@ private:
         }
       },
       galois::loopname("EdgeInspection"),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );

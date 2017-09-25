@@ -280,7 +280,7 @@ struct AsyncEdgePriSet {
     unsigned long long totaldid = 0;
 
     //First do all the nodes once
-    galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, Pstats, 0.0), galois::do_all_steal<true>());
+    galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, Pstats, 0.0), galois::steal<true>());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -325,7 +325,7 @@ struct AsyncEdgePriSet {
       // std::cout << round << " Count is " << count << " next limit is " << limit << " max is " << max << " std " << sdev << " did " << total << "\n";
       // totaldid += total;
       // ++round;
-      galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit), galois::do_all_steal<true>());
+      galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit), galois::steal<true>());
     }
     std::cout << "Did " << totaldid << " (in rounds)\n";
   }

@@ -494,7 +494,7 @@ public:
         // [] (Ctxt* ctxt) {
           // ctxt->reset();
         // },
-        // galois::loopname("reset_dag"), galois::do_all_steal<true>());
+        // galois::loopname("reset_dag"), galois::steal<true>());
     galois::do_all_choice (nhmgr.getAllRange (),
         [] (NItem* nitem) {
           nitem->reset();

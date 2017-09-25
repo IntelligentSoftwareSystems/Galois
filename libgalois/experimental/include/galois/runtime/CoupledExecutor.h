@@ -102,7 +102,7 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
           func_cpy (t, w);
         },
         galois::loopname("do_all_bs"),
-        galois::do_all_steal<DO_STEAL>());
+        galois::steal<DO_STEAL>());
   }
 
   substrate::getThreadPool ().beKind ();

@@ -430,7 +430,7 @@ struct SSSP {
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
         //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -532,7 +532,7 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
       //galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -726,7 +726,7 @@ struct NumShortestPaths {
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          galois::do_all_steal<true>(),
+          galois::steal<true>(),
           galois::timeit(),
           galois::no_stats()
         );
@@ -1011,7 +1011,7 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );

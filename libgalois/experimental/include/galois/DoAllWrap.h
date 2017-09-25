@@ -92,7 +92,7 @@ struct DoAllImpl<DO_ALL_OLD> {
   static inline void go (const R& range, const F& func, 
                          const ArgsTuple& argsTuple) {
     galois::runtime::do_all_gen_old(range, func, 
-        std::tuple_cat(std::make_tuple(do_all_steal<false> ()), argsTuple));
+        std::tuple_cat(std::make_tuple(steal<false> ()), argsTuple));
   }
 };
 
@@ -102,7 +102,7 @@ struct DoAllImpl<DO_ALL_OLD_STEAL> {
   static inline void go(const R& range, const F& func, 
                         const ArgsTuple& argsTuple) {
     galois::runtime::do_all_gen_old (range, func, 
-        std::tuple_cat(std::make_tuple(do_all_steal<true>()), argsTuple));
+        std::tuple_cat(std::make_tuple(steal<true>()), argsTuple));
   }
 };
 
@@ -242,7 +242,7 @@ struct DoAllImpl<DOALL_RANGE> {
     galois::runtime::do_all_gen(
       runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
       func, 
-      std::tuple_cat(std::make_tuple(do_all_steal<false>()), argsTuple)
+      std::tuple_cat(std::make_tuple(steal<false>()), argsTuple)
     );
   }
 };

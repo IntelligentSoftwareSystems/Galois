@@ -171,7 +171,7 @@ struct InitializeGraph {
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -319,7 +319,7 @@ struct BFS {
         nodesWithEdges,
         BFS(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );

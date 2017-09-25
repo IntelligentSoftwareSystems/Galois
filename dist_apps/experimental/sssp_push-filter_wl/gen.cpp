@@ -221,7 +221,7 @@ struct SSSP {
             nodesToWork.begin(), nodesToWork.end(),
             SSSP(&_graph, dga, dist_wl),
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-            galois::do_all_steal<true>(),
+            galois::steal<true>(),
             galois::timeit(),
         galois::no_stats()
             );

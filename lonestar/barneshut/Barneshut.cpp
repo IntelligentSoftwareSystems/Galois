@@ -497,7 +497,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
         [&boxes] (const Body* b) {
           boxes.update(b->pos);
         },
-        galois::loopname("reduceBoxes"), galois::do_all_steal<true>());
+        galois::loopname("reduceBoxes"), galois::steal<true>());
 
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));

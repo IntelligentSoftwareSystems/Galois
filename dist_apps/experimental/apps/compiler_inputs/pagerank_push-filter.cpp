@@ -176,7 +176,7 @@ struct PageRank {
           nodesWithEdges,
           PageRank{ alpha, tolerance, &_graph, dga },
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          galois::do_all_steal<true>(),
+          galois::steal<true>(),
           galois::timeit()
         );
       }

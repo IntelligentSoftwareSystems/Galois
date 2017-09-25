@@ -177,14 +177,14 @@ void initResidual(Graph& graph) {
                            auto& ddata = graph.getData(dst);
                            atomicAdd(ddata.residual, 1.0/nout);
                          }
-                       }, galois::do_all_steal<true>());
+                       }, galois::steal<true>());
   //scale residual
   galois::do_all_local(graph,
                        [&graph] (const typename Graph::GraphNode& src) {
                          auto& data = graph.getData(src);
                          data.residual = data.residual * alpha * (1.0-alpha);
                        },
-                       galois::do_all_steal<true>());
+                       galois::steal<true>());
 }
 
 int main(int argc, char **argv) {

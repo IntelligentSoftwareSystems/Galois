@@ -64,7 +64,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
   galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    galois::do_all(V.begin(), V.begin()+num, emp(), galois::do_all_steal<>());
+    galois::do_all(V.begin(), V.begin()+num, emp(), galois::steal<>());
   t.stop();
   return t.get();
 }

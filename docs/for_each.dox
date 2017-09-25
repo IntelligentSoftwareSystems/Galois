@@ -196,7 +196,7 @@ of the do_all. The arguments are as follows:
 - A functor specifying the loop body of the do_all. It takes only one argument,
   which is the current work item. 
 
-- {@link galois::do_all_steal} can be supplied with argument \b true or \b false to
+- {@link galois::steal} can be supplied with argument \b true or \b false to
   turn on work-stealing. This can be useful for loops where iterations have varying
   execution time. 
 

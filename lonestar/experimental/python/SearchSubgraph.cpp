@@ -81,7 +81,7 @@ struct VF2Algo {
     // return true if at least one node has an empty set of candidates
     static bool go(Graph& gD, Graph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::do_all_steal<true>());
+      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -417,7 +417,7 @@ struct UllmannAlgo {
     // return true if at least one node has an empty set of candidates
     static bool go(Graph& gD, Graph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::do_all_steal<true>());
+      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -613,7 +613,7 @@ void constructNodeVec(Graph& gQ) {
       // placement new
       new (&(gQ.getData(n).vVec)) vector_type();
     }, 
-    galois::do_all_steal<true>()
+    galois::steal<true>()
   );
 }
 
@@ -624,7 +624,7 @@ void destructNodeVec(Graph& gQ) {
     [&gQ] (const GNode n) {
       gQ.getData(n).vVec.~vector_type();
     }, 
-    galois::do_all_steal<true>()
+    galois::steal<true>()
   );
 }
 

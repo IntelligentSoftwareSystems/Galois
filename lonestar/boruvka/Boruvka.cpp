@@ -177,9 +177,6 @@ struct ParallelAlgo {
   };
 
   struct Merge {
-    // NB: tells do_all_bs this operator implicitly calls ctx.push(x) for each
-    // call to (*this)(x);
-    typedef int tt_does_not_need_push;
 
     ParallelAlgo* self;
 
@@ -243,17 +240,19 @@ struct ParallelAlgo {
   }
 
   void process() {
-    galois::Statistic rounds("Rounds");
+
+    size_t rounds = 0;
 
     init();
 
-    galois::do_all_local(graph, Initialize(this));
+    galois::do_all_local(graph, Initialize(this)
+        , galois::loopname("Initialize"));
     while (true) {
       while (true) {
         rounds += 1;
 
         std::swap(current, next);
-        galois::do_all_local(*current, Merge(this));
+        galois::do_all_local(*current, Merge(this), galois::loopname("Merge"));
         galois::do_all_local(*current, Find(this));
         current->clear();
 
@@ -268,6 +267,8 @@ struct ParallelAlgo {
 
       limit *= 2;
     }
+
+    galois::runtime::reportStat_Serial("Boruvka", "rounds", rounds);
   }
 
 #if defined(GALOIS_USE_EXP) && !defined(GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR)
@@ -438,7 +439,7 @@ void initializeGraph() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   galois::StatTimer Tinitial("InitializeTime");

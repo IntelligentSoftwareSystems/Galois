@@ -714,7 +714,7 @@ public:
   }
 
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, galois::do_all_steal<true>());
+    galois::do_all_local(*this, [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, galois::steal<true>());
   }
 
   //// General Things ////

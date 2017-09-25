@@ -380,7 +380,7 @@ public:
       (GraphNode N) {
         this->sortEdgesByDst(N, mflag);
       },
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::no_stats());
   }
 

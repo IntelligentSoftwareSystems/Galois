@@ -48,9 +48,9 @@ NodeList filterNode(Graph *g, const KeyAltTy key, const ValAltTy value, bool isF
   std::regex regex(value);
 
   if (isFullMatch) {
-    galois::do_all_local(*g, RegExMatch<true>{*g, bag, key, regex}, galois::do_all_steal<true>());
+    galois::do_all_local(*g, RegExMatch<true>{*g, bag, key, regex}, galois::steal<true>());
   } else {
-    galois::do_all_local(*g, RegExMatch<false>{*g, bag, key, regex}, galois::do_all_steal<true>());
+    galois::do_all_local(*g, RegExMatch<false>{*g, bag, key, regex}, galois::steal<true>());
   }
 
 //  T.stop();

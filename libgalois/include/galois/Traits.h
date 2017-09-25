@@ -199,9 +199,9 @@ struct numrun: public trait_has_value<const std::string>, numrun_tag {
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
  * argument to {@link do_all()} loops.
  */
-struct do_all_steal_tag {};
-template<bool V = false>
-struct do_all_steal: public trait_has_svalue<bool, V>, do_all_steal_tag {};
+struct steal_tag {};
+template<bool V = true>
+struct steal: public trait_has_svalue<bool, V>, steal_tag {};
 
 /**
  * Indicates worklist to use. Optional argument to {@link for_each()} loops.
@@ -363,8 +363,8 @@ namespace internal {
   template <unsigned V, unsigned MIN, unsigned MAX> 
   struct bring_within_limits {
   private:
-    static const unsigned LB = (V < MIN) ? MIN : V;
-    static const unsigned UB = (LB > MAX) ? MAX : LB;
+    constexpr static const unsigned LB = (V < MIN) ? MIN : V;
+    constexpr static const unsigned UB = (LB > MAX) ? MAX : LB;
 
   public:
     static const unsigned value = UB;
@@ -372,7 +372,7 @@ namespace internal {
 
   template <unsigned V>
   struct regulate_chunk_size {
-    static const unsigned value = bring_within_limits<V, chunk_size_tag::MIN, chunk_size_tag::MAX>::value;
+    constexpr static const unsigned value = bring_within_limits<V, chunk_size_tag::MIN, chunk_size_tag::MAX>::value;
   };
 }
 
@@ -393,7 +393,7 @@ struct chunk_size:
   // public trait_has_svalue<unsigned, internal::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
   public trait_has_value<unsigned>, chunk_size_tag {    
 
-  static const unsigned value = internal::regulate_chunk_size<SZ>::value;
+  constexpr static const unsigned value = internal::regulate_chunk_size<SZ>::value;
 
   unsigned regulate (const unsigned cs) const {
     return std::min (std::max (unsigned (chunk_size_tag::MIN), cs), unsigned (chunk_size_tag::MAX));

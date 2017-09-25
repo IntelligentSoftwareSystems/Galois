@@ -206,7 +206,7 @@ struct InitializeGraph {
       nodesWithEdges,
       InitializeGraph{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit()
     );
 
@@ -270,7 +270,7 @@ struct PageRank_delta {
       allNodes,
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit()
     );
 
@@ -326,7 +326,7 @@ struct PageRank {
         nodesWithEdges,
         PageRank{ &_graph },
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit()
       );
 

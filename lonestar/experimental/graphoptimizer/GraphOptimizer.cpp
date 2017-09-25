@@ -924,7 +924,7 @@ int main(int argc, char **argv) {
   delta.resize(size);
   lenBW.resize(11);
 
-  galois::do_all(graph.begin(), graph.end(), ComputeRatio(), galois::do_all_steal<>());
+  galois::do_all(graph.begin(), graph.end(), ComputeRatio(), galois::steal<>());
 
   if (dostat) {
     std::cout << "Writing to " << outfilename.c_str() << "\n";

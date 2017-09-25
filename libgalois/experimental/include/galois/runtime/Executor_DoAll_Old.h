@@ -56,7 +56,7 @@ namespace runtime {
 template<typename FunctionTy, typename RangeTy, typename ArgsTy>
 class DoAllExecutor {
 
-  static const bool STEAL = get_type_by_supertype<do_all_steal_tag, ArgsTy>::type::value;
+  static const bool STEAL = get_type_by_supertype<steal_tag, ArgsTy>::type::value;
 
   typedef typename RangeTy::local_iterator iterator;
   FunctionTy F;
@@ -201,8 +201,8 @@ void do_all_gen_old(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) 
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
-        std::make_tuple(loopname{}, do_all_steal<>{})));
+        std::make_tuple(loopname_tag{}, steal_tag{}),
+        std::make_tuple(loopname{}, steal<>{})));
 
   constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
   CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);

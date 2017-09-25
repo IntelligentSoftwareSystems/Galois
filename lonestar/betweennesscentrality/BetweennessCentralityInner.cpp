@@ -408,7 +408,7 @@ struct LeveledAlgo {
     while (!levels.back()->empty()) {
       Bag* b = levels.back();
       levels.push_back(new Bag());
-      galois::do_all_local(*b, BFS<>(graph, *levels.back()), galois::loopname("BFS"), galois::do_all_steal<true>());
+      galois::do_all_local(*b, BFS<>(graph, *levels.back()), galois::loopname("BFS"), galois::steal<true>());
       //galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
@@ -418,7 +418,7 @@ struct LeveledAlgo {
 
     Tdep.start();
     for (int i = levels.size() - 1; i > 0; --i)
-      galois::do_all_local(*levels[i-1], ComputeDep(graph), galois::loopname("DEPS"), galois::do_all_steal<true>());
+      galois::do_all_local(*levels[i-1], ComputeDep(graph), galois::loopname("DEPS"), galois::steal<true>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
     while (!levels.empty()) {

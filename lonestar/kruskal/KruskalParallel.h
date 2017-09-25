@@ -539,7 +539,7 @@ struct UnionFindWindow {
       findTimer.start ();
       galois::do_all_local (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
-          galois::do_all_steal<true>(),
+          galois::steal<true>(),
           galois::loopname("find_loop"));
       findTimer.stop ();
       // galois::runtime::endSampling ();
@@ -549,7 +549,7 @@ struct UnionFindWindow {
       linkUpTimer.start ();
       galois::do_all_local (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-          galois::do_all_steal<true>(),
+          galois::steal<true>(),
           galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
       // galois::runtime::endSampling ();
@@ -847,7 +847,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   filterTimer.start ();
   galois::do_all_local (heavier,
       FilterSelfEdges<EdgeCtxWL> (repVec, lighter),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::loopname ("filter_loop"));
   filterTimer.stop ();
 

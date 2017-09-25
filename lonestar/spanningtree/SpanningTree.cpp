@@ -144,7 +144,7 @@ struct AsyncAlgo {
   void operator()() {
     galois::Statistic emptyMerges("EmptyMerges");
     galois::do_all_local(graph, Merge(emptyMerges),
-        galois::loopname("Merge"), galois::do_all_steal<true>());
+        galois::loopname("Merge"), galois::steal<true>());
     galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
   }
 };

@@ -65,15 +65,12 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 
 template<typename InputIterator, class Predicate>
 struct find_if_helper {
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_push;
-  typedef int tt_does_not_need_aborts;
-  typedef int tt_needs_parallel_break;
 
   typedef galois::optional<InputIterator> ElementTy;
   typedef substrate::PerThreadStorage<ElementTy> AccumulatorTy;
   AccumulatorTy& accum;
   Predicate& f;
+
   find_if_helper(AccumulatorTy& a, Predicate& p): accum(a), f(p) { }
   void operator()(const InputIterator& v, UserContext<InputIterator>& ctx) {
     if (f(*v)) {
@@ -91,7 +88,12 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef galois::worklists::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, galois::wl<WL>());
+  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, 
+      galois::no_conflicts(),
+      galois::no_pushes(),
+      galois::no_stats(),
+      galois::parallel_break(),
+      galois::wl<WL>());
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);

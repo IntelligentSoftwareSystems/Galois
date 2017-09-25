@@ -180,13 +180,13 @@ void initResidual(Graph& graph) {
         auto& dResidual = ddata.DAd.vAtomicDouble;
         atomicAdd(dResidual, 1.0/nout);
       }
-    }, galois::do_all_steal<true>());
+    }, galois::steal<true>());
   //scale residual
   galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
       auto& dResidual = data.DAd.vAtomicDouble;
       dResidual = dResidual * alpha * (1.0-alpha);
-    }, galois::do_all_steal<true>());
+    }, galois::steal<true>());
 }
 
 NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy result) {

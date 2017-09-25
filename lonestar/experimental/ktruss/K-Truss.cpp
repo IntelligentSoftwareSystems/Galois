@@ -85,7 +85,7 @@ void initialize(Graph& g) {
         g.getEdgeData(e) = valid;
       }
     },
-    galois::do_all_steal<true>()
+    galois::steal<true>()
   );
 }
 
@@ -115,7 +115,7 @@ size_t countValidNodes(G& g) {
         }
       }
     },
-    galois::do_all_steal<true>()
+    galois::steal<true>()
   );
 
   return numNodes.reduce();
@@ -133,7 +133,7 @@ size_t countValidEdges(G& g) {
         }
       }
     },
-    galois::do_all_steal<true>()
+    galois::steal<true>()
   );
 
   return numEdges.reduce();
@@ -252,13 +252,13 @@ struct BSPTrussJacobiAlgo {
           }
         }
       },
-      galois::do_all_steal<true>()
+      galois::steal<true>()
     );
 
     while (true) {
       galois::do_all_local(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
-        galois::do_all_steal<true>()
+        galois::steal<true>()
       );
 
       if (0 == std::distance(unsupported.begin(), unsupported.end())) {
@@ -271,7 +271,7 @@ struct BSPTrussJacobiAlgo {
           g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
           g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
         },
-        galois::do_all_steal<true>()
+        galois::steal<true>()
       );
 
       unsupported.clear();
@@ -335,7 +335,7 @@ struct BSPTrussAlgo {
           }
         }
       },
-      galois::do_all_steal<true>()
+      galois::steal<true>()
     );
     curSize = std::distance(cur->begin(), cur->end());
 
@@ -343,7 +343,7 @@ struct BSPTrussAlgo {
     while (true) {
       galois::do_all_local(*cur, 
         KeepSupportedEdges{g, k-2, *next},
-        galois::do_all_steal<true>()
+        galois::steal<true>()
       );
       nextSize = std::distance(next->begin(), next->end());
 
@@ -416,7 +416,7 @@ struct BSPCoreAlgo {
 
     galois::do_all_local(g, 
       KeepValidNodes{g, k, *next}, 
-      galois::do_all_steal<true>()
+      galois::steal<true>()
     );
     nextSize = std::distance(next->begin(), next->end());
 
@@ -427,7 +427,7 @@ struct BSPCoreAlgo {
 
       galois::do_all_local(*cur, 
         KeepValidNodes{g, k, *next}, 
-        galois::do_all_steal<true>()
+        galois::steal<true>()
       );
       nextSize = std::distance(next->begin(), next->end());
     }
@@ -627,7 +627,7 @@ struct AsyncTrussTxAlgo {
           }
         }
       },
-      galois::do_all_steal<true>()
+      galois::steal<true>()
     );
 
     galois::for_each_local(work, 
@@ -759,7 +759,7 @@ struct AsyncTrussTxAlgo {
           }
         }
       },
-      galois::do_all_steal<true>()
+      galois::steal<true>()
     );
 
     galois::for_each_local(work, 

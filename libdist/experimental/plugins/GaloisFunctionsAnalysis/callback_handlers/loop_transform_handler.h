@@ -156,7 +156,7 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               string galois_foreach = "galois::for_each(";
               string galois_doall = "galois::do_all_local(nodesWithEdges, ";
               rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
-              string num_run = ",\ngalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \ngalois::do_all_steal<true>(), \ngalois::timeit())";
+              string num_run = ",\ngalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \ngalois::steal<true>(), \ngalois::timeit())";
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);
               string firstItr_func_call = "\nFirstItr_" + i.first + "::go(_graph);\n";
               string nodesWithEdgesRange_str = "\nauto nodesWithEdges = _graph.allNodesWithEdgesRange(); \n";

@@ -31,8 +31,8 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef GALOIS_RUNTIME_DOALLCOUPLED_H
-#define GALOIS_RUNTIME_DOALLCOUPLED_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
+#define GALOIS_RUNTIME_EXECUTOR_DO_ALL_H
 
 #include "galois/gIO.h"
 #include "galois/Timer.h"
@@ -661,8 +661,8 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, do_all_steal_tag{}), 
-        std::make_tuple (default_loopname {}, default_chunk_size {}, do_all_steal<false>{} )));
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}, steal_tag{}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {}, steal<>{} )));
 
   using ArgsT = decltype(argsT);
 
@@ -671,7 +671,7 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   timer.start();
 
-  static constexpr bool STEAL = get_type_by_supertype<do_all_steal_tag, ArgsT>::type::value;
+  static constexpr bool STEAL = get_type_by_supertype<steal_tag, ArgsT>::type::value;
 
   internal::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
 
@@ -682,4 +682,4 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 } // end namespace runtime
 } // end namespace galois
 
-#endif //  GALOIS_RUNTIME_DO_ALL_COUPLED_H_
+#endif //  GALOIS_RUNTIME_EXECUTOR_DO_ALL_H

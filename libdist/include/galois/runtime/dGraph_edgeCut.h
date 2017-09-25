@@ -221,7 +221,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         },
         galois::loopname("EdgeInspection"),
         galois::timeit(),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::no_stats()
       );
 
@@ -311,7 +311,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::loopname("EdgeLoading"),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -410,7 +410,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         assert(cur == (*graph.edge_end(lsrc)));
       },
       galois::loopname("EdgeLoading"),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -447,7 +447,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         assert(cur == (*graph.edge_end(lsrc)));
       },
       galois::loopname("EdgeLoading"),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );

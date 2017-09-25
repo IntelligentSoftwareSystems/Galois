@@ -224,7 +224,7 @@ struct SSSP {
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -271,7 +271,7 @@ struct PredAndSucc {
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -371,7 +371,7 @@ struct NumShortestPaths {
         nodesWithEdges,
         NumShortestPaths(infinity, &_graph, dga), 
         galois::loopname("NumShortestPaths"),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -480,7 +480,7 @@ struct DependencyPropogation {
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
