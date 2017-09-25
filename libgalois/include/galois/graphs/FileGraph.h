@@ -51,8 +51,6 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include "galois/graphs/GraphHelpers.h"
-
 #include <type_traits>
 #include <deque>
 #include <vector>
