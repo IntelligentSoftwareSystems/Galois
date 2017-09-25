@@ -156,7 +156,6 @@ void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  * @param c locality-aware container
  * @param fn operator
  * @param args optional arguments to loop
- * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
 void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
@@ -169,12 +168,17 @@ void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
  * the id of the current thread and numThreads is the total number of running
  * threads.
  *
- * @param fn operator
- * @param args optional arguments to loop (only loopname supported)
+ * @param fn operator, which is never copied
+ * @param args optional arguments to loop
  */
 template<typename FunctionTy, typename... Args>
 void on_each(const FunctionTy& fn, const Args&... args) {
-  runtime::on_each_gen(fn, std::make_tuple(args...));
+  runtime::on_each_impl(fn, std::make_tuple(args...));
+}
+
+template<typename FunctionTy, typename... Args>
+void on_each(FunctionTy& fn, const Args&... args) {
+  runtime::on_each_impl(fn, std::make_tuple(args...));
 }
 
 /**

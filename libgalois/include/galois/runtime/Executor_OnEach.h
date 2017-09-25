@@ -46,8 +46,9 @@
 namespace galois {
 namespace runtime {
 
+namespace internal {
 template <typename FunctionTy, typename ArgsTy> 
-void on_each_impl(const FunctionTy& fn, const ArgsTy& argsTuple) {
+inline void on_each_exec(FunctionTy& fn, const ArgsTy& argsTuple) {
   
   static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
@@ -71,7 +72,7 @@ void on_each_impl(const FunctionTy& fn, const ArgsTy& argsTuple) {
 }
 
 template<typename FunctionTy, typename TupleTy>
-void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
+inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
 
@@ -85,10 +86,23 @@ void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
 
   timer.start();
 
-  on_each_impl(fn, dtpl);
+  on_each_exec(fn, dtpl);
 
   timer.stop();
 }
+
+}
+
+template<typename FunctionTy, typename TupleTy>
+inline void on_each_impl(FunctionTy& fn, const TupleTy& tpl) {
+  internal::on_each_gen<FunctionTy, TupleTy>(fn, tpl);
+}
+
+template<typename FunctionTy, typename TupleTy>
+inline void on_each_impl(const FunctionTy& fn, const TupleTy& tpl) {
+  internal::on_each_gen<const FunctionTy, TupleTy>(fn, tpl);
+}
+
 
 } // end namespace runtime
 } // end namespace galois

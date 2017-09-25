@@ -94,7 +94,8 @@ template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
   graph.allocateFrom(f);
 
-  galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
+  ReadGraphConstructFrom<GraphTy> reader(graph, f);
+  galois::on_each(reader);
 }
 
 template<typename GraphTy>
@@ -111,8 +112,11 @@ void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag, FileGraph& f) {
   Aux aux;
   graph.allocateFrom(f, aux);
 
-  galois::on_each(ReadGraphConstructNodesFrom<GraphTy, Aux>(graph, f, aux));
-  galois::on_each(ReadGraphConstructEdgesFrom<GraphTy, Aux>(graph, f, aux));
+  ReadGraphConstructNodesFrom<GraphTy, Aux> nodeReader(graph, f, aux);
+  galois::on_each(nodeReader);
+
+  ReadGraphConstructEdgesFrom<GraphTy, Aux> edgeReader(graph, f, aux);
+  galois::on_each(edgeReader);
 }
 
 template<typename GraphTy>
