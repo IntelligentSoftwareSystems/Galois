@@ -164,6 +164,12 @@ if(OPENMP_FOUND)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 endif()
 
+# TODO: make this conditional on a flag specific to building libdist stuff
+find_package(MPI REQUIRED) # for distributed
+set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+include_directories(${MPI_INCLUDE_PATH})
+
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
@@ -177,10 +183,6 @@ if(USE_EXP)
     set(LWCI_LIBRARY "$ENV{LWCI_ROOT}/lib/liblwci.a")
   endif()
 
-  find_package(MPI REQUIRED) # for distributed
-  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
-  include_directories(${MPI_INCLUDE_PATH})
 
   find_package(OpenMP)
   if(OPENMP_FOUND)

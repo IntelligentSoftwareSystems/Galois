@@ -117,13 +117,12 @@ struct InitializeGraph {
 
 struct SSSP {
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
-    galois::for_each(src_node, SSSP (&_graph), galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("SSSP"));
+    galois::for_each(src_node, SSSP (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("SSSP"));
   }
 
   void operator()(GNode src, galois::UserContext<GNode>& ctx) const {

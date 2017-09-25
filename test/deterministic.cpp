@@ -80,9 +80,9 @@ void runLocalStateMatching(const std::string& name) {
   galois::for_each_local(graph,
       MatchingWithLocalState { graph, size },
       galois::wl<galois::worklists::Deterministic<>>(),
-      galois::has_deterministic_local_state<MatchingWithLocalState::LocalState>(),
-      galois::needs_per_iter_alloc<>(),
-      galois::has_deterministic_id<DeterministicId>());
+      galois::local_state<MatchingWithLocalState::LocalState>(),
+      galois::per_iter_alloc(),
+      galois::det_id<DeterministicId>());
   std::cout << "Deterministic matching (with local state) size: " << size.reduce() << "\n";
 }
 //! [Local state]

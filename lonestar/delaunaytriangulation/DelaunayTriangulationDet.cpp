@@ -211,9 +211,9 @@ struct Process {
   };
 
   typedef std::tuple<
-    galois::has_deterministic_local_state<LocalState>,
-    galois::needs_per_iter_alloc<>,
-    galois::does_not_need_push<>
+    galois::local_state<LocalState>,
+    galois::per_iter_alloc,
+    galois::no_pushes,
     > function_traits;
 
   //! Parallel operator

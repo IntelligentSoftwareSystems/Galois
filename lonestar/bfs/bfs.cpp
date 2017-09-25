@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
       }
       , galois::wl<BSWL>()
       , galois::loopname("runBFS")
-      , galois::does_not_need_aborts());
+      , galois::no_conflicts());
 
   Tmain.stop();
   T.stop();

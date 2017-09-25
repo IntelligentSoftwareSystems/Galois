@@ -282,9 +282,6 @@ Point updateForce(Point delta, double psq, double mass) {
 
 struct ComputeForces {
   // Optimize runtime for no conflict case
-  // typedef int tt_does_not_need_aborts;
-  // typedef int tt_needs_per_iter_alloc;
-  // typedef int tt_does_not_need_push;
 
   Octree* top;
   double root_dsq;
@@ -535,9 +532,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
         galois::loopname("compute"), 
         galois::wl<WLL> (),
         galois::timeit(),
-        galois::does_not_need_aborts (),
-        galois::does_not_need_push (),
-        galois::needs_per_iter_alloc ());
+        galois::no_conflicts (),
+        galois::no_pushes (),
+        galois::per_iter_alloc ());
     T_compute.stop();
 
     if (!skipVerify) {

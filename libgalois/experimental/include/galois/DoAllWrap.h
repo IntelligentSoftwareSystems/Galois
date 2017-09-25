@@ -132,8 +132,8 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     galois::runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::tuple_cat(
           std::make_tuple(galois::wl<WL_ty>(), 
-             does_not_need_push(),
-             does_not_need_aborts()),
+             no_pushes(),
+             no_conflicts()),
           argsTuple));
   }
 };

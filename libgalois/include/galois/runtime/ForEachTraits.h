@@ -61,17 +61,17 @@ struct ExtractForEachTraits {
       ForEachTraits<FunctionTy>::NeedsBreak,
       ForEachTraits<FunctionTy>::NeedsPIA>::type NotDefault;
   typedef std::tuple<
-      does_not_need_aborts_tag, 
+      no_conflicts_tag, 
       no_stats_tag,
-      does_not_need_push_tag,
-      needs_parallel_break_tag,
-      needs_per_iter_alloc_tag> Tags;
+      no_pushes_tag,
+      parallel_break_tag,
+      per_iter_alloc_tag> Tags;
   typedef std::tuple<
-      does_not_need_aborts,
+      no_conflicts,
       no_stats,
-      does_not_need_push,
-      needs_parallel_break,
-      needs_per_iter_alloc> Values;
+      no_pushes,
+      parallel_break,
+      per_iter_alloc> Values;
   typedef typename tuple_elements<Tags, NotDefault>::type tags_type;
   typedef typename tuple_elements<Values, NotDefault>::type values_type;
 };

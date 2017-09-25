@@ -177,8 +177,8 @@ template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
   static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
@@ -486,8 +486,8 @@ struct reiterator<WLTy, IterTy,
 //   typedef MakeTakeContext<FunctionTy, T> WrappedFunction;
 //   auto newArgs = std::tuple_cat(args,
 //       get_default_trait_values(args,
-//         std::make_tuple(does_not_need_push_tag {}),
-//         std::make_tuple(does_not_need_push<> {})));
+//         std::make_tuple(no_pushes_tag {}),
+//         std::make_tuple(no_pushes {})));
 //   typedef ForEachExecutor<WorkListTy, WrappedFunction, decltype(newArgs)> WorkTy;
 //   Barrier& barrier = getSystemBarrier();
 //   WorkTy W(WrappedFunction {fn}, newArgs);

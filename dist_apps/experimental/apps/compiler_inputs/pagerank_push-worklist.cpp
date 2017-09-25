@@ -150,11 +150,10 @@ struct InitializeGraph {
 
 struct PageRank {
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
-    galois::for_each(_graph.begin(), _graph.end(), PageRank{ &_graph }, galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("PageRank"));
+    galois::for_each(_graph.begin(), _graph.end(), PageRank{ &_graph }, galois::workList_version(), galois::no_conflicts(), galois::loopname("PageRank"));
   }
 
   void operator()(WorkItem src, galois::UserContext<WorkItem>& ctx) const {

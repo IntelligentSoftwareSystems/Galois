@@ -25,7 +25,7 @@
  *
  * First, by passing an argument to the corresponding method call:
  * \code
- * galois::for_each(v.begin(), v.end(), fn, galois::needs_parallel_break<>());
+ * galois::for_each(v.begin(), v.end(), fn, galois::parallel_break());
  * \endcode
  *
  * Second, by providing a specially named nested type
@@ -33,7 +33,7 @@
  * #include <tuple>
  *
  * struct MyClass { 
- *   typedef std::tuple<galois::needs_parallel_break<>> function_traits;
+ *   typedef std::tuple<galois::parallel_break> function_traits;
  * };
  *
  * int main() {
@@ -224,26 +224,25 @@ s_wl<T, Args...> wl(Args&&... args) {
 struct timeit_tag {};
 struct timeit: public trait_has_type<bool>, timeit_tag {};
 
-//TODO: need better names here. Suggestion: parallel_break_req, per_iter_alloc_req, no_push/has_no_push, no_aborts/has_no_abort
 //
 /**
  * Indicates the operator may request the parallel loop to be suspended and a
  * given function run in serial
  */
-struct needs_parallel_break_tag {};
-struct needs_parallel_break: public trait_has_type<bool>, needs_parallel_break_tag {};
+struct parallel_break_tag {};
+struct parallel_break: public trait_has_type<bool>, parallel_break_tag {};
 
 /**
  * Indicates the operator does not generate new work and push it on the worklist
  */
-struct does_not_need_push_tag {};
-struct does_not_need_push: public trait_has_type<bool>, does_not_need_push_tag {};
+struct no_pushes_tag {};
+struct no_pushes: public trait_has_type<bool>, no_pushes_tag {};
 
 /**
  * Indicates the operator may request the access to a per-iteration allocator
  */
-struct needs_per_iter_alloc_tag {};
-struct needs_per_iter_alloc: public trait_has_type<bool>, needs_per_iter_alloc_tag {};
+struct per_iter_alloc_tag {};
+struct per_iter_alloc: public trait_has_type<bool>, per_iter_alloc_tag {};
 
 /**
  * Indicates the operator doesn't need its execution stats recorded
@@ -260,8 +259,8 @@ struct more_stats: public trait_has_type<bool>, more_stats_tag { };
 /**
  * Indicates the operator doesn't need abort support
  */
-struct does_not_need_aborts_tag {};
-struct does_not_need_aborts: public trait_has_type<bool>, does_not_need_aborts_tag {};
+struct no_conflicts_tag {};
+struct no_conflicts: public trait_has_type<bool>, no_conflicts_tag {};
 
 /**
  * Indicates that the neighborhood set does not change through out i.e. is not
@@ -270,24 +269,24 @@ struct does_not_need_aborts: public trait_has_type<bool>, does_not_need_aborts_t
  * while the counter example is the neighborhood being some of the neighbors
  * based on some predicate. 
  */
-struct has_fixed_neighborhood_tag {};
-struct has_fixed_neighborhood: public trait_has_type<bool>, has_fixed_neighborhood_tag {};
+struct fixed_neighborhood_tag {};
+struct fixed_neighborhood: public trait_has_type<bool>, fixed_neighborhood_tag {};
 
 /**
  * Indicates that the operator uses the intent to read flag.
  */
-struct has_intent_to_read_tag {};
-struct has_intent_to_read: public trait_has_type<bool>, has_intent_to_read_tag {};
+struct intent_to_read_tag {};
+struct intent_to_read: public trait_has_type<bool>, intent_to_read_tag {};
 
 /**
  * Indicates the operator has a function that visits the neighborhood of the
  * operator without modifying it.
  */
-struct has_neighborhood_visitor_tag {};
+struct neighborhood_visitor_tag {};
 template<typename T>
-struct has_neighborhood_visitor: public trait_has_value<T>, has_neighborhood_visitor_tag {
-  has_neighborhood_visitor(const T& t = T {}): trait_has_value<T>(t) {}
-  has_neighborhood_visitor(T&& t): trait_has_value<T>(std::move(t)) {}
+struct neighborhood_visitor: public trait_has_value<T>, neighborhood_visitor_tag {
+  neighborhood_visitor(const T& t = T {}): trait_has_value<T>(t) {}
+  neighborhood_visitor(T&& t): trait_has_value<T>(std::move(t)) {}
 };
 
 /**
@@ -300,12 +299,12 @@ struct has_neighborhood_visitor: public trait_has_value<T>, has_neighborhood_vis
  * returns true, the loop ends as if calling {@link UserContext::breakLoop},
  * but unlike that function, these breaks are deterministic.
  */
-struct has_deterministic_parallel_break_tag {};
+struct det_parallel_break_tag {};
 template<typename T>
-struct has_deterministic_parallel_break: public trait_has_value<T>, has_deterministic_parallel_break_tag {
+struct det_parallel_break: public trait_has_value<T>, det_parallel_break_tag {
   static_assert(std::is_same<typename std::result_of<T()>::type, bool>::value, "signature must be bool()");
-  has_deterministic_parallel_break(const T& t = T {}): trait_has_value<T>(t) {}
-  has_deterministic_parallel_break(T&& t): trait_has_value<T>(std::move(t)) {}
+  det_parallel_break(const T& t = T {}): trait_has_value<T>(t) {}
+  det_parallel_break(T&& t): trait_has_value<T>(std::move(t)) {}
 };
 
 /**
@@ -319,11 +318,11 @@ struct has_deterministic_parallel_break: public trait_has_value<T>, has_determin
  *
  * \snippet test/deterministic.cpp Id
  */
-struct has_deterministic_id_tag {};
+struct det_id_tag {};
 template<typename T>
-struct has_deterministic_id: public trait_has_value<T>, has_deterministic_id_tag {
-  has_deterministic_id(const T& t = T {}): trait_has_value<T>(t) {}
-  has_deterministic_id(T&& t): trait_has_value<T>(std::move(t)) {}
+struct det_id: public trait_has_value<T>, det_id_tag {
+  det_id(const T& t = T {}): trait_has_value<T>(t) {}
+  det_id(T&& t): trait_has_value<T>(std::move(t)) {}
 };
 
 /**
@@ -334,9 +333,9 @@ struct has_deterministic_id: public trait_has_value<T>, has_deterministic_id_tag
  *
  * \snippet test/deterministic.cpp Local state
  */
-struct has_deterministic_local_state_tag {};
+struct local_state_tag {};
 template<typename T>
-struct has_deterministic_local_state: public trait_has_type<T>, has_deterministic_local_state_tag {};
+struct local_state: public trait_has_type<T>, local_state_tag {};
 
 
 // TODO: separate to libdist

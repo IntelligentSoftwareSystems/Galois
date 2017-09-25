@@ -351,8 +351,8 @@ struct UpdateHeights {
   };
 
   typedef std::tuple<
-    galois::needs_per_iter_alloc<>,
-    galois::has_deterministic_local_state<LocalState>
+    galois::per_iter_alloc,
+    galois::local_state<LocalState>
   > function_traits;
 
   //struct IdFn {
@@ -607,10 +607,10 @@ struct Process {
   Counter& counter;
 
   typedef std::tuple<
-    galois::needs_parallel_break<>,
-    galois::needs_per_iter_alloc<>,
-    galois::has_deterministic_local_state<LocalState>,
-    galois::has_deterministic_id<DeterministicId>
+    galois::parallel_break,
+    galois::per_iter_alloc,
+    galois::local_state<LocalState>
+    galois::det_id<DeterministicId>
   > function_traits;
 
   Process(Counter& c): counter(c) { }
@@ -640,7 +640,7 @@ struct Process {
 template<>
 struct Process<nondet> {
   typedef std::tuple<
-    galois::needs_parallel_break<>
+    galois::parallel_break
   > function_traits;
 
   Counter& counter;

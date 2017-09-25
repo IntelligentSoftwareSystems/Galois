@@ -291,7 +291,6 @@ if(_graph.is_vertex_cut()) {
 
 struct ConnectedComp {
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   ConnectedComp(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -346,7 +345,7 @@ struct ConnectedComp {
     		galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
-    galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("ConnectedComp"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));
+    galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("ConnectedComp"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(GNode src, galois::UserContext<GNode>& ctx) const {

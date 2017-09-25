@@ -325,7 +325,6 @@ if(_graph.is_vertex_cut()) {
 
 struct BFS {
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
@@ -392,7 +391,7 @@ struct BFS {
     			__begin = 0;
     			__end = 0;
     		}
-    galois::for_each(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), BFS (&_graph), galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("BFS"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));	}
+    galois::for_each(boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end), BFS (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("BFS"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));	}
     
   }
 

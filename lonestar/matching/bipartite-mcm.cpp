@@ -381,7 +381,7 @@ struct MatchingFF {
 
   //! Main entry point for galois::for_each
   struct Process {
-    typedef std::tuple<galois::needs_per_iter_alloc<>> function_traits;
+    typedef std::tuple<galois::per_iter_alloc> function_traits;
 
     MatchingFF<G,Concurrent>& parent;
     G& g;
@@ -538,7 +538,7 @@ struct MatchingABMP {
   }
 
   struct Process {
-    typedef std::tuple<galois::needs_per_iter_alloc<>,galois::needs_parallel_break<>> function_traits;
+    typedef std::tuple<galois::per_iter_alloc,galois::parallel_break> function_traits;
     MatchingABMP<G,Concurrent>& parent;
     G& g;
     unsigned& maxLayer;
@@ -732,7 +732,7 @@ struct MatchingMF {
   }
 
   struct Process {
-    typedef std::tuple<galois::needs_parallel_break<>> function_traits;
+    typedef std::tuple<galois::parallel_break> function_traits;
 
     MatchingMF<G,Concurrent>& parent;
     G& g;

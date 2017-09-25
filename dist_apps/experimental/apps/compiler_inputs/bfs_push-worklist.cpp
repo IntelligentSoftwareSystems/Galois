@@ -117,13 +117,12 @@ struct InitializeGraph {
 
 struct BFS {
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace galois::worklists;
     typedef dChunkedFIFO<64> dChunk;
-    galois::for_each(src_node, BFS (&_graph), galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("BFS"));
+    galois::for_each(src_node, BFS (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("BFS"));
   }
 
   void operator()(GNode src, galois::UserContext<GNode>& ctx) const {

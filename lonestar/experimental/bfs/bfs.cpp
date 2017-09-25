@@ -487,9 +487,9 @@ struct DetBarrierAlgo {
   };
 
   typedef std::tuple<
-    galois::needs_per_iter_alloc<>,
-    galois::has_deterministic_local_state<LocalState>,
-    galois::has_deterministic_id<DeterministicId>
+    galois::per_iter_alloc,
+    galois::local_state<LocalState>,
+    galois::det_id<DeterministicId>
   > function_traits;
 
   void operator()(const GNode& source) const {

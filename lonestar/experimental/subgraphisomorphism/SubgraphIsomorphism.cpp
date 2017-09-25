@@ -455,7 +455,7 @@ public:
 
     MatchingVector report;
     galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
-      galois::does_not_need_aborts<>(), galois::does_not_need_push<>(), galois::needs_parallel_break<>(), galois::needs_per_iter_alloc<>());
+      galois::no_conflicts(), galois::no_pushes(), galois::parallel_break(), galois::per_iter_alloc());
     return report;
   }
 };
@@ -597,7 +597,7 @@ public:
 
     MatchingVector report;
     galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
-      galois::does_not_need_aborts<>(), galois::does_not_need_push<>(), galois::needs_parallel_break<>());
+      galois::no_conflicts(), galois::no_pushes(), galois::parallel_break());
     return report;
   }
 };

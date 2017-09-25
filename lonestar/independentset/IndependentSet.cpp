@@ -135,10 +135,10 @@ struct Process {
   };
 
   typedef std::tuple<
-    galois::does_not_need_push<>,
-    galois::needs_per_iter_alloc<>,
-    galois::has_deterministic_id<DeterministicId>,
-    galois::has_deterministic_local_state<LocalState>
+    galois::no_pushes,
+    galois::per_iter_alloc,
+    galois::det_id<DeterministicId>,
+    galois::local_state<LocalState>
   > function_traits;
 
   Graph& graph;

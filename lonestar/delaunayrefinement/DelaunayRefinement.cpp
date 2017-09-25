@@ -77,7 +77,7 @@ struct Process {
   //! [Enabling Per Iteration Allocator in DMR]
   typedef std::tuple<
     galois::has_deterministic_local_state<LocalState>,
-    galois::needs_per_iter_alloc<>
+    galois::per_iter_alloc
   > function_traits;
   //! [Enabling Per Iteration Allocator in DMR]
 

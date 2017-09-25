@@ -69,17 +69,17 @@ protected:
     };
 
     typedef std::tuple<
-      galois::needs_per_iter_alloc<>,
-      galois::has_intent_to_read<>,
-      galois::has_deterministic_local_state<LocalState>,
-      galois::has_deterministic_id<DeterministicId>
+      galois::per_iter_alloc,
+      galois::intent_to_read,
+      galois::local_state<LocalState>,
+      galois::det_id<DeterministicId>
       > ikdg_function_traits;
     typedef std::tuple<
-      galois::needs_per_iter_alloc<>,
-      galois::has_fixed_neighborhood<>,
-      //galois::has_intent_to_read<>, // TODO enable
-      galois::has_deterministic_local_state<LocalState>,
-      galois::has_deterministic_id<DeterministicId>
+      galois::per_iter_alloc,
+      galois::fixed_neighborhood,
+      //galois::intent_to_read<>, // TODO enable
+      galois::local_state<LocalState>,
+      galois::det_id<DeterministicId>
       > add_remove_function_traits;
     typedef typename std::conditional<UseAddRemove, add_remove_function_traits, ikdg_function_traits>::type function_traits;
 

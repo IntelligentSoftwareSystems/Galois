@@ -467,17 +467,17 @@ struct OptionsCommon {
   typedef ArgsTy args_type;
 
   static const bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
+  static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
 
-  static const bool hasBreak = exists_by_supertype<has_deterministic_parallel_break_tag, ArgsTy>::value;
-  static const bool hasId = exists_by_supertype<has_deterministic_id_tag, ArgsTy>::value;
+  static const bool hasBreak = exists_by_supertype<det_parallel_break_tag, ArgsTy>::value;
+  static const bool hasId = exists_by_supertype<det_id_tag, ArgsTy>::value;
 
-  static const bool useLocalState = exists_by_supertype<has_deterministic_local_state_tag, ArgsTy>::value;
-  static const bool hasFixedNeighborhood = exists_by_supertype<has_fixed_neighborhood_tag, ArgsTy>::value;
-  static const bool hasIntentToRead = exists_by_supertype<has_intent_to_read_tag, ArgsTy>::value;
+  static const bool useLocalState = exists_by_supertype<local_state_tag, ArgsTy>::value;
+  static const bool hasFixedNeighborhood = exists_by_supertype<fixed_neighborhood_tag, ArgsTy>::value;
+  static const bool hasIntentToRead = exists_by_supertype<intent_to_read_tag, ArgsTy>::value;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
@@ -505,17 +505,17 @@ struct OptionsBase: public OptionsCommon<T, FunctionTy, ArgsTy> {
 template<typename T, typename FunctionTy, typename ArgsTy>
 struct OptionsBase<T, FunctionTy, ArgsTy, true>: public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
-  typedef typename get_type_by_supertype<has_neighborhood_visitor_tag, ArgsTy>::type::type function1_type;
+  typedef typename get_type_by_supertype<neighborhood_visitor_tag, ArgsTy>::type::type function1_type;
 
   function1_type fn1;
 
   OptionsBase(const FunctionTy& f, ArgsTy a):
     SuperTy(f, a), 
-    fn1(get_by_supertype<has_neighborhood_visitor_tag>(a).value) { }
+    fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) { }
 };
 
 template<typename T, typename FunctionTy, typename ArgsTy>
-using Options = OptionsBase<T, FunctionTy, ArgsTy, exists_by_supertype<has_neighborhood_visitor_tag, ArgsTy>::value>;
+using Options = OptionsBase<T, FunctionTy, ArgsTy, exists_by_supertype<neighborhood_visitor_tag, ArgsTy>::value>;
 
 
 template<typename OptionsTy, bool Enable>
@@ -680,7 +680,7 @@ template<typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  typedef typename get_type_by_supertype<has_deterministic_local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
+  typedef typename get_type_by_supertype<local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
 
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
@@ -732,14 +732,14 @@ public:
 
 template<typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
-  typedef typename get_type_by_supertype<has_deterministic_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
+  typedef typename get_type_by_supertype<det_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
   BreakFn breakFn;
   substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
 public:
   BreakManagerBase(const OptionsTy& o): 
-    breakFn(get_by_supertype<has_deterministic_parallel_break_tag>(o.args).value),
+    breakFn(get_by_supertype<det_parallel_break_tag>(o.args).value),
     barrier(getBarrier(activeThreads)) { }
 
   bool checkBreak() {
@@ -934,12 +934,12 @@ struct IdManagerBase {
 template<typename OptionsTy>
 class IdManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename get_type_by_supertype<has_deterministic_id_tag, typename OptionsTy::args_type>::type::type IdFn;
+  typedef typename get_type_by_supertype<det_id_tag, typename OptionsTy::args_type>::type::type IdFn;
   IdFn idFn;
 
 public:
   IdManagerBase(const OptionsTy& o):
-    idFn(get_by_supertype<has_deterministic_id_tag>(o.args).value) {}
+    idFn(get_by_supertype<det_id_tag>(o.args).value) {}
   uintptr_t id(const value_type& x) { return idFn(x); }
 };
 

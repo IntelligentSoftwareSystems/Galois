@@ -42,10 +42,10 @@ public:
   };
 
   typedef std::tuple<
-    galois::has_fixed_neighborhood<>,
-    galois::has_deterministic_id<DeterministicId>,
-    galois::has_deterministic_local_state<LocalState>,
-    galois::needs_per_iter_alloc<>
+    galois::fixed_neighborhood,
+    galois::det_id<DeterministicId>,
+    galois::local_state<LocalState>,
+    galois::per_iter_alloc,
   > function_traits;
 
   Process(Graph& g, galois::GAccumulator<size_t>& w): graph(g), weight(w) { }

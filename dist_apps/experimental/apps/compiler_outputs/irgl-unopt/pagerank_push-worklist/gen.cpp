@@ -420,7 +420,6 @@ struct PageRank {
   const float &local_alpha;
   cll::opt<float> &local_tolerance;
   Graph* graph;
-  typedef int tt_does_not_need_aborts;
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g): local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
@@ -474,7 +473,7 @@ struct PageRank {
     		galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
-    galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, galois::workList_version(), galois::does_not_need_aborts<>(), galois::loopname("PageRank"), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));
+    galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, galois::workList_version(), galois::no_conflicts(), galois::loopname("PageRank"), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(WorkItem src, galois::UserContext<WorkItem>& ctx) const {

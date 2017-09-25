@@ -633,15 +633,15 @@ struct AsyncTrussTxAlgo {
     galois::for_each_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
       galois::loopname("PickUnsupportedEdges"),
-      galois::does_not_need_aborts<>(),
-      galois::does_not_need_push<>(),
-      galois::needs_per_iter_alloc<>()
+      galois::no_conflicts(),
+      galois::no_pushes(),
+      galois::per_iter_alloc()
     );
 
     galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
       galois::loopname("PropagateEdgeRemoval"),
-      galois::needs_per_iter_alloc<>()
+      galois::per_iter_alloc()
     );
   } // end operator()
 }; // end AsyncTrussTxAlgo
@@ -765,15 +765,15 @@ struct AsyncTrussTxAlgo {
     galois::for_each_local(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
       galois::loopname("PickUnsupportedEdges"),
-      galois::does_not_need_aborts<>(),
-      galois::does_not_need_push<>(),
-      galois::needs_per_iter_alloc<>()
+      galois::no_conflicts(),
+      galois::no_pushes(),
+      galois::per_iter_alloc()
     );
 
     galois::for_each_local(unsupported,
       PropagateEdgeRemoval{g, k-2},
       galois::loopname("PropagateEdgeRemoval"),
-      galois::needs_per_iter_alloc<>()
+      galois::per_iter_alloc()
     );
   } // end operator()
 }; // end AsyncTrussAlgo
