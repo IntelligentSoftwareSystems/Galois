@@ -3,7 +3,7 @@
 
 #include <atomic>
 #include <type_traits>
-#include "Galois/Runtime/Extra_dist_traits.h"
+#include "galois/runtime/Extra_dist_traits.h"
 
 namespace galois {
 
