@@ -9,7 +9,7 @@ target_link_libraries(lonestar galois_shmem gllvm)
 #add_subdirectory(avi)
 
 add_subdirectory(barneshut)
-add_subdirectory(betweennesscentrality)
+#add_subdirectory(betweennesscentrality) # TODO: use lambdas in for_each/do_all and remove old style traits
 add_subdirectory(bfs)
 add_subdirectory(boruvka)
 add_subdirectory(clustering)

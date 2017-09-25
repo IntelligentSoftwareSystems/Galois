@@ -62,51 +62,17 @@ typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>,void>::wit
 
 typedef Graph::GraphNode GNode;
 
-static const bool trackWork = false;
-static galois::Statistic* BadWork;
-static galois::Statistic* WLEmptyWork;
+constexpr static const bool TRACK_WORK = false;
 
 #include "Lonestar/BFS_SSSP.h"
 
 
-struct BFS {
-  Graph& graph;
-  BFS(Graph& g) : graph(g) {}
-  void operator()(UpdateRequest& req,
-                  galois::UserContext<UpdateRequest>& ctx) {
-    const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-    Dist sdist = graph.getData(req.n, flag);
-    
-    if (req.w != sdist) {
-      if (trackWork)
-        *WLEmptyWork += 1;
-      return;
-    }
-    
-    for (auto ii : graph.edges(req.n, flag)) {
-      GNode dst = graph.getEdgeDst(ii);
-      auto& ddist  = graph.getData(dst, flag);
-      Dist newDist = sdist + 1;
-      Dist oldDist = ddist;
-      while (newDist < oldDist) {
-        if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-          if (trackWork && oldDist != DIST_INFINITY)
-            *BadWork += 1;
-          ctx.push(UpdateRequest(dst, newDist));
-        }
-      }
-    }
-  }
-};
-
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  if (trackWork) {
-    BadWork     = new galois::Statistic("BadWork");
-    WLEmptyWork = new galois::Statistic("EmptyWork");
-  }
+  galois::GAccumulator<size_t> BadWork;
+  galois::GAccumulator<size_t> WLEmptyWork;
 
   galois::StatTimer T("OverheadTime");
   T.start();
@@ -152,7 +118,36 @@ int main(int argc, char** argv) {
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
-  galois::for_each(UpdateRequest{source, 0}, BFS{graph}, galois::wl<BSWL>(), galois::does_not_need_aborts<>());
+
+  galois::for_each(UpdateRequest{source, 0}
+      , [&] (const UpdateRequest& req, auto& ctx) {
+        const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+        Dist sdist = graph.getData(req.n, flag);
+        
+        if (req.w != sdist) {
+          if (TRACK_WORK)
+            WLEmptyWork += 1;
+          return;
+        }
+        
+        for (auto ii : graph.edges(req.n, flag)) {
+          GNode dst = graph.getEdgeDst(ii);
+          auto& ddist  = graph.getData(dst, flag);
+          Dist newDist = sdist + 1;
+          Dist oldDist = ddist;
+          while (newDist < oldDist) {
+            if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
+              if (TRACK_WORK && oldDist != DIST_INFINITY)
+                BadWork += 1;
+              ctx.push(UpdateRequest(dst, newDist));
+            }
+          }
+        }
+      }
+      , galois::wl<BSWL>()
+      , galois::loopname("runBFS")
+      , galois::does_not_need_aborts());
+
   Tmain.stop();
   T.stop();
 
@@ -170,9 +165,9 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (trackWork) {
-    delete BadWork;
-    delete WLEmptyWork;
+  if (TRACK_WORK) {
+    galois::runtime::reportStat_Serial("BFS", "BadWork", BadWork.reduce());
+    galois::runtime::reportStat_Serial("BFS", "EmptyWork", WLEmptyWork.reduce());
   }
 
   return 0;
