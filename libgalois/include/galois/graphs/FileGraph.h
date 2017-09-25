@@ -48,6 +48,8 @@
 #include "galois/substrate/NumaMem.h"
 #include "galois/Accumulator.h"
 
+#include "galois/graphs/GraphHelpers.h"
+
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -350,10 +352,10 @@ public:
 
   bool hasNeighbor(GraphNode N1, GraphNode N2);
 
-  //! Returns the number of nodes in the graph
+  //! Returns the number of nodes in the (sub)graph
   size_t size() const { return numNodes; }
 
-  //! Returns the number of edges in the graph
+  //! Returns the number of edges in the (sub)graph
   size_t sizeEdges() const { return numEdges; }
 
   //! Returns the size of an edge
@@ -370,7 +372,7 @@ public:
   void fromFile(const std::string& filename);
 
   /**
-   * Reads a subgraph corresponding to given range of edges from file.
+   * Reads a subgraph corresponding to given range of nodes and edges from file.
    *
    * An example of use:
    *
