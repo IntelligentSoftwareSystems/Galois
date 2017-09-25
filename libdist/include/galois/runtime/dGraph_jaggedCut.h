@@ -425,9 +425,6 @@ private:
     for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
       // partition based on indegree-count only
 
-      //auto pair = galois::prefix_range(prefixSumOfInEdges, 
-      //    (uint64_t)0U, prefixSumOfInEdges.size(),
-      //    i, base_hGraph::numHosts);
       auto pair = galois::graphs::divideNodesBinarySearch(
         prefixSumOfInEdges.size(), prefixSumOfInEdges.back(),
         0, 1, i, base_hGraph::numHosts, prefixSumOfInEdges).first;
