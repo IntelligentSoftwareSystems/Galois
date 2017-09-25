@@ -208,7 +208,8 @@ void clusterGalois(vector<LeafNode*> & lights) {
 		findMatchingLambda.newNodes=newNodes;
 		findMatchingLambda.tree=tree;
 
-		galois::for_each(workList.begin(),workList.end(),findMatchingLambda);
+    using WL = galois::worklists::dChunkedFIFO<16>;
+		galois::for_each(workList.begin(),workList.end(),findMatchingLambda, galois::wl<WL>(), galois::timeit(), galois::loopname("Main"));
 
 		size += addedNodes.reduce();
 
@@ -326,7 +327,7 @@ void clusterSerial(vector<LeafNode*> & lights) {
 }
 ///////////////////////////////////////////
 int main(int argc, char ** argv){
-  galois::StatManager M;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 	std::cout<<"Starting Clustering app...["<<numPoints<<"]"<<std::endl;
 	//Initializing...
