@@ -98,11 +98,23 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
       auto& primary = (token == "input") ? inputs : outputs;
       for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
         fRd.pushToken(token);
-        VerilogPin *pin = new VerilogPin;
-        pin->name = getWireName(fRd);
-        pin->gate = nullptr;
-        pin->wire = nullptr;
-        primary.insert({pin->name, pin});
+        std::string name = getWireName(fRd);
+        // pin for I/O
+        if (!primary.count(name)) {
+          VerilogPin *pin = new VerilogPin;
+          pin->name = name;
+          pin->gate = nullptr;
+          pin->wire = nullptr;
+          primary.insert({pin->name, pin});
+        }
+        // wire for I/O
+        if (!wires.count(name)) {
+          VerilogWire *wire = new VerilogWire;
+          wire->name = name;
+          wire->root = nullptr;
+          wire->wireLoad = cellLib->defaultWireLoad;
+          wires.insert({wire->name, wire});
+        }
       }
     }
 
@@ -110,11 +122,14 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
     else if (token == "wire") {
       for (token = fRd.nextToken(); token != ";"; token = fRd.nextToken()) {
         fRd.pushToken(token);
-        VerilogWire *wire = new VerilogWire;
-        wire->name = getWireName(fRd);
-        wire->root = nullptr;
-        wire->wireLoad = cellLib->defaultWireLoad;
-        wires.insert({wire->name, wire});
+        std::string wireName = getWireName(fRd);
+        if (!wires.count(wireName)) {
+          VerilogWire *wire = new VerilogWire;
+          wire->name = wireName;
+          wire->root = nullptr;
+          wire->wireLoad = cellLib->defaultWireLoad;
+          wires.insert({wire->name, wire});
+        }
       }
     }
 
@@ -335,4 +350,3 @@ void VerilogModule::write(std::string outName) {
 
   of << "endmodule" << std::endl;
 }
-
