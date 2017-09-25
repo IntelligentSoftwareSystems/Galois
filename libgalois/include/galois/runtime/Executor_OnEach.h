@@ -79,7 +79,7 @@ inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
         std::make_tuple(loopname_tag{}),
-        std::make_tuple(default_loopname{})));
+        std::make_tuple(loopname{})));
 
   constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
   CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);

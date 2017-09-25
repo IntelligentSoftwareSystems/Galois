@@ -180,11 +180,6 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
     if (p == nullptr) { p = "ANON_LOOP"; }
   }
 };
-
-struct default_loopname: public loopname {
-  default_loopname (void): loopname ("ANON_LOOP") {}
-};
-
 /**
    - * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}
    - */
@@ -388,7 +383,7 @@ namespace internal {
  * chunk size is regulated to be within [chunk_size_tag::MIN, chunk_size_tag::MAX]
  */
 
-template <unsigned SZ> 
+template <unsigned SZ=16> 
 struct chunk_size: 
   // public trait_has_svalue<unsigned, internal::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
   public trait_has_value<unsigned>, chunk_size_tag {    
@@ -402,7 +397,6 @@ struct chunk_size:
   chunk_size (unsigned cs=SZ): trait_has_value (regulate (cs)) {}
 };
 
-struct default_chunk_size: public chunk_size<16> {};
 } // close namespace galois
 
 

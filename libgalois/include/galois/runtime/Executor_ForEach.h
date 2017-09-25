@@ -552,7 +552,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto xtpl = std::tuple_cat(ftpl, 
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(default_loopname {}, wl<defaultWL>())));
+            std::make_tuple(loopname {}, wl<defaultWL>())));
 
     constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
@@ -573,7 +573,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto xtpl = std::tuple_cat(ftpl, 
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(default_loopname {}, wl<defaultWL>())));
+            std::make_tuple(loopname {}, wl<defaultWL>())));
 
     constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);

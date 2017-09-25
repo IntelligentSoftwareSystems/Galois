@@ -662,7 +662,7 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
         std::make_tuple (loopname_tag {}, chunk_size_tag {}, steal_tag{}), 
-        std::make_tuple (default_loopname {}, default_chunk_size {}, steal<>{} )));
+        std::make_tuple (loopname {}, chunk_size<> {}, steal<>{} )));
 
   using ArgsT = decltype(argsT);
 
