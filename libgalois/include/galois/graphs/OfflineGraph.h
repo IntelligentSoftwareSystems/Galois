@@ -308,6 +308,9 @@ public:
 
   /**
    * Accesses the prefix sum on disk.
+   *
+   * @param n Index into edge prefix sum
+   * @returns The value located at index n in the edge prefix sum array
    */
   uint64_t operator[](uint64_t n) { 
     return outIndexs(n);
@@ -334,7 +337,7 @@ public:
   auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, size_t total, 
                     std::vector<unsigned> scaleFactor = std::vector<unsigned>())
       -> GraphRange {
-    return galois::graphs::divideNodesBinarySearch<OfflineGraph, uint64_t>(
+    return galois::graphs::divideNodesBinarySearch<OfflineGraph>(
       numNodes, numEdges, nodeWeight, edgeWeight, id, total, *this, scaleFactor);
   }
 };
@@ -466,7 +469,6 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
 };
 
 } // namespace graphs
-
 } // namespace galois
 
 #endif//_GALOIS_DIST_OFFLINE_GRAPH_
