@@ -1,4 +1,4 @@
-/**-*- C++ -*-
+/**sync_structures.h -*- C++ -*-
  * @file
  * @section License
  *
@@ -65,51 +65,18 @@ enum BITVECTOR_STATUS {
   BOTH_INVALID
 };
 
-bool src_invalid(BITVECTOR_STATUS bv_flag) {
-  return (bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
-          bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
-}
-
-bool dst_invalid(BITVECTOR_STATUS bv_flag) {
-  return (bv_flag == BITVECTOR_STATUS::DST_INVALID || 
-          bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
-}
-
-void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
-  switch(*bv_flag) {
-    case NONE_INVALID:
-      *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
-      break;
-    case DST_INVALID:
-      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
-      break;
-    case SRC_INVALID:
-    case BOTH_INVALID:
-      break;
-  }
-}
-
-void make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
-  switch(*bv_flag) {
-    case NONE_INVALID:
-      *bv_flag = BITVECTOR_STATUS::DST_INVALID;
-      break;
-    case SRC_INVALID:
-      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
-      break;
-    case DST_INVALID:
-    case BOTH_INVALID:
-      break;
-  }
-}
+bool src_invalid(BITVECTOR_STATUS bv_flag);
+bool dst_invalid(BITVECTOR_STATUS bv_flag);
+void make_src_invalid(BITVECTOR_STATUS* bv_flag);
+void make_dst_invalid(BITVECTOR_STATUS* bv_flag);
 
 class FieldFlags {
-private:
+ private:
   uint8_t _s2s;
   uint8_t _s2d;
   uint8_t _d2s;
   uint8_t _d2d;
-public:
+ public:
   BITVECTOR_STATUS bitvectorStatus;
   /**
    * Field Flags constructor. Sets all flags to false
