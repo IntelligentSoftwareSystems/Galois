@@ -27,146 +27,158 @@
  * @section Description
  *
  * Contains functions that can be done on various graphs with a particular
- * interface. Factored out from FileGraph, OfflineGraph, LC_CSR_Graph.
+ * interface.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#ifndef GALOIS_GRAPH_HELPERS
-#define GALOIS_GRAPH_HELPERS
+#ifndef __GALOIS_GRAPH_HELPERS__
+#define __GALOIS_GRAPH_HELPERS__
 
 #include <boost/iterator/counting_iterator.hpp>
 
 namespace galois {
 namespace graphs {
 
-///**
-// * Return a suitable index between an upper bound and a lower bound that
-// * attempts to get close to the target size (i.e. find a good chunk that
-// * corresponds to some size). 
-// *
-// * @tparam GraphClass class of the input graph; should have edge_end function
-// * @tparam NodeType type of node data
-// *
-// * @param inputGraph graph to find index in
-// * @param nodeWeight weight to give to a node in division
-// * @param edgeWeight weight to give to an edge in division
-// * @param targetWeight The amount of weight we want from the returned index
-// * @param lb lower bound to start search from
-// * @param ub upper bound to start search from
-// * @param nodeOffset number of nodes to subtract (offset)
-// * @param edgeOffset number of edges to subtract (offset)
-// */
-//template <typename GraphClass, typename NodeType>
-//inline uint64_t findIndex(GraphClass& inputGraph, size_t nodeWeight, size_t edgeWeight, 
-//                 uint64_t targetWeight, uint64_t lb, uint64_t ub,
-//                 NodeType nodeOffset = 0, uint64_t edgeOffset = 0) {
-//  assert(nodeWeight != 0 || edgeWeight != 0);
-//
-//  while (lb < ub) {
-//    uint64_t mid = lb + (ub - lb) / 2;
-//    uint64_t num_edges = *(inputGraph.edge_begin(mid)) - edgeOffset;
-//    uint64_t weight = (num_edges * edgeWeight) + ((mid - nodeOffset) * nodeWeight);
-//
-//    if (weight < targetWeight)
-//      lb = mid + 1;
-//    else if (weight == targetWeight)
-//      lb = mid + 1;
-//    else
-//      ub = mid;
-//  }
-//
-//  return lb;
-//}
+namespace internal {
 
 /**
  * Return a suitable index between an upper bound and a lower bound that
  * attempts to get close to the target size (i.e. find a good chunk that
  * corresponds to some size) using a prefix sum.
  *
- * TODO
+ * @tparam PrefixSumType type of the object that holds the edge prefix sum
  *
  * @param nodeWeight weight to give to a node in division
  * @param edgeWeight weight to give to an edge in division
  * @param targetWeight The amount of weight we want from the returned index
  * @param lb lower bound to start search from
  * @param ub upper bound to start search from
- * @param edgePrefixSum prefix sum of edges
+ * @param edgePrefixSum prefix sum of edges; may be full or partial prefix
+ * sum of the object you are attempting to split
+ * @param edgeOffset number of edges to subtract from edge count retrieved
+ * from prefix sum; used if array is a partial prefix sum
+ *
+ * @returns The node id that hits (or gets close to) the target size
  */
+// Note: "inline" may be required if PrefixSumType is exactly the same type
+// in 2 different translation units; otherwise it should be fine
 template <typename PrefixSumType>
-inline size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
+size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
                           size_t targetWeight, uint64_t lb, uint64_t ub, 
                           PrefixSumType& edgePrefixSum,
-                          uint64_t nodeOffset = 0, uint64_t edgeOffset = 0) {
+                          uint64_t edgeOffset = 0) {
   assert(nodeWeight != 0 || edgeWeight != 0);
-
-  // TODO offset incorporation
 
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
     size_t num_edges;
 
-
     if (mid != 0) {
-      num_edges = edgePrefixSum[mid - 1];
+      num_edges = edgePrefixSum[mid - 1] - edgeOffset;
     } else {
+      assert(edgeOffset == 0);
       num_edges = 0;
     }
 
-    size_t weight = num_edges * edgeWeight + (mid) * nodeWeight;
+    size_t weight = num_edges * edgeWeight + mid * nodeWeight;
 
-    if (weight <= targetWeight)
+    if (weight <= targetWeight) {
       lb = mid + 1;
-    else
+    } else {
       ub = mid;
+    }
   }
+
   return lb;
 }
 
+/**
+ * Given a number of divisions and a scale factor specifying how much of a 
+ * chunk of blocks each division should get, determine the total number
+ * of blocks to split among all divisions + calculate the prefix sum and
+ * save it in-place to the scaleFactor variable.
+ *
+ * @param numDivisions number of divisions to split blocks among
+ * @param scaleFactor vector specifying how much a particular vision should get
+ *
+ * @returns The total number of blocks to split among all divisions
+ */
+// inline required as GraphHelpers is included in multiple translation units
+inline uint32_t determine_block_division(uint32_t numDivisions, 
+                                         std::vector<unsigned>& scaleFactor) {
+  uint32_t numBlocks = 0;
 
+  if (scaleFactor.empty()) {
+    // if scale factor isn't specified, everyone gets the same amount
+    numBlocks = numDivisions;
+
+    // scale factor holds a prefix sum of the scale factor
+    for (uint32_t i = 0; i < numDivisions; i++) {
+      scaleFactor.push_back(i + 1);
+    }
+  } else {
+    assert(scaleFactor.size() == numDivisions);
+    assert(numDivisions >= 1);
+
+    // get numDivisions number of blocks we need + save a prefix sum of the scale
+    // factor vector to scaleFactor
+    for (uint32_t i = 0; i < numDivisions; i++) {
+      numBlocks += scaleFactor[i];
+      scaleFactor[i] = numBlocks;
+    }
+  }
+
+  return numBlocks;
+}
+} // end namespace internal
 
 /** 
  * Returns 2 ranges (one for nodes, one for edges) for a particular division.
  * The ranges specify the nodes/edges that a division is responsible for. The
  * function attempts to split them evenly among threads given some kind of
- * weighting
+ * weighting for both nodes and edges.
  *
- * TODO
+ * Assumes the parameters passed in apply to a local portion of whatever
+ * is being divided (i.e. concept of a "global" object is abstracted away in
+ * some sense)
+ *
+ * @tparam PrefixSumType type of the object that holds the edge prefix sum
+ * @tparam NodeType size of the type representing the node
  *
  * @param nodeWeight weight to give to a node in division
  * @param edgeWeight weight to give to an edge in division
- * @param id Division number you want the ranges for
- * @param total Total number of divisions
+ * @param id Division number you want the range for
+ * @param total Total number of divisions to divide nodes among
+ * @param edgePrefixSum Prefix sum of the edges in the graph
  * @param scaleFactor Vector specifying if certain divisions should get more 
  * than other divisions
- * @param nodeOffset number of nodes to subtract (offset)
- * @param edgeOffset number of edges to subtract (offset)
+ * @param edgeOffset number of edges to subtract from numbers in edgePrefixSum
+ *
+ * @returns A node pair and an edge pair specifying the assigned nodes/edges
+ * to division "id"
  */
-template <typename PrefixSumType, typename NodeType = uint64_t> inline
+// Note: "inline" may be required if PrefixSumType is exactly the same type
+// in 2 different translation units; otherwise it should be fine
+// If inline is used, then apparently you cannot use typedefs, so get rid
+// of those if the need arises.
+template <typename PrefixSumType, typename NodeType = uint64_t> 
 std::pair<std::pair<boost::counting_iterator<NodeType>,
                     boost::counting_iterator<NodeType>>,
           std::pair<boost::counting_iterator<uint64_t>,
                     boost::counting_iterator<uint64_t>>>
-divideNodesBinarySearch(NodeType numNodes,
-                   uint64_t numEdges,
-                   size_t nodeWeight, 
-                   size_t edgeWeight, 
-                   size_t id, 
-                   size_t total,
-                   PrefixSumType& edgePrefixSum, 
+divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
+                   size_t nodeWeight, size_t edgeWeight, size_t id,
+                   size_t total, PrefixSumType& edgePrefixSum,
                    std::vector<unsigned> scaleFactor = std::vector<unsigned>(),
-                   NodeType nodeOffset = 0, 
-                   uint64_t edgeOffset = 0)
-{ 
-
+                   uint64_t edgeOffset = 0) {
   typedef boost::counting_iterator<NodeType> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
 
-  //printf("[%lu] num nodes %lu num edges %lu\n", id, numNodes, numEdges);
-  // deal with corner case
+  // numNodes = 0 corner case
   if (numNodes == 0) {
     return GraphRange(NodeRange(iterator(0), 
                                 iterator(0)), 
@@ -175,79 +187,58 @@ divideNodesBinarySearch(NodeType numNodes,
   }
 
   assert(nodeWeight != 0 || edgeWeight != 0);
-
   assert(total >= 1);
   assert(id >= 0 && id < total);
 
-  //printf("num nodes is %lu num edges is %lu\n", numNodes, numEdges);
-
   // weight of all data
   uint64_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
-
-  // determine number of blocks to divide among total divisions
-  uint32_t numBlocks = 0;
-  if (scaleFactor.empty()) {
-    numBlocks = total;
-
-    // scale factor holds a prefix sum of the scale factor
-    for (uint32_t i = 0; i < total; i++) {
-      scaleFactor.push_back(i + 1);
-    }
-  } else {
-    assert(scaleFactor.size() == total);
-    assert(total >= 1);
-
-    // get total number of blocks we need + save a prefix sum of the scale
-    // factor vector
-    for (uint32_t i = 0; i < total; i++) {
-      numBlocks += scaleFactor[i];
-      scaleFactor[i] = numBlocks;
-    }
-  }
-
+  // determine the number of blocks to divide among total divisions + setup the
+  // scale factor vector if necessary
+  uint32_t numBlocks = internal::determine_block_division(total, scaleFactor);
   // weight of a block (one block for each division by default; if scale
   // factor specifies something different, then use that instead)
   uint64_t blockWeight = (weight + numBlocks - 1) / numBlocks;
 
-  // lower and upper blocks that this division should get using the prefix
-  // sum of scaleFactor calculated above
+  // lower and upper blocks that this division should use determined
+  // using scaleFactor
   uint32_t blockLower;
   if (id != 0) {
     blockLower = scaleFactor[id - 1];
   } else {
     blockLower = 0;
   }
+
   uint32_t blockUpper = scaleFactor[id];
 
   assert(blockLower <= blockUpper);
 
   uint64_t nodesLower;
-  uint64_t nodesUpper;
-  uint64_t edgesLower = numEdges;
-  uint64_t edgesUpper = numEdges;
-
-  // use prefix sums
+  // use prefix sum to find node bounds
   if (blockLower == 0) {
     nodesLower = 0;
   } else {
-    nodesLower = findIndexPrefixSum(nodeWeight, edgeWeight, 
+    nodesLower = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
                                     blockWeight * blockLower, 0, numNodes, 
-                                    edgePrefixSum, nodeOffset, edgeOffset);
+                                    edgePrefixSum, edgeOffset);
   }
-  nodesUpper = findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                  blockWeight * blockUpper, nodesLower, 
-                                  numNodes, edgePrefixSum, nodeOffset, 
-                                  edgeOffset);
 
-  // correct number of edges
+  uint64_t nodesUpper;
+  nodesUpper = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
+                                  blockWeight * blockUpper, nodesLower, 
+                                  numNodes, edgePrefixSum, edgeOffset);
+
+  // get the edges bounds using node lower/upper bounds
+  uint64_t edgesLower = numEdges;
+  uint64_t edgesUpper = numEdges;
+
   if (nodesLower != nodesUpper) {
-    // TODO incorporate offset into this as well
     if (nodesLower != 0) {
-      edgesLower = edgePrefixSum[nodesLower - 1];
+      edgesLower = edgePrefixSum[nodesLower - 1] - edgeOffset;
     } else {
       edgesLower = 0;
     }
-    edgesUpper = edgePrefixSum[nodesUpper - 1];
+
+    edgesUpper = edgePrefixSum[nodesUpper - 1] - edgeOffset;
   }
 
   return GraphRange(NodeRange(iterator(nodesLower), 
@@ -255,7 +246,6 @@ divideNodesBinarySearch(NodeType numNodes,
                     EdgeRange(edge_iterator(edgesLower), 
                               edge_iterator(edgesUpper)));
 }
-
 
 } // end namespace graphs
 } // end namespace galois
