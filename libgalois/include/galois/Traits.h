@@ -344,14 +344,6 @@ struct has_deterministic_local_state: public trait_has_type<T>, has_deterministi
 struct op_tag {};
 
 /**
- * Stats of multiple instance of a loop will be combined 
- * if this tag is passed
- */
-// TODO: delete this feature
-struct combine_stats_by_name_tag {};
-struct combine_stats_by_name: public trait_has_type<bool>, combine_stats_by_name_tag {}; 
-
-/**
  * Array of uint32_t. Could be used for various things, but main use case now
  * is to pass in information for thread work splitting.
  */

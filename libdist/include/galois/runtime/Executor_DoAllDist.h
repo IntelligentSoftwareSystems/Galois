@@ -59,7 +59,6 @@ namespace runtime {
 template<typename FunctionTy, typename RangeTy, typename ArgsTy>
 class DoAllExecutor {
 
-  static const bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
   static const bool STEAL = get_type_by_supertype<do_all_steal_tag, ArgsTy>::type::value;
 
   typedef typename RangeTy::local_iterator iterator;
@@ -150,9 +149,6 @@ public:
       range(r), 
       loopname(get_by_supertype<loopname_tag>(args).getValue())
   {
-    if (!combineStats) {
-      reportLoopInstance(loopname);
-    }
   }
 
   void operator()() {

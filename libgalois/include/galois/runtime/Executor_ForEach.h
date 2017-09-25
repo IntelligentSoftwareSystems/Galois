@@ -171,7 +171,6 @@ public:
   static constexpr bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static constexpr bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static constexpr bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
-  static constexpr bool combineStats = exists_by_supertype<combine_stats_by_name_tag, ArgsTy>::value;
   static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
@@ -373,9 +372,6 @@ protected:
     initTime(loopname, "Init"),
     execTime(loopname, "Execute")
   {
-    if (!combineStats) {
-      // reportLoopInstance(loopname);
-    }
   }
 
   template<typename WArgsTy, int... Is>
