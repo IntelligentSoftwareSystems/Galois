@@ -23,32 +23,12 @@
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
-#include <vector>
-#include <cstdint>
-#include <cassert>
 
-#ifndef _GALOIS_DIST_GLOBAL_OBJECT_H
-#define _GALOIS_DIST_GLOBAL_OBJECT_H
-class GlobalObject {
-  //FIXME: lock?
-  // TODO make a pointer?
-  static std::vector<uintptr_t> allobjs;
-  uint32_t objID;
+#include "galois/runtime/GlobalObj.h"
 
- protected:
-  GlobalObject(const GlobalObject&) = delete;
-  GlobalObject(GlobalObject&&) = delete;
+std::vector<uintptr_t> GlobalObject::allobjs;
 
-  static uintptr_t ptrForObj(unsigned oid);
-
-  template<typename T>
-  GlobalObject(const T* ptr) {
-    objID = allobjs.size();
-    allobjs.push_back(reinterpret_cast<uintptr_t>(ptr));
-  }
-
-  uint32_t idForSelf() const {
-    return objID;
-  }
-};
-#endif//_GALOIS_DIST_GLOBAL_OBJECT_H
+uintptr_t GlobalObject::ptrForObj(unsigned oid){
+  assert(oid < allobjs.size());
+  return allobjs[oid];
+}
