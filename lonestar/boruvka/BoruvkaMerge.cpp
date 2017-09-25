@@ -295,7 +295,7 @@ EdgeDataType runBodyParallel() {
 #ifdef GALOIS_USE_EXP
    Exp::PriAuto<64, Indexer, OBIM, seq_less, seq_gt>::for_each(graph.begin(), graph.end(), process());
 #else
-   galois::for_each_local(graph, process(), galois::wl<OBIM>());
+   galois::for_each_local(graph, process(), galois::wl<OBIM>(), galois::loopname("Main"));
 #endif
    T.stop();
 
@@ -496,7 +496,7 @@ EdgeDataType verify(Graph & g){
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
-   galois::StatManager M;
+   galois::SharedMemSys G;
    LonestarStart(argc, argv, name, desc, url);
    if(use_weighted_rmat)
       readWeightedRMAT(inputfile.c_str());
