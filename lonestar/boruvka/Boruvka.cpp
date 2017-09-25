@@ -78,6 +78,7 @@ typedef galois::graphs::LC_CSR_Graph<Node,EdgeData>
 
 typedef Graph::GraphNode GNode;
 
+// TODO: move this inside main
 Graph graph;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
@@ -246,14 +247,17 @@ struct ParallelAlgo {
     init();
 
     galois::do_all_local(graph, Initialize(this)
-        , galois::loopname("Initialize"));
+        , galois::chunk_size<16>(), galois::steal<true>() , galois::loopname("Initialize"));
+
     while (true) {
       while (true) {
         rounds += 1;
 
         std::swap(current, next);
-        galois::do_all_local(*current, Merge(this), galois::loopname("Merge"));
-        galois::do_all_local(*current, Find(this));
+        galois::do_all_local(*current, Merge(this)
+            , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Merge"));
+        galois::do_all_local(*current, Find(this)
+            , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Find"));
         current->clear();
 
         if (next->empty())
