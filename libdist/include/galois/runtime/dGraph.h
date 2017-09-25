@@ -492,31 +492,7 @@ private:
     }
 
     auto& net = galois::runtime::getSystemNetworkInterface();
-    #ifdef SERIALIZE_COMPUTE_MASTERS
-    if (id == 0) {
-      // compute owners for all hosts and send that info to all hosts
-      galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
-                           numHosts*DecomposeFactor,
-                           gid2host, 0, scalefactor);
-      for (unsigned h = 1; h < numHosts; ++h) {
-        galois::runtime::SendBuffer b;
-        galois::runtime::gSerialize(b, gid2host);
-        net.sendTagged(h, galois::runtime::evilPhase, b);
-      }
-      net.flush();
-    } else {
-      // receive computed owners from host 0
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first == 0);
-      auto& b = p->second;
-      galois::runtime::gDeserialize(b, gid2host);
-    }
-    ++galois::runtime::evilPhase;
-    #else
+
     gid2host.resize(numHosts*DecomposeFactor);
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       auto r = g.divideByNode(0, edgeWeightOfMaster, (id + d * numHosts), 
@@ -558,7 +534,6 @@ private:
        //ss << i << "  : " << gid2host[i].first << " , " << gid2host[i].second << "\n";
        //std::cerr << ss.str();
     //}
-    #endif
   }
 
   //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
@@ -589,31 +564,6 @@ private:
       edgeWeightOfMaster = 1;
     }
     auto& net = galois::runtime::getSystemNetworkInterface();
-    #ifdef SERIALIZE_COMPUTE_MASTERS
-    if (id == 0) {
-      // compute owners for all hosts and send that info to all hosts
-      galois::prefix_range(g, (uint64_t)0U, numNodes_to_divide,
-                           numHosts,
-                           gid2host, nodeWeightOfMaster, scalefactor);
-      for (unsigned h = 1; h < numHosts; ++h) {
-        galois::runtime::SendBuffer b;
-        galois::runtime::gSerialize(b, gid2host);
-        net.sendTagged(h, galois::runtime::evilPhase, b);
-      }
-      net.flush();
-    } else {
-      // receive computed owners from host 0
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first == 0);
-      auto& b = p->second;
-      galois::runtime::gDeserialize(b, gid2host);
-    }
-    ++galois::runtime::evilPhase;
-    #else
     gid2host.resize(numHosts);
     auto r = g.divideByNode(nodeWeightOfMaster, edgeWeightOfMaster, id, numHosts, scalefactor);
     gid2host[id].first = *r.first.first;
@@ -638,7 +588,6 @@ private:
       ++received;
     }
     ++galois::runtime::evilPhase;
-    #endif
   }
 
 protected:
