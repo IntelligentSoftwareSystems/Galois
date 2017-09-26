@@ -178,38 +178,35 @@ struct IdLess {
  * Thesis. Universitat Karlsruhe. 2007.
  */
 struct NodeIteratorAlgo {
-  galois::GAccumulator<size_t> numTriangles;
-  
-  struct Process {
-    NodeIteratorAlgo* self;
-    Process(NodeIteratorAlgo* s): self(s) { }
-
-    void operator()(const GNode& n, galois::UserContext<GNode>&) const { operator()(n); }
-    void operator()(const GNode& n) const {
-      // Partition neighbors
-      // [first, ea) [n] [bb, last)
-      Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
-      Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
-
-      for (; bb != last; ++bb) {
-        GNode B = graph.getEdgeDst(bb);
-        for (auto aa = first; aa != ea; ++aa) {
-          GNode A = graph.getEdgeDst(aa);
-          Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
-          if (it != ev && graph.getEdgeDst(it) == B) {
-            self->numTriangles += 1;
-          }
-        }
-      }
-    }
-  };
 
   void operator()() { 
-    galois::do_all_local(graph, Process(this));
+    galois::GAccumulator<size_t> numTriangles;
+
+    galois::do_all_local(graph, 
+        [&] (const GNode& n) {
+          // Partition neighbors
+          // [first, ea) [n] [bb, last)
+          Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
+          Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
+
+          for (; bb != last; ++bb) {
+            GNode B = graph.getEdgeDst(bb);
+            for (auto aa = first; aa != ea; ++aa) {
+              GNode A = graph.getEdgeDst(aa);
+              Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
+              Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
+              Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
+              if (it != ev && graph.getEdgeDst(it) == B) {
+                numTriangles += 1;
+              }
+            }
+          }
+        }
+        , galois::chunk_size<32>() // TODO: tune
+        , galois::loopname("NodeIteratorAlgo"));
+
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
@@ -247,7 +244,6 @@ struct HybridAlgo {
   //! Node iterator algorithm + populate 
   template<bool HasLimit>
   struct ProcessLow {
-    typedef int tt_does_not_need_aborts;
     HybridAlgo* self;
     ProcessLow(HybridAlgo* s): self(s) { }
 
@@ -286,18 +282,9 @@ struct HybridAlgo {
     size_t limitIdx;
 
     WriteAdjacency(HybridAlgo* s): self(s) { 
-      limitIdx = graph.getData(self->limit, galois::MethodFlag::UNPROTECTED);
     }
 
     void operator()(const GNode& n) const {
-      size_t nidx = graph.getData(n, galois::MethodFlag::UNPROTECTED) - limitIdx;
-      for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-        GNode dst = graph.getEdgeDst(edge);
-        if (dst < self->limit)
-          continue;
-        size_t didx = graph.getData(dst, galois::MethodFlag::UNPROTECTED) - limitIdx;
-        self->adjacency(nidx, didx) = 1;
-      }
     }
   };
 
@@ -321,6 +308,9 @@ struct HybridAlgo {
   }
 
   void operator()() {
+
+    using WL = galois::worklists::dChunkedFIFO<32>; // tune
+
     if (getenv("GALOIS_DO_NOT_BIND_MAIN_THREAD") == 0) {
       std::cerr << "To enable full parallelization, set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD=1\n";
     }
@@ -336,7 +326,23 @@ struct HybridAlgo {
         std::cout << "Processing high degree nodes\n";
         adjacency.resize(numHighNodes, numHighNodes);
         adjacency.setZero();
-        galois::do_all(limitIterator, graph.end(), WriteAdjacency(this));
+
+        size_t limitIdx = graph.getData(this->limit, galois::MethodFlag::UNPROTECTED);
+
+        galois::do_all(limitIterator, graph.end()
+            , [&, self=this] (const GNode& n) {
+              size_t nidx = graph.getData(n, galois::MethodFlag::UNPROTECTED) - limitIdx;
+              for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
+                GNode dst = graph.getEdgeDst(edge);
+                if (dst < self->limit)
+                  continue;
+                size_t didx = graph.getData(dst, galois::MethodFlag::UNPROTECTED) - limitIdx;
+                self->adjacency(nidx, didx) = 1;
+              }
+
+            }
+            , galois::loopname("WriteAdjacency"));
+
         // Compute matrix^3
         galois::StatTimer Tmm("MMTime");
         Tmm.start();
@@ -350,10 +356,16 @@ struct HybridAlgo {
         numTriangles += high;
       }
       std::cout << "Processing low degree nodes\n";
-      galois::for_each_local(graph, ProcessLow<true>(this));
+      galois::for_each_local(graph, ProcessLow<true>(this)
+          , galois::loopname("HybridAlgo-1")
+          , galois::no_conflicts()
+          , galois::wl<WL>());
 
     } else {
-      galois::for_each_local(graph, ProcessLow<false>(this));
+      galois::for_each_local(graph, ProcessLow<false>(this)
+          , galois::loopname("HybridAlgo-2")
+          , galois::no_conflicts()
+          , galois::wl<WL>());
     }
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
@@ -380,47 +392,36 @@ struct EdgeIteratorAlgo {
     WorkItem(const GNode& a1, const GNode& a2): src(a1), dst(a2) { }
   };
 
-  galois::InsertBag<WorkItem> items;
-  galois::GAccumulator<size_t> numTriangles;
-
-  struct Initialize {
-    EdgeIteratorAlgo* self;
-    Initialize(EdgeIteratorAlgo* s): self(s) { }
-
-    void operator()(GNode n) const {
-      for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-        GNode dst = graph.getEdgeDst(edge);
-        if (n < dst)
-          self->items.push(WorkItem(n, dst));
-      }
-    }
-  };
-
-  struct Process {
-    typedef int tt_does_not_need_aborts;
-    EdgeIteratorAlgo* self;
-    Process(EdgeIteratorAlgo* s): self(s) { }
-
-    void operator()(const WorkItem& w, galois::UserContext<WorkItem>&) { (*this)(w); }
-    void operator()(const WorkItem& w) {
-      // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
-      Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
-
-      Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
-      Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
-      Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
-      Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
-
-      self->numTriangles += countEqual(graph, aa, ea, bb, eb);
-    }
-  };
-
   void operator()() { 
-    galois::do_all(graph.begin(), graph.end(), Initialize(this));
-    galois::for_each_local(items, Process(this));
+    galois::InsertBag<WorkItem> items;
+    galois::GAccumulator<size_t> numTriangles;
+
+    galois::do_all(graph.begin(), graph.end(), 
+        [&, self=this] (GNode n) {
+          for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst = graph.getEdgeDst(edge);
+            if (n < dst)
+              items.push(WorkItem(n, dst));
+          }
+        }
+        , galois::loopname("Initialize"));
+
+    galois::do_all_local(items, 
+        [&] (const WorkItem& w) {
+          // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
+          Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
+
+          Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
+          Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
+          Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
+          Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
+
+          numTriangles += countEqual(graph, aa, ea, bb, eb);
+        },
+        galois::loopname("EdgeIteratorAlgo"));
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
@@ -462,7 +463,7 @@ void makeGraph(const std::string& triangleFilename) {
   }
 
   galois::graphs::permute<void>(initial, p, permuted);
-  galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); });
+  galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); }, galois::no_stats());
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.toFile(triangleFilename);
@@ -492,7 +493,7 @@ void readGraph() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   galois::StatTimer Tinitial("InitializeTime");
