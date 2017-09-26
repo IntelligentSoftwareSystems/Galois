@@ -72,62 +72,26 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
+#include "llvm/Support/CommandLine.h"
+
 namespace cll = llvm::cl;
-#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-static cll::opt<unsigned> buffSize("sendBuffSize",
-                       cll::desc("max size for send buffers in element count"),
-                       cll::init(4096));
-#endif
-
-static cll::opt<bool> useGidMetadata("useGidMetadata",
-  cll::desc("Use Global IDs in indices metadata (only when -metadata=2)"),
-  cll::init(false));
-
-static cll::opt<bool> useNumaAlloc("useNumaAlloc",
-                             cll::desc("Setting to use numa allocation"),
-                             cll::init(false));
-
-static cll::opt<bool> edgeNuma("edgeNuma",
-                             cll::desc("Flag to use exp. edge-centric "
-                             "numa allocation for threads"),
-                             cll::init(false));
 
 enum MASTERS_DISTRIBUTION {
   BALANCED_MASTERS, BALANCED_EDGES_OF_MASTERS, BALANCED_MASTERS_AND_EDGES
 };
 
-static cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
-                               cll::desc("Type of masters distribution."),
-                               cll::values(
-                                 clEnumValN(BALANCED_MASTERS, "nodes",
-                                            "Balance nodes only"),
-                                 clEnumValN(BALANCED_EDGES_OF_MASTERS, "edges",
-                                            "Balance edges only (default)"),
-                                 clEnumValN(BALANCED_MASTERS_AND_EDGES, "both",
-                                            "Balance both nodes and edges"),
-                                 clEnumValEnd
-                               ),
-                               cll::init(BALANCED_EDGES_OF_MASTERS));
+#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
+extern cll::opt<unsigned> buffSize;
+#endif
 
-static cll::opt<uint32_t> nodeWeightOfMaster("nodeWeight",
-                             cll::desc("Determines weight of nodes when "
-                             "distributing masterst to hosts"),
-                             cll::init(0));
-
-static cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight",
-                             cll::desc("Determines weight of edges when "
-                             "distributing masters to hosts"),
-                             cll::init(0));
-
-static cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges",
-                             cll::desc("Determines weight of nodes when "
-                             "partitioning among threads"),
-                             cll::init(0));
-
-static cll::opt<unsigned> numFileThreads("ft",
-                             cll::desc("Number of file reading threads or I/O "
-                             "requests per host"),
-                             cll::init(4));
+extern cll::opt<bool> useGidMetadata;
+extern cll::opt<bool> useNumaAlloc;
+extern cll::opt<bool> edgeNuma;
+extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
+extern cll::opt<uint32_t> nodeWeightOfMaster;
+extern cll::opt<uint32_t> edgeWeightOfMaster;
+extern cll::opt<uint32_t> nodeAlphaRanges;
+extern cll::opt<unsigned> numFileThreads;
 
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
@@ -148,7 +112,6 @@ enum ReadLocation { readSource, readDestination, readAny };
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
          bool BSPEdge = false>
 class hGraph: public GlobalObject {
-
   constexpr static const char* const GRNAME = "dGraph";
 
 public:
