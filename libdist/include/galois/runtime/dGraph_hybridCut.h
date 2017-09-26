@@ -33,7 +33,6 @@
 #include "galois/runtime/dGraph.h"
 #include <boost/dynamic_bitset.hpp>
 #include "galois/runtime/vecBool_bitset.h"
-#include "galois/runtime/dGraph_edgeAssign_policy.h"
 #include "galois/graphs/FileGraph.h"
 #include <sstream>
 
