@@ -88,26 +88,35 @@ galois::InsertBag<Edge> mst;
  * graph symmetric.
  */
 struct DemoAlgo {
-  Node* root;
-
-  void operator()(GNode src, galois::UserContext<GNode>& ctx) {
-    for (auto ii : graph.edges(src, galois::MethodFlag::WRITE)) {
-      GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-      if (ddata.component() == root)
-        continue;
-      ddata.setComponent(root);
-      mst.push(std::make_pair(src, dst));
-      ctx.push(dst);
-    }
-  }
 
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
+
     if (ii != ei) {
-      root = &graph.getData(*ii);
-      galois::for_each(*ii, *this);
+      Node* root = &graph.getData(*ii);
+
+      galois::for_each(*ii, 
+          [&] (GNode src, auto& ctx) {
+            for (auto ii : graph.edges(src, galois::MethodFlag::WRITE)) {
+              GNode dst = graph.getEdgeDst(ii);
+              Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+              if (ddata.component() == root)
+                continue;
+              ddata.setComponent(root);
+              mst.push(std::make_pair(src, dst));
+              ctx.push(dst);
+            }
+          },
+          galois::loopname("DemoAlgo"));
     }
+  }
+};
+
+//! Normalize component by doing find with path compression
+struct Normalize {
+  void operator()(const GNode& src) const {
+    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+    sdata.setComponent(sdata.findAndCompress());
   }
 };
 
@@ -115,37 +124,28 @@ struct DemoAlgo {
  * Like asynchronous connected components algorithm. 
  */
 struct AsyncAlgo {
-  struct Merge {
-    galois::Statistic& emptyMerges;
-    Merge(galois::Statistic& e): emptyMerges(e) { }
-
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-        GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-        if (sdata.merge(&ddata)) {
-          mst.push(std::make_pair(src, dst));
-        } else {
-          emptyMerges += 1;
-        }
-      }
-    }
-  };
-
-  //! Normalize component by doing find with path compression
-  struct Normalize {
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      sdata.setComponent(sdata.findAndCompress());
-    }
-  };
 
   void operator()() {
-    galois::Statistic emptyMerges("EmptyMerges");
-    galois::do_all_local(graph, Merge(emptyMerges),
+    galois::GAccumulator<size_t> emptyMerges;
+
+    galois::do_all_local(graph, 
+        [&] (const GNode& src) {
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst = graph.getEdgeDst(ii);
+            Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            if (sdata.merge(&ddata)) {
+              mst.push(std::make_pair(src, dst));
+            } else {
+              emptyMerges += 1;
+            }
+          }
+        },
         galois::loopname("Merge"), galois::steal<true>());
+
     galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
+
+    galois::runtime::reportStat_Serial("SpanningTree", "emptyMerges", emptyMerges.reduce());
   }
 };
 
@@ -158,62 +158,53 @@ struct BlockedAsyncAlgo {
     Graph::edge_iterator start;
   };
 
-  struct Merge {
-    typedef int tt_does_not_need_aborts;
+  template<bool MakeContinuation, int Limit, typename Pusher>
+  static void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) {
+    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+    int count = 0;
+    for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+      ++count;
+      GNode dst = graph.getEdgeDst(ii);
+      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+      if (sdata.merge(&ddata)) {
+        mst.push(std::make_pair(src, dst));
+        if (Limit == 0 || count != Limit)
+          continue;
+      }
 
-    galois::InsertBag<WorkItem>& items;
-
-    //! Add the next edge between components to the worklist
-    template<bool MakeContinuation, int Limit, typename Pusher>
-    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      int count = 0;
-      for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-        ++count;
-        GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-        if (sdata.merge(&ddata)) {
-          mst.push(std::make_pair(src, dst));
-          if (Limit == 0 || count != Limit)
-            continue;
-        }
-
-        if (MakeContinuation || (Limit != 0 && count == Limit)) {
-          WorkItem item = { src, ii + 1 };
-          pusher.push(item);
-          break;
-        }
+      if (MakeContinuation || (Limit != 0 && count == Limit)) {
+        WorkItem item = { src, ii + 1 };
+        pusher.push(item);
+        break;
       }
     }
-
-    void operator()(const GNode& src) const {
-      Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-      if (galois::substrate::ThreadPool::getPackage() == 0) {
-        process<true, 0>(src, start, items);
-      } else {
-        process<true, 1>(src, start, items);
-      }
-    }
-
-    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) const {
-      process<true, 0>(item.src, item.start, ctx);
-    }
-  };
-
-  //! Normalize component by doing find with path compression
-  struct Normalize {
-    void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      sdata.setComponent(sdata.findAndCompress());
-    }
-  };
+  }
 
   void operator()() {
     galois::InsertBag<WorkItem> items;
-    Merge merge = { items };
-    galois::do_all_local(graph, merge, galois::loopname("Initialize"));
-    galois::for_each_local(items, merge,
-        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
+
+
+    galois::do_all_local(graph, 
+        [&] (const GNode& src) {
+          Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          if (galois::substrate::ThreadPool::getPackage() == 0) {
+            process<true, 0>(src, start, items);
+          } else {
+            process<true, 1>(src, start, items);
+          }
+        },
+        galois::loopname("Initialize"));
+
+    galois::for_each_local(items, 
+        [&] (const WorkItem& i, auto& ctx) {
+          process<true, 0>(i.src, i.start, ctx);
+          
+        },
+        galois::loopname("Merge"), 
+        galois::no_conflicts(),
+        galois::wl<galois::worklists::dChunkedFIFO<128> >());
+
+    //! Normalize component by doing find with path compression
     galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
   }
 };
@@ -292,7 +283,7 @@ void run() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   galois::StatTimer Tinitial("InitializeTime");
