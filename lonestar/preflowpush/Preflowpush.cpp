@@ -609,7 +609,7 @@ struct Process {
   typedef std::tuple<
     galois::parallel_break,
     galois::per_iter_alloc,
-    galois::local_state<LocalState>
+    galois::local_state<LocalState>,
     galois::det_id<DeterministicId>
   > function_traits;
 
@@ -852,9 +852,9 @@ void run() {
               galois::loopname("Discharge"),
               galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-              galois::has_deterministic_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak())
+              galois::det_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak())
 #else
-              galois::make_trait_with_args<galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+              galois::make_trait_with_args<galois::det_parallel_break>(fn.getParallelBreak())
 #endif
               );
         }
@@ -867,9 +867,9 @@ void run() {
               galois::loopname("Discharge"),
               galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-              galois::has_deterministic_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak())
+              galois::det_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak())
 #else
-              galois::make_trait_with_args<galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+              galois::make_trait_with_args<galois::det_parallel_break>(fn.getParallelBreak())
 #endif
               );
         }
@@ -896,8 +896,8 @@ void run() {
 
 
 int main(int argc, char** argv) {
-  galois::StatManager M;
-  bool serial = false;
+  galois::SharedMemSys G;
+  constexpr bool serial = false;
   LonestarStart(argc, argv, name, desc, url);
 
   initializeGraph(filename, sourceId, sinkId, &app);
