@@ -36,11 +36,6 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
-
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
@@ -354,16 +349,11 @@ int main(int argc, char** argv) {
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
                     StatTimer_total("TIMER_TOTAL"); 
 
-
   StatTimer_total.start();
-
-  std::vector<unsigned> scaleFactor;
-
   #ifdef __GALOIS_HET_CUDA__
-  SetupHetero(scaleFactor);
-  Graph* hg = LoadDGraph<NodeData, void>(scaleFactor, &cuda_ctx);
+  Graph* hg = distGraphInitialization<NodeData, void>(&cuda_ctx);
   #else
-  Graph* hg = LoadDGraph<NodeData, void>(scaleFactor);
+  Graph* hg = distGraphInitialization<NodeData, void>();
   #endif
 
   // bitset comm setup
