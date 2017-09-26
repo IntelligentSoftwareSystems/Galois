@@ -33,7 +33,6 @@
 
 // TODO/FIXME change printfs to gDebug
 
-
 #ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
@@ -47,10 +46,9 @@
 
 namespace galois {
 namespace graphs {
-
 /**
- * Local computation graph (i.e., graph structure does not change). The data representation
- * is the traditional compressed-sparse-row (CSR) format.
+ * Local computation graph (i.e., graph structure does not change). The data 
+ * representation is the traditional compressed-sparse-row (CSR) format.
  *
  * The position of template parameters may change between Galois releases; the
  * most robust way to specify them is through the with_XXX nested templates.
@@ -67,17 +65,17 @@ namespace graphs {
  * @tparam EdgeTy data on out edges
  */
 template<typename NodeTy, typename EdgeTy,
-  bool HasNoLockable=false,
-  bool UseNumaAlloc=false,
-  bool HasOutOfLineLockable=false,
-  typename FileEdgeTy=EdgeTy>
-class LC_CSR_Graph:
- private boost::noncopyable,
- private internal::LocalIteratorFeature<UseNumaAlloc>,
- private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+         bool HasNoLockable=false,
+         bool UseNumaAlloc=false,
+         bool HasOutOfLineLockable=false,
+         typename FileEdgeTy=EdgeTy>
+class LC_CSR_Graph :
+     private boost::noncopyable,
+     private internal::LocalIteratorFeature<UseNumaAlloc>,
+     private internal::OutOfLineLockableFeature<HasOutOfLineLockable &&
+                                                !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
-
-public:
+ public:
   template<bool _has_id>
   struct with_id { typedef LC_CSR_Graph type; };
 
@@ -112,7 +110,7 @@ public:
 
   typedef read_default_graph_tag read_tag;
 
-protected:
+ protected:
   typedef LargeArray<EdgeTy> EdgeData;
   typedef LargeArray<uint32_t> EdgeDst;
   typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
@@ -120,7 +118,7 @@ protected:
   typedef LargeArray<uint64_t> EdgeIndData;
   typedef LargeArray<NodeInfo> NodeData;
 
-public:
+ public:
   typedef uint32_t GraphNode;
   typedef EdgeTy edge_data_type;
   typedef FileEdgeTy file_edge_data_type;
@@ -133,7 +131,7 @@ public:
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
 
-protected:
+ protected:
   NodeData nodeData;
   EdgeIndData edgeIndData;
   EdgeDst edgeDst;
@@ -142,9 +140,11 @@ protected:
   uint64_t numNodes;
   uint64_t numEdges;
 
-  // used to track division of nodes among threads
+  // used to track division of nodes among threads; for numa aware allocation
+  // + division of work among threads during do_all
   std::vector<uint32_t> threadRanges;
-  // used to track division of edges among threads
+  // used to track division of edges among threads; mainly for numa aware 
+  // allocation of edges
   std::vector<uint64_t> threadRangesEdge;
 
   typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
@@ -200,10 +200,25 @@ protected:
     return n;
   }
 
-public:
+ public:
   LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
   LC_CSR_Graph() = default;
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
+
+  /**
+   * Accesses the "prefix sum" of this graph; takes advantage of the fact
+   * that edge_end(n) is basically prefix_sum[n] (if a prefix sum existed +
+   * if prefix_sum[0] = number of edges in node 0).
+   *
+   * ONLY USE IF GRAPH HAS BEEN LOADED
+   *
+   * @param n Index into edge prefix sum
+   * @returns The value that would be located at index n in an edge prefix sum 
+   * array
+   */
+  uint64_t operator[](uint64_t n) { 
+    return *(edge_end(n));
+  }
 
   /**
    * Clear thread ranges.
@@ -322,11 +337,16 @@ public:
   }
 
   edge_iterator findEdge(GraphNode N1, GraphNode N2) {
-    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { return getEdgeDst(e) == N2; });
+    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { 
+      return getEdgeDst(e) == N2; 
+    });
   }
 
   edge_iterator findEdgeSortedByDst(GraphNode N1, GraphNode N2) {
-    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, [=] (edge_iterator e, GraphNode N) { return getEdgeDst(e) < N; });
+    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, 
+                [=] (edge_iterator e, GraphNode N) { 
+                  return getEdgeDst(e) < N; 
+                });
     return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }
 
@@ -384,7 +404,6 @@ public:
       galois::no_stats());
   }
 
-
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
@@ -410,6 +429,42 @@ public:
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
+  /** 
+   * Returns 2 ranges (one for nodes, one for edges) for a particular division.
+   * The ranges specify the nodes/edges that a division is responsible for. The
+   * function attempts to split them evenly among threads given some kind of
+   * weighting.
+   *
+   * Differs from above version as no prefix sum is passed in; however, you
+   * can use the graph itself as a prefix sum array. Additionally, this
+   * takes into account a node and edge offset since passing in the entire
+   * graph as the prefix sum doesn't work if you only want to divide
+   * a particular portion.
+   *
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param id Division number you want the ranges for
+   * @param total Total number of divisions
+   * @param nodesInRange Number of nodes in the range you want to divide
+   * up (specified by node offset)
+   * @param edgeInRange Number of edges in range you want to divide up
+   * (specified by node offset)
+   * @param nodeOffset Offset to the first node in the range you want
+   * to divide up
+   * @param edgeOffset Offset to the first edge in the range you want
+   * to divide up
+   */
+  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
+                    size_t total, uint32_t nodesInRange, uint64_t edgesInRange,
+                    uint32_t nodeOffset, uint64_t edgeOffset)
+      -> GraphRange {
+    std::vector<unsigned int> dummyScaleFactor;
+    return 
+      galois::graphs::divideNodesBinarySearch<LC_CSR_Graph, uint32_t>(
+        nodesInRange, edgesInRange, nodeWeight, edgeWeight, id, total, *this,
+        dummyScaleFactor, edgeOffset, nodeOffset);
+  }
+
   /**
    * Returns the thread ranges array that specifies division of nodes among
    * threads 
@@ -432,159 +487,61 @@ public:
     return threadRanges;
   }
 
-  // DEPRECATED: do not use, only use 1 that takes prefix sum + nodes
-  ///** 
-  // * Call ONLY after graph is completely constructed. Attempts to more evenly 
-  // * distribute nodes among threads by checking the number of edges per
-  // * node and determining where each thread should start. 
-  // * This should only be done once after graph construction to prevent
-  // * too much overhead.
-  // **/
-  //void determineThreadRanges() {
-  //  if (threadRanges.size() != 0) {
-  //    // other version already called or this is a second call to this;
-  //    // return 
-  //    return;
-  //  }
+  /**
+   * Helper function used by determineThreadRanges that consists of the main
+   * loop over all threads and calls to divide by node to determine the 
+   * division of nodes to threads.
+   *
+   * Saves the ranges to an argument vector provided by the caller.
+   *
+   * @param beginNode Beginning of range
+   * @param endNode End of range, non-inclusive
+   * @param returnRanges Vector to store thread offsets for ranges in
+   * @param nodeAlpha The higher the number, the more weight nodes have in
+   * determining division of nodes (edges have weight 1).
+   */
+  void determineThreadRangesThreadLoop(uint32_t beginNode, uint32_t endNode, 
+                                     std::vector<uint32_t>& returnRanges, 
+                                     uint32_t nodeAlpha) {
+    uint32_t numNodesInRange = endNode - beginNode;
+    uint64_t numEdgesInRange = edge_begin(endNode) - edge_begin(beginNode);
+    uint32_t numThreads = galois::runtime::activeThreads;
+    uint64_t edgeOffset = *edge_begin(beginNode);
 
-  //  uint32_t num_threads = galois::runtime::activeThreads;
-  //  uint32_t total_nodes = end() - begin();
-  //  //printf("nodes is %u\n", total_nodes);
+    returnRanges[0] = beginNode;
+    for (uint32_t i = 0; i < numThreads; i++) {
+      // determine division for thread i
+      auto nodeEdgeSplits = divideByNode(0, 1, i, numThreads, numNodesInRange,
+                                         numEdgesInRange, beginNode, edgeOffset);
 
-  //  threadRanges.resize(num_threads + 1);
+      auto nodeSplits = nodeEdgeSplits.first;
 
-  //  //printf("num owned edges is %lu\n", sizeEdges());
+      // i.e. if there are actually assigned nodes
+      if (nodeSplits.first != nodeSplits.second) {
+        if (i != 0) {
+          assert(returnRanges[i] == *(nodeSplits.first));
+        } else { // i == 0
+          assert(returnRanges[i] == 0);
+        }
+        returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
+      } else {
+        // thread assinged no nodes
+        returnRanges[i + 1] = returnRanges[i];
+      }
 
-  //  // theoretically how many edges we want to distributed to each thread
-  //  uint64_t edges_per_thread = sizeEdges() / num_threads;
-
-  //  //printf("want %lu edges per thread\n", edges_per_thread);
-
-  //  // Case where there are less nodes than threads
-  //  if (num_threads > end() - begin()) {
-  //    iterator current_node = begin();
-  //    uint64_t num_nodes = end() - current_node;
-  //    
-  //    // assign one node per thread (note not all nodes will get a thread in
-  //    // this case
-  //    threadRanges[0] = *current_node;
-  //    for (uint32_t i = 0; i < num_nodes; i++) {
-  //      threadRanges[i+1] = *(++current_node);
-  //    }
-
-  //    // deal with remainder threads
-  //    for (uint32_t i = num_nodes; i < num_threads; i++) {
-  //      threadRanges[i+1] = total_nodes;
-  //    }
-
-  //    return;
-  //  }
-
-  //  // Single node case
-  //  if (num_threads == 1) {
-  //    threadRanges[0] = *(begin());
-  //    threadRanges[1] = total_nodes;
-
-  //    return;
-  //  }
-
-
-  //  uint32_t current_thread = 0;
-  //  uint64_t current_edge_count = 0;
-  //  iterator current_local_node = begin();
-
-  //  threadRanges[current_thread] = *(begin());
-
-  //  //printf("going to determine thread ranges\n");
-
-  //  while (current_local_node != end() && current_thread != num_threads) {
-  //    uint32_t nodes_remaining = end() - current_local_node;
-  //    uint32_t threads_remaining = num_threads - current_thread;
-  //   
-  //    assert(nodes_remaining >= threads_remaining);
-
-  //    if (threads_remaining == 1) {
-  //      // give the rest of the nodes to this thread and get out
-  //      printf("Thread %u has %lu edges and %u nodes (only 1 thread)\n",
-  //             current_thread, 
-  //             edge_end(*(end() - 1)) -
-  //             edge_begin(threadRanges[current_thread]),
-  //             total_nodes - threadRanges[current_thread]);
-
-  //      threadRanges[current_thread + 1] = total_nodes;
-
-  //      break;
-  //    } else if ((end() - current_local_node) == threads_remaining) {
-  //      // Out of nodes to assign: finish up assignments (at this point,
-  //      // each remaining thread gets 1 node) and break
-  //      printf("Out of nodes: assigning the rest of the nodes to remaining "
-  //             "threads\n");
-  //      for (uint32_t i = 0; i < threads_remaining; i++) {
-  //        printf("Thread %u has %lu edges and %u nodes (oon)\n",
-  //               current_thread, 
-  //               edge_end(*current_local_node) -
-  //               edge_begin(threadRanges[current_thread]),
-  //               (*current_local_node) + 1 - threadRanges[current_thread]);
-
-  //        threadRanges[++current_thread] = *(++current_local_node);
-  //      }
-
-  //      assert(current_local_node == end());
-  //      assert(current_thread == num_threads);
-  //      break;
-  //    }
-
-  //    uint64_t num_edges = std::distance(edge_begin(*current_local_node), 
-  //                                       edge_end(*current_local_node));
-
-
-  //    current_edge_count += num_edges;
-  //    //printf("%u has %lu\n", *current_local_node, num_edges);
-  //    //printf("[%u] cur edge count is %lu\n", id, current_edge_count);
-
-  //    if (num_edges > (3 * edges_per_thread / 4)) {
-  //      if (current_edge_count - num_edges > (edges_per_thread / 2)) {
-  //        printf("Thread %u has %lu edges and %u nodes (big)\n",
-  //               current_thread, current_edge_count - num_edges,
-  //               (*current_local_node) - threadRanges[current_thread]);
-
-  //        // else, assign to the NEXT thread (i.e. end this thread and move
-  //        // on to the next)
-  //        // beginning of next thread is current local node (the big one)
-  //        threadRanges[current_thread + 1] = *current_local_node;
-  //        current_thread++;
-
-  //        current_edge_count = 0;
-  //        // go back to beginning of loop without incrementing
-  //        // current_local_node so the loop can handle this next node
-  //        continue;
-  //      }
-  //    }
-
-  //    if (current_edge_count >= edges_per_thread) {
-  //      printf("Thread %u has %lu edges and %u nodes (over)\n",
-  //             current_thread, current_edge_count,
-  //             (*current_local_node) + 1 - threadRanges[current_thread]);
-
-  //      // This thread has enough edges; save end of this node and move on
-  //      // mark beginning of next thread as the next node
-  //      threadRanges[current_thread + 1] = (*current_local_node) + 1;
-  //      current_edge_count = 0;
-  //      current_thread++;
-  //    } 
-  //    
-  //    current_local_node++;
-  //  }
-
-  //  // sanity checks
-  //  assert(threadRanges[0] == 0);
-  //  assert(threadRanges[num_threads] == total_nodes);
-  //  printf("ranges found\n");
-  //}
+      galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i], 
+                     " to ", returnRanges[i+1], ", num edges is ",
+                     edge_begin(returnRanges[i + 1]) - 
+                         edge_begin(returnRanges[i]));
+    }
+  }
 
   /**
    * Determines thread ranges for a given range of nodes and returns it as
-   * an offset vector in the passed in vector.
+   * an offset vector in the passed in vector. (thread ranges = assigned
+   * nodes that a thread should work on)
+   *
+   * Checks for corner cases, then calls the main loop function.
    *
    * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
    * the graph is already constructed.
@@ -593,7 +550,7 @@ public:
    * @param endNode End of range, non-inclusive
    * @param returnRanges Vector to store thread offsets for ranges in
    * @param nodeAlpha The higher the number, the more weight nodes have in
-   * determining division of nodes.
+   * determining division of nodes (edges have weight 1).
    */
   void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
                              std::vector<uint32_t>& returnRanges, 
@@ -603,7 +560,8 @@ public:
 
     returnRanges.resize(num_threads + 1);
 
-    // corner case; assign nothing
+    // check corner cases
+    // no nodes = assign nothing to all threads
     if (beginNode == endNode) {
       returnRanges[0] = beginNode;
       for (uint32_t i = 0; i < num_threads; i++) {
@@ -612,277 +570,47 @@ public:
       return;
     }
 
-    // Single thread case
+    // single thread case; 1 thread gets all
     if (num_threads == 1) {
       returnRanges[0] = beginNode;
       returnRanges[1] = endNode;
-
       return;
+    // more threads than nodes
     } else if (num_threads > total_nodes) {
-      // more threads than nodes
       uint32_t current_node = beginNode;
-
       returnRanges[0] = current_node;
+      // 1 node for threads until out of threads
       for (uint32_t i = 0; i < total_nodes; i++) {
         returnRanges[i+1] = ++current_node;
       }
-
-      // deal with remainder threads
+      // deal with remainder threads; they get nothing
       for (uint32_t i = total_nodes; i < num_threads; i++) {
         returnRanges[i+1] = total_nodes;
       }
-
       return;
     }
 
-    uint64_t node_weight = (uint64_t)total_nodes * (uint64_t)nodeAlpha;
+    // no corner cases: onto main loop over nodes that determines
+    // node ranges
+    determineThreadRangesThreadLoop(beginNode, endNode, returnRanges, nodeAlpha);
 
-    // theoretically how many units we want to distributed to each thread
-    uint64_t units_per_thread = (edge_end(endNode - 1) - edge_begin(beginNode)) /
-                                num_threads + node_weight;
-
-    uint32_t current_thread = 0;
-    uint32_t current_element = beginNode;
-    uint64_t current_unit_count = 0;
-
-    returnRanges[0] = beginNode;
-
-    while (current_element < endNode && current_thread < num_threads) {
-      uint32_t nodes_remaining = endNode - current_element;
-      uint32_t threads_remaining = num_threads - current_thread;
-     
-      assert(nodes_remaining >= threads_remaining);
-
-      if (threads_remaining == 1) {
-        returnRanges[current_thread + 1] = endNode;
-        break;
-      } else if (nodes_remaining == threads_remaining) {
-        // Out of nodes to assign: finish up assignments (at this point,
-        // each remaining thread gets 1 node) and break
-        for (uint32_t i = 0; i < threads_remaining; i++) {
-          current_element++;
-          returnRanges[++current_thread] = current_element;
-        }
-
-        assert(current_element == endNode);
-        assert(current_thread == num_threads);
-        break;
-      }
-
-      // calculate number of units this node is worth
-      uint64_t num_edges = std::distance(edge_begin(current_element), 
-                                         edge_end(current_element));
-      uint64_t num_units = num_edges + nodeAlpha;
-
-      if (num_units > (3 * units_per_thread / 4)) {
-        if (current_unit_count > (units_per_thread / 2)) {
-          assert(current_element != beginNode);
-
-          // assign to the NEXT thread (i.e. end this thread and move
-          // on to the next)
-          // beginning of next thread is current local node (the big one)
-          returnRanges[current_thread + 1] = current_element;
-          current_thread++;
-
-          current_unit_count = 0;
-
-          // go back to beginning of loop without incrementing
-          // current_element so the loop can handle this next node
-          continue;
-        }
-      }
-
-      current_unit_count += num_units;
-
-      if (current_unit_count >= units_per_thread) {
-        // This thread has enough units; save end of this node and move on
-        // mark beginning of next thread as the next node
-        returnRanges[current_thread + 1] = current_element + 1;
-        current_unit_count = 0;
-        current_thread++;
-      } 
-
-      current_element++;
-    }
-
+    #ifndef NDEBUG
     // sanity checks
-    assert(returnRanges[0] == beginNode);
-    assert(returnRanges[num_threads] == endNode);
+    assert(returnRanges[0] == beginNode && 
+           "return ranges begin not the begin node");
+    assert(returnRanges[num_threads] == endNode && 
+           "return ranges end not end node");
+
+    for (uint32_t i = 1; i < numThreads; i++) {
+      assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
+      assert(returnRanges[i] >= returnRanges[i-1]);
+    }
+    #endif
   }
 
   /**
-   * Uses a pre-computed prefix sum of edges to determine division of nodes 
-   * among threads.
-   *
-   * @param totalNodes The total number of nodes (masters + mirrors) on this
-   * partition.
-   * @param edgePrefixSum The edge prefix sum of the nodes on this partition.
-   * @param nodeAlpha The higher the number, the more weight nodes have in
-   * determining division of nodes.
-   */
-  template <typename VectorTy>
-  void determineThreadRanges(uint32_t totalNodes, VectorTy& edgePrefixSum,
-                             uint32_t nodeAlpha=0) {
-    // if we already have thread ranges calculated, do nothing and return
-    if (threadRanges.size() != 0) {
-      return;
-    }
-
-    assert(edgePrefixSum.size() == totalNodes);
-    uint32_t num_threads = galois::runtime::activeThreads;
-
-    threadRanges.resize(num_threads + 1);
-
-    // Single thread case
-    if (num_threads == 1) {
-      threadRanges[0] = 0;
-      threadRanges[1] = totalNodes;
-
-      return;
-    } else if (num_threads > totalNodes) {
-      // more threads than nodes
-      uint32_t current_node = 0;
-
-      threadRanges[0] = current_node;
-      for (uint32_t i = 0; i < totalNodes; i++) {
-        threadRanges[i+1] = ++current_node;
-      }
-
-      // deal with remainder threads
-      for (uint32_t i = totalNodes; i < num_threads; i++) {
-        threadRanges[i+1] = totalNodes;
-      }
-
-      return;
-    }
-
-    uint64_t node_weight = (uint64_t)totalNodes * (uint64_t)nodeAlpha;
-
-    // theoretically how many units we want to distributed to each thread
-    uint64_t units_per_thread = edgePrefixSum[totalNodes - 1] / num_threads +
-                                node_weight;
-
-    galois::gDebug("Optimally want ", units_per_thread, " units per thread");
-
-    uint32_t current_thread = 0;
-    uint32_t current_element = 0;
-
-    uint64_t accounted_edges = 0;
-    uint32_t accounted_elements = 0;
-
-    threadRanges[0] = 0;
-
-    while (current_element < totalNodes && current_thread < num_threads) {
-      uint32_t threads_remaining = num_threads - current_thread;
-
-      assert((totalNodes - current_element) >= threads_remaining);
-
-      if (threads_remaining == 1) {
-        // assign remaining elements to last thread
-        assert(current_thread == num_threads - 1); 
-        threadRanges[current_thread + 1] = totalNodes;
-        //printf("Thread %u begin %u end %u (1 thread)\n", current_thread,
-        //       threadRanges[current_thread], threadRanges[current_thread+1]);
-
-        break;
-      } else if ((totalNodes - current_element) == threads_remaining) {
-        // Out of elements to assign: finish up assignments (at this point,
-        // each remaining thread gets 1 element except for the current
-        // thread which may have some already)
-        for (uint32_t i = 0; i < threads_remaining; i++) {
-          threadRanges[++current_thread] = (++current_element);
-          //printf("Thread %u begin %u end %u (out of element)\n", 
-          //       current_thread-1, threadRanges[current_thread-1], 
-          //       threadRanges[current_thread]);
-        }
-
-        assert(current_element == totalNodes);
-        assert(current_thread == num_threads);
-        break;
-      }
-
-      //
-      // Determine various count numbers from prefix sum
-      //
-
-      // num edges this element has
-      uint64_t element_edges; 
-      if (current_element > 0) {
-        element_edges = edgePrefixSum[current_element] - 
-                        edgePrefixSum[current_element - 1];
-      } else {
-        element_edges = edgePrefixSum[0];
-      }
-  
-      // num edges this division currently has not taking into account 
-      // this element we are currently on
-      uint64_t edge_count_without_current;
-      if (current_element > 0) {
-        edge_count_without_current = edgePrefixSum[current_element] -
-                                     accounted_edges - element_edges;
-      } else {
-        edge_count_without_current = 0;
-      }
-
-      // determine current unit count by taking into account nodes already 
-      // handled
-      uint64_t unit_count_without_current = 
-         edge_count_without_current + 
-         ((current_element - accounted_elements) * nodeAlpha); 
-
-      // include node into weight of this element
-      uint64_t element_units = element_edges + nodeAlpha;
-
-      if (element_units > (3 * units_per_thread / 4)) {
-        // if this current thread + units of this element is too much,
-        // then do not add to this thread but rather the next one
-        if (unit_count_without_current > (units_per_thread / 2)) {
-          assert(current_element != 0);
-
-          // assign to the NEXT thread (i.e. end this thread and move on to the 
-          // next)
-          // beginning of next thread is current local element (i.e. the big 
-          // one we are giving up to the next)
-          threadRanges[current_thread + 1] = current_element;
-          //printf("Thread %u begin %u end %u (big)\n", 
-          //       current_thread, threadRanges[current_thread], 
-          //       threadRanges[current_thread+1]);
-
-          accounted_edges = edgePrefixSum[current_element - 1];
-          accounted_elements = current_element;
-
-          current_thread++;
-
-          // go back to beginning of loop 
-          continue;
-        }
-      }
-
-      // handle this element by adding edges to running sums
-      uint64_t unit_count_with_current = unit_count_without_current + 
-                                         element_units;
-
-      if (unit_count_with_current >= units_per_thread) {
-        threadRanges[++current_thread] = current_element + 1;
-        //printf("Thread %u begin %u end %u (over)\n", current_thread-1,
-        //       threadRanges[current_thread - 1], 
-        //       threadRanges[current_thread]);
-        //printf("sum is %lu\n", edgePrefixSum[current_thread-1]);
-
-        accounted_edges = edgePrefixSum[current_element];
-        accounted_elements = current_element + 1;
-      }
-
-      current_element++;
-    }
-
-    assert(threadRanges[0] == 0);
-    assert(threadRanges[num_threads] == totalNodes);
-  }
-
-  /**
-   * Uses the divideByNode function stolen from FileGraph to do partitioning
-   * of nodes/edges among threads.
+   * Uses the divideByNode function (which is binary search based) to 
+   * divide nodes/edges among threads.
    *
    * @param edgePrefixSum A prefix sum of edges
    */
@@ -910,16 +638,15 @@ public:
 
     for (uint32_t i = 0; i < numThreads; i++) {
       auto nodeEdgeSplits = divideByNode(0, 1, i, numThreads, edgePrefixSum);
-
       auto nodeSplits = nodeEdgeSplits.first;
       auto edgeSplits = nodeEdgeSplits.second;
 
+      // i.e. if there are actually assigned nodes
       if (nodeSplits.first != nodeSplits.second) {
         if (i != 0) {
           assert(threadRanges[i] == *(nodeSplits.first));
           assert(threadRangesEdge[i] == *(edgeSplits.first));
-        } else {
-          // = 0
+        } else { // i == 0
           assert(threadRanges[i] == 0);
           assert(threadRangesEdge[i] == 0);
         }
@@ -929,7 +656,6 @@ public:
       } else {
         // thread assinged no nodes
         assert(edgeSplits.first == edgeSplits.second);
-
         threadRanges[i + 1] = threadRanges[i];
         threadRangesEdge[i + 1] = threadRangesEdge[i];
       }
@@ -941,43 +667,6 @@ public:
     }
   }
 
-  /**
-   * Determine the ranges for the edges of a graph for each thread given the
-   * prefix sum. threadRanges must already be calculated.
-   *
-   * @param edgePrefixSum Prefix sum of edges 
-   */
-  template <typename VectorTy>
-  void determineThreadRangesEdge(VectorTy& edgePrefixSum) {
-    if (threadRanges.size() > 0) {
-      uint32_t totalThreads = galois::runtime::activeThreads;
-
-      threadRangesEdge.resize(totalThreads + 1);
-      threadRangesEdge[0] = 0;
-
-      // determine edge range for each active thread
-      for (uint32_t i = 0; i < totalThreads; i++) {
-        uint32_t beginNode = threadRanges[i];
-        uint32_t endNode = threadRanges[i + 1];
-        uint64_t endEdge = edgePrefixSum[endNode - 1];
-
-        if (beginNode > 0) {
-          assert(edgePrefixSum[beginNode - 1] <= endEdge);
-          assert(threadRangesEdge[i] == edgePrefixSum[beginNode - 1]);
-        } else {
-          assert(0 <= endEdge);
-          assert(threadRangesEdge[i] == 0);
-        }
-
-        assert(endEdge <= numEdges);
-
-        threadRangesEdge[i + 1] = endEdge;
-      }
-    } else {
-      galois::gDebug("WARNING: threadRangesEdge not calculated because "
-                     "threadRanges isn't calculated.");
-    }
-  }
 
   template <typename F>
   ptrdiff_t partition_neighbors(GraphNode N, const F& func) {
@@ -987,45 +676,16 @@ public:
     return (mid - beg);
   }
 
-
   void allocateFrom(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
-      //nodeData.allocateInterleaved(numNodes);
-      //edgeIndData.allocateInterleaved(numNodes);
-      //edgeDst.allocateInterleaved(numEdges);
-      //edgeData.allocateInterleaved(numEdges);
-      //this->outOfLineAllocateInterleaved(numNodes);
-
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
       edgeData.allocateBlocked(numEdges);
       this->outOfLineAllocateBlocked(numNodes);
-
-      //nodeData.allocateLocal(numNodes);
-      //edgeIndData.allocateLocal(numNodes);
-      //edgeDst.allocateLocal(numEdges);
-      //edgeData.allocateLocal(numEdges);
-      //this->outOfLineAllocateLocal(numNodes);
-
-      //nodeData.allocateFloating(numNodes);
-      //edgeIndData.allocateFloating(numNodes);
-      //edgeDst.allocateFloating(numEdges);
-      //edgeData.allocateFloating(numEdges);
-      //this->outOfLineAllocateFloating(numNodes);
     } else {
-      //nodeData.allocateLocal(numNodes);
-      //edgeIndData.allocateLocal(numNodes);
-      //edgeDst.allocateLocal(numEdges);
-      //edgeData.allocateLocal(numEdges);
-      //this->outOfLineAllocateLocal(numNodes);
-      //nodeData.allocateBlocked(numNodes);
-      //edgeIndData.allocateBlocked(numNodes);
-      //edgeDst.allocateBlocked(numEdges);
-      //edgeData.allocateBlocked(numEdges);
-      //this->outOfLineAllocateBlocked(numNodes);
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
       edgeDst.allocateInterleaved(numEdges);
@@ -1037,157 +697,25 @@ public:
   void allocateFrom(uint32_t nNodes, uint64_t nEdges) {
     numNodes = nNodes;
     numEdges = nEdges;
+
     if (UseNumaAlloc) {
       nodeData.allocateLocal(numNodes);
       edgeIndData.allocateLocal(numNodes);
       edgeDst.allocateLocal(numEdges);
       edgeData.allocateLocal(numEdges);
       this->outOfLineAllocateLocal(numNodes);
-      //nodeData.allocateInterleaved(numNodes);
-      //edgeIndData.allocateInterleaved(numNodes);
-      //edgeDst.allocateInterleaved(numEdges);
-      //edgeData.allocateInterleaved(numEdges);
-      //this->outOfLineAllocateInterleaved(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
       edgeDst.allocateInterleaved(numEdges);
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
-
-      //nodeData.allocateLocal(numNodes);
-      //edgeIndData.allocateLocal(numNodes);
-      //edgeDst.allocateLocal(numEdges);
-      //edgeData.allocateLocal(numEdges);
-      //this->outOfLineAllocateLocal(numNodes);
-
-      //nodeData.allocateBlocked(numNodes);
-      //edgeIndData.allocateBlocked(numNodes);
-      //edgeDst.allocateBlocked(numEdges);
-      //edgeData.allocateBlocked(numEdges);
-      //this->outOfLineAllocateBlocked(numNodes);
-
-      //nodeData.allocateFloating(numNodes);
-      //edgeIndData.allocateFloating(numNodes);
-      //edgeDst.allocateFloating(numEdges);
-      //edgeData.allocateFloating(numEdges);
-      //this->outOfLineAllocateFloating(numNodes);
     }
   }
 
   /**
-   * A version of allocateFrom that takes into account edge distribution across
-   * nodes.
-   *
-   * @param nNodes Number to allocate for node data
-   * @param nEdges Number to allocate for edge data
-   * @param edgePrefixSum Vector with prefix sum of edges.
-   */
-  void allocateFrom(uint32_t nNodes, uint64_t nEdges, 
-                    std::vector<uint64_t> edgePrefixSum) {
-    // update graph values
-    numNodes = nNodes;
-    numEdges = nEdges;
-
-    // calculate thread ranges for nodes and edges
-    determineThreadRanges(numNodes, edgePrefixSum);
-    determineThreadRangesEdge(edgePrefixSum);
-
-    // node based alloc
-    nodeData.allocateSpecified(numNodes, threadRanges);
-    edgeIndData.allocateSpecified(numNodes, threadRanges);
-    //nodeData.allocateLocal(numNodes);
-    //edgeIndData.allocateLocal(numNodes);
-
-    // edge based alloc
-    edgeDst.allocateSpecified(numEdges, threadRangesEdge);
-    edgeData.allocateSpecified(numEdges, threadRangesEdge);
-    //edgeDst.allocateLocal(numEdges);
-    //edgeData.allocateLocal(numEdges);
-
-    this->outOfLineAllocateSpecified(numNodes, threadRanges);
-    //this->outOfLineAllocateLocal(numNodes);
-  }
-
-
-  /**
    * A version of allocateFrom that takes into account node/edge distribution
-   * and tries to make the allocation of memory more. 
-   * Based on divideByNode in Lonestar.
-   *
-   * @param graph A graph in the FileGraph class.
-   */
-  void allocateFromByNode(FileGraph& graph) {
-    numNodes = graph.size();
-    numEdges = graph.sizeEdges();
-
-    uint32_t numThreads = galois::runtime::activeThreads;
-    assert(numThreads > 0);
-
-    threadRanges.resize(numThreads + 1);
-    threadRangesEdge.resize(numThreads + 1);
-
-    threadRanges[0] = 0;
-    threadRangesEdge[0] = 0;
-
-    for (uint32_t i = 0; i < numThreads; i++) {
-      // uses filegraph's divide by node call with same params as constructfrom
-      auto nodeEdgeSplits = graph.divideByNode(
-          NodeData::size_of::value + EdgeIndData::size_of::value + 
-          LC_CSR_Graph::size_of_out_of_line::value,
-          EdgeDst::size_of::value + EdgeData::size_of::value,
-          i, numThreads);
-
-      auto nodeSplits = nodeEdgeSplits.first;
-      auto edgeSplits = nodeEdgeSplits.second;
-
-      if (nodeSplits.first != nodeSplits.second) {
-        if (i != 0) {
-          //printf("thread ranges edge i is %lu\n", threadRangesEdge[i]);
-          //printf("edgeSplits first is %lu\n", *edgeSplits.first);
-          assert(threadRanges[i] == *(nodeSplits.first));
-          assert(threadRangesEdge[i] == *(edgeSplits.first));
-        } else {
-          // = 0
-          assert(threadRanges[i] == 0);
-          assert(threadRangesEdge[i] == 0);
-        }
-
-        threadRanges[i + 1] = *(nodeSplits.second);
-        threadRangesEdge[i + 1] = *(edgeSplits.second);
-      } else {
-        // thread assinged no nodes
-        assert(edgeSplits.first == edgeSplits.second);
-
-        threadRanges[i + 1] = threadRanges[i];
-        threadRangesEdge[i + 1] = threadRangesEdge[i];
-      }
-      //printf("thread %u gets nodes %u to %u\n", i, threadRanges[i], 
-      //        threadRanges[i+1]);
-      //printf("thread %u gets edges %lu to %lu\n", i, threadRangesEdge[i], 
-      //        threadRangesEdge[i+1]);
-    }
-
-    // node based alloc
-    nodeData.allocateSpecified(numNodes, threadRanges);
-    edgeIndData.allocateSpecified(numNodes, threadRanges);
-    //nodeData.allocateLocal(numNodes);
-    //edgeIndData.allocateLocal(numNodes);
-
-    // edge based alloc
-    edgeDst.allocateSpecified(numEdges, threadRangesEdge);
-    edgeData.allocateSpecified(numEdges, threadRangesEdge);
-    //edgeDst.allocateLocal(numEdges);
-    //edgeData.allocateLocal(numEdges);
-
-    this->outOfLineAllocateSpecified(numNodes, threadRanges);
-    //this->outOfLineAllocateLocal(numNodes);
-  }
-
-
-  /**
-   * A version of allocateFrom that takes into account node/edge distribution
-   * and tries to make the allocation of memory more even. 
+   * and tries to make the allocation of memory more numa aware.
    * Based on divideByNode in Lonestar.
    *
    * @param nNodes Number to allocate for node data
@@ -1196,7 +724,6 @@ public:
    */
   void allocateFromByNode(uint32_t nNodes, uint64_t nEdges, 
                           std::vector<uint64_t> edgePrefixSum) {
-    //printf("by node allocate specified\n");
     numNodes = nNodes;
     numEdges = nEdges;
 
@@ -1206,21 +733,12 @@ public:
     // node based alloc
     nodeData.allocateSpecified(numNodes, threadRanges);
     edgeIndData.allocateSpecified(numNodes, threadRanges);
-    //nodeData.allocateLocal(numNodes);
-    //edgeIndData.allocateLocal(numNodes);
-    //nodeData.allocateInterleaved(numNodes);
-    //edgeIndData.allocateInterleaved(numNodes);
 
     // edge based alloc
     edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     edgeData.allocateSpecified(numEdges, threadRangesEdge);
-    //edgeDst.allocateLocal(numEdges);
-    //edgeData.allocateLocal(numEdges);
-    //edgeDst.allocateInterleaved(numEdges);
-    //edgeData.allocateInterleaved(numEdges);
 
     this->outOfLineAllocateSpecified(numNodes, threadRanges);
-    //this->outOfLineAllocateInterleaved(numNodes);
   }
 
   void constructNodes() {
@@ -1242,7 +760,8 @@ public:
 #endif
   }
 
-  void constructEdge(uint64_t e, uint32_t dst, const typename EdgeData::value_type& val) {
+  void constructEdge(uint64_t e, uint32_t dst, 
+                     const typename EdgeData::value_type& val) {
     edgeData.set(e, val);
     edgeDst[e] = dst;
   }
@@ -1301,8 +820,6 @@ public:
     // recalculate thread ranges for nodes and edges
     clearRanges();
     determineThreadRangesByNode(edgeIndData_temp);
-    //determineThreadRanges(numNodes, edgeIndData_temp);
-    //determineThreadRangesEdge(edgeIndData_temp);
 
     // reallocate nodeData
     if (reallocate) {
@@ -1392,25 +909,22 @@ public:
   }
 
   template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<is_non_void>::type* = 0) {
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, 
+                    uint64_t e_new, uint64_t e, 
+                    typename std::enable_if<is_non_void>::type* = 0) {
     edgeData_new[e_new] = edgeData[e];
   }
 
   template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, uint64_t e_new, uint64_t e, typename std::enable_if<!is_non_void>::type* = 0) {
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, 
+                    uint64_t e_new, uint64_t e, 
+                    typename std::enable_if<!is_non_void>::type* = 0) {
+    // does nothing
   }
 
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
-    // at this point memory is already allocated
-    //auto both = graph.divideByNode(
-    //    NodeData::size_of::value + EdgeIndData::size_of::value + 
-    //    LC_CSR_Graph::size_of_out_of_line::value,
-    //    EdgeDst::size_of::value + EdgeData::size_of::value,
-    //    tid, total);
-    //auto r = both.first;
-    //auto edgeSplit = both.second;
-
+    // at this point memory should already be allocated
     auto r = graph.divideByNode(
         NodeData::size_of::value + EdgeIndData::size_of::value + 
         LC_CSR_Graph::size_of_out_of_line::value,
@@ -1435,7 +949,6 @@ public:
     }
   }
 };
-
 } // end namespace
 } // end namespace
 
