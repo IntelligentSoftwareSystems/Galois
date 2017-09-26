@@ -1009,6 +1009,8 @@ public:
   /**
    * A version of determine_thread_ranges that uses a pre-computed prefix sum
    * to determine division of nodes among threads.
+   * 
+   * The call uses binary search to determine the ranges.
    *
    * @param total_nodes The total number of nodes (masters + mirrors) on this
    * partition.
@@ -1016,22 +1018,7 @@ public:
    */
   void determine_thread_ranges(uint32_t total_nodes,
                                std::vector<uint64_t> edge_prefix_sum) {
-    // Old way that determined thread ranges with a linear scan.
-    //graph.determineThreadRanges(total_nodes, edge_prefix_sum, nodeAlphaRanges);
-    //graph.determineThreadRangesEdge(edge_prefix_sum);
-
-    // uses a binary search to find divisions
     graph.determineThreadRangesByNode(edge_prefix_sum);
-  }
-
-  /**
-   * Determine the ranges for the edges of a graph for each thread given the
-   * prefix sum of edges. threadRanges must already be calculated.
-   *
-   * @param edge_prefix_sum Prefix sum of edges
-   */
-  void determine_thread_ranges_edge(std::vector<uint64_t> edge_prefix_sum) {
-    graph.determineThreadRangesEdge(edge_prefix_sum);
   }
 
   /**
@@ -1052,8 +1039,7 @@ public:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      //printf("Manually det. master thread ranges\n");
-      // TODO use binary search?
+      galois::gDebug("Manually det. master thread ranges\n");
       graph.determineThreadRanges(beginMaster, endMaster, masterRanges,
                                   nodeAlphaRanges);
     }
@@ -1077,8 +1063,7 @@ public:
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
-      //printf("Manually det. with edges thread ranges\n");
-      // TODO use binary search?
+      galois::gDebug("Manually det. with edges thread ranges");
       graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges,
                                   nodeAlphaRanges);
     }
