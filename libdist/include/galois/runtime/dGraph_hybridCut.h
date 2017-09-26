@@ -37,7 +37,6 @@
 #include "galois/graphs/FileGraph.h"
 #include <sstream>
 
-#include "galois/DoAllWrap.h"
 
 
 #define BATCH_MSG_SIZE 1000

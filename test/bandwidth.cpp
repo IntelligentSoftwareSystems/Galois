@@ -34,7 +34,8 @@ void run_local(size_t seed, size_t mega) {
   int *block = (int*) malloc(size*sizeof(*block));
 
   // Assuming first touch policy
-  galois::on_each(run_local_helper(block, seed, size));
+  run_local_helper r(block, seed, size);
+  galois::on_each(r);
   free(block);
 }
 
@@ -57,7 +58,9 @@ void run_interleaved(size_t seed, size_t mega, bool full) {
   size_t size = mega*1024*1024;
   auto ptr = galois::substrate::largeMallocInterleaved(size * sizeof(int), full ? galois::substrate::getThreadPool().getMaxThreads() : galois::runtime::activeThreads);
   int *block = (int*)ptr.get();
-  galois::on_each(run_interleaved_helper(block, seed, size));
+
+  run_interleaved_helper r(block, seed, size);
+  galois::on_each(r);
 }
 
 template<typename Fn>

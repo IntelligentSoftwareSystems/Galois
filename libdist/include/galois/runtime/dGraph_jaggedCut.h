@@ -34,7 +34,6 @@
 #include "galois/runtime/Serialize.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
-#include "galois/DoAllWrap.h"
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {

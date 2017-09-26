@@ -27,12 +27,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
-#include <iostream>
-#include <limits>
-#include <algorithm>
-#include <vector>
 #include "galois/DistGalois.h"
-#include "galois/DoAllWrap.h"
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 
@@ -68,6 +63,11 @@ std::string personality_str(Personality p) {
    return "";
 }
 #endif
+
+#include <iostream>
+#include <limits>
+#include <algorithm>
+#include <vector>
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "PageRank Residual Pull version on Distributed Galois.";
@@ -206,7 +206,7 @@ struct InitializeGraph {
       nodesWithEdges,
       InitializeGraph{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -264,7 +264,7 @@ struct PageRank_delta {
       allNodes.begin(), allNodes.end(),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -317,7 +317,7 @@ struct PageRank {
         nodesWithEdges,
         PageRank{ &_graph },
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );

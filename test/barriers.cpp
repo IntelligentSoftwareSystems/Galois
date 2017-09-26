@@ -1,6 +1,6 @@
 #include "galois/Timer.h"
 #include "galois/Galois.h"
-#include "galois/substrate/BarrierImpl.h"
+#include "galois/substrate/Barrier.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -42,7 +42,8 @@ void test(std::unique_ptr<galois::substrate::Barrier> b) {
     b->reinit(M);
     galois::Timer t;
     t.start();
-    galois::on_each(emp{*b.get()});
+    emp e{*b.get()};
+    galois::on_each(e);
     t.stop();
     std::cout << bname << "," << b->name() << "," << M << "," << t.get() << "\n";
     M -= 1;

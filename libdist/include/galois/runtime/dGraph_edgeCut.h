@@ -34,7 +34,6 @@
 #include "galois/runtime/dGraph.h"
 #include "galois/graphs/OfflineGraph.h"
 #include "galois/Galois.h"
-#include "galois/DoAllWrap.h"
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;

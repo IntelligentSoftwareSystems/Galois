@@ -26,12 +26,7 @@
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
-#include <iostream>
-#include <limits>
-#include <algorithm>
-#include <vector>
 #include "galois/DistGalois.h"
-#include "galois/DoAllWrap.h"
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 
@@ -67,6 +62,11 @@ std::string personality_str(Personality p) {
    return "";
 }
 #endif
+
+#include <iostream>
+#include <limits>
+#include <algorithm>
+#include <vector>
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

@@ -162,7 +162,7 @@ struct InitializeGraph {
       allNodes,
       InitializeGraph{&_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::do_all_steal<true>(),
+      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -213,7 +213,7 @@ struct ConnectedComp {
         nodesWithEdges,
         ConnectedComp(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
-        galois::do_all_steal<true>(),
+        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
