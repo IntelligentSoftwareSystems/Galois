@@ -57,20 +57,20 @@ enum DoAllTypes {
 
 namespace cll = llvm::cl;
 //extern cll::opt<DoAllTypes> doAllKind;
-cll::opt<DoAllTypes> doAllKind (
-    "doAllKind",
-    cll::desc ("DoAll Implementation"),
-    cll::values (
-      clEnumVal (DO_ALL_OLD, "DO_ALL_OLD"),
-      clEnumVal (DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
-      clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
-      clEnumVal (DO_ALL, "DO_ALL"),
-      clEnumVal (DO_ALL_RANGE, "DO_ALL_RANGE"),
-      clEnumVal (DOALL_CILK, "DOALL_CILK"),
-      clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
-      clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
-      clEnumValEnd),
-    cll::init (DO_ALL_OLD)); // default is regular DOALL
+static cll::opt<DoAllTypes> doAllKind (
+        "doAllKind",
+        cll::desc ("DoAll Implementation"),
+        cll::values (
+          clEnumVal (DO_ALL_OLD, "DO_ALL_OLD"),
+          clEnumVal (DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
+          clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
+          clEnumVal (DO_ALL, "DO_ALL"),
+          clEnumVal (DO_ALL_RANGE, "DO_ALL_RANGE"),
+          clEnumVal (DOALL_CILK, "DOALL_CILK"),
+          clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
+          clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
+          clEnumValEnd),
+        cll::init (DO_ALL_OLD)); // default is regular DOALL
 
 
 void setDoAllImpl (const DoAllTypes& type);

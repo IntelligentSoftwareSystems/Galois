@@ -79,7 +79,7 @@ static cll::opt<unsigned> buffSize("sendBuffSize",
                        cll::init(4096));
 #endif
 
-cll::opt<bool> useGidMetadata("useGidMetadata",
+static cll::opt<bool> useGidMetadata("useGidMetadata",
   cll::desc("Use Global IDs in indices metadata (only when -metadata=2)"),
   cll::init(false));
 
