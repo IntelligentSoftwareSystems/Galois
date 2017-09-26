@@ -12,6 +12,8 @@ set(sources
         src/hash/crc32.cpp
         src/sync_structures.cpp
         src/GlobalObj.cpp
+        src/dGraph.cpp
+        src/dGraphLoader.cpp
 )
 
 add_library(galois_dist STATIC ${sources})
