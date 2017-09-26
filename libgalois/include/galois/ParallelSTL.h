@@ -111,7 +111,6 @@ Iterator choose_rand(Iterator first, Iterator last) {
 
 template<class Compare>
 struct sort_helper {
-  typedef int tt_does_not_need_aborts;
   Compare comp;
   
   //! Not equal in terms of less-than
@@ -260,7 +259,10 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   
-  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp), galois::wl<WL>());
+  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp)
+      , galois::no_conflicts()
+      , galois::no_stats()
+      , galois::wl<WL>());
 }
 
 template<class RandomAccessIterator>

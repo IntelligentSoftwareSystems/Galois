@@ -202,7 +202,7 @@ struct Process {
 
 template<bool prefix>
 struct OrderedProcess {
-  typedef int tt_does_not_need_push;
+  // typedef int tt_does_not_need_push;
 
   typedef typename Process<>::Graph Graph;
   typedef typename Graph::GraphNode GNode;
@@ -252,15 +252,15 @@ struct DefaultAlgo {
 
     switch (algo) {
       case nondet: 
-        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::wl<WL>());
+        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
         break;
       case detBase:
-        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::wl<DWL>());
+        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::loopname("Main"), galois::wl<DWL>());
         break;
       case detPrefix:
         galois::for_each(graph.begin(), graph.end(), Process<>(graph),
-            galois::wl<DWL>(),
-            galois::make_trait_with_args<galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
+            galois::loopname("Main"), galois::wl<DWL>(),
+            galois::make_trait_with_args<galois::neighborhood_visitor>(Process<detPrefix>(graph))
             );
         break;
       case detDisjoint:
@@ -341,7 +341,7 @@ struct PullAlgo {
   };
 
   void operator()(Graph& graph) {
-    galois::Statistic rounds("Rounds");
+    galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<size_t> numProcessed;
     galois::GAccumulator<size_t> numTaken;
 
@@ -389,6 +389,8 @@ struct PullAlgo {
       rounds += 1;
       size -= numTaken.reduce();
     }
+
+    galois::runtime::reportStat_Serial("IndependentSet-PullAlgo", "rounds", rounds.reduce());
   }
 };
 
@@ -483,7 +485,7 @@ void run() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
   
   switch (algo) {
