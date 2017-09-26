@@ -176,9 +176,7 @@ struct function_traits<T, typename std::enable_if<has_function_traits<T>(0)>::ty
  */
 struct loopname_tag {};
 struct loopname: public trait_has_value<const char*>, loopname_tag {
-  loopname(const char* p = nullptr): trait_has_value<const char*>(p) {
-    if (p == nullptr) { p = "ANON_LOOP"; }
-  }
+  loopname(const char* p = "ANON_LOOP"): trait_has_value<const char*>(p) { }
 };
 /**
    - * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}

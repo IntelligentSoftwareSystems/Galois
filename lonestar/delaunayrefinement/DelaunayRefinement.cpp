@@ -76,7 +76,7 @@ struct Process {
 
   //! [Enabling Per Iteration Allocator in DMR]
   typedef std::tuple<
-    galois::has_deterministic_local_state<LocalState>,
+    galois::local_state<LocalState>,
     galois::per_iter_alloc
   > function_traits;
   //! [Enabling Per Iteration Allocator in DMR]
@@ -132,7 +132,7 @@ struct DetLessThan {
 };
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   graph = new Graph();
@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
       break;
     case detPrefix:
       galois::for_each(initialBad.begin(), initialBad.end(), Process<>(),
-          galois::wl<DWL>(), galois::has_neighborhood_visitor<Process<detPrefix>>());
+          galois::wl<DWL>(), galois::neighborhood_visitor<Process<detPrefix>>());
       break;
     case detDisjoint:
       galois::for_each(initialBad.begin(), initialBad.end(), Process<detDisjoint>(), galois::wl<DWL>());
