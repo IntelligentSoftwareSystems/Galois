@@ -29,7 +29,8 @@
 #ifndef D_GRAPH_LOADER
 #define D_GRAPH_LOADER
 
-#include "Lonestar/BoilerPlate.h"
+//#include "Lonestar/BoilerPlate.h"
+#include "llvm/Support/CommandLine.h"
 #include "galois/runtime/dGraph_edgeCut.h"
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
@@ -48,47 +49,12 @@ enum PARTITIONING_SCHEME {
  ******************************************************************************/
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> inputFile(cll::Positional, 
-                                       cll::desc("<input file>"), 
-                                       cll::Required);
-static cll::opt<std::string> inputFileTranspose("graphTranspose",
-                                       cll::desc("<input file, transposed>"), 
-                                       cll::init(""));
-static cll::opt<bool> inputFileSymmetric("symmetricGraph",
-                              cll::desc("Set this flag if graph is symmetric"), 
-                              cll::init(false));
-static cll::opt<std::string> partFolder("partFolder", 
-                                        cll::desc("path to partitionFolder"), 
-                                        cll::init(""));
-static cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
-                                     cll::desc("Type of partitioning."),
-                                     cll::values(
-                                       clEnumValN(OEC, "oec", 
-                                                  "Outgoing Edge-Cut"), 
-                                       clEnumValN(IEC, "iec", 
-                                                  "Incoming Edge-Cut"), 
-                                       clEnumValN(HOVC, "hovc", 
-                                                  "Outgoing Hybrid Vertex-Cut"), 
-                                       clEnumValN(HIVC, "hivc", 
-                                                  "Incoming Hybrid Vertex-Cut"),
-                                       clEnumValN(BOARD2D_VCUT, "2dvc", 
-                                                  "2d Checkerboard Vertex-Cut"), 
-                                       clEnumValN(CART_VCUT, "cvc", 
-                                                  "Cartesian Vertex-Cut"), 
-                                       clEnumValN(JAGGED_CYCLIC_VCUT, "jcvc", 
-                                                  "Jagged Cyclic Vertex-Cut"), 
-                                       clEnumValN(JAGGED_BLOCKED_VCUT, "jbvc", 
-                                                  "Jagged Blocked Vertex-Cut"), 
-                                       clEnumValN(OVER_DECOMPOSE_2_VCUT, "od2vc", 
-                                                  "Over decomposed by 2 cartesian Vertex-Cut"), 
-                                       clEnumValN(OVER_DECOMPOSE_4_VCUT, "od4vc", 
-                                                  "Over decomposed by 4 cartesian Vertex-Cut"), 
-                                       clEnumValEnd),
-                                     cll::init(OEC));
-static cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
-                                            cll::desc("Threshold for high "
-                                                      "degree edges."), 
-                                            cll::init(1000));
+extern cll::opt<std::string> inputFile;
+extern cll::opt<std::string> inputFileTranspose;
+extern cll::opt<bool> inputFileSymmetric;
+extern cll::opt<std::string> partFolder;
+extern cll::opt<PARTITIONING_SCHEME> partitionScheme;
+extern cll::opt<unsigned int> VCutThreshold;
 
 /*******************************************************************************
  * Graph-loading functions
