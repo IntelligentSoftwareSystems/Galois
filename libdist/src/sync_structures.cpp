@@ -25,7 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#include <sync_structures.h>
+#include <galois/runtime/sync_structures.h>
 
 // TODO documentation
 // TODO put in a sensible namespace
