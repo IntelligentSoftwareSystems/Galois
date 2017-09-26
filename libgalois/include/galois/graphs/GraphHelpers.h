@@ -58,6 +58,10 @@ namespace internal {
  * sum of the object you are attempting to split
  * @param edgeOffset number of edges to subtract from edge count retrieved
  * from prefix sum; used if array is a partial prefix sum
+ * @param nodeOffset number of nodes to skip over when looking in the
+ * prefix sum: useful if the prefix sum is over the entire graph while you
+ * just want to divide the nodes for a particular region (jump to the region
+ * with the nodeOffset)
  *
  * @returns The node id that hits (or gets close to) the target size
  */
@@ -67,17 +71,16 @@ template <typename PrefixSumType>
 size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
                           size_t targetWeight, uint64_t lb, uint64_t ub, 
                           PrefixSumType& edgePrefixSum,
-                          uint64_t edgeOffset = 0) {
+                          uint64_t edgeOffset, uint64_t nodeOffset) {
   assert(nodeWeight != 0 || edgeWeight != 0);
 
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
     size_t num_edges;
 
-    if (mid != 0) {
-      num_edges = edgePrefixSum[mid - 1] - edgeOffset;
+    if ((mid + nodeOffset) != 0) {
+      num_edges = edgePrefixSum[mid - 1 + nodeOffset] - edgeOffset;
     } else {
-      assert(edgeOffset == 0);
       num_edges = 0;
     }
 
@@ -130,24 +133,25 @@ uint32_t determine_block_division(uint32_t numDivisions,
  * @param scaleFactor Vector specifying if certain divisions should get more 
  * than other divisions
  * @param edgeOffset number of edges to subtract from numbers in edgePrefixSum
+ * @param nodeOffset number of nodes to skip over when looking in the
+ * prefix sum: useful if the prefix sum is over the entire graph while you
+ * just want to divide the nodes for a particular region (jump to the region
+ * with the nodeOffset)
  *
  * @returns A node pair and an edge pair specifying the assigned nodes/edges
- * to division "id"
+ * to division "id"; returns LOCAL ids, not global ids (i.e. if node offset
+ * was used, it is up to the caller to add the offset to the numbers)
  */
 // Note: "inline" may be required if PrefixSumType is exactly the same type
 // in 2 different translation units; otherwise it should be fine
 // If inline is used, then apparently you cannot use typedefs, so get rid
 // of those if the need arises.
 template <typename PrefixSumType, typename NodeType = uint64_t> 
-std::pair<std::pair<boost::counting_iterator<NodeType>,
-                    boost::counting_iterator<NodeType>>,
-          std::pair<boost::counting_iterator<uint64_t>,
-                    boost::counting_iterator<uint64_t>>>
-divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
+auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
                    size_t nodeWeight, size_t edgeWeight, size_t id,
                    size_t total, PrefixSumType& edgePrefixSum,
                    std::vector<unsigned> scaleFactor = std::vector<unsigned>(),
-                   uint64_t edgeOffset = 0) {
+                   uint64_t edgeOffset = 0, uint64_t nodeOffset = 0) {
   typedef boost::counting_iterator<NodeType> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef std::pair<iterator, iterator> NodeRange;
@@ -195,26 +199,27 @@ divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
   } else {
     nodesLower = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
                                     blockWeight * blockLower, 0, numNodes, 
-                                    edgePrefixSum, edgeOffset);
+                                    edgePrefixSum, edgeOffset, nodeOffset);
   }
 
   uint64_t nodesUpper;
   nodesUpper = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
                                   blockWeight * blockUpper, nodesLower, 
-                                  numNodes, edgePrefixSum, edgeOffset);
+                                  numNodes, edgePrefixSum, edgeOffset, 
+                                  nodeOffset);
 
   // get the edges bounds using node lower/upper bounds
   uint64_t edgesLower = numEdges;
   uint64_t edgesUpper = numEdges;
 
   if (nodesLower != nodesUpper) {
-    if (nodesLower != 0) {
-      edgesLower = edgePrefixSum[nodesLower - 1] - edgeOffset;
+    if ((nodesLower + nodeOffset) != 0) {
+      edgesLower = edgePrefixSum[nodesLower - 1 + nodeOffset] - edgeOffset;
     } else {
       edgesLower = 0;
     }
 
-    edgesUpper = edgePrefixSum[nodesUpper - 1] - edgeOffset;
+    edgesUpper = edgePrefixSum[nodesUpper - 1 + nodeOffset] - edgeOffset;
   }
 
   return GraphRange(NodeRange(iterator(nodesLower), 
