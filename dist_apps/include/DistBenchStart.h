@@ -79,14 +79,16 @@ void DistBenchStart(int argc, char** argv, const char* app,
 void SetupHetero(std::vector<unsigned>& scaleFactor);
 #endif
 
-template <typename NodeData, typename EdgeData>
+
+
+template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
                                        struct CUDA_Context** cuda_ctx) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
   dGraphTimer.start();
 
   hGraph<NodeData, EdgeData>* loadedGraph = 
-      constructGraph<NodeData, EdgeData>(scaleFactor);
+      constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
 
   // graph marshalling
   #ifdef __GALOIS_HET_CUDA__
