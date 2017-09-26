@@ -59,6 +59,19 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
   }
   
   std::pair<int, int> initMPI() {
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    int provided;
+    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_MULTIPLE, &provided));
+    if(!(provided >= MPI_THREAD_MULTIPLE)){
+      //std::cerr << " MPI_THREAD_MULTIPLE not supported\n Abort\n";
+      abort();
+    }
+    else{
+      //std::cerr << " MPI_THREAD_MULTIPLE supported : MPI_THREAD_MULTIPLE val : " << MPI_THREAD_MULTIPLE <<" , provided : " << provided  <<"\n";
+    }
+    assert(provided >= MPI_THREAD_MULTIPLE);
+    return std::make_pair(getID(), getNum());
+#else
     int provided;
     handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
     if(!(provided >= MPI_THREAD_FUNNELED)){
@@ -70,6 +83,7 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
     }
     assert(provided >= MPI_THREAD_FUNNELED);
     return std::make_pair(getID(), getNum());
+#endif
   }
 
   struct mpiMessage {
@@ -124,11 +138,18 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-        inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
-        auto& m = inflight.back();
-        rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &m.req);
-        handleError(rv);
-        galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        assert(status.MPI_TAG <= 32767);
+        if (status.MPI_TAG != 32767) {
+#endif
+          inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
+          auto& m = inflight.back();
+          rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &m.req);
+          handleError(rv);
+          galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        }
+#endif
       }
       //complete messages
       if (!inflight.empty()) {
