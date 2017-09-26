@@ -274,7 +274,8 @@ struct MatchingFF {
 
   std::string name() { return std::string(Concurrent ? "Concurrent" : "Serial") + " Ford-Fulkerson"; }
 
-  bool findAugmentingPath(G& g, const GraphNode& root, galois::UserContext<GraphNode>& ctx,
+  template <typename C>
+  bool findAugmentingPath(G& g, const GraphNode& root, C& ctx,
       typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached) {
     Queue queue(ctx.getPerIterAlloc());
     Preds preds(ctx.getPerIterAlloc());
@@ -358,7 +359,8 @@ struct MatchingFF {
     }
   };
 
-  void operator()(G& g, const GraphNode& src, galois::UserContext<GraphNode>& ctx,
+  template <typename C>
+  void propagate(G& g, const GraphNode& src, C& ctx,
       typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached) {
 
     ReachedCleanup cleanup(g, reached);
@@ -379,37 +381,29 @@ struct MatchingFF {
     }
   }
 
-  //! Main entry point for galois::for_each
-  struct Process {
-    typedef std::tuple<galois::per_iter_alloc> function_traits;
-
-    MatchingFF<G,Concurrent>& parent;
-    G& g;
-    SerialRevs& serialRevs;
-    SerialReached& serialReached;
-
-    Process(MatchingFF<G,Concurrent>& _parent, G& _g, SerialRevs& revs, SerialReached& reached):
-      parent(_parent), g(_g), serialRevs(revs), serialReached(reached) { }
-
-    void operator()(const GraphNode& node, galois::UserContext<GraphNode>& ctx) {
-      if (!g.getData(node, flag).free)
-        return;
-
-      ParallelRevs parallelRevs(ctx.getPerIterAlloc());
-      ParallelReached parallelReached(ctx.getPerIterAlloc());
-
-      parent(g, node, ctx,
-          RevsWrapper(serialRevs, parallelRevs).get(),
-          ReachedWrapper(serialReached, parallelReached).get());
-    }
-  };
 
   void operator()(G& g) {
     SerialRevs revs;
     SerialReached reached;
 
     galois::setActiveThreads(Concurrent ? numThreads : 1);
-    galois::for_each(g.A.begin(), g.A.end(), Process(*this, g, revs, reached));
+    galois::for_each(g.A.begin(), g.A.end(), 
+        [&, outer=this] (const GraphNode& node, auto& ctx) {
+          if (!g.getData(node, flag).free)
+            return;
+
+          ParallelRevs parallelRevs(ctx.getPerIterAlloc());
+          ParallelReached parallelReached(ctx.getPerIterAlloc());
+
+          outer->propagate(g, node, ctx,
+              RevsWrapper(revs, parallelRevs).get(),
+              ReachedWrapper(reached, parallelReached).get());
+        },
+        galois::loopname("MatchingFF"),
+        galois::per_iter_alloc(),
+        galois::wl<galois::worklists::dChunkedFIFO<32> >());
+        
+        
   }
 };
 
@@ -491,7 +485,9 @@ struct MatchingABMP {
   }
 
   //! Returns true if we've added a new element
-  bool operator()(G& g, const GraphNode& root, galois::UserContext<WorkItem>& ctx) {
+  //TODO: better name here
+  template <typename C>
+  bool propagate(G& g, const GraphNode& root, C& ctx) {
     Revs revs(ctx.getPerIterAlloc());
 
     GraphNode cur = root;
@@ -537,33 +533,6 @@ struct MatchingABMP {
     }
   }
 
-  struct Process {
-    typedef std::tuple<galois::per_iter_alloc,galois::parallel_break> function_traits;
-    MatchingABMP<G,Concurrent>& parent;
-    G& g;
-    unsigned& maxLayer;
-    size_t& size;
-
-    Process(MatchingABMP<G,Concurrent>& p, G& _g, unsigned& m, size_t& s):
-      parent(p), g(_g), maxLayer(m), size(s) { }
-    
-    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) {
-      unsigned curLayer = item.second;
-      if (curLayer > maxLayer) {
-        //std::cout << "Reached max layer: " << curLayer << "\n";
-        ctx.breakLoop();
-        return;
-      }
-      //if (size <= 50 * curLayer) {
-      //  std::cout << "Reached min size: " << size << "\n";
-      //  ctx.breakLoop();
-      //}
-      if (!parent(g, item.first, ctx)) {
-        //__sync_fetch_and_add(&size, -1);
-      }
-    }
-  };
-
   void operator()(G& g) {
     galois::StatTimer t("serial");
     t.start();
@@ -576,7 +545,7 @@ struct MatchingABMP {
     t.stop();
 
     unsigned maxLayer = (unsigned) (0.1*sqrt(std::distance(g.begin(), g.end())));
-    size_t size = initial.size();
+    // size_t size = initial.size();
     galois::setActiveThreads(Concurrent ? numThreads : 1);
     
     using namespace galois::worklists;
@@ -585,7 +554,26 @@ struct MatchingABMP {
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    galois::for_each(initial.begin(), initial.end(), Process(*this, g, maxLayer, size), galois::wl<OBIM>());
+    galois::for_each(initial.begin(), initial.end(), 
+        [&, outer=this] (const WorkItem& item, auto& ctx) {
+          unsigned curLayer = item.second;
+          if (curLayer > maxLayer) {
+            //std::cout << "Reached max layer: " << curLayer << "\n";
+            ctx.breakLoop();
+            return;
+          }
+          //if (size <= 50 * curLayer) {
+          //  std::cout << "Reached min size: " << size << "\n";
+          //  ctx.breakLoop();
+          //}
+          if (!outer->propagate(g, item.first, ctx)) {
+            //__sync_fetch_and_add(&size, -1);
+          }
+        }, 
+        galois::per_iter_alloc(),
+        galois::parallel_break(),
+        galois::loopname("MatchingABMP"),
+        galois::wl<OBIM>());
     
     t.start();
     MatchingFF<G,false> algo;
@@ -649,7 +637,8 @@ struct MatchingMF {
     edge2.cap += amount;
   }
 
-  bool discharge(G& g, const GraphNode& src, galois::UserContext<GraphNode>& ctx,
+  template <typename C>
+  bool discharge(G& g, const GraphNode& src, C& ctx,
       const GraphNode& source, const GraphNode& sink, unsigned numNodes) {
     node_data_type& node = g.getData(src, flag);
     //unsigned prevHeight = node.height;
@@ -707,7 +696,7 @@ struct MatchingMF {
 
   void relabel(G& g, const GraphNode& src, unsigned numNodes) {
     unsigned minHeight = std::numeric_limits<unsigned>::max();
-    int minEdge;
+    int minEdge = 0; // TODO: not sure of initial value
 
     int current = -1;
     for (auto ii : g.edges(src, galois::MethodFlag::UNPROTECTED)) {
@@ -731,74 +720,6 @@ struct MatchingMF {
     node.current = minEdge;
   }
 
-  struct Process {
-    typedef std::tuple<galois::parallel_break> function_traits;
-
-    MatchingMF<G,Concurrent>& parent;
-    G& g;
-    const GraphNode& source;
-    const GraphNode& sink;
-    unsigned numNodes;
-    unsigned globalRelabelInterval;
-    bool& shouldGlobalRelabel;
-    unsigned counter;
-
-    Process(MatchingMF<G,Concurrent>& p,
-        G& _g,
-        const GraphNode& _source,
-        const GraphNode& _sink,
-        unsigned _numNodes,
-        unsigned i,
-        bool& s):
-      parent(p), g(_g), source(_source), sink(_sink), numNodes(_numNodes),
-      globalRelabelInterval(i), shouldGlobalRelabel(s), counter(0) { }
-
-    void operator()(const GraphNode& src, galois::UserContext<GraphNode>& ctx) {
-      int increment = 1;
-      if (parent.discharge(g, src, ctx, source, sink, numNodes)) {
-        increment += BETA;
-      }
-
-      counter += increment;
-      if (globalRelabelInterval && counter >= globalRelabelInterval) {
-        shouldGlobalRelabel = true;
-        ctx.breakLoop();
-        return;
-      }
-    }
-  };
-
-  template<bool useCAS>
-  struct UpdateHeights {
-    G& g;
-
-    UpdateHeights(G& _g): g(_g) { }
-    //! Do reverse BFS on residual graph.
-    void operator()(const GraphNode& src, galois::UserContext<GraphNode>& ctx) {
-      for (auto ii : g.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED : flag)) {
-        GraphNode dst = g.getEdgeDst(ii);
-        if (g.getEdgeData(g.findEdge(dst, src, galois::MethodFlag::UNPROTECTED)).cap > 0) {
-          node_data_type& node = g.getData(dst, galois::MethodFlag::UNPROTECTED);
-          unsigned newHeight = g.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
-          if (useCAS) {
-            unsigned oldHeight;
-            while (newHeight < (oldHeight = node.height)) {
-              if (__sync_bool_compare_and_swap(&node.height, oldHeight, newHeight)) {
-                ctx.push(dst);
-                break;
-              }
-            }
-          } else {
-            if (newHeight < node.height) {
-              node.height = newHeight;
-              ctx.push(dst);
-            }
-          }
-        }
-      }
-    }
-  };
-
   void globalRelabel(G& g, const GraphNode& source, const GraphNode& sink, unsigned numNodes,
       std::vector<GraphNode>& incoming) {
 
@@ -811,9 +732,36 @@ struct MatchingMF {
         node.height = 0;
     }
 
+    constexpr static const bool useCAS = false;
+
     galois::StatTimer T("BfsTime");
     T.start();
-    galois::for_each(sink, UpdateHeights<false>(g), galois::does_not_need_stats<>());
+    galois::for_each(sink, 
+        [&] (const GraphNode& src, auto& ctx) {
+          for (auto ii : g.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED : flag)) {
+            GraphNode dst = g.getEdgeDst(ii);
+            if (g.getEdgeData(g.findEdge(dst, src, galois::MethodFlag::UNPROTECTED)).cap > 0) {
+              node_data_type& node = g.getData(dst, galois::MethodFlag::UNPROTECTED);
+              unsigned newHeight = g.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
+              if (useCAS) {
+                unsigned oldHeight;
+                while (newHeight < (oldHeight = node.height)) {
+                  if (__sync_bool_compare_and_swap(&node.height, oldHeight, newHeight)) {
+                    ctx.push(dst);
+                    break;
+                  }
+                }
+              } else {
+                if (newHeight < node.height) {
+                  node.height = newHeight;
+                  ctx.push(dst);
+                }
+              }
+            }
+          }
+        }, 
+        galois::wl<galois::worklists::dChunkedFIFO<32> >(),
+        galois::no_stats());
     T.stop();
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -840,7 +788,7 @@ struct MatchingMF {
 
   //! Adds reverse edges
   void initializeGraph(G& g, GraphNode& source, GraphNode& sink, unsigned& numNodes,
-      unsigned& interval) {
+      unsigned& globalRelabelInterval) {
     size_t numEdges = 0;
 
     numNodes = std::distance(g.begin(), g.end());
@@ -873,7 +821,7 @@ struct MatchingMF {
       ++numEdges;
     }
 
-    interval = numNodes * ALPHA + numEdges;
+    globalRelabelInterval = numNodes * ALPHA + numEdges;
   }
 
   //! Extract matching from saturated edges
@@ -895,18 +843,35 @@ struct MatchingMF {
     GraphNode source;
     GraphNode sink;
     unsigned numNodes;
-    unsigned interval;
-    initializeGraph(g, source, sink, numNodes, interval);
+    unsigned globalRelabelInterval;
+    initializeGraph(g, source, sink, numNodes, globalRelabelInterval);
 
     std::vector<GraphNode> initial;
     initializePreflow(g, source, initial);
     t.stop();
 
     bool shouldGlobalRelabel = false;
+    unsigned counter = 0;
     galois::setActiveThreads(Concurrent ? numThreads : 1);
+
     while (!initial.empty()) {
       galois::for_each(initial.begin(), initial.end(), 
-          Process(*this, g, source, sink, numNodes, interval, shouldGlobalRelabel));
+          [&, outer=this] (const GraphNode& src, auto& ctx) {
+            int increment = 1;
+            if (outer->discharge(g, src, ctx, source, sink, numNodes)) {
+              increment += BETA;
+            }
+
+            counter += increment;
+            if (globalRelabelInterval && counter >= globalRelabelInterval) {
+              shouldGlobalRelabel = true;
+              ctx.breakLoop();
+              return;
+            }
+          }, 
+          galois::loopname("MatchingMF"),
+          galois::parallel_break(),
+          galois::wl<galois::worklists::dChunkedFIFO<32> >());
 
       if (!shouldGlobalRelabel)
         break;
@@ -1199,7 +1164,7 @@ void start() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager M;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   switch (executionType) {
