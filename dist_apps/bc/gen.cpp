@@ -39,37 +39,12 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
-
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/runtime/dGraphLoader.h"
-
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
-
-enum Personality {
-   CPU, GPU_CUDA, GPU_OPENCL
-};
-
-std::string personality_str(Personality p) {
-   switch (p) {
-   case CPU:
-      return "CPU";
-   case GPU_CUDA:
-      return "GPU_CUDA";
-   case GPU_OPENCL:
-      return "GPU_OPENCL";
-   }
-   assert(false && "Invalid personality");
-   return "";
-}
 #endif
 
 static const char* const name = "Betweeness Centrality - "
@@ -84,10 +59,6 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
-static cll::opt<bool> verify("verify", 
-                             cll::desc("Verify ranks by printing to "
-                                       "'page_ranks.#hid.csv' file"),
-                             cll::init(false));
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
@@ -100,46 +71,12 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                           "betweeness-centraility"),
                                 cll::init(0));
 
-#ifdef __GALOIS_HET_CUDA__
-// If running on both CPUs and GPUs, below is included
-static cll::opt<int> gpudevice("gpu", 
-                      cll::desc("Select GPU to run on, default is "
-                                "to choose automatically"), cll::init(-1));
-static cll::opt<Personality> personality("personality", 
-                 cll::desc("Personality"),
-                 cll::values(clEnumValN(CPU, "cpu", "Galois CPU"),
-                             clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),
-                             clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
-                             clEnumValEnd),
-                 cll::init(CPU));
-static cll::opt<std::string> personality_set("pset", 
-                              cll::desc("String specifying personality for "
-                                        "each host. 'c'=CPU,'g'=GPU/CUDA and "
-                                        "'o'=GPU/OpenCL"),
-                              cll::init(""));
-static cll::opt<unsigned> scalegpu("scalegpu", 
-                           cll::desc("Scale GPU workload w.r.t. CPU, default "
-                                     "is proportionally equal workload to CPU "
-                                     "and GPU (1)"), 
-                           cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", 
-                           cll::desc("Scale CPU workload w.r.t. GPU, "
-                                     "default is proportionally equal "
-                                     "workload to CPU and GPU (1)"), 
-                           cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", 
-                      cll::desc("Num of physical nodes with devices (default "
-                                "= num of hosts): detect GPU to use for each "
-                                "host automatically"), 
-                      cll::init(-1));
-#endif
-
-const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
-static uint64_t current_src_node = 0;
-
 /******************************************************************************/
 /* Graph structure declarations */
 /******************************************************************************/
+
+const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
+static uint64_t current_src_node = 0;
 
 // NOTE: types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
@@ -430,7 +367,6 @@ struct SSSP {
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
         //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -532,7 +468,6 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
       //galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
-      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -726,7 +661,6 @@ struct NumShortestPaths {
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          galois::steal<true>(),
           galois::timeit(),
           galois::no_stats()
         );
@@ -1011,7 +945,6 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -1318,226 +1251,170 @@ float Sanity::current_min = std::numeric_limits<float>::max() / 4;
 /******************************************************************************/
 
 int main(int argc, char** argv) {
-  try {
-    galois::DistMemSys G;
-    DistBenchStart(argc, argv, name, desc, url);
+  galois::DistMemSys G;
+  DistBenchStart(argc, argv, name, desc, url);
 
-    {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (net.ID == 0) {
-      galois::runtime::reportParam("BC", "Max Iterations", 
-                                  (unsigned long)maxIterations);
-    }
-
-    galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
-                      StatTimer_total("TIMER_TOTAL"),
-                      StatTimer_hg_init("TIMER_HG_INIT");
-
-    StatTimer_total.start();
-
-    std::vector<unsigned> scalefactor;
-  #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::runtime::getHostID();
-    int gpu_device = gpudevice;
-
-    if (num_nodes == -1) num_nodes = net.Num;
-    assert((net.Num % num_nodes) == 0);
-
-    // Parse arg string when running on multiple hosts and update/override 
-    // personality with corresponding value.
-    if (personality_set.length() == galois::runtime::NetworkInterface::Num) {
-      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
-        case 'g':
-          personality = GPU_CUDA;
-          break;
-        case 'o':
-          assert(0); // o currently not supported
-          personality = GPU_OPENCL;
-          break;
-        case 'c':
-        default:
-          personality = CPU;
-          break;
-      }
-
-      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
-        gpu_device = get_gpu_device_id(personality_set, num_nodes);
-      }
-
-      if ((scalecpu > 1) || (scalegpu > 1)) {
-        for (unsigned i = 0; i < net.Num; ++i) {
-          if (personality_set.c_str()[i % num_nodes] == 'c') 
-            scalefactor.push_back(scalecpu);
-          else
-            scalefactor.push_back(scalegpu);
-        }
-      }
-    }
-  #endif
-
-    StatTimer_hg_init.start();
-
-    Graph* h_graph = nullptr;
-
-    #ifndef __USE_BFS__
-    // uses sssp
-    h_graph = constructGraph<NodeData, unsigned int>(scalefactor);
-    #else
-    // uses bfs
-    h_graph = constructGraph<NodeData, void>(scalefactor);
-    #endif
-
-    // random num generate for sources
-    std::minstd_rand0 r_generator;
-    r_generator.seed(100);
-    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
-
-    if (numberOfSources != 0) {
-      // uncomment this to have srcnodeid included as well
-      //random_sources.insert(startSource);
-
-      while (random_sources.size() < numberOfSources) {
-        random_sources.insert(r_dist(r_generator));
-      }
-    }
-
-    #ifndef NDEBUG
-    int counter = 0;
-    for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
-      printf("Source #%d: %lu\n", counter, *i);
-      counter++;
-    }
-    #endif
-
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(my_host_id);
-      if (!init_CUDA_context(cuda_ctx, gpu_device))
-        return -1;
-      MarshalGraph m = (*h_graph).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m, net.Num);
-    } else if (personality == GPU_OPENCL) {
-      //galois::opencl::cl_env.init(cldevice.Value);
-    }
-  #endif
-
-    bitset_to_add.resize(h_graph->get_local_total_nodes());
-    bitset_to_add_float.resize(h_graph->get_local_total_nodes());
-    bitset_num_shortest_paths.resize(h_graph->get_local_total_nodes());
-    bitset_num_successors.resize(h_graph->get_local_total_nodes());
-    bitset_num_predecessors.resize(h_graph->get_local_total_nodes());
-    bitset_trim.resize(h_graph->get_local_total_nodes());
-    bitset_current_length.resize(h_graph->get_local_total_nodes());
-    bitset_propogation_flag.resize(h_graph->get_local_total_nodes());
-    bitset_dependency.resize(h_graph->get_local_total_nodes());
-
-    StatTimer_hg_init.stop();
-
-    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-
-    StatTimer_graph_init.start();
-      InitializeGraph::go((*h_graph));
-    StatTimer_graph_init.stop();
-    galois::runtime::getHostBarrier().wait();
-
-    // shared DG accumulator among all steps
-    galois::DGAccumulator<uint32_t> dga;
-
-    // sanity dg accumulators
-    galois::DGAccumulator<float> dga_max;
-    galois::DGAccumulator<float> dga_min;
-    galois::DGAccumulator<double> dga_sum;
-
-    for (auto run = 0; run < numRuns; ++run) {
-      std::cout << "[" << net.ID << "] BC::go run " << run << " called\n";
-      std::string timer_str("TIMER_" + std::to_string(run));
-      galois::StatTimer StatTimer_main(timer_str.c_str());
-
-      StatTimer_main.start();
-        BC::go(*h_graph, dga);
-      StatTimer_main.stop();
-
-      Sanity::current_max = 0;
-      Sanity::current_min = std::numeric_limits<float>::max() / 4;
-
-      Sanity::go(
-        *h_graph,
-        dga_max,
-        dga_min,
-        dga_sum
-      );
-
-      // re-init graph for next run
-      if ((run + 1) != numRuns) {
-        galois::runtime::getHostBarrier().wait();
-        (*h_graph).reset_num_iter(run + 1);
-
-      #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) { 
-          bitset_to_add_reset_cuda(cuda_ctx);
-          bitset_to_add_float_reset_cuda(cuda_ctx);
-          bitset_num_shortest_paths_reset_cuda(cuda_ctx);
-          bitset_num_successors_reset_cuda(cuda_ctx);
-          bitset_num_predecessors_reset_cuda(cuda_ctx);
-          bitset_trim_reset_cuda(cuda_ctx);
-          bitset_current_length_reset_cuda(cuda_ctx);
-          bitset_old_length_reset_cuda(cuda_ctx);
-          bitset_propogation_flag_reset_cuda(cuda_ctx);
-          bitset_dependency_reset_cuda(cuda_ctx);
-        } else
-      #endif
-        {
-        bitset_to_add.reset();
-        bitset_to_add_float.reset();
-        bitset_num_shortest_paths.reset();
-        bitset_num_successors.reset();
-        bitset_num_predecessors.reset();
-        bitset_trim.reset();
-        bitset_current_length.reset();
-        bitset_propogation_flag.reset();
-        bitset_dependency.reset();
-        }
-
-        InitializeGraph::go((*h_graph));
-        galois::runtime::getHostBarrier().wait();
-      }
-    }
-
-    StatTimer_total.stop();
-
-    // Verify, i.e. print out graph data for examination
-    if (verify) {
-      char *v_out = (char*)malloc(40);
-#ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-#endif
-        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
-            // outputs betweenness centrality
-            sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                    (*h_graph).getData(*ii).betweeness_centrality);
-            galois::runtime::printOutput(v_out);
-          }
-        }
-#ifdef __GALOIS_HET_CUDA__
-      } else if (personality == GPU_CUDA) {
-        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                    get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
-
-            galois::runtime::printOutput(v_out);
-            memset(v_out, '\0', 40);
-        }
-      }
-#endif
-      free(v_out);
-    }
-    }
-
-    return 0;
-  } catch(const char* c) {
-    std::cout << "Error: " << c << "\n";
-    return 1;
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  if (net.ID == 0) {
+    galois::runtime::reportParam("BC", "Max Iterations", 
+                                (unsigned long)maxIterations);
   }
+
+  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
+                    StatTimer_total("TIMER_TOTAL");
+
+  StatTimer_total.start();
+
+  #ifndef __USE_BFS__
+
+  #ifdef __GALOIS_HET_CUDA__
+  Graph* h_graph = distGraphInitialization<NodeData, unsigned int>(&cuda_ctx);
+  #else
+  Graph* h_graph = distGraphInitialization<NodeData, unsigned int>();
+  #endif
+
+  #else
+
+  #ifdef __GALOIS_HET_CUDA__
+  Graph* h_graph = distGraphInitialization<NodeData, void>(&cuda_ctx);
+  #else
+  Graph* h_graph = distGraphInitialization<NodeData, void>();
+  #endif
+
+  #endif
+
+  // random num generate for sources
+  std::minstd_rand0 r_generator;
+  r_generator.seed(100);
+  std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
+
+  if (numberOfSources != 0) {
+    // uncomment this to have srcnodeid included as well
+    //random_sources.insert(startSource);
+
+    while (random_sources.size() < numberOfSources) {
+      random_sources.insert(r_dist(r_generator));
+    }
+  }
+
+  #ifndef NDEBUG
+  int counter = 0;
+  for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
+    printf("Source #%d: %lu\n", counter, *i);
+    counter++;
+  }
+  #endif
+
+  bitset_to_add.resize(h_graph->get_local_total_nodes());
+  bitset_to_add_float.resize(h_graph->get_local_total_nodes());
+  bitset_num_shortest_paths.resize(h_graph->get_local_total_nodes());
+  bitset_num_successors.resize(h_graph->get_local_total_nodes());
+  bitset_num_predecessors.resize(h_graph->get_local_total_nodes());
+  bitset_trim.resize(h_graph->get_local_total_nodes());
+  bitset_current_length.resize(h_graph->get_local_total_nodes());
+  bitset_propogation_flag.resize(h_graph->get_local_total_nodes());
+  bitset_dependency.resize(h_graph->get_local_total_nodes());
+
+  std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+
+  StatTimer_graph_init.start();
+    InitializeGraph::go((*h_graph));
+  StatTimer_graph_init.stop();
+  galois::runtime::getHostBarrier().wait();
+
+  // shared DG accumulator among all steps
+  galois::DGAccumulator<uint32_t> dga;
+
+  // sanity dg accumulators
+  galois::DGAccumulator<float> dga_max;
+  galois::DGAccumulator<float> dga_min;
+  galois::DGAccumulator<double> dga_sum;
+
+  for (auto run = 0; run < numRuns; ++run) {
+    std::cout << "[" << net.ID << "] BC::go run " << run << " called\n";
+    std::string timer_str("TIMER_" + std::to_string(run));
+    galois::StatTimer StatTimer_main(timer_str.c_str());
+
+    StatTimer_main.start();
+      BC::go(*h_graph, dga);
+    StatTimer_main.stop();
+
+    Sanity::current_max = 0;
+    Sanity::current_min = std::numeric_limits<float>::max() / 4;
+
+    Sanity::go(
+      *h_graph,
+      dga_max,
+      dga_min,
+      dga_sum
+    );
+
+    // re-init graph for next run
+    if ((run + 1) != numRuns) {
+      galois::runtime::getHostBarrier().wait();
+      (*h_graph).reset_num_iter(run + 1);
+
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) { 
+        bitset_to_add_reset_cuda(cuda_ctx);
+        bitset_to_add_float_reset_cuda(cuda_ctx);
+        bitset_num_shortest_paths_reset_cuda(cuda_ctx);
+        bitset_num_successors_reset_cuda(cuda_ctx);
+        bitset_num_predecessors_reset_cuda(cuda_ctx);
+        bitset_trim_reset_cuda(cuda_ctx);
+        bitset_current_length_reset_cuda(cuda_ctx);
+        bitset_old_length_reset_cuda(cuda_ctx);
+        bitset_propogation_flag_reset_cuda(cuda_ctx);
+        bitset_dependency_reset_cuda(cuda_ctx);
+      } else
+    #endif
+      {
+      bitset_to_add.reset();
+      bitset_to_add_float.reset();
+      bitset_num_shortest_paths.reset();
+      bitset_num_successors.reset();
+      bitset_num_predecessors.reset();
+      bitset_trim.reset();
+      bitset_current_length.reset();
+      bitset_propogation_flag.reset();
+      bitset_dependency.reset();
+      }
+
+      InitializeGraph::go((*h_graph));
+      galois::runtime::getHostBarrier().wait();
+    }
+  }
+
+  StatTimer_total.stop();
+
+  // Verify, i.e. print out graph data for examination
+  if (verify) {
+    char *v_out = (char*)malloc(40);
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == CPU) { 
+    #endif
+      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
+          // outputs betweenness centrality
+          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                  (*h_graph).getData(*ii).betweeness_centrality);
+          galois::runtime::printOutput(v_out);
+        }
+      }
+    #ifdef __GALOIS_HET_CUDA__
+    } else if (personality == GPU_CUDA) {
+      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
+          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                  get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
+
+          galois::runtime::printOutput(v_out);
+          memset(v_out, '\0', 40);
+      }
+    }
+    #endif
+    free(v_out);
+  }
+
+  return 0;
 }
