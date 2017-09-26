@@ -25,10 +25,10 @@
 
 #include <iostream>
 
-galois::substrate::SimpleLock l;
 
 int main(int argc, char** argv) {
+  galois::substrate::SimpleLock l;
   galois::setActiveThreads(10000);
-  galois::on_each([] (int t, int num) { l.lock(); std::cout << t << "," << num << "\n"; l.unlock(); }, galois::loopname("simple loop"));
+  galois::on_each([&l] (int t, int num) { l.lock(); std::cout << t << "," << num << "\n"; l.unlock(); }, galois::loopname("simple loop"));
   return 0;
 }

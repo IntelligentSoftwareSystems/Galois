@@ -16,9 +16,6 @@ struct emp {
   }
   template<typename T, typename C>
   void operator()(const T& t, const C& c) const { galois::substrate::compilerBarrier(); }
-  typedef int tt_does_not_need_push;
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_aborts;
 };
 
 unsigned t_inline(std::vector<unsigned>& V, unsigned num) {
@@ -64,7 +61,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
   galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    galois::do_all(V.begin(), V.begin()+num, emp(), galois::steal<>());
+    galois::do_all(V.begin(), V.begin()+num, emp(), galois::steal<>(), galois::no_stats());
   t.stop();
   return t.get();
 }
@@ -77,7 +74,11 @@ unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned t
   galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    galois::for_each(V.begin(), V.begin() + num, emp(), galois::wl<galois::worklists::StableIterator<>>());
+    galois::for_each(V.begin(), V.begin() + num, emp()
+        , galois::no_stats()
+        , galois::no_pushes()
+        , galois::no_conflicts()
+        , galois::wl<galois::worklists::StableIterator<>>());
   t.stop();
   return t.get();
 }

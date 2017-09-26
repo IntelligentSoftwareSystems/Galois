@@ -39,11 +39,13 @@ void testf(const char* str) {
   std::cout << "\nRunning: " << str << " sizeof " << sizeof(PerThreadStorage<T>) << "\n";
   galois::Timer tL;
   tL.start();
-  galois::on_each(testL<T>(b));
+  testL<T> L(b);
+  galois::on_each(L);
   tL.stop();
   galois::Timer tR;
   tR.start();
-  galois::on_each(testR<T>(b));
+  testR<T> R(b);
+  galois::on_each(R);
   tR.stop();
   std::cout << str << " L: " << tL.get() << " R: " << tR.get() << '\n';
 }
