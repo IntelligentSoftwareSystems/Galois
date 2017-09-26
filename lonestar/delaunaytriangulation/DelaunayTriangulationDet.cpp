@@ -213,7 +213,7 @@ struct Process {
   typedef std::tuple<
     galois::local_state<LocalState>,
     galois::per_iter_alloc,
-    galois::no_pushes,
+    galois::no_pushes
     > function_traits;
 
   //! Parallel operator
@@ -528,7 +528,8 @@ static void generateRounds(PointList& points, bool addBoundary) {
         galois::do_all(
             boost::counting_iterator<size_t>(0),
             boost::counting_iterator<size_t>(size),
-            GenerateRounds(ordered, log2));
+            GenerateRounds(ordered, log2), 
+            galois::loopname("GenerateRounds"));
       } else {
         std::for_each(
             boost::counting_iterator<size_t>(0),
@@ -659,9 +660,9 @@ static void generateMesh() {
       case detPrefix:
         galois::for_each_local(pptrs, Process<>(&tree), galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-            galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
+            galois::neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
 #else
-            galois::make_trait_with_args<galois::has_neighborhood_visitor>(Process<detPrefix>(&tree))
+            galois::make_trait_with_args<galois::neighborhood_visitor>(Process<detPrefix>(&tree))
 #endif
               );
         break;
@@ -675,7 +676,7 @@ static void generateMesh() {
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   bool writepoints = doWritePoints.size() > 0;
@@ -698,7 +699,7 @@ int main(int argc, char** argv) {
   case detDisjoint: name = "detDisjoint"; break;
   default: name = "unknown"; break;
   }
-  galois::substrate::gInfo("Algorithm ", name);
+  galois::gInfo("Algorithm ", name);
   
   galois::StatTimer T;
   T.start();

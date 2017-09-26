@@ -65,8 +65,6 @@ static galois::graphs::SpatialTree2d<Point*> tree;
 
 //! Our main functor
 struct Process {
-  typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_push;
   typedef galois::PerIterAllocTy Alloc;
 
   struct ContainsTuple {
@@ -488,11 +486,15 @@ static void writeMesh(const std::string& filename) {
 
 static void generateMesh() {
   typedef galois::worklists::AltChunkedLIFO<32> CA;
-  galois::for_each_local(ptrPoints, Process(), galois::wl<CA>());
+  galois::for_each_local(ptrPoints, Process(), 
+      galois::no_pushes(),
+      galois::per_iter_alloc(),
+      galois::loopname("Main"),
+      galois::wl<CA>());
 }
 
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   readInput(inputname);
