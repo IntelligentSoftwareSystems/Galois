@@ -157,4 +157,3 @@ size_t mem_usage_CUDA_field(struct CUDA_Context_Field<Type> *field, MarshalGraph
   mem_usage += ((g.nnodes+63)/64) * sizeof(unsigned long long int);
   return mem_usage;
 }
-
