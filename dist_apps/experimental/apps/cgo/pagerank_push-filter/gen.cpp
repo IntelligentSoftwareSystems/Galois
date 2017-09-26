@@ -31,7 +31,6 @@
 #include <algorithm>
 #include <vector>
 #include "galois/DistGalois.h"
-#include "galois/DoAllWrap.h"
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 

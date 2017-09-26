@@ -36,8 +36,6 @@
 #include "galois/graphs/FileGraph.h"
 #include <sstream>
 
-
-
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
