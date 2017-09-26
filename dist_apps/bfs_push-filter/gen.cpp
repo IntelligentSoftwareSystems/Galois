@@ -361,9 +361,10 @@ int main(int argc, char** argv) {
 
   #ifdef __GALOIS_HET_CUDA__
   SetupHetero(scaleFactor);
-  #endif
-
   Graph* hg = LoadDGraph<NodeData, void>(scaleFactor, &cuda_ctx);
+  #else
+  Graph* hg = LoadDGraph<NodeData, void>(scaleFactor);
+  #endif
 
   // bitset comm setup
   bitset_dist_current.resize(hg->get_local_total_nodes());
