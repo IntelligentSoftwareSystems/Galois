@@ -33,15 +33,8 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
-
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
-
-#include "galois/runtime/dGraphLoader.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/runtime/Cuda/cuda_device.h"
@@ -68,6 +61,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<unsigned long long> src_node("srcNodeId", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
+
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
@@ -283,13 +277,10 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  std::vector<unsigned> scaleFactor;
-
   #ifdef __GALOIS_HET_CUDA__
-  SetupHetero(scaleFactor);
-  Graph* hg = LoadDGraph<NodeData, void, false>(scaleFactor, &cuda_ctx);
+  Graph* hg = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
   #else
-  Graph* hg = LoadDGraph<NodeData, void, false>(scaleFactor);
+  Graph* hg = distGraphInitialization<NodeData, void, false>();
   #endif
 
   bitset_dist_current.resize(hg->get_local_total_nodes());
