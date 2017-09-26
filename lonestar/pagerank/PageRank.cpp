@@ -136,36 +136,6 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 }
 
 
-struct PageRank {
-  Graph& graph;
-  PRTy tolerance;
-
-  PageRank(Graph& g, PRTy t) : graph(g), tolerance(t) {}
-
-  void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
-    LNode& sdata = graph.getData(src);
-    galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-
-    if (std::fabs(sdata.residual) > tolerance) {
-      PRTy oldResidual = sdata.residual.exchange(0.0);
-      sdata.value += oldResidual;
-      int src_nout = std::distance(graph.edge_begin(src, flag), graph.edge_end(src,flag));
-      PRTy delta = oldResidual*alpha/src_nout;
-      // for each out-going neighbors
-      for (auto jj : graph.edges(src, flag)) {
-        GNode dst = graph.getEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, flag);
-        auto old = atomicAdd(ddata.residual, delta);
-        if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
-          ctx.push(dst);
-      }
-    } else { // might need to reschedule self. But why?
-      // ctx.push(src);
-    }
-  }
-};
-
-
 void initResidual(Graph& graph) {
   //use residual for the partial, scaled initial residual
   galois::do_all_local(graph,
@@ -188,8 +158,8 @@ void initResidual(Graph& graph) {
 }
 
 int main(int argc, char **argv) {
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  galois::StatManager statManager;
 
   galois::StatTimer T("OverheadTime");
   T.start();
@@ -208,15 +178,35 @@ int main(int argc, char **argv) {
   galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   initResidual(graph);
   typedef galois::worklists::dChunkedFIFO<256> WL;
-  PageRank pr(graph, tolerance);
 
   galois::StatTimer Tmain;
   Tmain.start();
-  galois::for_each_local(graph,
-                         [&pr] (GNode src, auto& ctx) {
-                           pr(src, ctx);
-                         },
-                         galois::wl<WL>());
+  galois::for_each_local(graph, 
+      [&] (GNode src, auto& ctx) {
+        LNode& sdata = graph.getData(src);
+        constexpr const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+
+        if (std::fabs(sdata.residual) > tolerance) {
+          PRTy oldResidual = sdata.residual.exchange(0.0);
+          sdata.value += oldResidual;
+          int src_nout = std::distance(graph.edge_begin(src, flag), graph.edge_end(src,flag));
+          PRTy delta = oldResidual*alpha/src_nout;
+          // for each out-going neighbors
+          for (auto jj : graph.edges(src, flag)) {
+            GNode dst = graph.getEdgeDst(jj);
+            LNode& ddata = graph.getData(dst, flag);
+            auto old = atomicAdd(ddata.residual, delta);
+            if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
+              ctx.push(dst);
+          }
+        } else { // might need to reschedule self. But why?
+          // ctx.push(src);
+        }
+      },
+      galois::loopname("Main"),
+      galois::no_conflicts(),
+      galois::wl<WL>());
+
   Tmain.stop();
 
   galois::reportPageAlloc("MeminfoPost");
