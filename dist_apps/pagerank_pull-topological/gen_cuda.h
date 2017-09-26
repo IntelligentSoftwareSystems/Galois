@@ -1,14 +1,7 @@
 #pragma once
 #include "galois/runtime/Cuda/cuda_mtypes.h"
 #include "galois/runtime/DataCommMode.h"
-
-struct CUDA_Context;
-
-struct CUDA_Context *get_CUDA_context(int id);
-bool init_CUDA_context(struct CUDA_Context *ctx, int device);
-void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hosts);
-
-void reset_CUDA_context(struct CUDA_Context *ctx);
+#include "galois/runtime/Cuda/cuda_context_decl.h"
 
 float get_node_delta_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_delta_cuda(struct CUDA_Context *ctx, unsigned LID, float v);
