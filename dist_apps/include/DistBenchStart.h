@@ -77,25 +77,15 @@ void DistBenchStart(int argc, char** argv, const char* app,
 
 #ifdef __GALOIS_HET_CUDA__
 void SetupHetero(std::vector<unsigned>& scaleFactor);
-#endif
 
-
-
-template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
-                                       struct CUDA_Context** cuda_ctx) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
-  dGraphTimer.start();
-
-  hGraph<NodeData, EdgeData>* loadedGraph = 
-      constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
-
-  // graph marshalling
-  #ifdef __GALOIS_HET_CUDA__
+template <typename NodeData, typename EdgeData>
+void SetupGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
+                   struct CUDA_Context** cuda_ctx) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
 
   galois::StatTimer marshalTimer("TIMER_GRAPH_MARSHAL"); 
+
   marshalTimer.start();
 
   if (personality == GPU_CUDA) {
@@ -112,6 +102,21 @@ hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
   }
 
   marshalTimer.stop();
+}
+#endif
+
+template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
+hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
+                                   struct CUDA_Context** cuda_ctx = nullptr) {
+  galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
+  dGraphTimer.start();
+
+  hGraph<NodeData, EdgeData>* loadedGraph = 
+      constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
+
+  // graph marshalling
+  #ifdef __GALOIS_HET_CUDA__
+  SetupGPUGraph(loadedGraph, cuda_ctx);
   #endif
 
   dGraphTimer.stop();
