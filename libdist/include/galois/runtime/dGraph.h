@@ -1363,24 +1363,7 @@ private:
                                         bit_set_count);
     }
 
-    // TODO refactor into another function; not really part of offset/bitset
-    // determination
-    if (enforce_data_mode != noData) {
-      data_mode = enforce_data_mode;
-    } else { // == noData; set appropriately
-      if (bit_set_count == 0) {
-        data_mode = noData;
-      } else if ((bit_set_count * sizeof(unsigned int)) <
-                   bitset_comm.alloc_size()) {
-        data_mode = offsetsData;
-      } else if ((bit_set_count * sizeof(typename FnTy::ValTy) + 
-                  bitset_comm.alloc_size()) <
-                 (indices.size() * sizeof(typename FnTy::ValTy))) {
-        data_mode = bitsetData;
-      } else {
-        data_mode = onlyData;
-      }
-    }
+    data_mode = get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
   }
 
   /**

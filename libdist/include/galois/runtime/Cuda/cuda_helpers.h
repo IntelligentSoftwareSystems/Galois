@@ -352,20 +352,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     get_offsets_from_bitset(shared->num_nodes[from_id], ctx->offsets.device_ptr(), ctx->is_updated.gpu_rd_ptr(), v_size);
     //timer2.stop();
   }
-  if (enforce_data_mode != noData) {
-    *data_mode = enforce_data_mode;
-  } else { // auto
-    if ((*v_size) == 0) {
-      *data_mode = noData;
-      return;
-    } else if (((*v_size)*sizeof(unsigned int)) < ctx->is_updated.cpu_rd_ptr()->alloc_size()) {
-      *data_mode = offsetsData;
-    } else if (((*v_size)*sizeof(DataType)+ctx->is_updated.cpu_rd_ptr()->alloc_size()) < ((shared->num_nodes[from_id])*sizeof(DataType))) {
-      *data_mode = bitsetData;
-    } else {
-      *data_mode = onlyData;
-    }
-  }
+  *data_mode = get_data_mode<DataType>(*v_size, shared->num_nodes[from_id]);
   //timer3.start();
   if ((*data_mode) == onlyData) {
     *v_size = shared->num_nodes[from_id];
