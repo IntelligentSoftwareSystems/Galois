@@ -3,8 +3,6 @@
 #include "galois/runtime/DataCommMode.h"
 #include "galois/runtime/Cuda/cuda_context_decl.h"
 
-void reset_CUDA_context(struct CUDA_Context *ctx);
-
 void get_bitset_dist_current_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
 void bitset_dist_current_reset_cuda(struct CUDA_Context *ctx);
 void bitset_dist_current_reset_cuda(struct CUDA_Context *ctx, size_t begin, size_t end);
