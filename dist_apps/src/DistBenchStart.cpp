@@ -87,10 +87,9 @@ std::string personality_str(Personality p) {
   return "";
 }
 
-cll::opt<int> gpudevice("gpu", 
-                                cll::desc("Select GPU to run on, "
-                                          "default is to choose automatically"), 
-                                cll::init(-1));
+cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, "
+                                         "default is to choose automatically"), 
+                               cll::init(-1));
 cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
                   clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
@@ -181,7 +180,7 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 #ifdef __GALOIS_HET_CUDA__
-void heteroSetup(std::vector<unsigned>& scaleFactor) {
+void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
   const unsigned my_host_id = galois::runtime::getHostID();
 
   // Parse arg string when running on multiple hosts and update/override 
