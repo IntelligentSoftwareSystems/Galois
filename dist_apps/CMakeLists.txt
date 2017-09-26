@@ -5,6 +5,12 @@ target_include_directories(distbench PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# turn on cuda for distbench as well
+if(USE_GGC)
+  target_compile_definitions(distbench PRIVATE __GALOIS_HET_CUDA__=1)
+endif()
+
 target_link_libraries(distbench galois_shmem galois_dist gllvm)
 
 include_directories(include)
