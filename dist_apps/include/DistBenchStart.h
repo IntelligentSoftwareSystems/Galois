@@ -42,6 +42,10 @@
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/runtime/Cuda/cuda_device.h"
 #include "galois/runtime/Cuda/cuda_context_decl.h"
+#else
+// dummy struct declaration to allow non-het code to compile without
+// having to include cuda_context_decl
+struct CUDA_Context;
 #endif
 
 //! standard global options to the benchmarks
@@ -72,14 +76,23 @@ extern cll::opt<int> num_nodes;
 extern cll::opt<std::string> personality_set;
 #endif
 
+/**
+ * TODO doc
+ */
 void DistBenchStart(int argc, char** argv, const char* app, 
                     const char* desc = nullptr, const char* url = nullptr);
 
 #ifdef __GALOIS_HET_CUDA__
-void SetupHetero(std::vector<unsigned>& scaleFactor);
+/**
+ * TODO doc
+ */
+void heteroSetup(std::vector<unsigned>& scaleFactor);
 
+/**
+ * TODO doc
+ */
 template <typename NodeData, typename EdgeData>
-void SetupGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
+void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
                    struct CUDA_Context** cuda_ctx) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
@@ -105,8 +118,13 @@ void SetupGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
 }
 #endif
 
+
+
+/**
+ * TODO doc
+ */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
+hGraph<NodeData, EdgeData>* loadDGraph(std::vector<unsigned>& scaleFactor,
                                    struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
   dGraphTimer.start();
@@ -114,14 +132,28 @@ hGraph<NodeData, EdgeData>* LoadDGraph(std::vector<unsigned>& scaleFactor,
   hGraph<NodeData, EdgeData>* loadedGraph = 
       constructGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
 
-  // graph marshalling
   #ifdef __GALOIS_HET_CUDA__
-  SetupGPUGraph(loadedGraph, cuda_ctx);
+  marshalGPUGraph(loadedGraph, cuda_ctx);
   #endif
 
   dGraphTimer.stop();
 
   return loadedGraph;
+}
+
+/**
+ * TODO doc
+ */
+template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
+hGraph<NodeData, EdgeData>* distGraphInitialization(
+      struct CUDA_Context** cuda_ctx = nullptr) {
+  std::vector<unsigned> scaleFactor;
+  #ifdef __GALOIS_HET_CUDA__
+  heteroSetup(scaleFactor);
+  return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
+  #else
+  return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
+  #endif
 }
 
 #endif

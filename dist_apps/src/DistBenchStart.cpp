@@ -26,7 +26,8 @@
  *
  * @section Description
  *
- * Perform common setup tasks for the lonestar benchmarks
+ * Perform common setup tasks for the distributed benchmarks + contains 
+ * initialization functions for said benchmarks
  *
  * @author Gurbinder Gill <gill@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
@@ -67,11 +68,9 @@ cll::opt<unsigned int> enforce_metadata("metadata",
           cll::desc("Enforce communication metadata: 0 - auto (default), "
                          "1 - bitset, 2 - indices, 3 - no metadata"), 
           cll::init(0));
-
 cll::opt<bool> verify("verify", 
                      cll::desc("Verify results by outputting results to file"), 
                      cll::init(false));
-
 
 #ifdef __GALOIS_HET_CUDA__
 std::string personality_str(Personality p) {
@@ -182,7 +181,7 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 #ifdef __GALOIS_HET_CUDA__
-void SetupHetero(std::vector<unsigned>& scaleFactor) {
+void heteroSetup(std::vector<unsigned>& scaleFactor) {
   const unsigned my_host_id = galois::runtime::getHostID();
 
   // Parse arg string when running on multiple hosts and update/override 
