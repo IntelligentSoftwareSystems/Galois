@@ -36,12 +36,12 @@
 #define __GALOIS_GRAPH_HELPERS__
 
 #include <boost/iterator/counting_iterator.hpp>
+#include <cassert>
+#include <vector>
 
 namespace galois {
 namespace graphs {
-
 namespace internal {
-
 /**
  * Return a suitable index between an upper bound and a lower bound that
  * attempts to get close to the target size (i.e. find a good chunk that
@@ -105,32 +105,8 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  * @returns The total number of blocks to split among all divisions
  */
 // inline required as GraphHelpers is included in multiple translation units
-inline uint32_t determine_block_division(uint32_t numDivisions, 
-                                         std::vector<unsigned>& scaleFactor) {
-  uint32_t numBlocks = 0;
-
-  if (scaleFactor.empty()) {
-    // if scale factor isn't specified, everyone gets the same amount
-    numBlocks = numDivisions;
-
-    // scale factor holds a prefix sum of the scale factor
-    for (uint32_t i = 0; i < numDivisions; i++) {
-      scaleFactor.push_back(i + 1);
-    }
-  } else {
-    assert(scaleFactor.size() == numDivisions);
-    assert(numDivisions >= 1);
-
-    // get numDivisions number of blocks we need + save a prefix sum of the scale
-    // factor vector to scaleFactor
-    for (uint32_t i = 0; i < numDivisions; i++) {
-      numBlocks += scaleFactor[i];
-      scaleFactor[i] = numBlocks;
-    }
-  }
-
-  return numBlocks;
-}
+uint32_t determine_block_division(uint32_t numDivisions, 
+                                  std::vector<unsigned>& scaleFactor);
 } // end namespace internal
 
 /** 

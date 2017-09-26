@@ -35,6 +35,7 @@ set(sources
         src/FileGraphParallel_cpp11.cpp
 #        src/FileGraphParallel_pthread.cpp
         src/OCFileGraph.cpp
+        src/GraphHelpers.cpp
 )
 
 add_library(galois_shmem STATIC ${sources})
