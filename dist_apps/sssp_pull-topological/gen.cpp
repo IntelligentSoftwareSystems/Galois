@@ -37,7 +37,6 @@
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
