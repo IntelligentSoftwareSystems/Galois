@@ -204,7 +204,7 @@ struct OrderGraph {
   }
 };
 int main(int argc, char** argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   srand(-1);

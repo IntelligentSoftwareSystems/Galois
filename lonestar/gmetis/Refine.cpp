@@ -104,7 +104,6 @@ struct refine_BKL2 {
   GGraph* fg;
   std::vector<partInfo>& parts;
 
-  typedef int tt_needs_per_iter_alloc;
 
   refine_BKL2(unsigned mis, unsigned mas, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : minSize(mis), maxSize(mas), cg(_cg), fg(_fg), parts(_p) {}
 
@@ -174,15 +173,24 @@ struct refine_BKL2 {
     typedef galois::worklists::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
     gainIndexer::g = &cg;
     galois::InsertBag<GNode> boundary;
+
     if (fg)
       galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), galois::loopname("boundary"));
     else
       galois::do_all_local(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
-    galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p), galois::loopname("refine"), galois::wl<pG>());
+
+    galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p)
+        , galois::per_iter_alloc()
+        , galois::loopname("refine")
+        , galois::wl<pG>());
+
     if (false) {
       galois::InsertBag<GNode> boundary;
       galois::do_all_local(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
-      galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p), galois::loopname("refine"), galois::wl<pG>());
+      galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p)
+          , galois::per_iter_alloc()
+          , galois::loopname("refine")
+          , galois::wl<pG>());
     }
 
   }

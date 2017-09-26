@@ -183,8 +183,6 @@ struct parallelMatchAndCreateNodes {
  */
 
 struct parallelPopulateEdges {
-  typedef int tt_does_not_need_push;
-  typedef int tt_needs_per_iter_alloc;
     
   GGraph *coarseGGraph;
   GGraph *fineGGraph;
@@ -373,7 +371,11 @@ void createCoarseEdges(MetisGraph *coarseMetisGraph) {
   //GGraph* fineGGraph = fineMetisGraph->getGraph();
   typedef galois::worklists::StableIterator<true> WL;
   parallelPopulateEdges pPE(coarseMetisGraph);
-  galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, galois::loopname("popedge"), galois::wl<WL>());
+  galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, 
+      galois::no_pushes(),
+      galois::per_iter_alloc(),
+      galois::loopname("popedge"), 
+      galois::wl<WL>());
 }
 
 MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned& rem, bool useRM, bool with2Hop, bool verbose) {
