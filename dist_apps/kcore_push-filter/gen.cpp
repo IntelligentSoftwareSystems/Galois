@@ -35,37 +35,12 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/runtime/CompilerHelperFunctions.h"
-
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/runtime/dGraphLoader.h"
-
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/runtime/Cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
-
-enum Personality {
-   CPU, GPU_CUDA, GPU_OPENCL
-};
-
-std::string personality_str(Personality p) {
-   switch (p) {
-   case CPU:
-      return "CPU";
-   case GPU_CUDA:
-      return "GPU_CUDA";
-   case GPU_OPENCL:
-      return "GPU_OPENCL";
-   }
-   assert(false && "Invalid personality");
-   return "";
-}
 #endif
 
 static const char* const name = "KCore - Distributed Heterogeneous Push Filter.";
@@ -79,50 +54,10 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
-static cll::opt<bool> verify("verify", 
-                             cll::desc("Verify ranks by printing to "
-                                       "'page_ranks.#hid.csv' file"),
-                             cll::init(false));
-
 // required k specification for k-core
 static cll::opt<unsigned int> k_core_num("kcore",
                                      cll::desc("KCore value"),
                                      cll::Required);
-
-#ifdef __GALOIS_HET_CUDA__
-// If running on both CPUs and GPUs, below is included
-static cll::opt<int> gpudevice("gpu", 
-                      cll::desc("Select GPU to run on, default is "
-                                "to choose automatically"), cll::init(-1));
-static cll::opt<Personality> personality("personality", 
-                 cll::desc("Personality"),
-                 cll::values(clEnumValN(CPU, "cpu", "Galois CPU"),
-                             clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),
-                             clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
-                             clEnumValEnd),
-                 cll::init(CPU));
-static cll::opt<std::string> personality_set("pset", 
-                              cll::desc("String specifying personality for "
-                                        "each host. 'c'=CPU,'g'=GPU/CUDA and "
-                                        "'o'=GPU/OpenCL"),
-                              cll::init(""));
-static cll::opt<unsigned> scalegpu("scalegpu", 
-                           cll::desc("Scale GPU workload w.r.t. CPU, default "
-                                     "is proportionally equal workload to CPU "
-                                     "and GPU (1)"), 
-                           cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", 
-                           cll::desc("Scale CPU workload w.r.t. GPU, "
-                                     "default is proportionally equal "
-                                     "workload to CPU and GPU (1)"), 
-                           cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", 
-                      cll::desc("Num of physical nodes with devices (default "
-                                "= num of hosts): detect GPU to use for each "
-                                "host automatically"), 
-                      cll::init(-1));
-#endif
-
 
 /******************************************************************************/
 /* Graph structure declarations + other inits */
@@ -174,7 +109,6 @@ struct InitializeGraph2 {
       nodesWithEdges,
       InitializeGraph2{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -326,7 +260,6 @@ struct KCoreStep1 {
         nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -443,166 +376,101 @@ struct GetAliveDead {
 /******************************************************************************/
 
 int main(int argc, char** argv) {
-  try {
-    galois::DistMemSys G;
-    DistBenchStart(argc, argv, name, desc, url);
+  galois::DistMemSys G;
+  DistBenchStart(argc, argv, name, desc, url);
 
-    {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (net.ID == 0) {
-      galois::runtime::reportParam("KCore", "Max Iterations", 
-                                  (unsigned long)maxIterations);
-    }
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  if (net.ID == 0) {
+    galois::runtime::reportParam("KCore", "Max Iterations", 
+                                (unsigned long)maxIterations);
+  }
 
-    galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
-                      StatTimer_total("TIMER_TOTAL"),
-                      StatTimer_hg_init("TIMER_HG_INIT");
+  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
+                    StatTimer_total("TIMER_TOTAL");
 
-    StatTimer_total.start();
-
-    std::vector<unsigned> scalefactor;
-  #ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::runtime::getHostID();
-    int gpu_device = gpudevice;
-
-    if (num_nodes == -1) num_nodes = net.Num;
-    assert((net.Num % num_nodes) == 0);
-
-    // Parse arg string when running on multiple hosts and update/override 
-    // personality with corresponding value.
-
-    if (personality_set.length() == (net.Num / num_nodes)) {
-      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
-      case 'g':
-        personality = GPU_CUDA;
-        break;
-      case 'o':
-        assert(0);
-        personality = GPU_OPENCL;
-        break;
-      case 'c':
-      default:
-        personality = CPU;
-        break;
-      }
-      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
-        gpu_device = get_gpu_device_id(personality_set, num_nodes);
-      }
-      if ((scalecpu > 1) || (scalegpu > 1)) {
-        for (unsigned i=0; i<net.Num; ++i) {
-          if (personality_set.c_str()[i % num_nodes] == 'c') 
-            scalefactor.push_back(scalecpu);
-          else
-            scalefactor.push_back(scalegpu);
-        }
-      }
-    }
-  #endif
-
-    StatTimer_hg_init.start();
-
-    Graph* h_graph = nullptr;
-
-    if (inputFileSymmetric) {
-      h_graph = constructSymmetricGraph<NodeData, void>(scalefactor);
-    } else {
-      GALOIS_DIE("must pass symmetricGraph flag with symmetric graph to "
-                 "kcore");
-    }
+  StatTimer_total.start();
 
   #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(my_host_id);
-      if (!init_CUDA_context(cuda_ctx, gpu_device))
-        return -1;
-      MarshalGraph m = (*h_graph).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m, net.Num);
-    } else if (personality == GPU_OPENCL) {
-      //galois::opencl::cl_env.init(cldevice.Value);
-    }
+  Graph* h_graph = symmetricDistGraphInitialization<NodeData, void>(&cuda_ctx);
+  #else
+  Graph* h_graph = symmetricDistGraphInitialization<NodeData, void>();
   #endif
 
-    bitset_current_degree.resize(h_graph->get_local_total_nodes());
-    bitset_trim.resize(h_graph->get_local_total_nodes());
+  bitset_current_degree.resize(h_graph->get_local_total_nodes());
+  bitset_trim.resize(h_graph->get_local_total_nodes());
 
-    StatTimer_hg_init.stop();
+  std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
+  StatTimer_graph_init.start();
+    InitializeGraph1::go((*h_graph));
+  StatTimer_graph_init.stop();
+  galois::runtime::getHostBarrier().wait();
 
-    std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
-    StatTimer_graph_init.start();
-      InitializeGraph1::go((*h_graph));
-    StatTimer_graph_init.stop();
-    galois::runtime::getHostBarrier().wait();
+  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t> dga1;
+  galois::DGAccumulator<uint64_t> dga2;
 
-    galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-    galois::DGAccumulator<uint64_t> dga1;
-    galois::DGAccumulator<uint64_t> dga2;
+  for (auto run = 0; run < numRuns; ++run) {
+    std::cout << "[" << net.ID << "] KCoreStep1::go run " << run << " called\n";
+    std::string timer_str("TIMER_" + std::to_string(run));
+    galois::StatTimer StatTimer_main(timer_str.c_str());
 
-    for (auto run = 0; run < numRuns; ++run) {
-      std::cout << "[" << net.ID << "] KCoreStep1::go run " << run << " called\n";
-      std::string timer_str("TIMER_" + std::to_string(run));
-      galois::StatTimer StatTimer_main(timer_str.c_str());
+    StatTimer_main.start();
+      KCoreStep1::go(*h_graph, DGAccumulator_accum);
+    StatTimer_main.stop();
 
-      StatTimer_main.start();
-        KCoreStep1::go(*h_graph, DGAccumulator_accum);
-      StatTimer_main.stop();
+    // sanity check
+    GetAliveDead::go(*h_graph, dga1, dga2);
 
-      // sanity check
-      GetAliveDead::go(*h_graph, dga1, dga2);
-
-      // re-init graph for next run
-      if ((run + 1) != numRuns) {
-        (*h_graph).reset_num_iter(run+1);
+    // re-init graph for next run
+    if ((run + 1) != numRuns) {
+      (*h_graph).reset_num_iter(run+1);
 
       #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) { 
-          bitset_current_degree_reset_cuda(cuda_ctx);
-          bitset_trim_reset_cuda(cuda_ctx);
-        } else
+      if (personality == GPU_CUDA) { 
+        bitset_current_degree_reset_cuda(cuda_ctx);
+        bitset_trim_reset_cuda(cuda_ctx);
+      } else
       #endif
-        { bitset_current_degree.reset();
-        bitset_trim.reset(); }
+      { bitset_current_degree.reset();
+      bitset_trim.reset(); }
 
-        InitializeGraph1::go((*h_graph));
-        galois::runtime::getHostBarrier().wait();
-      }
+      InitializeGraph1::go((*h_graph));
+      galois::runtime::getHostBarrier().wait();
     }
-
-    StatTimer_total.stop();
-
-    // Verify, i.e. print out graph data for examination
-    if (verify) {
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-    #endif
-        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            // prints the flag (alive/dead)
-            galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                         (bool)(*h_graph).getData(*ii).flag);
-
-
-          // does a sanity check as well: 
-          // degree higher than kcore if node is alive
-          if (!((*h_graph).getData(*ii).flag)) {
-            assert((*h_graph).getData(*ii).current_degree < k_core_num);
-          } 
-        }
-    #ifdef __GALOIS_HET_CUDA__
-      } else if (personality == GPU_CUDA) {
-        for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-          if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-            galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                       (bool)get_node_flag_cuda(cuda_ctx, *ii));
-                                     
-        }
-      }
-    #endif
-    }
-    }
-
-    return 0;
-  } catch(const char* c) {
-    std::cerr << "Error: " << c << "\n";
-    return 1;
   }
+
+  StatTimer_total.stop();
+
+  // Verify, i.e. print out graph data for examination
+  if (verify) {
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == CPU) { 
+    #endif
+      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
+          // prints the flag (alive/dead)
+          galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                       (bool)(*h_graph).getData(*ii).flag);
+        }
+
+        // does a sanity check as well: 
+        // degree higher than kcore if node is alive
+        if (!((*h_graph).getData(*ii).flag)) {
+          assert((*h_graph).getData(*ii).current_degree < k_core_num);
+        } 
+      }
+    #ifdef __GALOIS_HET_CUDA__
+    } else if (personality == GPU_CUDA) {
+      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
+        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
+          galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                     (bool)get_node_flag_cuda(cuda_ctx, *ii));
+        }
+                                   
+      }
+    }
+    #endif
+  }
+
+  return 0;
 }
