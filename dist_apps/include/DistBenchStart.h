@@ -77,7 +77,14 @@ extern cll::opt<std::string> personality_set;
 #endif
 
 /**
- * TODO doc
+ * Initialize Galois runtime for distributed benchmarks and print/report various
+ * information.
+ *
+ * @param argc argument count
+ * @param argv list of arguments
+ * @param app Name of the application
+ * @param desc Description of the application
+ * @param url URL to the application
  */
 void DistBenchStart(int argc, char** argv, const char* app, 
                     const char* desc = nullptr, const char* url = nullptr);
@@ -85,14 +92,15 @@ void DistBenchStart(int argc, char** argv, const char* app,
 #ifdef __GALOIS_HET_CUDA__
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
-/**
- * TODO doc
- */
 void heteroSetup(std::vector<unsigned>& scaleFactor);
 }; // end internal namespace
 
 /**
- * TODO doc
+ * Given a loaded graph, marshal it over to the GPU device for use
+ * on the GPU.
+ *
+ * @param loadedGraph a loaded graph that you want to marshal
+ * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
 static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
@@ -123,7 +131,22 @@ static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
 
 
 /**
- * TODO doc
+ * Loads a graph into memory. Details/partitioning will be handled in the 
+ * construct graph call.
+ *
+ * The user should NOT call this function.
+ *
+ * @tparam NodeData struct specifying what kind of data the node contains
+ * @tparam EdgeData type specifying the type of the edge data
+ * @tparam iterateOutEdges Boolean specifying if the graph should be iterating
+ * over outgoing or incoming edges
+ *
+ * @param scaleFactor Vector that specifies how much of the graph each
+ * host should get
+ * @param cuda_ctx CUDA context of the currently running program; only matters
+ * if using GPU
+ *
+ * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static hGraph<NodeData, EdgeData>* loadDGraph(
@@ -147,7 +170,20 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
 }
 
 /**
- * TODO doc
+ * Loads a symmetric graph into memory.
+ * Details/partitioning will be handled in the construct graph call.
+ *
+ * The user should NOT call this function.
+ *
+ * @tparam NodeData struct specifying what kind of data the node contains
+ * @tparam EdgeData type specifying the type of the edge data
+ *
+ * @param scaleFactor Vector that specifies how much of the graph each
+ * host should get
+ * @param cuda_ctx CUDA context of the currently running program; only matters
+ * if using GPU
+ *
+ * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
 static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
@@ -177,9 +213,20 @@ static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
   return loadedGraph;
 }
 
-
 /**
- * TODO doc
+ * Loads a graph into memory, setting up heterogeneous execution if
+ * necessary. Unlike the dGraph load functions above, this is meant
+ * to be exposed to the user.
+ *
+ * @tparam NodeData struct specifying what kind of data the node contains
+ * @tparam EdgeData type specifying the type of the edge data
+ * @tparam iterateOutEdges Boolean specifying if the graph should be iterating
+ * over outgoing or incoming edges
+ *
+ * @param cuda_ctx CUDA context of the currently running program; only matters
+ * if using GPU
+ *
+ * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 hGraph<NodeData, EdgeData>* distGraphInitialization(
@@ -194,7 +241,17 @@ hGraph<NodeData, EdgeData>* distGraphInitialization(
 }
 
 /**
- * TODO doc
+ * Loads a symmetric graph into memory, setting up heterogeneous execution if
+ * necessary. Unlike the dGraph load functions above, this is meant
+ * to be exposed to the user.
+ *
+ * @tparam NodeData struct specifying what kind of data the node contains
+ * @tparam EdgeData type specifying the type of the edge data
+ *
+ * @param cuda_ctx CUDA context of the currently running program; only matters
+ * if using GPU
+ *
+ * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
 hGraph<NodeData, EdgeData>* symmetricDistGraphInitialization(

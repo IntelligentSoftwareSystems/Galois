@@ -180,6 +180,15 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
 }
 
 #ifdef __GALOIS_HET_CUDA__
+/**
+ * Processes/setups the specified heterogeneous configuration (the pset
+ * command line option) and sets up the scale factor vector for
+ * graph partitioning.
+ * 
+ * @param scaleFactor input and output: an empty vector that will hold
+ * the scale factor (i.e. how much each host will get relative to
+ * other hosts) at the end of the function
+ */
 void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
   const unsigned my_host_id = galois::runtime::getHostID();
 
