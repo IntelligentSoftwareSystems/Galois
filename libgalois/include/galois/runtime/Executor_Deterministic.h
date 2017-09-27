@@ -71,7 +71,7 @@ namespace runtime {
 //! Implementation of deterministic execution
 namespace internal {
 
-extern __thread SizedHeapFactory::SizedHeap* dagListHeap;
+extern thread_local SizedHeapFactory::SizedHeap* dagListHeap;
 
 template<typename T, bool UseLocalState>
 class DItemBase {
