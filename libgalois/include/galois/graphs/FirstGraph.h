@@ -33,6 +33,7 @@
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
 #include "galois/Bag.h"
+#include "galois/Accumulator.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
 #include "galois/Galois.h"
@@ -233,7 +234,7 @@ public:
   template<bool _sorted_neighbors>
   struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
 
-  typedef read_with_aux_graph_tag read_tag;
+  typedef read_with_aux_first_graph_tag read_tag;
 
 private:
   template<typename T>
@@ -476,22 +477,78 @@ private:
     return boost::make_filter_iterator(is_out_edge(), ii, src->end());
   }
 
+  /**
+   * Creates an outgoing edge at src for the edge from src to dst.
+   * Only called by constructOutEdgeValue.
+   */
+  template<typename... Args>
+  edge_iterator createOutEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
+    assert(src);
+    assert(dst);
+
+    src->acquire(mflag);
+    typename gNode::iterator ii = src->end();
+    if (ii == src->end()) {
+      dst->acquire(mflag);
+      EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
+      ii = src->createEdge(dst, e, false, std::forward<Args>(args)...);
+    }
+    return boost::make_filter_iterator(is_out_edge(), ii, src->end());
+  }
+
+  /**
+   * Creates an incoming edge at dst for the edge from src to dst.
+   * Only called by constructInEdgeValue.
+   */
+  template<typename... Args>
+  in_edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
+    assert(src);
+    assert(dst);
+
+    dst->acquire(mflag);
+    typename gNode::iterator ii = dst->end();
+    if (ii == dst->end()) {
+      src->acquire(mflag);
+      EdgeTy* e = src->find(dst)->second();
+      ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
+    }
+    return boost::make_filter_iterator(is_in_edge(), ii, dst->end());
+  }
+
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  void constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
     typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
     typedef LargeArray<EdgeTy> ED;
     if (ED::has_value) {
-      addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+      createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
-      addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+      createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
     }
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  void constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
-    addMultiEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+    createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructInEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef LargeArray<EdgeTy> ED;
+    if (ED::has_value) {
+      createInEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+    } else {
+      createInEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructInEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    createInEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
 public:
@@ -868,13 +925,27 @@ public:
     }
   }
 
-  void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+  void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        constructEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
+        constructOutEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
+      }
+    }
+  }
+
+  void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        // no incoming edges for directed and outedge-only graphs
+        if (!Directional || InOut) {
+          constructInEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
+        }
       }
     }
   }

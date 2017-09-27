@@ -67,6 +67,15 @@ struct ReadGraphConstructFrom {
   }
 };
 
+template<typename GraphTy>
+void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
+  graph.allocateFrom(f);
+
+  ReadGraphConstructFrom<GraphTy> reader(graph, f);
+  galois::on_each(reader);
+}
+
+
 template<typename GraphTy, typename Aux>
 struct ReadGraphConstructNodesFrom {
   GraphTy& graph;
@@ -89,15 +98,6 @@ struct ReadGraphConstructEdgesFrom {
   }
 };
 
-  
-template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
-  graph.allocateFrom(f);
-
-  ReadGraphConstructFrom<GraphTy> reader(graph, f);
-  galois::on_each(reader);
-}
-
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag tag, const std::string& filename) {
   FileGraph f;
@@ -117,6 +117,53 @@ void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag, FileGraph& f) {
 
   ReadGraphConstructEdgesFrom<GraphTy, Aux> edgeReader(graph, f, aux);
   galois::on_each(edgeReader);
+}
+
+
+template<typename GraphTy, typename Aux>
+struct ReadGraphConstructOutEdgesFrom {
+  GraphTy& graph;
+  FileGraph& f;
+  Aux& aux;
+  ReadGraphConstructOutEdgesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
+  void operator()(unsigned tid, unsigned total) {
+    graph.constructOutEdgesFrom(f, tid, total, aux);
+  }
+};
+
+template<typename GraphTy, typename Aux>
+struct ReadGraphConstructInEdgesFrom {
+  GraphTy& graph;
+  FileGraph& f;
+  Aux& aux;
+  ReadGraphConstructInEdgesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
+  void operator()(unsigned tid, unsigned total) {
+    graph.constructInEdgesFrom(f, tid, total, aux);
+  }
+};
+
+template<typename GraphTy>
+void readGraphDispatch(GraphTy& graph, read_with_aux_first_graph_tag, FileGraph& f) {
+  typedef typename GraphTy::ReadGraphAuxData Aux;
+
+  Aux aux;
+  graph.allocateFrom(f, aux);
+
+  ReadGraphConstructNodesFrom<GraphTy, Aux> nodeReader(graph, f, aux);
+  galois::on_each(nodeReader);
+
+  ReadGraphConstructOutEdgesFrom<GraphTy, Aux> outEdgeReader(graph, f, aux);
+  galois::on_each(outEdgeReader);
+
+  ReadGraphConstructInEdgesFrom<GraphTy, Aux> inEdgeReader(graph, f, aux);
+  galois::on_each(inEdgeReader);
+}
+
+template<typename GraphTy>
+void readGraphDispatch(GraphTy& graph, read_with_aux_first_graph_tag tag, const std::string& filename) {
+  FileGraph f;
+  f.fromFileInterleaved<typename GraphTy::file_edge_data_type>(filename);
+  readGraphDispatch(graph, tag, f);
 }
 
 template<typename GraphTy>

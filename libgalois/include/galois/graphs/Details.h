@@ -52,6 +52,7 @@ namespace graphs {
 struct read_default_graph_tag { };
 struct read_with_aux_graph_tag { };
 struct read_lc_inout_graph_tag { };
+struct read_with_aux_first_graph_tag {};
 
 namespace internal {
 
