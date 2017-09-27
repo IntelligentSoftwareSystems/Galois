@@ -41,10 +41,6 @@ cll::opt<bool> useGidMetadata("useGidMetadata",
   cll::desc("Use Global IDs in indices metadata (only when -metadata=2)"),
   cll::init(false));
 
-cll::opt<bool> useNumaAlloc("useNumaAlloc",
-                             cll::desc("Setting to use numa allocation"),
-                             cll::init(false));
-
 cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
                                cll::desc("Type of masters distribution."),
                                cll::values(
@@ -77,4 +73,3 @@ cll::opt<unsigned> numFileThreads("ft",
                              cll::desc("Number of file reading threads or I/O "
                              "requests per host"),
                              cll::init(4));
-
