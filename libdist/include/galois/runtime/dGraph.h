@@ -656,6 +656,50 @@ public:
     StatTimer_set.stop();
   }
 
+  void initBareMPI() {
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    if (bare_mpi == noBareMPI) return;
+
+#ifdef GALOIS_USE_LWCI
+    int provided;
+    int rv = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
+    if (rv != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, rv);
+    }
+    if(!(provided >= MPI_THREAD_FUNNELED)){
+      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
+      abort();
+    }
+    else{
+      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
+    }
+    assert(provided >= MPI_THREAD_FUNNELED);
+    int taskRank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
+    if (taskRank != id) GALOIS_DIE("Mismatch in MPI rank");
+    int numTasks;
+    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    if (numTasks != net.Num) GALOIS_DIE("Mismatch in MPI rank");
+#endif
+
+    if (id == 0) galois::gDebug("Using bare MPI\n");
+#endif
+  }
+
+  void finalizeBareMPI() {
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    if (bare_mpi == noBareMPI) return;
+
+#ifdef GALOIS_USE_LWCI
+    int rv = MPI_Finalize();
+    if (rv != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, rv);
+    }
+#endif
+#endif
+  }
+
 public:
   typedef typename GraphTy::GraphNode GraphNode;
   typedef typename GraphTy::iterator iterator;
@@ -690,44 +734,11 @@ public:
     totalEdges = 0;
     currentBVFlag = nullptr;
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    switch (bare_mpi) {
-      case noBareMPI:
-        break;
-      case nonBlockingBareMPI:
-        galois::gDebug("Using bare MPI\n");
-        break;
-      default:
-        GALOIS_DIE("Unsupported bare MPI");
-    }
-#ifdef GALOIS_USE_LWCI
-    int provided;
-    int rv = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
-    if (rv != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, rv);
-    }
-    if(!(provided >= MPI_THREAD_FUNNELED)){
-      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
-      abort();
-    }
-    else{
-      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
-    }
-    assert(provided >= MPI_THREAD_FUNNELED);
-    return std::make_pair(getID(), getNum());
-#endif
-#endif
+    initBareMPI();
   }
 
   ~hGraph() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-#ifdef GALOIS_USE_LWCI
-    int rv = MPI_Finalize();
-    if (rv != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, rv);
-    }
-#endif
-#endif
+    finalizeBareMPI();
   }
 
   /**
