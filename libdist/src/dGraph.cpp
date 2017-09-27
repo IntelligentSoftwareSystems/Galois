@@ -73,3 +73,18 @@ cll::opt<unsigned> numFileThreads("ft",
                              cll::desc("Number of file reading threads or I/O "
                              "requests per host"),
                              cll::init(4));
+
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+cll::opt<BareMPI> bare_mpi("bare_mpi",
+                             cll::desc("Type of bare MPI."),
+                             cll::values(
+                               clEnumValN(noBareMPI, "no",
+                                          "Do not us bare MPI (default)"),
+                               clEnumValN(nonBlockingBareMPI, "nonBlocking",
+                                          "Use non-blocking bare MPI"),
+                               clEnumValN(oneSidedBareMPI, "oneSided",
+                                          "Use one-sided bare MPI"),
+                               clEnumValEnd
+                             ),
+                             cll::init(noBareMPI));
+#endif

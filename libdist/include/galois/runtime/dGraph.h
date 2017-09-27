@@ -58,9 +58,7 @@
 #include "galois/opencl/CL_Header.h"
 #endif
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-#include "mpi.h"
-#endif
+#include "galois/runtime/bare_mpi.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -80,23 +78,6 @@ extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
 extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
-
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-enum BareMPI { noBareMPI, nonBlockingBareMPI, oneSidedBareMPI };
-
-static cll::opt<BareMPI> bare_mpi("bare_mpi",
-                               cll::desc("Type of bare MPI."),
-                               cll::values(
-                                 clEnumValN(noBareMPI, "no",
-                                            "Do not us bare MPI (default)"),
-                                 clEnumValN(nonBlockingBareMPI, "nonBlocking",
-                                            "Use non-blocking bare MPI"),
-                                 clEnumValN(BALANCED_MASTERS_AND_EDGES, "oneSided",
-                                            "Use one-sided bare MPI"),
-                                 clEnumValEnd
-                               ),
-                               cll::init(noBareMPI));
-#endif
 
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
@@ -710,6 +691,15 @@ public:
     currentBVFlag = nullptr;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    switch (bare_mpi) {
+      case noBareMPI:
+        break;
+      case nonBlockingBareMPI:
+        galois::gDebug("Using bare MPI\n");
+        break;
+      default:
+        GALOIS_DIE("Unsupported bare MPI");
+    }
 #ifdef GALOIS_USE_LWCI
     int provided;
     int rv = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);

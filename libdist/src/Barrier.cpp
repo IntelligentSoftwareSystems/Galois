@@ -81,7 +81,7 @@ public:
 */
 
 #include <iostream>
-#include <mpi.h>
+#include "galois/runtime/bare_mpi.h"
 
 namespace {
 class HostBarrier : public galois::substrate::Barrier {
@@ -91,15 +91,7 @@ class HostBarrier : public galois::substrate::Barrier {
     --static_cast<HostBarrier&>(galois::runtime::getHostBarrier()).count;
   }
 
-public:
-  HostBarrier() : count(0) {}
-
-  virtual const char* name() const { return "HostBarrier"; }
-
-  virtual void reinit(unsigned val) { }
-
-  virtual void wait() {
-
+  void barrier_net() {
     if (galois::substrate::ThreadPool::getTID() == 0) {
       count += galois::runtime::NetworkInterface::Num;
     }
@@ -117,6 +109,37 @@ public:
       net.handleReceives();
     }
     //    std::cerr << "$";
+  }
+
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+  void barrier_mpi() {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+#endif
+
+public:
+  HostBarrier() : count(0) {}
+
+  virtual const char* name() const { return "HostBarrier"; }
+
+  virtual void reinit(unsigned val) { }
+
+  virtual void wait() {
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    switch (bare_mpi) {
+      case noBareMPI:
+#endif
+        barrier_net();
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        break;
+      case nonBlockingBareMPI:
+        barrier_mpi();
+        break;
+      default:
+        GALOIS_DIE("Unsupported bare MPI");
+    }
+#endif
+
   }
 };
 } // end namespace ""

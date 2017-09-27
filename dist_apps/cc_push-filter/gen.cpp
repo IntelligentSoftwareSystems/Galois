@@ -251,13 +251,13 @@ struct SourceComponentSize {
   const unsigned long long src_comp;
   Graph* graph;
 
-  galois::DGAccumulator<unsigned long long>& DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
 
   SourceComponentSize(const uint64_t _src_comp, Graph* _graph, 
-                      galois::DGAccumulator<unsigned long long>& _dga) : 
+                      galois::DGAccumulator<uint64_t>& _dga) : 
     src_comp(_src_comp), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned long long>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
@@ -342,7 +342,7 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-  galois::DGAccumulator<unsigned long long> DGAccumulator_accum64;
+  galois::DGAccumulator<uint64_t> DGAccumulator_accum64;
 
   for (auto run = 0; run < numRuns; ++run) {
     printf("[%d] ConnectedComp::go run %d called\n", net.ID, run);

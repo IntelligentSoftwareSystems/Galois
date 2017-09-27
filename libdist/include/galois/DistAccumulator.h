@@ -33,6 +33,7 @@
 #include <limits>
 #include "galois/Galois.h"
 #include "galois/Accumulator.h"
+#include "galois/runtime/bare_mpi.h"
 
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
@@ -48,6 +49,69 @@ class DGAccumulator {
   Ty local_mdata, global_mdata;
 #ifdef __GALOIS_HET_OPENCL__
   cl_mem dev_data;
+#endif
+
+  void reduce_net() {
+    global_mdata = local_mdata;
+#ifdef __GALOIS_HET_OPENCL__
+    Ty tmp;
+    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
+    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
+//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
+    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
+    galois::atomicAdd(mdata, tmp);
+#endif
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (net.ID + h) % net.Num;
+      galois::runtime::SendBuffer b;
+      gSerialize(b, local_mdata);
+      net.sendTagged(x, galois::runtime::evilPhase, b);
+    }
+    net.flush();
+
+    unsigned num_Hosts_recvd = 1;
+    while (num_Hosts_recvd < net.Num) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
+      Ty x_mdata;
+      gDeserialize(p->second, x_mdata);
+      global_mdata += x_mdata;
+      ++num_Hosts_recvd;
+    }
+    ++galois::runtime::evilPhase;
+  }
+
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+  void reduce_mpi(const int32_t& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::INT, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const int64_t& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const uint32_t& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const uint64_t& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const float& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const double& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  }
+
+  void reduce_mpi(const long double& l_mdata) {
+    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  }
 #endif
 
 public:
@@ -114,85 +178,30 @@ public:
    *
    ************************************************************/
 
-  Ty reduce() {
-    if (local_mdata == 0) local_mdata = mdata.reduce();
-    global_mdata = local_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-    Ty tmp;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    galois::atomicAdd(mdata, tmp);
-#endif
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (net.ID + h) % net.Num;
-      galois::runtime::SendBuffer b;
-      gSerialize(b, local_mdata);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
-    }
-    net.flush();
-
-    unsigned num_Hosts_recvd = 1;
-    while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      Ty x_mdata;
-      gDeserialize(p->second, x_mdata);
-      global_mdata += x_mdata;
-      ++num_Hosts_recvd;
-    }
-    ++galois::runtime::evilPhase;
-
-    return global_mdata;
-  }
-
-  /************************************************************
-   *
-   ************************************************************/
-
   /**
    * Reduce with a timer
    */
-  Ty reduce(std::string runID) {
+  Ty reduce(std::string runID = std::string()) {
     std::string timer_str("REDUCE_DGACCUM_" + runID); 
     galois::StatTimer reduceTimer(timer_str.c_str());
     reduceTimer.start();
 
     if (local_mdata == 0) local_mdata = mdata.reduce();
-    global_mdata = local_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-    Ty tmp;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    galois::atomicAdd(mdata, tmp);
-#endif
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (net.ID + h) % net.Num;
-      galois::runtime::SendBuffer b;
-      gSerialize(b, local_mdata);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
-    }
-    net.flush();
 
-    unsigned num_Hosts_recvd = 1;
-    while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        net.handleReceives();
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      Ty x_mdata;
-      gDeserialize(p->second, x_mdata);
-      global_mdata += x_mdata;
-      ++num_Hosts_recvd;
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    switch (bare_mpi) {
+      case noBareMPI:
+#endif
+        reduce_net();
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        break;
+      case nonBlockingBareMPI:
+        reduce_mpi(local_mdata);
+        break;
+      default:
+        GALOIS_DIE("Unsupported bare MPI");
     }
-    ++galois::runtime::evilPhase;
+#endif
 
     reduceTimer.stop();
 
