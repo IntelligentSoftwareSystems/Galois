@@ -344,8 +344,7 @@ int main(int argc, char** argv) {
                                 (unsigned long long)src_node);
   }
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
-                    StatTimer_total("TIMER_TOTAL"); 
+  galois::StatTimer StatTimer_total("TIMER_TOTAL"); 
 
   StatTimer_total.start();
   #ifdef __GALOIS_HET_CUDA__
@@ -359,6 +358,7 @@ int main(int argc, char** argv) {
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"); 
   StatTimer_init.start();
   InitializeGraph::go((*hg));
   StatTimer_init.stop();
