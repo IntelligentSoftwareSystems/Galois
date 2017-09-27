@@ -72,6 +72,10 @@ bool dst_invalid(BITVECTOR_STATUS bv_flag);
 void make_src_invalid(BITVECTOR_STATUS* bv_flag);
 void make_dst_invalid(BITVECTOR_STATUS* bv_flag);
 
+/**
+ * Each field has a FieldFlags object that indicates synchronization status
+ * of that field.
+ */
 class FieldFlags {
  private:
   uint8_t _s2s;
@@ -132,6 +136,13 @@ class FieldFlags {
   void clear_read_dst() {
     _s2d = false;
     _d2d = false;
+  }
+
+  void clear_read_any() {
+    _s2d = false;
+    _d2d = false;
+    _s2s = false;
+    _d2s = false;
   }
   
   void clear_all() {
