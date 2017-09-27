@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -28,21 +28,21 @@
 
 #ifndef _GALOIS_EXTRA_TRAITS_
 #define _GALOIS_EXTRA_TRAITS_
-
+// needed when clang did not define trivially copyable, but clang 3.8 has it
 //from libc++, clang specific
-namespace std {
-#ifdef __clang__
-template <class T> struct is_trivially_copyable;
-template <class _Tp> struct is_trivially_copyable
-  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
-{};
-#else
-#if __GNUC__ < 5
-template<class T>
-using is_trivially_copyable = is_trivial<T>;
-#endif
-#endif
-}
+//namespace std {
+//#ifdef __clang__
+//template <class T> struct is_trivially_copyable;
+//template <class _Tp> struct is_trivially_copyable
+//  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
+//{};
+//#else
+//#if __GNUC__ < 5
+//template<class T>
+//using is_trivially_copyable = is_trivial<T>;
+//#endif
+//#endif
+//}
 #endif
 //#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
