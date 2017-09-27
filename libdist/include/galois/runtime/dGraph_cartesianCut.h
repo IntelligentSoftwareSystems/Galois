@@ -348,14 +348,7 @@ public:
     base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
 
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
-    if (!edgeNuma) {
-      base_hGraph::graph.allocateFrom(numNodes, numEdges);
-    } else {
-      fprintf(stderr, "[%d] Edge based NUMA division on\n", base_hGraph::id);
-      //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-      base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                            prefixSumOfEdges);
-    }
+    base_hGraph::graph.allocateFrom(numNodes, numEdges);
 
     //std::cerr << "Allocate done\n";
 
@@ -405,13 +398,11 @@ public:
 
 
     //printf("[%d] about to thread range\n", base_hGraph::id);
-    // TODO revise how this works and make it consistent across cuts
-    if (!edgeNuma) {
-      galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-      StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
-      StatTimer_thread_ranges.stop();
-    }
+
+    galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+    StatTimer_thread_ranges.start();
+    base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
+    StatTimer_thread_ranges.stop();
 
     //printf("[%d] about to master thread range\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_master();

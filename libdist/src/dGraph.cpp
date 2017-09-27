@@ -45,11 +45,6 @@ cll::opt<bool> useNumaAlloc("useNumaAlloc",
                              cll::desc("Setting to use numa allocation"),
                              cll::init(false));
 
-cll::opt<bool> edgeNuma("edgeNuma",
-                        cll::desc("Flag to use exp. edge-centric "
-                        "numa allocation for threads"),
-                        cll::init(false));
-
 cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
                                cll::desc("Type of masters distribution."),
                                cll::values(

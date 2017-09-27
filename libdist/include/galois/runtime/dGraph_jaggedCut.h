@@ -286,14 +286,7 @@ public:
 
     assert(prefixSumOfEdges.size() == numNodes);
 
-    if (!edgeNuma) {
-      base_hGraph::graph.allocateFrom(numNodes, numEdges);
-    } else {
-      printf("Edge based NUMA division on\n");
-      //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-      base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                            prefixSumOfEdges);
-    }
+    base_hGraph::graph.allocateFrom(numNodes, numEdges);
 
     if (numNodes > 0) {
       //assert(numEdges > 0);
@@ -332,13 +325,10 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-    // TODO revise how this works and make it consistent across cuts
-    if (!edgeNuma) {
-      galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
-      StatTimer_thread_ranges.start();
-      base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
-      StatTimer_thread_ranges.stop();
-    }
+    galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+    StatTimer_thread_ranges.start();
+    base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
+    StatTimer_thread_ranges.stop();
 
     base_hGraph::determine_thread_ranges_master();
     base_hGraph::determine_thread_ranges_with_edges();

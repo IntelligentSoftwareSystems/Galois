@@ -342,14 +342,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_allocate_local_DS.start();
 
-      if (!edgeNuma) {
-        base_hGraph::graph.allocateFrom(numNodes, numEdges);
-      } else {
-        printf("Edge based NUMA division on\n");
-        //base_hGraph::graph.allocateFrom(numNodes, numEdges, prefixSumOfEdges);
-        base_hGraph::graph.allocateFromByNode(numNodes, numEdges, 
-                                              prefixSumOfEdges);
-      }
+      base_hGraph::graph.allocateFrom(numNodes, numEdges);
 
       base_hGraph::graph.constructNodes();
 
@@ -385,10 +378,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::runtime::getHostBarrier().wait();
 
       if (transpose && (numNodes > 0)) {
-        base_hGraph::graph.transpose(edgeNuma);
+        base_hGraph::graph.transpose();
         base_hGraph::transposed = true;
-      } else if (!edgeNuma) {
-        // elseif because transpose will find thread ranges for you
+      } else {
+        // else because transpose will find thread ranges for you
         galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
 
         StatTimer_thread_ranges.start();
@@ -415,7 +408,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_graph_construct_comm.stop();
       //print_string(" : Setup communication done");
-
     }
 
     template<typename GraphTy>

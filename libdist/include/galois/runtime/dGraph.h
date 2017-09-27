@@ -86,7 +86,6 @@ extern cll::opt<unsigned> buffSize;
 
 extern cll::opt<bool> useGidMetadata;
 extern cll::opt<bool> useNumaAlloc;
-extern cll::opt<bool> edgeNuma;
 extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
 extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
