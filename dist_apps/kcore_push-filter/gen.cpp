@@ -385,8 +385,7 @@ int main(int argc, char** argv) {
                                 (unsigned long)maxIterations);
   }
 
-  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
-                    StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL");
 
   StatTimer_total.start();
 
@@ -400,6 +399,7 @@ int main(int argc, char** argv) {
   bitset_trim.resize(h_graph->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
+  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT");
   StatTimer_graph_init.start();
     InitializeGraph1::go((*h_graph));
   StatTimer_graph_init.stop();

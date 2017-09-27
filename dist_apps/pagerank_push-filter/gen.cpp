@@ -454,8 +454,7 @@ int main(int argc, char** argv) {
     ss << tolerance;
     galois::runtime::reportParam("PageRank", "Tolerance", ss.str());
   }
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"),
-                    StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL");
 
   StatTimer_total.start();
 
@@ -469,6 +468,7 @@ int main(int argc, char** argv) {
   bitset_nout.resize(hg->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
   StatTimer_init.start();
     InitializeGraph::go((*hg));
   StatTimer_init.stop();
