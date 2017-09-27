@@ -46,25 +46,24 @@
 namespace galois {
 namespace graphs {
 
-//File format V1:
-//version (1) {uint64_t LE}
-//EdgeType size {uint64_t LE}
-//numNodes {uint64_t LE}
-//numEdges {uint64_t LE}
-//outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint32_t LE}
-//potential padding (32bit max) to Re-Align to 64bits
-//EdgeType[numEdges] {EdgeType size}
+// File format V1:
+// version (1) {uint64_t LE}
+// EdgeType size {uint64_t LE}
+// numNodes {uint64_t LE}
+// numEdges {uint64_t LE}
+// outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+// outedges[numEdges] {uint32_t LE}
+// potential padding (32bit max) to Re-Align to 64bits
+// EdgeType[numEdges] {EdgeType size}
 
-//File format V2:
-//version (2) {uint64_t LE}
-//EdgeType size {uint64_t LE}
-//numNodes {uint64_t LE}
-//numEdges {uint64_t LE}
-//outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint64_t LE}
-//EdgeType[numEdges] {EdgeType size}
-
+// File format V2:
+// version (2) {uint64_t LE}
+// EdgeType size {uint64_t LE}
+// numNodes {uint64_t LE}
+// numEdges {uint64_t LE}
+// outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+// outedges[numEdges] {uint64_t LE}
+// EdgeType[numEdges] {EdgeType size}
 
 class OfflineGraph {
   std::ifstream fileEdgeDst, fileIndex, fileEdgeData;
@@ -77,8 +76,6 @@ class OfflineGraph {
   bool v2;
   uint64_t numSeeksEdgeDst, numSeeksIndex, numSeeksEdgeData;
   uint64_t numBytesReadEdgeDst, numBytesReadIndex, numBytesReadEdgeData;
-
-  void* file_buffer;
 
   galois::substrate::SimpleLock lock;
 
@@ -99,7 +96,8 @@ class OfflineGraph {
       fileEdgeDst.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
     } catch (std::ifstream::failure e) {
       std::cerr << "Exception while reading edge destinations:" << e.what() << "\n";
-      std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL " << fileEdgeDst.fail() << " BAD " << fileEdgeDst.bad() << "\n";
+      std::cerr << "IO error flags: EOF " << fileEdgeDst.eof() << " FAIL " 
+                << fileEdgeDst.fail() << " BAD " << fileEdgeDst.bad() << "\n";
     }
 
     // metadata update
@@ -131,7 +129,8 @@ class OfflineGraph {
       }
       catch (std::ifstream::failure e) {
         std::cerr << "Exception while reading index:" << e.what() << "\n";
-        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
+        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " 
+                  << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
       }
 
       auto numBytesRead = fileIndex.gcount();
@@ -146,7 +145,8 @@ class OfflineGraph {
       }
       catch (std::ifstream::failure e) {
         std::cerr << "Exception while reading index:" << e.what() << "\n";
-        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
+        std::cerr << "IO error flags: EOF " << fileIndex.eof() << " FAIL " 
+                  << fileIndex.fail() << " BAD " << fileIndex.bad() << "\n";
       }
 
       auto numBytesRead = fileIndex.gcount();
@@ -259,13 +259,14 @@ public:
   }
 
   uint64_t num_seeks(){
-     //std::cout << "Seeks :: " << numSeeksEdgeDst << " , " << numSeeksEdgeData << " , " << numSeeksIndex << " \n";
-     return numSeeksEdgeDst+numSeeksEdgeData+numSeeksIndex;
+     //std::cout << "Seeks :: " << numSeeksEdgeDst << " , " << numSeeksEdgeData 
+     //          << " , " << numSeeksIndex << " \n";
+     return numSeeksEdgeDst + numSeeksEdgeData+numSeeksIndex;
   }
 
   uint64_t num_bytes_read(){
      //std::cout << "Bytes read :: " << numBytesReadEdgeDst << " , " << numBytesReadEdgeData << " , " << numBytesReadIndex << " \n";
-     return numBytesReadEdgeDst+numBytesReadEdgeData+numBytesReadIndex;
+     return numBytesReadEdgeDst + numBytesReadEdgeData+numBytesReadIndex;
   }
 
   void reset_seek_counters() {
@@ -349,7 +350,6 @@ class OfflineGraphWriter {
   bool smallData;
   uint64_t ver;
   std::vector<uint64_t> bufferDst;
-  uint32_t counter;
 
   std::deque<uint64_t> edgeOffsets;
 
@@ -412,8 +412,6 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
     file.write(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
     file.write(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
     file.seekg(0, std::ios_base::beg);
-    //bufferDst.resize(1024);
-    //counter = 0;
   }
 
   ~OfflineGraphWriter() {}
@@ -425,7 +423,7 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
     numEdges = std::accumulate(edgeOffsets.begin(),edgeOffsets.end(),0);
     std::cout << " NUM EDGES  : " << numEdges << "\n";
     std::partial_sum(edgeOffsets.begin(), edgeOffsets.end(), edgeOffsets.begin());
-    //Nodes are greater than 2^32 so need ver = 2. 
+    // Nodes are greater than 2^32 so need ver = 2. 
     if(numNodes >= 4294967296){
       ver = 2;
     }
@@ -446,21 +444,12 @@ OfflineGraphWriter(const std::string& name, bool use32=false, uint64_t _numNodes
   }
 
   void setEdge(uint64_t src, uint64_t offset, uint64_t dst, uint64_t val) {
-    if(smallData)
-      setEdge32(src,offset,dst,val);
-    else
-      setEdge64(src,offset,dst,val);
+    if (smallData) setEdge32(src,offset,dst,val);
+    else setEdge64(src,offset,dst,val);
   }
+
   void setEdgeSorted(uint64_t dst) {
-#if 0
-      bufferDst[counter] = dst;
-      ++counter;
-      if(counter == 1024){
-        setEdge_sortedBuffer();
-        counter = 0;
-      }
-#endif
-      setEdge_sorted(dst);
+    setEdge_sorted(dst);
   }
 
   void seekEdgesDstStart(){
