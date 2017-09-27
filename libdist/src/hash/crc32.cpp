@@ -318,20 +318,22 @@ namespace
       0x2C8E0FFF,0xE0240F61,0x6EAB0882,0xA201081C,0xA8C40105,0x646E019B,0xEAE10678,0x264B06E6 }
   };
 
-  inline uint32_t swap(uint32_t x)
-  {
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_bswap32(x);
-#endif
-#ifdef MSC_VER
-    return _byteswap_ulong(x);
-#endif
-
-    return (x >> 24) |
-          ((x >>  8) & 0x0000FF00) |
-          ((x <<  8) & 0x00FF0000) |
-           (x << 24);
-  }
+  // Edited by Galois project team: this function is apparently never used so 
+  // we commented it out to make the compiler not complain
+//  inline uint32_t swap(uint32_t x)
+//  {
+//#if defined(__GNUC__) || defined(__clang__)
+//    return __builtin_bswap32(x);
+//#endif
+//#ifdef MSC_VER
+//    return _byteswap_ulong(x);
+//#endif
+//
+//    return (x >> 24) |
+//          ((x >>  8) & 0x0000FF00) |
+//          ((x <<  8) & 0x00FF0000) |
+//           (x << 24);
+//  }
 }
 
 
