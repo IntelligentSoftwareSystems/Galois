@@ -271,7 +271,7 @@ struct SSSPSanityCheck {
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
   galois::DGAccumulator<uint32_t>& DGAccumulator_max;
 
-  SSSPSanityCheck(const uint32_t _infinity, Graph* _graph,
+  SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph,
                   galois::DGAccumulator<uint64_t>& dgas,
                   galois::DGAccumulator<uint32_t>& dgam) : 
     local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
@@ -339,8 +339,7 @@ int main(int argc, char** argv) {
       (unsigned long)src_node);
   }
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
-                    StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL");
 
   StatTimer_total.start();
 
@@ -353,6 +352,9 @@ int main(int argc, char** argv) {
   bitset_dist_current.resize(hg->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
+
   StatTimer_init.start();
     InitializeGraph::go((*hg));
   StatTimer_init.stop();

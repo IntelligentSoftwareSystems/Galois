@@ -274,7 +274,7 @@ struct BFSSanityCheck {
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
   galois::DGAccumulator<uint32_t>& DGAccumulator_max;
 
-  BFSSanityCheck(const uint32_t _infinity, Graph* _graph, 
+  BFSSanityCheck(const uint32_t& _infinity, Graph* _graph, 
                  galois::DGAccumulator<uint64_t>& dgas,
                  galois::DGAccumulator<uint32_t>& dgam) : 
     local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
