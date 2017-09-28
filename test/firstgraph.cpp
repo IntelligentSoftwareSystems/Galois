@@ -6,9 +6,9 @@
 #include <iostream>
 #include <string>
 
-using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
 using OutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, false>;
 using InOutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, true>;
+using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
 
 std::string filename;
 
@@ -21,27 +21,32 @@ void initGraph(Graph& g) {
 }
 
 template<typename Graph>
-unsigned int traverseGraph(Graph& g) {
+void traverseGraph(Graph& g) {
   unsigned int sum = 0;
+
   for (auto n: g) {
-    auto node = g.getData(n);
     for (auto oe: g.edges(n)) {
-      sum += node * g.getEdgeData(oe);
-    }
-    for (auto ie: g.in_edges(n)) {
-      sum -= node * g.getEdgeData(ie);
+      sum += g.getData(n) * g.getEdgeData(oe);
     }
   }
-  return sum;
+  std::cout << "  outgoing sum = " << sum << std::endl;
+
+  for (auto n: g) {
+    for (auto ie: g.in_edges(n)) {
+      sum -= g.getData(n) * g.getEdgeData(ie);
+    }
+  }
+  std::cout << "  all sum = " << sum << std::endl;
 }
 
 template<typename Graph>
-void exp(Graph& g, galois::StatTimer& timer, std::string prompt) {
+void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
+  std::cout << prompt << std::endl;
   timer.start();
   galois::graphs::readGraph(g, filename);
   timer.stop();
   initGraph(g);
-  std::cout << prompt << ": sum = " << traverseGraph(g) << std::endl;
+  traverseGraph(g);
 }
 
 int main(int argc, char** argv) {
@@ -58,15 +63,15 @@ int main(int argc, char** argv) {
 
   galois::StatTimer outT("OutGraphTime");
   OutGraph outG;
-  exp(outG, outT, "out graph");
-
-  galois::StatTimer symT("SymGraphTime");
-  SymGraph symG;
-  exp(symG, symT, "symmetric graph");
+  run(outG, outT, "out graph");
 
   galois::StatTimer inoutT("InOutGraphTime");
   InOutGraph inoutG;
-  exp(inoutG, inoutT, "in-out graph");
+  run(inoutG, inoutT, "in-out graph");
+
+  galois::StatTimer symT("SymGraphTime");
+  SymGraph symG;
+  run(symG, symT, "symmetric graph");
 
   return 0;
 }
