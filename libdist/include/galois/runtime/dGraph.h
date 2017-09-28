@@ -948,8 +948,8 @@ public:
    *
    * @returns A range object that contains all the nodes in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[0];
   }
@@ -960,8 +960,8 @@ public:
    *
    * @returns A range object that contains the master nodes in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  masterNodesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  masterNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[1];
   }
@@ -973,8 +973,8 @@ public:
    * @returns A range object that contains the master nodes and the nodes
    * with outgoing edges in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesWithEdgesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesWithEdgesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[2];
   }
