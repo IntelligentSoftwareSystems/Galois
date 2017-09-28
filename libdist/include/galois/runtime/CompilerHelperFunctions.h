@@ -24,11 +24,9 @@
 #ifndef GALOIS_RUNTIME_COMPILER_HELPER_FUNCTIONS_H
 #define GALOIS_RUNTIME_COMPILER_HELPER_FUNCTIONS_H
 
-//TODO: move to libdist
 #include <atomic>
 #include <algorithm>
 #include <vector>
-
 namespace galois {
   /** galois::atomicMax + non-atomic max calls **/
 
@@ -186,26 +184,26 @@ namespace galois {
     var = val;
   }
 
-  //like std::inner_product
-    template<typename ItrTy, typename Ty >
-    Ty innerProduct(ItrTy& a_arr, ItrTy& b_arr, Ty init_value) {
-      auto jj = b_arr.begin();
-      for(auto ii = a_arr.begin(); ii != a_arr.end(); ++ii, ++jj){
-        init_value += (*ii) * (*jj);
-      }
-      return init_value;
+  // like std::inner_product
+  template<typename ItrTy, typename Ty >
+  Ty innerProduct(ItrTy& a_arr, ItrTy& b_arr, Ty init_value) {
+    auto jj = b_arr.begin();
+    for(auto ii = a_arr.begin(); ii != a_arr.end(); ++ii, ++jj){
+      init_value += (*ii) * (*jj);
     }
+    return init_value;
+  }
 
-    template<typename... Args>
-      int read_set(Args... args) {
-        //Nothing for now.
-        return 0;
-      }
+  template<typename... Args>
+  int read_set(Args... args) {
+    // Nothing for now.
+    return 0;
+  }
 
-    template<typename... Args>
-      int write_set(Args... args) {
-        // Nothing for now.
-        return 0;
-      }
-}//End namespace galois
+  template<typename... Args>
+  int write_set(Args... args) {
+    // Nothing for now.
+    return 0;
+  }
+} //End namespace galois
 #endif

@@ -45,7 +45,7 @@ cll::opt<std::string> partFolder("partFolder",
 cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                      cll::desc("Type of partitioning."),
                      cll::values(
-                       clEnumValN(OEC, "oec", 
+                       clEnumValN(OEC, "oec (default)", 
                                   "Outgoing Edge-Cut"), 
                        clEnumValN(IEC, "iec", 
                                   "Incoming Edge-Cut"), 
@@ -70,4 +70,3 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
 cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
                                  cll::desc("Threshold for high degree edges."), 
                                  cll::init(1000));
-

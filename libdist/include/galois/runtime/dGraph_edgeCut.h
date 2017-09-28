@@ -23,17 +23,10 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
-
 #ifndef _GALOIS_DIST_HGRAPHEC_H
 #define _GALOIS_DIST_HGRAPHEC_H
 
-#include <vector>
-#include <set>
-#include <algorithm>
-#include <unordered_map>
 #include "galois/runtime/dGraph.h"
-#include "galois/graphs/OfflineGraph.h"
-#include "galois/Galois.h"
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;

@@ -31,15 +31,13 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-// TODO/FIXME change printfs to gDebug
-
 #ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
+#include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-#include "galois/Galois.h"
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
@@ -389,11 +387,16 @@ class LC_CSR_Graph :
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
-    std::sort(edge_sort_begin(N), edge_sort_end(N), [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
+    std::sort(edge_sort_begin(N), edge_sort_end(N), 
+      [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { 
+        return e1.dst < e2.dst; 
+      }
+    );
   }
 
   /**
-   * Sorts all outgoing edges of all nodes in parallel. Comparison is over getEdgeDst(e).
+   * Sorts all outgoing edges of all nodes in parallel. Comparison is over 
+   * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
     galois::do_all_local(*this, [=] 
@@ -601,7 +604,7 @@ class LC_CSR_Graph :
     assert(returnRanges[num_threads] == endNode && 
            "return ranges end not end node");
 
-    for (uint32_t i = 1; i < numThreads; i++) {
+    for (uint32_t i = 1; i < num_threads; i++) {
       assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
       assert(returnRanges[i] >= returnRanges[i-1]);
     }
@@ -755,7 +758,6 @@ class LC_CSR_Graph :
                      this->outOfLineConstructAt(x);
                    }, 
                    galois::loopname("CONSTRUCT_NODES"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 #endif
   }
@@ -799,7 +801,6 @@ class LC_CSR_Graph :
                      edgeIndData_temp[n] = 0;
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 
     // parallelization makes this slower
@@ -840,7 +841,6 @@ class LC_CSR_Graph :
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
@@ -853,7 +853,6 @@ class LC_CSR_Graph :
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
-                     galois::numrun("0"),
                      galois::no_stats());
     }
 
@@ -901,7 +900,6 @@ class LC_CSR_Graph :
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 
                      galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
-                     galois::numrun("0"),
                      galois::no_stats());
     }
 

@@ -86,7 +86,7 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -122,7 +122,7 @@ struct FirstItr_ConnectedComp{
   FirstItr_ConnectedComp(Graph * _graph):graph(_graph){}
 
   void static go(Graph& _graph) {
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
@@ -181,7 +181,7 @@ struct ConnectedComp {
     
     unsigned _num_iterations = 1;
     
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do { 
       _graph.set_num_iter(_num_iterations);

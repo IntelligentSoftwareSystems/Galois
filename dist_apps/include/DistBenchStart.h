@@ -51,12 +51,8 @@ struct CUDA_Context;
 //! standard global options to the benchmarks
 namespace cll = llvm::cl;
 
-extern cll::opt<bool> skipVerify;
 extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
-extern cll::opt<bool> savegraph;
-extern cll::opt<std::string> outputFile;
-extern cll::opt<bool> verifyMax;
 extern cll::opt<std::string> statFile;
 extern cll::opt<unsigned int> enforce_metadata;
 extern cll::opt<bool> verify;

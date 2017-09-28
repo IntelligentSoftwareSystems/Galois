@@ -30,7 +30,6 @@
 #ifndef GALOIS_RUNTIME_DIST_STATS_H
 #define GALOIS_RUNTIME_DIST_STATS_H
 
-#include "galois/gstl.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/runtime/Network.h"
 

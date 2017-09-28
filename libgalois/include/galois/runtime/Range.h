@@ -151,45 +151,43 @@ public:
     assert(local_begin <= local_end);
 
     if (thread_beginnings[total_threads] == *global_end && *global_begin == 0) {
-      //printf("thread %u gets start %u and end %u\n", my_thread_id, *local_begin, 
-      //       *local_end);
       return std::make_pair(local_begin, local_end);
     } else {
-      //printf("Thread %u begin is %u end is %u\n", my_thread_id, *local_begin, 
-      //                                            *local_end);
       // This path assumes that we were passed in thread_beginnings for the range
       // 0 to last node, but the passed in range to execute is NOT the entire 
       // 0 to thread end range; therefore, work under the assumption that only
       // some threads will execute things only if they "own" nodes in the range
+      iterator left = local_begin;
+      iterator right = local_end;
 
-      // TODO (Loc): need 3rd party to verify correctness + all cases
-      // determine if our range is in range of what needs to be executed
-      if (local_begin >= global_begin && local_end <= global_end) {
-        // we are contained in global range; no cutoff required
-        //printf("Thread %u gets work %u to %u\n", my_thread_id, *local_begin,
-        //                                         *local_end);
-        return std::make_pair(local_begin, local_end);
-      } else if (local_end <= global_end && local_end > global_begin) {
-        // local_begin < global_begin; cut off our local range on left
-        //printf("Thread %u gets work %u to %u\n", my_thread_id, *global_begin,
-        //                                         *local_end);
-        return std::make_pair(global_begin, local_end);
-      } else if (local_begin >= global_begin && local_begin < global_end) {
-        // local_end > global_end; cut off our local range on right
-        //printf("Thread %u gets work %u to %u\n", my_thread_id, *local_begin,
-        //                                         *global_end);
-        return std::make_pair(local_begin, global_end);
-      } else if (local_begin <= global_begin && local_end >= global_end) {
-        // global range contained in our local range; cut off local left and 
-        // right
-        //printf("Thread %u gets work %u to %u\n", my_thread_id, *global_begin,
-        //                                         *global_end);
-        return std::make_pair(global_begin, global_end);
-      } else {
-        // we don't fall in range
-        //printf("Thread %u does nothing\n", my_thread_id);
-        return std::make_pair(global_end, global_end);
+      // local = what this thread CAN do
+      // global = what this thread NEEDS to do
+
+      // cutoff left and right if global begin/end require less than what we
+      // need
+      if (local_begin < global_begin) {
+        left = global_begin;
       }
+      if (local_end > global_end) {
+        right = global_end;
+      }
+      // make sure range is sensible after changing left and right
+      if (left >= right || right <= left) {
+        left = right = global_end;
+      }
+
+      // Explanations/reasoning of possible cases
+      // [ ] = local ranges
+      // o = need to be included; global ranges = leftmost and rightmost circle
+      // x = not included
+      // ooooo[ooooooooxxxx]xxxxxx handled (left the same, right moved)
+      // xxxxx[xxxxxooooooo]oooooo handled (left moved, right the same)
+      // xxxxx[xxoooooooxxx]xxxxxx handled (both left/right moved)
+      // xxxxx[xxxxxxxxxxxx]oooooo handled (left will be >= right, set l = r)
+      // oooox[xxxxxxxxxxxx]xxxxxx handled (right will be <= left, set l = r)
+      // xxxxx[oooooooooooo]xxxxxx handled (left, right the same = local range)
+
+      return std::make_pair(left, right);
     }
   }
 

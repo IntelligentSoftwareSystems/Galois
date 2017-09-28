@@ -29,7 +29,6 @@
 #ifndef D_GRAPH_LOADER
 #define D_GRAPH_LOADER
 
-#include "llvm/Support/CommandLine.h"
 #include "galois/runtime/dGraph_edgeCut.h"
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"

@@ -28,37 +28,32 @@
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
+#ifndef _GALOIS_DIST_HGRAPH_H
+#define _GALOIS_DIST_HGRAPH_H
 
-#include "galois/gstl.h"
-#include "galois/graphs/LC_CSR_Graph.h"
-#include "galois/runtime/Substrate.h"
-#include "galois/runtime/Network.h"
-
-#include "galois/runtime/Serialize.h"
-#include "galois/runtime/DistStats.h"
-
-#include "galois/runtime/GlobalObj.h"
-#include "galois/graphs/OfflineGraph.h"
 #include <vector>
 #include <set>
 #include <algorithm>
 #include <unordered_map>
 #include <iostream>
-
-#include "galois/runtime/sync_structures.h"
-
-#include "galois/runtime/DataCommMode.h"
-#include "galois/runtime/Dynamic_bitset.h"
 #include <fcntl.h>
 #include <sys/mman.h>
 
-// for thread container stuff
+#include "galois/gstl.h"
+#include "galois/Galois.h"
+#include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/runtime/Substrate.h"
+#include "galois/runtime/DistStats.h"
+#include "galois/runtime/GlobalObj.h"
+#include "galois/graphs/OfflineGraph.h"
+#include "galois/runtime/sync_structures.h"
+#include "galois/runtime/DataCommMode.h"
+#include "galois/runtime/Dynamic_bitset.h"
 #include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/runtime/Cuda/cuda_mtypes.h"
 #endif
-
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
 #endif
@@ -68,9 +63,6 @@
 #include "mpi.h"
 #endif
 #endif
-
-#ifndef _GALOIS_DIST_HGRAPH_H
-#define _GALOIS_DIST_HGRAPH_H
 
 #include "llvm/Support/CommandLine.h"
 
@@ -956,8 +948,8 @@ public:
    *
    * @returns A range object that contains all the nodes in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[0];
   }
@@ -968,8 +960,8 @@ public:
    *
    * @returns A range object that contains the master nodes in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  masterNodesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  masterNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[1];
   }
@@ -981,8 +973,8 @@ public:
    * @returns A range object that contains the master nodes and the nodes
    * with outgoing edges in this graph
    */
-  galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesWithEdgesRange() {
+  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  allNodesWithEdgesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[2];
   }
@@ -1556,7 +1548,6 @@ public:
               #endif
             }, 
             galois::loopname(get_run_identifier("REDUCE_SET").c_str()),
-            galois::numrun(get_run_identifier()),
             galois::no_stats());
       }
       #endif

@@ -93,7 +93,7 @@ struct DegreeCounting {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
   #ifdef __GALOIS_HET_CUDA__
     // TODO calls all wrong
@@ -146,7 +146,7 @@ struct InitializeGraph {
 
   /* Initialize the entire graph node-by-node */
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -195,7 +195,7 @@ struct LiveUpdate {
     local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
   
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
     dga.reset();
 
     // TODO GPU code
@@ -257,7 +257,7 @@ struct KCore {
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     unsigned iterations = 0;
     
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
