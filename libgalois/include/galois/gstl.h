@@ -32,6 +32,7 @@
 #include <vector>
 #include <set>
 #include <deque>
+#include <map>
 #include <list>
 #include <string>
 #include <sstream>

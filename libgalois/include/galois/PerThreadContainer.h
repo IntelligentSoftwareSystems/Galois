@@ -36,6 +36,7 @@
 #include <vector>
 #include <deque>
 #include <list>
+#include <map>
 #include <set>
 #include <limits>
 #include <iterator>
@@ -548,6 +549,36 @@ public:
   PerThreadList(): Super_ty(), alloc() {
     Super_ty::init(alloc);
   }
+};
+
+template<typename K, typename V, typename C=std::less<K> >
+class PerThreadMap:
+  public PerThreadContainer<typename gstl::template Map<K, V, C> > {
+
+public:
+  typedef typename gstl::template FixedSizeAlloc<typename std::pair<const K, V> > Alloc_ty;
+
+protected:
+  typedef typename gstl::template Map<K, V, C> container_type;
+  typedef PerThreadContainer<container_type> Super_ty;
+
+  Alloc_ty alloc;
+
+public:
+  explicit PerThreadMap(const C& cmp = C()): Super_ty(), alloc() {
+    Super_ty::init(cmp, alloc);
+  }
+
+  typedef typename Super_ty::global_const_iterator global_const_iterator;
+  typedef typename Super_ty::global_const_reverse_iterator global_const_reverse_iterator;
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_iterator begin_all() const { return Super_ty::cbegin_all(); }
+  global_const_iterator end_all() const { return Super_ty::cend_all(); }
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_reverse_iterator rbegin_all() const { return Super_ty::crbegin_all(); }
+  global_const_reverse_iterator rend_all() const { return Super_ty::crend_all(); }
 };
 
 template<typename T, typename C=std::less<T> >
