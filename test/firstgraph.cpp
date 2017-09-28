@@ -6,9 +6,9 @@
 #include <iostream>
 #include <string>
 
-typedef galois::graphs::FirstGraph<unsigned int, unsigned int, false> SymGraph;
-typedef galois::graphs::FirstGraph<unsigned int, unsigned int, true, false> OutGraph;
-typedef galois::graphs::FirstGraph<unsigned int, unsigned int, true, true> InOutGraph;
+using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
+using OutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, false>;
+using InOutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, true>;
 
 std::string filename;
 
