@@ -31,15 +31,13 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-// TODO/FIXME change printfs to gDebug
-
 #ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
+#include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
-#include "galois/Galois.h"
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
@@ -389,11 +387,16 @@ class LC_CSR_Graph :
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
-    std::sort(edge_sort_begin(N), edge_sort_end(N), [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
+    std::sort(edge_sort_begin(N), edge_sort_end(N), 
+      [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { 
+        return e1.dst < e2.dst; 
+      }
+    );
   }
 
   /**
-   * Sorts all outgoing edges of all nodes in parallel. Comparison is over getEdgeDst(e).
+   * Sorts all outgoing edges of all nodes in parallel. Comparison is over 
+   * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
     galois::do_all_local(*this, [=] 
