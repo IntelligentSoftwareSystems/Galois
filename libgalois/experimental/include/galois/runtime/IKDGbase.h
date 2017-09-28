@@ -60,7 +60,7 @@ public:
   template <typename R>
   void run (const R& range) const {
 
-    galois::do_all_choice (range,
+    galois::runtime::do_all_gen (range,
         [this, &range] (const Ctxt* c) {
 
           auto beg_lesser = boost::make_filter_iterator (
@@ -353,7 +353,7 @@ protected:
 
     substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMin;
 
-    galois::do_all_choice (makeLocalRange (*currWL),
+    galois::runtime::do_all_gen (makeLocalRange (*currWL),
         [this, &perThrdMin] (const Ctxt* c) {
           galois::optional<const Ctxt*>& m = *(perThrdMin.getLocal ());
 
@@ -385,7 +385,7 @@ protected:
 
     substrate::PerThreadStorage<galois::optional<const Ctxt*> > perThrdMax;
 
-    galois::do_all_choice (makeLocalRange (*currWL),
+    galois::runtime::do_all_gen (makeLocalRange (*currWL),
         [this, &perThrdMax] (const Ctxt* c) {
           galois::optional<const Ctxt*>& m = *(perThrdMax.getLocal ());
 

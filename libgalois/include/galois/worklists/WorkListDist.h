@@ -46,8 +46,7 @@ public:
    */
   void convertGID2LID_localWL() {
     uint32_t num = size();
-    galois::do_all(boost::counting_iterator<uint32_t>(0),
-        boost::counting_iterator<uint32_t>(num),
+    galois::do_all(galois::iterate(0u, num),
         [&](uint32_t n) {
           local_wl[n] = graph.G2L(local_wl[n]);
         },

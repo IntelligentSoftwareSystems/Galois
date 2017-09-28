@@ -446,21 +446,6 @@ public:
         [this] (const unsigned tid, const unsigned numT) {
           get ().clear ();
         });
-
-
-    // XXX: following implementation causes problems with allocators
-    // that allocate per thread separately
-    // auto r = galois::runtime::makeStandardRange (
-        // boost::counting_iterator<unsigned> (0),
-        // boost::counting_iterator<unsigned> (perThrdCont.size ()));
-// 
-    // galois::runtime:: do_all_impl (
-        // r, 
-        // [this] (unsigned i) {
-          // get (i).clear ();
-        // },
-        // "clear_all", 
-        // false);
     
   }
 
@@ -475,54 +460,17 @@ public:
 
   template <typename Range, typename Ret>
   void fill_parallel (const Range& range, Ret (container_type::*pushFn) (const value_type&) = &container_type::push_back) {
-    galois::runtime::do_all_impl (
+    galois::runtime::do_all_gen (
         range,
         [this, pushFn] (const typename Range::value_type& v) {
           container_type& my = get ();
           (my.*pushFn) (v);
           // (get ().*pushFn)(v);
         },
-        "fill_parallel", 
-        false);
+        std::make_tuple(
+          galois::no_stats()
+          galois::steal<false>()));
   }
-
-  // // TODO: fill parallel
-  // template<typename Iter, typename R>
-  // void fill_serial(Iter begin, Iter end,
-      // R(container_type::*pushFn)(const value_type&) = &container_type::push_back) {
-// 
-    // const unsigned P = galois::getActiveThreads();
-// 
-    // typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
-// 
-    // // integer division, where we want to round up. So adding P-1
-    // Diff_ty block_size = (std::distance(begin, end) + (P-1) ) / P;
-// 
-    // assert(block_size >= 1);
-// 
-    // Iter block_begin = begin;
-// 
-    // for (unsigned i = 0; i < P; ++i) {
-// 
-      // Iter block_end = block_begin;
-// 
-      // if (std::distance(block_end, end) < block_size) {
-        // block_end = end;
-// 
-      // } else {
-        // std::advance(block_end, block_size);
-      // }
-// 
-      // for (; block_begin != block_end; ++block_begin) {
-        // // workList[i].push_back(Marked<Value_ty>(*block_begin));
-        // ((*this)[i].*pushFn)(value_type(*block_begin));
-      // }
-// 
-      // if (block_end == end) {
-        // break;
-      // }
-    // }
-  // }
 };
 
 template<typename T>

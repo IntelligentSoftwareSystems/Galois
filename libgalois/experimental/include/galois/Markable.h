@@ -112,9 +112,7 @@ template <typename WL>
 void removeMarked (WL& wl) {
 
   galois::do_all (
-  // galois::runtime::do_all_coupled (
-      boost::counting_iterator<unsigned> (0),
-      boost::counting_iterator<unsigned> (wl.numRows ()),
+      galois::iterate(0, wl.numRows()),
       RemoveMarked<WL> (wl),
       "remove_marked");
       
@@ -144,9 +142,7 @@ template <typename WL>
 void removeMarkedStable (WL& wl) {
 
   galois::do_all (
-  // galois::runtime::do_all_coupled (
-      boost::counting_iterator<unsigned> (0),
-      boost::counting_iterator<unsigned> (wl.numRows ()),
+      galois::iterate(0, wl.numRows()),
       RemoveMarkedStable<WL> (wl),
       "remove_marked_stable");
       

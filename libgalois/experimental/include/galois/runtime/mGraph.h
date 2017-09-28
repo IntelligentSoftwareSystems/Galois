@@ -345,7 +345,7 @@ public:
        std::vector<typename FnTy::ValTy> val_vec(num);
        galois::runtime::gDeserialize(buf, val_vec);
        if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
-       galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+       galois::do_all(galois::iterate(0, num), 
                       [&](uint32_t n){
                         uint32_t lid = masterNodes[from_id][n];
                         FnTy::reduce(lid, getData(lid), val_vec[n]);
@@ -387,7 +387,8 @@ public:
        //std::cout << "["<< net.ID << "] num : " << num << "\n";
        
        if (!FnTy::extract_batch(from_id, &val_vec[0])) {
-         galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+         galois::do_all(galois::iterate(0, num), 
+           [&](uint32_t n){
              uint32_t localID = masterNodes[from_id][n];
              //std::cout << "["<< net.ID << "] n : " << n << "\n";
              auto val = FnTy::extract((localID), getData(localID));
@@ -423,7 +424,8 @@ public:
       galois::runtime::gDeserialize(buf, val_vec);
 
       if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
-        galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+        galois::do_all(galois::iterate(0, num), 
+            [&](uint32_t n){
             uint32_t localID = mirrorNodes[from_id][n];
             FnTy::setVal((localID), getData(localID), val_vec[n]);}, galois::loopname(doall_str.c_str()));
       }
@@ -593,7 +595,7 @@ public:
     std::cerr << "DONE exchange_info_init \n";
 
     for(uint32_t h = 0; h < masterNodes.size(); ++h){
-       galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
+       galois::do_all(galois::iterate(0U, masterNodes[h].size()),
            [&](uint32_t n){
            masterNodes[h][n] = G2L_merged(masterNodes[h][n]);
            }, galois::loopname("MASTER_NODES"));
@@ -602,7 +604,7 @@ public:
     std::cerr << "DONE converting masterNodes to localID \n";
 
     for(uint32_t h = 0; h < mirrorNodes.size(); ++h){
-       galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(mirrorNodes[h].size()),
+       galois::do_all(galois::iterate(0U, mirrorNodes[h].size()), 
            [&](uint32_t n){
            mirrorNodes[h][n] = G2L_merged(mirrorNodes[h][n]);
            }, galois::loopname("MIRROR_NODES"));
@@ -821,7 +823,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
@@ -897,7 +900,8 @@ public:
 #endif
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
@@ -969,7 +973,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                 uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1047,7 +1052,7 @@ public:
 #endif
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::reduce_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+           galois::do_all(galois::iterate(0, num), 
                [&](uint32_t n){
                uint32_t lid = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1101,7 +1106,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
@@ -1156,7 +1162,8 @@ public:
          galois::runtime::gDeserialize(rb[x], val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                uint32_t localID = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                {
@@ -1209,7 +1216,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                 uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1266,7 +1274,7 @@ public:
          galois::runtime::gDeserialize(rb[x], val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::reduce_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+           galois::do_all(galois::iterate(0, num), 
                [&](uint32_t n){
                uint32_t lid = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1314,7 +1322,8 @@ public:
      galois::runtime::gDeserialize(buf, val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
      if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
-       galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+     galois::do_all(galois::iterate(0, num), 
+         [&](uint32_t n){
            uint32_t localID = mirrorNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
            {
@@ -1346,7 +1355,7 @@ public:
      galois::runtime::gDeserialize(buf, val_vec);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
      if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
-       galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+       galois::do_all(galois::iterate(0, num), 
            [&](uint32_t n){
            uint32_t lid = masterNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -1394,7 +1403,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+             [&](uint32_t n){
                uint32_t localID = masterNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
@@ -1455,7 +1465,8 @@ public:
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
-           galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
                 uint32_t lid = mirrorNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                 CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1518,7 +1529,8 @@ public:
         std::vector<typename FnTy::ValTy> val_vec(num);
 
         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
-          galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           galois::do_all(galois::iterate(0, num), 
+               [&](uint32_t n){
               uint32_t lid = mirrorNodes[x][n];
               auto val = FnTy::extract(lid, getData(lid));
               FnTy::reset(lid, getData(lid));
@@ -1585,7 +1597,8 @@ public:
         std::vector<typename FnTy::ValTy> val_vec(num);
         if (!FnTy::extract_batch(x, &val_vec[0])) {
 
-          galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+          galois::do_all(galois::iterate(0, num), 
+             [&](uint32_t n){
               uint32_t localID = masterNodes[x][n];
               auto val = FnTy::extract((localID), getData(localID));
               val_vec[n] = val;

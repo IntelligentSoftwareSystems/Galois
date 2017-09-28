@@ -399,8 +399,7 @@ class LC_CSR_Graph :
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all_local(*this, [=] 
-      (GraphNode N) {
+    galois::do_all(galois::iterate(*this), [=] (GraphNode N) {
         this->sortEdgesByDst(N, mflag);
       },
       galois::steal<true>(),
@@ -751,9 +750,7 @@ class LC_CSR_Graph :
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(boost::counting_iterator<uint32_t>(0), 
-                   boost::counting_iterator<uint32_t>(numNodes),
-                   [&](uint32_t x) {
+    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    }, 
@@ -794,9 +791,7 @@ class LC_CSR_Graph :
     edgeData_new.allocateInterleaved(numEdges);
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(boost::counting_iterator<uint32_t>(0), 
-                   boost::counting_iterator<uint32_t>(numNodes),
-                   [&](uint32_t n) {
+    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t n) {
                      edgeIndData_old[n] = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    }, 
@@ -835,9 +830,7 @@ class LC_CSR_Graph :
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(boost::counting_iterator<uint32_t>(0), 
-                   boost::counting_iterator<uint32_t>(numNodes),
-                   [&](uint32_t n) {
+    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
@@ -847,9 +840,7 @@ class LC_CSR_Graph :
     // before the ith node have
     if (numNodes >= 1) {
       edgeIndData_temp[0] = 0;
-      galois::do_all(boost::counting_iterator<uint32_t>(1), 
-                     boost::counting_iterator<uint32_t>(numNodes),
-                     [&](uint32_t n){
+      galois::do_all(galois::iterate(1u, numNodes), [&](uint32_t n) {
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
@@ -894,8 +885,7 @@ class LC_CSR_Graph :
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
-      galois::do_all(boost::counting_iterator<uint32_t>(0), 
-                     boost::counting_iterator<uint32_t>(numEdges),
+      galois::do_all(galois::iterate(0u, numEdges),
                      [&](uint32_t e){
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 

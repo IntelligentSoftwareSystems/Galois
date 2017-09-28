@@ -216,10 +216,10 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
 
       if (useDense) {
         DenseVertexMap<CheckInput,PassWrappedGraph,Graph,WrappedGraph,VertexOperator,Bag> vop(graph, wgraph, op, input, first, prev, cur, next);
-        galois::for_each(graph.begin(cur), graph.end(cur), vop);
+        galois::for_each(galois::iterate(graph.begin(cur), graph.end(cur)), vop);
       } else {
         SparseVertexMap<PassWrappedGraph,Graph,WrappedGraph,VertexOperator> vop(graph, wgraph, op, first, prev, cur, next);
-        galois::for_each_local(*input, vop);
+        galois::for_each(galois::iterate(*input), vop);
       }
 
       // XXX Shouldn't be necessary

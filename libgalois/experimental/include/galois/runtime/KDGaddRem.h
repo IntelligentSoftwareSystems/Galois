@@ -458,14 +458,14 @@ public:
 
     addCtxtWL.clear_all_parallel ();
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         range, 
         CreateCtxtExpandNhood {*this, nInit},
         std::make_tuple (
           galois::loopname ("create_contexts"),
           galois::chunk_size<NhFunc::CHUNK_SIZE> ()));
 
-    galois::do_all_choice (makeLocalRange(this->addCtxtWL),
+    galois::runtime::do_all_gen (makeLocalRange(this->addCtxtWL),
         [this, &sources] (Ctxt* ctxt) {
           if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
             sources.get ().push_back (ctxt);
@@ -480,11 +480,11 @@ public:
   template <typename A>
   void applyOperator (CtxtWL& sources, A op) {
 
-    galois::for_each_local(sources,
+    galois::for_each(galois::iterate(sources),
         op,
         galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
 
-    galois::do_all_choice (makeLocalRange(ctxtDelQ),
+    galois::runtime::do_all_gen (makeLocalRange(ctxtDelQ),
         [this] (Ctxt* ctxt) {
           ThisClass::ctxtAlloc.destroy (ctxt);
           ThisClass::ctxtAlloc.deallocate (ctxt, 1);
@@ -581,7 +581,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
 
     if (ThisClass::targetCommitRatio == 0.0) {
 
-      galois::do_all_choice (range,
+      galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             pending.push (x);
           }, 

@@ -119,7 +119,7 @@ struct DetKDGexecutorAddRem {
   template <typename R>
   void execute (const R& range, KDGexecType kdgType) {
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         range,
         [this] (const T& elem) {
           push (elem);
@@ -268,7 +268,7 @@ struct DetKDG_AddRem_reuseDAG {
   template <typename R>
   void execute (const R& initRange) {
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         initRange,
         [this] (T node) {
           push (node);

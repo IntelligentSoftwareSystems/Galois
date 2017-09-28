@@ -25,7 +25,7 @@
  *
  * First, by passing an argument to the corresponding method call:
  * \code
- * galois::for_each(v.begin(), v.end(), fn, galois::parallel_break());
+ * galois::for_each(galois::iterate(0, 10), fn, galois::parallel_break());
  * \endcode
  *
  * Second, by providing a specially named nested type
@@ -37,7 +37,7 @@
  * };
  *
  * int main() {
- *   galois::for_each(v.begin(), v.end(), MyClass {});
+ *   galois::for_each(galois::iterate(v), MyClass {});
  * \endcode
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>

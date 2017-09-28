@@ -59,7 +59,7 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   auto R = [] (ptrdiff_t& lhs, ptrdiff_t rhs) { lhs += rhs; };
   GReducible<ptrdiff_t,decltype(R)> count(R);
-  do_all(first, last, count_if_helper<Predicate, decltype(R)>(pred, count));
+  do_all(galois::iterate(first, last), count_if_helper<Predicate, decltype(R)>(pred, count));
   return count.reduce();
 }
 
@@ -88,7 +88,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef galois::worklists::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, 
+  for_each(galois::iterate(make_no_deref_iterator(first), make_no_deref_iterator(last)), helper, 
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::no_stats(),
@@ -257,9 +257,8 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   }
   typedef galois::worklists::dChunkedFIFO<1> WL;
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
-  Pair initial[1] = { std::make_pair(first, last) };
   
-  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp)
+  for_each(galois::iterate( { std::make_pair(first, last) }, sort_helper<Compare>(comp)
       , galois::no_conflicts()
       , galois::no_stats()
       , galois::wl<WL>());
@@ -279,7 +278,7 @@ T accumulate (InputIterator first, InputIterator last, T init, const BinaryOpera
   };
   GReducible<T, updater> R{updater(binary_op)};
   R.update(init);
-  do_all(first, last, [&R] (const T& v) { R.update(v); });
+  do_all(galois::iterate(first, last), [&R] (const T& v) { R.update(v); });
   return R.reduce(updater(binary_op));
 }
 
@@ -304,7 +303,7 @@ struct map_reduce_helper {
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
   galois::substrate::PerThreadStorage<T> reduced;
-  do_all(first, last,
+  do_all(galois::iterate(first, last),
          map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
   //         galois::loopname("map_reduce"));
   for (unsigned i = 0; i < reduced.size(); ++i)

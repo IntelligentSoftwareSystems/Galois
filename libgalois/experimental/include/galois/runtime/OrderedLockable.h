@@ -323,7 +323,7 @@ public:
 
 protected:
   void resetAllNItems() {
-    do_all_choice(makeLocalRange(allNItems), 
+    runtime::do_all_gen(makeLocalRange(allNItems), 
         [this] (NItem* ni) {
           ni->clearMapping();
           destroy(ni);

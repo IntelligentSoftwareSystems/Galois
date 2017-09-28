@@ -172,8 +172,8 @@ public:
     typedef galois::worklists::dChunkedFIFO<256> WL;
 
     galois::InsertBag<WorkItem> bag;
-    galois::do_all_local(graph, Initialize(this, bag));
-    galois::for_each_local(bag, Process(this), galois::wl<WL>());
+    galois::do_all(galois::iterate(graph), Initialize(this, bag));
+    galois::for_each(galois::iterate(bag), Process(this), galois::wl<WL>());
   }
 };
 
@@ -327,14 +327,14 @@ class SyncEngine {
 
   template<bool IsFirst,typename Container1, typename Container2>
   void executeStep(Container1& cur, Container2& next) {
-    galois::for_each_local(cur, Initialize<IsFirst>(this), galois::wl<WL>());
+    galois::for_each(galois::iterate(cur), Initialize<IsFirst>(this), galois::wl<WL>());
     
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
-      galois::for_each_local(cur, Gather(this), galois::wl<WL>());
+      galois::for_each(galois::iterate(cur), Gather(this), galois::wl<WL>());
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-      galois::for_each_local(cur, Scatter<Container2>(this, next), galois::wl<WL>());
+      galois::for_each(galois::iterate(cur), Scatter<Container2>(this, next), galois::wl<WL>());
     }
   }
 

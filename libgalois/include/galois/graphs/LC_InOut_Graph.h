@@ -253,7 +253,7 @@ public:
    * Sorts incoming edges of all nodes. Comparison is by getInEdgeDst(e).
    */
   void sortAllInEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all_local(*this, [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, galois::steal<true>());
+    galois::do_all(galois::iterate(*this), [=] (GraphNode N) {this->sortInEdgesByDst(N, mflag);}, galois::steal<true>());
   }
 
   size_t idFromNode(GraphNode N) {

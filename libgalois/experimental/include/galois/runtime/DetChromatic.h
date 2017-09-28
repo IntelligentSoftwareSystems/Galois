@@ -284,7 +284,7 @@ public:
 
     assignPriority ();
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         galois::runtime::makeLocalRange (graph),
         [this, &postInit] (GNode src) {
           
@@ -332,7 +332,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         range,
         [this] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -348,7 +348,7 @@ public:
         "reinitActiveDAG-0",
         galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         range,
         [this] (GNode src) {
 
@@ -367,7 +367,7 @@ public:
         "reinitActiveDAG-1",
         galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         range,
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -464,7 +464,7 @@ public:
 
     typedef galois::worklists::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = 0;
-    galois::for_each(it, it,
+    galois::for_each(galois::iterate(it, it),
         ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
         galois::loopname(loopname),
                      galois::wl<WL>(std::ref(sources)));
@@ -484,7 +484,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    galois::do_all_choice ( galois::runtime::makeLocalRange (graph), 
+    galois::runtime::do_all_gen ( galois::runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           sd.indegree = sd.indeg_backup;
@@ -512,7 +512,7 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    galois::do_all_choice ( galois::runtime::makeLocalRange (graph), 
+    galois::runtime::do_all_gen ( galois::runtime::makeLocalRange (graph), 
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
           // assert (sd.indegree == sd.indeg_backup);
@@ -561,7 +561,7 @@ public:
     using WL_ty = galois::worklists::ExternalReference<W>;
     typename WL_ty::value_type* it = nullptr;
 
-    galois::for_each (it, it, 
+    galois::for_each (galois::iterate(it, it), 
         RunDAGcomp<F> {*this, func},
         galois::loopname (loopname),
                       galois::wl<WL_ty> (std::ref(initWL)));
@@ -579,7 +579,7 @@ public:
 
     WL_ty initWL;
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         makeLocalRange (sources), 
         [&initWL] (typename WL_ty::value_type src) {
           initWL.push (src);
@@ -635,7 +635,7 @@ public:
 
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         galois::runtime::makeLocalRange (graph),
         [&] (GNode node) {
           nodeFunc (node);
@@ -774,7 +774,7 @@ public:
 
     galois::GReduceLogicalOR foundError;
 
-    galois::do_all_choice (
+    galois::runtime::do_all_gen (
         galois::runtime::makeLocalRange (graph),
         [&] (GNode src) {
 
@@ -986,7 +986,7 @@ struct DAGmanagerInOut {
 
       G& graph = Base_ty::graph;
 
-      galois::do_all_choice (
+      galois::runtime::do_all_gen (
           range, 
           [&graph, &pred] (GNode src) {
             auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
@@ -1075,7 +1075,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   }
 
   void freeDAGdata (void) {
-    galois::do_all_choice ( galois::runtime::makeLocalRange (Base::graph), 
+    galois::runtime::do_all_gen ( galois::runtime::makeLocalRange (Base::graph), 
         [this] (GNode src) {
           auto& sd = Base::graph.getData (src, galois::MethodFlag::UNPROTECTED);
           dagSuccAlloc.deallocate (sd.dagSucc, sd.numSucc);
@@ -1128,7 +1128,7 @@ struct DAGvisitorUndirected {
 // 
   // void addPredecessors (void) {
 // 
-    // galois::do_all_choice (
+    // galois::runtime::do_all_gen (
         // galois::runtime::makeLocalRange (graph),
         // [this] (GNode src) {
         // 
@@ -1284,12 +1284,13 @@ struct ChromaticExecutor {
   void execute (const R& range) {
 
     // fill initial
-    do_all_impl (range,
+    runtime::do_all_gen (range,
         [this] (GNode n) {
           push (n);
         },
-        "fill_initial",
-        false );
+        std::make_tuple(
+        galois::loopname("fill_initial"),
+        galois::steal<false>()));
 
     unsigned rounds = 0;
     // process until done
@@ -1311,7 +1312,7 @@ struct ChromaticExecutor {
       typedef galois::worklists::ExternalReference<WL_ty> WL;
       GNode* it = 0;
 
-      for_each(it, it,
+      for_each(galois::iterate(it, it),
           ApplyOperator {*this},
           galois::loopname(loopname),
                galois::wl<WL>(std::ref(*nextWL)));

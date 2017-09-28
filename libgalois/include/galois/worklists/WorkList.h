@@ -54,7 +54,7 @@ namespace galois {
  * {@link for_each()}. For example,
  *
  * \code
- * galois::for_each(begin, end, fn, galois::wl<galois::worklists::dChunkedFIFO<32>>());
+ * galois::for_each(galois::iterate(beg,end), fn, galois::wl<galois::worklists::dChunkedFIFO<32>>());
  * \endcode
  */
 namespace worklists {

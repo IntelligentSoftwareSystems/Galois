@@ -222,7 +222,7 @@ struct GreedyPartitioner {
       c.reset ();
     }
 
-    do_all_coupled (makeLocalRange (graph),
+    runtime::do_all_gen (makeLocalRange (graph),
         [this, &partBoundarySizes, &adjMatrix] (GNode src) {
 
           bool boundary = false;
@@ -332,7 +332,7 @@ struct BFSpartitioner {
     using WL = galois::worklists::dChunkedFIFO<32>;
     // using WL = galois::worklists::AltChunkedFIFO<8>;
 
-    galois::for_each (beg, end,
+    galois::for_each (galois::iterate(beg, end),
         [this] (GNode src, galois::UserContext<GNode>& ctxt) {
 
           auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
@@ -366,7 +366,7 @@ struct BFSpartitioner {
   void filterUnpartitioned (const R& range, W& unpartitioned) {
 
     assert (unpartitioned.empty_all ());
-    galois::runtime::do_all_coupled (range,
+    galois::runtime::do_all_gen (range,
         [this, &unpartitioned] (GNode n) {
           auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
           if (nd.partition == -1) {
@@ -442,8 +442,8 @@ struct BFSpartitioner {
       // run BFS
 
       componentIDs[*nextSource] = numComp;
-      GNode init[] = { *nextSource };
-      galois::for_each ( &init[0], &init[1], 
+
+      galois::for_each ( galois::iterate( {*nextSource}), 
           [this, &componentIDs, &numComp] (GNode n, galois::UserContext<GNode>& ctxt) {
 
             assert (componentIDs[n] != 0);

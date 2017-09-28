@@ -537,15 +537,20 @@ public:
     galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    galois::runtime::do_all_impl(
+    galois::runtime::do_all_gen(
         range, 
-				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
-    //        "create_initial_contexts");
+				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt)
+        std::make_tuple(
+          galois::timeit(),
+          galois::loopname("create_initial_contexts")));
     t_create.stop ();
 
     t_find.start ();
-    galois::runtime::do_all_impl(makeLocalRange(initCtxt),
-				 FindInitSources (sourceTest, initSrc, nInitSrc));
+    galois::runtime::do_all_gen(makeLocalRange(initCtxt),
+				 FindInitSources (sourceTest, initSrc, nInitSrc),
+         std::make_tuple(
+           galois::timeit(),
+           galois::loopname("find_initial_sources")));
     //       "find_initial_sources");
     t_find.stop ();
 
@@ -563,7 +568,7 @@ public:
     // TODO: code to find global min goes here
 
     t_for.start ();
-    galois::for_each_local(initSrc,
+    galois::for_each(galois::iterate(initSrc),
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -575,20 +580,17 @@ public:
           ctxtDelQ,
           perThUserCtx,
           niter),
-        galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
+        galois::loopname("apply_operator"), 
+        galois::timeit(),
+        galois::wl<SrcWL_ty>());
     t_for.stop ();
 
     t_destroy.start ();
-    galois::runtime::do_all_impl(makeLocalRange(ctxtDelQ),
-				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
+    galois::runtime::do_all_gen(makeLocalRange(ctxtDelQ),
+				 DelCtxt (ctxtAlloc),
+         std::make_tuple(galois::loopname("delete_all_ctxt"))); //, "delete_all_ctxt");
     t_destroy.stop ();
 
-    std::cout << "Number of iterations: " << niter.reduce () << std::endl;
-
-    std::cout << "Time taken in creating intial contexts: " << t_create.get () << std::endl;
-    std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
-    std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
-    std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
   }
 };
 

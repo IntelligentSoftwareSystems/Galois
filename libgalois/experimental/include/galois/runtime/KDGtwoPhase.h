@@ -142,7 +142,7 @@ public:
   void push_initial (const R& range) {
     if (ThisClass::targetCommitRatio == 0.0) {
 
-      galois::do_all_choice (range,
+      galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             ThisClass::getNextWL ().push_back (ctxtMaker (x));
           }, 
@@ -176,7 +176,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (internal::DummyExecFunc*) {
     // for stable case
 
-    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
         [this] (Ctxt* c) {
           typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
@@ -204,7 +204,7 @@ protected:
     auto m_beg = boost::make_transform_iterator (ThisClass::getCurrWL ().begin_all (), GetActive ());
     auto m_end = boost::make_transform_iterator (ThisClass::getCurrWL ().end_all (), GetActive ());
 
-    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
         [m_beg, m_end, this] (Ctxt* c) {
           typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
           uhand.reset ();
@@ -231,7 +231,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
     assert (ThisClass::HAS_EXEC_FUNC);
 
-    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
       [this] (Ctxt* ctxt) {
 
         typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
@@ -263,7 +263,7 @@ protected:
     }
 
 
-    galois::do_all_choice (makeLocalRange (ThisClass::getCurrWL ()),
+    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
         [this, &minElem] (Ctxt* c) {
           bool commit = false;
 

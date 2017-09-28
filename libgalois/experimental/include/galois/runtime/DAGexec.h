@@ -338,7 +338,7 @@ public:
   {}
 
   ~DAGexecutorBase (void) {
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->reclaimAlloc (ctxtAdjAlloc);
           ctxtAlloc.destroy (ctxt);
@@ -383,7 +383,7 @@ public:
     std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
 
     t_init.start ();
-    galois::do_all_choice (range,
+    galois::runtime::do_all_gen (range,
         [this] (const T& x) {
           Ctxt* ctxt = ctxtAlloc.allocate (1);
           assert (ctxt != NULL);
@@ -408,7 +408,7 @@ public:
     createAllEdges ();
 
 
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->finalizeAdj (ctxtAdjAlloc);
           // std::printf ("ctxt: %p, indegree=%d\n", ctxt, ctxt->origInDeg);
@@ -435,7 +435,7 @@ public:
 
     t_exec.start ();
 
-    galois::for_each_local (initSources,
+    galois::for_each (galois::iterate(initSources),
         ApplyOperator {*this}, galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
 
     // std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
@@ -447,7 +447,7 @@ public:
     galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
@@ -463,7 +463,7 @@ public:
 
     printf ("WARNING: timing affected by measuring DAG stats\n");
 
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [&numNodes,&numEdges] (Ctxt* ctxt) {
           numNodes += 1;
           numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
@@ -494,7 +494,7 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
   {}
 
   virtual void createAllEdges (void) {
-    galois::do_all_choice (Base::nhmgr.getAllRange(),
+    galois::runtime::do_all_gen (Base::nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
 
@@ -531,7 +531,7 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
 
   virtual void createAllEdges (void) {
 
-    galois::do_all_choice (Base::nhmgr.getAllRange(),
+    galois::runtime::do_all_gen (Base::nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
 

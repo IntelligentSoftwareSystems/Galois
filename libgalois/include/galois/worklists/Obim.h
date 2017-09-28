@@ -131,7 +131,7 @@ struct OrderedByIntegerMetricComparator<Index, true> {
  * };
  *
  * typedef galois::worklists::OrderedByIntegerMetric<Indexer> WL;
- * galois::for_each<WL>(items.begin(), items.end(), Fn);
+ * galois::for_each<WL>(galois::iterate(items), Fn);
  * \endcode
  *
  * @tparam Indexer        Indexer class

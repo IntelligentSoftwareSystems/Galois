@@ -803,7 +803,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
-    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::runtime::do_all_gen (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           if (!c->hasState (ContextState::ABORTED_CHILD)) {
@@ -929,7 +929,7 @@ public:
     t.start();
 
     const bool USE_WIN = (this->targetCommitRatio != 0.0);
-    galois::do_all_choice (range,
+    galois::runtime::do_all_gen (range,
         [this, USE_WIN] (const T& x) {
 
           Ctxt* c = this->ctxtMaker (x);
@@ -1078,7 +1078,7 @@ protected:
       return; 
     }
 
-    galois::do_all_choice (makeLocalRange (abortLocations),
+    galois::runtime::do_all_gen (makeLocalRange (abortLocations),
         [this] (NItem* ni) {
 
           Ctxt* c = ni->getMin();
@@ -1124,7 +1124,7 @@ protected:
 
     abortRoots.clear_all_parallel();
 
-    galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
+    galois::runtime::do_all_gen (makeLocalRange (Base::getCurrWL()),
         [this, &abortRoots] (Ctxt* c) {
 
           if (c->isSrc()) {
@@ -1168,7 +1168,7 @@ protected:
     
 
 
-    galois::do_all_choice (makeLocalRange (Base::getCurrWL()),
+    galois::runtime::do_all_gen (makeLocalRange (Base::getCurrWL()),
 
         [this, &sources] (Ctxt* c) {
           if (c->isSrc() && !c->hasState (ContextState::ABORTED_CHILD)) {
@@ -1212,7 +1212,7 @@ protected:
 
     assert (commitRoots.empty_all());
 
-    galois::do_all_choice (makeLocalRange (this->commitQ),
+    galois::runtime::do_all_gen (makeLocalRange (this->commitQ),
         [this, gvt] (Ctxt* c) {
 
           assert (c);
@@ -1395,7 +1395,7 @@ protected:
     if (ThisClass::HAS_EXEC_FUNC) {
 
 
-      galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+      galois::runtime::do_all_gen (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* ctxt) {
           bool _x = ctxt->hasState (ContextState::ABORTED_CHILD) 
                  || ctxt->hasState (ContextState::SCHEDULED)
@@ -1420,7 +1420,7 @@ protected:
     // Ctxt in currWL can be in SCHEDULED, UNSCHEDULED (after having been aborted),
     // ABORTED_CHILD
 
-    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::runtime::do_all_gen (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           bool _x = c->hasState (ContextState::ABORTED_CHILD) 
@@ -1676,7 +1676,7 @@ public:
   void push_initial (const R& range) {
     if (this->targetCommitRatio == 0.0) {
 
-      galois::do_all_choice (range,
+      galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             this->getNextWL ().push_back (this->ctxtMaker (x));
           }, 
@@ -1821,7 +1821,7 @@ protected:
 
   void serviceAborts() {
 
-    galois::do_all_choice (makeLocalRange (abortRoots),
+    galois::runtime::do_all_gen (makeLocalRange (abortRoots),
         [this] (Ctxt* c) {
 
           bool b = c->hasState (ContextState::ABORT_HELP) 
@@ -1846,7 +1846,7 @@ protected:
 
     if (ThisClass::HAS_EXEC_FUNC) {
 
-      galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+      galois::runtime::do_all_gen (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* ctxt) {
 
           if (ctxt->isSrc()) {
@@ -1864,7 +1864,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
 
-    galois::do_all_choice (makeLocalRange (this->getCurrWL()),
+    galois::runtime::do_all_gen (makeLocalRange (this->getCurrWL()),
         [this] (Ctxt* c) {
 
           if (this->NEEDS_CUSTOM_LOCKING || c->isSrc()) {

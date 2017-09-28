@@ -96,7 +96,7 @@ void do_all_coupled_wake (const R& initRange, const F& func, const char* loopnam
 
     // std::printf ("Current size: %zd\n", curr->size_all ());
 
-    galois::do_all_local(*curr,
+    galois::runtime::do_all_gen(makeLocalRange(*curr),
         [&func_cpy, &next] (const T& t) {
           PushWrapper<typename WL_ty::Cont_ty> w(next->get());
           func_cpy (t, w);

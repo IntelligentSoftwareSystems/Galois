@@ -23,6 +23,7 @@
  */
 #include "galois/UserContext.h"
 
+#if 0
 namespace galois {
 
 template<typename IterTy,typename FunctionTy, typename... Args>
@@ -35,3 +36,4 @@ template<typename IterTy,typename FunctionTy, typename... Args>
 void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args);
 
 }
+#endif

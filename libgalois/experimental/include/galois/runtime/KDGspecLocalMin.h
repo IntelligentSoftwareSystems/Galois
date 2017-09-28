@@ -75,7 +75,7 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
-    galois::do_all_choice (makeLocalRange (pending),
+    galois::runtime::do_all_gen (makeLocalRange (pending),
         [this] (const T& x) {
 
           Ctxt* c = Base::ctxtAlloc.allocate (1);
@@ -117,7 +117,7 @@ protected:
     }
 
 
-    galois::do_all_choice (makeLocalRange (scheduled),
+    galois::runtime::do_all_gen (makeLocalRange (scheduled),
         [this, &minElem] (Ctxt* c) {
 
           typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
@@ -167,7 +167,7 @@ protected:
 
   void serviceAborts(void) {
     if (ENABLE_PROF) {
-      galois::do_all_choice (makeLocalRange(abortList),
+      galois::runtime::do_all_gen (makeLocalRange(abortList),
           [this] (Ctxt* c) {
             abortCtxt(c);
           }, 
@@ -181,7 +181,7 @@ protected:
 
   void performCommits(void) {
     if (ENABLE_PROF) {
-      galois::do_all_choice (makeLocalRange(retireList),
+      galois::runtime::do_all_gen (makeLocalRange(retireList),
           [this] (Ctxt* c) {
             retireCtxt(c);
           }, 
@@ -210,7 +210,7 @@ public:
 
     if (Base::targetCommitRatio == 0.0) {
 
-      galois::do_all_choice (range,
+      galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             pending.push (x);
           }, 

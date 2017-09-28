@@ -96,7 +96,7 @@ struct PriAuto {
         galois::gInfo("WorkList ", #__x);                    \
 	printed = true;							\
       }									\
-      galois::for_each(b,e,f,std::forward<Args>(args)..., galois::wl<__x>()); \
+      galois::for_each(galois::iterate(b,e),f,std::forward<Args>(args)..., galois::wl<__x>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2

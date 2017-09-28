@@ -216,7 +216,7 @@ public:
   template <typename R>
   void execute (const R& initRange) {
 
-    galois::do_all_choice(initRange,
+    galois::runtime::do_all_gen(initRange,
         [this] (const T& item) {
           Task* initTask = taskAlloc.allocate (1);
           taskAlloc.construct (initTask, item, nullptr, Task::DIVIDE);
@@ -229,7 +229,7 @@ public:
     typedef worklists::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = nullptr;
 
-    galois::for_each (it, it,
+    galois::for_each (galois::iterate(it, it),
         ApplyOperatorSinglePhase {*this},
         galois::loopname(loopname.c_str()),
                       galois::wl<WL>(std::ref(workList)));

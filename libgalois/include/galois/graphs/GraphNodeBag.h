@@ -109,7 +109,7 @@ public:
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
         InitializeSmall fn = { this };
-        galois::do_all_local(bag, fn);
+        galois::do_all(galois::iterate(bag), fn);
       } else {
         InitializeBig fn = { this };
         galois::on_each(fn);
@@ -136,7 +136,7 @@ public:
     }
 
     Densify fn = { this };
-    galois::do_all_local(bag, fn);
+    galois::do_all(galois::iterate(bag), fn);
   }
 };
 

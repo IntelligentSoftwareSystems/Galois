@@ -405,7 +405,7 @@ public:
 
   ~DAGexecutor (void) {
 
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
@@ -427,7 +427,7 @@ public:
     std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
 
     t_init.start ();
-    galois::do_all_choice (range,
+    galois::runtime::do_all_gen (range,
         [this] (const T& x) {
           Ctxt* ctxt = ctxtAlloc.allocate (1);
           assert (ctxt != NULL);
@@ -445,14 +445,14 @@ public:
         }, "create_ctxt", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
-    galois::do_all_choice (nhmgr.getAllRange(),
+    galois::runtime::do_all_gen (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
         }, 
         "sort_sharers", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
-    galois::do_all_choice (galois::runtime::makeLocalRange (allCtxts),
+    galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           if (ctxt->isSrc ()) {
             ctxt->onWL = true;
@@ -477,7 +477,7 @@ public:
 
     t_exec.start ();
 
-    galois::for_each_local (initSources,
+    galois::for_each(galois::iterate(initSources),
         ApplyOperator {*this}, galois::loopname {"apply_operator"}, galois::wl<SrcWL_ty>());
 
     std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
@@ -490,12 +490,7 @@ public:
     galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    // galois::do_all_choice (allCtxts,
-        // [] (Ctxt* ctxt) {
-          // ctxt->reset();
-        // },
-        // galois::loopname("reset_dag"), galois::steal<true>());
-    galois::do_all_choice (nhmgr.getAllRange (),
+    galois::runtime::do_all_gen (nhmgr.getAllRange (),
         [] (NItem* nitem) {
           nitem->reset();
         },
