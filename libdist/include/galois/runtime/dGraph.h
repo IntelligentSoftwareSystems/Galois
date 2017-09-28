@@ -226,7 +226,6 @@ public:
                             void (*bitset_reset_range)(size_t,
                                                        size_t)) const = 0;
 
-  uint32_t numPipelinedPhases;
   uint32_t num_recv_expected; // Number of receives expected for local completion.
   uint32_t num_run; //Keep track of number of runs.
   uint32_t num_iteration; //Keep track of number of iterations.
@@ -727,7 +726,6 @@ public:
     masterNodes.resize(numHosts);
     mirrorNodes.resize(numHosts);
 
-    numPipelinedPhases = 0;
     num_recv_expected = 0;
     num_run = 0;
     num_iteration = 0;
@@ -2021,23 +2019,21 @@ private:
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void sync_recv_net(std::string loopName, unsigned int num_messages) {
+  void sync_recv_net(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    for (unsigned num = 0; num < num_messages; ++num) {
-      for (unsigned x = 0; x < net.Num; ++x) {
-        if (x == id) continue;
-        if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+    for (unsigned x = 0; x < net.Num; ++x) {
+      if (x == id) continue;
+      if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
-        decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
-        do {
-          net.handleReceives();
-          p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-        } while (!p);
+      decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
+      do {
+        net.handleReceives();
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
 
-        syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second, 
-                                                      loopName);
-      }
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second, 
+                                                    loopName);
     }
     ++galois::runtime::evilPhase;
   }
@@ -2048,53 +2044,47 @@ private:
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void sync_recv_mpi(std::string loopName, unsigned int num_messages) {
+  void sync_recv_mpi(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
 
     static std::vector<std::vector<uint8_t>> b;
     static std::vector<MPI_Request> requests;
     static std::vector<MPI_Status> statuses;
-    b.resize(net.Num*num_messages);
-    requests.resize(net.Num*num_messages, MPI_REQUEST_NULL);
-    statuses.resize(net.Num*num_messages);
+    b.resize(net.Num);
+    requests.resize(net.Num, MPI_REQUEST_NULL);
+    statuses.resize(net.Num);
 
-    for (unsigned num = 0; num < num_messages; ++num) {
-      unsigned offset = num * num_messages;
-      for (unsigned h = 1; h < net.Num; ++h) {
-        unsigned x = (id + net.Num - h) % net.Num;
-        if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (id + net.Num - h) % net.Num;
+      if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
-        size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
-        size += sizeof(size_t); // vector size
-        size += sizeof(DataCommMode); // data mode
+      size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
+      size += sizeof(size_t); // vector size
+      size += sizeof(DataCommMode); // data mode
 
-        b[offset+x].reserve(size);
-        b[offset+x].resize(size);
+      b[x].reserve(size);
+      b[x].resize(size);
 
-        MPI_Irecv((uint8_t *)b[offset+x].data(), size, MPI_BYTE, x, 32767, 
-                  MPI_COMM_WORLD, &requests[offset+x]);
-      }
+      MPI_Irecv((uint8_t *)b[x].data(), size, MPI_BYTE, x, 32767, 
+                MPI_COMM_WORLD, &requests[x]);
     }
 
-    for (unsigned num = 0; num < num_messages; ++num) {
-      unsigned offset = num * num_messages;
-      for (unsigned h = 1; h < net.Num; ++h) {
-        unsigned x = (id + net.Num - h) % net.Num;
-        if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (id + net.Num - h) % net.Num;
+      if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
-        MPI_Status status;
-        MPI_Wait(&requests[offset+x], &status);
+      MPI_Status status;
+      MPI_Wait(&requests[x], &status);
 
-        int size = 0;
-        MPI_Get_count(&status, MPI_BYTE, &size);
+      int size = 0;
+      MPI_Get_count(&status, MPI_BYTE, &size);
 
-        b[offset+x].resize(size);
+      b[x].resize(size);
 
-        galois::runtime::RecvBuffer rb(b[offset+x]);
+      galois::runtime::RecvBuffer rb(b[x]);
 
-        syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rb, loopName);
-      }
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rb, loopName);
     }
   }
 #endif
@@ -2104,7 +2094,7 @@ private:
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void sync_recv(std::string loopName, unsigned int num_messages = 1) {
+  void sync_recv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
@@ -2115,11 +2105,11 @@ private:
     switch (bare_mpi) {
       case noBareMPI:
 #endif
-        sync_recv_net<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName, num_messages);
+        sync_recv_net<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         break;
       case nonBlockingBareMPI:
-        sync_recv_mpi<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName, num_messages);
+        sync_recv_mpi<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
         break;
       default:
         GALOIS_DIE("Unsupported bare MPI");
@@ -2609,98 +2599,6 @@ public:
     currentBVFlag = nullptr;
 
     StatTimer_sync.stop();
-  }
-
-
-  // just like any other sync_*, this is expected to be a collective call
-  // but it does not synchronize with other hosts
-  // nonetheless, it should be called same number of times on all hosts
-  template<typename ReduceFnTy, typename BroadcastFnTy>
-  void sync_dst_to_src_pipe(std::string loopName, 
-                            galois::DynamicBitSet& bit_set_compute) {
-    if (transposed) {
-      if (is_vertex_cut()) {
-        sync_send<ReduceFnTy, syncReduce, writeDestination, 
-                  readSource>(loopName, bit_set_compute);
-      } else {
-        sync_send<BroadcastFnTy, syncBroadcast, writeDestination, 
-                  readSource>(loopName, bit_set_compute);
-      }
-    } else {
-      sync_send<ReduceFnTy, syncReduce, writeDestination, 
-                readSource>(loopName, bit_set_compute);
-    }
-    ++numPipelinedPhases;
-  }
-
-  template<typename ReduceFnTy, typename BroadcastFnTy>
-  void sync_dst_to_src_wait(std::string loopName, 
-                            galois::DynamicBitSet& bit_set_compute) {
-    if (transposed) {
-      if (is_vertex_cut()) {
-        sync_recv<ReduceFnTy, syncReduce, writeDestination, 
-                  readSource>(loopName, bit_set_compute, numPipelinedPhases);
-      } else {
-        sync_recv<BroadcastFnTy, syncBroadcast, writeDestination, 
-                  readSource>(loopName, bit_set_compute, numPipelinedPhases);
-      }
-    } else {
-      sync_recv<ReduceFnTy, syncReduce, writeDestination, 
-                readSource>(loopName, bit_set_compute, numPipelinedPhases);
-    }
-
-    numPipelinedPhases = 0;
-
-    if (is_vertex_cut()) {
-      broadcast<BroadcastFnTy, writeDestination, 
-                readSource>(loopName, bit_set_compute);
-    }
-  }
-
-  // just like any other sync_*, this is expected to be a collective call
-  // but it does not synchronize with other hosts
-  // nonetheless, it should be called same number of times on all hosts
-  template<typename ReduceFnTy, typename BroadcastFnTy>
-  void sync_src_to_dst_pipe(std::string loopName, 
-                            galois::DynamicBitSet& bit_set_compute) {
-    if (transposed) {
-      sync_send<ReduceFnTy, syncReduce, writeSource, readDestination>(loopName, 
-          bit_set_compute);
-    } else {
-      if (is_vertex_cut()) {
-        sync_send<ReduceFnTy, syncReduce, writeSource, readDestination>(loopName, 
-            bit_set_compute);
-      } else {
-        sync_send<BroadcastFnTy, syncBroadcast, writeSource, 
-                  readDestination>(loopName, bit_set_compute);
-      }
-    }
-    ++numPipelinedPhases;
-  }
-
-  template<typename ReduceFnTy, typename BroadcastFnTy>
-  void sync_src_to_dst_wait(std::string loopName, 
-                            galois::DynamicBitSet& bit_set_compute) {
-    if (transposed) {
-      sync_recv<ReduceFnTy, syncReduce, writeSource, readDestination>(loopName, 
-          bit_set_compute, numPipelinedPhases);
-    } else {
-      if (is_vertex_cut()) {
-        sync_recv<ReduceFnTy, syncReduce, writeSource, readDestination>(loopName, 
-            bit_set_compute, numPipelinedPhases);
-      } else {
-        sync_recv<BroadcastFnTy, syncBroadcast, writeSource, 
-                  readDestination>(loopName, bit_set_compute, 
-                                   numPipelinedPhases);
-      }
-    }
-
-    numPipelinedPhases = 0;
-
-    if (is_vertex_cut()) {
-      broadcast<BroadcastFnTy, writeSource, readDestination>(loopName, 
-          bit_set_compute);
-    }
   }
 
   template<typename FnTy>
