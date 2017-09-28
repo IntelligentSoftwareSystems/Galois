@@ -454,7 +454,7 @@ public:
     galois::gstl::Vector<GraphNode> inNghs;
   };
   using AuxNodePadded = typename galois::substrate::CacheLineStorage<AuxNode>;
-  using ReadGraphAuxData = LargeArray<AuxNodePadded> ReadGraphAuxData;
+  using ReadGraphAuxData = LargeArray<AuxNodePadded>;
 #endif
 
 private:
