@@ -51,8 +51,7 @@ public:
         [&](uint32_t n) {
           local_wl[n] = graph.G2L(local_wl[n]);
         },
-        galois::loopname("G2L_wl"),
-        galois::numrun(graph.get_run_identifier())
+        galois::loopname("G2L_wl")
     );
   }
 

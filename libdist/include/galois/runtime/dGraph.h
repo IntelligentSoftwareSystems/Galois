@@ -1548,7 +1548,6 @@ public:
               #endif
             }, 
             galois::loopname(get_run_identifier("REDUCE_SET").c_str()),
-            galois::numrun(get_run_identifier()),
             galois::no_stats());
       }
       #endif

@@ -758,7 +758,6 @@ class LC_CSR_Graph :
                      this->outOfLineConstructAt(x);
                    }, 
                    galois::loopname("CONSTRUCT_NODES"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 #endif
   }
@@ -802,7 +801,6 @@ class LC_CSR_Graph :
                      edgeIndData_temp[n] = 0;
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 
     // parallelization makes this slower
@@ -843,7 +841,6 @@ class LC_CSR_Graph :
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
-                   galois::numrun("0"),
                    galois::no_stats());
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
@@ -856,7 +853,6 @@ class LC_CSR_Graph :
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
-                     galois::numrun("0"),
                      galois::no_stats());
     }
 
@@ -904,7 +900,6 @@ class LC_CSR_Graph :
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 
                      galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
-                     galois::numrun("0"),
                      galois::no_stats());
     }
 
