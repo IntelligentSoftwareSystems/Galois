@@ -36,6 +36,7 @@ makeTest(ADD_TARGET wakeup-overhead)
 makeTest(ADD_TARGET worklists-compile DISTSAFE)
 makeTest(ADD_TARGET floatingPointErrors)
 makeTest(ADD_TARGET hwtopo DISTSAFE)
+makeTest(ADD_TARGET firstgraph)
 
 makeTest(TARGET apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz")
 makeTest(TARGET apps/barneshut/barneshut -n 1000 -steps 1 -seed 0)
