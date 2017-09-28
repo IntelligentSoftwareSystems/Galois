@@ -1,9 +1,8 @@
 //Dynamic bit set for CPU
 
-#include <atomic>
+#include "galois/Atomic_wrapper.h"
 #include <iostream>
 #include <bitset>
-#include "galois/Atomic_wrapper.h"
 #include <climits> // CHAR_BIT
 #include <boost/iterator/counting_iterator.hpp>
 #include "galois/GaloisForwardDecl.h"
