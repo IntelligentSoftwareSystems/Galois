@@ -2128,146 +2128,6 @@ private:
 
     StatTimer_RecvTime.stop();
   }
-
-  #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-  template<typename FnTy, SyncType syncType>
-  void sync_sendrecv_exp(std::string loopName,
-                         galois::DynamicBitSet& bit_set_compute,
-                         size_t block_size) {
-    std::atomic<unsigned> total_incoming(0);
-    std::atomic<unsigned> recved_firsts(0);
-    std::atomic<unsigned> sendbytes_count(0);
-    std::atomic<unsigned> msg_received(0);
-
-    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + 
-                                  get_run_identifier(loopName));
-    std::string send_timer_str(syncTypeStr + "_SEND_" + 
-                               get_run_identifier(loopName));
-    std::string tryrecv_timer_str(syncTypeStr + "_TRYRECV_" + 
-                                  get_run_identifier(loopName));
-    std::string recv_timer_str(syncTypeStr + "_RECV_" + 
-                               get_run_identifier(loopName));
-    std::string loop_timer_str(syncTypeStr + "_EXP_MAIN_LOOP_" + 
-                               get_run_identifier(loopName));
-    std::string doall_str("LAMBDA::SENDRECV_" + 
-                          get_run_identifier(loopName));
-
-    galois::StatTimer StatTimer_send(send_timer_str.c_str(), GRNAME);
-    galois::StatTimer StatTimer_tryrecv(tryrecv_timer_str.c_str(), GRNAME);
-    galois::StatTimer StatTimer_RecvTime(recv_timer_str.c_str(), GRNAME);
-    galois::StatTimer StatTimer_mainLoop(loop_timer_str.c_str(), GRNAME);
-
-    StatTimer_mainLoop.start();
-
-    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    std::mutex m;
-
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + h) % net.Num;
-      auto& indices = sharedNodes[x];
-      size_t num_elem = indices.size();
-      size_t nblocks = (num_elem + (block_size - 1)) / block_size;
-
-      galois::do_all(galois::iterate(0, nblocks), 
-        [&](size_t n) {
-          // ========== Send ==========
-          galois::runtime::SendBuffer b;
-          size_t num = ((n + 1) * (block_size) > num_elem) ? 
-                       (num_elem - (n * block_size)) : 
-                       block_size;
-          size_t start = n * block_size;
-          std::vector<unsigned int> offsets;
-
-          if (num > 0) {
-            if (n == 0) {
-              gSerialize(b, dataSplitFirst, num, nblocks);
-              auto lseq = gSerializeLazySeq(b, num, 
-                              (std::vector<typename FnTy::ValTy>*)nullptr);
-              extract_subset<FnTy, syncType, decltype(lseq), true, false>(
-                  loopName, indices, num, offsets, b, lseq, start
-              );
-            } else {
-              gSerialize(b, dataSplit, num, start);
-              auto lseq = gSerializeLazySeq(b, num, 
-                              (std::vector<typename FnTy::ValTy>*)nullptr);
-              extract_subset<FnTy, syncType, decltype(lseq), true, false>(
-                  loopName, indices, num, offsets, b, lseq, start
-              );
-            }
-          } else {
-            // TODO: Send dataSplitFirst with # msg = 1. Will need extra check 
-            // in syncRecvApply
-            gSerialize(b, noData);
-          }
-
-          StatTimer_send.start();
-
-          net.sendTagged(x, galois::runtime::evilPhase, b);
-          net.flush();
-          StatTimer_send.stop();
-
-          sendbytes_count += b.size();
-
-          // ========== Try Receive ==========
-          decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
-
-          if (m.try_lock()) {
-            net.handleReceives();
-            p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-            m.unlock();
-          }
-
-          if (p) {
-            auto val = syncRecvApply<FnTy, syncType, false>(p->first, p->second, 
-                bit_set_compute, loopName);
-
-            if (val != 0) {
-              recved_firsts += 1;
-              total_incoming += val;
-            }
-
-            msg_received += 1;
-          }
-        }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::no_stats());
-    }
-
-    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, 
-                                     sendbytes_count.load());
-    StatTimer_mainLoop.stop();
-
-    // ========== Receive ==========
-    StatTimer_RecvTime.start();
-
-    decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
-
-    while (recved_firsts.load() != (net.Num - 1) || 
-           msg_received.load() != total_incoming.load()) {
-      net.handleReceives();
-
-      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-
-      if (p) {
-        auto val = syncRecvApply<FnTy, syncType, true>(p->first, p->second, 
-                       bit_set_compute, loopName);
-        if (val != 0) {
-          recved_firsts += 1;
-          total_incoming += val;
-        }
-
-        msg_received += 1;
-      }
-    }
-
-    ++galois::runtime::evilPhase;
-
-    StatTimer_RecvTime.stop();
-  }
-  #endif // end galois exp comm algo
   
   /**
    * TODO
@@ -2280,17 +2140,11 @@ private:
     galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
     StatTimer_syncReduce.start();
 
-    #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-    size_t block_size = buffSize;
-    sync_sendrecv_exp<ReduceFnTy, syncReduce>(loopName, bit_set_compute, 
-        block_size);
-    #else
     sync_send<writeLocation, readLocation, syncReduce, ReduceFnTy, 
               BitsetFnTy>(loopName);
 
     sync_recv<writeLocation, readLocation, syncReduce, ReduceFnTy, 
               BitsetFnTy>(loopName);
-    #endif
 
     StatTimer_syncReduce.stop();
   }
@@ -2307,10 +2161,6 @@ private:
 
     StatTimer_syncBroadcast.start();
 
-    #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-    size_t block_size = buffSize;
-    sync_sendrecv_exp<BroadcastFnTy, syncBroadcast>(loopName, block_size);
-    #else
     bool use_bitset = true;
 
     if (currentBVFlag != nullptr) {
@@ -2343,7 +2193,6 @@ private:
 
     sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
               BitsetFnTy>(loopName);
-    #endif
     StatTimer_syncBroadcast.stop();
   }
 
