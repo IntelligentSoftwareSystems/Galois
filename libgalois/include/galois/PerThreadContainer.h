@@ -556,10 +556,10 @@ class PerThreadMap:
   public PerThreadContainer<typename gstl::template Map<K, V, C> > {
 
 public:
-  typedef typename gstl::template FixedSizeAlloc<typename std::pair<const K, V> > Alloc_ty;
+  typedef typename gstl::template Map<K, V, C> container_type;
+  typedef typename gstl::template FixedSizeAlloc<typename container_type::value_type> Alloc_ty;
 
 protected:
-  typedef typename gstl::template Map<K, V, C> container_type;
   typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
