@@ -70,6 +70,13 @@ public:
 // Foreach
 ////////////////////////////////////////////////////////////////////////////////
 
+
+template <typename RangeFunc, typename FunctionTy, typename... Args>
+void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args) {
+  auto tpl = std::make_tuple(args...);
+  runtime::for_each_gen(rangeMaker(tpl), fn, tpl);
+}
+
 /**
  * Galois unordered set iterator.
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
@@ -81,11 +88,11 @@ public:
  * @param fn operator
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
-template<typename IterTy, typename FunctionTy, typename... Args>
-void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  runtime::for_each_gen(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
-}
-
+// template<typename IterTy, typename FunctionTy, typename... Args>
+// void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
+  // runtime::for_each_gen(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
+// }
+// 
 /**
  * Galois unordered set iterator.
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
@@ -96,12 +103,12 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
  * @param fn operator
  * @param args optional arguments to loop
  */
-template<typename ItemTy, typename FunctionTy, typename... Args>
-void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
-  ItemTy iwl[1] = {i};
-  runtime::for_each_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
-}
-
+// template<typename ItemTy, typename FunctionTy, typename... Args>
+// void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
+  // ItemTy iwl[1] = {i};
+  // runtime::for_each_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+// }
+// 
 /**
  * Galois unordered set iterator with locality-aware container.
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
@@ -112,9 +119,15 @@ void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  * @param fn operator
  * @param args optional arguments to loop
  */
-template<typename ConTy, typename FunctionTy, typename... Args>
-void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
-  runtime::for_each_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
+// template<typename ConTy, typename FunctionTy, typename... Args>
+// void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
+  // runtime::for_each_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
+// }
+
+template <typename RangeFunc, typename FunctionTy, typename... Args>
+void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args) {
+  auto tpl = std::make_tuple(args...);
+  runtime::do_all_gen(rangeMaker(tpl), fn, tpl);
 }
 
 /**
@@ -127,10 +140,10 @@ void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
  * @param args optional arguments to loop
  * @returns fn
  */
-template<typename IterTy,typename FunctionTy, typename... Args>
-void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  runtime::do_all_gen(runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
-}
+// template<typename IterTy,typename FunctionTy, typename... Args>
+// void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
+  // runtime::do_all_gen(runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
+// }
 
 /**
  * Standard do-all loop. All iterations should be independent.
@@ -141,12 +154,12 @@ void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&.
  * @param args optional arguments to loop
  * @returns fn
  */
-template<typename ItemTy, typename FunctionTy, typename... Args>
-void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
-  ItemTy iwl[1] = {i};
-  runtime::do_all_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
-                      std::make_tuple(args...));
-}
+// template<typename ItemTy, typename FunctionTy, typename... Args>
+// void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
+  // ItemTy iwl[1] = {i};
+  // runtime::do_all_gen(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, 
+                      // std::make_tuple(args...));
+// }
 
 /**
  * Standard do-all loop with locality-aware container. All iterations should
@@ -157,10 +170,10 @@ void do_all(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
  * @param fn operator
  * @param args optional arguments to loop
  */
-template<typename ConTy,typename FunctionTy, typename... Args>
-void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
-  runtime::do_all_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
-}
+// template<typename ConTy,typename FunctionTy, typename... Args>
+// void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
+  // runtime::do_all_gen(runtime::makeLocalRange(c), fn, std::make_tuple(args...));
+// }
 
 /**
  * Low-level parallel loop. Operator is applied for each running thread.

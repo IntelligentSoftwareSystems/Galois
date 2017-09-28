@@ -29,6 +29,8 @@
 #include "galois/gstl.h"
 #include "galois/substrate/ThreadPool.h"
 
+#include <boost/iterator/counting_iterator.hpp>
+
 #include <iterator>
 
 namespace galois {
@@ -219,6 +221,108 @@ inline SpecificRange<IterTy> makeSpecificRange(IterTy begin,
   return SpecificRange<IterTy>(begin, end, thread_ranges);
 }
 
+} // end namespace runtime
+
+namespace internal {
+
+// supported variants
+// range(beg, end)
+// range(C& cont)
+// range(const T& x); // single item or drop this in favor of initializer list
+// range(std::initializer_list<T>)
+template <typename I, bool IS_INTEGER=false>
+class IteratorRangeMaker {
+  I m_beg;
+  I m_end;
+
+public:
+  template <typename Arg>
+  auto operator () (const Arg& argTuple) const {
+    return runtime::makeStandardRange(m_beg, m_end);
+  }
+};
+
+template <typename I>
+class IteratorRangeMaker<I, true> {
+  I m_beg;
+  I m_end;
+
+public:
+  template <typename Arg>
+  auto operator () (const Arg& argTuple) const {
+    return runtime::makeStandardRange(boost::counting_iterator<I>(m_beg)
+        , boost::counting_iterator<I>(m_end));
+  }
+};
+
+template <typename T>
+class InitListRangeMaker {
+  std::initializer_list<T> m_list;
+
+public:
+  template <typename Arg>
+  auto operator () (const Arg& argTuple) const {
+    return runtime::makeStandardRange(m_list.begin(), m_list.end());
+  }
+};
+
+template <typename C, bool HAS_LOCAL_RANGE=true>
+class ContainerRangeMaker {
+  C& m_cont;
+
+public:
+  template <typename Arg>
+  auto operator () (const Arg& argTuple) const {
+    return runtime::makeLocalRange(m_cont);
+  }
+};
+
+template <typename C>
+class ContainerRangeMaker<C, false> {
+
+  C& m_cont;
+
+public:
+  template <typename Arg>
+  auto operator () (const Arg& argTuple) const {
+    return runtime::makeStandardRange(m_cont.cbegin(), m_cont.cend());
+  }
+};
+
+template <typename C>
+class HasLocalIter {
+
+  template <typename T>
+  using CallExprType = typename std::remove_reference<decltype( std::declval<T>().local_begin() )>::type;
+
+  template <typename T>
+  static std::true_type go (typename std::add_pointer< CallExprType<T> >::type);
+
+  template <typename T>
+  static std::false_type go(...);
+
+public:
+  constexpr static const bool value = std::is_same< decltype(go<C>(nullptr)), std::true_type>::value;
+
+};
+
+} // end namespace internal
+
+template <typename C>
+auto range(C& cont) {
+  return internal::ContainerRangeMaker<C, internal::HasLocalIter<C>::value> {cont};
 }
+
+template <typename T>
+auto range(std::initializer_list<T> initList) {
+  return internal::InitListRangeMaker<T> {initList};
+}
+
+template <typename I>
+auto range(const I& beg, const I& end) {
+  return internal::IteratorRangeMaker<I, std::is_integral<I>::value> {beg, end};
+}
+
+
 } // end namespace galois
 #endif
