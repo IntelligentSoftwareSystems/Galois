@@ -32,7 +32,6 @@
 #include <unordered_map>
 #include "galois/runtime/dGraph.h"
 #include <boost/dynamic_bitset.hpp>
-#include "galois/runtime/vecBool_bitset.h"
 #include "galois/graphs/FileGraph.h"
 #include <sstream>
 
@@ -85,8 +84,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
     std::vector<uint64_t> numEdges_per_host;
     std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
-
-    galois::VecBool gid_vecBool;
 
     uint64_t globalOffset;
     uint32_t numNodes;
