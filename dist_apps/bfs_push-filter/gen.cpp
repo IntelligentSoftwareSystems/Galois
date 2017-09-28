@@ -91,7 +91,7 @@ struct InitializeGraph {
     local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph){
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -197,7 +197,7 @@ struct BFS {
 
     unsigned _num_iterations = 1;
 
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
       _graph.set_num_iter(_num_iterations);
@@ -336,7 +336,7 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  auto& net = galois::runtime::getSystemNetworkInterface();
+  const auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
     galois::runtime::reportParam("BFS", "Max Iterations", 
                                 (unsigned long)maxIterations);

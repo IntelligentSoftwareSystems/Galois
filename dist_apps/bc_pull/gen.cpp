@@ -129,7 +129,7 @@ struct InitializeGraph {
 
   /* Initialize the graph */
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -184,7 +184,7 @@ struct InitializeIteration {
 
   /* Reset necessary graph metadata for next iteration of SSSP */
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -249,7 +249,7 @@ struct SSSP {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
@@ -345,7 +345,7 @@ struct PredAndSucc {
       local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph){
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -417,7 +417,7 @@ struct NumShortestPathsChanges {
       local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -497,7 +497,7 @@ struct NumShortestPaths {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       _graph.set_num_iter(iterations);
@@ -590,7 +590,7 @@ struct FlagPrep {
     local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
@@ -625,7 +625,7 @@ struct DependencyPropChanges {
                Graph* _graph) : local_infinity(_local_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -702,7 +702,7 @@ struct DependencyPropogation {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+      const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -869,7 +869,7 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+      const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
       // finally, since dependencies are finalized for this round at this 
       // point, add them to the betweeness centrality measure on each node
