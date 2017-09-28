@@ -363,28 +363,29 @@ inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& dat
 }
 
 
-/**
- * For serializing insertBag.
- * Insert contigous memory chunks for each thread
- * and clear it.
- * Can not be const.
- * Implemention below makes sure that it can be deserialized
- * into a linear sequence like vector or deque.
- */
-template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, galois::InsertBag<T>& bag){
-  gSerializeObj(buf, bag.size());
-  auto headerVec = bag.getHeads();
-  size_t totalSize = 0;
-  for(auto h : headerVec){
-    size_t localSize = (h->dend - h->dbegin);
-    buf.insert((uint8_t*)h->dbegin, localSize*sizeof(T));
-    totalSize += (h->dend - h->dbegin);
-  }
-
-  assert(totalSize == bag.size());
-  bag.clear();
-}
+// TODO removed the functions in Bag.h that this function requires
+///**
+// * For serializing insertBag.
+// * Insert contigous memory chunks for each thread
+// * and clear it.
+// * Can not be const.
+// * Implemention below makes sure that it can be deserialized
+// * into a linear sequence like vector or deque.
+// */
+//template<typename T>
+//inline void gSerializeObj(SerializeBuffer& buf, galois::InsertBag<T>& bag){
+//  gSerializeObj(buf, bag.size());
+//  auto headerVec = bag.getHeads();
+//  size_t totalSize = 0;
+//  for(auto h : headerVec){
+//    size_t localSize = (h->dend - h->dbegin);
+//    buf.insert((uint8_t*)h->dbegin, localSize*sizeof(T));
+//    totalSize += (h->dend - h->dbegin);
+//  }
+//
+//  assert(totalSize == bag.size());
+//  bag.clear();
+//}
 
 
 } //internal

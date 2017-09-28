@@ -231,44 +231,6 @@ public:
   local_iterator local_begin() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID()); }
   local_iterator local_end() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1); }
 
-  bool empty() const {
-    for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = heads.getRemote(x)->first;
-      if (h)
-        return false;
-    }
-    return true;
-  }
-
-  size_t size() const {
-    size_t s = 0;
-    for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = heads.getRemote(x)->first;
-      while(h){
-        s += std::distance(h->dbegin, h->dend);
-        h = h->next;
-      }
-    }
-    return s;
-  }
-
-  size_t sizeHeads() const {
-    return heads.size();
-  }
-
-  std::vector<header*> getHeads() const {
-    std::vector<header*> hVec;
-    for (unsigned x = 0; x < heads.size(); ++x) {
-      header* h = heads.getRemote(x)->first;
-      while(h){
-        hVec.push_back(h);
-        h = h->next;
-      }
-    }
-    return hVec;
-  }
-
-
   //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {
