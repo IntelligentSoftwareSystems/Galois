@@ -46,21 +46,10 @@
 // Command line args
 ////////////////////////////////////////////////////////////////////////////////
 
-cll::opt<bool> skipVerify("noverify", cll::desc("Skip verification step"), 
-                                      cll::init(false));
 cll::opt<int> numThreads("t", cll::desc("Number of threads"), 
                               cll::init(1));
 cll::opt<int> numRuns("runs", cll::desc("Number of runs"), 
                               cll::init(3));
-cll::opt<bool> savegraph("savegraph", 
-                         cll::desc("Bool flag to enable save graph"),
-                         cll::init(false));
-cll::opt<std::string> outputFile("outputFile", 
-              cll::desc("Output file name to store the local graph structure"), 
-              cll::init("local_graph"));
-cll::opt<bool> verifyMax("verifyMax", 
-              cll::desc("Just print the max value of nodes fields"),
-              cll::init(false));
 cll::opt<std::string> statFile("statFile", 
          cll::desc("output file to print stats to "), 
          cll::init(""));
@@ -173,10 +162,6 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
   char name[256];
   gethostname(name, 256);
   galois::runtime::reportParam("DistBench", "Hostname", name);
-
-  if (savegraph) {
-    galois::runtime::reportParam("DistBench", "outputFile", outputFile.c_str());
-  }
 }
 
 #ifdef __GALOIS_HET_CUDA__
