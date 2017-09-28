@@ -309,17 +309,17 @@ public:
 } // end namespace internal
 
 template <typename C>
-auto range(C& cont) {
+auto iterate(C& cont) {
   return internal::ContainerRangeMaker<C, internal::HasLocalIter<C>::value> {cont};
 }
 
 template <typename T>
-auto range(std::initializer_list<T> initList) {
+auto iterate(std::initializer_list<T> initList) {
   return internal::InitListRangeMaker<T> {initList};
 }
 
 template <typename I>
-auto range(const I& beg, const I& end) {
+auto iterate(const I& beg, const I& end) {
   return internal::IteratorRangeMaker<I, std::is_integral<I>::value> {beg, end};
 }
 

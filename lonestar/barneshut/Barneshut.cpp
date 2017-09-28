@@ -438,7 +438,7 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   //sort and copy out
   divide(tmp.begin(), tmp.end(), gen);
 
-  galois::do_all(galois::range(tmp), 
+  galois::do_all(galois::iterate(tmp), 
       [&pBodies, &bodies] (const Body& b) {
         pBodies.push_back(&(bodies.push_back(b)));
       },
@@ -493,14 +493,13 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     // Do tree building sequentially
     galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
-    galois::do_all(galois::range(pBodies), 
+    galois::do_all(galois::iterate(pBodies), 
         [&boxes] (const Body* b) {
           boxes.update(b->pos);
         },
         galois::loopname("reduceBoxes"), galois::steal<true>());
 
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
-    //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 
     Tree t;
     BuildOctree treeBuilder {t};
@@ -508,7 +507,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     galois::StatTimer T_build("BuildTime");
     T_build.start();
-    galois::do_all(galois::range(pBodies), 
+    galois::do_all(galois::iterate(pBodies), 
         [&] (Body* body) {
           treeBuilder.insert(body, &top, box.radius()); 
         }, 
@@ -525,7 +524,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
     galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
-    galois::for_each(galois::range(pBodies), 
+    galois::for_each(galois::iterate(pBodies), 
         [&] (Body* b, auto& cnx) {
           cf.computeForce(b, cnx);
         },
@@ -541,7 +540,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
     //Done in compute forces
-    galois::do_all(galois::range(pBodies), 
+    galois::do_all(galois::iterate(pBodies), 
         [] (Body* b) {
           Point dvel(b->acc);
           dvel *= config.dthf;
