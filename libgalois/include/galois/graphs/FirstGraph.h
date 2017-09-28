@@ -445,15 +445,16 @@ public:
 #ifdef AUX_MAP
   struct ReadGraphAuxData {
     LargeArray<GraphNode> nodes;
-    galois::PerThreadMap<FileGraph::GraphNode, galois::gstl::List<GraphNode> > inNghs;
+    galois::PerThreadMap<FileGraph::GraphNode, galois::gstl::Vector<GraphNode> > inNghs;
   };
 #else
   struct AuxNode {
     galois::substrate::SimpleLock lock;
     GraphNode n;
-    galois::gstl::List<GraphNode> inNghs;
+    galois::gstl::Vector<GraphNode> inNghs;
   };
-  typedef LargeArray<typename galois::substrate::CacheLineStorage<AuxNode> > ReadGraphAuxData;
+  using AuxNodePadded = typename galois::substrate::CacheLineStorage<AuxNode>;
+  using ReadGraphAuxData = LargeArray<AuxNodePadded> ReadGraphAuxData;
 #endif
 
 private:
@@ -924,7 +925,6 @@ public:
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) { 
     size_t numNodes = graph.size();
     aux.nodes.allocateInterleaved(numNodes);
-    aux.inNghs.init();
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
@@ -974,6 +974,13 @@ public:
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
     aux.allocateInterleaved(numNodes);
+
+    galois::do_all(aux.begin(), aux.end(),
+        [=] (AuxNodePadded& n) {
+           // in-place new
+           new (&n) AuxNodePadded();
+        }
+    );
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
