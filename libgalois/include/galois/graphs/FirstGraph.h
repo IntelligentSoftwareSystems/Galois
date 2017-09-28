@@ -32,8 +32,16 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
+//#define AUX_MAP
+
 #include "galois/Bag.h"
-#include "galois/Accumulator.h"
+#include "galois/gstl.h"
+#ifdef AUX_MAP
+  #include "galois/PerThreadContainer.h"
+#else
+  #include "galois/substrate/CacheLineStorage.h"
+  #include "galois/substrate/SimpleLock.h"
+#endif
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
 #include "galois/Galois.h"
@@ -434,7 +442,19 @@ public:
   typedef boost::transform_iterator<makeGraphNode,
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
-  typedef LargeArray<GraphNode> ReadGraphAuxData;
+#ifdef AUX_MAP
+  struct ReadGraphAuxData {
+    LargeArray<GraphNode> nodes;
+    galois::PerThreadMap<FileGraph::GraphNode, galois::gstl::List<GraphNode> > inNghs;
+  };
+#else
+  struct AuxNode {
+    galois::substrate::SimpleLock lock;
+    GraphNode n;
+    galois::gstl::List<GraphNode> inNghs;
+  };
+  typedef LargeArray<typename galois::substrate::CacheLineStorage<AuxNode> > ReadGraphAuxData;
+#endif
 
 private:
   template<typename... Args>
@@ -499,6 +519,7 @@ private:
   /**
    * Creates an incoming edge at dst for the edge from src to dst.
    * Only called by constructInEdgeValue.
+   * Reuse data from the corresponding outgoing edge.
    */
   template<typename... Args>
   in_edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
@@ -533,21 +554,8 @@ private:
     createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
-  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructInEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
-      GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
-    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
-    typedef LargeArray<EdgeTy> ED;
-    if (ED::has_value) {
-      createInEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
-    } else {
-      createInEdge(src, dst, galois::MethodFlag::UNPROTECTED);
-    }
-  }
-
-  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructInEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
-      GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+  // will reuse edge data from outgoing edges
+  void constructInEdgeValue(FileGraph& graph, GraphNode src, GraphNode dst) {
     createInEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
@@ -912,7 +920,58 @@ public:
     return gNode::EdgeInfo::sizeOfSecond();
   }
 
+#ifdef AUX_MAP
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) { 
+    size_t numNodes = graph.size();
+    aux.nodes.allocateInterleaved(numNodes);
+    aux.inNghs.init();
+  }
+
+  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      aux.nodes[*ii] = createNode();
+      addNode(aux.nodes[*ii], galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+    auto& map = aux.inNghs.get();
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        auto dstID = graph.getEdgeDst(nn);
+        auto src = aux.nodes[*ii], dst = aux.nodes[dstID];
+        constructOutEdgeValue(graph, nn, src, dst);
+        if (!Directional || InOut) {
+          map[dstID].push_back(src);
+        }
+      }
+    }
+  }
+
+  void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+
+    if (!Directional || InOut) {
+      auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+
+      for (auto i = 0; i < aux.inNghs.numRows(); ++i) {
+        auto& map = aux.inNghs.get(i);
+        auto ii = map.lower_bound(*(r.first)), ei = map.upper_bound(*(r.second));
+        for ( ; ii != ei; ++ii) {
+          auto dst = aux.nodes[ii->first];
+          for (auto src: ii->second) {
+            constructInEdgeValue(graph, src, dst);
+          }
+        }
+      }
+    }
+  }
+#else
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
     aux.allocateInterleaved(numNodes);
   }
@@ -920,35 +979,45 @@ public:
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
-      aux[*ii] = createNode();
-      addNode(aux[*ii], galois::MethodFlag::UNPROTECTED);
+      auto& auxNode = aux[*ii].get();
+      auxNode.n = createNode();
+      addNode(auxNode.n, galois::MethodFlag::UNPROTECTED);
     }
   }
 
-  void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+  void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
     typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        constructOutEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
-      }
-    }
-  }
-
-  void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
-    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
-
-    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
-      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        // no incoming edges for directed and outedge-only graphs
+        auto src = aux[*ii].get().n;
+        auto& dstAux = aux[graph.getEdgeDst(nn)].get();
+        constructOutEdgeValue(graph, nn, src, dstAux.n);
         if (!Directional || InOut) {
-          constructInEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
+          dstAux.lock.lock();
+          dstAux.inNghs.push_back(src);
+          dstAux.lock.unlock();
         }
       }
     }
   }
+
+  void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+
+    if (!Directional || InOut) {
+      auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+
+      for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+        auto& auxNode = aux[*ii].get();
+        for (auto src: auxNode.inNghs) {
+          constructInEdgeValue(graph, src, auxNode.n);
+        }
+      }
+    }
+  }
+#endif
 };
 
 }
