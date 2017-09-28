@@ -48,11 +48,13 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
   if (argc < 1) {
-    std::cout << "usage: ./test-firstgraph <input> <num_threads>" << std::endl;
+    std::cout << "Usage: ./test-firstgraph <input> <num_threads>" << std::endl;
     return 0;
   } 
   filename = argv[1];
-  galois::runtime::activeThreads = std::stoul(argv[2]);
+
+  auto numThreads = galois::setActiveThreads(std::stoul(argv[2]));
+  std::cout << "Loading " << filename << " with " << numThreads << " threads." << std::endl;
 
   galois::StatTimer outT("OutGraphTime");
   OutGraph outG;
