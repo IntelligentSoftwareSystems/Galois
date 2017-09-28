@@ -139,6 +139,15 @@ namespace {
     string VAL_TYPE;
   };
 
+  class InfoClass {
+    public:
+      //Global variables for synchronization to be inserted.
+      //Hack: bool is used to prevent multiple prints of the 
+      //      variable, since AST matchers visits the matched
+      //      node twice. (Find a better solution)
+      vector<std::pair<bool,std::string>> syncGlobals_vec;
+  };
+
   /**
    * Given an input, upper-cases + returns
    */
@@ -153,8 +162,8 @@ namespace {
    */
   std::string getSyncer(const Write_set& i) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << 
-         "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) <<
+         "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
     return s.str();
   }
 
@@ -164,15 +173,15 @@ namespace {
    * information + saves names of flags structure and reduce structure to a map.
    */
   typedef std::map<std::string, std::vector<std::string>> SyncCall_map;
-          //std::map<std::string, std::vector<std::string>> syncCall_map;
   std::string getSyncer(const Write_set& i, SyncCall_map& syncCall_map) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << 
-         "(" << i.FIELD_NAME << " , " << i.VAL_TYPE << ");\n";
+    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) <<
+         "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
 
-    std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
-    std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" + 
-                                  i.FIELD_NAME + " ";
+    //std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
+    std::string str_readFlags = i.READ_FLAG;
+    std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" +
+                                  i.FIELD_NAME;
     syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
     syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
 
@@ -187,8 +196,8 @@ namespace {
    */
   std::string getSyncerPull(const Write_set& i) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME 
-      << " , " << i.VAL_TYPE << ");\n";
+    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME
+      << ", " << i.VAL_TYPE << ");\n";
     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
 
     return s.str();
@@ -202,18 +211,32 @@ namespace {
    */
   std::string getSyncerPull(const Write_set& i, SyncCall_map& syncCall_map) {
     std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << " , " 
+    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << ", "
       << i.VAL_TYPE << ");\n";
     s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
 
-    std::string str_broadcast_call = " Broadcast_" + i.FIELD_NAME + " ";
-    std::string str_bitset = " Bitset_" + i.FIELD_NAME + " ";
+    std::string str_broadcast_call = "Broadcast_" + i.FIELD_NAME + " ";
+    std::string str_bitset = "Bitset_" + i.FIELD_NAME ;
     syncCall_map[i.FIELD_NAME].push_back(str_broadcast_call);
     syncCall_map[i.FIELD_NAME].push_back(str_bitset);
 
     return s.str();
   }
 
+  /*
+   * To avoid duplicates in syncGlobal vector. 
+   */
+  bool syncGlobal_exists(vector<std::pair<bool, std::string>>& vec, std::string name){
+    for(auto entry : vec){
+      if((entry.second).compare(name) == 0){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  //XXX: Deprecated
+  //TODO: Merge code for for_each loop and do_all loop.
   /**
    * Handles sync additions/other things for galois::for_each calls
    */
@@ -226,6 +249,8 @@ namespace {
       FunctionForEachHandler(Rewriter &rewriter) : rewriter(rewriter) {}
 
       virtual void run(const MatchFinder::MatchResult &results) {
+
+#if 0
         llvm::errs() << "for_each found\n";
         const CallExpr* callFS = 
           results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop_forEach");
@@ -615,6 +640,8 @@ namespace {
           kernelBefore << "\t} else if (personality == CPU)\n";
           kernelBefore << "#endif\n";
 
+
+#if 0
           // TODO check for sanity
           // here begins non-cuda code adding
           // this is for first-itr loops
@@ -638,6 +665,7 @@ namespace {
             string iterator_range = "boost::make_counting_iterator(__begin), boost::make_counting_iterator(__end)";
             rewriter.ReplaceText(ST_forEach_start, galois_foreach.length() + single_source.length(), galois_foreach + iterator_range);
           }
+#endif
 
           //insert helperFunc in for_each call
           SourceLocation ST_forEach_end = callFS->getSourceRange().getEnd().getLocWithOffset(0);
@@ -653,14 +681,16 @@ namespace {
             rewriter.InsertText(ST_forEach_end2, end_single_source, true, true);
           }
         }
+#endif
       }
   };
 
   class FunctionCallHandler : public MatchFinder::MatchCallback {
     private:
       Rewriter &rewriter;
+      InfoClass* info;
     public:
-      FunctionCallHandler(Rewriter &rewriter) : rewriter(rewriter) {}
+      FunctionCallHandler(Rewriter &rewriter, InfoClass* _info) : rewriter(rewriter), info(_info) {}
       virtual void run(const MatchFinder::MatchResult &results) {
         const CallExpr* callFS = results.Nodes.getNodeAs<clang::CallExpr>(
                                    "galoisLoop");
@@ -701,6 +731,18 @@ namespace {
           // it is begin/end, but if not, then assume this is a single
           // source do all
           assert(callFS->getNumArgs() > 1);
+          string single_source;
+
+          /** Get Operator range: First field in do_all or do_all_local.
+           *                      Operator ranges could be allNodes, 
+           *                      nodesWithEdges and masterNodes.
+           **/
+          string str_range_arg;
+          llvm::raw_string_ostream s_range(str_range_arg);
+          callFS->getArg(0)->printPretty(s_range, 0, Policy);
+          string rangeType = s_range.str();
+
+#if 0
           string str_begin_arg;
           llvm::raw_string_ostream s_begin(str_begin_arg);
           callFS->getArg(0)->printPretty(s_begin, 0, Policy);
@@ -710,7 +752,7 @@ namespace {
           callFS->getArg(1)->printPretty(s_end, 0, Policy);
           string end = s_end.str();
 
-          string single_source;
+
 
           // TODO: revise to work with new range calls too.... (allNodes, etc.)
           // TODO: use type comparison instead
@@ -725,6 +767,7 @@ namespace {
             assert(begin.compare("_graph.begin()") == 0);
             assert(end.compare("_graph.end()") == 0);
           }
+#endif
 
           // Get the arguments
           for (int i = 0, j = callFS->getNumArgs(); i < j; ++i) {
@@ -838,9 +881,6 @@ namespace {
                     write_set_vec_PULL.push_back(WR_entry);
                   }
                 }
-                if (func->getNameInfo().getName().getAsString() == "read_set"){
-                  llvm::errs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
-                }
 
               }
             }
@@ -881,6 +921,8 @@ namespace {
             if(!found) write_set_vec_PUSH_PULL.push_back(i);
           }
 
+
+#if 0
           // deal with single source case: set up do all call vars
           if (!single_source.empty()) {
             stringstream kernelBefore;
@@ -894,16 +936,17 @@ namespace {
             kernelBefore << "\t\t}\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
           }
+#endif
 
-          // IMP: Ordering matter : All getSyncer calls should be before 
-          // getSyncerPull
-          // TODO reason about why this is the case
           stringstream SSSyncer;
 
           // map from FIELD_NAME -> reduce, broadcast, bitset;
           std::map<std::string, std::vector<std::string>> syncCall_map;
 
           for (auto& i : write_set_vec_PUSH) {
+            /** For allNodes operator range, if only source is written, sync is not required **/
+            if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+              continue;
             SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
             SSSyncer.str(string());
@@ -914,6 +957,9 @@ namespace {
           stringstream SSSyncer_vertexCut;
           for (auto& i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_pull") {
+              /** For allNodes operator range, if only source is written, sync is not required **/
+              if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+                continue;
               SSSyncer_vertexCut << getSyncer(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
@@ -924,6 +970,9 @@ namespace {
           // Addding structure for pull sync
           stringstream SSSyncer_pull;
           for(auto& i : write_set_vec_PULL) {
+            /** For allNodes operator range, if only source is written, sync is not required **/
+            if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+              continue;
             SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
             SSSyncer_pull.str(string());
@@ -934,6 +983,9 @@ namespace {
           // Addding additional structs for vertex cut
           for (auto& i : write_set_vec_PUSH_PULL) {
             if(i.SYNC_TYPE == "sync_push"){
+              /** For allNodes operator range, if only source is written, sync is not required **/
+              if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+                continue;
               SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
               SSSyncer_vertexCut.str(string());
@@ -941,11 +993,6 @@ namespace {
             }
           }
 
-          for (auto& i : syncCall_map) {
-            llvm::outs() << "__________________> : "
-                         << i.first << " ---- > " <<  i.second[0] << " , "
-                         << i.second[1] << "\n";
-          }
 
           auto recordDecl = results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
           std::string className = recordDecl->getNameAsString();
@@ -999,6 +1046,7 @@ namespace {
           rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
 
 
+# if 0
           // TODO make sanity pass
           // replace do all call with single source call if necessary
           if (!single_source.empty()) {
@@ -1009,6 +1057,7 @@ namespace {
                                  galois_doall.length() + single_source.length(),
                                  galois_doall + iterator_range);
           }
+#endif
 
 
           // Adding sync calls for write set
@@ -1034,7 +1083,7 @@ namespace {
 
             // TODO flags now an argument; add them
             // TODO originally \( instead of (
-            SSAfter << ">(\"" << OperatorStructName << "\");\n\n";
+            SSAfter << ">(Flags_" << i.first << ", \"" << OperatorStructName << "\");\n\n";
             rewriter.InsertText(ST_main, SSAfter.str(), true, true);
             SSAfter.str(string());
             SSAfter.clear();
@@ -1050,47 +1099,85 @@ namespace {
           for (auto& i : write_set_vec_PUSH_PULL) {
             if (i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull") {
               if (i.WRITE_FLAG == "writeDestination") {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_dst();\n";
+                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_dst();\n";
               } else if (i.WRITE_FLAG == "writeSource") {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_src();\n";
+                if(rangeType == "allNodes"){
+                  continue;
+                }
+                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_src();\n";
               } else if (i.WRITE_FLAG == "writeAny") {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_both();\n";
+                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_any();\n";
               } else {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << "::set_write_none();\n";
+                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_none();\n";
               }
 
               rewriter.InsertText(ST, SSAfter.str(), true, true);
               SSAfter.str(string());
               SSAfter.clear();
             }
+
+            if(!syncGlobal_exists(info->syncGlobals_vec, i.FIELD_NAME)){
+              info->syncGlobals_vec.push_back(make_pair(false,i.FIELD_NAME));
+            }
           }
         }
       }
   };
 
+  class FunctionGlobalVarHandler : public MatchFinder::MatchCallback {
+    private:
+      Rewriter &rewriter;
+      InfoClass* info;
+    public:
+      FunctionGlobalVarHandler(Rewriter &rewriter, InfoClass* _info) : rewriter(rewriter), info(_info) {}
+      virtual void run(const MatchFinder::MatchResult &results) {
+        auto record_InitializeGraph_operator = results.Nodes.getNodeAs<clang::RecordDecl>("InitializeGraph_operator");
+        if(record_InitializeGraph_operator){
+
+          SourceLocation ST_begin = record_InitializeGraph_operator->getSourceRange().getBegin();
+
+          for(auto& field_name : info->syncGlobals_vec){
+            if(!field_name.first){
+              //Insert Bitset vector
+              std::string bitset_vector = "//Global variable: For bistset optimization to track changes to the field.\ngalois::DynamicBitSet bitset_" + field_name.second + ";\n";
+              rewriter.InsertText(ST_begin, bitset_vector, true, true);
+
+              //Insert Field flag
+              std::string field_flag = "//Global variable: For on-demand communication optimization\nFieldFlags Flags_" + field_name.second + ";\n\n";
+              rewriter.InsertText(ST_begin, field_flag, true, true);
+
+              //mark it done
+              field_name.first = true;
+            }
+          }
+        }
+      }
+  };
+
+
   class GaloisFunctionsConsumer : public ASTConsumer {
     private:
-      //CompilerInstance &Instance;
       std::set<std::string> ParsedTemplates;
       GaloisFunctionsVisitor* Visitor;
-      MatchFinder Matchers;
+      MatchFinder Matchers_syncCalls, Matchers_GlobalVar;
       ForStmtHandler forStmtHandler;
-      //NameSpaceHandler namespaceHandler;
       FunctionCallHandler functionCallHandler;
       FunctionForEachHandler forEachHandler;
+      FunctionGlobalVarHandler globalVarHandler;
+      InfoClass info;
     public:
       GaloisFunctionsConsumer(CompilerInstance &Instance, 
                               std::set<std::string> ParsedTemplates, 
                               Rewriter &R) : 
             ParsedTemplates(ParsedTemplates), 
             Visitor(new GaloisFunctionsVisitor(&Instance)), 
-            functionCallHandler(R), 
-            forEachHandler(R) 
-      {
+            functionCallHandler(R, &info), 
+            forEachHandler(R),
+            globalVarHandler(R, &info) {}
+
+      virtual void HandleTranslationUnit(ASTContext &Context) {
         // do all loop matcher
-        // TODO this matcher assumes do all syntax is range.begin, range.end;
-        // do_all_local does not necessarily follow this syntax......
-        Matchers.addMatcher(
+        Matchers_syncCalls.addMatcher(
           callExpr(
             isExpansionInMainFile(), 
             callee(
@@ -1107,7 +1194,7 @@ namespace {
 
         // TODO for each needed?
         /** for galois::for_each. Needs different treatment. **/
-        Matchers.addMatcher(
+        Matchers_syncCalls.addMatcher(
           callExpr(
             isExpansionInMainFile(), 
             callee(functionDecl(hasName("galois::for_each"))), 
@@ -1117,10 +1204,19 @@ namespace {
             hasAncestor(recordDecl().bind("class"))
           ).bind("galoisLoop_forEach"), &forEachHandler
         );
-      }
 
-      virtual void HandleTranslationUnit(ASTContext &Context) {
-        Matchers.matchAST(Context);
+        Matchers_syncCalls.matchAST(Context);
+
+        /* Matchers for inserting global variables required for sync.
+         *
+         * Globals are: Bitset vector
+         *              Field flags
+         *
+         * Assumption: Every compiler input will have function named InitializeGraph.
+         */
+
+        Matchers_GlobalVar.addMatcher(recordDecl(isExpansionInMainFile(), hasName("InitializeGraph")).bind("InitializeGraph_operator"), &globalVarHandler);
+        Matchers_GlobalVar.matchAST(Context);
       }
   };
 

@@ -71,7 +71,6 @@ class AddNewVariableHandler : public MatchFinder::MatchCallback {
               findAndReplace(j.FIELD_TYPE, "*", "");
 
               std::string  newVar = "\n" + j.FIELD_TYPE + " " + j.FIELD_NAME + " ;\n";
-              llvm::outs() << " HHHHHHHHHHHHHHHHHHHHHHHHHHH : " << newVar << "\n";
               rewriter.InsertText(nodeData_loc_end, newVar, true, true);
             }
           }

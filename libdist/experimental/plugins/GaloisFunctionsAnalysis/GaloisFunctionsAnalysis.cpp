@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,8 +19,6 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
- *
- * TODO
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
@@ -40,8 +38,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 /*
- * Matchers
- */
+ *  * Matchers
+ *   */
 
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -74,21 +72,19 @@ using namespace llvm;
 using namespace std;
 
 namespace {
-class GaloisFunctionsVisitor : 
-    public RecursiveASTVisitor<GaloisFunctionsVisitor> {
+
+class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor> {
   private:
     ASTContext* astContext;
 
   public:
-    explicit GaloisFunctionsVisitor(CompilerInstance *CI) : 
-        astContext(&(CI->getASTContext())){}
+    explicit GaloisFunctionsVisitor(CompilerInstance *CI) : astContext(&(CI->getASTContext())){}
 
-    virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec) {
+    virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec){
       //Dec->dump();
       return true;
     }
-
-    virtual bool VisitFunctionDecl(FunctionDecl* func) {
+    virtual bool VisitFunctionDecl(FunctionDecl* func){
       //std::string funcName = func->getNameInfo().getName().getAsString();
       std::string funcName = func->getNameAsString();
       if (funcName == "foo"){
@@ -102,13 +98,11 @@ class GaloisFunctionsVisitor :
         auto t = call->getType().getTypePtrOrNull();
         if (t) {
           auto func = call->getDirectCallee();
-          if (func) {
-            if (func->getNameAsString() == "getData") {
-              llvm::outs() << func->getNameInfo().getName().getAsString() 
-                           << "\n";
+          if (func)
+            if (func->getNameAsString() == "getData"){
+              llvm::outs() << func->getNameInfo().getName().getAsString() << "\n";
               call->dump();
             }
-          }
         }
       }
       return true;
@@ -116,16 +110,10 @@ class GaloisFunctionsVisitor :
   };
 
 
-
-/**
- * Get the typedef name of the graph as well as the types of the node data
- * and edge data.
- */
-class TypedefHandler : public MatchFinder::MatchCallback {
+class TypedefHandler :  public MatchFinder::MatchCallback {
   InfoClass* info;
-
   public:
-    TypedefHandler(InfoClass* _info) : info(_info) {}
+    TypedefHandler(InfoClass* _info):info(_info){}
     virtual void run(const MatchFinder::MatchResult & Results) {
       auto typedefDecl = Results.Nodes.getNodeAs<clang::TypeDecl>("typedefDecl");
 
@@ -133,143 +121,112 @@ class TypedefHandler : public MatchFinder::MatchCallback {
       string Graph_name = typedefDecl->getNameAsString();
       llvm::outs() << "--->" << Graph_name << "\n";
       //typedefDecl->dump();
-      auto templatePtr = 
-        typedefDecl->getTypeForDecl()->getAs<TemplateSpecializationType>();
-
+      auto templatePtr = typedefDecl->getTypeForDecl()->getAs<TemplateSpecializationType>();
       if (templatePtr) {
         Graph_entry g_entry;
-        /** We only need NodeType and EdgeType **/
+        /**We only need NopeType and EdgeType**/
         //templatePtr->getArg(0).getAsType().dump();
-        llvm::outs() << " ARGUMENTS : " << templatePtr->getNumArgs() << "\n";
-
-        // save node type and edge type under the type of the graph
-        g_entry.NODE_TYPE = 
-          templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
-
+        llvm::outs() << " ARGUMETNS : " << templatePtr->getNumArgs() << "\n";
+        g_entry.NODE_TYPE = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
         templatePtr->getArg(1).getAsType().dump();
-        g_entry.EDGE_TYPE = 
-          templatePtr->getArg(1).getAsType().getAsString();
+        g_entry.EDGE_TYPE = templatePtr->getArg(1).getAsType().getAsString();
+
 
         info->graphs_map[Graph_name].push_back(g_entry);
-        llvm::outs() << "node is :" << g_entry.NODE_TYPE << ", edge is : " 
-                     << g_entry.EDGE_TYPE << "\n";
+        llvm::outs() << "node is :" << g_entry.NODE_TYPE << ", edge is : " << g_entry.EDGE_TYPE << "\n";
       }
     }
-};
+  };
 
-/**
- * Helper handler that dumps out the AST of an operator for viewing.
- */
+
 class FindOperatorHandler : public MatchFinder::MatchCallback {
   private:
-    ASTContext* astContext;
-  public:
-    FindOperatorHandler(CompilerInstance *CI) : 
-          astContext(&(CI->getASTContext())) {}
+      ASTContext* astContext;
+    public:
+      FindOperatorHandler(CompilerInstance *CI):astContext(&(CI->getASTContext())){}
+      virtual void run(const MatchFinder::MatchResult &Results) {
+        llvm::outs() << "I found one operator\n";
 
-    virtual void run(const MatchFinder::MatchResult &Results) {
-      llvm::outs() << "I found one operator\n";
+        const CXXRecordDecl* recDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("GaloisOP");
 
-      const CXXRecordDecl* recDecl = 
-        Results.Nodes.getNodeAs<clang::CXXRecordDecl>("GaloisOP");
+        if(recDecl){
+          //recDecl->dump();
 
-      if (recDecl) {
-        //recDecl->dump();
-        for (auto method : recDecl->methods()) {
-          if (method->getNameAsString() == "operator()") {
-            llvm::outs() << method->getNameAsString() << "\n";
-            //method->dump();
-            auto funcDecl = dyn_cast<clang::FunctionDecl>(method);
-            llvm::outs() << funcDecl->param_size() << "\n";
+          for(auto method : recDecl->methods()){
+            if (method->getNameAsString() == "operator()") {
+              llvm::outs() << method->getNameAsString() << "\n";
+              //method->dump();
+              auto funcDecl = dyn_cast<clang::FunctionDecl>(method);
+              llvm::outs() << funcDecl->param_size() << "\n";
+              if (funcDecl->hasBody() && (funcDecl->param_size() == 1)){
+                auto paramValdecl = funcDecl->getParamDecl(0); // This is GNode src to operator. 
+                auto stmt = funcDecl->getBody();
+                if (stmt){
+                  //stmt->dumpColor();
 
-            if (funcDecl->hasBody() && (funcDecl->param_size() == 1)) {
-              // This is GNode src to operator. 
-              auto paramValdecl = funcDecl->getParamDecl(0); 
-              auto stmt = funcDecl->getBody();
-              if (stmt) {
-                //stmt->dumpColor();
-                // dump the operator out
-                for(auto& stmtChild : stmt->children()) {
-                  stmtChild->dump();
+                  for(auto stmtChild : stmt->children()) {
+                    stmtChild->dump();
+                  }
+
                 }
               }
             }
           }
         }
       }
-    }
-};
-
-
-/**
- *
- */
+  };
 class FunctionCallHandler : public MatchFinder::MatchCallback {
   private:
     Rewriter &rewriter;
     InfoClass* info;
   public:
-    FunctionCallHandler(Rewriter &rewriter, InfoClass* _info) : 
-          rewriter(rewriter), info(_info) {}
-
+    FunctionCallHandler(Rewriter &rewriter, InfoClass* _info ) :  rewriter(rewriter), info(_info){}
     virtual void run(const MatchFinder::MatchResult &Results) {
       const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
 
-      if (callFS) {
-        auto callRecordDecl = 
-          Results.Nodes.getNodeAs<clang::CXXRecordDecl>("do_all_recordDecl");
+
+      if(callFS){
+        callFS->dumpColor();
+        auto callRecordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("do_all_recordDecl");
         string struct_name = callRecordDecl->getNameAsString();
 
-        //SourceLocation ST_main = callFS->getSourceRange().getBegin();
-        //clang::LangOptions LangOpts;
-        //LangOpts.CPlusPlus = true;
-        //clang::PrintingPolicy Policy(LangOpts);
-        // Add text before
+        SourceLocation ST_main = callFS->getSourceRange().getBegin();
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
+
+        //Add text before
         //stringstream SSBefore;
-        //SSBefore << "/* galois:: do_all before  */\n";
+        //SSBefore << "/* Galois:: do_all before  */\n";
         //SourceLocation ST = callFS->getSourceRange().getBegin();
         //rewriter.InsertText(ST, "hello", true, true);
 
-        // TODO come back to this
-
-        // loop through reduction ops
-        for (auto& i : info->reductionOps_map) {
-          if ((i.first == struct_name) &&  (i.second.size() > 0)) {
-            for (auto& j : i.second) {
+        //Add text after
+        for(auto i : info->reductionOps_map){
+          if((i.first == struct_name) &&  (i.second.size() > 0)){
+            for(auto j : i.second){
               stringstream SSAfter;
               j.READFLAG = "";
               j.WRITEFLAG = "";
               j.IS_RESET = false;
-
-              for (auto& h : info->syncFlags_map[struct_name]) {
-                if (h.FIELD_NAME == j.FIELD_NAME) {
-                  for (auto& k : info->syncFlags_map[struct_name]) {
-                    if (k.FIELD_NAME == h.FIELD_NAME) {
-                      if (k.RW == "read") {
-                        if (j.READFLAG == "") {
+              for(auto h : info->syncFlags_map[struct_name]){
+                if(h.FIELD_NAME == j.FIELD_NAME){
+                  for(auto k : info->syncFlags_map[struct_name]){
+                    if(k.FIELD_NAME == h.FIELD_NAME){
+                      if(k.RW == "read"){
+                        if(j.READFLAG == "")
                           j.READFLAG = k.AT;
-                        } else if ((
-                              (j.READFLAG == "readSource") && 
-                              (k.AT == "readDestination")
-                            ) || (
-                              (j.READFLAG == "readDestination") && 
-                              (k.AT == "readSource")
-                            )) {
-                          llvm::outs() << k.FIELD_NAME << " : " << j.READFLAG 
-                                       << " : k.AT : " << k.AT << "\n";
+                        else if(((j.READFLAG == "readSource") && (k.AT == "readDestination")) || ((j.READFLAG == "readDestination") && (k.AT == "readSource"))){
+                          llvm::outs() << k.FIELD_NAME << " : " << j.READFLAG << " : k.AT : " << k.AT << "\n";
                           j.READFLAG = "readAny";
                         }
-                      } else if (k.RW == "write") {
-                        if (j.WRITEFLAG == "") {
+                      }
+                      if(k.RW == "write"){
+                        if(j.WRITEFLAG == ""){
                           j.WRITEFLAG = k.AT;
                           j.IS_RESET |= k.IS_RESET;
-                        } else if ((
-                              (j.WRITEFLAG == "writeSource") && 
-                              (k.AT == "writeDestination")
-                            ) || (
-                              (j.WRITEFLAG == "writeDestination") && 
-                              (k.AT == "writeSource")
-                            )) {
+                        }
+                        else if(((j.WRITEFLAG == "writeSource") && (k.AT == "writeDestination")) || ((j.WRITEFLAG == "writeDestination") && (k.AT == "writeSource"))){
                           j.WRITEFLAG = "writeAny";
                           j.IS_RESET |= k.IS_RESET;
                         }
@@ -279,37 +236,23 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
                 }
               }
 
-              // write out the write set as an argument to the do all function
-              if (j.SYNC_TYPE == "sync_push") {
-                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
-                        << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" 
-                        << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" 
-                        << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR 
-                        << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" 
-                        << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
-              } else if(j.SYNC_TYPE == "sync_pull") {
-                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" 
-                        << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE 
-                        << "\", \"" << j.FIELD_TYPE << "\", \"" 
-                        << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" 
-                        << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR 
-                        << "\",  \"" << j.READFLAG << "\",  \"" 
-                        << j.WRITEFLAG <<"\")";
-              }
+              if(j.SYNC_TYPE == "sync_push")
+                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
+              else if(j.SYNC_TYPE == "sync_pull")
+                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG <<"\")";
 
-              SourceLocation ST = 
-                callFS->getSourceRange().getEnd().getLocWithOffset(0);
+              SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
             }
           }
-        } // end loop through reduction ops map
-      } // end if callFS
+        }
+      }
     }
 };
 
 
 class GaloisFunctionsConsumer : public ASTConsumer {
-  private:
+    private:
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
@@ -339,57 +282,24 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       /****************************************************************************************************************/
 
       
-      /**
-       * MATCHER 2:
-       * For matching the nodes in AST with getData function call
-       */ 
+      /*MATCHER 2 :************* For matching the nodes in AST with getData function call *****************************/
       StatementMatcher getDataCallExprMatcher = callExpr(
-        isExpansionInMainFile(),
-        callee(functionDecl(hasName("getData"))),
-        hasAncestor(recordDecl().bind("callerInStruct")),
-        anyOf(
-          hasAncestor(
-            binaryOperator(
-              hasOperatorName("="),
-              hasLHS(
-                anyOf(
-                  LHSRefVariable,
-                  LHSNonRefVariable
-                )
-              )
-            ).bind("getDataAssignment")
-          ),
-          hasAncestor(
-            declStmt(
-              hasSingleDecl(
-                varDecl(
-                  hasType(references(AnyType))
-                ).bind("getData_varName")
-              )
-            ).bind("refVariableDecl_getData")
-          ),
-          hasAncestor(
-            declStmt(
-              hasSingleDecl(
-                varDecl(
-                  unless(hasType(references(AnyType)))
-                ).bind("getData_varName")
-              )
-            ).bind("nonRefVariableDecl_getData")
-          )
-        ),
-        hasDescendant(
-          memberExpr(
-            hasDescendant(
-              memberExpr().bind("getData_memExpr_graph")
-            )
-          )
-        ),
-        unless(hasAncestor(EdgeForLoopMatcher))
-      ).bind("calleeName");
-
+                                                          isExpansionInMainFile(),
+                                                          callee(functionDecl(hasName("getData"))),
+                                                          hasAncestor(recordDecl().bind("callerInStruct")),
+                                                          anyOf(
+                                                                hasAncestor(binaryOperator(hasOperatorName("="),
+                                                                                              hasLHS(anyOf(
+                                                                                                        LHSRefVariable,
+                                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
+                                                                              ),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
+                                                            ),
+                                                          hasDescendant(memberExpr(hasDescendant(memberExpr().bind("getData_memExpr_graph")))),
+                                                          unless(hasAncestor(EdgeForLoopMatcher))
+                                                     ).bind("calleeName");
       Matchers.addMatcher(getDataCallExprMatcher, &callExprHandler);
-
       /****************************************************************************************************************/
 
 
@@ -415,7 +325,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       Matchers_typedef.matchAST(Context);
       Matchers.matchAST(Context);
       llvm::outs() << " MAP SIZE : " << info.getData_map.size() << "\n";
-      for (auto& i : info.getData_map)
+      for (auto i : info.getData_map)
       {
         llvm::outs() <<"\n" <<i.first << " has " << i.second.size() << " references of getData \n";
 
@@ -428,7 +338,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("RW_STATUS"), width) << "||"
                      << center(string("GRAPH_NAME"), width) << "\n";
         llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
-        for( auto& j : i.second) {
+        for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.SRC_NAME,  width) << "|"
@@ -440,7 +350,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       llvm::outs() << "\n\n Printing for getData in forLoop for all edges\n\n";
-      for (auto& i : info.edgeData_map)
+      for (auto i : info.edgeData_map)
       {
         llvm::outs() << "\n" << i.first << " has " << i.second.size() << " references of getData \n";
 
@@ -453,7 +363,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("RW_STATUS"), width) << "||"
                      << center(string("GRAPH_NAME"), width) << "\n";
         llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
-        for( auto& j : i.second) {
+        for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.SRC_NAME,  width) << "|"
@@ -464,8 +374,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       /*MATCHER 5: ********************* Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
-      for (auto& i : info.getData_map) {
-        for(auto& j : i.second) {
+      for (auto i : info.getData_map) {
+        for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
@@ -594,8 +504,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       /****************************************************************************************************************/
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified inside the Galois all edges forLoop *******************/
-      for (auto& i : info.edgeData_map) {
-        for(auto& j : i.second) {
+      for (auto i : info.edgeData_map) {
+        for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
@@ -772,8 +682,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
       Matchers_gen.matchAST(Context);
 
-      for(auto& i : info.fieldData_map){
-        for(auto& j : i.second) {
+      for(auto i : info.fieldData_map){
+        for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
@@ -856,7 +766,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_plusOp_vec),
                                                                       binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_assignment_vec),
 
-                                                                       /** galois::atomicAdd(field, val) **/
+                                                                       /** Galois::atomicAdd(field, val) **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExpr)).bind(str_atomicAdd),
 
                                                                       /** Galois Reset noticed **/
@@ -930,7 +840,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       Matchers_gen_field.matchAST(Context);
 
       llvm::outs() << "\n\n Printing for all fields found \n\n";
-      for (auto& i : info.fieldData_map)
+      for (auto i : info.fieldData_map)
       {
         llvm::outs() << "\n" << i.first << " has " << i.second.size() << " Fields \n";
 
@@ -946,7 +856,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("RESET_VAL"), width) << "||"
                      << center(string("GRAPH_NAME"), width) << "\n";
         llvm::outs() << std::string(width*10 + 2*10, '-') << "\n";
-        for( auto& j : i.second) {
+        for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.FIELD_NAME,  width) << "|"
@@ -962,7 +872,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
       
       llvm::outs() << "\n\n Printing Read and Write sets \n\n";
-      for (auto& i : info.syncFlags_map)
+      for (auto i : info.syncFlags_map)
       {
         llvm::outs() << "\n" << i.first << " has " << i.second.size() << " Fields \n";
 
@@ -972,7 +882,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      <<  center(string("RESET"), width) << "|"
                      << center(string("AT"), width) << "\n";
         llvm::outs() << std::string(width*10 + 2*10, '-') << "\n";
-        for( auto& j : i.second) {
+        for( auto j : i.second) {
           llvm::outs() << center(j.FIELD_NAME,  width) << "|"
                        << center(j.RW,  width) << "|"
                        << center(j.IS_RESET,  width) << "|"
@@ -1006,8 +916,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       Matchers_addNewVariable.matchAST(Context);
 
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
-      for (auto& i : info.reductionOps_map) {
-        for(auto& j : i.second) {
+      for (auto i : info.reductionOps_map) {
+        for(auto j : i.second) {
           llvm::outs() << " INSIDE LOOP : j.NODE_NAME : " << j.NODE_NAME << " for : " << i.first <<"\n";
           //if(j.IS_REFERENCED && j.IS_REFERENCE) {
           string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + j.FIELD_NAME + i.first;
@@ -1068,8 +978,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
 
-      for (auto& i : info.fieldData_map) {
-        for(auto& j : i.second) {
+      for (auto i : info.fieldData_map) {
+        for(auto j : i.second) {
           string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
           string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
           string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
@@ -1110,9 +1020,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       /** PRINTING FINAL REDUCTION OPERATIONS **/
 
       llvm::outs() << "\n\n";
-      for (auto& i : info.reductionOps_map){
+      for (auto i : info.reductionOps_map){
         llvm::outs() << "FOR >>>>> " << i.first << "\n";
-        for(auto& j : i.second) {
+        for(auto j : i.second) {
           string write_set = "write_set( " + j.SYNC_TYPE + ", " + j.NODE_TYPE + " , " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + ")";
           llvm::outs() << write_set << "\n";
         }
@@ -1120,9 +1030,20 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
 
-      for (auto& i : info.reductionOps_map){
+
+      /**
+       * Description: After Identifying the final reductions in each operator, this loop
+       *              writes the galois::write_sets in each operator execution loops, which
+       *              will then be used in the next compiler phase to generate appropriate
+       *              synchronization calls.
+       *
+       */
+      for (auto i : info.reductionOps_map){
         if(i.second.size() > 0) {
-          Matchers_doall.addMatcher(callExpr(callee(functionDecl(anyOf(hasName("galois::do_all"),hasName("galois::do_all_local"), hasName("galois::for_each")))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
+          Matchers_doall.addMatcher(callExpr(callee(functionDecl(anyOf(hasName("galois::do_all"),hasName("galois::do_all_local"), hasName("galois::for_each")))),
+                                             unless(isExpansionInSystemHeader()),
+                                             /*unless(hasDescendant(declRefExpr(to(varDecl(hasName("allNodes")))))),*/
+                                             hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
         }
       }
 
@@ -1130,8 +1051,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
       /*MATCHER 7: ******************** Matchers for 2 loop transformations *******************/
-      for (auto& i : info.edgeData_map) {
-        for(auto& j : i.second) {
+      for (auto i : info.edgeData_map) {
+        for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
             string str_if_RHS_const = "if_RHS_const" + j.VAR_NAME + "_" + i.first;
@@ -1183,11 +1104,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
   /******* Split operator if required ***********/
-      for(auto& i : info.syncFlags_map){
-        for(auto& j : i.second){
+      for(auto i : info.syncFlags_map){
+        for(auto j : i.second){
           if(j.IS_RESET && (j.AT == "writeSource")){
             bool should_split = false;
-            for(auto& k : info.syncFlags_map[i.first]){
+            for(auto k : info.syncFlags_map[i.first]){
               if((k.FIELD_NAME == j.FIELD_NAME)){
                 if(k.AT == "writeDestination"){
                   should_split = true;
@@ -1238,31 +1159,32 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     };
 
   class GaloisFunctionsAction : public PluginASTAction {
-    private:
-      std::set<std::string> ParsedTemplates;
-      Rewriter TheRewriter;
-    protected:
-      void EndSourceFileAction() override {
-        TheRewriter.getEditBuffer(
-          TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-        if (!TheRewriter.overwriteChangedFiles()) {
-          llvm::outs() << "Successfully saved changes\n";
-        }
+  private:
+    std::set<std::string> ParsedTemplates;
+    Rewriter TheRewriter;
+  protected:
+
+    void EndSourceFileAction() override {
+      TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
+      if (!TheRewriter.overwriteChangedFiles())
+      {
+        llvm::outs() << "Successfully saved changes\n";
       }
 
-      std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, 
-                                                     llvm::StringRef) override {
-        TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
-        return llvm::make_unique<GaloisFunctionsConsumer>(CI, ParsedTemplates, 
-                                                          TheRewriter);
-      }
+    }
+    std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
+      TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
+      return llvm::make_unique<GaloisFunctionsConsumer>(CI, ParsedTemplates, TheRewriter);
 
-      bool ParseArgs(const CompilerInstance &CI, 
-                     const std::vector<std::string> &args) override {
-        return true;
-      }
+    }
+
+    bool ParseArgs(const CompilerInstance &CI, const std::vector<std::string> &args) override {
+      return true;
+    }
+
   };
+
+
 }
 
-static FrontendPluginRegistry::Add<GaloisFunctionsAction> X(
-  "galois-analysis", "find galois function names");
+static FrontendPluginRegistry::Add<GaloisFunctionsAction> X("galois-analysis", "find galois function names");
