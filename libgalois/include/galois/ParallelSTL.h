@@ -37,6 +37,7 @@
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
 #include "galois/worklists/Chunked.h"
+#include "galois/runtime/Range.h"
 
 namespace galois {
 //! Parallel versions of STL library algorithms.
@@ -256,9 +257,9 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     return;
   }
   typedef galois::worklists::dChunkedFIFO<1> WL;
-  typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   
-  for_each(galois::iterate( { std::make_pair(first, last) }, sort_helper<Compare>(comp)
+  for_each(galois::iterate( { std::make_pair(first, last) } )
+      , sort_helper<Compare>(comp)
       , galois::no_conflicts()
       , galois::no_stats()
       , galois::wl<WL>());

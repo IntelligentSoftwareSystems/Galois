@@ -88,7 +88,6 @@ void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... 
 }
 
 
-template <typename RangeFunc, typename FunctionTy, typename... Args>
 /**
  * Standard do-all loop. All iterations should be independent.
  * Operator should conform to <code>fn(item)</code> where item is a value from the iteration range.
@@ -98,6 +97,7 @@ template <typename RangeFunc, typename FunctionTy, typename... Args>
  * @param fn operator
  * @param args optional arguments to loop
  */
+template <typename RangeFunc, typename FunctionTy, typename... Args>
 void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args) {
   auto tpl = std::make_tuple(args...);
   runtime::do_all_gen(rangeMaker(tpl), fn, tpl);

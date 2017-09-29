@@ -557,28 +557,28 @@ class LC_CSR_Graph :
   void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
                              std::vector<uint32_t>& returnRanges, 
                              uint32_t nodeAlpha=0) {
-    uint32_t num_threads = galois::runtime::activeThreads;
+    uint32_t numThreads = galois::runtime::activeThreads;
     uint32_t total_nodes = endNode - beginNode;
 
-    returnRanges.resize(num_threads + 1);
+    returnRanges.resize(numThreads + 1);
 
     // check corner cases
     // no nodes = assign nothing to all threads
     if (beginNode == endNode) {
       returnRanges[0] = beginNode;
-      for (uint32_t i = 0; i < num_threads; i++) {
+      for (uint32_t i = 0; i < numThreads; i++) {
         returnRanges[i+1] = beginNode;
       }
       return;
     }
 
     // single thread case; 1 thread gets all
-    if (num_threads == 1) {
+    if (numThreads == 1) {
       returnRanges[0] = beginNode;
       returnRanges[1] = endNode;
       return;
     // more threads than nodes
-    } else if (num_threads > total_nodes) {
+    } else if (numThreads > total_nodes) {
       uint32_t current_node = beginNode;
       returnRanges[0] = current_node;
       // 1 node for threads until out of threads
@@ -586,7 +586,7 @@ class LC_CSR_Graph :
         returnRanges[i+1] = ++current_node;
       }
       // deal with remainder threads; they get nothing
-      for (uint32_t i = total_nodes; i < num_threads; i++) {
+      for (uint32_t i = total_nodes; i < numThreads; i++) {
         returnRanges[i+1] = total_nodes;
       }
       return;
@@ -600,7 +600,7 @@ class LC_CSR_Graph :
     // sanity checks
     assert(returnRanges[0] == beginNode && 
            "return ranges begin not the begin node");
-    assert(returnRanges[num_threads] == endNode && 
+    assert(returnRanges[numThreads] == endNode && 
            "return ranges end not end node");
 
     for (uint32_t i = 1; i < num_threads; i++) {
@@ -750,7 +750,7 @@ class LC_CSR_Graph :
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t x) {
+    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    }, 
@@ -791,7 +791,7 @@ class LC_CSR_Graph :
     edgeData_new.allocateInterleaved(numEdges);
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t n) {
+    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData_old[n] = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    }, 
@@ -830,7 +830,7 @@ class LC_CSR_Graph :
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(galois::iterate(0u, numNodes), [&](uint32_t n) {
+    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
                    }, 
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
@@ -840,7 +840,7 @@ class LC_CSR_Graph :
     // before the ith node have
     if (numNodes >= 1) {
       edgeIndData_temp[0] = 0;
-      galois::do_all(galois::iterate(1u, numNodes), [&](uint32_t n) {
+      galois::do_all(galois::iterate(1ul, numNodes), [&](uint32_t n) {
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      }, 
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
@@ -885,7 +885,7 @@ class LC_CSR_Graph :
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
-      galois::do_all(galois::iterate(0u, numEdges),
+      galois::do_all(galois::iterate(0ul, numEdges),
                      [&](uint32_t e){
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      }, 

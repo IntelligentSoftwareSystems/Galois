@@ -236,6 +236,9 @@ class IteratorRangeMaker {
   I m_end;
 
 public:
+
+  IteratorRangeMaker(const I& beg, const I& end): m_beg(beg), m_end(end) {}
+
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
     return runtime::makeStandardRange(m_beg, m_end);
@@ -248,6 +251,9 @@ class IteratorRangeMaker<I, true> {
   I m_end;
 
 public:
+
+  IteratorRangeMaker(const I& beg, const I& end): m_beg(beg), m_end(end) {}
+
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
     return runtime::makeStandardRange(boost::counting_iterator<I>(m_beg)
@@ -260,6 +266,8 @@ class InitListRangeMaker {
   std::initializer_list<T> m_list;
 
 public:
+  explicit InitListRangeMaker(const std::initializer_list<T>& l): m_list(l) {}
+
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
     return runtime::makeStandardRange(m_list.begin(), m_list.end());
@@ -271,6 +279,8 @@ class ContainerRangeMaker {
   C& m_cont;
 
 public:
+  explicit ContainerRangeMaker(C& cont): m_cont(cont) {}
+
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
     return runtime::makeLocalRange(m_cont);
@@ -283,6 +293,9 @@ class ContainerRangeMaker<C, false> {
   C& m_cont;
 
 public:
+
+  explicit ContainerRangeMaker(C& cont): m_cont(cont) {}
+
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
     return runtime::makeStandardRange(m_cont.cbegin(), m_cont.cend());
@@ -310,17 +323,17 @@ public:
 
 template <typename C>
 auto iterate(C& cont) {
-  return internal::ContainerRangeMaker<C, internal::HasLocalIter<C>::value> {cont};
+  return internal::ContainerRangeMaker<C, internal::HasLocalIter<C>::value> (cont);
 }
 
 template <typename T>
 auto iterate(std::initializer_list<T> initList) {
-  return internal::InitListRangeMaker<T> {initList};
+  return internal::InitListRangeMaker<T> (initList);
 }
 
 template <typename I>
 auto iterate(const I& beg, const I& end) {
-  return internal::IteratorRangeMaker<I, std::is_integral<I>::value> {beg, end};
+  return internal::IteratorRangeMaker<I, std::is_integral<I>::value> (beg, end);
 }
 
 

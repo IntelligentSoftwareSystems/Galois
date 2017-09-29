@@ -486,7 +486,7 @@ template<int... Is, typename R, typename OpFn, typename TupleTy>
 auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
   -> decltype(std::declval<typename R::container_type>(), void()) 
 {
-  for_each_local(range.get_container(), opFn, std::get<Is>(tpl)...);
+  for_each(range.get_container(), opFn, std::get<Is>(tpl)...);
 }
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
