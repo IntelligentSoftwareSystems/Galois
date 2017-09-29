@@ -105,8 +105,8 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     {
-    galois::do_all_local(
-      allNodes,
+    galois::do_all(
+      galois::iterate(allNodes),
       InitializeGraph(src_node, infinity, &_graph),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::timeit(),
@@ -148,8 +148,8 @@ struct BFS {
         } else if (personality == CPU)
       #endif
       {
-      galois::do_all_local(
-        nodesWithEdges,
+      galois::do_all(
+        galois::iterate(nodesWithEdges),
         BFS(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
         galois::timeit(),
@@ -222,7 +222,7 @@ struct BFSSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(*_graph.begin(), *_graph.end()),
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("BFSSanityCheck"),
                    galois::no_stats());
