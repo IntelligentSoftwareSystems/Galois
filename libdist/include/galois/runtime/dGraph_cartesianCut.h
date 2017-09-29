@@ -352,16 +352,13 @@ public:
       base_hGraph::graph.constructNodes();
 
       //std::cerr << "Construct nodes done\n";
-      auto beginIter = boost::make_counting_iterator((uint32_t)0);
-      auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
       galois::do_all(
-        beginIter, endIter,
+        galois::iterate((uint32_t)0, numNodes),
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::loopname("EdgeLoading"),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -453,12 +450,14 @@ public:
       timer.start();
       fileGraph[d].reset_byte_counters();
 
-      uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
-      auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first);
-      auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second);
+      uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + 
+                                                 d*base_hGraph::numHosts].first;
 
       galois::do_all(
-        beginIter, endIter,
+        galois::iterate(base_hGraph::gid2host[base_hGraph::id + 
+                                              d*base_hGraph::numHosts].first,
+                        base_hGraph::gid2host[base_hGraph::id + 
+                                              d*base_hGraph::numHosts].second),
         [&] (auto src) {
           auto ii = fileGraph[d].edge_begin(src);
           auto ee = fileGraph[d].edge_end(src);
@@ -470,7 +469,6 @@ public:
           }
         },
         galois::loopname("EdgeInspection"),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );

@@ -287,16 +287,13 @@ public:
       base_hGraph::graph.constructNodes();
 
       //std::cerr << "Construct nodes done\n";
-      auto beginIter = boost::make_counting_iterator((uint32_t)0);
-      auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
       galois::do_all(
-        beginIter, endIter,
+        galois::iterate((uint32_t)0, numNodes),
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::loopname("EdgeLoading"),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -343,12 +340,11 @@ private:
     galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
-    auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
-    auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
     size_t numColumnChunks = (base_hGraph::totalNodes + columnChunkSize - 1)/columnChunkSize;
     std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
     galois::do_all(
-      beginIter, endIter,
+      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                      base_hGraph::gid2host[base_hGraph::id].second),
       [&] (auto src) {
         auto ii = fileGraph.edge_begin(src);
         auto ee = fileGraph.edge_end(src);
@@ -358,7 +354,6 @@ private:
         }
       },
       galois::loopname("CalculateIndegree"),
-      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );
@@ -470,10 +465,10 @@ private:
     timer.start();
     fileGraph.reset_byte_counters();
     uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id].first;
-    auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
-    auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
+
     galois::do_all(
-      beginIter, endIter,
+      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                      base_hGraph::gid2host[base_hGraph::id].second),
       [&] (auto src) {
         auto ii = fileGraph.edge_begin(src);
         auto ee = fileGraph.edge_end(src);
@@ -485,7 +480,6 @@ private:
         }
       },
       galois::loopname("EdgeInspection"),
-      galois::steal<true>(),
       galois::timeit(),
       galois::no_stats()
     );

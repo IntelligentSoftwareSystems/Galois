@@ -334,19 +334,15 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       StatTimer_allocate_local_DS.start();
 
       base_hGraph::graph.allocateFrom(numNodes, numEdges);
-
       base_hGraph::graph.constructNodes();
 
-      auto beginIter = boost::make_counting_iterator((uint32_t)0);
-      auto endIter = boost::make_counting_iterator(numNodes);
       auto& base_graph = base_hGraph::graph;
       galois::do_all(
-        beginIter, endIter,
+        galois::iterate((uint32_t)0, numNodes),
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::loopname("EdgeLoading"),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
@@ -483,43 +479,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       //base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
                                      //base_hGraph::gid2host[base_hGraph::id].first;
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
-      auto beginIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].first);
-      auto endIter = boost::make_counting_iterator(base_hGraph::gid2host[base_hGraph::id].second);
       auto& id = base_hGraph::id;
-      //galois::runtime::do_all_coupled(
-      //  galois::runtime::makeStandardRange(beginIter, endIter),
-      //  [&] (auto src) {
-      //    auto ee = fileGraph.edge_begin(src);
-      //    auto ee_end = fileGraph.edge_end(src);
-      //    auto num_edges = std::distance(ee, ee_end);
-      //    if(num_edges > VCutThreshold){
-      //      //Assign edges for high degree nodes to the destination
-      //      for(; ee != ee_end; ++ee){
-      //        auto gdst = fileGraph.getEdgeDst(ee);
-      //        auto h = this->find_hostID(gdst);
-      //        numOutgoingEdges[h][src - globalOffset]++;
-      //        num_assigned_edges_perhost[h] += 1;
-      //      }
-      //    } else {
-      //      //keep all edges with the source node
-      //      for(; ee != ee_end; ++ee){
-      //        numOutgoingEdges[id][src - globalOffset]++;
-      //        num_assigned_edges_perhost[id] += 1;
-      //        auto gdst = fileGraph.getEdgeDst(ee);
-      //        if(!this->isOwned(gdst))
-      //          ghosts.set(gdst);
-      //      }
-      //    }
-      //  },
-
-      //  std::make_tuple(
-      //    galois::loopname("EdgeInspection"),
-      //    galois::timeit()
-      //  )
-      //);
 
       galois::do_all(
-        beginIter, endIter,
+        galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                        base_hGraph::gid2host[base_hGraph::id].second),
         [&] (auto src) {
           auto ee = fileGraph.edge_begin(src);
           auto ee_end = fileGraph.edge_end(src);
@@ -544,7 +508,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           }
         },
         galois::loopname("EdgeInspection"),
-        galois::steal<true>(),
         galois::timeit(),
         galois::no_stats()
       );
