@@ -231,6 +231,14 @@ public:
   local_iterator local_begin() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID()); }
   local_iterator local_end() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1); }
 
+  bool empty() const {
+    for (unsigned x = 0; x < heads.size(); ++x) {
+      header* h = heads.getRemote(x)->first;
+      if (h)
+        return false;
+    }
+    return true;
+  }
   //! Thread safe bag insertion
   template<typename... Args>
   reference emplace(Args&&... args) {

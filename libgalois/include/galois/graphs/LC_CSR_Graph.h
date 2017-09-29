@@ -603,7 +603,7 @@ class LC_CSR_Graph :
     assert(returnRanges[numThreads] == endNode && 
            "return ranges end not end node");
 
-    for (uint32_t i = 1; i < num_threads; i++) {
+    for (uint32_t i = 1; i < numThreads; i++) {
       assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
       assert(returnRanges[i] >= returnRanges[i-1]);
     }
