@@ -271,7 +271,7 @@ public:
    */
   hGraph_cartesianCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
-              unsigned _numHosts, std::vector<unsigned> scalefactor, 
+              unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false) : base_hGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("ERROR: transpose not supported for cartesian vertex-cuts");

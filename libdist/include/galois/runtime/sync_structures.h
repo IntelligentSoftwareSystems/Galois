@@ -95,19 +95,19 @@ class FieldFlags {
     bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
 
-  bool src_to_src() {
+  bool src_to_src() const {
     return _s2s;
   }
 
-  bool src_to_dst() {
+  bool src_to_dst() const {
     return _s2d;
   }
 
-  bool dst_to_src() {
+  bool dst_to_src() const {
     return _d2s;
   }
 
-  bool dst_to_dst() {
+  bool dst_to_dst() const {
     return _d2d;
   }
 

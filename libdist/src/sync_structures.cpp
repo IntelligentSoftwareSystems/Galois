@@ -27,9 +27,7 @@
 
 #include <galois/runtime/sync_structures.h>
 
-// TODO documentation
 // TODO put in a sensible namespace
-
 bool src_invalid(BITVECTOR_STATUS bv_flag) {
   return (bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
           bv_flag == BITVECTOR_STATUS::BOTH_INVALID);

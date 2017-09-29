@@ -193,7 +193,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     hGraph_vertexCut(const std::string& filename, 
                const std::string& partitionFolder,
                unsigned host, unsigned _numHosts, 
-               std::vector<unsigned> scalefactor, 
+               std::vector<unsigned>& scalefactor, 
                bool transpose = false, 
                uint32_t VCutThreshold = 100, 
                bool bipartite = false) : base_hGraph(host, _numHosts) {

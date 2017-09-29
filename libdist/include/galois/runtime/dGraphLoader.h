@@ -68,7 +68,7 @@ extern cll::opt<unsigned int> VCutThreshold;
  * loaded based on command line arguments
  */
 template<typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned> 
+hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
                                                     scaleFactor) {
   if (!inputFileSymmetric) {
     GALOIS_DIE("Calling constructSymmetricGraph without inputFileSymmetric "
@@ -136,7 +136,8 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>
  */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<iterateOut>::type* = nullptr>
-hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
+hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& 
+                                           scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
@@ -224,7 +225,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
  */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<!iterateOut>::type* = nullptr>
-hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned> scaleFactor) {
+hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
   typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef hGraph_cartesianCut<NodeData, EdgeData, false, 
