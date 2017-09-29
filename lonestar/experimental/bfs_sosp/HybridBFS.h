@@ -150,7 +150,7 @@ struct HybridBFS {
 
     graph.getData(source).dist = 0;
     if (std::distance(graph.edge_begin(source), graph.edge_end(source)) + 1 > (long) graph.sizeEdges() / 20) {
-      galois::do_all_local(graph, BackwardProcess(graph, this, &bags[next], newDist));
+      galois::do_all(graph, BackwardProcess(graph, this, &bags[next], newDist));
       numBackward += 1;
     } else {
       galois::for_each(graph.out_edges(source, galois::MethodFlag::UNPROTECTED).begin(), 
@@ -167,17 +167,17 @@ struct HybridBFS {
       newDist++;
       if (nextSize > graph.sizeEdges() / 20) {
         //std::cout << "Dense " << nextSize << "\n";
-        galois::do_all_local(graph, BackwardProcess(graph, this, &bags[next], newDist));
+        galois::do_all(graph, BackwardProcess(graph, this, &bags[next], newDist));
         numBackward += 1;
       } else if (numForward < 10 && numBackward == 0) {
         //std::cout << "Sparse " << nextSize << "\n";
-        galois::for_each_local(bags[cur], ForwardProcess(graph, this, &bags[next], newDist), galois::wl<WL>());
+        galois::for_each(bags[cur], ForwardProcess(graph, this, &bags[next], newDist), galois::wl<WL>());
         numForward += 1;
       } else {
         //std::cout << "Async " << nextSize << "\n";
         WorkItemBag asyncBag;
-        galois::for_each_local(bags[cur], PopulateAsync(asyncBag, newDist), galois::wl<WL>());
-        galois::for_each_local(asyncBag, ForwardProcess(graph, this), galois::wl<BSWL>());
+        galois::for_each(bags[cur], PopulateAsync(asyncBag, newDist), galois::wl<WL>());
+        galois::for_each(asyncBag, ForwardProcess(graph, this), galois::wl<BSWL>());
         break;
       }
       bags[cur].clear();

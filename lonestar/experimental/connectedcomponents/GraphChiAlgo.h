@@ -99,7 +99,7 @@ struct GraphChiAlgo: public galois::ligraGraphChi::ChooseExecutor<true> {
   void operator()(Graph& graph) {
     BagPair bags(graph.size());
 
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
     galois::graphsChi::vertexMap(graph, Process(bags.next()), memoryLimit);
     while (!bags.next().empty()) {
       bags.swap();

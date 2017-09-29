@@ -67,7 +67,7 @@ struct AuxData {
           graph.getData(src).sum += e;
           graph.getData(dst).sum += e;
         }, true);
-    galois::do_all_local(graph, [&](GNode n) {
+    galois::do_all(graph, [&](GNode n) {
       if (n < numItems)
         graph.getData(n).sum *= norm1;
       else

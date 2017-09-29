@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  galois::do_all_local(graph, 
+  galois::do_all(graph, 
                        [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
   graph.getData(source) = 0;
   galois::StatTimer Tmain;

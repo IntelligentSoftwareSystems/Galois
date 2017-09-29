@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 
   //galois::InsertBag<Edge> edges;
   std::deque<Edge> edges;
-  galois::do_all_local(graph, [&](GNode n1) {
+  galois::do_all(graph, [&](GNode n1) {
     for (auto edge : graph.out_edges(n1)) {
       GNode n2 = graph.getEdgeDst(edge);
       if (n1 == n2)

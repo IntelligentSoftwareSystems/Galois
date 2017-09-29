@@ -162,7 +162,7 @@ struct VF2Algo {
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
+      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -454,7 +454,7 @@ public:
       works.push_back(NodeMatch(nQ, c));
 
     MatchingVector report;
-    galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
+    galois::for_each(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
       galois::no_conflicts(), galois::no_pushes(), galois::parallel_break(), galois::per_iter_alloc());
     return report;
   }
@@ -491,7 +491,7 @@ struct UllmannAlgo {
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
+      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -596,7 +596,7 @@ public:
       works.push_back(NodeMatch(nQ, c));
 
     MatchingVector report;
-    galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
+    galois::for_each(works, SubgraphSearchInternal(gD, gQ, report), galois::loopname("search_for_each"), 
       galois::no_conflicts(), galois::no_pushes(), galois::parallel_break());
     return report;
   }

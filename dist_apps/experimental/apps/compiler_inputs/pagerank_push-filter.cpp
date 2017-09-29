@@ -171,7 +171,7 @@ struct PageRank {
       PageRank_delta::go(_graph);
       dga.reset();
       {
-        galois::do_all_local(
+        galois::do_all(
           nodesWithEdges,
           PageRank{ alpha, tolerance, &_graph, dga },
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),

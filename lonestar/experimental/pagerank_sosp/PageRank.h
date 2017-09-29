@@ -57,7 +57,7 @@ double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, 
 
 template<typename Graph>
 void initResidual(Graph& graph) {
-  galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+  galois::do_all(graph, [&graph] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
       // for each in-coming neighbour, add residual
       PRTy sum = 0.0;
@@ -72,7 +72,7 @@ void initResidual(Graph& graph) {
 
 template<typename Graph, typename PriFn>
 void initResidual(Graph& graph, galois::InsertBag<std::pair<typename Graph::GraphNode, int> >& b, const PriFn& pri) {
-  galois::do_all_local(graph, [&graph, &b, &pri] (const typename Graph::GraphNode& src) {
+  galois::do_all(graph, [&graph, &b, &pri] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
       // for each in-coming neighbour, add residual
       PRTy sum = 0.0;

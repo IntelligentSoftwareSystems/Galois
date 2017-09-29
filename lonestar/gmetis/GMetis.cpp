@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 
   galois::graphs::readGraph(*graph, filename);
 
-  galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
+  galois::do_all(*graph, parallelInitMorphGraph(*graph));
 
   graphStat(graph);
   std::cout << "\n";

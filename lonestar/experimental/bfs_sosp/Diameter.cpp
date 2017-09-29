@@ -177,7 +177,7 @@ struct CountLevels {
   std::deque<size_t> count() {
     galois::GReducible<std::deque<size_t>, updater> C{updater()};
     counts = &C;
-    galois::do_all_local(graph, *this);
+    galois::do_all(graph, *this);
    //![Reduce the final value] 
     return C.reduce(reducer());
    //![Reduce the final value] 
@@ -186,7 +186,7 @@ struct CountLevels {
 
 template<typename Algo>
 void resetGraph(typename Algo::Graph& g) {
-  galois::do_all_local(g, typename Algo::Initialize(g));
+  galois::do_all(g, typename Algo::Initialize(g));
 }
 
 template<typename Graph>
@@ -299,7 +299,7 @@ struct PickKAlgo {
   
   std::deque<GNode> select(Graph& graph, unsigned topn, size_t dist) {
     galois::InsertBag<GNode> bag;
-    galois::do_all_local(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
+    galois::do_all(graph, collect_nodes_with_dist<Graph>(graph, bag, dist));
 
     // Incrementally sort nodes until we find least N who are not neighbors
     // of each other

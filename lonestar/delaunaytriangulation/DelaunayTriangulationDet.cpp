@@ -654,11 +654,11 @@ static void generateMesh() {
     galois::InsertBag<Point*>& pptrs = rounds[i];
     switch (detAlgo) {
       case nondet:
-        galois::for_each_local(pptrs, Process<>(&tree), galois::wl<Chunked>()); break;
+        galois::for_each(pptrs, Process<>(&tree), galois::wl<Chunked>()); break;
       case detBase:
-        galois::for_each_local(pptrs, Process<>(&tree), galois::wl<DWL>()); break;
+        galois::for_each(pptrs, Process<>(&tree), galois::wl<DWL>()); break;
       case detPrefix:
-        galois::for_each_local(pptrs, Process<>(&tree), galois::wl<DWL>(),
+        galois::for_each(pptrs, Process<>(&tree), galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
             galois::neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
 #else
@@ -667,7 +667,7 @@ static void generateMesh() {
               );
         break;
       case detDisjoint:
-        galois::for_each_local(pptrs, Process<detDisjoint>(&tree), galois::wl<DWL>());
+        galois::for_each(pptrs, Process<detDisjoint>(&tree), galois::wl<DWL>());
         break;
       default: GALOIS_DIE("Unknown algorithm: ", detAlgo);
     }

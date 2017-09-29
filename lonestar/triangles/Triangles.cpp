@@ -182,7 +182,7 @@ struct NodeIteratorAlgo {
   void operator()() { 
     galois::GAccumulator<size_t> numTriangles;
 
-    galois::do_all_local(graph, 
+    galois::do_all(graph, 
         [&] (const GNode& n) {
           // Partition neighbors
           // [first, ea) [n] [bb, last)
@@ -356,13 +356,13 @@ struct HybridAlgo {
         numTriangles += high;
       }
       std::cout << "Processing low degree nodes\n";
-      galois::for_each_local(graph, ProcessLow<true>(this)
+      galois::for_each(graph, ProcessLow<true>(this)
           , galois::loopname("HybridAlgo-1")
           , galois::no_conflicts()
           , galois::wl<WL>());
 
     } else {
-      galois::for_each_local(graph, ProcessLow<false>(this)
+      galois::for_each(graph, ProcessLow<false>(this)
           , galois::loopname("HybridAlgo-2")
           , galois::no_conflicts()
           , galois::wl<WL>());
@@ -406,7 +406,7 @@ struct EdgeIteratorAlgo {
         }
         , galois::loopname("Initialize"));
 
-    galois::do_all_local(items, 
+    galois::do_all(items, 
         [&] (const WorkItem& w) {
           // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
           Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);

@@ -383,7 +383,7 @@ struct AsyncAlgo {
     galois::do_all(graph.edges(source, galois::MethodFlag::UNPROTECTED).begin(),
                    graph.edges(source, galois::MethodFlag::UNPROTECTED).end(),
                    InitialProcess(this, graph, initial, graph.getData(source)));
-    galois::for_each_local(initial, Process(this, graph), galois::wl<OBIM>());
+    galois::for_each(initial, Process(this, graph), galois::wl<OBIM>());
   }
 };
 
@@ -493,7 +493,7 @@ struct AsyncAlgoPP {
     galois::do_all(graph.edges(source, galois::MethodFlag::UNPROTECTED).begin(),
                    graph.edges(source, galois::MethodFlag::UNPROTECTED).end(),
                    InitialProcess(this, graph, initial));
-    galois::for_each_local(initial, Process(this, graph), galois::wl<OBIM>());
+    galois::for_each(initial, Process(this, graph), galois::wl<OBIM>());
   }
 };
 
@@ -531,7 +531,7 @@ void run(bool prealloc = true) {
   galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
 

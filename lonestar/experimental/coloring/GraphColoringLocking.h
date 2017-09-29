@@ -43,7 +43,7 @@ protected:
   // typedef galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
   void firstFit (void) {
 
-    galois::for_each_local (
+    galois::for_each (
         graph, ColorNodeLocking {*this},
         galois::loopname ("first-fit"),
         galois::wl<WL_ty> ());
@@ -65,7 +65,7 @@ protected:
 
     typedef galois::worklists::OrderedByIntegerMetric<GetPriority, WL_ty> OBIM;
 
-    galois::for_each_local(graph, 
+    galois::for_each(graph, 
         ColorNodeLocking {*this}, galois::loopname("color-obim"), 
         galois::wl<OBIM>(GetPriority {graph}));
   }

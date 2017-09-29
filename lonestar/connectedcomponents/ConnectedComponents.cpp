@@ -265,11 +265,11 @@ struct SynchronousAlgo {
 
     cur = &wls[0];
     next = &wls[1];
-    galois::do_all_local(graph, Initialize(graph, *cur));
+    galois::do_all(graph, Initialize(graph, *cur));
 
     while (!cur->empty()) {
-      galois::do_all_local(*cur, Merge(graph, emptyMerges));
-      galois::for_each_local(*cur, Find(graph, *next));
+      galois::do_all(*cur, Merge(graph, emptyMerges));
+      galois::for_each(*cur, Find(graph, *next));
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
@@ -364,11 +364,11 @@ struct LabelPropAlgo {
   void operator()(Graph& graph) {
     typedef galois::worklists::dChunkedFIFO<256> WL;
 
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
     if (symmetricGraph) {
-      galois::for_each_local(graph, Process<true,false>(graph), galois::wl<WL>());
+      galois::for_each(graph, Process<true,false>(graph), galois::wl<WL>());
     } else {
-      galois::for_each_local(graph, Process<true,true>(graph), galois::wl<WL>());
+      galois::for_each(graph, Process<true,true>(graph), galois::wl<WL>());
     }
   }
 };
@@ -459,7 +459,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph) {
     galois::Statistic emptyMerges("EmptyMerges");
-    galois::for_each_local(graph, Merge(graph, emptyMerges));
+    galois::for_each(graph, Merge(graph, emptyMerges));
   }
 };
 
@@ -531,8 +531,8 @@ struct BlockedAsyncAlgo {
   void operator()(Graph& graph) {
     galois::InsertBag<WorkItem> items;
     Merge merge = { graph, items };
-    galois::do_all_local(graph, merge, galois::loopname("Initialize"));
-    galois::for_each_local(items, merge,
+    galois::do_all(graph, merge, galois::loopname("Initialize"));
+    galois::for_each(items, merge,
         galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
   }
 };
@@ -767,7 +767,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   typedef ReduceMax<Graph> RM;
 
   typename CL::Accums accums;
-  galois::do_all_local(graph, CL(graph, accums));
+  galois::do_all(graph, CL(graph, accums));
   typename CL::Map& map = accums.map.reduce();
   size_t reps = accums.reps.reduce();
 

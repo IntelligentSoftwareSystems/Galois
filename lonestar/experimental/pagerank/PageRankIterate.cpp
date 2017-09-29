@@ -432,7 +432,7 @@ struct SynchronousAlgo {
       } else {
         galois::do_all(tgraphOrder.begin(), tgraphOrder.begin() + numNodes,
             Process(accum, tol, iteration));
-        //galois::do_all_local(tgraph,
+        //galois::do_all(tgraph,
         //    Process(accum, tol, iteration));
       }
 

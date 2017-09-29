@@ -162,7 +162,7 @@ void CutFinder::run( int k, int c ) {
 	galois::InsertBag< aig::GNode > workList;
 	
 	galois::do_all( this->aig.getInputNodes().begin(), this->aig.getInputNodes().end(), Preprocess( this->aig.getGraph(), workList ) );
-	galois::for_each_local( workList, Process( this->aig.getGraph(), k, c ), galois::loopname("K-Cuts") );
+	galois::for_each( workList, Process( this->aig.getGraph(), k, c ), galois::loopname("K-Cuts") );
 	// galois::for_each( workList.begin(), workList.end(), Process( this->aig.getGraph(), k, c ) );
 	
 }

@@ -1,5 +1,5 @@
 //Match parallel loop calls
-StatementMatcher galoisLoop = callExpr(callee(functionDecl(anyOf(hasName("for_each"), hasName("do_all"), hasName("for_each_local"), hasName("do_all_local"))).bind("gLoopType"))).bind("gLoop");
+StatementMatcher galoisLoop = callExpr(callee(functionDecl(anyOf(hasName("for_each"), hasName("do_all"))).bind("gLoopType"))).bind("gLoop");
 
 //Matches calls to getdat and binds getDataVar to the valiable expression which is the node
 //g.getData(foo) // binds here, foo bound to getDataVar

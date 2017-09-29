@@ -172,7 +172,7 @@ struct LigraDiameter: public galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
       newDist++;
       int cur = newDist & 1;
       int next = (newDist + 1) & 1;
-      galois::do_all_local(bags.cur(), Update(this, graph, cur, next));
+      galois::do_all(bags.cur(), Update(this, graph, cur, next));
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(this, cur, next, newDist), bags.cur(), bags.next(), false);
     }
 

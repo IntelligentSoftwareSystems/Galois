@@ -1645,7 +1645,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			auto ln = galois::loopname("GLMENT-CDiteration");
 			auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
 			//galois::for_each(active_set.begin(), active_set.end(), glmnet_cd(g_train, params, cd_bag, nr_samples), ln, wl);
-			galois::for_each_local(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
+			galois::for_each(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
 
 			cd_iter++;
 			double tmp_QP_Gmax_new = params.QP_Gmax_new.reduce();

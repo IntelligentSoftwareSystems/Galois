@@ -105,7 +105,7 @@ struct InitializeGraph2 {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    galois::do_all_local(
+    galois::do_all(
       nodesWithEdges,
       InitializeGraph2{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
@@ -256,7 +256,7 @@ struct KCoreStep1 {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),

@@ -90,7 +90,7 @@ struct InitializeGraph {
 
   void static go(Graph::pointer g)
   {
-    galois::for_each_local(g, InitializeGraph{g}, galois::loopname("init"));
+    galois::for_each(g, InitializeGraph{g}, galois::loopname("init"));
   }
 
   void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
@@ -133,7 +133,7 @@ struct checkGraph {
 
     void static go(Graph::pointer g)
     {
-      galois::for_each_local(g, checkGraph{g}, galois::loopname("checkGraph"));
+      galois::for_each(g, checkGraph{g}, galois::loopname("checkGraph"));
     }
 
     void operator()(GNode n, galois::UserContext<GNode>& cnx) const {
@@ -153,7 +153,7 @@ struct PageRank {
       for(int iterations = 0; iterations < maxIterations; ++iterations){
           std::cout<<"Iteration : " << iterations << "  start : " << "\n";
           round_time.start();
-          galois::for_each_local(g, PageRank{g}, galois::loopname("Page Rank"));
+          galois::for_each(g, PageRank{g}, galois::loopname("Page Rank"));
           round_time.stop();
           std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
       }
@@ -191,7 +191,7 @@ struct PageRankMsg {
     for(int iterations = 0; iterations < maxIterations; ++iterations){
       std::cout<<"Iteration : " << iterations << "  start : " << "\n";
       round_time.start();
-      galois::for_each_local(g, PageRankMsg{g}, galois::loopname("Page Rank"));
+      galois::for_each(g, PageRankMsg{g}, galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
       galois::runtime::getSystemNetworkInterface().dumpStats();

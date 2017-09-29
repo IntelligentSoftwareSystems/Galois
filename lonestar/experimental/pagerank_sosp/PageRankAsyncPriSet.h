@@ -115,7 +115,7 @@ struct AsyncPriSet{
     galois::substrate::PerThreadStorage<galois::OnlineStat> stats;
 
     //First do all the nodes once
-    galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, 0.0), galois::steal<true>());
+    galois::do_all(graph, Process(graph, tolerance, nextWL, stats, 0.0), galois::steal<true>());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -141,7 +141,7 @@ struct AsyncPriSet{
       if (count < 5000)
         limit = 0.0;
       //std::cout << "Count is " << count << " next limit is " << limit << " max is " << max << "\n";
-      galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, limit), galois::steal<true>());
+      galois::do_all(curWL, Process(graph, tolerance, nextWL, stats, limit), galois::steal<true>());
     }
   }
 

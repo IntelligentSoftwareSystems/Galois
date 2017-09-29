@@ -218,7 +218,7 @@ void verify(Graphp g){
   //  unsigned int num_movie_nodes; 
     AccumDouble rms;
     //DGraph::iterator ii = g->begin() + num_movie_nodes;
-    galois::do_all_local(g, [&g,&rms] (DGNode n) {
+    galois::do_all(g, [&g,&rms] (DGNode n) {
 			for(auto ii = g->edge_begin(n); ii != g->edge_end(n); ++ii){
 			
 			    DGNode m = g->getEdgeDst(ii);
@@ -362,7 +362,7 @@ struct Process : public galois::runtime::Lockable {
 	
 */
 
-	//galois::for_each_local(g, Process(this,g), "Process");
+	//galois::for_each(g, Process(this,g), "Process");
 	galois::for_each(graph.begin(), ii, Process(this), "SGD Process");
     
         // Verification routine
@@ -488,7 +488,7 @@ void deserialize(galois::runtime::DeSerializeBuffer& s) {
 	
 */
 
-	//galois::for_each_local(g, Process(this,g), "Process");
+	//galois::for_each(g, Process(this,g), "Process");
 	galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
     
         // Verification routine

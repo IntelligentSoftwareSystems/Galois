@@ -112,7 +112,7 @@ protected:
   };
 
   virtual void runPageRank() {
-    galois::do_all_local(graph, AddToBag { bags[0] });
+    galois::do_all(graph, AddToBag { bags[0] });
 
     while (!bags[0].empty()) {
       galois::for_each(graph.begin(), graph.end(),
@@ -120,7 +120,7 @@ protected:
           galois::loopname("page-rank-ikdg"),
           galois::wl<galois::worklists::Deterministic<>>());
       bags[0].clear();
-      galois::do_all_local(bags[1], AddToNewBag { bags[0], graph });
+      galois::do_all(bags[1], AddToNewBag { bags[0], graph });
     }
   }
 };

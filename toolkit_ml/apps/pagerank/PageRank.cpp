@@ -236,7 +236,7 @@ struct PullAlgo {
     unsigned int iteration = 0;
     
     while (true) {
-      galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -263,7 +263,7 @@ struct PullAlgo {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      galois::do_all_local(graph, Copy(graph));
+      galois::do_all(graph, Copy(graph));
     }
   }
 };
@@ -355,7 +355,7 @@ struct PullAlgo2 {
     unsigned int iteration = 0;
 
     while (true) {
-      galois::for_each_local(graph, Process(this, graph, iteration));
+      galois::for_each(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -381,7 +381,7 @@ struct PullAlgo2 {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      galois::do_all_local(graph, Copy(graph));
+      galois::do_all(graph, Copy(graph));
     }
   }
 };
@@ -509,7 +509,7 @@ struct Sync {
     unsigned int iteration = 0;
     auto numNodes = graph.size();
     while (true) {
-      galois::do_all_local(graph, Process(this, graph, iteration));
+      galois::do_all(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -535,7 +535,7 @@ struct Sync {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      galois::do_all_local(graph, Copy(graph));
+      galois::do_all(graph, Copy(graph));
     }
   }
 };
@@ -729,8 +729,8 @@ struct PrtRsd {
   void operator()(Graph& graph) {
  galois::Statistic pre("PrePrune");
     galois::Statistic post("PostPrune");
-    galois::do_all_local(graph, Process1(this, graph), galois::loopname("P1"));
-    galois::do_all_local(graph, Process2(this, graph), galois::loopname("P2")); 
+    galois::do_all(graph, Process1(this, graph), galois::loopname("P1"));
+    galois::do_all(graph, Process2(this, graph), galois::loopname("P2")); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
     using namespace galois::worklists;
     typedef dChunkedFIFO<16> dChunk;
@@ -741,7 +741,7 @@ struct PrtRsd {
     typedef OBIM dOBIM;
 #endif
     galois::InsertBag<UpdateRequest> initialWL;
-    galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
+    galois::do_all(graph, [&initialWL, &graph] (GNode src) {
 	LNode& data = graph.getData(src);
         if(data.residual>=tolerance){
 	  initialWL.push_back(std::make_pair(pri(data), src)); // degree biased
@@ -749,7 +749,7 @@ struct PrtRsd {
       });
     galois::StatTimer T("InnerTime");
     T.start();
-    galois::for_each_local(initialWL, Process3(this, graph, pre, post), galois::wl<OBIM>(), galois::loopname("mainloop"));   
+    galois::for_each(initialWL, Process3(this, graph, pre, post), galois::wl<OBIM>(), galois::loopname("mainloop"));   
     T.stop();
 
     for(auto N : graph) {
@@ -766,7 +766,7 @@ struct PrtRsd {
     }
         
     //std::cout<<"print residuals\n";
-    //galois::for_each_local(graph, Process4(this, graph));
+    //galois::for_each(graph, Process4(this, graph));
     //std::cout<<"\n";
   } 
 
@@ -861,7 +861,7 @@ struct Async {
   void operator()(Graph& graph) {
     //    skip = 0;
     typedef galois::worklists::dChunkedFIFO<16> WL;
-    galois::for_each_local(graph, Process(graph), galois::wl<WL>());
+    galois::for_each(graph, Process(graph), galois::wl<WL>());
   }
 };
 
@@ -1022,7 +1022,7 @@ void run() {
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "Target max delta: " << tolerance << "\n";
   T.start();
-  galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all(graph, typename Algo::Initialize(graph));
   algo(graph);
   T.stop();
   

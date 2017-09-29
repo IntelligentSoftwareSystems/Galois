@@ -906,7 +906,7 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
 // 
     // t_fill_wl.start ();
     // WL_ty wl;
-    // galois::do_all_local (internalNodes,
+    // galois::do_all (internalNodes,
         // [&wl] (InterNode* n) {
           // unsigned c = n->numChild;
 // 

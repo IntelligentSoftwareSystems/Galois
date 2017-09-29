@@ -351,7 +351,7 @@ struct PageRank {
       } else if (personality == CPU)
       #endif
       {
-        galois::do_all_local(
+        galois::do_all(
           nodesWithEdges,
           PageRank{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),

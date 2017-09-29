@@ -306,7 +306,7 @@ struct SSSP {
       } else if (personality == CPU)
       #endif
       {
-        galois::do_all_local(
+        galois::do_all(
           nodesWithEdges,
           SSSP{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),

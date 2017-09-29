@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
 
   Tprefetch.start();
   std::cout << "beginning prefetch\n";
-  galois::for_each_local(graph, Prefetch(graph), 
+  galois::for_each(graph, Prefetch(graph), 
       galois::loopname("prefetch"), galois::wl<galois::worklists::AltChunkedLIFO<32>>());
   //galois::runtime::setTrace(true);
   Tprefetch.stop();
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
   T.start();
   Tfindbad.start();
   std::cout << "beginning findbad\n";
-  galois::for_each_local(graph, Preprocess(graph,gwl),
+  galois::for_each(graph, Preprocess(graph,gwl),
       galois::loopname("findbad"), galois::wl<galois::worklists::AltChunkedLIFO<32>>());
   Tfindbad.stop();
 
@@ -212,18 +212,18 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace galois::worklists;
   
-      //! [for_each_local example]
+      //! [for_each example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
 
   std::cout << "beginning refine\n";
-  galois::for_each_local(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunked>());
+  galois::for_each(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunked>());
   Trefine.stop();
   T.stop();
   Tb.stop();
 
   std::cout << "beginning verify\n";
-  galois::for_each_local(graph, Verification(graph), galois::loopname("verification"), galois::wl<Chunked>());
+  galois::for_each(graph, Verification(graph), galois::loopname("verification"), galois::wl<Chunked>());
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";

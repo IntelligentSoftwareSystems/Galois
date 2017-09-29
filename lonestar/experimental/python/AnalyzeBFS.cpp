@@ -29,7 +29,7 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
 //  galois::StatTimer T;
 //  T.start();
 
-  galois::do_all_local(
+  galois::do_all(
     *g, 
     [=] (GNode n) 
       {
@@ -43,7 +43,7 @@ void analyzeBFS(Graph *g, GNode src, const ValAltTy result) {
 
 //  T.stop();
 
-  galois::do_all_local(
+  galois::do_all(
     *g, 
     [=] (GNode n) 
       {

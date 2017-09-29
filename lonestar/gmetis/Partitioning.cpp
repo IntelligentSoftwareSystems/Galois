@@ -425,7 +425,7 @@ struct initPart {
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, InitialPartMode partMode) {
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight());
-  galois::do_all_local(*mcg->getGraph(), initPart(*mcg->getGraph()));
+  galois::do_all(*mcg->getGraph(), initPart(*mcg->getGraph()));
   bool serialPartition = false;
   if (serialPartition) {
   serialBisect<bisect_GGGP>(mcg, numPartitions, parts)();

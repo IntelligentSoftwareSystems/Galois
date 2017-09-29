@@ -77,7 +77,7 @@ void runLocalStateMatching(const std::string& name) {
   galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
-  galois::for_each_local(graph,
+  galois::for_each(graph,
       MatchingWithLocalState { graph, size },
       galois::wl<galois::worklists::Deterministic<>>(),
       galois::local_state<MatchingWithLocalState::LocalState>(),

@@ -248,7 +248,7 @@ void verify(Graphp g){
     typedef galois::GAccumulator<double> AccumDouble;
     AccumDouble rms;
     cout<<"Host:"<<networkHostID<<" is verifying after SGD..\n";
-    //galois::do_all_local(g, [&g,&rms] (DGNode n) {
+    //galois::do_all(g, [&g,&rms] (DGNode n) {
 	auto ei = g->begin();
 	std::advance(ei,num_movie_nodes);
 	unsigned int count=0;
@@ -434,7 +434,7 @@ void deserialize(galois::runtime::DeSerializeBuffer& s) {
 	
 
 
-	//galois::for_each_local(g, Process(this,g), "Process");
+	//galois::for_each(g, Process(this,g), "Process");
 	galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
 	//galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
     

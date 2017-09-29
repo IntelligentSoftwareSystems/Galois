@@ -948,8 +948,8 @@ public:
       Process fn2 { g, edgesVisited, failures, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
       // Testing sufficient optimizations by moving towards BlockJump
       //galois::for_each(initial.begin(), initial.end(), fn2, galois::wl<galois::worklists::dChunkedFIFO<1>>());
-      //galois::for_each_local(initial, fn2, galois::wl<galois::worklists::dChunkedFIFO<1>>());
-      //galois::do_all_local(initial, fn2, galois::wl<galois::worklists::dChunkedLIFO<1>>());
+      //galois::for_each(initial, fn2, galois::wl<galois::worklists::dChunkedFIFO<1>>());
+      //galois::do_all(initial, fn2, galois::wl<galois::worklists::dChunkedLIFO<1>>());
       galois::on_each(fn2);
       //TODO: delete when racy fix is in
       if (!std::all_of(tasks.begin(), tasks.end(), [maxUpdates](Task& t) { return t.updates == maxUpdates; }))
@@ -973,7 +973,7 @@ size_t initializeGraphData(Graph& g) {
   std::uniform_real<LatentValue> dist(0, top);
 #endif
 
-  galois::do_all_local(g, [&](typename Graph::GraphNode n) {
+  galois::do_all(g, [&](typename Graph::GraphNode n) {
   //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
     auto& data = g.getData(n);
 

@@ -164,7 +164,7 @@ struct InitializeGraph {
     #endif
     {
 
-    galois::do_all_local(
+    galois::do_all(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),

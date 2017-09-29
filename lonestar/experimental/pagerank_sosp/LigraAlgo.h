@@ -85,7 +85,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
     // Initialize
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
-    galois::do_all_local(graph, UpdateNode(this, graph));
+    galois::do_all(graph, UpdateNode(this, graph));
 
     while (true) {
       iteration += 1;
@@ -106,7 +106,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
       //this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
-      galois::do_all_local(graph, UpdateNode(this, graph));
+      galois::do_all(graph, UpdateNode(this, graph));
     }
     
     if (iteration >= maxIterations) {

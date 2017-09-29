@@ -97,7 +97,7 @@ struct GraphLabAlgo {
   }
 
   void operator()(Graph& graph) {
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
 
     galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
     engine.execute();

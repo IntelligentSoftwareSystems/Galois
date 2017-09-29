@@ -246,7 +246,7 @@ struct ParallelAlgo {
 
     init();
 
-    galois::do_all_local(graph, Initialize(this)
+    galois::do_all(galois::iterate(graph), Initialize(this)
         , galois::chunk_size<16>(), galois::steal<true>() , galois::loopname("Initialize"));
 
     while (true) {
@@ -254,9 +254,11 @@ struct ParallelAlgo {
         rounds += 1;
 
         std::swap(current, next);
-        galois::do_all_local(*current, Merge(this)
+        galois::do_all(galois::iterate(*current)
+            , Merge(this)
             , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Merge"));
-        galois::do_all_local(*current, Find(this)
+        galois::do_all(galois::iterate(*current)
+            , Find(this)
             , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Find"));
         current->clear();
 
@@ -346,7 +348,7 @@ struct CheckAcyclic {
   bool operator()() {
     Accum a;
     accum = &a;
-    galois::do_all_local(graph, *this);
+    galois::do_all(galois::iterate(graph), *this, galois::no_stats());
     unsigned numRoots = a.roots.reduce();
     unsigned numEdges = std::distance(mst.begin(), mst.end());
     if (graph.size() - numRoots != numEdges) {
@@ -386,7 +388,7 @@ struct SortEdges {
   EdgeData operator()() {
     Accum a;
     accum = &a;
-    galois::do_all_local(graph, *this);
+    galois::do_all(galois::iterate(graph), *this, galois::no_stats());
     return a.heavy.reduce();
   }
 };

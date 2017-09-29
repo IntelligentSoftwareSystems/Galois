@@ -408,11 +408,11 @@ struct SynchronousAlgo {
 
     cur = &wls[0];
     next = &wls[1];
-    galois::do_all_local(graph, Initialize(graph, *cur));
+    galois::do_all(graph, Initialize(graph, *cur));
 
     while (!cur->empty()) {
-      galois::do_all_local(*cur, Merge(graph, emptyMerges));
-      galois::for_each_local(*cur, Find(graph, *next));
+      galois::do_all(*cur, Merge(graph, emptyMerges));
+      galois::for_each(*cur, Find(graph, *next));
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
@@ -576,119 +576,119 @@ struct LabelPropNoCasAlgo {
     auto logIndexer = LabelLogIndexer<Graph>(graph);
     auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
     switch(algo) {
     case Algo::gLpMSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
       break;
     case Algo::gLpOSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<OSet>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<OSet>());
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<OSet>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<OSet>());
       break;
     case Algo::gLpHSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<HSet>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<HSet>());
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<HSet>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<HSet>());
       break;
     case Algo::gLpDivObim:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObim>(divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObim>(divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObim>(divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObim>(divIndexer));
       break;
     case Algo::gLpDivObimMSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
       break;
     case Algo::gLpDivObimOSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
       break;
     case Algo::gLpDivObimHSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
       break;
     case Algo::gLpLogObim:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObim>(logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObim>(logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObim>(logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObim>(logIndexer));
       break;
     case Algo::gLpLogObimMSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
       break;
     case Algo::gLpLogObimOSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
       break;
     case Algo::gLpLogObimHSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
       break;
     case Algo::gLpShrObim:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObim>(shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObim>(shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObim>(shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObim>(shrIndexer));
       break;
     case Algo::gLpShrObimMSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
       break;
     case Algo::gLpShrObimOSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
       break;
     case Algo::gLpShrObimHSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
       break;
     default:
       if (symmetricGraph) {
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<WL>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<WL>());
       } else {
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<WL>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<WL>());
       }
       break;
     } // end switch
@@ -822,136 +822,136 @@ struct LabelPropAlgo {
     auto logIndexer = LabelLogIndexer<Graph>(graph);
     auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
 #ifdef GALOIS_USE_EXP
     switch(algo) {
     case Algo::labelPropMSet:
     case Algo::staleLpMSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
       break;
     case Algo::labelPropOSet:
     case Algo::staleLpOSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<OSet>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<OSet>());
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<OSet>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<OSet>());
       break;
     case Algo::labelPropHSet:
     case Algo::staleLpHSet:
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<HSet>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<HSet>());
       else
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<HSet>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<HSet>());
       break;
     case Algo::labelPropDivObim:
     case Algo::staleLpDivObim:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObim>(divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObim>(divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObim>(divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObim>(divIndexer));
       break;
     case Algo::labelPropDivObimMSet:
     case Algo::staleLpDivObimMSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
       break;
     case Algo::labelPropDivObimOSet:
     case Algo::staleLpDivObimOSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
       break;
     case Algo::labelPropDivObimHSet:
     case Algo::staleLpDivObimHSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
       break;
     case Algo::labelPropLogObim:
     case Algo::staleLpLogObim:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObim>(logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObim>(logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObim>(logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObim>(logIndexer));
       break;
     case Algo::labelPropLogObimMSet:
     case Algo::staleLpLogObimMSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
       break;
     case Algo::labelPropLogObimOSet:
     case Algo::staleLpLogObimOSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
       break;
     case Algo::labelPropLogObimHSet:
     case Algo::staleLpLogObimHSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
       break;
     case Algo::labelPropShrObim:
     case Algo::staleLpShrObim:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObim>(shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObim>(shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObim>(shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObim>(shrIndexer));
       break;
     case Algo::labelPropShrObimMSet:
     case Algo::staleLpShrObimMSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
       break;
     case Algo::labelPropShrObimOSet:
     case Algo::staleLpShrObimOSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
       break;
     case Algo::labelPropShrObimHSet:
     case Algo::staleLpShrObimHSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
       if(symmetricGraph)
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
       else
-        galois::for_each_local(graph, Process<true, true>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
+        galois::for_each(graph, Process<true, true>(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
       break;
     default:
 #endif
       if (symmetricGraph) {
-        galois::for_each_local(graph, Process<true,false>(graph), galois::wl<WL>());
+        galois::for_each(graph, Process<true,false>(graph), galois::wl<WL>());
       } else {
-        galois::for_each_local(graph, Process<true,true>(graph), galois::wl<WL>());
+        galois::for_each(graph, Process<true,true>(graph), galois::wl<WL>());
       }
 #ifdef GALOIS_USE_EXP
       break;
@@ -1049,8 +1049,8 @@ struct PullLPAlgo {
   void operator()(Graph& graph) {
     typedef galois::worklists::dChunkedFIFO<256> WL;
 
-    galois::do_all_local(graph, Initialize(graph));
-    galois::for_each_local(graph, Process(graph), galois::wl<WL>());
+    galois::do_all(graph, Initialize(graph));
+    galois::for_each(graph, Process(graph), galois::wl<WL>());
   }
 };
 
@@ -1159,71 +1159,71 @@ struct PullLPCASAlgo {
     auto logIndexer = LabelLogIndexer<Graph>(graph);
     auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
-    galois::do_all_local(graph, Initialize(graph));
+    galois::do_all(graph, Initialize(graph));
     switch(algo) {
     case Algo::pullLpMSet:
-      galois::for_each_local(graph, Process(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      galois::for_each(graph, Process(graph), galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
       break;
     case Algo::pullLpOSet:
-      galois::for_each_local(graph, Process(graph), galois::wl<OSet>());
+      galois::for_each(graph, Process(graph), galois::wl<OSet>());
       break;
     case Algo::pullLpHSet:
-      galois::for_each_local(graph, Process(graph), galois::wl<HSet>());
+      galois::for_each(graph, Process(graph), galois::wl<HSet>());
       break;
     case Algo::pullLpDivObim:
       std::cout << "using priority scheduling based on (label / 1000).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<DivObim>(divIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<DivObim>(divIndexer));
       break;
     case Algo::pullLpDivObimMSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<DivObimMSet>(marker,dummy,divIndexer));
       break;
     case Algo::pullLpDivObimOSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<DivObimOSet>(dummy,divIndexer));
       break;
     case Algo::pullLpDivObimHSet:
       std::cout << "using priority scheduling based on (label / 1000).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<DivObimHSet>(dummy,divIndexer));
       break;
     case Algo::pullLpLogObim:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<LogObim>(logIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<LogObim>(logIndexer));
       break;
     case Algo::pullLpLogObimMSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<LogObimMSet>(marker,dummy,logIndexer));
       break;
     case Algo::pullLpLogObimOSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<LogObimOSet>(dummy,logIndexer));
       break;
     case Algo::pullLpLogObimHSet:
       std::cout << "using priority scheduling based on floor(log(label+1)).\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<LogObimHSet>(dummy,logIndexer));
       break;
     case Algo::pullLpShrObim:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<ShrObim>(shrIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<ShrObim>(shrIndexer));
       break;
     case Algo::pullLpShrObimMSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
       break;
     case Algo::pullLpShrObimOSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<ShrObimOSet>(dummy,shrIndexer));
       break;
     case Algo::pullLpShrObimHSet:
       std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
       std::cout << "default delta may not be the best for performance.\n";
-      galois::for_each_local(graph, Process(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      galois::for_each(graph, Process(graph), galois::wl<ShrObimHSet>(dummy,shrIndexer));
       break;
     default:
-      galois::for_each_local(graph, Process(graph), galois::wl<WL>());
+      galois::for_each(graph, Process(graph), galois::wl<WL>());
       break;
     } // end switch
   }
@@ -1323,12 +1323,12 @@ struct AsyncAlgo {
     galois::Statistic emptyMerges("EmptyMerges");
 #ifdef GALOIS_USE_EXP
     if(algo == Algo::asyncOSet) {
-      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelSetFIFO<32> >());
+      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelSetFIFO<32> >());
     } else if(algo == Algo::asyncHSet) {
-      galois::for_each_local(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelHashFIFO<32> >());
+      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelHashFIFO<32> >());
     } else {
 #endif
-      galois::for_each_local(graph, Merge(graph, emptyMerges));
+      galois::for_each(graph, Merge(graph, emptyMerges));
 #ifdef GALOIS_USE_EXP
     }
 #endif
@@ -1403,8 +1403,8 @@ struct BlockedAsyncAlgo {
   void operator()(Graph& graph) {
     galois::InsertBag<WorkItem> items;
     Merge merge = { graph, items };
-    galois::do_all_local(graph, merge, galois::loopname("Initialize"));
-    galois::for_each_local(items, merge,
+    galois::do_all(graph, merge, galois::loopname("Initialize"));
+    galois::for_each(items, merge,
         galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
   }
 };
@@ -1640,7 +1640,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   typedef ReduceMax<Graph> RM;
 
   typename CL::Accums accums;
-  galois::do_all_local(graph, CL(graph, accums));
+  galois::do_all(graph, CL(graph, accums));
   typename CL::Map& map = accums.map.reduce();
   size_t reps = accums.reps.reduce();
 

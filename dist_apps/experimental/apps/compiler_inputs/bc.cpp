@@ -268,7 +268,7 @@ struct SSSP {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
@@ -320,7 +320,7 @@ struct PredAndSucc {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     {
-    galois::do_all_local(
+    galois::do_all(
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
@@ -420,7 +420,7 @@ struct NumShortestPaths {
       dga.reset();
 
       { 
-        galois::do_all_local(
+        galois::do_all(
           nodesWithEdges,
           NumShortestPaths(infinity, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
@@ -574,7 +574,7 @@ struct DependencyPropogation {
       auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),

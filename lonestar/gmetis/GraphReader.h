@@ -141,11 +141,11 @@ void readGraph(MetisGraph* metisGraph, const char* filename, bool weighted = fal
 
     galois::Timer t;
     t.start();
-    galois::for_each_local<WL>(inputGraph,parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
+    galois::for_each<WL>(inputGraph,parallelMakeNodes(graph,gnodes,&inputGraph,pnumNodes),"NodesLoad");
     t.stop();
     cout<<t.get()<<" ms "<<endl;
     t.start();
-    galois::for_each_local<WL>(inputGraph,parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
+    galois::for_each<WL>(inputGraph,parallelMakeEdges(graph,gnodes,&inputGraph,pnumEdges,weighted,true),"EdgesLoad");
     t.stop();
     cout<<t.get()<<" ms "<<endl;
 

@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  galois::do_all_local(graph, 
+  galois::do_all(galois::iterate(graph), 
                        [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
   graph.getData(source) = 0;
   galois::StatTimer Tmain;
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-  galois::for_each(UpdateRequest{source, 0}
+  galois::for_each(galois::iterate({ UpdateRequest{source, 0} }
       , [&] (const UpdateRequest& req, auto& ctx) {
         const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
         Dist sdist = graph.getData(req.n, flag);

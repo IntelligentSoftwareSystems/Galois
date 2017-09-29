@@ -272,7 +272,7 @@ private:
       }
     };
     galois::GReducible<std::deque<size_t>, updater> counts{updater()};
-    galois::do_all_local(graph, CountLevels<decltype(counts)>(reset, counts));
+    galois::do_all(graph, CountLevels<decltype(counts)>(reset, counts));
     res.counts = counts.reduce(CountLevels<decltype(counts)>::reduce);
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
@@ -293,7 +293,7 @@ private:
     while (!cur->empty()) {
       galois::GAccumulator<size_t> count;
 
-      galois::for_each_local(*cur, OrderedProcess(BagWorklist(next), AccumUpdate(&count)));
+      galois::for_each(*cur, OrderedProcess(BagWorklist(next), AccumUpdate(&count)));
       res.counts.push_back(count.reduce());
       if (res.counts.back() >= limit) {
         res.complete = next->empty();
@@ -322,11 +322,11 @@ public:
   }
 
   static void init() {
-    galois::do_all_local(graph, &initNode);
+    galois::do_all(graph, &initNode);
   }
 
   static void reset() {
-    galois::do_all_local(graph, &resetNode);
+    galois::do_all(graph, &resetNode);
   }
 
     // Compute maximum bandwidth for a given graph
@@ -567,7 +567,7 @@ struct PseudoPeripheral {
   struct select_candidates {
     static std::deque<GNode> go(unsigned topn, size_t dist) {
       galois::InsertBag<GNode> bag;
-      galois::do_all_local(graph, collect_nodes(bag, dist));
+      galois::do_all(graph, collect_nodes(bag, dist));
 
       // Incrementally sort nodes until we find least N who are not neighbors
       // of each other

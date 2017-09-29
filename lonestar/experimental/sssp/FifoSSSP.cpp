@@ -411,9 +411,9 @@ struct AsyncAlgo {
         graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
     if(algo == Algo::asyncFifo || algo == Algo::asyncWithCasFifo)
-      galois::for_each_local(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
+      galois::for_each(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
     else
-      galois::for_each_local(initial, Process(this, graph), galois::wl<OBIM>());
+      galois::for_each(initial, Process(this, graph), galois::wl<OBIM>());
   }
 };
 
@@ -547,31 +547,31 @@ struct AsyncSetAlgo {
     switch(algo) {
     case Algo::asyncBlindFifoMSet:
     case Algo::asyncWithCasBlindFifoMSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<MSet>(marker));
+      galois::for_each(initial, Process(this, graph), galois::wl<MSet>(marker));
       break;
     case Algo::asyncBlindFifoOSet:
     case Algo::asyncWithCasBlindFifoOSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<OSet>());
+      galois::for_each(initial, Process(this, graph), galois::wl<OSet>());
       break;
     case Algo::asyncBlindFifoHSet:
     case Algo::asyncWithCasBlindFifoHSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<HSet>());
+      galois::for_each(initial, Process(this, graph), galois::wl<HSet>());
       break;
     case Algo::asyncBlindFifo:
     case Algo::asyncWithCasBlindFifo:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
+      galois::for_each(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
       break;
     case Algo::asyncBlindObimMSet:
     case Algo::asyncWithCasBlindObimMSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<ObimMSet>(marker,dummy,indexer));
+      galois::for_each(initial, Process(this, graph), galois::wl<ObimMSet>(marker,dummy,indexer));
       break;
     case Algo::asyncBlindObimOSet:
     case Algo::asyncWithCasBlindObimOSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<ObimOSet>(dummy,indexer));
+      galois::for_each(initial, Process(this, graph), galois::wl<ObimOSet>(dummy,indexer));
       break;
     case Algo::asyncBlindObimHSet:
     case Algo::asyncWithCasBlindObimHSet:
-      galois::for_each_local(initial, Process(this, graph), galois::wl<ObimHSet>(dummy,indexer));
+      galois::for_each(initial, Process(this, graph), galois::wl<ObimHSet>(dummy,indexer));
       break;
     case Algo::asyncBlindObim:
     case Algo::asyncWithCasBlindObim:
@@ -579,7 +579,7 @@ struct AsyncSetAlgo {
       std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
       std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
       std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-      galois::for_each_local(initial, Process(this, graph), galois::wl<OBIM>(NodeIndexer<Graph>(graph)));
+      galois::for_each(initial, Process(this, graph), galois::wl<OBIM>(NodeIndexer<Graph>(graph)));
       break;
     } // end switch
   }
@@ -691,7 +691,7 @@ struct AsyncAlgoPP {
         graph.out_edges(source, galois::MethodFlag::UNPROTECTED).begin(),
         graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial));
-    galois::for_each_local(initial, Process(this, graph), galois::wl<OBIM>());
+    galois::for_each(initial, Process(this, graph), galois::wl<OBIM>());
   }
 };
 
@@ -723,7 +723,7 @@ void run(bool prealloc = true) {
   galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   

@@ -193,7 +193,7 @@ struct Sync {
     unsigned int iteration = 0;
     auto numNodes = graph.size();
     while (true) {
-      galois::do_all_local(graph, Process(this, graph, iteration));
+      galois::do_all(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
@@ -221,7 +221,7 @@ struct Sync {
       // Result already in right place
     } else {
       if (coord)
-        galois::do_all_local(graph, Copy(graph));
+        galois::do_all(graph, Copy(graph));
     }
   }
 
@@ -330,7 +330,7 @@ void run() {
   std::cout << "tolerance: " << tolerance << "\n";
   std::cout << "effective amp: " << eamp << "\n";
   T.start();
-  galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+  galois::do_all(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   algo(graph, tolerance, eamp);
   T.stop();
   
@@ -374,7 +374,7 @@ void runPPR() {
     galois::StatTimer T1, T2, T3;
     std::cout << "Running " << algo.name() << " version\n";
     T1.start();
-    galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+    galois::do_all(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
     T1.stop();
     T2.start();
     algo(graph, seed);

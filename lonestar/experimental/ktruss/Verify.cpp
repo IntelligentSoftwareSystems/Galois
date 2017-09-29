@@ -71,7 +71,7 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to removed
-  galois::do_all_local(
+  galois::do_all(
     g, 
     [&g] (typename Graph::GraphNode N) { 
       for (auto e: g.edges(N, galois::MethodFlag::UNPROTECTED)) {
@@ -141,7 +141,7 @@ void printGraph(Graph& g) {
 std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
   galois::GAccumulator<size_t> numNodes, numEdges;
 
-  galois::do_all_local(g, 
+  galois::do_all(g, 
     [&g, &numNodes, &numEdges] (GNode n) {
       size_t numN = 0;
       for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
 
   // symmetry breaking: 
   // consider only edges (i, j) where i < j
-  galois::do_all_local(g, 
+  galois::do_all(g, 
     [&g, &work] (GNode n) {
       for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         auto dst = g.getEdgeDst(e);
@@ -245,7 +245,7 @@ int main(int argc, char **argv) {
   // pick out the following:
   // 1. valid edges whose support < trussNum-2
   // 2. removed edges whose support >= trussNum-2
-  galois::do_all_local(work, 
+  galois::do_all(work, 
     [&g, &shouldBeInvalid, &shouldBeValid] (Edge e) {
        bool isSupportEnough = isSupportNoLessThanJ(g, e.first, e.second, trussNum-2);
        bool isRemoved = g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) & 0x1;

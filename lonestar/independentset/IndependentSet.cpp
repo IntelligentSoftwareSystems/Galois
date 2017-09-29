@@ -366,8 +366,8 @@ struct PullAlgo {
 
       if (!cur->empty()) {
         typedef galois::worklists::StableIterator<> WL;
-        //galois::for_each_local(*cur, pull, galois::wl<WL>());
-        galois::do_all_local(*cur, pull);
+        //galois::for_each(*cur, pull, galois::wl<WL>());
+        galois::do_all(*cur, pull);
       }
 
       size_t numCur = numProcessed.reduce();
@@ -379,8 +379,8 @@ struct PullAlgo {
 
       numTaken.reset();
 
-      galois::do_all_local(matched, takeMatched);
-      galois::do_all_local(otherMatched, takeOtherMatched);
+      galois::do_all(matched, takeMatched);
+      galois::do_all(otherMatched, takeOtherMatched);
 
       cur->clear();
       matched.clear();

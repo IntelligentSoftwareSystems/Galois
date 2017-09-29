@@ -81,7 +81,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
     graph.getData(source).dist = 0;
 
     this->outEdgeMap(memoryLimit, graph, EdgeOperator(), source, bags.next());
-    galois::do_all_local(bags.next(), ResetVisited(graph));
+    galois::do_all(bags.next(), ResetVisited(graph));
     
     unsigned rounds = 0;
     while (!bags.next().empty()) {
@@ -92,7 +92,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
          
       bags.swap();
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
-      galois::do_all_local(bags.next(), ResetVisited(graph));
+      galois::do_all(bags.next(), ResetVisited(graph));
     }
 
     roundStat += rounds + 1;

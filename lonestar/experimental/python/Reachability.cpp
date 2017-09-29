@@ -50,7 +50,7 @@ struct Reach {
 
 static void initialize(Graph *g) {
   // set all distance to infinity
-  galois::do_all_local(*g, 
+  galois::do_all(*g, 
     [=] (GNode n)
       {
         auto& data = (*g).getData(n);
@@ -74,7 +74,7 @@ static void findOutward(Graph *g, NodeList l, int hop) {
   }
 
   // move from w up to hop steps
-  galois::for_each_local(w, Reach<isBackward>{*g, hop});
+  galois::for_each(w, Reach<isBackward>{*g, hop});
 }
 
 // collect nodes marked within hop steps
@@ -82,7 +82,7 @@ template<bool isBackward>
 static NodeSet collectOutward(Graph *g, int hop) {
   NodeSet w;
 
-  galois::do_all_local(*g, 
+  galois::do_all(*g, 
     [g, &w, hop] (GNode n)
       {
         auto dist = (!isBackward) ? (*g).getData(n).II.vInt1 : (*g).getData(n).II.vInt2;
@@ -100,7 +100,7 @@ static NodeSet collectOutward(Graph *g, int hop) {
 static NodeSet collectBetween(Graph *g, int hop) {
   NodeSet w;
 
-  galois::do_all_local(
+  galois::do_all(
     *g, 
     [g, &w, hop] (GNode n) 
       {

@@ -412,7 +412,7 @@ struct initializeGraphData {
 
     galois::runtime::PerHost<stats> s = galois::runtime::PerHost<stats>::allocate();
     
-    galois::for_each_local(g, initializeGraphData{g,s}, galois::loopname("init"));
+    galois::for_each(g, initializeGraphData{g,s}, galois::loopname("init"));
 
     unsigned int numMovieNodes = 0;
     unsigned int numUserNodes = 0;

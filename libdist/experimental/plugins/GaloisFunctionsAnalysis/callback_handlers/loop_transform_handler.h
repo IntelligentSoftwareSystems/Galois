@@ -154,7 +154,7 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               //TODO:: get _graph from go struct IMPORTANT
               // change for_each to do_all
               string galois_foreach = "galois::for_each(";
-              string galois_doall = "galois::do_all_local(nodesWithEdges, ";
+              string galois_doall = "galois::do_all(nodesWithEdges, ";
               rewriter.ReplaceText(for_each_loc_begin, galois_foreach.length() + operator_range.length(), galois_doall);
               string num_run = ",\ngalois::loopname(_graph.get_run_identifier(\"" + (i.first) + "\").c_str()), \ngalois::steal<true>(), \ngalois::timeit())";
               rewriter.InsertText(for_each_loc_end.getLocWithOffset(-2), num_run, true, true);

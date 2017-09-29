@@ -226,7 +226,7 @@ void verify (Graph& g) {
 
   AccumDouble rms;
 
-  galois::do_all_local (g, 
+  galois::do_all (g, 
       [&g, &rms] (GNode n) {
       for (auto e = g.edge_begin (n, galois::MethodFlag::UNPROTECTED)
         , e_end = g.edge_end (n, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {

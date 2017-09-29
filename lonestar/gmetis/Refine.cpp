@@ -175,19 +175,19 @@ struct refine_BKL2 {
     galois::InsertBag<GNode> boundary;
 
     if (fg)
-      galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), galois::loopname("boundary"));
+      galois::do_all(cg, findBoundaryAndProject(boundary, cg, *fg), galois::loopname("boundary"));
     else
-      galois::do_all_local(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
+      galois::do_all(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
 
-    galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p)
+    galois::for_each(boundary, refine_BKL2(mins, maxs, cg, fg, p)
         , galois::per_iter_alloc()
         , galois::loopname("refine")
         , galois::wl<pG>());
 
     if (false) {
       galois::InsertBag<GNode> boundary;
-      galois::do_all_local(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
-      galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p)
+      galois::do_all(cg, findBoundary(boundary, cg), galois::loopname("boundary"));
+      galois::for_each(boundary, refine_BKL2(mins, maxs, cg, fg, p)
           , galois::per_iter_alloc()
           , galois::loopname("refine")
           , galois::wl<pG>());
@@ -211,7 +211,7 @@ struct projectPart {
   }
 
   static void go(MetisGraph* Graph, std::vector<partInfo>& p) {
-    galois::do_all_local(*Graph->getGraph(), projectPart(Graph, p), galois::loopname("project"));
+    galois::do_all(*Graph->getGraph(), projectPart(Graph, p), galois::loopname("project"));
   }
 };
 

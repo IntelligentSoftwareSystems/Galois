@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
   IntPtrs pBodies = galois::graphs::Bag<int>::allocate();
   galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(10), InsertBody { pBodies });
-  galois::for_each_local(pBodies, PrintInt());
+  galois::for_each(pBodies, PrintInt());
 
   galois::runtime::getSystemNetworkInterface().terminate();
 

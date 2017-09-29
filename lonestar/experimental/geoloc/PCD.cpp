@@ -306,18 +306,18 @@ int main( int argc, char** argv )
 	galois::GAccumulator<int> cnt_l_set_neighbors;
 	galois::GAccumulator<float> error_location;
 	galois::graphs::readGraph( graph, filename );
-	galois::for_each_local( graph, Initialize( graph ) );
+	galois::for_each( graph, Initialize( graph ) );
 
         int u_set_size = std::count_if( graph.begin(), graph.end(), ValueEqual( graph, 'U' ) );
         int l_set_size = std::count_if( graph.begin(), graph.end(), ValueEqual( graph, 'L' ) );
 
 	T.start();
 	for ( int iteration = 0; iteration < maxIterations; ++iteration ) {
-		// Unlike galois::for_each, galois::for_each_local initially assigns work
+		// Unlike galois::for_each, galois::for_each initially assigns work
   		// based on which thread created each node (galois::for_each uses a simple
   		// blocking of the iterator range to initialize work, but the iterator order
   		// of a Graph is implementation-defined). 
-  		galois::for_each_local( graph, EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
+  		galois::for_each( graph, EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
 		//galois::for_each( graph.begin(), graph.end(), EstimateLocation( graph, error_location, cnt_useful_it, cnt_useless_it ) );
 	}
 	T.stop();

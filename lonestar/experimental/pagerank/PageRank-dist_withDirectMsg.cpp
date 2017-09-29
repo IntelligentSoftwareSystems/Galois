@@ -83,7 +83,7 @@ struct InitializeGraph {
 
     void static go(Graph::pointer g)
     {
-      galois::for_each_local(g, InitializeGraph{g}, galois::loopname("init"));
+      galois::for_each(g, InitializeGraph{g}, galois::loopname("init"));
     }
 
     void operator()(GNode n, galois::UserContext<GNode>& cnx) const {
@@ -105,7 +105,7 @@ struct PageRank {
       galois::Timer round_time;
       for(int iterations = 0; iterations < maxIterations; ++iterations){
           round_time.start();
-          galois::for_each_local(g, PageRank{g}, galois::loopname("Page Rank"));
+          galois::for_each(g, PageRank{g}, galois::loopname("Page Rank"));
           round_time.stop();
           std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
       }
@@ -142,7 +142,7 @@ struct PageRankMsg {
     galois::Timer round_time;
     for(int iterations = 0; iterations < maxIterations; ++iterations){
       round_time.start();
-      galois::for_each_local(g, PageRank{g}, galois::loopname("Page Rank"));
+      galois::for_each(g, PageRank{g}, galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
     }

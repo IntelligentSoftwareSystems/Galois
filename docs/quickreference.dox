@@ -7,13 +7,9 @@
 
 \subsection loop_types Loop Types
 
-- \b galois::for_each(I beg, I end, const F& operator, galois::wl<WorkListType>(), galois::loopname("loopname")
+- \b galois::for_each(galois::iterate(beg, end), const F& operator, galois::wl<WorkListType>(), galois::loopname("loopname")
 
-- \b galois::do_all(I beg, I end, const F& operator, galois::loopname("loopname")
-
-- \b galois::for_each_local(I beg, I end, const F& operator, galois::wl<WorkListType>(), galois::loopname("loopname")
-
-- \b galois::do_all_local(I beg, I end, const F& operator, galois::loopname("loopname")
+- \b galois::do_all(galois::iterate(beg, end), const F& operator, galois::loopname("loopname")
 
 - \b galois::on_each(const F& operator, galois::loopname("loopname")
 
@@ -21,9 +17,9 @@
 
 \subsection operator Operator
 
-- \b for_each/for_each_local operator implements `template <typename C> void operator () (T item, C& ctx) {...}`
+- \b for_each operator implements `template <typename C> void operator () (T item, C& ctx) {...}`
 
-- \b do_all/do_all_local  operator implements `void operator () (T item) {...}`
+- \b do_all operator implements `void operator () (T item) {...}`
 
 - \b on_each operator implements `void operator () (unsigned TID, unsigned numThreads) {...}`
 

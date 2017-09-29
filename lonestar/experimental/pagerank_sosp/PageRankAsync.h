@@ -81,7 +81,7 @@ struct AsyncSet {
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     typedef galois::worklists::dChunkedFIFO<16> WL;
-    galois::for_each_local(graph, Process(graph, tolerance), galois::wl<WL>());
+    galois::for_each(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {

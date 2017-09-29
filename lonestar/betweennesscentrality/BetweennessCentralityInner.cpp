@@ -258,7 +258,7 @@ struct AsyncAlgo {
   void operator()(Graph& graph, GNode source) {
     galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
-    galois::do_all_local(graph, Initialize(graph), galois::loopname("INIT"));
+    galois::do_all(graph, Initialize(graph), galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
@@ -270,7 +270,7 @@ struct AsyncAlgo {
     std::cout << "BFS DONE " << Tbfs.get() << "\n";
     Tcount.start();
     graph.getData(source).numPaths = 1;
-    galois::for_each_local(graph, CountPaths(graph), galois::loopname("COUNT"), galois::wl<CountPaths::OBIM>());
+    galois::for_each(graph, CountPaths(graph), galois::loopname("COUNT"), galois::wl<CountPaths::OBIM>());
     Tcount.stop();
     std::cout << "COUNT DONE " << Tcount.get() << "\n";
     Tdep.start();
@@ -395,7 +395,7 @@ struct LeveledAlgo {
     galois::StatTimer Tcount("CountTime");
     galois::StatTimer Tdep("DepTime");
     Tinit.start();
-    galois::do_all_local(graph, Initialize(graph), galois::loopname("INIT"));
+    galois::do_all(graph, Initialize(graph), galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
 
@@ -408,8 +408,8 @@ struct LeveledAlgo {
     while (!levels.back()->empty()) {
       Bag* b = levels.back();
       levels.push_back(new Bag());
-      galois::do_all_local(*b, BFS<>(graph, *levels.back()), galois::loopname("BFS"), galois::steal<true>());
-      //galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
+      galois::do_all(*b, BFS<>(graph, *levels.back()), galois::loopname("BFS"), galois::steal<true>());
+      //galois::do_all(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
     levels.pop_back();
@@ -418,7 +418,7 @@ struct LeveledAlgo {
 
     Tdep.start();
     for (int i = levels.size() - 1; i > 0; --i)
-      galois::do_all_local(*levels[i-1], ComputeDep(graph), galois::loopname("DEPS"), galois::steal<true>());
+      galois::do_all(*levels[i-1], ComputeDep(graph), galois::loopname("DEPS"), galois::steal<true>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
     while (!levels.empty()) {

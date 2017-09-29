@@ -293,7 +293,7 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   if(onlyOneNode)
     static_go += "galois::do_all(" + operator_range;
   else
-    static_go += "galois::do_all_local(" + operator_range;
+    static_go += "galois::do_all(" + operator_range;
   static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
   static_go += "galois::loopname(_graph.get_run_identifier(\"" + orig_functor_name + "\").c_str()),";
   if(!onlyOneNode)

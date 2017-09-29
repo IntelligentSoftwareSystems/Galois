@@ -118,10 +118,10 @@ struct AsyncPri{
     typedef galois::worklists::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
     galois::InsertBag<std::pair<GNode, int> > bag;
     PRPri pri(graph, tolerance);
-    // galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+    // galois::do_all(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });
-    // galois::for_each_local(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
+    // galois::for_each(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
 
     auto fn = [&pri] (const GNode& node) { return std::make_pair(node, pri(node)); };
     galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),

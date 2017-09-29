@@ -165,11 +165,11 @@ int main(int argc, char** argv) {
 
   galois::Timer T;
   T.start();
-  // Unlike galois::for_each, galois::for_each_local initially assigns work
+  // Unlike galois::for_each, galois::for_each initially assigns work
   // based on which thread created each node (galois::for_each uses a simple
   // blocking of the iterator range to initialize work, but the iterator order
   // of a Graph is implementation-defined). 
-  galois::for_each_local(graph, IncrementNeighbors(graph));
+  galois::for_each(graph, IncrementNeighbors(graph));
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";

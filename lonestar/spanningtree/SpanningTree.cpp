@@ -128,7 +128,7 @@ struct AsyncAlgo {
   void operator()() {
     galois::GAccumulator<size_t> emptyMerges;
 
-    galois::do_all_local(graph, 
+    galois::do_all(graph, 
         [&] (const GNode& src) {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
@@ -143,7 +143,7 @@ struct AsyncAlgo {
         },
         galois::loopname("Merge"), galois::steal<true>());
 
-    galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
+    galois::do_all(graph, Normalize(), galois::loopname("Normalize"));
 
     galois::runtime::reportStat_Serial("SpanningTree", "emptyMerges", emptyMerges.reduce());
   }
@@ -184,7 +184,7 @@ struct BlockedAsyncAlgo {
     galois::InsertBag<WorkItem> items;
 
 
-    galois::do_all_local(graph, 
+    galois::do_all(graph, 
         [&] (const GNode& src) {
           Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
           if (galois::substrate::ThreadPool::getPackage() == 0) {
@@ -195,7 +195,7 @@ struct BlockedAsyncAlgo {
         },
         galois::loopname("Initialize"));
 
-    galois::for_each_local(items, 
+    galois::for_each(items, 
         [&] (const WorkItem& i, auto& ctx) {
           process<true, 0>(i.src, i.start, ctx);
           
@@ -205,7 +205,7 @@ struct BlockedAsyncAlgo {
         galois::wl<galois::worklists::dChunkedFIFO<128> >());
 
     //! Normalize component by doing find with path compression
-    galois::do_all_local(graph, Normalize(), galois::loopname("Normalize"));
+    galois::do_all(graph, Normalize(), galois::loopname("Normalize"));
   }
 };
 
@@ -246,7 +246,7 @@ struct CheckAcyclic {
   bool operator()() {
     Accum a;
     accum = &a;
-    galois::do_all_local(graph, *this);
+    galois::do_all(graph, *this);
     unsigned numRoots = a.roots.reduce();
     unsigned numEdges = std::distance(mst.begin(), mst.end());
     if (graph.size() - numRoots != numEdges) {

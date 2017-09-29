@@ -33,7 +33,7 @@ void testSerialAdd(int N) {
     g->at(n) = std::make_pair(i, i);
   }
 
-  galois::for_each_local(g, AddSelfLoop(g));
+  galois::for_each(g, AddSelfLoop(g));
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
@@ -137,7 +137,7 @@ void testGrid(int N) {
   GALOIS_ASSERT(N > 0);
 
   galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N*N), AddNode(g));
-  galois::for_each_local(g, Grid(g, N));
+  galois::for_each(g, Grid(g, N));
   
   if (!printGraph)
     GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N * N);

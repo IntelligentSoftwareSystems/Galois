@@ -614,7 +614,7 @@ struct AsyncBFS {
     //typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-    galois::do_all_local(graph, [&graph] (const GNode& n) { graph.getData(n) = ~0; }, galois::loopname("init"));
+    galois::do_all(graph, [&graph] (const GNode& n) { graph.getData(n) = ~0; }, galois::loopname("init"));
 
     graph.getData(source) = 0;
 

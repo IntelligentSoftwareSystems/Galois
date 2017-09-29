@@ -458,7 +458,7 @@ struct AsyncAlgo {
         count = 0;
       }
 
-      galois::for_each_local(bags[cur], Process(this, graph, rangeScale, cur, next, bags), galois::wl<OBIM>());
+      galois::for_each(bags[cur], Process(this, graph, rangeScale, cur, next, bags), galois::wl<OBIM>());
       rounds += 1;
 
       if (!WithPartitioning)
@@ -467,7 +467,7 @@ struct AsyncAlgo {
       clearTime.start();
       bags[cur].clear();
       if (!next.empty()) {
-        galois::do_all_local(next, [&](UpdateRequest& req) { bags[cur].push(req); });
+        galois::do_all(next, [&](UpdateRequest& req) { bags[cur].push(req); });
         next.clear();
       }
       clearTime.stop();
@@ -591,7 +591,7 @@ struct Algo2 {
             self->relaxEdge(graph, sourceData, ii, bag);
         });
 
-    galois::for_each_local(bag, Process(this, graph), galois::wl<OBIM>());
+    galois::for_each(bag, Process(this, graph), galois::wl<OBIM>());
   }
 };
 
@@ -726,9 +726,9 @@ struct Algo3 {
           break;
         std::cout << std::distance(cur->begin(), cur->end()) << " ";
         if (i == 0)
-          galois::for_each_local(*cur, Process<true>(this, graph, i, innerNext, next), galois::wl<OBIM>());
+          galois::for_each(*cur, Process<true>(this, graph, i, innerNext, next), galois::wl<OBIM>());
         else
-          galois::for_each_local(*cur, Process<false>(this, graph, i, innerNext, next), galois::wl<OBIM>());
+          galois::for_each(*cur, Process<false>(this, graph, i, innerNext, next), galois::wl<OBIM>());
         clearTime.start();
         cur->clear();
         clearTime.stop();
@@ -878,7 +878,7 @@ struct Algo4 {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
 
-    galois::for_each_local(*cur, Process(this, graph, next), galois::wl<OBIM>());
+    galois::for_each(*cur, Process(this, graph, next), galois::wl<OBIM>());
   }
 };
 
@@ -1021,8 +1021,8 @@ struct Algo5 {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
 
-    galois::for_each_local(*cur, Process(this, graph, next), galois::wl<OBIM>());
-    //galois::for_each_local<Part>(*cur, Process(this, graph, next));
+    galois::for_each(*cur, Process(this, graph, next), galois::wl<OBIM>());
+    //galois::for_each<Part>(*cur, Process(this, graph, next));
   }
 };
 
@@ -1171,7 +1171,7 @@ struct Algo6 {
     galois::StatTimer initTime("ExtraInitTime");
     initTime.start();
     for (Graph& g : parts)
-      galois::do_all_local(g, Initialize(g));
+      galois::do_all(g, Initialize(g));
     initTime.stop();
 
     // XXX compute dst ranges
@@ -1198,14 +1198,14 @@ struct Algo6 {
 
       wholeTime.start();
       mainTime.start();
-      galois::for_each_local(*cur, Process(this, parts[0], next), galois::wl<OBIM>());
+      galois::for_each(*cur, Process(this, parts[0], next), galois::wl<OBIM>());
       mainTime.stop();
       //std::cout << "(" << std::distance(cur->begin(), cur->end()) << ", " << mainTime.get() << ") ";
 
       for (unsigned int i = 1; i < parts.size(); ++i) {
         cur->clear();
         // XXX for dst range add outgoing 
-        galois::do_all_local(self->parts[i], [&](GNode nn) {
+        galois::do_all(self->parts[i], [&](GNode nn) {
           GNode n = self->parts[i-1].nodeFromId(self->parts[i].idFromNode(nn));
           Dist newDist = self->parts[i-1].getData(n).dist;
           if (newDist != self->parts[i].getData(nn).dist) {
@@ -1215,7 +1215,7 @@ struct Algo6 {
           }
         });
         mainTime.start();
-        galois::for_each_local(*cur, Process(this, parts[i], next), galois::wl<OBIM>());
+        galois::for_each(*cur, Process(this, parts[i], next), galois::wl<OBIM>());
         mainTime.stop();
         //std::cout << "(" << std::distance(cur->begin(), cur->end()) << ", " << mainTime.get() << ") ";
       }
@@ -1223,7 +1223,7 @@ struct Algo6 {
       for (int i = 0; i < 1; ++i) {
         cur->clear();
         int t = parts.size() - 1;
-        galois::do_all_local(parts[i], [&](GNode nn) {
+        galois::do_all(parts[i], [&](GNode nn) {
           GNode n = self->parts[t].nodeFromId(self->parts[i].idFromNode(nn));
           Dist newDist = self->parts[t].getData(n).dist;
           if (newDist != self->parts[i].getData(nn).dist) {
@@ -1243,7 +1243,7 @@ struct Algo6 {
 
     galois::StatTimer copyOutTime("CopyOutTime");
     copyOutTime.start();
-    galois::do_all_local(parts[0], [&](GNode n0) {
+    galois::do_all(parts[0], [&](GNode n0) {
       GNode n = graph.nodeFromId(self->parts[0].idFromNode(n0));
       graph.getData(n).dist = self->parts[0].getData(n0).dist;
     });
@@ -1415,8 +1415,8 @@ struct Algo7 {
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, ii, sourceData.dist + graph.getEdgeData(ii), initial);
         });
-    galois::for_each_local(initial, Process(this, graph, &next), galois::loopname("A1"), galois::wl<OBIM>());
-    galois::for_each_local(next, Process(this, graph, nullptr), galois::loopname("A2"), galois::wl<OBIM>());
+    galois::for_each(initial, Process(this, graph, &next), galois::loopname("A1"), galois::wl<OBIM>());
+    galois::for_each(next, Process(this, graph, nullptr), galois::loopname("A2"), galois::wl<OBIM>());
   }
 };
 
@@ -1442,7 +1442,7 @@ void run(bool prealloc = true) {
   galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  galois::do_all_local(graph, typename A::Initialize(graph));
+  galois::do_all(graph, typename A::Initialize(graph));
   algo(graph, source);
   T.stop();
   

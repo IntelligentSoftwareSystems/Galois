@@ -1146,7 +1146,7 @@ int main(int argc, char** argv) {
 		thirdLoopTimer.start();
 		double backupSrcBC = currSrcNode->bc;
 #if CONCURRENT	 
-                galois::for_each_local(wl4, feach2, galois::wl<wl4ty>());
+                galois::for_each(wl4, feach2, galois::wl<wl4ty>());
 #else
     while (!wl4.empty()) {
       ND *nn = wl4.pop().second;

@@ -362,7 +362,7 @@ struct SSSP {
       } else if (personality == CPU)
     #endif
       {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
@@ -463,7 +463,7 @@ struct PredAndSucc {
       } else if (personality == CPU)
     #endif
     {
-    galois::do_all_local(
+    galois::do_all(
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
@@ -656,7 +656,7 @@ struct NumShortestPaths {
       } else if (personality == CPU)
     #endif
       { 
-        galois::do_all_local(
+        galois::do_all(
           nodesWithEdges,
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
@@ -940,7 +940,7 @@ struct DependencyPropogation {
       } else if (personality == CPU)
     #endif
     {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),

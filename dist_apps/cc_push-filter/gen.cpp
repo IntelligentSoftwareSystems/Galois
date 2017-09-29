@@ -100,7 +100,7 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     {
-    galois::do_all_local(
+    galois::do_all(
       allNodes,
       InitializeGraph{&_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
@@ -135,7 +135,7 @@ struct FirstItr_ConnectedComp{
     } else if (personality == CPU)
 #endif
     {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         FirstItr_ConnectedComp{ &_graph },
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
@@ -200,7 +200,7 @@ struct ConnectedComp {
       } else if (personality == CPU)
     #endif
       {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         ConnectedComp(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),

@@ -78,7 +78,7 @@ void initialize(Graph& g) {
   g.sortAllEdgesByDst();
 
   // initializa all edges to valid
-  galois::do_all_local(
+  galois::do_all(
     g, 
     [&g] (typename Graph::GraphNode N) { 
       for (auto e: g.edges(N, galois::MethodFlag::UNPROTECTED)) {
@@ -106,7 +106,7 @@ template<typename G>
 size_t countValidNodes(G& g) {
   galois::GAccumulator<size_t> numNodes;
 
-  galois::do_all_local(g, 
+  galois::do_all(g, 
     [&g, &numNodes] (typename G::GraphNode n) {
       for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         if (!(g.getEdgeData(e) & removed)) {
@@ -125,7 +125,7 @@ template<typename G>
 size_t countValidEdges(G& g) {
   galois::GAccumulator<size_t> numEdges;
 
-  galois::do_all_local(g, 
+  galois::do_all(g, 
     [&g, &numEdges] (typename G::GraphNode n) {
       for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
         if (n < g.getEdgeDst(e) && !(g.getEdgeData(e) & removed)) {
@@ -243,7 +243,7 @@ struct BSPTrussJacobiAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    galois::do_all_local(g, 
+    galois::do_all(g, 
       [&g, cur] (GNode n) {
         for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
@@ -256,7 +256,7 @@ struct BSPTrussJacobiAlgo {
     );
 
     while (true) {
-      galois::do_all_local(*cur, 
+      galois::do_all(*cur, 
         PickUnsupportedEdges{g, k-2, unsupported, *next},
         galois::steal<true>()
       );
@@ -266,7 +266,7 @@ struct BSPTrussJacobiAlgo {
       }
 
       // mark unsupported edges as removed
-      galois::do_all_local(unsupported, 
+      galois::do_all(unsupported, 
         [&g] (Edge e) {
           g.getEdgeData(g.findEdgeSortedByDst(e.first, e.second)) = removed;
           g.getEdgeData(g.findEdgeSortedByDst(e.second, e.first)) = removed;
@@ -326,7 +326,7 @@ struct BSPTrussAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    galois::do_all_local(g, 
+    galois::do_all(g, 
       [&g, cur] (GNode n) {
         for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
@@ -341,7 +341,7 @@ struct BSPTrussAlgo {
 
     // remove unsupported edges until no more edges can be removed
     while (true) {
-      galois::do_all_local(*cur, 
+      galois::do_all(*cur, 
         KeepSupportedEdges{g, k-2, *next},
         galois::steal<true>()
       );
@@ -414,7 +414,7 @@ struct BSPCoreAlgo {
     NodeVec *cur = &work[0], *next = &work[1];
     size_t curSize = g.size(), nextSize;
 
-    galois::do_all_local(g, 
+    galois::do_all(g, 
       KeepValidNodes{g, k, *next}, 
       galois::steal<true>()
     );
@@ -425,7 +425,7 @@ struct BSPCoreAlgo {
       curSize = nextSize;
       std::swap(cur, next);
 
-      galois::do_all_local(*cur, 
+      galois::do_all(*cur, 
         KeepValidNodes{g, k, *next}, 
         galois::steal<true>()
       );
@@ -618,7 +618,7 @@ struct AsyncTrussTxAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    galois::do_all_local(g, 
+    galois::do_all(g, 
       [&g, &work] (GNode n) {
         for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
@@ -630,7 +630,7 @@ struct AsyncTrussTxAlgo {
       galois::steal<true>()
     );
 
-    galois::for_each_local(work, 
+    galois::for_each(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
       galois::loopname("PickUnsupportedEdges"),
       galois::no_conflicts(),
@@ -638,7 +638,7 @@ struct AsyncTrussTxAlgo {
       galois::per_iter_alloc()
     );
 
-    galois::for_each_local(unsupported,
+    galois::for_each(unsupported,
       PropagateEdgeRemoval{g, k-2},
       galois::loopname("PropagateEdgeRemoval"),
       galois::per_iter_alloc()
@@ -750,7 +750,7 @@ struct AsyncTrussTxAlgo {
 
     // symmetry breaking: 
     // consider only edges (i, j) where i < j
-    galois::do_all_local(g, 
+    galois::do_all(g, 
       [&g, &work] (GNode n) {
         for (auto e: g.edges(n, galois::MethodFlag::UNPROTECTED)) {
           auto dst = g.getEdgeDst(e);
@@ -762,7 +762,7 @@ struct AsyncTrussTxAlgo {
       galois::steal<true>()
     );
 
-    galois::for_each_local(work, 
+    galois::for_each(work, 
       PickUnsupportedEdges{g, k-2, unsupported},
       galois::loopname("PickUnsupportedEdges"),
       galois::no_conflicts(),
@@ -770,7 +770,7 @@ struct AsyncTrussTxAlgo {
       galois::per_iter_alloc()
     );
 
-    galois::for_each_local(unsupported,
+    galois::for_each(unsupported,
       PropagateEdgeRemoval{g, k-2},
       galois::loopname("PropagateEdgeRemoval"),
       galois::per_iter_alloc()

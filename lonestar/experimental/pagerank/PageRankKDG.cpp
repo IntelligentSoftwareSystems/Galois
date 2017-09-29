@@ -147,7 +147,7 @@ protected:
         break;
 
       case UNORD:
-        galois::for_each_local (
+        galois::for_each (
             graph,
             [this] (GNode src, galois::UserContext<GNode>& ctx) {
               // visitNhood (src);

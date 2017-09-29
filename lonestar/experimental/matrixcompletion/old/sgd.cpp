@@ -245,7 +245,7 @@ void verify(Graphp g){
     typedef galois::DGReducible<double> AccumDouble;
     AccumDouble rms;
     cout<<"Host:"<<galois::runtime::NetworkInterface::ID<<" is verifying after SGD..\n";
-    //galois::do_all_local(g, [&g,&rms] (DGNode n) {
+    //galois::do_all(g, [&g,&rms] (DGNode n) {
 	auto ei = g->begin();
 	std::advance(ei,num_movie_nodes);
 	unsigned int count=0;
@@ -425,7 +425,7 @@ void deserialize(galois::runtime::DeSerializeBuffer& s) {
 	int movie_host0 = 0;
 	int movie_host1 = 0;
 
-	//galois::for_each_local(g, Process(this,g), "Process");
+	//galois::for_each(g, Process(this,g), "Process");
 /*	unsigned int blockSize = num_user_nodes/galois::runtime::NetworkInterface::Num;
 	for(int i=0;i<galois::runtime::NetworkInterface::Num;i++) {
 	    int blockNum = (galois::runtime::NetworkInterface::ID+i)%galois::runtime::NetworkInterface::Num;

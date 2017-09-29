@@ -201,7 +201,7 @@ struct InitializeGraph {
     } else if (personality == CPU)
     #endif
     // doing a local do all because we are looping over edges
-    galois::do_all_local(
+    galois::do_all(
       nodesWithEdges,
       InitializeGraph{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
@@ -265,7 +265,7 @@ struct PageRank_delta {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
-    galois::do_all_local(
+    galois::do_all(
       allNodes,
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
@@ -321,7 +321,7 @@ struct PageRank {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
       #endif
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         PageRank{ &_graph },
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),

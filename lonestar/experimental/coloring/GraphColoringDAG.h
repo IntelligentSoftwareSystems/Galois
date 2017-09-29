@@ -129,7 +129,7 @@ protected:
     galois::StatTimer t_dag_color ("dag coloring time: ");
 
     t_dag_color.start ();
-    galois::for_each_local (initWork, ColorNodeDAG {*this}, 
+    galois::for_each (initWork, ColorNodeDAG {*this}, 
         galois::loopname ("color-DAG"), galois::wl<WL_ty> ());
     t_dag_color.stop ();
   }

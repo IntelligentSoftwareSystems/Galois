@@ -58,7 +58,7 @@ struct initialize {
 
   Graphp g;
   void static go(Graphp g, std::vector<int>& elements) {
-    galois::for_each_local(elements.begin(), elements.end(), initialize{g}, galois::loopname("initialize"));
+    galois::for_each(elements.begin(), elements.end(), initialize{g}, galois::loopname("initialize"));
   }
 
   void operator() (node_data& item, galois::UserContext<node_data>& cnx) {

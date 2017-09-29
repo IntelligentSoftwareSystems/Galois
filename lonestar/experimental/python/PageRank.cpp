@@ -171,7 +171,7 @@ struct PageRank {
 void initResidual(Graph& graph) {
 
   //use residual for the partial, scaled initial residual
-  galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+  galois::do_all(graph, [&graph] (const typename Graph::GraphNode& src) {
       //contribute residual
       auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
       for (auto ii : graph.edges(src)) {
@@ -182,7 +182,7 @@ void initResidual(Graph& graph) {
       }
     }, galois::steal<true>());
   //scale residual
-  galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+  galois::do_all(graph, [&graph] (const typename Graph::GraphNode& src) {
       auto& data = graph.getData(src);
       auto& dResidual = data.DAd.vAtomicDouble;
       dResidual = dResidual * alpha * (1.0-alpha);
@@ -197,13 +197,13 @@ NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy
 
 //  std::cout << "Running Edge Async version\n";
 //  std::cout << "tolerance: " << tolerance << "\n";
-  galois::do_all_local(*g, Initialization{*g});
+  galois::do_all(*g, Initialization{*g});
   initResidual(*g);
 
 //  galois::StatTimer Tmain;
 //  Tmain.start();  
   typedef galois::worklists::dChunkedFIFO<256> WL;
-  galois::for_each_local(*g, PageRank{*g, tolerance}, galois::wl<WL>());
+  galois::for_each(*g, PageRank{*g, tolerance}, galois::wl<WL>());
 //  Tmain.stop();
   
 //  T.stop();

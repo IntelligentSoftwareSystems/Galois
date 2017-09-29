@@ -95,10 +95,10 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi>  {
     typedef galois::graphsNodeBagPair<> BagPair;
     BagPair bags(graph.size());
 
-    galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
+    galois::do_all(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
     while (!bags.next().empty()) {
       bags.swap();
-      galois::for_each_local(bags.cur(), Copy(graph), galois::wl<WL>());
+      galois::for_each(bags.cur(), Copy(graph), galois::wl<WL>());
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
     } 
   }

@@ -162,12 +162,12 @@ int main(int argc, char** argv) {
   galois::StatTimer T;
   T.start();
 
-  //! [do_all_local example]
+  //! [do_all example]
   galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
-    galois::do_all_local(*graph, Preprocess(initialBad), galois::loopname("findbad"));
-  //! [do_all_local example]
+    galois::do_all(*graph, Preprocess(initialBad), galois::loopname("findbad"));
+  //! [do_all example]
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
@@ -178,15 +178,15 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
-  //! [for_each_local example]
+  //! [for_each example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {
     case nondet: 
-      galois::for_each_local(initialBad, Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
+      galois::for_each(initialBad, Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
       break;
-      //! [for_each_local example]
+      //! [for_each example]
     case detBase:
       galois::for_each(initialBad.begin(), initialBad.end(), Process<>(), galois::wl<DWL>());
       break;

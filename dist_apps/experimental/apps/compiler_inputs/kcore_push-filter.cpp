@@ -95,7 +95,7 @@ struct InitializeGraph2 {
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    galois::do_all_local(
+    galois::do_all(
       nodesWithEdges,
       InitializeGraph2{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
@@ -169,7 +169,7 @@ struct KCoreStep1 {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      galois::do_all_local(
+      galois::do_all(
         allNodes,
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),

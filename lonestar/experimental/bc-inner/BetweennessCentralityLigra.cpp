@@ -214,9 +214,9 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
       ++round;
       Bag* output = new Bag(graph.size());
       this->outEdgeMap(memoryLimit, graph, ForwardPass(), *frontier, *output, false);
-      //galois::do_all_local(*output, [&](GNode n) {
+      //galois::do_all(*output, [&](GNode n) {
       //galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      galois::for_each_local(*output, [&](size_t id, galois::UserContext<size_t>&) {
+      galois::for_each(*output, [&](size_t id, galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
         d.visited = true;
         },galois::wl<WL>()); 
@@ -226,7 +226,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
     delete levels[round];
 
-    galois::do_all_local(graph, [&](GNode n) {
+    galois::do_all(graph, [&](GNode n) {
         SNode& d = graph.getData(n, galois::MethodFlag::UNPROTECTED);
         d.numPaths.write(1.0/d.numPaths.read());
         d.visited = false;
@@ -234,8 +234,8 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
     frontier = levels[round-1];
 
-    //galois::do_all_local(*frontier, [&](GNode n) {
-    galois::for_each_local(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
+    //galois::do_all(*frontier, [&](GNode n) {
+    galois::for_each(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
       SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
       d.visited = true;
       d.dependencies.write(d.dependencies.read() + d.numPaths.read());
@@ -246,8 +246,8 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
       this->inEdgeMap(memoryLimit, graph, BackwardPass(), *frontier, output, false);
       delete frontier;
       frontier = levels[r];
-      //galois::do_all_local(*frontier, [&](GNode n) {
-      galois::for_each_local(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
+      //galois::do_all(*frontier, [&](GNode n) {
+      galois::for_each(*frontier, [&](size_t id, galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), galois::MethodFlag::UNPROTECTED);
         d.visited = true;
         d.dependencies.write(d.dependencies.read() + d.numPaths.read());
@@ -256,7 +256,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
 
     delete frontier;
 
-    galois::do_all_local(graph, [&](GNode n) {
+    galois::do_all(graph, [&](GNode n) {
       SNode& d = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       d.dependencies.write((d.dependencies.read() - d.numPaths.read())
           / d.numPaths.read());
@@ -282,7 +282,7 @@ void run() {
   galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  galois::do_all_local(graph, typename Algo::Initialize(graph));
+  galois::do_all(graph, typename Algo::Initialize(graph));
   algo(graph, source);
   T.stop();
   

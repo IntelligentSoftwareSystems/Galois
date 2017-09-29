@@ -167,7 +167,7 @@ struct InitializeGraph {
     #endif
     {
 
-    galois::do_all_local(
+    galois::do_all(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
@@ -315,7 +315,7 @@ struct BFS {
       } else if (personality == CPU)
     #endif
       {
-      galois::do_all_local(
+      galois::do_all(
         nodesWithEdges,
         BFS(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),

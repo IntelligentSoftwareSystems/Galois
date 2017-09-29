@@ -397,7 +397,7 @@ protected:
       galois::StatTimer t_dag_color("dag edge-coloring time: ");
 
       t_dag_color.start();
-      galois::for_each_local(initWork, ColorNodeEdgeDAG { *this }, galois::loopname("edge-color-DAG"), galois::wl<WL_ty>());
+      galois::for_each(initWork, ColorNodeEdgeDAG { *this }, galois::loopname("edge-color-DAG"), galois::wl<WL_ty>());
       t_dag_color.stop();
    }
    ////////////////////////////////////////////////////////////

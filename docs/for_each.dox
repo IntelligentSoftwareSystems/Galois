@@ -1,5 +1,6 @@
 /**
 \page Manual Manual
+TODO: needs update
 
 \section parallel_loop Parallel Loops
 
@@ -115,7 +116,6 @@ The scheduling policies are listed as follows:
         has a leader, which steals from other packages when its own package is out
         of work. 
         We show an example of using chunked worklists from {@link apps/delaunayrefinement/DelaunayRefinement.cpp}
-        @snippet apps/delaunayrefinement/DelaunayRefinement.cpp for_each_local example
 
 
  - \b OrderedByIntegerMetric
@@ -206,31 +206,6 @@ of the do_all. The arguments are as follows:
 The file {@link apps/tutorial/HelloWorld.cpp} contains some examples of do_all
 loops:
 @snippet apps/tutorial/HelloWorld.cpp do_all example
-
-\subsection for_each_local Locality Aware Loops: for_each_local and do_all_local
-
-Often a parallel loop iterates over (or consumes) data that was produced by a
-previous parallel loop. In such cases, locality can be improved if the threads in
-the consuming loop operate over the same elements they produced in the previous
-loop. This notion of *ownership* of data is supported in Galois, through 
-{@link galois::for_each_local} and {@link galois::do_all_local}. 
-
-The for_each_local and do_all_local are similar to their non-local counterparts, except
-for the first argument. Instead of passing in a pair of iterators, we pass in a
-"locality-aware data structure". A locality aware data structure must support 
-\b local_begin and \b local_end (in addition to \b begin and \b end), which point
-to the range of data items owned/produced by a thread. 
-
-Example of such data-structure is {@link galois::graphs::FirstGraph}, used in 
-{@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
-
-@snippet apps/delaunayrefinement/DelaunayRefinement.cpp do_all_local example
-
-And similarly, for_each_local, in the same file (iterating over a bag 
-{@link galois::InsertBag} of items produced by the do_all_local above):
-
-@snippet apps/delaunayrefinement/DelaunayRefinement.cpp for_each_local example
-
 
 
 \subsection on_each on_each loop

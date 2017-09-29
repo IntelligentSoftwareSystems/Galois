@@ -235,13 +235,13 @@ struct Async {
     auto marker = LNodeSetMarker<Graph>(graph);
 
     if(algo == Algo::asyncB_hset)
-      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<HSet>());
+      galois::for_each(graph, Process(graph, tolerance), galois::wl<HSet>());
     else if(algo == Algo::asyncB_mset)
-      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<MSet>(marker));
+      galois::for_each(graph, Process(graph, tolerance), galois::wl<MSet>(marker));
     else if(algo == Algo::asyncB_oset)
-      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<OSet>());
+      galois::for_each(graph, Process(graph, tolerance), galois::wl<OSet>());
     else
-      galois::for_each_local(graph, Process(graph, tolerance), galois::wl<WL>());
+      galois::for_each(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {
@@ -344,10 +344,10 @@ struct AsyncNodePri{
     galois::InsertBag<GNode> bag;
     PRPri pri(graph, tolerance);
     auto marker = LNodeSetMarker<Graph>(graph);
-    // galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+    // galois::do_all(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });
-    // galois::for_each_local(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
+    // galois::for_each(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
 
     if(algo == Algo::asyncB_prt_mset)
       galois::for_each(graph.begin(), graph.end(),
@@ -386,7 +386,7 @@ void run() {
   std::cout << "tolerance: " << tolerance << "\n";
   std::cout << "effective amp: " << eamp << "\n";
   T.start();
-  galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+  galois::do_all(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   algo(graph, tolerance, eamp);
   T.stop();
   

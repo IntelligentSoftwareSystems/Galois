@@ -136,7 +136,7 @@ struct AsyncEdge {
     initResidual(graph);
     if (!edgePri) {
       typedef galois::worklists::dChunkedFIFO<256> WL;
-      galois::for_each_local(graph, Process(graph, tolerance, amp), galois::wl<WL>());
+      galois::for_each(graph, Process(graph, tolerance, amp), galois::wl<WL>());
     } else {
       typedef galois::worklists::dChunkedFIFO<32> WL;
       //typedef galois::worklists::AltChunkedFIFO<32> WL;
@@ -280,7 +280,7 @@ struct AsyncEdgePriSet {
     unsigned long long totaldid = 0;
 
     //First do all the nodes once
-    galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, Pstats, 0.0), galois::steal<true>());
+    galois::do_all(graph, Process(graph, tolerance, nextWL, stats, Pstats, 0.0), galois::steal<true>());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -319,13 +319,13 @@ struct AsyncEdgePriSet {
 
       if (count < 50000) {
         //limit = 0.0;
-        galois::for_each_local(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit));
+        galois::for_each(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit));
         return;
       }
       // std::cout << round << " Count is " << count << " next limit is " << limit << " max is " << max << " std " << sdev << " did " << total << "\n";
       // totaldid += total;
       // ++round;
-      galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit), galois::steal<true>());
+      galois::do_all(curWL, Process(graph, tolerance, nextWL, stats, Pstats, limit), galois::steal<true>());
     }
     std::cout << "Did " << totaldid << " (in rounds)\n";
   }
