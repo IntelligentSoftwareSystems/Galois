@@ -200,7 +200,7 @@ class PQuadTree {
   void init(IterTy begin, IterTy end) {
     MinBox least;
     MaxBox most;
-    galois::do_all(begin, end, ComputeBox(least, most));
+    galois::do_all(galois::iterate(begin, end), ComputeBox(least, most));
     //std::for_each(begin, end, ComputeBox(least, most));
 
     MTuple<true> mmost = most.reduce();
@@ -372,7 +372,7 @@ public:
     WorkTy work;
     std::back_insert_iterator<WorkTy> it(work);
     divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
-    galois::for_each(work.begin(), work.end(), PAdd<PointsBufTy::iterator>(), galois::wl<WL>());
+    galois::for_each(galois::iterate(work), PAdd<PointsBufTy::iterator>(), galois::wl<WL>());
   }
 
   ~PQuadTree() {

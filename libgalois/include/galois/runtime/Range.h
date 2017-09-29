@@ -298,7 +298,7 @@ public:
 
   template <typename Arg>
   auto operator () (const Arg& argTuple) const {
-    return runtime::makeStandardRange(m_cont.cbegin(), m_cont.cend());
+    return runtime::makeStandardRange(m_cont.begin(), m_cont.end());
   }
 };
 

@@ -252,19 +252,19 @@ struct DefaultAlgo {
 
     switch (algo) {
       case nondet: 
-        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
+        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
         break;
       case detBase:
-        galois::for_each(graph.begin(), graph.end(), Process<>(graph), galois::loopname("Main"), galois::wl<DWL>());
+        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<DWL>());
         break;
       case detPrefix:
-        galois::for_each(graph.begin(), graph.end(), Process<>(graph),
+        galois::for_each(galois::iterate(graph), Process<>(graph),
             galois::loopname("Main"), galois::wl<DWL>(),
             galois::make_trait_with_args<galois::neighborhood_visitor>(Process<detPrefix>(graph))
             );
         break;
       case detDisjoint:
-        galois::for_each(graph.begin(), graph.end(), Process<detDisjoint>(graph), galois::wl<DWL>());
+        galois::for_each(galois::iterate(graph), Process<detDisjoint>(graph), galois::wl<DWL>());
         break;
       case orderedBase:
         galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
@@ -365,22 +365,22 @@ struct PullAlgo {
       numProcessed.reset();
 
       if (!cur->empty()) {
-        typedef galois::worklists::StableIterator<> WL;
+        // typedef galois::worklists::StableIterator<> WL;
         //galois::for_each(*cur, pull, galois::wl<WL>());
-        galois::do_all(*cur, pull);
+        galois::do_all(galois::iterate(*cur), pull, galois::loopname("pull-0"));
       }
 
       size_t numCur = numProcessed.reduce();
       std::advance(ei, std::min(size, delta) - numCur);
 
       if (ii != ei)
-        galois::do_all(ii, ei, pull);
+        galois::do_all(galois::iterate(ii, ei), pull, galois::loopname("pull-1"));
       ii = ei;
 
       numTaken.reset();
 
-      galois::do_all(matched, takeMatched);
-      galois::do_all(otherMatched, takeOtherMatched);
+      galois::do_all(galois::iterate(matched), takeMatched, galois::loopname("takeMatched"));
+      galois::do_all(galois::iterate(otherMatched), takeOtherMatched, galois::loopname("takeOtherMatched"));
 
       cur->clear();
       matched.clear();

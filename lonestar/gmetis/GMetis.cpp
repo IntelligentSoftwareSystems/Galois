@@ -136,16 +136,6 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
 //printGraphBeg(*graph)
 
-struct parallelInitMorphGraph {
-  GGraph &graph;
-  parallelInitMorphGraph(GGraph &g):graph(g) {  }
-  void operator()(GNode node) const {
-    for (auto jj : graph.edges(node)) {
-      graph.getEdgeData(jj)=1;
-      // weight+=1;
-    }
-  }
-};
 typedef galois::graphs::FileGraph FG;
 typedef FG::GraphNode FN;
 template<typename GNode, typename Weights>
@@ -166,75 +156,46 @@ struct order_by_degree {
     return wa < wb;
   }
 };
-typedef galois::substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
-struct OrderGraph {
-  GGraph &graph;
-  PerThreadDegInfo &threadDegInfo;
-  OrderGraph(GGraph &g,PerThreadDegInfo &ti):graph(g),threadDegInfo(ti) {
 
-  }
-  template<typename Context>
-  void operator()(int part, Context &lwl) {
-    auto flag = galois::MethodFlag::UNPROTECTED;
-    typedef std::vector<std::pair<unsigned,GNode>, galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
-    //copy and translate all edges
-    GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
-    for (auto n : graph) {
-      auto &nd = graph.getData(n,flag); 
-      if (static_cast<int>(nd.getPart()) == part) {
-        int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
-        orderedNodes.push_back(std::make_pair(edges,n));
-      }
-    } 
-    std::sort(orderedNodes.begin(),orderedNodes.end());
-    int index = 0;
-    std::map<GNode, uint64_t> &threadMap(*threadDegInfo.getLocal());
-    for (auto p : orderedNodes) {
-      GNode n = p.second;
-      threadMap[n] += index;
-      for (auto eb : graph.edges(n, flag)) {
-        GNode neigh = graph.getEdgeDst(eb);
-        auto &nd = graph.getData(neigh,flag);
-        if (static_cast<int>(nd.getPart()) == part) { 
-          threadMap[neigh] += index;
-        }
-      }
-      index++;
-    }
-  }
-};
+typedef galois::substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
+
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
   srand(-1);
   MetisGraph metisGraph;
-  GGraph* graph = metisGraph.getGraph();
+  GGraph& graph = *metisGraph.getGraph();
 
-  galois::graphs::readGraph(*graph, filename);
+  galois::graphs::readGraph(graph, filename);
 
-  galois::do_all(*graph, parallelInitMorphGraph(*graph));
+  galois::do_all(galois::iterate(graph), 
+      [&] (GNode node) {
+        for (auto jj : graph.edges(node)) {
+          graph.getEdgeData(jj)=1;
+          // weight+=1;
+        }
+      },
+      galois::loopname("initMorphGraph"));
 
   graphStat(graph);
   std::cout << "\n";
-
-  //printGraphBeg(*graph);
 
   galois::reportPageAlloc("MeminfoPre");
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
   Partition(&metisGraph, numPartitions);
   galois::reportPageAlloc("MeminfoPost");
 
-  std::cout << "Total edge cut: " << computeCut(*graph) << "\n";
+  std::cout << "Total edge cut: " << computeCut(graph) << "\n";
 
   if (outfile != "") {   
     MetisGraph* coarseGraph = &metisGraph;
     while (coarseGraph->getCoarserGraph())
       coarseGraph = coarseGraph->getCoarserGraph();
     std::ofstream outFile(outfile.c_str());
-    for (auto it = graph->begin(), ie = graph->end(); it!=ie; it++)
+    for (auto it = graph.begin(), ie = graph.end(); it!=ie; it++)
     {
-      unsigned gPart = graph->getData(*it).getPart();
+      unsigned gPart = graph.getData(*it).getPart();
       outFile<< gPart<< '\n';
     }
   }
@@ -245,14 +206,47 @@ int main(int argc, char** argv) {
     typedef galois::LargeArray<GNode> Permutation;
     Permutation perm; 
     perm.create(g.size());
-    std::copy(graph->begin(),graph->end(), perm.begin());
+    std::copy(graph.begin(),graph.end(), perm.begin());
     PerThreadDegInfo threadDegInfo; 
-    OrderGraph og(*graph,threadDegInfo);
     std::vector<int> parts(numPartitions);
     for (unsigned int i=0;i<parts.size();i++){ 
       parts[i] = i;
     } 
-    galois::for_each(parts.begin(), parts.end(), og, galois::loopname("Order Graph"));
+
+    using WL = galois::worklists::dChunkedFIFO<16>;
+
+    galois::for_each(galois::iterate(parts), 
+        [&] (int part, auto& lwl) {
+          auto flag = galois::MethodFlag::UNPROTECTED;
+          typedef std::vector<std::pair<unsigned,GNode>, galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
+          //copy and translate all edges
+          GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
+          for (auto n : graph) {
+            auto &nd = graph.getData(n,flag); 
+            if (static_cast<int>(nd.getPart()) == part) {
+              int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
+              orderedNodes.push_back(std::make_pair(edges,n));
+            }
+          } 
+          std::sort(orderedNodes.begin(),orderedNodes.end());
+          int index = 0;
+          std::map<GNode, uint64_t> &threadMap(*threadDegInfo.getLocal());
+          for (auto p : orderedNodes) {
+            GNode n = p.second;
+            threadMap[n] += index;
+            for (auto eb : graph.edges(n, flag)) {
+              GNode neigh = graph.getEdgeDst(eb);
+              auto &nd = graph.getData(neigh,flag);
+              if (static_cast<int>(nd.getPart()) == part) { 
+                threadMap[neigh] += index;
+              }
+            }
+            index++;
+          }
+        },
+        galois::wl<WL>(),
+        galois::loopname("Order Graph"));
+
     std::map<GNode,uint64_t> globalMap;
     for (unsigned int i = 0; i < threadDegInfo.size(); i++) { 
       std::map<GNode,uint64_t> &localMap(*threadDegInfo.getRemote(i));
@@ -260,10 +254,10 @@ int main(int argc, char** argv) {
         globalMap[mb->first] = mb->second;
       }
     }
-    order_by_degree<GNode,std::map<GNode,uint64_t> > fn(*graph,globalMap);
+    order_by_degree<GNode,std::map<GNode,uint64_t> > fn(graph,globalMap);
     std::map<GNode,int> nodeIdMap; 
     int id = 0;
-    for (auto nb = graph->begin(), ne = graph->end(); nb != ne; nb++) { 
+    for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) { 
       nodeIdMap[*nb] = id; 
       id++;
     }

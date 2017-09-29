@@ -107,8 +107,12 @@ int main(int argc, char** argv) {
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  galois::do_all(graph, 
-                       [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
+  galois::do_all(galois::iterate(graph), 
+      [&graph] (GNode n) { 
+        graph.getData(n) = DIST_INFINITY; 
+      }, 
+      galois::no_stats());
+
   graph.getData(source) = 0;
   galois::StatTimer Tmain;
   Tmain.start();
@@ -117,7 +121,7 @@ int main(int argc, char** argv) {
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
 
-  galois::for_each(UpdateRequest{source, 0}, 
+  galois::for_each(galois::iterate( { UpdateRequest{source, 0} } ),
       [&] (const UpdateRequest& req, auto& ctx) {
         const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
         Dist sdist = graph.getData(req.n, flag);

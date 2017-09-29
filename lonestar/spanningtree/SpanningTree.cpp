@@ -95,7 +95,7 @@ struct DemoAlgo {
     if (ii != ei) {
       Node* root = &graph.getData(*ii);
 
-      galois::for_each(*ii, 
+      galois::for_each(galois::iterate( { *ii }), 
           [&] (GNode src, auto& ctx) {
             for (auto ii : graph.edges(src, galois::MethodFlag::WRITE)) {
               GNode dst = graph.getEdgeDst(ii);
@@ -107,7 +107,8 @@ struct DemoAlgo {
               ctx.push(dst);
             }
           },
-          galois::loopname("DemoAlgo"));
+          galois::loopname("DemoAlgo"),
+          galois::wl<galois::worklists::dChunkedFIFO<32> >());
     }
   }
 };
@@ -128,7 +129,7 @@ struct AsyncAlgo {
   void operator()() {
     galois::GAccumulator<size_t> emptyMerges;
 
-    galois::do_all(graph, 
+    galois::do_all(galois::iterate(graph), 
         [&] (const GNode& src) {
           Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
           for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
@@ -143,7 +144,9 @@ struct AsyncAlgo {
         },
         galois::loopname("Merge"), galois::steal<true>());
 
-    galois::do_all(graph, Normalize(), galois::loopname("Normalize"));
+    galois::do_all(galois::iterate(graph), 
+        Normalize(), 
+        galois::loopname("Normalize"));
 
     galois::runtime::reportStat_Serial("SpanningTree", "emptyMerges", emptyMerges.reduce());
   }
@@ -184,7 +187,7 @@ struct BlockedAsyncAlgo {
     galois::InsertBag<WorkItem> items;
 
 
-    galois::do_all(graph, 
+    galois::do_all(galois::iterate(graph), 
         [&] (const GNode& src) {
           Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
           if (galois::substrate::ThreadPool::getPackage() == 0) {
@@ -195,7 +198,7 @@ struct BlockedAsyncAlgo {
         },
         galois::loopname("Initialize"));
 
-    galois::for_each(items, 
+    galois::for_each(galois::iterate(items), 
         [&] (const WorkItem& i, auto& ctx) {
           process<true, 0>(i.src, i.start, ctx);
           
@@ -205,7 +208,9 @@ struct BlockedAsyncAlgo {
         galois::wl<galois::worklists::dChunkedFIFO<128> >());
 
     //! Normalize component by doing find with path compression
-    galois::do_all(graph, Normalize(), galois::loopname("Normalize"));
+    galois::do_all(galois::iterate(graph), 
+      Normalize(), 
+      galois::loopname("Normalize"));
   }
 };
 
@@ -230,43 +235,35 @@ struct is_bad_mst {
   }
 };
 
-struct CheckAcyclic {
-  struct Accum {
-    galois::GAccumulator<unsigned> roots;
-  };
+bool checkAcyclic (void) {
 
-  Accum* accum;
-
-  void operator()(const GNode& n) const {
-    Node& data = graph.getData(n);
-    if (data.component() == &data)
-      accum->roots += 1;
+  galois::GAccumulator<unsigned> roots;
+  galois::do_all(galois::iterate(graph), 
+      [&] (const GNode& n) {
+        Node& data = graph.getData(n);
+        if (data.component() == &data)
+          roots += 1;
+      },
+      galois::no_stats());
+      
+  unsigned numRoots = roots.reduce();
+  unsigned numEdges = std::distance(mst.begin(), mst.end());
+  if (graph.size() - numRoots != numEdges) {
+    std::cerr << "Generated graph is not a forest. "
+      << "Expected " << graph.size() - numRoots << " edges but "
+      << "found " << numEdges << "\n";
+    return false;
   }
 
-  bool operator()() {
-    Accum a;
-    accum = &a;
-    galois::do_all(graph, *this);
-    unsigned numRoots = a.roots.reduce();
-    unsigned numEdges = std::distance(mst.begin(), mst.end());
-    if (graph.size() - numRoots != numEdges) {
-      std::cerr << "Generated graph is not a forest. "
-        << "Expected " << graph.size() - numRoots << " edges but "
-        << "found " << numEdges << "\n";
-      return false;
-    }
-
-    std::cout << "Num trees: " << numRoots << "\n";
-    std::cout << "Tree edges: " << numEdges << "\n";
-    return true;
-  }
+  std::cout << "Num trees: " << numRoots << "\n";
+  std::cout << "Tree edges: " << numEdges << "\n";
+  return true;
 };
 
 bool verify() {
   if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
     if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      CheckAcyclic c;
-      return c();
+      return checkAcyclic();
     }
   }
   return false;

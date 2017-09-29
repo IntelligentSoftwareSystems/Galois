@@ -52,8 +52,6 @@ static cll::opt<int> M(cll::Positional, cll::desc("<num variables>"), cll::Requi
 static cll::opt<int> N(cll::Positional, cll::desc("<num clauses>"), cll::Required);
 static cll::opt<int> K(cll::Positional, cll::desc("<variables per clause>"), cll::Required);
 
-//#define WLWL LocalQueues<ChunkedFIFO<1024>, FIFO<> >
-#define WLWL dChunkedFIFO<1024>
 
 //SAT problem:
 //variables Xi E {0,1}, i E {1 .. N), M constraints
@@ -157,8 +155,8 @@ void initialize_random_formula(int M, int N, int K) {
       //extra complex to generate uniform rand value
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
-	touse.push_back(newK);
-	graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
+        touse.push_back(newK);
+        graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
@@ -175,15 +173,15 @@ void print_formula() {
     GNode N = clauses[m].first;
     for (auto ii : graph.edges(N, galois::MethodFlag::UNPROTECTED)) {
       if (ii != graph.edge_begin(N, galois::MethodFlag::UNPROTECTED))
-	std::cout << " | ";
+        std::cout << " | ";
       SPEdge& E = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
       if (E.isNegative)
-	std::cout << "-";
-      
+        std::cout << "-";
+
       SPNode& V = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
       std::cout << "v" << V.name;
       if (V.solved)
-	std::cout << "[" << (V.value ? 1 : 0) << "]";
+        std::cout << "[" << (V.value ? 1 : 0) << "]";
       std::cout << "{" << E.eta << "," << V.Bias << "," << (V.value ? 1 : 0) << "}";
       std::cout << " ";
     }
@@ -282,10 +280,9 @@ void SP_algorithm() {
   
   //  tlimit += tmax;
 
-  //FIXME: check obim again
-  //  Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), galois::loopname("update_eta"));
-  galois::for_each(
-      clauses.begin(), clauses.end(), 
+  using WL = galois::worklists::dChunkedFIFO<1024>;
+
+  galois::for_each( galois::iterate(clauses), 
       [&] (const std::pair<GNode, int>& p, auto& ctx) {
 
         GNode a = p.first;
@@ -322,7 +319,7 @@ void SP_algorithm() {
 
       },
       galois::loopname("update_eta"), 
-      galois::wl<WLWL>());
+      galois::wl<WL>());
 
   maxBias.reset();
   numBias.reset();
@@ -330,7 +327,7 @@ void SP_algorithm() {
   nontrivial.reset();
 
   // update_biases
-  galois::do_all(literalsN.begin(), literalsN.end(), 
+  galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
         SPNode& idata = graph.getData(i, galois::MethodFlag::UNPROTECTED);
         if (idata.solved) return;
@@ -389,7 +386,7 @@ void decimate() {
   const double limit = d;
 
   // fix_variables
-  galois::do_all(literalsN.begin(), literalsN.end(), 
+  galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
         SPNode& idata = graph.getData(i);
         if (idata.solved) return;

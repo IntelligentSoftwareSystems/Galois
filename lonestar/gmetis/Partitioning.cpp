@@ -282,7 +282,10 @@ void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int ne
         iterationInfo.getRemote(i)->second.second = NULL; 
       }
       KLMatch matchIter(graph,iterationInfo,oldPartNum,newPartNum);
-      galois::for_each(boundary.begin(),boundary.end(), matchIter,galois::wl<galois::worklists::ChunkedLIFO<32> >());
+      galois::for_each(galois::iterate(boundary), 
+          matchIter,
+          galois::loopname("KLMatch"),
+          galois::wl<galois::worklists::ChunkedLIFO<32> >());
       PartMatch bestMatch;
       bestMatch.first = INT_MIN;
       for (unsigned int i = 0; i < iterationInfo.size(); i++) {
@@ -410,22 +413,20 @@ struct parallelBisect {
   }
 };
 
-struct initPart {
-  GGraph& g;
-  initPart(GGraph& _g): g(_g) {}
-  void operator()(GNode item) const {
-    g.getData(item, galois::MethodFlag::UNPROTECTED).initRefine(0,true);
-    g.getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
-  }
-};
-
 } //anon namespace
 
 
 std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, InitialPartMode partMode) {
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight());
-  galois::do_all(*mcg->getGraph(), initPart(*mcg->getGraph()));
+
+  galois::do_all(galois::iterate(*mcg->getGraph()), 
+      [g=mcg->getGraph()] (GNode item) {
+        g->getData(item, galois::MethodFlag::UNPROTECTED).initRefine(0,true);
+        g->getData(item, galois::MethodFlag::UNPROTECTED).initPartition();
+      },
+      galois::loopname("initPart"));
+
   bool serialPartition = false;
   if (serialPartition) {
   serialBisect<bisect_GGGP>(mcg, numPartitions, parts)();
@@ -433,11 +434,17 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
     switch (partMode) {
       case GGP:
         std::cout <<"\n  Sarting initial partitioning using GGP:\n";
-        galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), galois::wl<galois::worklists::ChunkedLIFO<1>>());
+        galois::for_each(galois::iterate( {&parts[0]} ), 
+            parallelBisect<bisect_GGP>(mcg, numPartitions, parts), 
+            galois::loopname("parallelBisect"),
+            galois::wl<galois::worklists::ChunkedLIFO<1>>());
         break;
       case GGGP:
         std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
-        galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), galois::wl<galois::worklists::ChunkedLIFO<1>>());
+        galois::for_each(galois::iterate( {&parts[0]} ), 
+            parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), 
+            galois::loopname("parallelBisect"),
+            galois::wl<galois::worklists::ChunkedLIFO<1>>());
         break;
       default: abort();
     }

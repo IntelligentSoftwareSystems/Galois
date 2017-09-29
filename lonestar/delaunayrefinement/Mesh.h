@@ -45,7 +45,7 @@ struct is_bad {
 struct create_nodes {
   Graph* g;
   create_nodes(Graph* _g): g(_g) {}
-  void operator()(Element& item) const {
+  void operator()(const Element& item) const {
     GNode n = g->createNode(item);
     g->addNode(n);
   }
@@ -382,7 +382,7 @@ private:
     divide(elements.begin(), elements.end());
 
     if (parallelAllocate) 
-      galois::do_all(elements.begin(), elements.end(), create_nodes(mesh), galois::loopname("allocate"));
+      galois::do_all(galois::iterate(elements), create_nodes(mesh), galois::loopname("allocate"));
     else
       std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
 

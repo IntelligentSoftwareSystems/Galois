@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
   galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
-    galois::do_all(*graph, Preprocess(initialBad), galois::loopname("findbad"));
+    galois::do_all(galois::iterate(*graph), Preprocess(initialBad), galois::loopname("findbad"));
   //! [do_all example]
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
@@ -184,18 +184,18 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      galois::for_each(initialBad, Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
+      galois::for_each(galois::iterate(initialBad), Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
       break;
       //! [for_each example]
     case detBase:
-      galois::for_each(initialBad.begin(), initialBad.end(), Process<>(), galois::wl<DWL>());
+      galois::for_each(galois::iterate(initialBad), Process<>(), galois::wl<DWL>());
       break;
     case detPrefix:
-      galois::for_each(initialBad.begin(), initialBad.end(), Process<>(),
+      galois::for_each(galois::iterate(initialBad), Process<>(),
           galois::wl<DWL>(), galois::neighborhood_visitor<Process<detPrefix>>());
       break;
     case detDisjoint:
-      galois::for_each(initialBad.begin(), initialBad.end(), Process<detDisjoint>(), galois::wl<DWL>());
+      galois::for_each(galois::iterate(initialBad), Process<detDisjoint>(), galois::wl<DWL>());
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }

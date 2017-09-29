@@ -90,50 +90,6 @@ void getRandomPoints(vector<LeafNode*> & lights, int numPoints){
 	    }
 	    return;
 }
-/*********************************************************************************************/
-galois::GAccumulator<size_t> addedNodes;
-struct FindMatching {
-	KdTree * tree;
-	galois::InsertBag<NodeWrapper *> *newNodes;
-	galois::InsertBag<NodeWrapper *> &allocs;
-	vector<double> * coordinatesArray;
-	vector<ClusterNode*> &clusterArray;
-
-	FindMatching(KdTree * pT,galois::InsertBag<NodeWrapper *> *&pNNodes, galois::InsertBag<NodeWrapper *> &pAllocs,
-			vector<double> * pCoordinatesArray,vector<ClusterNode*> &pClusterArray):
-		tree(pT), newNodes(pNNodes), allocs(pAllocs),coordinatesArray(pCoordinatesArray), clusterArray(pClusterArray)
-	{
-	}
-	template<typename ContextTy>
-	void operator()(NodeWrapper * nodeA, ContextTy& lwl) {
-		if (tree->contains(*nodeA)) {
-				NodeWrapper * nodeB = tree->findBestMatch((*nodeA));
-				if (nodeB != NULL && tree->contains(*nodeB)) {
-					NodeWrapper * nodeBMatch = tree->findBestMatch((*nodeB));
-					if (nodeBMatch!=NULL ){
-						if(nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB)==false) {
-							//Create a new node here.
-							if(nodeA<nodeB){
-								//galois::Allocator::
-								NodeWrapper * newNode = new NodeWrapper(*nodeA, *nodeB, coordinatesArray,clusterArray);
-								newNodes->push(newNode);
-								allocs.push(newNode);
-								addedNodes +=1;
-							}
-						}
-						else{
-							addedNodes +=1;
-							newNodes->push(nodeA);
-						}
-					}
-				}
-				else{
-					addedNodes +=1;
-					newNodes->push(nodeA);
-				}
-		}
-	}
-};
 
 ////////////////////////////////////////////////////////////
 int findMatch(KdTree * tree, NodeWrapper * nodeA,galois::InsertBag<NodeWrapper *> *&newNodes, galois::InsertBag<NodeWrapper *> &allocs,
@@ -194,9 +150,10 @@ void clusterGalois(vector<LeafNode*> & lights) {
 	for(unsigned int i=0;i<workListOld.size();i++){
 		workList.push_back(workListOld[i]);
 	}
+  galois::GAccumulator<size_t> addedNodes;
 	galois::InsertBag<NodeWrapper *> *newNodes;
 	galois::InsertBag<NodeWrapper *> allocs;
-	FindMatching findMatchingLambda(tree,newNodes, allocs,coordinatesArray,clusterArray);
+
 	galois::StatTimer T;
 	T.start();
 
@@ -205,11 +162,41 @@ void clusterGalois(vector<LeafNode*> & lights) {
 
 		addedNodes.reset();
 
-		findMatchingLambda.newNodes=newNodes;
-		findMatchingLambda.tree=tree;
-
     using WL = galois::worklists::dChunkedFIFO<16>;
-		galois::for_each(workList.begin(),workList.end(),findMatchingLambda, galois::wl<WL>(), galois::timeit(), galois::loopname("Main"));
+
+    // find matching
+		galois::for_each(galois::iterate(workList), 
+        [&] (NodeWrapper* nodeA, auto& lwl) {
+          if (tree->contains(*nodeA)) {
+              NodeWrapper * nodeB = tree->findBestMatch((*nodeA));
+              if (nodeB != NULL && tree->contains(*nodeB)) {
+                NodeWrapper * nodeBMatch = tree->findBestMatch((*nodeB));
+                if (nodeBMatch!=NULL ){
+                  if(nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB)==false) {
+                    //Create a new node here.
+                    if(nodeA<nodeB){
+                      //galois::Allocator::
+                      NodeWrapper * newNode = new NodeWrapper(*nodeA, *nodeB, coordinatesArray,clusterArray);
+                      newNodes->push(newNode);
+                      allocs.push(newNode);
+                      addedNodes +=1;
+                    }
+                  }
+                  else{
+                    addedNodes +=1;
+                    newNodes->push(nodeA);
+                  }
+                }
+              }
+              else{
+                addedNodes +=1;
+                newNodes->push(nodeA);
+              }
+          }
+        },
+        
+        
+        galois::wl<WL>(), galois::timeit(), galois::loopname("Main"));
 
 		size += addedNodes.reduce();
 

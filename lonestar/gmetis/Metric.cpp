@@ -62,10 +62,10 @@ struct onlineStat {
 };
     
 
-unsigned  graphStat(GGraph* graph) {
+unsigned  graphStat(GGraph& graph) {
   onlineStat e;
-  for (auto ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-    unsigned val = std::distance(graph->edge_begin(*ii), graph->edge_end(*ii));
+  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+    unsigned val = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
     e.add(val);
   }
   std::cout << "Nodes " << e.count()

@@ -137,7 +137,7 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 
 void initResidual(Graph& graph) {
   // use residual for the partial, scaled initial residual
-  galois::do_all(graph,
+  galois::do_all(galois::iterate(graph),
                        [&graph](const typename Graph::GraphNode& src) {
                          // contribute residual
                          auto nout = std::distance(graph.edge_begin(src),
@@ -148,13 +148,15 @@ void initResidual(Graph& graph) {
                            atomicAdd(ddata.residual, 1.0 / nout);
                          }
                        },
+                       galois::loopname("init-res-0"),
                        galois::steal<true>());
   // scale residual
-  galois::do_all(graph,
+  galois::do_all(galois::iterate(graph),
                        [&graph](const typename Graph::GraphNode& src) {
                          auto& data    = graph.getData(src);
                          data.residual = data.residual * alpha * (1.0 - alpha);
                        },
+                       galois::loopname("init-res-1"),
                        galois::steal<true>());
 }
 
@@ -179,16 +181,19 @@ int main(int argc, char** argv) {
 
   std::cout << "Running Edge Async version\n";
   std::cout << "tolerance: " << tolerance << "\n";
-  galois::do_all(graph, [&graph](typename Graph::GraphNode n) {
-    graph.getData(n).init();
-  });
+
+  galois::do_all(galois::iterate(graph), 
+      [&graph](typename Graph::GraphNode n) {
+        graph.getData(n).init();
+      }, 
+      galois::no_stats());
+
   initResidual(graph);
   typedef galois::worklists::dChunkedFIFO<256> WL;
 
   galois::StatTimer Tmain;
   Tmain.start();
-  galois::for_each(
-      graph,
+  galois::for_each(galois::iterate(graph),
       [&](GNode src, auto& ctx) {
         LNode& sdata = graph.getData(src);
         constexpr const galois::MethodFlag flag =

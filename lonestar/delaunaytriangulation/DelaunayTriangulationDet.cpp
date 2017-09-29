@@ -526,8 +526,7 @@ static void generateRounds(PointList& points, bool addBoundary) {
     if (true) {
       if (detAlgo == nondet) {
         galois::do_all(
-            boost::counting_iterator<size_t>(0),
-            boost::counting_iterator<size_t>(size),
+            galois::iterate(0ul, size),
             GenerateRounds(ordered, log2), 
             galois::loopname("GenerateRounds"));
       } else {
@@ -654,11 +653,11 @@ static void generateMesh() {
     galois::InsertBag<Point*>& pptrs = rounds[i];
     switch (detAlgo) {
       case nondet:
-        galois::for_each(pptrs, Process<>(&tree), galois::wl<Chunked>()); break;
+        galois::for_each(galois::iterate(pptrs), Process<>(&tree), galois::wl<Chunked>()); break;
       case detBase:
-        galois::for_each(pptrs, Process<>(&tree), galois::wl<DWL>()); break;
+        galois::for_each(galois::iterate(pptrs), Process<>(&tree), galois::wl<DWL>()); break;
       case detPrefix:
-        galois::for_each(pptrs, Process<>(&tree), galois::wl<DWL>(),
+        galois::for_each(galois::iterate(pptrs), Process<>(&tree), galois::wl<DWL>(),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
             galois::neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
 #else
@@ -667,7 +666,7 @@ static void generateMesh() {
               );
         break;
       case detDisjoint:
-        galois::for_each(pptrs, Process<detDisjoint>(&tree), galois::wl<DWL>());
+        galois::for_each(galois::iterate(pptrs), Process<detDisjoint>(&tree), galois::wl<DWL>());
         break;
       default: GALOIS_DIE("Unknown algorithm: ", detAlgo);
     }

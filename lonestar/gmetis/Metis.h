@@ -35,8 +35,10 @@
 #include "galois/graphs/LC_Morph_Graph.h"
 
 class MetisNode;
-typedef galois::graphs::LC_Morph_Graph<MetisNode, int> GGraph;
-typedef galois::graphs::LC_Morph_Graph<MetisNode, int>::GraphNode GNode;
+using GGraph = galois::graphs::LC_Morph_Graph<MetisNode, int>;
+using GNode = GGraph::GraphNode;
+using GNodeBag = galois::InsertBag<GNode>;
+
 
 //algorithms
 enum InitialPartMode {GGP, GGGP, MGGGP};
@@ -203,7 +205,7 @@ std::ostream& operator<<(std::ostream& os, const partInfo& p);
 
 //Metrics
 void printPartStats(std::vector<partInfo>&);
-unsigned graphStat(GGraph* graph);
+unsigned graphStat(GGraph& graph);
 std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts);
 void printCuts(const char* str, MetisGraph* g, unsigned numPartitions);
 unsigned computeCut(GGraph& g);

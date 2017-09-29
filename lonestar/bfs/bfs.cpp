@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-  galois::for_each(galois::iterate({ UpdateRequest{source, 0} }
+  galois::for_each(galois::iterate({ UpdateRequest{source, 0} })
       , [&] (const UpdateRequest& req, auto& ctx) {
         const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
         Dist sdist = graph.getData(req.n, flag);

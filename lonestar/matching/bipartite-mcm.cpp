@@ -387,7 +387,7 @@ struct MatchingFF {
     SerialReached reached;
 
     galois::setActiveThreads(Concurrent ? numThreads : 1);
-    galois::for_each(g.A.begin(), g.A.end(), 
+    galois::for_each(galois::iterate(g.A),
         [&, outer=this] (const GraphNode& node, auto& ctx) {
           if (!g.getData(node, flag).free)
             return;
@@ -435,28 +435,6 @@ struct MatchingABMP {
   static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
-
-  struct Indexer: public std::unary_function<const WorkItem&,unsigned> {
-    unsigned operator()(const WorkItem& n) const {
-      return n.second;
-    }
-  };
-
-  struct Less: public std::binary_function<const WorkItem&,const WorkItem&,bool> {
-    bool operator()(const WorkItem& n1, const WorkItem& n2) const {
-      if (n1.second < n2.second) return true;
-      if (n1.second > n2.second) return false;
-      return n1.first < n2.first;
-    }
-  };
-
-  struct Greater: public std::binary_function<const WorkItem&,const WorkItem&,bool> {
-    bool operator()(const WorkItem& n1, const WorkItem& n2) const {
-      if (n1.second > n2.second) return true;
-      if (n1.second < n2.second) return false;
-      return n1.first > n2.first;
-    }
-  };
 
   std::string name() { 
     return std::string(Concurrent ? "Concurrent" : "Serial") + " Alt-Blum-Mehlhorn-Paul"; 
@@ -550,11 +528,15 @@ struct MatchingABMP {
     
     using namespace galois::worklists;
 
-    typedef ChunkedFIFO<1024> Chunk;
+    auto indexer = [] (const WorkItem& n) {
+      return n.second;
+    };
+
+
     typedef dChunkedFIFO<1024> dChunk;
-    typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<decltype(indexer),dChunk> OBIM;
     
-    galois::for_each(initial.begin(), initial.end(), 
+    galois::for_each(galois::iterate(initial),
         [&, outer=this] (const WorkItem& item, auto& ctx) {
           unsigned curLayer = item.second;
           if (curLayer > maxLayer) {
@@ -573,7 +555,7 @@ struct MatchingABMP {
         galois::per_iter_alloc(),
         galois::parallel_break(),
         galois::loopname("MatchingABMP"),
-        galois::wl<OBIM>());
+        galois::wl<OBIM>(indexer));
     
     t.start();
     MatchingFF<G,false> algo;
@@ -736,7 +718,7 @@ struct MatchingMF {
 
     galois::StatTimer T("BfsTime");
     T.start();
-    galois::for_each(sink, 
+    galois::for_each(galois::iterate({ sink }), 
         [&] (const GraphNode& src, auto& ctx) {
           for (auto ii : g.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED : flag)) {
             GraphNode dst = g.getEdgeDst(ii);
@@ -855,7 +837,7 @@ struct MatchingMF {
     galois::setActiveThreads(Concurrent ? numThreads : 1);
 
     while (!initial.empty()) {
-      galois::for_each(initial.begin(), initial.end(), 
+      galois::for_each(galois::iterate(initial),
           [&, outer=this] (const GraphNode& src, auto& ctx) {
             int increment = 1;
             if (outer->discharge(g, src, ctx, source, sink, numNodes)) {

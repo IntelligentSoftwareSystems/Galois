@@ -393,7 +393,7 @@ void divide(const Iter& b, const Iter& e) {
 
 void layoutPoints(PointList& points) {
   divide(points.begin(), points.end() - 3);
-  galois::do_all(points.begin(), points.end() - 3, insPt());
+  galois::do_all(galois::iterate(points.begin(), points.end() - 3), insPt(), galois::no_stats());
 //! [Insert elements into InsertBag]
   Point* p1 = &basePoints.push(*(points.end() - 1));
   Point* p2 = &basePoints.push(*(points.end() - 2));
@@ -486,7 +486,8 @@ static void writeMesh(const std::string& filename) {
 
 static void generateMesh() {
   typedef galois::worklists::AltChunkedLIFO<32> CA;
-  galois::for_each(ptrPoints, Process(), 
+  galois::for_each(galois::iterate(ptrPoints), 
+      Process(), 
       galois::no_pushes(),
       galois::per_iter_alloc(),
       galois::loopname("Main"),

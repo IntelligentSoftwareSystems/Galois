@@ -182,7 +182,7 @@ struct NodeIteratorAlgo {
   void operator()() { 
     galois::GAccumulator<size_t> numTriangles;
 
-    galois::do_all(graph, 
+    galois::do_all(galois::iterate(graph), 
         [&] (const GNode& n) {
           // Partition neighbors
           // [first, ea) [n] [bb, last)
@@ -329,7 +329,7 @@ struct HybridAlgo {
 
         size_t limitIdx = graph.getData(this->limit, galois::MethodFlag::UNPROTECTED);
 
-        galois::do_all(limitIterator, graph.end()
+        galois::do_all(galois::iterate(limitIterator, graph.end())
             , [&, self=this] (const GNode& n) {
               size_t nidx = graph.getData(n, galois::MethodFlag::UNPROTECTED) - limitIdx;
               for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
@@ -356,13 +356,15 @@ struct HybridAlgo {
         numTriangles += high;
       }
       std::cout << "Processing low degree nodes\n";
-      galois::for_each(graph, ProcessLow<true>(this)
+      galois::for_each(galois::iterate(graph)
+          , ProcessLow<true>(this)
           , galois::loopname("HybridAlgo-1")
           , galois::no_conflicts()
           , galois::wl<WL>());
 
     } else {
-      galois::for_each(graph, ProcessLow<false>(this)
+      galois::for_each(galois::iterate(graph)
+          , ProcessLow<false>(this)
           , galois::loopname("HybridAlgo-2")
           , galois::no_conflicts()
           , galois::wl<WL>());
@@ -396,7 +398,7 @@ struct EdgeIteratorAlgo {
     galois::InsertBag<WorkItem> items;
     galois::GAccumulator<size_t> numTriangles;
 
-    galois::do_all(graph.begin(), graph.end(), 
+    galois::do_all(galois::iterate(graph),
         [&, self=this] (GNode n) {
           for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(edge);
@@ -406,7 +408,7 @@ struct EdgeIteratorAlgo {
         }
         , galois::loopname("Initialize"));
 
-    galois::do_all(items, 
+    galois::do_all(galois::iterate(items),
         [&] (const WorkItem& w) {
           // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
           Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
@@ -463,7 +465,11 @@ void makeGraph(const std::string& triangleFilename) {
   }
 
   galois::graphs::permute<void>(initial, p, permuted);
-  galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); }, galois::no_stats());
+  galois::do_all(galois::iterate(permuted), 
+      [&](N x) {
+        permuted.sortEdges<void>(x, IdLess<N,void>()); 
+      }, 
+      galois::no_stats());
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.toFile(triangleFilename);
