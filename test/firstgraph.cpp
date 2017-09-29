@@ -29,7 +29,7 @@ void traverseGraph(Graph& g) {
       sum += g.getData(n) * g.getEdgeData(oe);
     }
   }
-  std::cout << "  outgoing sum = " << sum << std::endl;
+  std::cout << "  out sum = " << sum << std::endl;
 
   for (auto n: g) {
     for (auto ie: g.in_edges(n)) {

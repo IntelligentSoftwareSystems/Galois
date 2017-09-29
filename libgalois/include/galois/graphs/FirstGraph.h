@@ -522,8 +522,8 @@ private:
    * Only called by constructInEdgeValue.
    * Reuse data from the corresponding outgoing edge.
    */
-  template<typename... Args>
-  in_edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
+  template<bool _Undirected = !Directional, typename... Args>
+  in_edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, typename std::enable_if<!_Undirected>::type* = 0, Args&&... args) {
     assert(src);
     assert(dst);
 
@@ -532,9 +532,24 @@ private:
     if (ii == dst->end()) {
       src->acquire(mflag);
       EdgeTy* e = src->find(dst)->second();
-      ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
+      ii = dst->createEdge(src, e, true, std::forward<Args>(args)...);
     }
     return boost::make_filter_iterator(is_in_edge(), ii, dst->end());
+  }
+
+  template<bool _Undirected = !Directional, typename... Args>
+  edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, typename std::enable_if<_Undirected>::type* = 0, Args&&... args) {
+    assert(src);
+    assert(dst);
+
+    dst->acquire(mflag);
+    typename gNode::iterator ii = dst->end();
+    if (ii == dst->end()) {
+      src->acquire(mflag);
+      EdgeTy* e = src->find(dst)->second();
+      ii = dst->createEdge(src, e, false, std::forward<Args>(args)...);
+    }
+    return boost::make_filter_iterator(is_out_edge(), ii, dst->end());
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
