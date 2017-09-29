@@ -29,6 +29,7 @@
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+  constexpr static const char* const GRNAME = "dGraph_jaggedCut";
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
 
@@ -220,9 +221,10 @@ public:
       GALOIS_DIE("ERROR: transpose not supported for jagged vertex-cuts");
     }
 
-    galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+    galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
     StatTimer_graph_construct.start();
-    galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
+    galois::StatTimer StatTimer_graph_construct_comm(
+      "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
 
     // only used to determine node splits among hosts; abandonded later
     // for the FileGraph which mmaps appropriate regions of memory
@@ -314,7 +316,8 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-    galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+    galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", GRNAME);
+
     StatTimer_thread_ranges.start();
     base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
     StatTimer_thread_ranges.stop();

@@ -34,6 +34,7 @@
 template<typename NodeTy, typename EdgeTy, bool isBipartite = false, 
          bool BSPNode = false, bool BSPEdge = false>
 class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+  constexpr static const char* const GRNAME = "dGraph_edgeCut";
   public:
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     // GID = ghostMap[LID - numOwned]
@@ -108,9 +109,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                     base_hGraph(host, _numHosts) {
       /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
        *  uint64_t& _totalNodes, unsigned _id )*/
-      galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
+      galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", 
+                                                  GRNAME);
       StatTimer_graph_construct.start();
-      galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
+      galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
+                                                       GRNAME);
       uint32_t _numNodes;
       uint64_t _numEdges;
 
@@ -307,7 +310,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // !transpose because tranpose finds thread ranges for you
       if (!transpose) {
-        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", 
+                                                  GRNAME);
 
         StatTimer_thread_ranges.start();
 

@@ -32,6 +32,7 @@
 #define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+  constexpr static const char* const GRNAME = "dGraph_hybridCut";
   public:
     typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
     /** Utilities for reading partitioned graphs. **/
@@ -206,16 +207,26 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       galois::runtime::reportParam("(NULL)", "ONLINE VERTEX CUT PL", "0");
 
-      galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT");
-      galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM");
-      galois::StatTimer StatTimer_local_distributed_edges("TIMER_LOCAL_DISTRIBUTE_EDGES");
-      galois::StatTimer StatTimer_exchange_edges("TIMER_EXCHANGE_EDGES");
-      galois::StatTimer StatTimer_fill_local_mirrorNodes("TIMER_FILL_LOCAL_MIRRORNODES");
-      galois::StatTimer StatTimer_distributed_edges_test_set_bit("TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT");
-      galois::StatTimer StatTimer_allocate_local_DS("TIMER_ALLOCATE_LOCAL_DS");
-      galois::StatTimer StatTimer_distributed_edges_get_edges("TIMER_DISTRIBUTE_EDGES_GET_EDGES");
-      galois::StatTimer StatTimer_distributed_edges_inner_loop("TIMER_DISTRIBUTE_EDGES_INNER_LOOP");
-      galois::StatTimer StatTimer_distributed_edges_next_src("TIMER_DISTRIBUTE_EDGES_NEXT_SRC");
+      galois::StatTimer StatTimer_graph_construct(
+        "TIME_GRAPH_CONSTRUCT", GRNAME);
+      galois::StatTimer StatTimer_graph_construct_comm(
+        "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
+      galois::StatTimer StatTimer_local_distributed_edges(
+        "TIMER_LOCAL_DISTRIBUTE_EDGES", GRNAME);
+      galois::StatTimer StatTimer_exchange_edges(
+        "TIMER_EXCHANGE_EDGES", GRNAME);
+      galois::StatTimer StatTimer_fill_local_mirrorNodes(
+        "TIMER_FILL_LOCAL_MIRRORNODES", GRNAME);
+      galois::StatTimer StatTimer_distributed_edges_test_set_bit(
+        "TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT", GRNAME);
+      galois::StatTimer StatTimer_allocate_local_DS(
+        "TIMER_ALLOCATE_LOCAL_DS", GRNAME);
+      galois::StatTimer StatTimer_distributed_edges_get_edges(
+        "TIMER_DISTRIBUTE_EDGES_GET_EDGES", GRNAME);
+      galois::StatTimer StatTimer_distributed_edges_inner_loop(
+        "TIMER_DISTRIBUTE_EDGES_INNER_LOOP", GRNAME);
+      galois::StatTimer StatTimer_distributed_edges_next_src(
+        "TIMER_DISTRIBUTE_EDGES_NEXT_SRC", GRNAME);
 
       StatTimer_graph_construct.start();
       //std::stringstream ss_cout;
@@ -369,7 +380,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       } else {
         // else because transpose will find thread ranges for you
-        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES");
+        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", GRNAME);
 
         StatTimer_thread_ranges.start();
         base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
@@ -746,7 +757,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     template<typename GraphTy>
     void receive_edges(GraphTy& graph){
-      galois::StatTimer StatTimer_exchange_edges("RECEIVE_EDGES_TIME");
+      galois::StatTimer StatTimer_exchange_edges("RECEIVE_EDGES_TIME", GRNAME);
       auto& net = galois::runtime::getSystemNetworkInterface();
 
       //receive the edges from other hosts
