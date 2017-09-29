@@ -151,7 +151,7 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      allNodes.begin(), allNodes.end(), 
+      galois::iterate(*allNodes.begin(), *allNodes.end()), 
       InitializeGraph{&_graph}, 
       galois::loopname("InitializeGraph"), 
       //galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
@@ -212,7 +212,7 @@ struct InitializeIteration {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      allNodes.begin(), allNodes.end(), 
+      galois::iterate(*allNodes.begin(), *allNodes.end()), 
       InitializeIteration{infinity, current_src_node, &_graph},
       galois::loopname("InitializeIteration"), 
       //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
@@ -278,8 +278,7 @@ struct FirstIterationSSSP {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      boost::make_counting_iterator(__begin), 
-      boost::make_counting_iterator(__end), 
+      galois::iterate(__begin, __end), 
       FirstIterationSSSP(&_graph),
       galois::loopname("SSSP"),
       //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
@@ -363,7 +362,7 @@ struct SSSP {
     #endif
       {
       galois::do_all(
-        nodesWithEdges,
+        galois::iterate(nodesWithEdges),
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
         //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
@@ -464,7 +463,7 @@ struct PredAndSucc {
     #endif
     {
     galois::do_all(
-      nodesWithEdges,
+      galois::iterate(nodesWithEdges),
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
       //galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
@@ -561,7 +560,7 @@ struct NumShortestPathsChanges {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      nodesWithEdges.begin(), nodesWithEdges.end(), 
+      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
       NumShortestPathsChanges{infinity, &_graph}, 
       galois::loopname("NumShortestPathsChanges"), 
       //galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
@@ -657,7 +656,7 @@ struct NumShortestPaths {
     #endif
       { 
         galois::do_all(
-          nodesWithEdges,
+          galois::iterate(nodesWithEdges),
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
@@ -776,7 +775,7 @@ struct PropogationFlagUpdate {
     // TODO gpu code
 
     galois::do_all(
-      nodesWithEdges.begin(), nodesWithEdges.end(),
+      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
       PropogationFlagUpdate(infinity, &_graph), 
       galois::loopname("PropogationFlagUpdate"),
       galois::timeit(),
@@ -844,7 +843,7 @@ struct DependencyPropChanges {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      nodesWithEdges.begin(), nodesWithEdges.end(),
+      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
       DependencyPropChanges{infinity, &_graph}, 
       galois::loopname("DependencyPropChanges"),
       //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
@@ -941,7 +940,7 @@ struct DependencyPropogation {
     #endif
     {
       galois::do_all(
-        nodesWithEdges,
+        galois::iterate(nodesWithEdges),
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
@@ -1138,7 +1137,7 @@ struct BC {
       } else if (personality == CPU)
     #endif
       galois::do_all(
-        nodesWithEdges.begin(), nodesWithEdges.end(), 
+        galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
         BC(&_graph), 
         galois::loopname("BC"),
         //galois::loopname(_graph.get_run_identifier("BC").c_str()),
@@ -1200,7 +1199,7 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(*_graph.begin(), *_graph.end()),
                    Sanity(
                      &_graph,
                      DGA_max,
