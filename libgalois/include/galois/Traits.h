@@ -296,7 +296,7 @@ struct det_parallel_break_tag {};
 template<typename T>
 struct det_parallel_break: public trait_has_value<T>, det_parallel_break_tag {
   static_assert(std::is_same<typename std::result_of<T()>::type, bool>::value, "signature must be bool()");
-  det_parallel_break(const T& t = T {}): trait_has_value<T>(t) {}
+  det_parallel_break(const T& t = T()): trait_has_value<T>(t) {}
   det_parallel_break(T&& t): trait_has_value<T>(std::move(t)) {}
 };
 
@@ -314,7 +314,7 @@ struct det_parallel_break: public trait_has_value<T>, det_parallel_break_tag {
 struct det_id_tag {};
 template<typename T>
 struct det_id: public trait_has_value<T>, det_id_tag {
-  det_id(const T& t = T {}): trait_has_value<T>(t) {}
+  det_id(const T& t = T()): trait_has_value<T>(t) {}
   det_id(T&& t): trait_has_value<T>(std::move(t)) {}
 };
 

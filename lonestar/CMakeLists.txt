@@ -23,7 +23,7 @@ add_subdirectory(independentset)
 add_subdirectory(matching)
 add_subdirectory(pagerank)
 add_subdirectory(pta)
-#add_subdirectory(preflowpush) # disabling temporarily
+add_subdirectory(preflowpush)
 add_subdirectory(sssp)
 add_subdirectory(surveypropagation)
 add_subdirectory(spanningtree)
