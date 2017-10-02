@@ -875,7 +875,7 @@ int main(int argc, char** argv) {
   app.initializeGraph(filename, sourceId, sinkId);
 
   // TODO: remove later
-  app.checkSorting();
+  // app.checkSorting();
 
   if (relabelInt == 0) {
     app.global_relabel_interval =
