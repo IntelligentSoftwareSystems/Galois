@@ -32,7 +32,7 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
-#define AUX_MAP
+//#define AUX_MAP
 
 #include "galois/Bag.h"
 #include "galois/gstl.h"
@@ -961,6 +961,7 @@ public:
         auto& map = aux.inNghs.get(i);
         auto ii = map.lower_bound(*(r.first)), ei = map.upper_bound(*(r.second));
         for ( ; ii != ei; ++ii) {
+          assert(*(r.first) <= dst && dst < *(r.second));
           auto dst = aux.nodes[ii->first];
           for (auto ie: ii->second) {
             constructInEdgeValue(graph, ie.second, ie.first, dst);
@@ -974,12 +975,11 @@ public:
     size_t numNodes = graph.size();
     aux.allocateInterleaved(numNodes);
 
-    galois::do_all(aux.begin(), aux.end(),
-        [=] (AuxNodePadded& n) {
-           // in-place new
-           new (&n) AuxNodePadded();
-        }
-    );
+    galois::do_all(galois::iterate(0ul, aux.size()),
+        [&] (size_t index) {
+          aux.constructAt(index);
+        },
+	galois::no_stats());
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
