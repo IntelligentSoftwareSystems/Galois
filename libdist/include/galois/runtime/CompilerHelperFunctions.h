@@ -160,7 +160,8 @@ namespace galois {
 
   template<typename Ty>
   void resetVec(std::vector<Ty>& a_vec) {
-    std::for_each(a_vec.begin(), a_vec.end(),[](Ty &ele){ele = 0;} ); 
+    std::for_each(galois::iterate(a_vec.begin(), a_vec.end()),
+                  [] (Ty &ele) { ele = 0; } ); 
   }
 
 
