@@ -133,6 +133,7 @@ public:
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         break;
       case nonBlockingBareMPI:
+      case oneSidedBareMPI:
         barrier_mpi();
         break;
       default:

@@ -161,6 +161,10 @@ public:
   // of a bitvector with regard to where data has been synchronized
   BITVECTOR_STATUS* currentBVFlag;
 
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+  std::vector<MPI_Group> mpi_identity_groups;
+#endif
+
   /****** VIRTUAL FUNCTIONS *********/
   virtual uint32_t G2L(uint64_t) const = 0 ;
   virtual uint64_t L2G(uint32_t) const = 0;
@@ -681,6 +685,15 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
     if (numTasks != net.Num) GALOIS_DIE("Mismatch in MPI rank");
 #endif
+
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+    mpi_identity_groups.resize(net.Num);
+    for (unsigned x = 0; x < net.Num; ++x) {
+      const int g[1] = {(int)x};
+      MPI_Group_incl(world_group, 1, g, &mpi_identity_groups[x]);
+    }
 
     if (id == 0) galois::gDebug("Using bare MPI\n");
 #endif
@@ -2119,6 +2132,101 @@ private:
     StatTimer_RecvTime.stop();
   }
   
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+  /**
+   * TODO
+   */
+  template<WriteLocation writeLocation, ReadLocation readLocation,
+           SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+  void sync_put_mpi(std::string loopName, bool use_bitset_to_send = true) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    static std::vector<MPI_Win> window;
+    static std::vector<std::vector<uint8_t>> rb;
+    if (window.size() == 0) { // create the windows
+      auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+      window.resize(net.Num);
+      rb.resize(net.Num);
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+        size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
+        size += sizeof(size_t); // vector size
+        size += sizeof(DataCommMode); // data mode
+        size += sizeof(size_t); // buffer size
+
+        rb[x].resize(size);
+
+        // TODO add no_locks and same_disp_unit
+        MPI_Win_create(rb[x].data(), size, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &window[x]);
+      }
+
+      for (unsigned h = 1; h < net.Num; ++h) {
+        unsigned x = (id + net.Num - h) % net.Num;
+        if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+        MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
+      }
+    }
+
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
+                                         get_run_identifier(loopName)).c_str(), GRNAME);
+
+    StatTimer_SendTime.start();
+
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (id + h) % net.Num;
+      if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
+
+      galois::runtime::SendBuffer sb;
+      if (use_bitset_to_send) {
+        get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sb);
+      } else {
+        get_send_buffer<syncType, SyncFnTy, galois::InvalidBitsetFnTy>(loopName, x, sb);
+      }
+
+      MPI_Win_start(mpi_identity_groups[x], 0, window[id]);
+      size_t size = sb.size();
+      MPI_Put((uint8_t *)&size, sizeof(size_t), MPI_BYTE, 
+          x, 0, sizeof(size_t), MPI_BYTE,
+          window[id]);
+      MPI_Put((uint8_t *)sb.linearData(), size, MPI_BYTE, 
+          x, sizeof(size_t), size, MPI_BYTE,
+          window[id]);
+      MPI_Win_complete(window[id]);
+    }
+
+    if (BitsetFnTy::is_valid()) {
+      reset_bitset(syncType, &BitsetFnTy::reset_range);
+    }
+
+    StatTimer_SendTime.stop();
+
+    galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
+                                         get_run_identifier(loopName)).c_str(), GRNAME);
+
+    StatTimer_RecvTime.start();
+
+    for (unsigned h = 1; h < net.Num; ++h) {
+      unsigned x = (id + net.Num - h) % net.Num;
+      if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+
+      MPI_Win_wait(window[x]);
+
+      size_t size;
+      memcpy(&size, rb[x].data(), sizeof(size_t));
+
+      galois::runtime::RecvBuffer rbuf(rb[x].begin() + sizeof(size_t), 
+          rb[x].begin() + sizeof(size_t) + size);
+
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
+
+      MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
+    }
+
+    StatTimer_RecvTime.stop();
+  }
+#endif
+  
   /**
    * TODO
    */
@@ -2130,11 +2238,25 @@ private:
     galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
     StatTimer_syncReduce.start();
 
-    sync_send<writeLocation, readLocation, syncReduce, ReduceFnTy, 
-              BitsetFnTy>(loopName);
-
-    sync_recv<writeLocation, readLocation, syncReduce, ReduceFnTy, 
-              BitsetFnTy>(loopName);
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    switch (bare_mpi) {
+      case noBareMPI:
+      case nonBlockingBareMPI:
+#endif
+        sync_send<writeLocation, readLocation, syncReduce, ReduceFnTy, 
+                  BitsetFnTy>(loopName);
+        sync_recv<writeLocation, readLocation, syncReduce, ReduceFnTy, 
+                  BitsetFnTy>(loopName);
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        break;
+      case oneSidedBareMPI:
+        sync_put_mpi<writeLocation, readLocation, syncReduce, ReduceFnTy, 
+                  BitsetFnTy>(loopName);
+        break;
+      default:
+        GALOIS_DIE("Unsupported bare MPI");
+    }
+#endif
 
     StatTimer_syncReduce.stop();
   }
@@ -2173,16 +2295,31 @@ private:
       }
     }
 
-    if (use_bitset) {
-      sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                BitsetFnTy>(loopName);
-    } else {
-      sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                galois::InvalidBitsetFnTy>(loopName);
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    switch (bare_mpi) {
+      case noBareMPI:
+      case nonBlockingBareMPI:
+#endif
+        if (use_bitset) {
+          sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
+                    BitsetFnTy>(loopName);
+        } else {
+          sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
+                    galois::InvalidBitsetFnTy>(loopName);
+        }
+        sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
+                  BitsetFnTy>(loopName);
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        break;
+      case oneSidedBareMPI:
+        sync_put_mpi<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
+                  BitsetFnTy>(loopName, use_bitset);
+        break; 
+      default:
+        GALOIS_DIE("Unsupported bare MPI");
     }
+#endif
 
-    sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-              BitsetFnTy>(loopName);
     StatTimer_syncBroadcast.stop();
   }
 

@@ -196,6 +196,7 @@ public:
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         break;
       case nonBlockingBareMPI:
+      case oneSidedBareMPI:
         reduce_mpi(local_mdata);
         break;
       default:
