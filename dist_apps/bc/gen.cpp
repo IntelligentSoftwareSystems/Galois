@@ -475,7 +475,7 @@ struct PredAndSucc {
                 Broadcast_num_predecessors, 
                 Bitset_num_predecessors>("PredAndSucc");
 
-    // sync now for later DependencyPropogation use 
+    // sync now for later DependencyPropagation use 
     _graph.sync<writeSource, readSource, Reduce_add_num_successors, 
                 Broadcast_num_successors, 
                 Bitset_num_successors>("PredAndSucc");
@@ -760,11 +760,11 @@ struct NumShortestPaths {
  * Make sure all flags are false except for nodes with 0 successors and sync 
  * flag
  */
-struct PropogationFlagUpdate {
+struct PropagationFlagUpdate {
   const uint32_t &local_infinity;
   Graph* graph;
 
-  PropogationFlagUpdate(const uint32_t &_local_infinity, Graph* _graph) : 
+  PropagationFlagUpdate(const uint32_t &_local_infinity, Graph* _graph) : 
     local_infinity(_local_infinity), graph(_graph) { }
 
   void static go(Graph& _graph) {
@@ -774,8 +774,8 @@ struct PropogationFlagUpdate {
 
     galois::do_all(
       galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
-      PropogationFlagUpdate(infinity, &_graph), 
-      galois::loopname("PropogationFlagUpdate"),
+      PropagationFlagUpdate(infinity, &_graph), 
+      galois::loopname("PropagationFlagUpdate"),
       galois::timeit(),
       galois::no_stats()
     );
@@ -785,7 +785,7 @@ struct PropogationFlagUpdate {
     // do not need to be sync'd as they will (or should) all be false already
     _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
                 Broadcast_propogation_flag, 
-                Bitset_propogation_flag>("PropogationFlagUpdate");
+                Bitset_propogation_flag>("PropagationFlagUpdate");
   }
 
   void operator()(GNode src) const {
@@ -865,7 +865,7 @@ struct DependencyPropChanges {
         src_data.dependency += src_data.to_add_float;
         src_data.to_add_float = 0.0;
 
-        // used in DependencyPropogation's go method
+        // used in DependencyPropagation's go method
         bitset_dependency.set(src);
       }
 
@@ -893,13 +893,13 @@ struct DependencyPropChanges {
 
 /* Do dependency propogation which is required for betweeness centraility
  * calculation */
-struct DependencyPropogation {
+struct DependencyPropagation {
   const uint32_t &local_infinity;
   const uint64_t &local_current_src_node;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  DependencyPropogation(const uint32_t &_local_infinity,
+  DependencyPropagation(const uint32_t &_local_infinity,
                         const uint64_t &_local_current_src_node,
                         Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
       local_infinity(_local_infinity),
@@ -920,15 +920,15 @@ struct DependencyPropogation {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation");
+        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropagation");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
-          "CUDA_DO_ALL_IMPL_DependencyPropogation"
+          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropagation")
+          "CUDA_DO_ALL_IMPL_DependencyPropagation"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
-        DependencyPropogation_cuda(
+        DependencyPropagation_cuda(
           *nodesWithEdges.begin(), *nodesWithEdges.end(),
           __retval, infinity, current_src_node, cuda_ctx
         );
@@ -939,9 +939,9 @@ struct DependencyPropogation {
     {
       galois::do_all(
         galois::iterate(nodesWithEdges),
-        DependencyPropogation(infinity, current_src_node, &_graph, dga), 
-        galois::loopname("DependencyPropogation"),
-        //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
+        DependencyPropagation(infinity, current_src_node, &_graph, dga), 
+        galois::loopname("DependencyPropagation"),
+        //galois::loopname(_graph.get_run_identifier("DependencyPropagation").c_str()),
         galois::timeit(),
         galois::no_stats()
       );
@@ -949,10 +949,10 @@ struct DependencyPropogation {
                     
 
       _graph.sync<writeSource, readSource, Reduce_add_trim, 
-                  Broadcast_trim, Bitset_trim>("DependencyPropogation");
+                  Broadcast_trim, Bitset_trim>("DependencyPropagation");
       _graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
                   Broadcast_to_add_float, 
-                  Bitset_to_add_float>("DependencyPropogation");
+                  Bitset_to_add_float>("DependencyPropagation");
 
       // use trim + to add to do appropriate changes
       DependencyPropChanges::go(_graph);
@@ -965,7 +965,7 @@ struct DependencyPropogation {
         // sync dependency on dest; source should all have same dep
         _graph.sync<writeSource, readDestination, Reduce_set_dependency,
                     Broadcast_dependency, 
-                    Bitset_dependency>("DependencyPropogation");
+                    Bitset_dependency>("DependencyPropagation");
       } 
     } while (accum_result);
   }
@@ -1112,11 +1112,11 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      PropogationFlagUpdate::go(_graph);
+      PropagationFlagUpdate::go(_graph);
 
       // do between-cent calculations for this iteration 
-      DependencyPropogation::go(_graph, dga);
-      //galois::gDebug("DepPropogation done");
+      DependencyPropagation::go(_graph, dga);
+      //galois::gDebug("DepPropagation done");
 
       _graph.set_num_iter(0);
 

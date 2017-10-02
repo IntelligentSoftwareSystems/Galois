@@ -676,13 +676,13 @@ struct DependencyPropChanges {
 
 /* Do dependency propogation which is required for betweeness centraility
  * calculation */
-struct DependencyPropogation {
+struct DependencyPropagation {
   const uint32_t &local_infinity;
   const uint64_t &local_current_src_node;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  DependencyPropogation(const uint32_t &_local_infinity,
+  DependencyPropagation(const uint32_t &_local_infinity,
                         const uint64_t &_local_current_src_node,
                         Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
       local_infinity(_local_infinity),
@@ -703,14 +703,14 @@ struct DependencyPropogation {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropogation");
+        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropagation");
         std::string impl_str(
-          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
+          _graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropagation")
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
-        DependencyPropogation_cuda(
+        DependencyPropagation_cuda(
           *nodesWithEdges.begin(), *nodesWithEdges.end(),
           __retval, infinity, current_src_node, cuda_ctx
         );
@@ -721,18 +721,18 @@ struct DependencyPropogation {
     {
       galois::do_all(
         galois::iterate(nodesWithEdges),
-        DependencyPropogation(infinity, current_src_node, &_graph, dga), 
-        galois::loopname("DependencyPropogation"),
+        DependencyPropagation(infinity, current_src_node, &_graph, dga), 
+        galois::loopname("DependencyPropagation"),
         galois::timeit(),
         galois::no_stats()
       );
     }
                     
       _graph.sync<writeDestination, readSource, Reduce_add_trim, 
-                  Broadcast_trim, Bitset_trim>("DependencyPropogation");
+                  Broadcast_trim, Bitset_trim>("DependencyPropagation");
       _graph.sync<writeDestination, readSource, Reduce_add_to_add_float, 
                   Broadcast_to_add_float, 
-                  Bitset_to_add_float>("DependencyPropogation");
+                  Bitset_to_add_float>("DependencyPropagation");
 
       // use trim + to add to do appropriate changes
       DependencyPropChanges::go(_graph);
@@ -861,8 +861,8 @@ struct BC {
       FlagPrep::go(_graph);
 
       // do between-cent calculations for this iteration 
-      DependencyPropogation::go(_graph, dga);
-      //galois::gDebug("DepPropogation done");
+      DependencyPropagation::go(_graph, dga);
+      //galois::gDebug("DepPropagation done");
 
       _graph.set_num_iter(0);
 
