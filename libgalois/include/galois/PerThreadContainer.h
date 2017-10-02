@@ -442,12 +442,12 @@ public:
   // }
 
   void clear_all_parallel (void) {
-
     galois::on_each(
         [this] (const unsigned tid, const unsigned numT) {
           get ().clear ();
-        });
-    
+        },
+        std::make_tuple(
+          galois::no_stats()));
   }
 
   bool empty_all() const {
@@ -469,7 +469,7 @@ public:
           // (get ().*pushFn)(v);
         },
         std::make_tuple(
-          galois::no_stats()
+          galois::no_stats(),
           galois::steal<false>()));
   }
 };
