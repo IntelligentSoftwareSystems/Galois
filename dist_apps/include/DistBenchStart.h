@@ -104,7 +104,7 @@ static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
   auto& net = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
 
-  galois::StatTimer marshalTimer("TIMER_GRAPH_MARSHAL"); 
+  galois::StatTimer marshalTimer("TIMER_GRAPH_MARSHAL", "DistBench"); 
 
   marshalTimer.start();
 
@@ -148,7 +148,7 @@ template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static hGraph<NodeData, EdgeData>* loadDGraph(
           std::vector<unsigned>& scaleFactor,
           struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
+  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
   hGraph<NodeData, EdgeData>* loadedGraph = nullptr;
@@ -185,7 +185,7 @@ template <typename NodeData, typename EdgeData>
 static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
           std::vector<unsigned>& scaleFactor,
           struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT"); 
+  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
   hGraph<NodeData, EdgeData>* loadedGraph = nullptr;
