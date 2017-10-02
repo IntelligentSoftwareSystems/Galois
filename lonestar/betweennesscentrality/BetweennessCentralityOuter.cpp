@@ -56,119 +56,172 @@ typedef galois::graphs::LC_CSR_Graph<void, void>
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-Graph* G;
-int NumNodes;
+class BCouter {
 
-galois::substrate::PerThreadStorage<double*> CB;
-galois::substrate::PerThreadStorage<double*> perThreadSigma;
-galois::substrate::PerThreadStorage<int*> perThreadD;
-galois::substrate::PerThreadStorage<double*> perThreadDelta;
-galois::substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
+  Graph* G;
+  int NumNodes;
 
-struct Process {
-  typedef int tt_does_not_need_aborts;
-  typedef int tt_does_not_need_push;
+  galois::substrate::PerThreadStorage<double*> CB;
+  galois::substrate::PerThreadStorage<double*> perThreadSigma;
+  galois::substrate::PerThreadStorage<int*> perThreadD;
+  galois::substrate::PerThreadStorage<double*> perThreadDelta;
+  galois::substrate::PerThreadStorage<galois::gdeque<GNode>*> perThreadSucc;
 
-  void operator()(GNode& _req, galois::UserContext<GNode>&) {
-    galois::gdeque<GNode> SQ;
+public:
 
-    double* sigma = *perThreadSigma.getLocal();
-    int* d = *perThreadD.getLocal();
-    double* delta = *perThreadDelta.getLocal();
-    galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+  BCouter (Graph& g): G(&g), NumNodes(g.size()) {
+    InitializeLocal();
+  }
+  
+  ~BCouter (void) {
+    DeleteLocal();
+  }
 
-    //unsigned int QAt = 0;
-    
-    int req = _req;
-    
-    sigma[req] = 1;
-    d[req] = 1;
-    
-    SQ.push_back(_req);
-    for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
-      GNode _v = *qq;
-      int v = _v;
-      for (auto ii : G->edges(_v, galois::MethodFlag::UNPROTECTED)) {
-	GNode _w = G->getEdgeDst(ii);
-	int w = _w;
-	if (!d[w]) {
-	  SQ.push_back(_w);
-	  d[w] = d[v] + 1;
-	}
-	if (d[w] == d[v] + 1) {
-	  sigma[w] = sigma[w] + sigma[v];
-	  succ[v].push_back(_w);
-	}
-      }
-    }
+  template <typename Cont>
+  void run(const Cont& v) {
+    galois::do_all(galois::iterate(v), 
+        [&] (const GNode& _req) {
+          galois::gdeque<GNode> SQ;
 
-    while (SQ.size() > 1) {
-      int w = SQ.back();
-      SQ.pop_back();
+          double* sigma = *perThreadSigma.getLocal();
+          int* d = *perThreadD.getLocal();
+          double* delta = *perThreadDelta.getLocal();
+          galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
 
-      double sigma_w = sigma[w];
-      double delta_w = delta[w];
-      auto& slist = succ[w];
-      for (auto ii = slist.begin(), ee = slist.end(); ii != ee; ++ii) {
-	GNode v = *ii;
-	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
-      }
-      delta[w] = delta_w;
-    }
-    double* Vec = *CB.getLocal();
+          //unsigned int QAt = 0;
+
+          int req = _req;
+
+          sigma[req] = 1;
+          d[req] = 1;
+
+          SQ.push_back(_req);
+          for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
+            GNode _v = *qq;
+            int v = _v;
+            for (auto ii : G->edges(_v, galois::MethodFlag::UNPROTECTED)) {
+              GNode _w = G->getEdgeDst(ii);
+              int w = _w;
+              if (!d[w]) {
+                SQ.push_back(_w);
+                d[w] = d[v] + 1;
+              }
+              if (d[w] == d[v] + 1) {
+                sigma[w] = sigma[w] + sigma[v];
+                succ[v].push_back(_w);
+              }
+            }
+          }
+
+          while (!SQ.empty()) {
+            int w = SQ.back();
+            SQ.pop_back();
+
+            double sigma_w = sigma[w];
+            double delta_w = delta[w];
+            auto& slist = succ[w];
+            for (auto ii = slist.begin(), ee = slist.end(); ii != ee; ++ii) {
+              GNode v = *ii;
+              delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
+            }
+            delta[w] = delta_w;
+          }
+
+          double* Vec = *CB.getLocal();
+          for (int i = 0; i < NumNodes; ++i) {
+            Vec[i] += delta[i];
+            delta[i] = 0;
+            sigma[i] = 0;
+            d[i] = 0;
+            succ[i].clear();
+          }
+        },
+        galois::loopname("Main"));
+        
+  }
+
+  // Verification for reference torus graph inputs. 
+  // All nodes should have the same betweenness value.
+  void verify() {
+    double sampleBC = 0.0;
+    bool firstTime = true;
     for (int i = 0; i < NumNodes; ++i) {
-      Vec[i] += delta[i];
-      delta[i] = 0;
-      sigma[i] = 0;
-      d[i] = 0;
-      succ[i].clear();
-    }
-  }
-};
-
-// Verification for reference torus graph inputs. 
-// All nodes should have the same betweenness value.
-void verify() {
-  double sampleBC = 0.0;
-  bool firstTime = true;
-  for (int i = 0; i < NumNodes; ++i) {
-    double bc = (*CB.getRemote(0))[i];
-    for (int j = 1; j < numThreads; ++j)
-      bc += (*CB.getRemote(j))[i];
-    if (firstTime) {
-      sampleBC = bc;
-      std::cerr << "BC: " << sampleBC << "\n";
-      firstTime = false;
-    } else {
-      if (!((bc - sampleBC) <= 0.0001)) {
-        std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
-        if (forceVerify)
-          abort();
-        return;
+      double bc = (*CB.getRemote(0))[i];
+      for (unsigned j = 1; j < galois::getActiveThreads(); ++j)
+        bc += (*CB.getRemote(j))[i];
+      if (firstTime) {
+        sampleBC = bc;
+        std::cerr << "BC: " << sampleBC << "\n";
+        firstTime = false;
+      } else {
+        if (!((bc - sampleBC) <= 0.0001)) {
+          std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
+          if (forceVerify)
+            abort();
+          return;
+        }
       }
     }
   }
-}
 
-void printBCValues(int begin, int end, std::ostream& out, int precision = 6) {
-  for (; begin != end; ++begin) {
-    double bc = (*CB.getRemote(0))[begin];
-    for (int j = 1; j < numThreads; ++j)
-      bc += (*CB.getRemote(j))[begin];
-    out << begin << " " << std::setiosflags(std::ios::fixed) << std::setprecision(precision) << bc << "\n"; 
+  void printBCValues(size_t begin, size_t end, std::ostream& out, int precision = 6) {
+    for (; begin != end; ++begin) {
+      double bc = (*CB.getRemote(0))[begin];
+      for (unsigned j = 1; j < galois::getActiveThreads(); ++j)
+        bc += (*CB.getRemote(j))[begin];
+      out << begin << " " << std::setiosflags(std::ios::fixed) << std::setprecision(precision) << bc << "\n"; 
+    }
   }
-}
 
-void printBCcertificate() {
-  std::stringstream foutname;
-  foutname << "outer_certificate_" << numThreads;
-  std::ofstream outf(foutname.str().c_str());
-  std::cerr << "Writing certificate...\n";
+  void printBCcertificate() {
+    std::stringstream foutname;
+    foutname << "outer_certificate_" << galois::getActiveThreads();
+    std::ofstream outf(foutname.str().c_str());
+    std::cerr << "Writing certificate...\n";
 
-  printBCValues(0, NumNodes, outf, 9);
+    printBCValues(0, NumNodes, outf, 9);
 
-  outf.close();
-}
+    outf.close();
+  }
+
+private:
+
+  template<typename T>
+  void initArray(T** addr) {
+    *addr = new T[NumNodes]();
+  }
+
+  template<typename T>
+  void deleteArray(T** addr) {
+    delete [] *addr;
+  }
+
+  void InitializeLocal(void) {
+    galois::on_each(
+        [this] (unsigned, unsigned) {
+          this->initArray(CB.getLocal());
+          this->initArray(perThreadSigma.getLocal());
+          this->initArray(perThreadD.getLocal());
+          this->initArray(perThreadDelta.getLocal());
+          this->initArray(perThreadSucc.getLocal());
+          
+        },
+        galois::no_stats());
+  }
+
+  void DeleteLocal(void) {
+    galois::on_each(
+        [this] (unsigned, unsigned) {
+          this->deleteArray(CB.getLocal());
+          this->deleteArray(perThreadSigma.getLocal());
+          this->deleteArray(perThreadD.getLocal());
+          this->deleteArray(perThreadDelta.getLocal());
+          this->deleteArray(perThreadSucc.getLocal());
+        },
+        galois::no_stats());
+  }
+
+};
 
 struct HasOut: public std::unary_function<GNode,bool> {
   Graph* graph;
@@ -178,53 +231,25 @@ struct HasOut: public std::unary_function<GNode,bool> {
   }
 };
 
-struct InitializeLocal {
-  template<typename T>
-  void initArray(T** addr) {
-    *addr = new T[NumNodes]();
-  }
-  void operator()(unsigned, unsigned) {
-    initArray(CB.getLocal());
-    initArray(perThreadSigma.getLocal());
-    initArray(perThreadD.getLocal());
-    initArray(perThreadDelta.getLocal());
-    initArray(perThreadSucc.getLocal());
-  }
-};
-
-struct DeleteLocal {
-  template<typename T>
-  void deleteArray(T** addr) {
-    delete [] *addr;
-  }
-  void operator()(unsigned, unsigned) {
-    deleteArray(CB.getLocal());
-    deleteArray(perThreadSigma.getLocal());
-    deleteArray(perThreadD.getLocal());
-    deleteArray(perThreadDelta.getLocal());
-    deleteArray(perThreadSucc.getLocal());
-  }
-};
-
 int main(int argc, char** argv) {
-  galois::StatManager M;
+  galois::SharedMemSys Gal;
   LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
-  G = &g;
-  galois::graphs::readGraph(*G, filename);
+  galois::graphs::readGraph(g, filename);
 
-  NumNodes = G->size();
 
-  galois::on_each(InitializeLocal());
+  BCouter bcOuter(g);
+
+  size_t NumNodes = g.size();
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::preAlloc(numThreads * NumNodes / 1650);
+  galois::preAlloc(galois::getActiveThreads() * NumNodes / 1650);
   galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>
-    begin  = boost::make_filter_iterator(HasOut(G), g.begin(), g.end()),
-    end    = boost::make_filter_iterator(HasOut(G), g.end(), g.end());
+    begin  = boost::make_filter_iterator(HasOut(&g), g.begin(), g.end()),
+    end    = boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
 
   boost::filter_iterator<HasOut,Graph::iterator> begin2 = 
     iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
@@ -238,24 +263,20 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef galois::worklists::StableIterator<true> WL;
   galois::StatTimer T;
   T.start();
-  galois::for_each(v.begin(), v.end(), Process(), galois::wl<WL>());
+  bcOuter.run(v);
   T.stop();
 
-  printBCValues(0, std::min(10, NumNodes), std::cout, 6);
+  bcOuter.printBCValues(0, std::min(10ul, NumNodes), std::cout, 6);
 
   if (printAll)
-    printBCcertificate();
+    bcOuter.printBCcertificate();
 
   if (forceVerify || !skipVerify)
-    verify();
+    bcOuter.verify();
 
   galois::reportPageAlloc("MeminfoPost");
-
-  // XXX(ddn): Could use unique_ptr but not supported on all our platforms :(
-  galois::on_each(DeleteLocal());
 
   return 0;
 }
