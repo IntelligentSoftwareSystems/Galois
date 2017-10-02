@@ -124,7 +124,7 @@ struct PreflowPush {
         if (prevDst) {
           Node& prevNode = graph.getData(*prevDst, galois::MethodFlag::UNPROTECTED);
           Node& currNode = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-          GALOIS_ASSERT(prevNode.id < currNode.id, "Adjacency list unsorted");
+          GALOIS_ASSERT(prevNode.id <= currNode.id, "Adjacency list unsorted");
         }
         prevDst = dst;
       }
@@ -213,7 +213,7 @@ struct PreflowPush {
         GNode dst      = graph.getEdgeDst(jj);
         uint32_t dstId = graph.getData(dst).id;
         int64_t ocap   = orig.graph.getEdgeData(
-            findEdge(orig.graph, map[srcId], map[dstId]));
+            orig.findEdge(map[srcId], map[dstId]));
         int64_t delta = 0;
         if (ocap > 0)
           delta -= (ocap - graph.getEdgeData(jj));
@@ -239,38 +239,38 @@ struct PreflowPush {
 
   void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int64_t amount) {
     Graph::edge_data_type& cap1 = graph.getEdgeData(ii);
-    Graph::edge_data_type& cap2 = graph.getEdgeData(findEdge(graph, dst, src));
+    Graph::edge_data_type& cap2 = graph.getEdgeData(findEdge(dst, src));
     cap1 -= amount;
     cap2 += amount;
   }
 
-  Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
+  Graph::edge_iterator findEdge(GNode src, GNode dst) {
 
-    auto i     = g.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-    auto end_i = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
+    auto i     = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    auto end_i = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
     if ((end_i - i) < 32) {
-      return findEdgeLinear(g, dst, i, end_i);
+      return findEdgeLinear(dst, i, end_i);
 
     } else {
-      return findEdgeLog2(g, dst, i, end_i);
+      return findEdgeLog2(dst, i, end_i);
     }
   }
 
-  Graph::edge_iterator findEdgeLinear(Graph& g, GNode dst,
+  Graph::edge_iterator findEdgeLinear(GNode dst,
       Graph::edge_iterator beg_e,
       Graph::edge_iterator end_e) {
 
     auto ii = beg_e;
     for (; ii != end_e; ++ii) {
-      if (g.getEdgeDst(ii) == dst)
+      if (graph.getEdgeDst(ii) == dst)
         break;
     }
     assert(ii != end_e); // Never return the end iterator
     return ii;
   }
 
-  Graph::edge_iterator findEdgeLog2(Graph& g, GNode dst, Graph::edge_iterator i, Graph::edge_iterator end_i) {
+  Graph::edge_iterator findEdgeLog2(GNode dst, Graph::edge_iterator i, Graph::edge_iterator end_i) {
 
     struct EdgeDstIter
       : public boost::iterator_facade< EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode> {
@@ -307,8 +307,8 @@ struct PreflowPush {
       }
     };
 
-    EdgeDstIter ai(&g, i);
-    EdgeDstIter end_ai(&g, end_i);
+    EdgeDstIter ai(&graph, i);
+    EdgeDstIter end_ai(&graph, end_i);
 
     auto ret = std::lower_bound(ai, end_ai, dst);
 
@@ -454,7 +454,7 @@ struct PreflowPush {
           for (auto ii : app.graph.edges(src, galois::MethodFlag::WRITE)) {
             GNode dst = app.graph.getEdgeDst(ii);
             int64_t rdata =
-              app.graph.getEdgeData(app.findEdge(app.graph, dst, src));
+              app.graph.getEdgeData(app.findEdge(dst, src));
             if (rdata > 0) {
               app.graph.getData(dst, galois::MethodFlag::WRITE);
             }
@@ -472,7 +472,7 @@ struct PreflowPush {
       for (auto ii : app.graph.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED
             : galois::MethodFlag::WRITE)) {
         GNode dst     = app.graph.getEdgeDst(ii);
-        int64_t rdata = app.graph.getEdgeData(app.findEdge(app.graph, dst, src));
+        int64_t rdata = app.graph.getEdgeData(app.findEdge(dst, src));
         if (rdata > 0) {
           Node& node = app.graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           int newHeight =
@@ -874,8 +874,7 @@ int main(int argc, char** argv) {
   PreflowPush app;
   app.initializeGraph(filename, sourceId, sinkId);
 
-  // TODO: remove later
-  // app.checkSorting();
+  app.checkSorting();
 
   if (relabelInt == 0) {
     app.global_relabel_interval =
