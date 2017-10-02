@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
   bitset_current_degree.resize(h_graph->get_local_total_nodes());
   bitset_trim.resize(h_graph->get_local_total_nodes());
 
-  printf("[%d] InitializeGraph::go called\n", net.ID);
+  galois::gPrint("[", net.ID, "] InitializeGraph::go functions called\n");
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
 
   StatTimer_graph_init.start();
@@ -410,7 +410,7 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<uint64_t> dga2;
 
   for (auto run = 0; run < numRuns; ++run) {
-    printf("[%d] KCore::go run %d called\n", net.ID, run);
+    galois::gPrint("[", net.ID, "] KCore::go run ", run, " called\n");
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 

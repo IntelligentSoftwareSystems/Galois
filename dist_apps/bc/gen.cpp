@@ -1082,7 +1082,7 @@ struct BC {
       #ifndef NDEBUG
       if (_graph.id == 0) {
         if (i % 5000 == 0) {
-          printf("SSSP source node #%lu\n", i);
+          galois::gPrint("SSSP source node ", i, "\n");
         }
       }
       #endif
@@ -1314,7 +1314,7 @@ int main(int argc, char** argv) {
   bitset_propogation_flag.resize(h_graph->get_local_total_nodes());
   bitset_dependency.resize(h_graph->get_local_total_nodes());
 
-  printf("[%d] InitializeGraph::go called\n", net.ID);
+  galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_graph_init.start();
@@ -1331,7 +1331,7 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<double> dga_sum;
 
   for (auto run = 0; run < numRuns; ++run) {
-    printf("[%d] BC::go run %d called\n", net.ID, run);
+    galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
