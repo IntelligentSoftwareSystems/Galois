@@ -124,6 +124,7 @@ struct PreflowPush {
         if (prevDst) {
           Node& prevNode = graph.getData(*prevDst, galois::MethodFlag::UNPROTECTED);
           Node& currNode = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+          GALOIS_ASSERT(prevNode.id != currNode.id, "Adjacency list cannot have duplicates");
           GALOIS_ASSERT(prevNode.id <= currNode.id, "Adjacency list unsorted");
         }
         prevDst = dst;
