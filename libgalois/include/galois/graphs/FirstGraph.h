@@ -32,7 +32,7 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
-//#define AUX_MAP
+#define AUX_MAP
 
 #include "galois/Bag.h"
 #include "galois/gstl.h"
@@ -85,7 +85,7 @@ struct UEdgeInfoBase<NTy, ETy, true> {
   UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
 
   template<typename... Args>
-  UEdgeInfoBase(NTy* n, ETy &v, bool f, Args&&... args): N(n) { Ea = v; }
+  UEdgeInfoBase(NTy* n, ETy& v, bool f, Args&&... args): N(n) { Ea = v; }
 
   static size_t sizeOfSecond()     { return sizeof(ETy); }
   bool isInEdge() const { return false; }
@@ -291,7 +291,7 @@ private:
   {
     friend class FirstGraph;
     typedef internal::NodeInfoBase<NodeTy, !HasNoLockable> NodeInfo;
-    typename gNode::EdgesTy edges;
+    typename gNodeTypes::EdgesTy edges;
     typedef typename gNode::iterator iterator;
     typedef typename gNode::EdgeInfo EdgeInfo;
 
@@ -445,13 +445,13 @@ public:
 #ifdef AUX_MAP
   struct ReadGraphAuxData {
     LargeArray<GraphNode> nodes;
-    galois::PerThreadMap<FileGraph::GraphNode, galois::gstl::Vector<GraphNode> > inNghs;
+    galois::PerThreadMap<FileGraph::GraphNode, galois::gstl::Vector<std::pair<GraphNode, EdgeTy*> > > inNghs;
   };
 #else
   struct AuxNode {
     galois::substrate::SimpleLock lock;
     GraphNode n;
-    galois::gstl::Vector<GraphNode> inNghs;
+    galois::gstl::Vector<std::pair<GraphNode, EdgeTy*> > inNghs;
   };
   using AuxNodePadded = typename galois::substrate::CacheLineStorage<AuxNode>;
   using ReadGraphAuxData = LargeArray<AuxNodePadded>;
@@ -503,7 +503,7 @@ private:
    * Only called by constructOutEdgeValue.
    */
   template<typename... Args>
-  edge_iterator createOutEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
+  EdgeTy* createOutEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
 
@@ -513,8 +513,9 @@ private:
       dst->acquire(mflag);
       EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
       ii = src->createEdge(dst, e, false, std::forward<Args>(args)...);
+      return e;
     }
-    return boost::make_filter_iterator(is_out_edge(), ii, src->end());
+    return nullptr;
   }
 
   /**
@@ -522,8 +523,8 @@ private:
    * Only called by constructInEdgeValue.
    * Reuse data from the corresponding outgoing edge.
    */
-  template<bool _Undirected = !Directional, typename... Args>
-  in_edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, typename std::enable_if<!_Undirected>::type* = 0, Args&&... args) {
+  template<typename... Args>
+  void createInEdge(GraphNode src, GraphNode dst, EdgeTy* e, galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
 
@@ -531,48 +532,31 @@ private:
     typename gNode::iterator ii = dst->end();
     if (ii == dst->end()) {
       src->acquire(mflag);
-      EdgeTy* e = src->find(dst)->second();
-      ii = dst->createEdge(src, e, true, std::forward<Args>(args)...);
+      ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
     }
-    return boost::make_filter_iterator(is_in_edge(), ii, dst->end());
-  }
-
-  template<bool _Undirected = !Directional, typename... Args>
-  edge_iterator createInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag, typename std::enable_if<_Undirected>::type* = 0, Args&&... args) {
-    assert(src);
-    assert(dst);
-
-    dst->acquire(mflag);
-    typename gNode::iterator ii = dst->end();
-    if (ii == dst->end()) {
-      src->acquire(mflag);
-      EdgeTy* e = src->find(dst)->second();
-      ii = dst->createEdge(src, e, false, std::forward<Args>(args)...);
-    }
-    return boost::make_filter_iterator(is_out_edge(), ii, dst->end());
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  EdgeTy* constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
     typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
     typedef LargeArray<EdgeTy> ED;
     if (ED::has_value) {
-      createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+      return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
     } else {
-      createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+      return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
     }
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+  EdgeTy* constructOutEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
-    createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+    return createOutEdge(src, dst, galois::MethodFlag::UNPROTECTED);
   }
 
   // will reuse edge data from outgoing edges
-  void constructInEdgeValue(FileGraph& graph, GraphNode src, GraphNode dst) {
-    createInEdge(src, dst, galois::MethodFlag::UNPROTECTED);
+  void constructInEdgeValue(FileGraph& graph, EdgeTy* e, GraphNode src, GraphNode dst) {
+    createInEdge(src, dst, e, galois::MethodFlag::UNPROTECTED);
   }
 
 public:
@@ -959,9 +943,9 @@ public:
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
         auto dstID = graph.getEdgeDst(nn);
         auto src = aux.nodes[*ii], dst = aux.nodes[dstID];
-        constructOutEdgeValue(graph, nn, src, dst);
+        auto e = constructOutEdgeValue(graph, nn, src, dst);
         if (!Directional || InOut) {
-          map[dstID].push_back(src);
+          map[dstID].push_back({src, e});
         }
       }
     }
@@ -978,8 +962,8 @@ public:
         auto ii = map.lower_bound(*(r.first)), ei = map.upper_bound(*(r.second));
         for ( ; ii != ei; ++ii) {
           auto dst = aux.nodes[ii->first];
-          for (auto src: ii->second) {
-            constructInEdgeValue(graph, src, dst);
+          for (auto ie: ii->second) {
+            constructInEdgeValue(graph, ie.second, ie.first, dst);
           }
         }
       }
@@ -1015,10 +999,10 @@ public:
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
         auto src = aux[*ii].get().n;
         auto& dstAux = aux[graph.getEdgeDst(nn)].get();
-        constructOutEdgeValue(graph, nn, src, dstAux.n);
+        auto e = constructOutEdgeValue(graph, nn, src, dstAux.n);
         if (!Directional || InOut) {
           dstAux.lock.lock();
-          dstAux.inNghs.push_back(src);
+          dstAux.inNghs.push_back({src, e});
           dstAux.lock.unlock();
         }
       }
@@ -1033,8 +1017,8 @@ public:
 
       for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
         auto& auxNode = aux[*ii].get();
-        for (auto src: auxNode.inNghs) {
-          constructInEdgeValue(graph, src, auxNode.n);
+        for (auto ie: auxNode.inNghs) {
+          constructInEdgeValue(graph, ie.second, ie.first, auxNode.n);
         }
       }
     }
