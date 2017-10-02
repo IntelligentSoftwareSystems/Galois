@@ -43,9 +43,7 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "KCore - Distributed Heterogeneous Pull Topological.";
-static const char* const desc = "KCore on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "KCore";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -100,15 +98,15 @@ struct DegreeCounting {
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
                            (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                             cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    galois::do_all_local(
-      nodesWithEdges,
+    galois::do_all(
+      galois::iterate(nodesWithEdges),
       DegreeCounting{ &_graph },
       galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
       galois::timeit(),
@@ -153,7 +151,7 @@ struct InitializeGraph {
       // TODO calls all wrong
       std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
                            (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       InitializeGraph1_cuda(*(allNodes.begin()), *(allNodes.end()), 
                             cuda_ctx);
@@ -161,7 +159,7 @@ struct InitializeGraph {
     } else if (personality == CPU)
   #endif
      galois::do_all(
-        allNodes.begin(), allNodes.end(),
+        galois::iterate(allNodes.begin(), allNodes.end()),
         InitializeGraph{ &_graph },
         galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
         galois::timeit(),
@@ -201,7 +199,7 @@ struct LiveUpdate {
     // TODO GPU code
 
     galois::do_all(
-      allNodes.begin(), allNodes.end(),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       LiveUpdate{ k_core_num, &_graph, dga },
       galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()),
       galois::timeit(),
@@ -262,8 +260,8 @@ struct KCore {
     do {
       _graph.set_num_iter(iterations);
 
-      galois::do_all_local(
-        nodesWithEdges,
+      galois::do_all(
+        galois::iterate(nodesWithEdges),
         KCore{ &_graph },
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
         galois::timeit(),
@@ -280,7 +278,7 @@ struct KCore {
     } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("KCore", 
+      galois::runtime::reportStat_Serial(REGION_NAME, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations);
     }
@@ -338,7 +336,7 @@ struct GetAliveDead {
     dga1.reset();
     dga2.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()),
                    GetAliveDead(&_graph, dga1, dga2), 
                    galois::loopname("GetAliveDead"),
                    galois::numrun(_graph.get_run_identifier()),
@@ -372,17 +370,22 @@ struct GetAliveDead {
 /* Main method for running */
 /******************************************************************************/
 
+constexpr static const char* const name = "KCore - Distributed Heterogeneous "
+                                          "Pull Topological.";
+constexpr static const char* const desc = "KCore on Distributed Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam("KCore", "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
                                 (unsigned long)maxIterations);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
   
   StatTimer_total.start();
 
@@ -396,7 +399,7 @@ int main(int argc, char** argv) {
   bitset_trim.resize(h_graph->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go functions called\n";
-  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
 
   StatTimer_graph_init.start();
     InitializeGraph::go((*h_graph));
@@ -410,7 +413,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] KCore::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       KCore::go(*h_graph, DGAccumulator_accum);
