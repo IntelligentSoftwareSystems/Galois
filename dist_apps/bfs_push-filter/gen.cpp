@@ -44,6 +44,8 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
+constexpr static const char* const regionname = "BFS";
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -97,7 +99,7 @@ struct InitializeGraph {
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier(
                                "CUDA_DO_ALL_IMPL_InitializeGraph_"));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
@@ -105,15 +107,13 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     {
-
     galois::do_all(
-      allNodes,
+      galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::timeit(),
       galois::no_stats()
     );
-
     }
   }
 
@@ -126,7 +126,7 @@ struct InitializeGraph {
   }
 };
 
-struct FirstItr_BFS{
+struct FirstItr_BFS {
   Graph * graph;
 
   FirstItr_BFS(Graph * _graph) : graph(_graph) {}
@@ -144,26 +144,27 @@ struct FirstItr_BFS{
     if (personality == GPU_CUDA) {
       std::string impl_str(_graph.get_run_identifier(
                              "CUDA_DO_ALL_IMPL_BFS_"));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
     {
-    // one node, doesn't matter which do_all you use, so regular one suffices
-    galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
-                FirstItr_BFS{&_graph}, 
-                galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-                galois::timeit(),
-                galois::no_stats()
-                );
+    // one node
+    galois::do_all(
+      galois::iterate(__begin, __end),
+      FirstItr_BFS{&_graph}, 
+      galois::loopname(_graph.get_run_identifier("BFS").c_str()),
+      galois::timeit(),
+      galois::no_stats()
+    );
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
     
-    galois::runtime::reportStat_Tsum("BFS", 
+    galois::runtime::reportStat_Tsum(regionname,
        _graph.get_run_identifier("NUM_WORK_ITEMS"), __end - __begin);
   }
 
@@ -205,7 +206,7 @@ struct BFS {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         int __retval = 0;
         BFS_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
@@ -216,7 +217,7 @@ struct BFS {
     #endif
     {
       galois::do_all(
-        nodesWithEdges,
+        galois::iterate(nodesWithEdges),
         BFS(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
         galois::timeit(),
@@ -226,14 +227,14 @@ struct BFS {
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      galois::runtime::reportStat_Tsum("BFS", 
+      galois::runtime::reportStat_Tsum(regionname,
         _graph.get_run_identifier("NUM_WORK_ITEMS"), 
         (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("BFS", 
+      galois::runtime::reportStat_Serial(regionname,
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -292,7 +293,7 @@ struct BFSSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("BFSSanityCheck"),
                    galois::no_stats());
@@ -328,9 +329,10 @@ uint32_t BFSSanityCheck::current_max = 0;
 /* Main */
 /******************************************************************************/
 
-static const char* const name = "BFS - Distributed Heterogeneous with worklist.";
-static const char* const desc = "BFS on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const name = "BFS - Distributed Heterogeneous with "
+                                          "worklist.";
+constexpr static const char* const desc = "BFS on Distributed Galois.";
+constexpr static const char* const url = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -338,13 +340,13 @@ int main(int argc, char** argv) {
 
   const auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam("BFS", "Max Iterations", 
+    galois::runtime::reportParam(regionname, "Max Iterations", 
                                 (unsigned long)maxIterations);
-    galois::runtime::reportParam("BFS", "Source Node ID", 
+    galois::runtime::reportParam(regionname, "Source Node ID", 
                                 (unsigned long long)src_node);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL"); 
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
 
   StatTimer_total.start();
   #ifdef __GALOIS_HET_CUDA__
@@ -358,7 +360,7 @@ int main(int argc, char** argv) {
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"); 
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", regionname); 
   StatTimer_init.start();
   InitializeGraph::go((*hg));
   StatTimer_init.stop();
@@ -373,7 +375,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] BFS::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
       BFS::go(*hg, DGAccumulator_accum);

@@ -41,9 +41,7 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "BFS pull - Distributed Heterogeneous";
-static const char* const desc = "BFS pull on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const regionname = "BFS";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -97,7 +95,7 @@ struct InitializeGraph {
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
@@ -138,7 +136,7 @@ struct BFS {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
-          galois::StatTimer StatTimer_cuda(impl_str.c_str());
+          galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
           StatTimer_cuda.start();
           int __retval = 0;
           BFS_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -160,14 +158,14 @@ struct BFS {
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
-      galois::runtime::reportStat_Tsum("BFS", 
+      galois::runtime::reportStat_Tsum(regionname,
         _graph.get_run_identifier("NUM_WORK_ITEMS"), 
         (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("BFS", 
+      galois::runtime::reportStat_Serial(regionname, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -259,18 +257,22 @@ uint32_t BFSSanityCheck::current_max = 0;
 /* Main */
 /******************************************************************************/
 
+static const char* const name = "BFS pull - Distributed Heterogeneous";
+static const char* const desc = "BFS pull on Distributed Galois.";
+static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam("BFS", "Max Iterations", 
+    galois::runtime::reportParam(regionname, "Max Iterations", 
                                 (unsigned long)maxIterations);
-    galois::runtime::reportParam("BFS", "Source Node ID", 
+    galois::runtime::reportParam(regionname, "Source Node ID", 
                                 (unsigned long long)src_node);
   }
-  galois::StatTimer StatTimer_total("TIMER_TOTAL"); 
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
 
   StatTimer_total.start();
 
@@ -284,7 +286,7 @@ int main(int argc, char** argv) {
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"); 
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", regionname); 
   StatTimer_init.start();
     InitializeGraph::go((*hg));
   StatTimer_init.stop();
@@ -295,10 +297,10 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint32_t> DGAccumulator_max;
 
-  for(auto run = 0; run < numRuns; ++run){
+  for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] BFS::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
       BFS::go(*hg, DGAccumulator_accum);
