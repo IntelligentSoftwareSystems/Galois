@@ -355,8 +355,7 @@ int main(int argc, char** argv) {
 
   bitset_dist_current.resize(hg->get_local_total_nodes());
 
-  std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-
+  printf("[%d] InitializeGraph::go called\n", net.ID);
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
 
   StatTimer_init.start();
@@ -369,8 +368,8 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint32_t> DGAccumulator_max;
 
-  for(auto run = 0; run < numRuns; ++run){
-    std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
+  for (auto run = 0; run < numRuns; ++run) {
+    printf("[%d] SSSP::go run %d called\n", net.ID, run);
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 

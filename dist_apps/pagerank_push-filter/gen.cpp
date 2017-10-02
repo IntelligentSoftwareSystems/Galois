@@ -468,7 +468,7 @@ int main(int argc, char** argv) {
   bitset_residual.resize(hg->get_local_total_nodes());
   bitset_nout.resize(hg->get_local_total_nodes());
 
-  std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+  printf("[%d] InitializeGraph::go called\n", net.ID);
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_init.start();
     InitializeGraph::go((*hg));
@@ -486,7 +486,7 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<float> DGA_min_residual;
 
   for (auto run = 0; run < numRuns; ++run) {
-    std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
+    printf("[%d] PageRank::go run %d called\n", net.ID, run);
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
