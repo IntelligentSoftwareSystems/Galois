@@ -27,6 +27,8 @@
 
 // TODO rebuild gpu code (new things added)
 
+constexpr static const char* const REGION_NAME = "BC";
+
 /******************************************************************************/
 /* Sync code/calls was manually written, not compiler generated */
 /******************************************************************************/
@@ -47,10 +49,6 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "Betweeness Centrality - "
-                                "Distributed Heterogeneous.";
-static const char* const desc = "Betweeness Centrality on Distributed Galois.";
-static const char* const url = 0;
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -144,7 +142,7 @@ struct InitializeGraph {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
           "CUDA_DO_ALL_IMPL_InitializeGraph"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
         StatTimer_cuda.stop();
@@ -202,7 +200,7 @@ struct InitializeIteration {
           "CUDA_DO_ALL_IMPL_InitializeIteration"
         );
 
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         InitializeIteration_cuda(
           *allNodes.begin(), *allNodes.end(),
@@ -271,7 +269,7 @@ struct FirstIterationSSSP {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
           "CUDA_DO_ALL_IMPL_SSSP"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         FirstIterationSSSP_cuda(__begin, __end, cuda_ctx);
         StatTimer_cuda.stop();
@@ -352,7 +350,7 @@ struct SSSP {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_SSSP")
           "CUDA_DO_ALL_IMPL_SSSP"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, cuda_ctx);
@@ -454,7 +452,7 @@ struct PredAndSucc {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PredAndSucc")
           "CUDA_DO_ALL_IMPL_PredAndSucc"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         PredAndSucc_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                          infinity, cuda_ctx);
@@ -548,7 +546,7 @@ struct NumShortestPathsChanges {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPathsChanges")
           "CUDA_DO_ALL_IMPL_NumShortestPathsChanges"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         // TODO local infinity needed
         NumShortestPathsChanges_cuda(
@@ -645,7 +643,7 @@ struct NumShortestPaths {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPaths")
           "CUDA_DO_ALL_IMPL_NumShortestPaths"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         NumShortestPaths_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -832,7 +830,7 @@ struct DependencyPropChanges {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropChanges")
           "CUDA_DO_ALL_IMPL_DependencyPropChanges"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         DependencyPropChanges_cuda(
           *nodesWithEdges.begin(), 
@@ -927,7 +925,7 @@ struct DependencyPropogation {
           //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropogation")
           "CUDA_DO_ALL_IMPL_DependencyPropogation"
         );
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         DependencyPropogation_cuda(
@@ -1130,7 +1128,7 @@ struct BC {
       if (personality == GPU_CUDA) {
         //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
         StatTimer_cuda.stop();
@@ -1249,17 +1247,23 @@ float Sanity::current_min = std::numeric_limits<float>::max() / 4;
 /* Main method for running */
 /******************************************************************************/
 
+constexpr static const char* const name = "Betweeness Centrality - "
+                                          "Distributed Heterogeneous.";
+constexpr static const char* const desc = "Betweeness Centrality on Distributed "
+                                          "Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam("BC", "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
                                 (unsigned long)maxIterations);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -1315,7 +1319,7 @@ int main(int argc, char** argv) {
 
   printf("[%d] InitializeGraph::go called\n", net.ID);
 
-  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_graph_init.start();
     InitializeGraph::go((*h_graph));
   StatTimer_graph_init.stop();
@@ -1332,7 +1336,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     printf("[%d] BC::go run %d called\n", net.ID, run);
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       BC::go(*h_graph, dga);
