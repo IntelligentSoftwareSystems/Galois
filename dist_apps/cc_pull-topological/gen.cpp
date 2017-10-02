@@ -42,9 +42,7 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "ConnectedComp Pull - Distributed Heterogeneous";
-static const char* const desc = "ConnectedComp pull on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "ConnectedComp";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -90,7 +88,7 @@ struct InitializeGraph {
     	if (personality == GPU_CUDA) {
     		std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-    		galois::StatTimer StatTimer_cuda(impl_str.c_str());
+    		galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
     		StatTimer_cuda.start();
 
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()), 
@@ -100,8 +98,8 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     {
-    galois::do_all_local(
-      allNodes,
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{&_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::timeit(),
@@ -133,7 +131,7 @@ struct ConnectedComp {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         ConnectedComp_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -142,8 +140,8 @@ struct ConnectedComp {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      galois::do_all_local(
-        nodesWithEdges,
+      galois::do_all(
+        galois::iterate(nodesWithEdges),
         ConnectedComp(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
         galois::timeit(),
@@ -153,14 +151,14 @@ struct ConnectedComp {
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
       
-      galois::runtime::reportStat_Tsum("ConnectedComp", 
+      galois::runtime::reportStat_Tsum(REGION_NAME, 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
         (unsigned long)dga.read_local());
       ++_num_iterations;
     } while((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("ConnectedComp", 
+      galois::runtime::reportStat_Serial(REGION_NAME, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -216,7 +214,7 @@ struct SourceComponentSize {
 
     dga.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
                    SourceComponentSize(src_comp, &_graph, dga), 
                    galois::loopname("SourceComponentSize"),
                    galois::no_stats());
@@ -246,6 +244,12 @@ struct SourceComponentSize {
 /* Main */
 /******************************************************************************/
 
+constexpr static const char* const name = "ConnectedComp Pull - Distributed "
+                                          "Heterogeneous";
+constexpr static const char* const desc = "ConnectedComp pull on Distributed "
+                                          "Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
@@ -253,11 +257,11 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("ConnectedComponents", "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
       (unsigned long)maxIterations);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -270,7 +274,7 @@ int main(int argc, char** argv) {
   bitset_comp_current.resize(hg->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_init.start();
     InitializeGraph::go((*hg));
   StatTimer_init.stop();
@@ -282,7 +286,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] ConnectedComp::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       ConnectedComp::go(*hg, DGAccumulator_accum);
