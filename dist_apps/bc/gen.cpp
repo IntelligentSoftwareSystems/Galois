@@ -40,7 +40,6 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 

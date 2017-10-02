@@ -38,6 +38,8 @@
 #include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
 #include "galois/runtime/dGraphLoader.h"
+#include "galois/runtime/AtomicHelpers.h"
+#include "galois/runtime/CompilerHelpers.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/runtime/Cuda/cuda_device.h"
