@@ -41,10 +41,7 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "SSSP - Distributed Heterogeneous with worklist.";
-static const char* const desc = "Variant of Chaotic relaxation SSSP on "
-                                "Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "SSSP";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -98,7 +95,7 @@ struct InitializeGraph {
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
@@ -107,7 +104,7 @@ struct InitializeGraph {
     #endif
     {
     galois::do_all(
-      allNodes.begin(), allNodes.end(),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::timeit(),
@@ -139,20 +136,21 @@ struct FirstItr_SSSP {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       FirstItr_SSSP_cuda(__begin, __end, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
     {
-    // one node, doesn't matter which do_all you use, so regular one suffices
-    galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
-                FirstItr_SSSP{&_graph}, 
-                galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                galois::timeit(),
-                galois::no_stats()
-                );
+    // one node
+    galois::do_all(
+      galois::iterate(__begin, __end),
+      FirstItr_SSSP{&_graph}, 
+      galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
+      galois::timeit(),
+      galois::no_stats()
+    );
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -200,7 +198,7 @@ struct SSSP {
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -211,7 +209,7 @@ struct SSSP {
       #endif
       {
         galois::do_all(
-          nodesWithEdges,
+          galois::iterate(nodesWithEdges),
           SSSP{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           galois::steal<true>(),
@@ -289,7 +287,7 @@ struct SSSPSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("SSSPSanityCheck"),
                    galois::no_stats());
@@ -326,6 +324,12 @@ uint32_t SSSPSanityCheck::current_max = 0;
 /* Main */
 /******************************************************************************/
 
+constexpr static const char* const name = "SSSP - Distributed Heterogeneous "
+                                          "with worklist.";
+constexpr static const char* const desc = "Variant of Chaotic relaxation SSSP "
+                                          "on Distributed Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
@@ -339,7 +343,7 @@ int main(int argc, char** argv) {
       (unsigned long)src_node);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -353,7 +357,7 @@ int main(int argc, char** argv) {
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
 
   StatTimer_init.start();
     InitializeGraph::go((*hg));
@@ -368,7 +372,7 @@ int main(int argc, char** argv) {
   for(auto run = 0; run < numRuns; ++run){
     std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       SSSP::go(*hg, DGAccumulator_accum);

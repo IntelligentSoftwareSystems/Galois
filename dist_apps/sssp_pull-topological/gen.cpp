@@ -41,9 +41,7 @@
 struct CUDA_Context *cuda_ctx;
 #endif
 
-static const char* const name = "SSSP pull - Distributed Heterogeneous";
-static const char* const desc = "SSSP pull on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "SSSP";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -95,7 +93,7 @@ struct InitializeGraph {
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
                              infinity, src_node, cuda_ctx);
@@ -104,7 +102,7 @@ struct InitializeGraph {
     #endif
     {
     galois::do_all(
-      allNodes.begin(), allNodes.end(),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::timeit(),
@@ -138,7 +136,7 @@ struct SSSP {
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
           std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-          galois::StatTimer StatTimer_cuda(impl_str.c_str());
+          galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
           StatTimer_cuda.start();
           int __retval = 0;
           SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -148,8 +146,8 @@ struct SSSP {
         } else if (personality == CPU)
       #endif
       {
-        galois::do_all_local(
-          nodesWithEdges,
+        galois::do_all(
+          galois::iterate(nodesWithEdges),
           SSSP{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           galois::timeit(),
@@ -160,7 +158,7 @@ struct SSSP {
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
 
-      galois::runtime::reportStat_Tsum("SSSP", 
+      galois::runtime::reportStat_Tsum(REGION_NAME, 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
         (unsigned long)dga.read_local());
 
@@ -168,7 +166,7 @@ struct SSSP {
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("SSSP", 
+      galois::runtime::reportStat_Serial(REGION_NAME, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -222,7 +220,7 @@ struct SSSPSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("SSSPSanityCheck"),
                    galois::no_stats());
@@ -259,19 +257,24 @@ uint32_t SSSPSanityCheck::current_max = 0;
 /* Main */
 /******************************************************************************/
 
+constexpr static const char* const name = "SSSP pull - Distributed "
+                                          "Heterogeneous";
+constexpr static const char* const desc = "SSSP pull on Distributed Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam("SSSP", "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
                                 (unsigned long)maxIterations);
-    galois::runtime::reportParam("SSSP", "Source Node ID", 
+    galois::runtime::reportParam(REGION_NAME, "Source Node ID", 
                                 (unsigned long long)src_node);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -284,7 +287,7 @@ int main(int argc, char** argv) {
   bitset_dist_current.resize(hg->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
 
   StatTimer_init.start();
     InitializeGraph::go((*hg));
@@ -299,7 +302,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       SSSP::go(*hg, DGAccumulator_accum);
