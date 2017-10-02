@@ -306,8 +306,6 @@ struct FirstIterationSSSP {
       auto& dst_data = graph->getData(dst);
 
       #ifndef __USE_BFS__
-      // For SSSP (uses the edge weight; you need to change the graph edge
-      // type as well in the declaration above)
       uint32_t new_dist = graph->getEdgeData(current_edge) + 
                               src_data.current_length + 1;
       #else

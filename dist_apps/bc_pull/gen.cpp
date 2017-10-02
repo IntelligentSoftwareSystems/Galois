@@ -99,7 +99,13 @@ struct NodeData {
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
+#ifndef __USE_BFS__
 typedef hGraph<NodeData, unsigned int> Graph;
+#else
+typedef hGraph<NodeData, void> Graph;
+#endif
+
+
 typedef typename Graph::GraphNode GNode;
 
 // bitsets for tracking updates
@@ -318,10 +324,12 @@ struct SSSP {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
+      #ifndef __USE_BFS__
       uint32_t new_dist = graph->getEdgeData(current_edge) + 
                               dst_data.current_length + 1;
-
-      //uint32_t new_dist = 1 + dst_data.current_length;
+      #else
+      uint32_t new_dist = 1 + dst_data.current_length;
+      #endif
 
       uint32_t old = galois::min(src_data.current_length, new_dist);
 
@@ -386,8 +394,12 @@ struct PredAndSucc {
         GNode dst = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
-        //uint32_t edge_weight = 1;
+
+        #ifndef __USE_BFS__
         uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
+        #else
+        uint32_t edge_weight = 1;
+        #endif
 
         if ((dst_data.current_length + edge_weight) == src_data.current_length) {
           // dest on shortest path with this node as successor
@@ -556,8 +568,11 @@ struct NumShortestPaths {
           GNode dst = graph->getEdgeDst(current_edge);
           auto& dst_data = graph->getData(dst);
 
-          //uint32_t edge_weight = 1;
+          #ifndef __USE_BFS__
           uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
+          #else
+          uint32_t edge_weight = 1;
+          #endif
 
           // only operate if a dst flag is set (i.e. no more pred, finalized
           // short paths to take)
@@ -763,8 +778,12 @@ struct DependencyPropagation {
   
           auto& dst_data = graph->getData(dst);
 
-          //uint32_t edge_weight = 1;
+          #ifndef __USE_BFS__
           uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
+          #else
+          uint32_t edge_weight = 1;
+          #endif
+
           uint32_t dep = src_data.dependency;
 
           // I am successor to destination
@@ -1015,12 +1034,24 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
+  #ifndef __USE_BFS__
+
   #ifdef __GALOIS_HET_CUDA__
   Graph* h_graph = distGraphInitialization<NodeData, unsigned int,
                                            false>(&cuda_ctx);
   #else
   Graph* h_graph = distGraphInitialization<NodeData, unsigned int,
                                            false>();
+  #endif
+
+  #else
+
+  #ifdef __GALOIS_HET_CUDA__
+  Graph* h_graph = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
+  #else
+  Graph* h_graph = distGraphInitialization<NodeData, void, false>();
+  #endif
+
   #endif
 
   // random num generate for sources
