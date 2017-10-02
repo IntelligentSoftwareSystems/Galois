@@ -44,10 +44,7 @@ struct CUDA_Context *cuda_ctx;
 #include <algorithm>
 #include <vector>
 
-static const char* const name = "PageRank - Compiler Generated Distributed "
-                                "Heterogeneous";
-static const char* const desc = "Residual PageRank on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "PageRank";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -96,15 +93,14 @@ struct ResetGraph {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      allNodes.begin(),
-      allNodes.end(),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph{ &_graph },
       galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
       galois::timeit(),
@@ -141,7 +137,7 @@ struct InitializeGraph {
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
           (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), alpha, 
                              cuda_ctx);
@@ -152,8 +148,7 @@ struct InitializeGraph {
      // regular do all without stealing; just initialization of nodes with
      // outgoing edges
      galois::do_all(
-        nodesWithEdges.begin(),
-        nodesWithEdges.end(),
+        galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         InitializeGraph{alpha, &_graph},
         galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
         galois::timeit(),
@@ -192,7 +187,7 @@ struct PageRank_delta {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       PageRank_delta_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
                           alpha, tolerance, cuda_ctx);
@@ -201,7 +196,7 @@ struct PageRank_delta {
   #endif
     {
       galois::do_all(
-        nodesWithEdges.begin(), nodesWithEdges.end(),
+        galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         PageRank_delta{ alpha, tolerance, &_graph },
         galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
         galois::timeit(),
@@ -242,7 +237,7 @@ struct PageRank {
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         int __retval = 0;
         PageRank_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
@@ -253,7 +248,7 @@ struct PageRank {
       #endif
       {
         galois::do_all(
-          nodesWithEdges,
+          galois::iterate(nodesWithEdges),
           PageRank{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
           galois::timeit(),
@@ -264,7 +259,7 @@ struct PageRank {
       _graph.sync<writeDestination, readSource, Reduce_add_residual, 
                   Broadcast_residual, Bitset_residual>("PageRank");
       
-      galois::runtime::reportStat_Tsum("PageRank", 
+      galois::runtime::reportStat_Tsum(REGION_NAME, 
           "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
           (unsigned long)dga.read_local());
 
@@ -272,7 +267,7 @@ struct PageRank {
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial("PageRank", 
+      galois::runtime::reportStat_Serial(REGION_NAME, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -361,7 +356,7 @@ struct PageRankSanity {
     DGA_max_residual.reset();
     DGA_min_residual.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
                    PageRankSanity(
                      tolerance, 
                      &_graph,
@@ -441,6 +436,12 @@ float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() /
 /* Main */
 /******************************************************************************/
 
+constexpr static const char* const name = "PageRank - Compiler Generated "
+                                          "Distributed Heterogeneous";
+constexpr static const char* const desc = "Residual PageRank on Distributed "
+                                          "Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
@@ -448,13 +449,13 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("PageRank", "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
                                 (unsigned long)maxIterations);
     std::ostringstream ss;
     ss << tolerance;
-    galois::runtime::reportParam("PageRank", "Tolerance", ss.str());
+    galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());
   }
-  galois::StatTimer StatTimer_total("TIMER_TOTAL");
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
   StatTimer_total.start();
 
@@ -468,7 +469,7 @@ int main(int argc, char** argv) {
   bitset_nout.resize(hg->get_local_total_nodes());
 
   std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT");
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_init.start();
     InitializeGraph::go((*hg));
   StatTimer_init.stop();
@@ -487,7 +488,7 @@ int main(int argc, char** argv) {
   for (auto run = 0; run < numRuns; ++run) {
     std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
     std::string timer_str("TIMER_" + std::to_string(run));
-    galois::StatTimer StatTimer_main(timer_str.c_str());
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
       PageRank::go(*hg, PageRank_accum);
