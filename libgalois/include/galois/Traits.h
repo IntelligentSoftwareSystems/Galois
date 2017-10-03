@@ -47,6 +47,7 @@
 #define GALOIS_TRAITS_H
 
 #include "galois/gtuple.h"
+#include "galois/worklists/WorkList.h"
 
 #include <type_traits>
 #include <tuple>
@@ -381,7 +382,7 @@ namespace internal {
  * chunk size is regulated to be within [chunk_size_tag::MIN, chunk_size_tag::MAX]
  */
 
-template <unsigned SZ=16> 
+template <unsigned SZ=32> 
 struct chunk_size: 
   // public trait_has_svalue<unsigned, internal::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
   public trait_has_value<unsigned>, chunk_size_tag {    
@@ -394,6 +395,8 @@ struct chunk_size:
 
   chunk_size (unsigned cs=SZ): trait_has_value (regulate (cs)) {}
 };
+
+typedef worklists::dChunkedFIFO<chunk_size<>::value> defaultWL;
 
 } // close namespace galois
 
