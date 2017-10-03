@@ -78,5 +78,7 @@ int main(int argc, char** argv) {
   SymGraph symG;
   run(symG, symT, "symmetric graph");
 
+  galois::runtime::reportParam("Load FirstGraph", "Threads", numThreads);
+  galois::runtime::reportParam("Load FirstGraph", "File", filename);
   return 0;
 }
