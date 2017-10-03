@@ -22,7 +22,7 @@ void initGraph(Graph& g) {
 
 template<typename Graph>
 void traverseGraph(Graph& g) {
-  unsigned int sum = 0;
+  uint64_t sum = 0;
 
   for (auto n: g) {
     for (auto oe: g.edges(n)) {
