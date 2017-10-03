@@ -183,7 +183,7 @@ public:
    */
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("REDUCE_DGACCUM_" + runID); 
-    galois::StatTimer reduceTimer(timer_str.c_str());
+    galois::StatTimer reduceTimer(timer_str.c_str(), "DGReducible");
     reduceTimer.start();
 
     if (local_mdata == 0) local_mdata = mdata.reduce();
