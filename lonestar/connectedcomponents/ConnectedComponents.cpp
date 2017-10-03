@@ -160,7 +160,7 @@ struct SerialAlgo {
   };
 
   void operator()(Graph& graph) {
-    std::for_each(graph.begin(), graph.end(), Merge(graph));
+    std::for_each(galois::iterate(graph), Merge(graph));
   }
 };
 
@@ -265,11 +265,11 @@ struct SynchronousAlgo {
 
     cur = &wls[0];
     next = &wls[1];
-    galois::do_all(graph, Initialize(graph, *cur));
+    galois::do_all(galois::iterate(graph), Initialize(graph, *cur));
 
     while (!cur->empty()) {
-      galois::do_all(*cur, Merge(graph, emptyMerges));
-      galois::for_each(*cur, Find(graph, *next));
+      galois::do_all(galois::iterate(*cur), Merge(graph, emptyMerges));
+      galois::for_each(galois::iterate(*cur), Find(graph, *next));
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
