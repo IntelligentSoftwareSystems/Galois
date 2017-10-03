@@ -78,9 +78,6 @@ typedef galois::graphs::LC_CSR_Graph<Node,EdgeData>
 
 typedef Graph::GraphNode GNode;
 
-// TODO: move this inside main
-Graph graph;
-
 std::ostream& operator<<(std::ostream& os, const Node& n) {
   os << "[id: " << &n << ", c: " << n.find() << "]";
   return os;
@@ -93,9 +90,6 @@ struct Edge {
   Edge(const GNode& s, const GNode& d, const EdgeData* w): src(s), dst(d), weight(w) { }
 };
 
-galois::InsertBag<Edge> mst;
-EdgeData inf;
-EdgeData heaviest;
 
 /**
  * Boruvka's algorithm. Implemented bulk-synchronously in order to avoid the
@@ -111,11 +105,16 @@ struct ParallelAlgo {
 
   typedef galois::InsertBag<WorkItem> WL;
 
+  Graph graph;
+
   WL wls[3];
   WL* current;
   WL* next;
   WL* pending;
   EdgeData limit;
+  galois::InsertBag<Edge> mst;
+  EdgeData inf;
+  EdgeData heaviest;
 
   /**
    * Find lightest edge between components leaving a node and add it to the
@@ -124,23 +123,23 @@ struct ParallelAlgo {
   template<bool useLimit, typename Context, typename Pending>
   static void findLightest(ParallelAlgo* self,
       const GNode& src, int cur, Context& ctx, Pending& pending) {
-    Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+    Node& sdata = self->graph.getData(src, galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ii = self->graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ei = self->graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
     std::advance(ii, cur);
 
     for (; ii != ei; ++ii, ++cur) {
-      GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-      EdgeData& weight = graph.getEdgeData(ii);
+      GNode dst = self->graph.getEdgeDst(ii);
+      Node& ddata = self->graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+      EdgeData& weight = self->graph.getEdgeData(ii);
       if (useLimit && weight > self->limit) {
         pending.push(WorkItem(src, dst, &weight, cur));
         return;
       }
       Node* rep;
       if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
-        //const EdgeData& weight = graph.getEdgeData(ii);
+        //const EdgeData& weight = self->graph.getEdgeData(ii);
         EdgeData* old;
         ctx.push(WorkItem(src, dst, &weight, cur));
         while (weight < *(old = rep->lightest)) {
@@ -171,8 +170,8 @@ struct ParallelAlgo {
 
     template<typename Context,typename Pending>
     void operator()(const GNode& src, Context& ctx, Pending& pending) const {
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      sdata.lightest = &inf;
+      Node& sdata = self->graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      sdata.lightest = &self->inf;
       findLightest<false>(self, src, 0, ctx, pending);
     }
   };
@@ -195,16 +194,16 @@ struct ParallelAlgo {
     template<typename Context, typename Pending>
     void operator()(const WorkItem& item, Context& ctx, Pending& pending) const {
       GNode src = item.edge.src;
-      Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      Node& sdata = self->graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Node* rep = sdata.findAndCompress();
       int cur = item.cur;
 
       if (rep->lightest == item.edge.weight) {
         GNode dst = item.edge.dst;
-        Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+        Node& ddata = self->graph.getData(dst, galois::MethodFlag::UNPROTECTED);
         if ((rep = sdata.merge(&ddata))) {
-          rep->lightest = &inf;
-          mst.push(Edge(src, dst, item.edge.weight));
+          rep->lightest = &self->inf;
+          self->mst.push(Edge(src, dst, item.edge.weight));
         }
         ++cur;
       }
@@ -309,173 +308,168 @@ struct ParallelAlgo {
       process();
     }
   }
-};
 
-struct is_bad_graph {
-  bool operator()(const GNode& n) const {
-    Node& me = graph.getData(n);
-    for (auto ii : graph.edges(n)) {
-      GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst);
-      if (me.findAndCompress() != data.findAndCompress()) {
-        std::cerr << "not in same component: " << me << " and " << data << "\n";
-        return true;
+  bool checkAcyclic(void) {
+      galois::GAccumulator<unsigned> roots;
+
+      galois::do_all(galois::iterate(graph),
+          [&roots, this] (const GNode& n) {
+            const auto& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
+            if (data.isRep())
+              roots += 1;
+          },
+          galois::no_stats());
+
+
+      unsigned numRoots = roots.reduce();
+      unsigned numEdges = std::distance(mst.begin(), mst.end());
+
+      if (graph.size() - numRoots != numEdges) {
+        std::cerr << "Generated graph is not a forest. "
+          << "Expected " << graph.size() - numRoots << " edges but "
+          << "found " << numEdges << "\n";
+        return false;
+      }
+
+      std::cout << "Num trees: " << numRoots << "\n";
+      std::cout << "Tree edges: " << numEdges << "\n";
+      return true;
+
+  }
+
+  EdgeData sortEdges () {
+
+    galois::GReduceMax<EdgeData> heavy;
+
+    galois::do_all(galois::iterate(graph), 
+        [&heavy, this] (const GNode& src) {
+          //! [sortEdgeByEdgeData]
+          graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), galois::MethodFlag::UNPROTECTED);
+          //! [sortEdgeByEdgeData]
+
+          Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+          ptrdiff_t dist = std::distance(ii, ei);
+          if (dist == 0)
+            return;
+          std::advance(ii, dist - 1);
+          heavy.update(graph.getEdgeData(ii));
+        },
+        galois::no_stats());
+
+    return heavy.reduce();
+  }
+
+
+
+  bool verify() {
+
+    auto is_bad_graph = [this] (const GNode& n) {
+      Node& me = graph.getData(n);
+      for (auto ii : graph.edges(n)) {
+        GNode dst = graph.getEdgeDst(ii);
+        Node& data = graph.getData(dst);
+        if (me.findAndCompress() != data.findAndCompress()) {
+          std::cerr << "not in same component: " << me << " and " << data << "\n";
+          return true;
+        }
+      }
+      return false;
+    };
+
+    auto is_bad_mst = [this] (const Edge& e) {
+      return graph.getData(e.src).findAndCompress() != graph.getData(e.dst).findAndCompress();
+    };
+
+
+    if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph) == graph.end()) {
+      if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst) == mst.end()) {
+        return checkAcyclic();
       }
     }
     return false;
   }
-};
 
-struct is_bad_mst {
-  bool operator()(const Edge& e) const {
-    return graph.getData(e.src).findAndCompress() != graph.getData(e.dst).findAndCompress();
-  }
-};
+  void initializeGraph() {
+    galois::graphs::FileGraph origGraph;
+    galois::graphs::FileGraph symGraph;
+    
+    origGraph.fromFileInterleaved<EdgeData>(inputFilename);
+    if (!symmetricGraph) 
+      galois::graphs::makeSymmetric<EdgeData>(origGraph, symGraph);
+    else
+      std::swap(symGraph, origGraph);
 
-struct CheckAcyclic {
-  struct Accum {
-    galois::GAccumulator<unsigned> roots;
-  };
-
-  Accum* accum;
-
-  void operator()(const GNode& n) const {
-    Node& data = graph.getData(n);
-    if (data.isRep())
-      accum->roots += 1;
-  }
-
-  bool operator()() {
-    Accum a;
-    accum = &a;
-    galois::do_all(galois::iterate(graph), *this, galois::no_stats());
-    unsigned numRoots = a.roots.reduce();
-    unsigned numEdges = std::distance(mst.begin(), mst.end());
-    if (graph.size() - numRoots != numEdges) {
-      std::cerr << "Generated graph is not a forest. "
-        << "Expected " << graph.size() - numRoots << " edges but "
-        << "found " << numEdges << "\n";
-      return false;
+    galois::graphs::readGraph(graph, symGraph);
+    
+    galois::StatTimer Tsort("InitializeSortTime");
+    Tsort.start();
+    heaviest = sortEdges();
+    if (heaviest == std::numeric_limits<EdgeData>::max() || 
+        heaviest == std::numeric_limits<EdgeData>::min()) {
+      GALOIS_DIE("Edge weights of graph out of range");
     }
+    inf = heaviest + 1;
+    
+    Tsort.stop();
 
-    std::cout << "Num trees: " << numRoots << "\n";
-    std::cout << "Tree edges: " << numEdges << "\n";
-    return true;
-  }
-};
-
-struct SortEdges {
-  struct Accum {
-    galois::GReduceMax<EdgeData> heavy;
-  };
-
-  Accum* accum;
-
-  void operator()(const GNode& src) const {
-    //! [sortEdgeByEdgeData]
-    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), galois::MethodFlag::UNPROTECTED);
-    //! [sortEdgeByEdgeData]
-
-    Graph::edge_iterator ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-    Graph::edge_iterator ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-    ptrdiff_t dist = std::distance(ii, ei);
-    if (dist == 0)
-      return;
-    std::advance(ii, dist - 1);
-    accum->heavy.update(graph.getEdgeData(ii));
+    std::cout << "Nodes: " << graph.size()
+      << " edges: " << graph.sizeEdges() 
+      << " heaviest edge: " << heaviest 
+      << "\n";
   }
 
-  EdgeData operator()() {
-    Accum a;
-    accum = &a;
-    galois::do_all(galois::iterate(graph), *this, galois::no_stats());
-    return a.heavy.reduce();
-  }
-};
-
-struct get_weight {
-  EdgeData operator()(const Edge& e) const { return *e.weight; }
 };
 
 template<typename Algo>
 void run() {
+
   Algo algo;
 
-  return algo();
-}
+  galois::StatTimer Tinitial("InitializeTime");
+  Tinitial.start();
+  algo.initializeGraph();
+  Tinitial.stop();
 
-bool verify() {
-  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
-    if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      CheckAcyclic c;
-      return c();
-    }
+  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 10);
+  galois::reportPageAlloc("MeminfoPre");
+
+  galois::StatTimer T;
+
+  T.start();
+  algo();
+  T.stop();
+
+  galois::reportPageAlloc("MeminfoPost");
+
+  auto get_weight = [] (const Edge& e) { return *e.weight; };
+
+  std::cout << "MST weight: "
+    << galois::ParallelSTL::map_reduce(algo.mst.begin(), algo.mst.end(),
+        get_weight, 0.0, std::plus<double>())
+    << " ("
+    << galois::ParallelSTL::map_reduce(algo.mst.begin(), algo.mst.end(),
+        get_weight, 0UL, std::plus<size_t>())
+    << ")\n";
+
+  if (!skipVerify && !algo.verify()) {
+    GALOIS_DIE("verification failed");
   }
-  return false;
+
 }
 
-void initializeGraph() {
-  galois::graphs::FileGraph origGraph;
-  galois::graphs::FileGraph symGraph;
-  
-  origGraph.fromFileInterleaved<EdgeData>(inputFilename);
-  if (!symmetricGraph) 
-    galois::graphs::makeSymmetric<EdgeData>(origGraph, symGraph);
-  else
-    std::swap(symGraph, origGraph);
-
-  galois::graphs::readGraph(graph, symGraph);
-  
-  galois::StatTimer Tsort("InitializeSortTime");
-  Tsort.start();
-  SortEdges sortEdges;
-  heaviest = sortEdges();
-  if (heaviest == std::numeric_limits<EdgeData>::max() || 
-      heaviest == std::numeric_limits<EdgeData>::min()) {
-    GALOIS_DIE("Edge weights of graph out of range");
-  }
-  inf = heaviest + 1;
-  
-  Tsort.stop();
-
-  std::cout << "Nodes: " << graph.size()
-    << " edges: " << graph.sizeEdges() 
-    << " heaviest edge: " << heaviest 
-    << "\n";
-}
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  galois::StatTimer Tinitial("InitializeTime");
-  Tinitial.start();
-  initializeGraph();
-  Tinitial.stop();
-
-  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 10);
-  galois::reportPageAlloc("MeminfoPre");
-  galois::StatTimer T;
-  T.start();
   switch (algo) {
     case parallel: run<ParallelAlgo<false> >(); break;
     case exp_parallel: run<ParallelAlgo<true> >(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
-  T.stop();
-  galois::reportPageAlloc("MeminfoPost");
+  
 
-  std::cout << "MST weight: "
-    << galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
-        get_weight(), 0.0, std::plus<double>())
-    << " ("
-    << galois::ParallelSTL::map_reduce(mst.begin(), mst.end(),
-        get_weight(), 0UL, std::plus<size_t>())
-    << ")\n";
-
-  if (!skipVerify && !verify()) {
-    GALOIS_DIE("verification failed");
-  }
 
   return 0;
 }
