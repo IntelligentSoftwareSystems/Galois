@@ -442,7 +442,7 @@ public:
   // }
 
   void clear_all_parallel (void) {
-    galois::on_each(
+    galois::runtime::on_each_gen(
         [this] (const unsigned tid, const unsigned numT) {
           get ().clear ();
         },
