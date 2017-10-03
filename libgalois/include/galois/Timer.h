@@ -116,14 +116,18 @@ public:
 //! Galois Timer that automatically reports stats upon destruction
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
-  const char* name;
-  const char* region;
+  gstl::Str name;
+  gstl::Str region;
   bool valid;
 
 protected:
-  void init(const char* const n, const char* const l, bool s) {
-    name = n ? n : "Time";
-    region = l? l : "(NULL)";
+  void init(const char* n, const char* r, bool s) {
+    n = n ? n : "Time";
+    r = r? r : "(NULL)";
+
+    name = gstl::makeStr(n);
+    region = gstl::makeStr(r);
+
     valid = false;
     if (s)
       start();
@@ -133,8 +137,8 @@ public:
   StatTimer(const char* const n) { init(n, nullptr, false); }
   StatTimer(const char* const n, start_now_t t) { init(n, nullptr, true); }
 
-  StatTimer(const char* const n, const char* const l) { init(n, l, false); }
-  StatTimer(const char* const n, const char* const l, start_now_t t) { init(n, l, true); }
+  StatTimer(const char* const n, const char* const r) { init(n, r, false); }
+  StatTimer(const char* const n, const char* const r, start_now_t t) { init(n, r, true); }
 
   StatTimer() { init(nullptr, nullptr, false); }
   StatTimer(start_now_t t) { init(nullptr, nullptr, true); }
@@ -143,7 +147,7 @@ public:
     if (valid)
       stop();
     if (TimeAccumulator::get()) // only report non-zero stat
-      galois::runtime::reportStat_Tmax(region, name, get());
+      galois::runtime::reportStat_Tmax(region, name, TimeAccumulator::get());
   }
 
   void start() {
@@ -160,7 +164,7 @@ public:
 template <bool Enable> 
 class CondStatTimer: public StatTimer {
 public:
-  CondStatTimer(const char* name): StatTimer("Time", name) {}
+  CondStatTimer(const char* region): StatTimer("Time", region) {}
 };
 
 template <> class CondStatTimer<false> {

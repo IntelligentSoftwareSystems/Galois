@@ -17,10 +17,10 @@ int main() {
   std::vector<int> v(10);
   galois::InsertBag<int> b;
 
-  galois::for_each(v.begin(), v.end(), &function_pointer);
-  galois::for_each(v.begin(), v.end(), function_object(), galois::loopname("with function object and options"));
-  galois::do_all(v.begin(), v.end(), [&b](int x) { b.push(x); });
-  galois::for_each(b, function_object());
+  galois::for_each(galois::iterate(v), &function_pointer, galois::loopname("func-pointer"));
+  galois::for_each(galois::iterate(v), function_object(), galois::loopname("with function object and options"));
+  galois::do_all(galois::iterate(v), [&b](int x) { b.push(x); }, galois::no_stats());
+  galois::for_each(galois::iterate(b), function_object());
   
   // Works without context as well
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400

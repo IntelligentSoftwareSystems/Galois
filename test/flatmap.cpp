@@ -46,10 +46,10 @@ void timeMapParallel(std::string c, const std::vector<int>& keys) {
   MapTy m;
   galois::Timer t1, t2;
   t1.start();
-  galois::do_all(keys.begin(), keys.end(), Fn1<MapTy> { &m });
+  galois::do_all(galois::iterate(keys), Fn1<MapTy> { &m });
   t1.stop();
   t2.start();
-  galois::do_all(keys.begin(), keys.end(), Fn2<MapTy> { &m });
+  galois::do_all(galois::iterate(keys), Fn2<MapTy> { &m });
   t2.stop();
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
 }

@@ -42,13 +42,6 @@ static const char* url = 0;
 static llvm::cl::opt<int> sval(llvm::cl::Positional, llvm::cl::desc("<start value>"), llvm::cl::init(-1));
 static llvm::cl::opt<int> ival(llvm::cl::Positional, llvm::cl::desc("<init num>"), llvm::cl::init(100));
 
-struct process {
-  void operator()(int item, galois::UserContext<int>& lwl) {
-    for (int i = 0; i < item; ++i)
-      lwl.push(item - 1);
-  }
-};
-
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
@@ -56,21 +49,15 @@ int main(int argc, char** argv) {
 
   std::cout << "Initial: " << (int)ival << " using " << (int)sval << "\n";
 
-  // galois::StatTimer T0("T0");
-  // T0.start();
-  // using namespace galois::runtime::WorkList;
-  // galois::for_each<ChunkedLIFO<64> >(v.begin(), v.end(), process());
-  // T0.stop();
-
-  // galois::StatTimer T1("T1");
-  // T1.start();
-  // using namespace galois::runtime::WorkList;
-  // galois::for_each<Alt::ChunkedAdaptor<LIFO<>, 64, true > >(v.begin(), v.end(), process());
-  // T1.stop();
 
   galois::StatTimer T2("T2");
   T2.start();
   using namespace galois::worklists;
-  galois::for_each(v.begin(), v.end(), process(), galois::wl<dChunkedLIFO<64>>());
+  galois::for_each(galois::iterate(v), 
+      [&] (int item, auto& lwl) {
+        for (int i = 0; i < item; ++i)
+          lwl.push(item - 1);
+      },
+      galois::wl<dChunkedLIFO<64>>());
   T2.stop();
 }

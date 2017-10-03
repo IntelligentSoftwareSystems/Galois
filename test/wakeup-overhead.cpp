@@ -18,25 +18,25 @@ static cll::opt<int> size("size", cll::desc ("length of vectors"), cll::init(100
 static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(10000));
 static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(1));
 
-void runDoAllBurn(size_t num) {
+void runDoAllBurn(int num) {
   galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   for (int r = 0; r < rounds; ++r) {
-    galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+    galois::do_all(galois::iterate(0, num),
                    [&](int i) { asm volatile("" ::: "memory"); });
   }
 
   galois::substrate::getThreadPool().beKind();
 }
 
-void runDoAll(size_t num) {
+void runDoAll(int num) {
   for (int r = 0; r < rounds; ++r) {
-    galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+    galois::do_all(galois::iterate(0, num),
         [&](int i) { asm volatile("" ::: "memory"); });
   }
 }
 
-void runExplicitThread(size_t num) {
+void runExplicitThread(int num) {
   galois::substrate::Barrier& barrier = galois::runtime::getBarrier(galois::runtime::activeThreads);
   
   galois::on_each([&](unsigned tid, unsigned total) {
@@ -52,7 +52,7 @@ void runExplicitThread(size_t num) {
   });
 }
 
-void run(std::function<void(size_t)> fn, std::string name) {
+void run(std::function<void(int)> fn, std::string name) {
   galois::Timer t;
   t.start();
   fn(size);

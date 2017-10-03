@@ -77,7 +77,7 @@ void runLocalStateMatching(const std::string& name) {
   galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
-  galois::for_each(graph,
+  galois::for_each(galois::iterate(graph),
       MatchingWithLocalState { graph, size },
       galois::wl<galois::worklists::Deterministic<>>(),
       galois::local_state<MatchingWithLocalState::LocalState>(),
@@ -92,7 +92,7 @@ void runDetMatching(const std::string& name) {
   galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
-  galois::for_each(graph.begin(), graph.end(), Matching { graph, size },
+  galois::for_each(galois::iterate(graph), Matching { graph, size },
       galois::wl<galois::worklists::Deterministic<>>());
   std::cout << "Deterministic matching size: " << size.reduce() << "\n";
 }
@@ -102,7 +102,7 @@ void runNDMatching(const std::string& name) {
   galois::graphs::readGraph(graph, name);
   galois::GAccumulator<int> size;
 
-  galois::for_each(graph.begin(), graph.end(), Matching { graph, size });
+  galois::for_each(galois::iterate(graph), Matching { graph, size });
   std::cout << "Non-deterministic matching size: " << size.reduce() << "\n";
 }
 
