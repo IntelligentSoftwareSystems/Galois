@@ -11,6 +11,7 @@ using InOutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, 
 using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
 
 std::string filename;
+std::string statfile;
 
 template<typename Graph>
 void initGraph(Graph& g) {
@@ -52,14 +53,18 @@ void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
-  if (argc < 1) {
-    std::cout << "Usage: ./test-firstgraph <input> <num_threads>" << std::endl;
+  if (argc < 3) {
+    std::cout << "Usage: ./test-firstgraph <input> <num_threads> [stat_file]" << std::endl;
     return 0;
   } 
   filename = argv[1];
 
   auto numThreads = galois::setActiveThreads(std::stoul(argv[2]));
   std::cout << "Loading " << filename << " with " << numThreads << " threads." << std::endl;
+
+  if (argc >= 4) {
+    galois::runtime::setStatFile(argv[3]);
+  }
 
   galois::StatTimer outT("OutGraphTime");
   OutGraph outG;
