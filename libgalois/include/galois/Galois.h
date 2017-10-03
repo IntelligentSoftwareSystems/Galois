@@ -115,7 +115,7 @@ void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... ar
  */
 template<typename FunctionTy, typename... Args>
 void on_each(const FunctionTy& fn, const Args&... args) {
-  runtime::on_each_impl(fn, std::make_tuple(args...));
+  runtime::on_each_gen(fn, std::make_tuple(args...));
 }
 
 /**
@@ -129,7 +129,7 @@ void on_each(const FunctionTy& fn, const Args&... args) {
  */
 template<typename FunctionTy, typename... Args>
 void on_each(FunctionTy& fn, const Args&... args) {
-  runtime::on_each_impl(fn, std::make_tuple(args...));
+  runtime::on_each_gen(fn, std::make_tuple(args...));
 }
 
 /**

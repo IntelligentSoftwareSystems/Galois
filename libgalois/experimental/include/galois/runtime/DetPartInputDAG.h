@@ -325,7 +325,7 @@ struct InputGraphPartDAGexecutor {
 
     using LocalContrib = typename galois::gstl::Vector<galois::gdeque<GNode, 64> >;
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this, &range] (unsigned tid, unsigned numT) {
 
           LocalContrib localContribInner (numPart);
@@ -424,7 +424,7 @@ struct InputGraphPartDAGexecutor {
 
     galois::substrate::PerThreadStorage<ThreadWorker> workers;
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this, &workers] (const unsigned tid, const unsigned numT) {
           ThreadWorker& w = *workers.getLocal (tid);
 
@@ -457,7 +457,7 @@ struct InputGraphPartDAGexecutor {
     //
     // TODO: what to do with stolen partition? put back in original owner? keep?
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this, &workers] (const unsigned tid, const unsigned numT) {
 
           ThreadWorker& worker = *workers.getLocal (tid);

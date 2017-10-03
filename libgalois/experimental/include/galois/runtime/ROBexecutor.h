@@ -399,7 +399,7 @@ public:
 
     const T& dummy = *pending[0].begin ();
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [&dummy,this] (const unsigned tid, const unsigned numT) {
           for (unsigned j = 0; j < WINDOW_SIZE_PER_THREAD; ++j) {
             Ctxt* ctx = ctxtAlloc.allocate (1);

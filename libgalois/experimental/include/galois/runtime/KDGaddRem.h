@@ -493,7 +493,7 @@ public:
           galois::loopname ("delete_all_ctxt"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
-    runtime::on_each_impl (
+    galois::on_each(
         [this, &sources] (const unsigned tid, const unsigned numT) {
           sources.get ().clear ();
           ctxtDelQ.get ().clear ();

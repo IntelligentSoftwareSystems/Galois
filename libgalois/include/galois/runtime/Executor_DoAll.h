@@ -606,7 +606,7 @@ template <> struct ChooseDoAllImpl<false> {
   template <typename R, typename F, typename ArgsT>
   static void call(const R& range, const F& func, const ArgsT& argsTuple) {
 
-    runtime::on_each_impl([&] (const unsigned tid, const unsigned numT) {
+    runtime::on_each_gen([&] (const unsigned tid, const unsigned numT) {
 
         static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsT>::value;
         static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsT>::value;

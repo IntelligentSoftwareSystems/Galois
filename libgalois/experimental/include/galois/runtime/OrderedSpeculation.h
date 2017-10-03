@@ -841,7 +841,7 @@ protected:
 
     substrate::PerThreadStorage<Ctxt*> perThrdMin;
 
-    on_each_impl ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
+    galois::on_each ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
           
           for (auto i = Base::getNextWL().local_begin()
             , end_i = Base::getNextWL().local_end(); i != end_i; ++i) {
@@ -991,7 +991,7 @@ protected:
 
   void resetCurrMinPending(void) {
     // reset currMinPending
-    on_each_impl (
+    galois::on_each (
         [this] (const unsigned tid, const unsigned numT) {
           *(currMinPending.getLocal()) = nullptr;
         });
@@ -1112,7 +1112,7 @@ protected:
           galois::wl<galois::worklists::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
 
 
-    galois::runtime::on_each_impl(
+    galois::on_each(
         [this] (const unsigned tid, const unsigned numT) {
           abortRoots.get().clear();
           abortLocations.get().clear();
@@ -1276,7 +1276,7 @@ protected:
     // among all threads
 
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this] (const unsigned tid, const unsigned numT) {
           
           auto& localQ = this->commitQ.get();
@@ -1745,7 +1745,7 @@ protected:
 
   void resetCurrMinPending(void) {
     // reset currMinPending
-    on_each_impl (
+    galois::on_each(
         [this] (const unsigned tid, const unsigned numT) {
           *(currMinPending.getLocal()) = galois::optional<T>();
         });
@@ -1989,7 +1989,7 @@ protected:
     };
 
 
-    galois::runtime::on_each_impl (
+    galois::on_each (
         [this, &ptest] (const unsigned tid, const unsigned numT) {
           auto& localQ = this->commitQ.get();
 
@@ -2004,7 +2004,7 @@ protected:
 // 
     // auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
 // 
-    // galois::runtime::on_each_impl (
+    // galois::on_each (
         // [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
           // auto& localQ = Base::commitQ.get();
           // auto new_end = std::partition (localQ.begin(), 
@@ -2111,7 +2111,7 @@ protected:
 // 
     // // memory is returned to owner thread, thus thread 0 doesn't accumulate all 
     // // the feed blocks
-    // on_each_impl (
+    // galois::on_each (
         // [this] (const unsigned tid, const unsigned numT) {
           // for (auto i = freeWL.get().begin()
               // , end_i = freeWL.get().end(); i != end_i; ++i) {

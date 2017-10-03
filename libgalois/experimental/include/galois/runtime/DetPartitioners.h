@@ -78,40 +78,39 @@ struct GreedyPartitioner {
   template <typename R>
   void blockStart (const R& range) {
 
-          size_t lim = std::distance(range.begin (), range.end ()) / numPart;
+      size_t lim = std::distance(range.begin (), range.end ()) / numPart;
 
-    on_each_impl (
-        [this, &range, &lim] (const unsigned tid, const unsigned numT) {
-          unsigned partPerThread = (numPart + numT - 1) / numT;
-          unsigned pbeg = tid * partPerThread;
+      galois::on_each ( [this, &range, &lim] (const unsigned tid, const unsigned numT) {
+        unsigned partPerThread = (numPart + numT - 1) / numT;
+        unsigned pbeg = tid * partPerThread;
 
 
-          size_t size = 0;
-          unsigned currP = pbeg;
-          for (auto i = range.local_begin (), end_i = range.local_end ();
-            i != end_i; ++i) {
+        size_t size = 0;
+        unsigned currP = pbeg;
+        for (auto i = range.local_begin (), end_i = range.local_end ();
+          i != end_i; ++i) {
 
-            auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
-            GALOIS_ASSERT (nd.partition == -1);
+          auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
+          GALOIS_ASSERT (nd.partition == -1);
 
-            nd.partition = currP;
-            ++size;
+          nd.partition = currP;
+          ++size;
 
-            if (size >= lim) {
-              ++currP;
-              if (currP >= numPart) {
-                currP = pbeg;
-              }
-              size = 0;
+          if (size >= lim) {
+            ++currP;
+            if (currP >= numPart) {
+              currP = pbeg;
             }
+            size = 0;
           }
-        });
+        }
+    });
 
   }
 
   template <typename R>
   void cyclicStart (const R& range) {
-    on_each_impl (
+    galois::on_each (
         [this, &range] (const unsigned tid, const unsigned numT) {
           int counter = 0;
           for (auto i = range.local_begin (), end_i = range.local_end ();

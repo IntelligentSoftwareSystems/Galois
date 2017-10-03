@@ -94,13 +94,13 @@ struct ThreadLocalTest {
     Bag_ty localSafeEvents;
 
     // TODO: try do-all with fine grained work items. 
-    galois::runtime::on_each_impl (
+    galois::on_each (
         [&] (const unsigned tid, const unsigned numT) {
 
           DepTestUtils::selfTestRange (crange.begin_local (), crange.end_local (), cmp, localSafeEvents);
 
         }
-        , "thread-local-safety-test");
+        , galois::loopname("thread-local-safety-test"));
 
 
     DepTestUtils::testOnRange (galois::runtime::makeLocalRange (localSafeEvents), cmp, "thread-local-round-2");

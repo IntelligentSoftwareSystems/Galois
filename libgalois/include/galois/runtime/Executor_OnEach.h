@@ -72,7 +72,7 @@ inline void on_each_exec(FunctionTy& fn, const ArgsTy& argsTuple) {
 }
 
 template<typename FunctionTy, typename TupleTy>
-inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
+inline void on_each_impl(FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
 
@@ -94,13 +94,13 @@ inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
 }
 
 template<typename FunctionTy, typename TupleTy>
-inline void on_each_impl(FunctionTy& fn, const TupleTy& tpl) {
-  internal::on_each_gen<FunctionTy, TupleTy>(fn, tpl);
+inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
+  internal::on_each_impl<FunctionTy, TupleTy>(fn, tpl);
 }
 
 template<typename FunctionTy, typename TupleTy>
-inline void on_each_impl(const FunctionTy& fn, const TupleTy& tpl) {
-  internal::on_each_gen<const FunctionTy, TupleTy>(fn, tpl);
+inline void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
+  internal::on_each_impl<const FunctionTy, TupleTy>(fn, tpl);
 }
 
 

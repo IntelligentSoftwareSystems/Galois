@@ -105,7 +105,7 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  galois::runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
+  galois::on_each (_CleanupFunc (workList, currStep), "remove_simulated_events");
   // galois::runtime::do_all_coupled (
       // boost::counting_iterator<unsigned> (0),
       // boost::counting_iterator<unsigned> (workList.numRows ()), 

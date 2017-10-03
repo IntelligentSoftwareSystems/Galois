@@ -76,11 +76,11 @@ public:
 
     init_sz = count.reduce ();
 
-    galois::runtime::on_each_impl (
+    galois::on_each (
         [this] (const unsigned tid, const unsigned numT) {
           std::sort (m_wl[tid].begin (), m_wl[tid].end (), cmp);
         }
-        , "initsort");
+        , galois::loopname("initsort"));
 
     for (unsigned i = 0; i < m_wl.numRows (); ++i) {
       *(wlRange.getRemote (i)) = std::make_pair (m_wl[i].begin (), m_wl[i].end ());
@@ -170,7 +170,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      galois::runtime::on_each_impl (
+      galois::on_each(
           [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal ());
 
@@ -188,7 +188,7 @@ public:
                 workList.get ().push_back (wrap (*(r.first)));
             }
           }
-          , "poll");
+          , galois::loopname("poll"));
 
     } else {
 
@@ -300,7 +300,7 @@ public:
     Derived* d = static_cast<Derived*> (this);
     assert(d);
 
-    galois::runtime::on_each_impl (
+    galois::on_each (
         [this, d, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
 
           galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
@@ -319,7 +319,7 @@ public:
             d->popMin();
           }
         }
-        , "poll_part_1");
+        , galois::loopname("poll_part_1"));
 
 
 
@@ -362,7 +362,7 @@ public:
       Derived* d = static_cast<Derived*> (this);
       assert(d);
 
-      galois::runtime::on_each_impl (
+      galois::on_each (
           [this, d, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
             while (!m_wl.get ().empty ()) {
@@ -377,7 +377,7 @@ public:
               d->popMin ();
             }
           }
-          , "poll_part_2");
+          , galois::loopname("poll_part_2"));
 
 
       galois::optional<T> min  = d->getMin ();
@@ -495,20 +495,20 @@ public:
 
   template <typename R>
   void initfill (const R& range) {
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this, range] (const unsigned tid, const unsigned numT) {
           m_wl.getLocal ()->initfill (range.local_begin (), range.local_end ());
-        }, "initfill");
+        }, galois::loopname("initfill"));
   }
 
   template <typename WL>
   void poll (WL& workList, const size_t numElems) {
 
-    galois::runtime::on_each_impl (
+    galois::on_each(
         [this, &workList, numElems] (const unsigned tid, const unsigned numT) {
           const size_t numPerThrd = numElems / numT;
           m_wl.getLocal ()->poll (workList, numPerThrd);
-        }, "poll_part_1");
+        }, galois::loopname("poll_part_1"));
 
 
     const T* windowLim = nullptr;
@@ -527,10 +527,10 @@ public:
     }
 
     if (windowLim != nullptr) {
-      galois::runtime::on_each_impl (
+      galois::on_each(
           [this, &workList, windowLim] (const unsigned tid, const unsigned numT) {
             m_wl.getLocal ()->partition (workList, *windowLim);
-          }, "poll_part_2");
+          }, galois::loopname("poll_part_2"));
 
 
       for (unsigned i = 0; i < m_wl.size (); ++i) {
