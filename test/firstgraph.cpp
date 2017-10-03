@@ -26,14 +26,14 @@ void traverseGraph(Graph& g) {
 
   for (auto n: g) {
     for (auto oe: g.edges(n)) {
-      sum += g.getData(n) * g.getEdgeData(oe);
+      sum += g.getEdgeData(oe);
     }
   }
   std::cout << "  out sum = " << sum << std::endl;
 
   for (auto n: g) {
     for (auto ie: g.in_edges(n)) {
-      sum -= g.getData(n) * g.getEdgeData(ie);
+      sum -= g.getEdgeData(ie);
     }
   }
   std::cout << "  all sum = " << sum << std::endl;
