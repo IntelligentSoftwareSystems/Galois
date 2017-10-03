@@ -225,7 +225,7 @@ void verify (Graph& g) {
 
   AccumDouble rms;
 
-  galois::do_all_local (g, 
+  galois::do_all (galois::iterate(g),
       [&g, &rms] (GNode n) {
       for (auto e = g.edge_begin (n, galois::MethodFlag::UNPROTECTED)
         , e_end = g.edge_end (n, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
@@ -274,7 +274,7 @@ struct sgd_node_movie {
       std::cout << "Step Size: " << step_size << "\n";
       // if (i != 0)
       //   std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie(g, step_size));
+      galois::for_each(galois::iterate(Movies.begin(), Movies.end()), sgd_node_movie(g, step_size));
     }
   }
 };
@@ -310,7 +310,7 @@ struct sgd_node_movie_pri {
       std::cout << "Step Size: " << step_size << "\n";
       // if (i != 0)
       //   std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie_pri(g, step_size), 
+      galois::for_each(galois::iterate(Movies.begin(), Movies.end()), sgd_node_movie_pri(g, step_size),
                        galois::wl<galois::worklists::dChunkedFIFO<>>());
     }
   }
@@ -348,7 +348,7 @@ struct sgd_edge_movie {
       std::cout << "Step Size: " << step_size << "\n";
       if (i != 0)
         std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(Movies.begin(), Movies.end(), sgd_edge_movie(g, step_size), galois::wl<galois::worklists::dChunkedLIFO<8>>());
+      galois::for_each(galois::iterate(Movies.begin(), Movies.end()), sgd_edge_movie(g, step_size), galois::wl<galois::worklists::dChunkedLIFO<8>>());
     }
   }
 };
@@ -727,7 +727,7 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
   // advances the edge iterator until it reaches the userRangeStart field of 
   // the ThreadWorkItem
   // userRangeStart isn't needed after this point
-  galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
+  galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), advance_edge_iterators(g));
 
   unsigned long** updates = new unsigned long*[numWorkItems];
   for (int i = 0; i < numWorkItems; i++) {
@@ -746,7 +746,7 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
     for (unsigned int j = 0; j < numWorkItems; j++) {  
       // std::cout << "Update " << update << " Block " << j << std::endl;
       // assign one ThreadWorkItem to each thread statically
-      galois::do_all(workItems + 0, workItems + numWorkItems, 
+      galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems),
                      BlockFn(g, lf->step_size(update)));
 
       // move each thread's assignment of work one block to the right
@@ -941,8 +941,8 @@ void runSliceMarch(Graph& g, const LearnFN* lf) {
   //move the edge iterators of each movie to the start of the current block
   //advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
   //userRangeStart isn't needed after this point
-  galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
-  galois::do_all(workItems + 0, workItems + numWorkItems, sgd_march(g, locks, step_size));
+  galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), advance_edge_iterators(g));
+  galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), sgd_march(g, locks, step_size));
 
 
   /*for(unsigned int i = 0; i < numWorkItems; i++)
@@ -1206,7 +1206,7 @@ void runSliceJump(Graph& g, const LearnFN* lf)
   }
 
   //generate indexes for user ids into graph
-  galois::do_all(g.begin(), g.begin() + NUM_MOVIE_NODES, 
+  galois::do_all(galois::iterate(g.begin(), g.begin() + NUM_MOVIE_NODES),
       calculate_user_offsets(g, slices, moviesPerSlice, numXSlices, numYSlices));
   
   //stagger the starting slices for each thread
@@ -1226,7 +1226,7 @@ void runSliceJump(Graph& g, const LearnFN* lf)
   
   double step_size = lf->step_size(1); //FIXME
   galois::GAccumulator<size_t> eVisited;
-  galois::do_all(&startSlices[0], &startSlices[threadCount], 
+  galois::do_all(galois::iterate(&startSlices[0], &startSlices[threadCount]),
       sgd_slice_jump(g, &eVisited, xLocks, yLocks, slices, numXSlices, numYSlices, step_size));
 
   galois::runtime::reportStat_Serial("Matrix Completion", "EdgesVisited", eVisited.reduce());
