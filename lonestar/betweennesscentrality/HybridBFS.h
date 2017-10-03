@@ -20,128 +20,90 @@ struct HybridBFS {
   galois::GAccumulator<size_t> count;
   NodeBag bags[2];
 
-  struct ForwardProcess {
-    typedef int tt_does_not_need_aborts;
+  template <typename I>
+  void bfsPushBulkSyncOperator (I ii, Graph& graph, NodeBag* nextBag, Dist newDist) {
+    GNode dst = graph.getEdgeDst(ii);
+    NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-    Graph& graph;
-    HybridBFS* self;
-    NodeBag* nextBag;
-    Dist newDist;
-
-    ForwardProcess(Graph& g, HybridBFS* s, NodeBag* n = 0, int d = 0):
-      graph(g), self(s), nextBag(n), newDist(d) { }
-
-    void operator()(const GNode& n, galois::UserContext<GNode>&) {
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
-            ei = graph.edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
-        processBS(ii, newDist, *nextBag);
-      }
-    }
-
-    void operator()(const typename Graph::edge_iterator& ii, galois::UserContext<typename Graph::edge_iterator>&) {
-      processBS(ii, newDist, *nextBag);
-    }
-
-    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) {
-      GNode n = item.first;
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
-            ei = graph.edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
-        processAsync(ii, item.second, ctx);
-      }
-    }
-
-    void processBS(const typename Graph::edge_iterator& ii, Dist nextDist, NodeBag& next) {
-      GNode dst = graph.getEdgeDst(ii);
-      NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-
-      Dist oldDist;
-      while (true) {
-        oldDist = ddata.dist;
-        if (oldDist <= nextDist)
-          return;
-        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, nextDist)) {
-          next.push(dst);
-          self->count += 1 
-            + std::distance(graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED),
-              graph.edge_end(dst, galois::MethodFlag::UNPROTECTED));
-          break;
-        }
-      }
-    }
-
-    void processAsync(const typename Graph::edge_iterator& ii, Dist nextDist, galois::UserContext<WorkItem>& next) {
-      GNode dst = graph.getEdgeDst(ii);
-      NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-
-      Dist oldDist;
-      while (true) {
-        oldDist = ddata.dist;
-        if (oldDist <= nextDist)
-          return;
-        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, nextDist)) {
-          next.push(WorkItem(dst, nextDist + 1));
-          break;
-        }
-      }
-    }
-  };
-
-  struct BackwardProcess {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_push;
-
-    Graph& graph;
-    HybridBFS* self;
-    NodeBag* nextBag;
-    Dist newDist; 
-    BackwardProcess(Graph& g, HybridBFS* s, NodeBag* n, int d): graph(g), self(s), nextBag(n), newDist(d) { }
-
-    void operator()(const GNode& n, galois::UserContext<GNode>&) {
-      (*this)(n);
-    }
-
-    void operator()(const GNode& n) const {
-      NodeData& sdata = graph.getData(n, galois::MethodFlag::UNPROTECTED);
-      if (sdata.dist <= newDist)
+    Dist oldDist;
+    while (true) {
+      oldDist = ddata.dist;
+      if (oldDist <= newDist)
         return;
-
-      for (typename Graph::in_edge_iterator ii = graph.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
-            ei = graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
-        GNode dst = graph.getInEdgeDst(ii);
-        NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-
-        if (ddata.dist + 1 == newDist) {
-          sdata.dist = newDist;
-          nextBag->push(n);
-          self->count += 1
-            + std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
-              graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
-          break;
-        }
+      if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+        nextBag->push(dst);
+        this->count += 1 
+          + std::distance(graph.edge_begin(dst, galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(dst, galois::MethodFlag::UNPROTECTED));
+        break;
       }
     }
-  };
+  }
 
-  struct PopulateAsync {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_push;
+  void bfsPushAsync(Graph& graph, WorkItemBag& asyncBag) {
 
-    WorkItemBag& bag;
-    Dist newDist;
-    PopulateAsync(WorkItemBag& b, Dist d): bag(b), newDist(d) { }
-    void operator()(const GNode& n, galois::UserContext<GNode>&) {
-      (*this)(n);
-    }
-
-    void operator()(const GNode& n) {
-      bag.push(WorkItem(n, newDist));
-    }
-  };
-
-  void operator()(Graph& graph, const GNode& source) {
     using namespace galois::worklists;
     typedef dChunkedLIFO<256> WL;
     typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+
+    galois::for_each(galois::iterate(asyncBag), 
+        [&] (const WorkItem& item, auto& ctx) {
+          GNode n = item.first;
+          const Dist& newDist = item.second;
+
+          for (typename Graph::edge_iterator ii = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+                ei = graph.edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+
+            GNode dst = graph.getEdgeDst(ii);
+            NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+
+            Dist oldDist;
+            while (true) {
+              oldDist = ddata.dist;
+              if (oldDist <= newDist)
+                return;
+              if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+                ctx.push(WorkItem(dst, newDist + 1));
+                break;
+              }
+            }
+          }
+        },
+        galois::no_conflicts(),
+        galois::loopname("bfsPushAsync"),
+        galois::wl<BSWL>());
+  }
+
+  void bfsPullTopo (Graph& graph, NodeBag* nextBag, const Dist& newDist) {
+
+    galois::do_all(galois::iterate(graph),
+        [&, outer=this] (const GNode& n) {
+          NodeData& sdata = graph.getData(n, galois::MethodFlag::UNPROTECTED);
+          if (sdata.dist <= newDist)
+            return;
+
+          for (auto ii = graph.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
+                ei = graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+
+            GNode dst = graph.getInEdgeDst(ii);
+            NodeData& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+
+            if (ddata.dist + 1 == newDist) {
+              sdata.dist = newDist;
+              nextBag->push(n);
+              outer->count += 1
+                + std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+                  graph.edge_end(n, galois::MethodFlag::UNPROTECTED));
+              break;
+            }
+          }
+
+        },
+        galois::loopname("bfsPullTopo"));
+  }
+
+
+  void operator()(Graph& graph, const GNode& source) {
 
     int next = 0;
     Dist newDist = 1;
@@ -149,13 +111,22 @@ struct HybridBFS {
     int numBackward = 0;
 
     graph.getData(source).dist = 0;
+
     if (std::distance(graph.edge_begin(source), graph.edge_end(source)) + 1 > (long) graph.sizeEdges() / 20) {
-      galois::do_all(graph, BackwardProcess(graph, this, &bags[next], newDist));
+      bfsPullTopo(graph, &bags[next], newDist);
       numBackward += 1;
+
     } else {
-      galois::for_each(graph.out_edges(source, galois::MethodFlag::UNPROTECTED).begin(), 
-          graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end(),
-          ForwardProcess(graph, this, &bags[next], newDist));
+      galois::do_all(
+          galois::iterate(graph.out_edges(source, galois::MethodFlag::UNPROTECTED).begin()
+            , graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end()),
+
+        [&, outer=this] (auto ii) {
+          outer->bfsPushBulkSyncOperator(ii, graph, &outer->bags[next], newDist);
+        },
+        galois::loopname("bfsPushBulkSync"));
+
+
       numForward += 1;
     }
 
@@ -165,21 +136,38 @@ struct HybridBFS {
       int cur = next;
       next = (cur + 1) & 1;
       newDist++;
+
       if (nextSize > graph.sizeEdges() / 20) {
         //std::cout << "Dense " << nextSize << "\n";
-        galois::do_all(graph, BackwardProcess(graph, this, &bags[next], newDist));
+        bfsPullTopo(graph, &bags[next], newDist);
         numBackward += 1;
+
       } else if (numForward < 10 && numBackward == 0) {
         //std::cout << "Sparse " << nextSize << "\n";
-        galois::for_each(bags[cur], ForwardProcess(graph, this, &bags[next], newDist), galois::wl<WL>());
+        
+        galois::do_all(galois::iterate(bags[cur]),
+            [&, outer=this] (const GNode& n) {
+              for (typename Graph::edge_iterator ii = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+                    ei = graph.edge_end(n, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+                outer->bfsPushBulkSyncOperator(ii, graph, &outer->bags[next], newDist);
+              }
+            },
+            galois::loopname("bfsPushBulkSync"));
         numForward += 1;
       } else {
         //std::cout << "Async " << nextSize << "\n";
         WorkItemBag asyncBag;
-        galois::for_each(bags[cur], PopulateAsync(asyncBag, newDist), galois::wl<WL>());
-        galois::for_each(asyncBag, ForwardProcess(graph, this), galois::wl<BSWL>());
+
+        galois::do_all(galois::iterate(bags[cur]), 
+            [&] (const GNode& n) {
+              asyncBag.push(WorkItem(n, newDist));
+            },
+            galois::no_stats());
+
+        bfsPushAsync(graph, asyncBag);
         break;
       }
+
       bags[cur].clear();
     }
   }
