@@ -390,7 +390,7 @@ struct PullAlgo {
       size -= numTaken.reduce();
     }
 
-    galois::runtime::reportStat_Serial("IndependentSet-PullAlgo", "rounds", rounds.reduce());
+    galois::runtime::reportStat_Single("IndependentSet-PullAlgo", "rounds", rounds.reduce());
   }
 };
 

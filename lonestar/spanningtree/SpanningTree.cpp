@@ -148,7 +148,7 @@ struct AsyncAlgo {
         Normalize(), 
         galois::loopname("Normalize"));
 
-    galois::runtime::reportStat_Serial("SpanningTree", "emptyMerges", emptyMerges.reduce());
+    galois::runtime::reportStat_Single("SpanningTree", "emptyMerges", emptyMerges.reduce());
   }
 };
 

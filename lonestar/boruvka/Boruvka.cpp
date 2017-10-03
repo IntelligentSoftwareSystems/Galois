@@ -274,7 +274,7 @@ struct ParallelAlgo {
       limit *= 2;
     }
 
-    galois::runtime::reportStat_Serial("Boruvka", "rounds", rounds);
+    galois::runtime::reportStat_Single("Boruvka", "rounds", rounds);
   }
 
 #if defined(GALOIS_USE_EXP) && !defined(GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR)

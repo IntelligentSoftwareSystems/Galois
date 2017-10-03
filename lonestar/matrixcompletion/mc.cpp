@@ -1226,7 +1226,7 @@ void runSliceJump(Graph& g, const LearnFN* lf)
   galois::do_all(galois::iterate(&startSlices[0], &startSlices[threadCount]),
       sgd_slice_jump(g, &eVisited, xLocks, yLocks, slices, numXSlices, numYSlices, step_size));
 
-  galois::runtime::reportStat_Serial("Matrix Completion", "EdgesVisited", eVisited.reduce());
+  galois::runtime::reportStat_Single("Matrix Completion", "EdgesVisited", eVisited.reduce());
 }
 
 static double genRand () {

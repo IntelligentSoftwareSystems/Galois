@@ -1453,8 +1453,8 @@ void Executor<OptionsTy>::go() {
   
   if (OptionsTy::needsStats) {
     if (substrate::ThreadPool::getTID() == 0) {
-      reportStat_Serial(loopname, "RoundsExecuted", tld.rounds);
-      reportStat_Serial(loopname, "OuterRoundsExecuted", tld.outerRounds);
+      reportStat_Single(loopname, "RoundsExecuted", tld.rounds);
+      reportStat_Single(loopname, "OuterRoundsExecuted", tld.outerRounds);
     }
   }
 }

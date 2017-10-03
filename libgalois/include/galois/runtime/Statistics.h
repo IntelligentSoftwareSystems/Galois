@@ -184,7 +184,7 @@ template <typename _UNUSED=void>
 struct StatTotalImpl {
 
   enum Type {
-    SERIAL = 0,
+    SINGLE = 0,
     TMIN,
     TMAX,
     TSUM,
@@ -193,24 +193,24 @@ struct StatTotalImpl {
 
   // TODO: remove
   // static constexpr bool isValidInt(int v) {
-    // return (v >= SERIAL && v <= TAVG);
+    // return (v >= SINGLE && v <= TAVG);
   // }
 // 
   // static constexpr Type fromInt(int v) {
     // assert(isValidInt(v) && "Invalid int value for enum Type");
 // 
     // switch(v) {
-      // case 0: return SERIAL;
+      // case 0: return SINGLE;
       // case 1: return TMIN;
       // case 2: return TMAX;
       // case 3: return TSUM;
       // case 4: return TAVG;
-      // default: std::abort(); return SERIAL;
+      // default: std::abort(); return SINGLE;
     // }
   // }
 
   static constexpr const char* NAMES[] = {
-    "SERIAL",
+    "SINGLE",
     "TMIN",
     "TMAX",
     "TSUM",
@@ -327,7 +327,7 @@ struct VecStat: public VecStat_with_MinMaxSum<T> {
 
     switch(m_totalTy) {
 
-      case StatTotal::SERIAL:
+      case StatTotal::SINGLE:
         assert(Base::values().size() > 0);
         return Base::values()[0];
 
@@ -364,7 +364,7 @@ template <> struct VecStat<gstl::Str>: public AggregStat<gstl::Str>::with_mem {
 
     switch(m_totalTy) {
 
-      case StatTotal::SERIAL:
+      case StatTotal::SINGLE:
         assert(Base::values().size() > 0);
         return Base::values()[0];
 
@@ -590,7 +590,7 @@ public:
 
   template <typename S1, typename S2, typename V>
   void addToParam(const S1& region, const S2& category, const V& val) {
-    strStats.addToStat(gstl::makeStr(region), gstl::makeStr(category), gstl::makeStr(val), StatTotal::SERIAL);
+    strStats.addToStat(gstl::makeStr(region), gstl::makeStr(category), gstl::makeStr(val), StatTotal::SINGLE);
   }
 
   void print(void);
@@ -729,8 +729,8 @@ inline void reportStat(const S1& region, const S2& category, const T& value, con
 }
 
 template <typename S1, typename S2, typename T>
-inline void reportStat_Serial(const S1& region, const S2& category, const T& value) {
-  reportStat(region, category, value, StatTotal::SERIAL);
+inline void reportStat_Single(const S1& region, const S2& category, const T& value) {
+  reportStat(region, category, value, StatTotal::SINGLE);
 }
          
 

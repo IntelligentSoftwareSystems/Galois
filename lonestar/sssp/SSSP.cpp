@@ -170,8 +170,8 @@ int main(int argc, char** argv) {
   }
 
   if (TRACK_WORK) {
-    galois::runtime::reportStat_Serial("SSSP", "BadWork", BadWork.reduce());
-    galois::runtime::reportStat_Serial("SSSP", "WLEmptyWork", WLEmptyWork.reduce());
+    galois::runtime::reportStat_Single("SSSP", "BadWork", BadWork.reduce());
+    galois::runtime::reportStat_Single("SSSP", "WLEmptyWork", WLEmptyWork.reduce());
   }
 
   return 0;

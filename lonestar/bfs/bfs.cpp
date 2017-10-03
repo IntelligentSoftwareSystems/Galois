@@ -166,8 +166,8 @@ int main(int argc, char** argv) {
   }
 
   if (TRACK_WORK) {
-    galois::runtime::reportStat_Serial("BFS", "BadWork", BadWork.reduce());
-    galois::runtime::reportStat_Serial("BFS", "EmptyWork", WLEmptyWork.reduce());
+    galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());
+    galois::runtime::reportStat_Single("BFS", "EmptyWork", WLEmptyWork.reduce());
   }
 
   return 0;

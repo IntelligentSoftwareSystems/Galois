@@ -1163,7 +1163,7 @@ public:
                                   uint64_t global_total_owned_nodes) {
     float replication_factor = (float)(global_total_mirror_nodes + totalNodes) /
                                (float)totalNodes;
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
     float replication_factor_new = (float)(global_total_mirror_nodes + 
@@ -1172,18 +1172,18 @@ public:
                                    (float)(global_total_owned_nodes - 
                                            total_isolatedNodes);
 
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
         replication_factor_new);
 
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_NODES_" + get_run_identifier(), totalNodes);
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
         global_total_mirror_nodes);
-    galois::runtime::reportStat_Serial(GRNAME, 
+    galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
   }
 
@@ -1725,7 +1725,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + "_" + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Serial(GRNAME, metadata_str, 1);
+    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
   
   /**
@@ -1820,7 +1820,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Serial(GRNAME, metadata_str, 1);
+    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
   
   /**

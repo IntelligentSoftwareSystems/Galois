@@ -194,7 +194,7 @@ class DistStatManager: public galois::runtime::StatManager {
 
     static constexpr const char* htotalName(const StatTotal::Type& type) {
       switch(type) {
-        case StatTotal::SERIAL: return "HOST_0";
+        case StatTotal::SINGLE: return "HOST_0";
         case StatTotal::TSUM: return "HSUM";
         case StatTotal::TAVG: return "HAVG";
         case StatTotal::TMIN: return "HMIN";
