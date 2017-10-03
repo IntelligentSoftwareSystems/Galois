@@ -130,8 +130,8 @@ public:
   }
 
   void dumpStats (void) {
-    reportStat_Serial (Base::loopname, "efficiency %", double (100.0 * ThisClass::totalCommits) / ThisClass::totalTasks);
-    reportStat_Serial (Base::loopname, "avg. parallelism", double (ThisClass::totalCommits) / ThisClass::rounds);
+    reportStat_Single (Base::loopname, "efficiency %", double (100.0 * ThisClass::totalCommits) / ThisClass::totalTasks);
+    reportStat_Single (Base::loopname, "avg. parallelism", double (ThisClass::totalCommits) / ThisClass::rounds);
   }
 
   CtxtMaker& getCtxtMaker(void) {

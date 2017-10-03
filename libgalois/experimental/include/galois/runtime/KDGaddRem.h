@@ -526,11 +526,11 @@ public:
     applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
     t_for.stop ();
 
-    reportStat_Serial (Base::loopname, "Number of iterations: ", nsrc.reduce ());
-    reportStat_Serial (Base::loopname, "Time taken in creating intial contexts: ",   t_create.get ());
-    reportStat_Serial (Base::loopname, "Time taken in finding intial sources: ", t_find.get ());
-    reportStat_Serial (Base::loopname, "Time taken in for_each loop: ", t_for.get ());
-    reportStat_Serial (Base::loopname, "Time taken in destroying all the contexts: ", t_destroy.get ());
+    reportStat_Single (Base::loopname, "Number of iterations: ", nsrc.reduce ());
+    reportStat_Single (Base::loopname, "Time taken in creating intial contexts: ",   t_create.get ());
+    reportStat_Single (Base::loopname, "Time taken in finding intial sources: ", t_find.get ());
+    reportStat_Single (Base::loopname, "Time taken in for_each loop: ", t_for.get ());
+    reportStat_Single (Base::loopname, "Time taken in destroying all the contexts: ", t_destroy.get ());
   }
 };
 

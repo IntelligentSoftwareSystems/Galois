@@ -277,7 +277,7 @@ struct KCore {
     } while ((iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Serial(REGION_NAME, 
+      galois::runtime::reportStat_Single(REGION_NAME, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)iterations);
     }
