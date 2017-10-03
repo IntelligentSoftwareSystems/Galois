@@ -32,7 +32,7 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
-//#define AUX_MAP
+#define AUX_MAP
 
 #include "galois/Bag.h"
 #include "galois/gstl.h"
@@ -957,13 +957,13 @@ public:
     if (!Directional || InOut) {
       auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
-      for (auto i = 0; i < aux.inNghs.numRows(); ++i) {
-        auto& map = aux.inNghs.get(i);
-        auto ii = map.lower_bound(*(r.first)), ei = map.upper_bound(*(r.second));
+      for (size_t i = 0; i < aux.inNghs.numRows(); ++i) {
+        const auto& map = aux.inNghs.get(i);
+        auto ii = map.lower_bound(*(r.first)); // inclusive begin
+        auto ei = map.lower_bound(*(r.second)); // exclusive end
         for ( ; ii != ei; ++ii) {
-          assert(*(r.first) <= dst && dst < *(r.second));
           auto dst = aux.nodes[ii->first];
-          for (auto ie: ii->second) {
+          for (const auto& ie: ii->second) {
             constructInEdgeValue(graph, ie.second, ie.first, dst);
           }
         }
