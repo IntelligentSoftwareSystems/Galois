@@ -26,9 +26,11 @@ function(distApp name)
   endif()
 endfunction()
 
+
 distApp(bfs_push-filter_wl)
 distApp(sssp_push-filter_wl)
 distApp(pagerank_push-filter_wl)
 distApp(bfs_push-filter_od)
 
 distApp(pagerank_pull_od)
+distAppNoGPU(toy_read)
