@@ -99,5 +99,6 @@ int main(int argc, char** argv) {
 
   galois::runtime::reportParam("Load FirstGraph", "Threads", numThreads);
   galois::runtime::reportParam("Load FirstGraph", "File", filename);
+  galois::runtime::reportParam("Load FirstGraph", "Graph Type", graphtype);
   return 0;
 }
