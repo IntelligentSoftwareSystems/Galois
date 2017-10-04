@@ -280,7 +280,8 @@ private:
     typedef internal::UEdgeInfoBase<gNode, EdgeTy, Directional&!InOut> EdgeInfo;
 
     //! The storage type for edges
-    typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
+    // typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
+    typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
 
     typedef typename EdgesTy::iterator iterator;
   };
