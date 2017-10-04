@@ -2,6 +2,7 @@
 bfs r4-2e26
 sssp r4-2e26
 dmr r5M
+#gmetis USA-road-d.USA
 barneshut nothing
 # TODO get graphs for bc
 #bc-outer
