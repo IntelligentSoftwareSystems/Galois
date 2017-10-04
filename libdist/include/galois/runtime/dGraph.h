@@ -60,6 +60,8 @@
 
 #include "galois/runtime/bare_mpi.h"
 
+#include "llvm/Support/CommandLine.h"
+
 namespace cll = llvm::cl;
 
 enum MASTERS_DISTRIBUTION {
