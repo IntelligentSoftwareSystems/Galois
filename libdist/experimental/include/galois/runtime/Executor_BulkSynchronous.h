@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -86,7 +86,7 @@ class dChunkedMaster : private boost::noncopyable {
     alloc.construct(ptr);
     return ptr;
   }
-  
+
   void delChunk(Chunk* ptr) {
     alloc.destroy(ptr);
     alloc.deallocate(ptr, 1);
@@ -108,10 +108,10 @@ class dChunkedMaster : private boost::noncopyable {
     Chunk* r = popChunkByID(id.pid);
     if (r)
       return r;
-    
+
     for (unsigned int i = id.pid + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
-      if (r) 
+      if (r)
 	return r;
     }
 
@@ -292,7 +292,7 @@ class Executor {
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-    //FIXME:    clearReleasable(); 
+    //FIXME:    clearReleasable();
     switch (result) {
     case 0: break;
     case galois::runtime::CONFLICT:
@@ -350,7 +350,7 @@ class Executor {
         if (empty(cur))
           done.get() = true;
       }
-      
+
       barrier.wait();
 
       if (done.get())
@@ -362,15 +362,15 @@ class Executor {
 
 public:
   static_assert(!needsBreak, "not supported by this executor");
-  
+
   Executor(const FunctionTy& f, const ArgsTy& args):
-    function(f), 
+    function(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
     barrier(getBarrier(activeThreads)) { }
 
   template<typename RangeTy>
   void init(const RangeTy& range) { }
-  
+
   template<typename RangeTy>
   void initThread(const RangeTy& range) {
     wls[0].push_initial(WID(), range.local_begin(), range.local_end());
@@ -403,7 +403,7 @@ namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 struct ForEachExecutor<worklists::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:
-  public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> 
+  public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy>
 {
   typedef BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> SuperTy;
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }

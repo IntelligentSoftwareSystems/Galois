@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -44,7 +44,7 @@ extern llvm::cl::opt<std::string> statFile;
 
 
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, 
+void LonestarStart(int argc, char** argv,
                    const char* app, const char* desc = nullptr, const char* url = nullptr);
 
 #endif

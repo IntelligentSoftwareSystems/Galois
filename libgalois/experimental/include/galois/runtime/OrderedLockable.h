@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -52,7 +52,7 @@ protected:
 
 public:
 
-  explicit OrderedContextBase (const T& x): 
+  explicit OrderedContextBase (const T& x):
     Base (true), // call overriden subAcquire
     active (x)
   {}
@@ -102,10 +102,10 @@ public:
   using value_type = T;
 
   explicit TwoPhaseContext (const T& x, const Cmp& cmp)
-    : 
+    :
       Base (x),  // pass true so that Base::acquire invokes virtual subAcquire
       ctxtCmp (cmp),
-      source (true) 
+      source (true)
   {}
 
   bool isSrc (void) const {
@@ -116,7 +116,7 @@ public:
     source = false;
   }
 
-  void reset () { 
+  void reset () {
     source = true;
   }
 
@@ -145,7 +145,7 @@ public:
         if (conflict) {
           // A lock that I want but can't get
           this->source = false;
-          return; 
+          return;
         }
       }
     } while (!this->stealByCAS(l, other));
@@ -163,24 +163,24 @@ public:
       // Base::addToNhood (l);
       // succ = true;
     // }
-// 
+//
     // assert (Base::getOwner (l) != NULL);
-// 
+//
     // if (!succ) {
       // while (true) {
         // TwoPhaseContext* that = static_cast<TwoPhaseContext*> (Base::getOwner (l));
-// 
+//
         // assert (that != NULL);
         // assert (this != that);
-// 
+//
         // if (PtrComparator::compare (this, that)) { // this < that
           // if (Base::stealByCAS (that, this)) {
             // that->source = false;
             // break;
           // }
-// 
+//
         // } else { // this >= that
-          // this->source = false; 
+          // this->source = false;
           // break;
         // }
       // }
@@ -218,7 +218,7 @@ struct OrdLocBase: public LockManagerBase {
 
   Lockable* lockable;
 
-  explicit OrdLocBase (Lockable* l): 
+  explicit OrdLocBase (Lockable* l):
     Base (), lockable (l) {}
 
   bool tryMappingTo (Lockable* l) {
@@ -284,7 +284,7 @@ protected:
     ni = NULL;
   }
 
-  
+
 public:
   PtrBasedNhoodMgr(NItemFactory& f): factory (f) {}
 
@@ -323,13 +323,13 @@ public:
 
 protected:
   void resetAllNItems() {
-    runtime::do_all_gen(makeLocalRange(allNItems), 
+    runtime::do_all_gen(makeLocalRange(allNItems),
         [this] (NItem* ni) {
           ni->clearMapping();
           destroy(ni);
         },
         std::make_tuple (
-          galois::loopname ("resetNItems"), 
+          galois::loopname ("resetNItems"),
           galois::chunk_size<16>()));
   }
 };
@@ -339,7 +339,7 @@ class MapBasedNhoodMgr: public PtrBasedNhoodMgr<NItem> {
 public:
   typedef MapBasedNhoodMgr MyType;
 
-  // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
+  // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap;
   //
   typedef Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
 
@@ -360,7 +360,7 @@ protected:
 
 public:
 
-  MapBasedNhoodMgr (const typename Base::NItemFactory& f): 
+  MapBasedNhoodMgr (const typename Base::NItemFactory& f):
     Base (f),
     nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), MapAlloc ())
 
@@ -396,7 +396,7 @@ public:
     assert (i->second != nullptr);
 
     return *(i->second);
-    
+
   }
 
 
@@ -409,7 +409,7 @@ public:
 
 
 namespace internal {
-  
+
   struct DummyExecFunc {
     static const unsigned CHUNK_SIZE = 1;
     template <typename T, typename C>
@@ -420,12 +420,12 @@ namespace internal {
 }
 
 
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt> 
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
 class OrderedExecutorBase {
 protected:
 
   static const bool NEEDS_CUSTOM_LOCKING = exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
-  static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value 
+  static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value
     || !std::is_same<ExFunc, internal::DummyExecFunc>::value;
 
   static const bool ENABLE_PARAMETER = get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
@@ -451,11 +451,11 @@ protected:
   PerThreadUserCtxt userHandles;
 
   OrderedExecutorBase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
-    : 
-      cmp (cmp), 
-      nhFunc (nhFunc), 
+    :
+      cmp (cmp),
+      nhFunc (nhFunc),
       exFunc (exFunc),
-      opFunc (opFunc), 
+      opFunc (opFunc),
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
       ctxtCmp (cmp)
   {
@@ -487,7 +487,7 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
     } else {
       // TODO
     }
-#else 
+#else
   } catch (ConflictFlag f) {
     result = f;
   }
@@ -496,7 +496,7 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
   switch (result) {
     case 0:
       break;
-    case CONFLICT: 
+    case CONFLICT:
       c->disableSrc ();
       break;
     default:

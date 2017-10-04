@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ public:
   typedef T& reference;
   typedef const T& const_reference;
   const static bool has_value = true;
-  // Can't support incomplete T's but provide same interface as 
+  // Can't support incomplete T's but provide same interface as
   // {@link galois::LargeArray} for consistency
   struct size_of {
     const static size_t value = sizeof(T);
@@ -116,7 +116,7 @@ public:
 
   template<typename... Args>
   void construct(Args&&... args) { new (cast()) T(std::forward<Args>(args)...); }
-  
+
   const_reference get() const { return *cast(); }
   reference get() { return *cast(); }
 };

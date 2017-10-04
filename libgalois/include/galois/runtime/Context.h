@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -54,11 +54,11 @@ enum ConflictFlag {
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
-class LockManagerBase; 
+class LockManagerBase;
 
 /**
  * All objects that may be locked (nodes primarily) must inherit from
- * Lockable. 
+ * Lockable.
  */
 class Lockable {
   substrate::PtrLock<LockManagerBase> owner;
@@ -143,7 +143,7 @@ public:
   void startIteration() {
     assert(!locks);
   }
-  
+
   unsigned cancelIteration();
   unsigned commitIteration();
 

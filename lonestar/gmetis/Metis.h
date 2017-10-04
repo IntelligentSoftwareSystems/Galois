@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -77,7 +77,7 @@ public:
     initCoarsen();
     initPartition();
   }
-  
+
   MetisNode(unsigned weight, GNode child0, GNode child1 = NULL)
     : _weight(weight) {
     initCoarsen();
@@ -140,12 +140,12 @@ class MetisGraph{
 
 public:
   MetisGraph() :coarser(0), finer(0) { }
-  
+
   explicit MetisGraph(MetisGraph* finerGraph)
     :coarser(0), finer(finerGraph) {
     finer->coarser = this;
   }
-  
+
   const GGraph* getGraph() const { return &graph; }
   GGraph* getGraph() { return &graph; }
   MetisGraph* getFinerGraph() const { return finer; }
@@ -154,7 +154,7 @@ public:
   unsigned getNumNodes() {
     return std::distance(graph.begin(), graph.end());
   }
-  
+
   unsigned getTotalWeight() {
     MetisGraph* f = this;
     while (f->finer)

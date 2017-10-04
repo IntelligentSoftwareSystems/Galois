@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,7 +26,7 @@
  *
  * @section Description
  *
- * TODO 
+ * TODO
  *
  * @author <ahassaan@ices.utexas.edu>
  */
@@ -95,7 +95,7 @@ public:
   }
 
   Ctxt* getHighestPriority () const {
-    if (sharers.empty ()) { 
+    if (sharers.empty ()) {
       return NULL;
 
     } else {
@@ -109,7 +109,7 @@ public:
     assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
   }
 
-  void print () const { 
+  void print () const {
     // TODO
   }
 };
@@ -121,7 +121,7 @@ class KDGaddRemContext: public OrderedContextBase<T> {
 public:
   typedef T value_type;
   typedef KDGaddRemContext MyType;
-  typedef ContextComparator<MyType, Cmp> CtxtCmp; 
+  typedef ContextComparator<MyType, Cmp> CtxtCmp;
   typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef galois::GAtomic<bool> AtomicBool;
@@ -142,7 +142,7 @@ public:
 public:
 
   KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
-    : 
+    :
       OrderedContextBase<T> (active), // to make acquire call virtual function sub_acquire
       nhmgr (nhmgr),
       onWL (false)
@@ -158,7 +158,7 @@ public:
       nhood.push_back (&nitem);
       nitem.add (this);
     }
-    
+
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
@@ -187,7 +187,7 @@ public:
     std::stringstream ss;
 #if 0
     ss << "[" << this << ": " << active << "]";
-#endif 
+#endif
     return ss.str ();
   }
 
@@ -198,9 +198,9 @@ public:
         , endn = nhood.end (); n != endn; ++n) {
 
       KDGaddRemContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL) 
+      if ((highest != NULL)
           && !bool (highest->onWL)
-          && srcTest (highest) 
+          && srcTest (highest)
           && highest->onWL.cas (false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
@@ -217,9 +217,9 @@ public:
         , endn = nhood.end (); n != endn; ++n) {
 
       KDGaddRemContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL) 
+      if ((highest != NULL)
           && !bool (highest->onWL)
-          && srcTest (highest) 
+          && srcTest (highest)
           && highest->onWL.cas (false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
@@ -349,7 +349,7 @@ protected:
       exec.ctxtLocalQ.get ().push_back (in_src);
 
 
-      for (unsigned local_iter = 0; 
+      for (unsigned local_iter = 0;
           (local_iter < UNROLL_FACTOR) && !exec.ctxtLocalQ.get ().empty (); ++local_iter ) {
 
         Ctxt* src = exec.ctxtLocalQ.get ().front (); exec.ctxtLocalQ.get ().pop_front ();
@@ -370,7 +370,7 @@ protected:
           userCtxt.resetPushBuffer ();
         }
 
-        exec.opFunc (src->getActive (), userCtxt); 
+        exec.opFunc (src->getActive (), userCtxt);
 
 
         if (ThisClass::NEEDS_PUSH) {
@@ -387,7 +387,7 @@ protected:
             } else {
               winWL.push (*a);
             }
-  
+
           }
 
           for (auto c = exec.addCtxtWL.get ().begin ()
@@ -423,7 +423,7 @@ protected:
 
         Ctxt* c = exec.ctxtDelQ.get ().front (); exec.ctxtDelQ.get ().pop_front ();
         exec.ctxtAlloc.destroy (c);
-        exec.ctxtAlloc.deallocate (c, 1); 
+        exec.ctxtAlloc.deallocate (c, 1);
       }
     }
 
@@ -443,7 +443,7 @@ public:
       const Cmp& cmp,
       const NhFunc& nhFunc,
       const OpFunc& opFunc,
-      const ArgsTuple& argsTuple, 
+      const ArgsTuple& argsTuple,
       NhoodMgr& nhmgr,
       const SourceTest& sourceTest)
     :
@@ -459,7 +459,7 @@ public:
     addCtxtWL.clear_all_parallel ();
 
     galois::runtime::do_all_gen (
-        range, 
+        range,
         CreateCtxtExpandNhood {*this, nInit},
         std::make_tuple (
           galois::loopname ("create_contexts"),
@@ -520,7 +520,7 @@ public:
     // TODO: code to find global min goes here
 
     DummyWinWL winWL;
-    galois::optional<T> minWinWL; // should remain uninitialized 
+    galois::optional<T> minWinWL; // should remain uninitialized
 
     t_for.start ();
     applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, minWinWL, nsrc, nInitCtxt});
@@ -535,7 +535,7 @@ public:
 };
 
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt> 
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt>
 class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, SourceTest, ArgsTuple, Ctxt> {
 
   using Base = KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, SourceTest, ArgsTuple, Ctxt>;
@@ -571,7 +571,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
     if (ThisClass::NEEDS_PUSH && ThisClass::targetCommitRatio != 0.0) {
       minWinWL = winWL.getMin ();
     }
-    
+
     using Op = typename ThisClass::template ApplyOperator<WindowWL>;
     Base::applyOperator (sources, Op {*this, winWL, minWinWL, ThisClass::roundCommits, ThisClass::roundTasks});
   }
@@ -584,7 +584,7 @@ class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Sou
       galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             pending.push (x);
-          }, 
+          },
           std::make_tuple (
             galois::loopname ("init-fill"),
             chunk_size<NhFunc::CHUNK_SIZE> ()));
@@ -601,7 +601,7 @@ public:
       const Cmp& cmp,
       const NhFunc& nhFunc,
       const OpFunc& opFunc,
-      const ArgsTuple& argsTuple, 
+      const ArgsTuple& argsTuple,
       typename Base::NhoodMgr& nhmgr,
       const SourceTest& sourceTest)
     :
@@ -637,13 +637,13 @@ public:
 
 
 template <
-    template <typename _one, typename _two, typename _three, typename _four, typename _five, typename _six, typename _seven> class Executor, 
+    template <typename _one, typename _two, typename _three, typename _four, typename _five, typename _six, typename _seven> class Executor,
     typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ST, typename ArgsTuple>
 void for_each_ordered_ar_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& sourceTest, const ArgsTuple& argsTuple) {
 
   typedef typename R::value_type T;
 
-  auto argsT = std::tuple_cat (argsTuple, 
+  auto argsT = std::tuple_cat (argsTuple,
       get_default_trait_values (argsTuple,
         std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
         std::make_tuple (default_loopname {}, enable_parameter<false> {})));

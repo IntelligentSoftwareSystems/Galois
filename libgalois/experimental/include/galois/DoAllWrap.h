@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -49,8 +49,8 @@
 
 namespace galois {
 
-enum DoAllTypes { 
-  DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL, 
+enum DoAllTypes {
+  DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL,
   DO_ALL_RANGE,
   DOALL_CILK, DOALL_OPENMP, DOALL_RANGE
 };
@@ -77,10 +77,10 @@ void setDoAllImpl (const DoAllTypes& type);
 
 DoAllTypes getDoAllImpl (void);
 
-template <DoAllTypes TYPE> 
+template <DoAllTypes TYPE>
 struct DoAllImpl {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go(const R& range, const F& func, 
+  static inline void go(const R& range, const F& func,
                         const ArgsTuple& argsTuple) {
     std::abort();
   }
@@ -89,9 +89,9 @@ struct DoAllImpl {
 template <>
 struct DoAllImpl<DO_ALL_OLD> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, 
+  static inline void go (const R& range, const F& func,
                          const ArgsTuple& argsTuple) {
-    galois::runtime::do_all_gen_old(range, func, 
+    galois::runtime::do_all_gen_old(range, func,
         std::tuple_cat(std::make_tuple(steal<false> ()), argsTuple));
   }
 };
@@ -99,9 +99,9 @@ struct DoAllImpl<DO_ALL_OLD> {
 template <>
 struct DoAllImpl<DO_ALL_OLD_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go(const R& range, const F& func, 
+  static inline void go(const R& range, const F& func,
                         const ArgsTuple& argsTuple) {
-    galois::runtime::do_all_gen_old (range, func, 
+    galois::runtime::do_all_gen_old (range, func,
         std::tuple_cat(std::make_tuple(steal<true>()), argsTuple));
   }
 };
@@ -131,7 +131,7 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 
     galois::runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::tuple_cat(
-          std::make_tuple(galois::wl<WL_ty>(), 
+          std::make_tuple(galois::wl<WL_ty>(),
              no_pushes(),
              no_conflicts()),
           argsTuple));
@@ -146,7 +146,7 @@ struct DoAllImpl<DO_ALL> {
   }
 };
 
-/* Better do all coupled that takes into account even distribution of edges 
+/* Better do all coupled that takes into account even distribution of edges
  * among threads
  */
 template <>
@@ -156,13 +156,13 @@ struct DoAllImpl<DO_ALL_RANGE> {
     auto defaultArgsTuple = std::tuple_cat(
       argsTuple,
       get_default_trait_values(
-        argsTuple, 
+        argsTuple,
         std::make_tuple(thread_range_tag{}),
         std::make_tuple(thread_range{})
       )
     );
 
-    const uint32_t *thread_ranges = 
+    const uint32_t *thread_ranges =
       get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
 
     assert(thread_ranges != nullptr);
@@ -185,7 +185,7 @@ struct DoAllImpl<DOALL_CILK> {
     }
   }
 };
-#else 
+#else
 template <> struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
@@ -207,13 +207,13 @@ struct DoAllImpl<DOALL_OPENMP> {
 };
 
 /**
- * Not a standard do-all loop as the work distribution among threads is 
+ * Not a standard do-all loop as the work distribution among threads is
  * specified by an iterator array. All iterations should be independent.
  * Operator should conform to <code>fn(item)</code> where item is i
  *
  * @param range Begin/end of range of do-all
  * @param func operator
- * @param argsTuple optional arguments to loop; 
+ * @param argsTuple optional arguments to loop;
  * TODO currently should have a non-optional iterator array that tells you
  * where each thread starts/stops work; make this optional in the future
  */
@@ -223,25 +223,25 @@ struct DoAllImpl<DOALL_RANGE> {
   // of at graph initialization (then it would work with all ranges
   // and not just an all vertices range as is being assumed currently)
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go(const R& range, const F& func, 
+  static inline void go(const R& range, const F& func,
                         const ArgsTuple& argsTuple) {
 
     auto defaultArgsTuple = std::tuple_cat(
       argsTuple,
       get_default_trait_values(
-        argsTuple, 
+        argsTuple,
         std::make_tuple(thread_range_tag{}),
         std::make_tuple(thread_range{})
       )
     );
 
-    const uint32_t *thread_ranges = 
+    const uint32_t *thread_ranges =
       get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
     assert(thread_ranges != nullptr);
 
     galois::runtime::do_all_gen(
-      runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges), 
-      func, 
+      runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges),
+      func,
       std::tuple_cat(std::make_tuple(steal<false>()), argsTuple)
     );
   }
@@ -249,7 +249,7 @@ struct DoAllImpl<DOALL_RANGE> {
 
 
 template <typename R, typename F, typename ArgsTuple>
-void do_all_choice(const R& range, const F& func, const DoAllTypes& type, 
+void do_all_choice(const R& range, const F& func, const DoAllTypes& type,
                    const ArgsTuple& argsTuple) {
   switch (type) {
     case DO_ALL_OLD_STEAL:

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -52,13 +52,13 @@ public:
   typedef std::pair<_Key, _Tp> value_type;
   typedef _Compare key_compare;
   typedef _Alloc allocator_type;
-  
-  class value_compare 
+
+  class value_compare
     : public std::binary_function<value_type, value_type, bool> {
     friend class flat_map<_Key, _Tp, _Compare, _Alloc, _Store>;
   protected:
     _Compare comp;
-    
+
     value_compare(_Compare __c): comp(__c) { }
   public:
     bool operator()(const value_type& __x, const value_type& __y) const {
@@ -70,17 +70,17 @@ private:
 
   /// This turns...
   typedef typename _Alloc::template rebind<value_type>::other _Pair_alloc_type;
-  
+
   typedef _Store _VectTy;
   _VectTy _data;
   _Compare _comp;
-  
-  class value_key_compare 
+
+  class value_key_compare
     : public std::binary_function<value_type, key_type, bool> {
     friend class flat_map<_Key, _Tp, _Compare, _Alloc, _Store>;
   protected:
     _Compare comp;
-    
+
     value_key_compare(_Compare __c): comp(__c) { }
   public:
     bool operator()(const value_type& __x, const key_type& __y) const {
@@ -109,20 +109,20 @@ public:
   typedef typename _VectTy::difference_type        difference_type;
   typedef typename _VectTy::reverse_iterator       reverse_iterator;
   typedef typename _VectTy::const_reverse_iterator const_reverse_iterator;
-  
+
   flat_map() :_data(), _comp() {}
-  
+
   explicit flat_map(const _Compare& __comp,
 		    const allocator_type& __a = allocator_type())
     // XXX :_data(_Pair_alloc_type(__a)), _comp(__comp) {}
     :_data(), _comp(__comp) {}
-  
+
   flat_map(const flat_map& __x) :_data(__x._data), _comp(__x._comp) {}
-  
+
   flat_map(flat_map&& __x)
   /* noexcept(std::is_nothrow_copy_constructible<_Compare>::value) */
   : _data(std::move(__x._data)), _comp(std::move(__x._comp)) {}
-  
+
   /*
   flat_map(std::initializer_list<value_type> __l,
 	   const _Compare& __comp = _Compare(),
@@ -133,7 +133,7 @@ public:
   template<typename _InputIterator>
   flat_map(_InputIterator __first, _InputIterator __last)
     : _data(__first, __last), _comp() { resort(); }
-  
+
   template<typename _InputIterator>
   flat_map(_InputIterator __first, _InputIterator __last,
 	   const _Compare& __comp,
@@ -141,19 +141,19 @@ public:
     : _data(__first, __last, _Pair_alloc_type(__a)) {
     resort();
   }
-  
+
   flat_map& operator=(const flat_map& __x) {
     _data = __x._data;
     _comp = __x._comp;
     return *this;
   }
-  
+
   flat_map& operator=(flat_map&& __x) {
     clear();
     swap(__x);
     return *this;
   }
-  
+
   /*
   flat_map& operator=(std::initializer_list<value_type> __l) {
     clear();
@@ -162,12 +162,12 @@ public:
   }
    */
 
-  allocator_type get_allocator() const /* noexcept */ { 
-    return allocator_type(_data.get_allocator()); 
+  allocator_type get_allocator() const /* noexcept */ {
+    return allocator_type(_data.get_allocator());
   }
-  
+
   // iterators
-  
+
   iterator  begin() /* noexcept */ { return _data.begin(); }
   const_iterator begin() const /* noexcept */ { return _data.begin(); }
   iterator  end() /* noexcept */ { return _data.end(); }
@@ -180,11 +180,11 @@ public:
   const_iterator  cend() const /* noexcept */ { return _data.end(); }
   const_reverse_iterator crbegin() const /* noexcept */ { return _data.rbegin(); }
   const_reverse_iterator crend() const /* noexcept */ { return _data.rend(); }
-  
+
   bool empty() const /* noexcept */ { return _data.empty(); }
   size_type size() const /* noexcept */ { return _data.size(); }
   size_type max_size() const /* noexcept */ { return _data.max_size(); }
-  
+
   template<typename... Args>
   std::pair<iterator, bool> emplace(Args&&... args) {
     //assert(std::adjacent_find(_data.begin(), _data.end(), [&](const value_type& a, const value_type& b) {
@@ -204,7 +204,7 @@ public:
         _data.pop_back();
       }
     } else {
-      // key == __i->first 
+      // key == __i->first
       _data.pop_back();
     }
     return std::make_pair(__i, retval);
@@ -219,12 +219,12 @@ public:
 			  std::tuple<>());
     return (*__i).second;
   }
-  
+
   mapped_type& operator[](key_type&& __k) {
     iterator __i = lower_bound(__k);
     // __i->first is greater than or equivalent to __k.
     if (__i == end() || key_comp()(__k, (*__i).first))
-      __i = _data.emplace(__i, std::piecewise_construct, 
+      __i = _data.emplace(__i, std::piecewise_construct,
 			  std::forward_as_tuple(std::move(__k)),
 			  std::tuple<>());
     return (*__i).second;
@@ -236,34 +236,34 @@ public:
       throw std::out_of_range("flat_map::at");
     return (*__i).second;
   }
-  
+
   const mapped_type& at(const key_type& __k) const {
     const_iterator __i = lower_bound(__k);
     if (__i == end() || key_comp()(__k, (*__i).first))
       throw std::out_of_range("flat_map::at");
     return (*__i).second;
   }
-  
+
   template<typename PairTy, typename = typename std::enable_if<std::is_constructible<value_type, PairTy&&>::value>::type>
   std::pair<iterator, bool> insert(PairTy&& __x) {
     return emplace(std::forward<PairTy>(__x));
   }
-  
+
   /*
   void insert(std::initializer_list<value_type> __list) {
     insert(__list.begin(), __list.end());
   }
    */
-  
+
   template<typename _InputIterator>
   void insert(_InputIterator __first, _InputIterator __last) {
     while (__first != __last)
       insert(*__first++);
   }
-  
+
   iterator erase(const_iterator __position) { return _data.erase(__position); }
   iterator erase(iterator __position)       { return _data.erase(__position); }
-  
+
   size_type erase(const key_type& __x) {
     auto i = find(__x);
     if (i != end()) {
@@ -300,17 +300,17 @@ public:
 
   size_type count(const key_type& __x) const { return find(__x) == end() ? 0 : 1; }
 
-  iterator lower_bound(const key_type& __x) { 
+  iterator lower_bound(const key_type& __x) {
     return std::lower_bound(_data.begin(), _data.end(), __x, value_key_comp());
   }
   const_iterator lower_bound(const key_type& __x) const {
     return std::lower_bound(_data.begin(), _data.end(), __x, value_key_comp());
   }
 
-  iterator upper_bound(const key_type& __x) { 
+  iterator upper_bound(const key_type& __x) {
     return std::upper_bound(_data.begin(), _data.end(), __x, value_key_comp());
   }
-  const_iterator upper_bound(const key_type& __x) const { 
+  const_iterator upper_bound(const key_type& __x) const {
     return std::upper_bound(_data.begin(), _data.end(), __x, value_key_comp());
   }
 
@@ -321,11 +321,11 @@ public:
   std::pair<const_iterator, const_iterator> equal_range(const key_type& __x) const {
     return std::make_pair(lower_bound(__x), upper_bound(__x));
   }
-  
+
   template<typename _K1, typename _T1, typename _C1, typename _A1>
   friend bool operator==(const flat_map<_K1, _T1, _C1, _A1>&,
 			 const flat_map<_K1, _T1, _C1, _A1>&);
-  
+
   template<typename _K1, typename _T1, typename _C1, typename _A1>
   friend bool operator<(const flat_map<_K1, _T1, _C1, _A1>&,
 			const flat_map<_K1, _T1, _C1, _A1>&);

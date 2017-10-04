@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -102,7 +102,7 @@ private:
   }
 
 public:
-  Partitioned(const Indexer& x = Indexer()): indexer(x), current(0), empty(false) { 
+  Partitioned(const Indexer& x = Indexer()): indexer(x), current(0), empty(false) {
     for (int i = 0; i < MaxValue; ++i)
       items.emplace_back();
   }
@@ -200,7 +200,7 @@ public:
 
     for (mask = 1; mask < n; mask <<= 1)
       ;
-    for (unsigned i = 0; i < mask; ++i) 
+    for (unsigned i = 0; i < mask; ++i)
       mapping.push_back(i % n);
     mask -= 1;
   }

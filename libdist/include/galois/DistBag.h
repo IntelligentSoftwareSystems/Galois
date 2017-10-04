@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -67,7 +67,7 @@ class DGBag {
     galois::runtime::getHostBarrier().wait();
   }
 
-public: 
+public:
   DGBag(const FunctionTy &fn, std::string name) : helper_fn(fn), loopName(name) {
     bagItems_vec.resize(net.Num);
   }

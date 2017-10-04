@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -177,7 +177,7 @@ class SerialBag {
 
     void* p = nullptr;
 
-    if (SZ == 0) { 
+    if (SZ == 0) {
       assert (pageHeap);
       p = pageHeap->allocate (ALLOC_SIZE);
 
@@ -308,7 +308,7 @@ public:
   using const_reference = const  value_type&;
   using pointer = value_type*;
   using const_pointer = const  value_type*;
-   
+
 
   using iterator =  typename ChooseStlTwoLevelIterator<OuterIter, typename DynamicBoundedVector<T>::iterator>::type;
   using const_iterator =  typename ChooseStlTwoLevelIterator<ConstOuterIter, typename DynamicBoundedVector<T>::const_iterator>::type;
@@ -317,7 +317,7 @@ public:
   using const_reverse_iterator =  typename ChooseStlTwoLevelIterator<ConstRevOuterIter, typename DynamicBoundedVector<T>::const_reverse_iterator>::type;
 
   SerialBag (void)
-    : 
+    :
       pageHeap (PageHeap::getInstance ()),
       fsHeap (ALLOC_SIZE),
       sentinel (),
@@ -403,7 +403,7 @@ public:
       this->tail->next = &(this->sentinel);
       this->sentinel.prev = this->tail;
 
-      that.init (); // make that look empty 
+      that.init (); // make that look empty
     }
 
     assert (that.empty ());
@@ -427,7 +427,7 @@ public:
     return stl_two_level_cend (make_outer_cbeg (), make_outer_cend ());
   }
 
-  const_iterator begin () const { 
+  const_iterator begin () const {
     return cbegin ();
   }
 
@@ -461,19 +461,19 @@ public:
 
 };
 
-#else 
-// 
+#else
+//
 // template <typename T, const size_t SZ=0>
 // class SerialBag {
-// 
+//
 //   using PageHeap = runtime::MM::SystemHeap;
 //   using FSheap = runtime::MM::FixedSizeHeap;
-// 
+//
 //   struct Block {
 //     Block* next;
 //     Block* prev;
 //     DynamicBoundedVector<T> chunk;
-// 
+//
 //     explicit Block (T* beg=nullptr, T* end=nullptr)
 //       :
 //         next (nullptr),
@@ -481,149 +481,149 @@ public:
 //         chunk (beg, end)
 //     {}
 //   };
-// 
-// 
-// 
+//
+//
+//
 //   PageHeap pageHeap;
 //   FSheap fsHeap;
 //   Block tail; // sentinel
 //   Block* head;
-// 
-// 
+//
+//
 //   template <typename U>
 //   struct OuterIterImpl: public boost::iterator_facade<OuterIterImpl<U>, U, boost::bidirectional_traversal_tag> {
-// 
+//
 //     friend class boost::iterator_core_access;
-// 
+//
 //     Block* curr;
-// 
+//
 //     explicit OuterIterImpl (Block* b=nullptr): curr (b) {}
-// 
+//
 //     U& dereference (void)  const {
 //       assert (curr != nullptr);
 //       return curr->chunk;
 //     }
-// 
+//
 //     // const U& dereference (void) const {
 //       // assert (curr != nullptr);
 //       // return curr->chunk;
 //     // }
-// 
+//
 //     void increment (void) {
 //       curr = curr->next;
 //     }
-// 
+//
 //     void decrement (void) {
 //       curr = curr->prev;
 //     }
-// 
+//
 //     bool equal (const OuterIterImpl& that) const {
 //       return curr == that.curr;
 //     }
-// 
+//
 //   };
-// 
+//
 //   using OuterIter = OuterIterImpl<DynamicBoundedVector<T> >;
-// 
+//
 //   OuterIter make_outer_beg (void) {
 //     return OuterIter (head);
 //   }
-// 
+//
 //   OuterIter make_outer_end (void) {
 //     return OuterIter (&tail);
 //   }
-// 
+//
 //   using ConstOuterIter = OuterIterImpl<const DynamicBoundedVector<T> >;
-// 
+//
 //   ConstOuterIter make_outer_cbeg (void) const {
 //     return ConstOuterIter (head);
 //   }
-// 
+//
 //   ConstOuterIter make_outer_cend (void) const {
 //     return ConstOuterIter (&tail);
 //   }
-// 
+//
 //   using RevOuterIter = std::reverse_iterator<OuterIter>;
-// 
+//
 //   RevOuterIter make_outer_rbeg (void) {
 //     return RevOuterIter (make_outer_end ());
 //   }
-// 
+//
 //   RevOuterIter make_outer_rend (void) {
 //     return RevOuterIter (make_outer_beg ());
 //   }
-// 
+//
 //   using ConstRevOuterIter = std::reverse_iterator<ConstOuterIter>;
-// 
+//
 //   ConstRevOuterIter make_outer_crbeg (void) const {
 //     return ConstRevOuterIter (make_outer_cend ());
 //   }
-// 
+//
 //   ConstRevOuterIter make_outer_crend (void) const {
 //     return ConstRevOuterIter (make_outer_cbeg ());
 //   }
-// 
+//
 //   static const size_t ALLOC_SIZE = (SZ == 0) ? PageHeap::AllocSize : SZ * sizeof (T);
 //   static_assert (sizeof(T) < PageHeap::AllocSize, "Serial Bag with template type too large in size");
 //   static_assert (ALLOC_SIZE <= PageHeap::AllocSize, "Serial Bag with SZ parameter too large");
 //   static_assert (ALLOC_SIZE > sizeof (Block), "Serial Bag with SZ parameter too small");
-// 
-// 
+//
+//
 //   Block* allocateBlock (void) {
-// 
+//
 //     void* p = nullptr;
-// 
-//     if (SZ == 0) { 
+//
+//     if (SZ == 0) {
 //       p = pageHeap.allocate (ALLOC_SIZE);
-// 
+//
 //     } else {
 //       p = fsHeap.allocate (ALLOC_SIZE);
 //     }
-// 
+//
 //     assert (p != nullptr);
-// 
-// 
+//
+//
 //     size_t offset = 1;
 //     if (sizeof (T) < sizeof (Block)) {
 //       offset += sizeof (Block) / sizeof (T);
 //     }
-// 
+//
 //     T* beg = reinterpret_cast<T*> (p) + offset;
 //     T* end = reinterpret_cast<T*> (p) + (ALLOC_SIZE / sizeof (T));
-// 
+//
 //     Block* b = reinterpret_cast<Block*> (p);
 //     ::new (b) Block (beg, end);
-// 
+//
 //     return b;
 //   }
-// 
+//
 //   void pushBlock (void) {
-// 
+//
 //     Block* b = allocateBlock ();
-// 
+//
 //     b->next = head;
 //     head->prev = b;
 //     head = b;
 //   }
-// 
+//
 //   void popBlock (void) {
 //     assert (head->chunk.empty ());
-// 
+//
 //     Block* b = head;
 //     head->next->prev = nullptr;
 //     head = head->next;
-// 
+//
 //     b->~Block ();
-// 
+//
 //     if (SZ == 0) {
 //       pageHeap.deallocate (b);
 //     } else {
 //       fsHeap.deallocate (b);
 //     }
 //   }
-// 
-// 
-// 
+//
+//
+//
 // public:
 //   using value_type = T;
 //   using reference = T&;
@@ -632,52 +632,52 @@ public:
 //   using const_reference = const  value_type&;
 //   using pointer = value_type*;
 //   using const_pointer = const  value_type*;
-//    
-// 
+//
+//
 //   using iterator =  typename ChooseStlTwoLevelIterator<OuterIter, typename DynamicBoundedVector<T>::iterator>::type;
 //   using const_iterator =  typename ChooseStlTwoLevelIterator<ConstOuterIter, typename DynamicBoundedVector<T>::const_iterator>::type;
-// 
+//
 //   using reverse_iterator =  typename ChooseStlTwoLevelIterator<RevOuterIter, typename DynamicBoundedVector<T>::reverse_iterator>::type;
 //   using const_reverse_iterator =  typename ChooseStlTwoLevelIterator<ConstRevOuterIter, typename DynamicBoundedVector<T>::const_reverse_iterator>::type;
-// 
+//
 //   SerialBag (void)
-//     : 
+//     :
 //       pageHeap (),
 //       fsHeap (ALLOC_SIZE),
 //       tail (),
 //       head (&tail)
 //   {}
-// 
+//
 //   ~SerialBag (void) {
 //     clear ();
 //   }
-// 
+//
 //   bool empty (void) const {
 //     return head == &tail;
 //   }
-// 
+//
 //   size_t size (void) const {
-// 
+//
 //     size_t s = 0;
 //     for (Block* i = head; i != &tail; i = i->next) {
 //       s += i->chunk.size ();
 //     }
-// 
+//
 //     return s;
 //   }
-// 
+//
 //   void clear (void) {
-// 
+//
 //     for (Block* i = head; i != &tail;) {
 //       Block* b = i;
 //       i = i->next;
 //       b->chunk.clear ();
 //       popBlock ();
 //     }
-// 
+//
 //     head = &tail;
 //   }
-// 
+//
 //   void printBlocks (void) {
 //     std::printf ("SerialBag blocks are: ");
 //     for (Block* i = head; i != &tail; i = i->next) {
@@ -687,37 +687,37 @@ public:
 //     }
 //     std::printf ("\n");
 //   }
-// 
-// 
+//
+//
 //   template <typename... Args>
 //   void emplace_back (Args&&... args) {
-// 
+//
 //     if (empty () || head->chunk.full ()) {
 //       pushBlock ();
 //       // printBlocks ();
 //     }
-// 
+//
 //     head->chunk.emplace_back (std::forward<Args> (args)...);
 //   }
-// 
+//
 //   void push_back (const T& elem) {
 //     this->emplace_back (elem);
 //   }
-// 
+//
 //   reference back (void) {
 //     assert (!empty ());
 //     return head->chunk.back ();
 //   }
-// 
+//
 //   const_reference back (void) const {
 //     return const_cast<SerialBag*> (this)->back ();
 //   }
-// 
+//
 //   void pop_back (void) {
 //     assert (!empty ());
-// 
+//
 //     head->chunk.pop_back ();
-// 
+//
 //     if (head->chunk.empty ()) {
 //       popBlock ();
 //     }
@@ -725,53 +725,53 @@ public:
 //   iterator begin () {
 //     return stl_two_level_begin (make_outer_beg (), make_outer_end ());
 //   }
-// 
+//
 //   iterator end () {
 //     return stl_two_level_end (make_outer_beg (), make_outer_end ());
 //   }
-// 
+//
 //   const_iterator cbegin () const {
 //     return stl_two_level_cbegin (make_outer_cbeg (), make_outer_cend ());
 //   }
-// 
+//
 //   const_iterator cend () const {
 //     return stl_two_level_cend (make_outer_cbeg (), make_outer_cend ());
 //   }
-// 
-//   const_iterator begin () const { 
+//
+//   const_iterator begin () const {
 //     return cbegin ();
 //   }
-// 
+//
 //   const_iterator end () const {
 //     return cend ();
 //   }
-// 
+//
 //   reverse_iterator rbegin () {
 //     return stl_two_level_rbegin (make_outer_rbeg (), make_outer_rend ());
 //   }
-// 
+//
 //   reverse_iterator rend () {
 //     return stl_two_level_rend (make_outer_rbeg (), make_outer_rend ());
 //   }
-// 
+//
 //   const_reverse_iterator crbegin () {
 //     return stl_two_level_crbegin (make_outer_crbeg (), make_outer_crend ());
 //   }
-// 
+//
 //   const_reverse_iterator crend () {
 //     return stl_two_level_crend (make_outer_crbeg (), make_outer_crend ());
 //   }
-// 
+//
 //   const_reverse_iterator rbegin () const {
 //     return crbegin ();
 //   }
-// 
+//
 //   const_reverse_iterator crend () const {
 //     return crend ();
 //   }
-// 
+//
 // };
-// 
+//
 #endif
 
 template <typename T, const size_t SZ=0>

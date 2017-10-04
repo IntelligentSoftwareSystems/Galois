@@ -3,7 +3,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -89,7 +89,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef galois::worklists::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  for_each(galois::iterate(make_no_deref_iterator(first), make_no_deref_iterator(last)), helper, 
+  for_each(galois::iterate(make_no_deref_iterator(first), make_no_deref_iterator(last)), helper,
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::no_stats(),
@@ -113,7 +113,7 @@ Iterator choose_rand(Iterator first, Iterator last) {
 template<class Compare>
 struct sort_helper {
   Compare comp;
-  
+
   //! Not equal in terms of less-than
   template<class value_type>
   struct neq_to: public std::binary_function<value_type,value_type,bool> {
@@ -127,7 +127,7 @@ struct sort_helper {
   sort_helper(Compare c): comp(c) { }
 
   template <class RandomAccessIterator, class Context>
-  void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds, 
+  void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds,
 		  Context& ctx) {
     if (std::distance(bounds.first, bounds.second) <= 1024) {
       std::sort(bounds.first, bounds.second, comp);
@@ -141,11 +141,11 @@ struct sort_helper {
       if (bounds.first != pivot)
 	ctx.push(std::make_pair(bounds.first, pivot));
       //adjust the upper bit
-      pivot = std::find_if(pivot, bounds.second, 
+      pivot = std::find_if(pivot, bounds.second,
           std::bind(neq_to<VT>(comp), std::placeholders::_1, pv));
       //push the upper bit
       if (bounds.second != pivot)
-	ctx.push(std::make_pair(pivot, bounds.second)); 
+	ctx.push(std::make_pair(pivot, bounds.second));
     }
   }
 };
@@ -228,7 +228,7 @@ struct partition_helper {
 };
 
 template<class RandomAccessIterator, class Predicate>
-RandomAccessIterator partition(RandomAccessIterator first, 
+RandomAccessIterator partition(RandomAccessIterator first,
 			       RandomAccessIterator last,
 			       Predicate pred) {
   if (std::distance(first, last) <= 1024)
@@ -257,7 +257,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     return;
   }
   typedef galois::worklists::dChunkedFIFO<1> WL;
-  
+
   for_each(galois::iterate( { std::make_pair(first, last) } )
       , sort_helper<Compare>(comp)
       , galois::no_conflicts()

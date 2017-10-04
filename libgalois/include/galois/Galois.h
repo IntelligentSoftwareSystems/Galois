@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -75,7 +75,7 @@ public:
  * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
  * range and T is the type of item.
  *
- * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code> 
+ * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code>
  * (@see galois::iterate()). rangeMaker is a functor which when called returns a range object
  * @param fn operator
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
@@ -92,7 +92,7 @@ void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... 
  * Standard do-all loop. All iterations should be independent.
  * Operator should conform to <code>fn(item)</code> where item is a value from the iteration range.
  *
- * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code> 
+ * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code>
  * (@see galois::iterate()). rangeMaker is a functor which when called returns a range object
  * @param fn operator
  * @param args optional arguments to loop
@@ -149,7 +149,7 @@ static inline void preAlloc(int num) {
 
 /**
  * Reports number of hugepages allocated by the Galois system so far. The value is printing using
- * the statistics infrastructure. 
+ * the statistics infrastructure.
  *
  * @param label Label to associated with report at this program point
  */

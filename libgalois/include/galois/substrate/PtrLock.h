@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -101,7 +101,7 @@ public:
     assert(!((uintptr_t)val & 1));
     _lock.store((uintptr_t) val, std::memory_order_release);
   }
-  
+
   inline T* getValue() const {
     return (T*)(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1);
   }
@@ -146,7 +146,7 @@ class DummyPtrLock {
   T* _lock;
 public:
   DummyPtrLock() : _lock() {}
-  
+
   inline void lock() {}
   inline void unlock() {}
   inline void unlock_and_clear() { _lock = 0; }

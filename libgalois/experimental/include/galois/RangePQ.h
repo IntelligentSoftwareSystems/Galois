@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -39,12 +39,12 @@
 
 namespace galois {
 
-template <typename T, typename Cmp, unsigned N=1024, typename WL=galois::BoundedVector<T, N> > 
+template <typename T, typename Cmp, unsigned N=1024, typename WL=galois::BoundedVector<T, N> >
 class RangeBuffer: public WL {
 
   using Super = WL;
 
-  Cmp m_cmp; 
+  Cmp m_cmp;
   const T* m_min;
   const T* m_max;
 
@@ -119,7 +119,7 @@ public:
         // < d)
         // or
         // (c < b && a < d)
-        
+
         assert (cmp (*right.m_min, *left.m_max) && cmp (*left.m_min, *right.m_max));
 
         return 0;
@@ -154,7 +154,7 @@ namespace internal {
 
   template <typename T>
   struct Identity {
-    const T& operator () (const T& x) { 
+    const T& operator () (const T& x) {
       return x;
     }
   };
@@ -208,14 +208,14 @@ public:
       auto right = Tree::_S_right (node);
 
       if (ptrcmp (&unitRange, nv)) { // item < nv
-        if (left != nullptr) { 
+        if (left != nullptr) {
           node = left;
 
         } else {
           break;
         }
 
-      } else if (ptrcmp (nv, &unitRange)) { // nv < item 
+      } else if (ptrcmp (nv, &unitRange)) { // nv < item
 
         if (right != nullptr) {
           node = right;
@@ -259,7 +259,7 @@ class RangePQSetBased: public internal::TypeHelper<T, Cmp>::Set {
 
 public:
 
-  explicit RangePQSetBased (const Cmp& cmp=Cmp()) 
+  explicit RangePQSetBased (const Cmp& cmp=Cmp())
     : Set (RBufPtrCmp (cmp), RBufPtrAlloc ()), ptrcmp (cmp)
   {}
 
@@ -297,7 +297,7 @@ public:
 
 
 
-template <typename T, typename Cmp, typename PQImpl> 
+template <typename T, typename Cmp, typename PQImpl>
 class PartialPQBase {
 
   using THelper = internal::TypeHelper<T, Cmp>;
@@ -310,7 +310,7 @@ class PartialPQBase {
 
 public:
 
-  PartialPQBase (const Cmp& cmp=Cmp ()): cmp (cmp), bufAlloc (), pq (cmp)  
+  PartialPQBase (const Cmp& cmp=Cmp ()): cmp (cmp), bufAlloc (), pq (cmp)
   {}
 
   bool empty () const {
@@ -318,7 +318,7 @@ public:
   }
 
   const T* getMin () const {
-    if (pq.empty ()) { 
+    if (pq.empty ()) {
       return nullptr;
 
     }  else {
@@ -347,7 +347,7 @@ public:
 
   template <typename WL>
   void push_back (const T& item) {
-    auto mp = pq.mergePoint (item); 
+    auto mp = pq.mergePoint (item);
     merge (mp, item);
   }
 
@@ -368,7 +368,7 @@ public:
 
         if (cmp (*head->getMax (), windowLim)) {
           copyOut (workList, head);
-          
+
         } else {
           auto splitPt = partition_reverse (head->begin (), head->end (), windowLim);
           assert (splitPt != head->end ());
@@ -402,7 +402,7 @@ public:
     }
 
   }
-  
+
 private:
 
   template <typename I>
@@ -439,7 +439,7 @@ private:
 
     bufAlloc.destroy (head);
     bufAlloc.deallocate (head, 1);
-    
+
   }
 
   template <typename I>
@@ -478,7 +478,7 @@ private:
 
   }
 
-  template <typename I> 
+  template <typename I>
   RBuf* makeBuf (const I beg, const I end) {
 
     RBuf* buf = bufAlloc.allocate (1);
@@ -493,7 +493,7 @@ private:
     return buf;
   }
 
-  template <typename PI> 
+  template <typename PI>
   void merge (PI mp, const T& item) {
 
     RBuf& nv = *mp;
@@ -501,7 +501,7 @@ private:
     if (nv.full ()) {
       pq.erase (mp);
 
-      auto middle = nv.begin () + nv.size () / 2; 
+      auto middle = nv.begin () + nv.size () / 2;
       std::nth_element (nv.begin (), middle, nv.end (), nv.comparator ());
 
       RBuf* lower = makeBuf (nv.begin (), middle);
@@ -527,11 +527,11 @@ template <typename T, typename Cmp>
 struct TreeBasedPartialPQ: public PartialPQBase<T, Cmp, RangePQTreeBased<T, Cmp> > {
 
   TreeBasedPartialPQ (const Cmp& cmp=Cmp ())
-    : PartialPQBase<T, Cmp, RangePQTreeBased<T, Cmp> > (cmp) 
+    : PartialPQBase<T, Cmp, RangePQTreeBased<T, Cmp> > (cmp)
   {}
 };
 
-template <typename T, typename Cmp> 
+template <typename T, typename Cmp>
 struct SetBasedPartialPQ: public PartialPQBase<T, Cmp, RangePQSetBased<T, Cmp> > {
 
   SetBasedPartialPQ (const Cmp& cmp=Cmp ())
@@ -545,4 +545,3 @@ struct SetBasedPartialPQ: public PartialPQBase<T, Cmp, RangePQSetBased<T, Cmp> >
 } // end namespace galois
 
 #endif // GALOIS_RANGE_PQ_H
-

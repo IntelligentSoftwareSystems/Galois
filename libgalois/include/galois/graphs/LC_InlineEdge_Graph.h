@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -46,7 +46,7 @@ namespace graphs {
 /**
  * Local computation graph (i.e., graph structure does not change). The data representation
  * is a modification of {@link LC_CSR_Graph} where the edge data is stored inline with the
- * adjacency information. 
+ * adjacency information.
  *
  * The position of template parameters may change between Galois releases; the
  * most robust way to specify them is through the with_XXX nested templates.

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -43,7 +43,7 @@ stealHalfInPackage(substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
-  
+
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   auto& tp = substrate::getThreadPool();
@@ -66,7 +66,7 @@ stealRemote(substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
-  
+
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   for (unsigned i = id + 1; i < num; ++i)
@@ -82,7 +82,7 @@ template<typename QueueTy>
 class PerThreadQueues : private boost::noncopyable {
 public:
   typedef typename QueueTy::value_type value_type;
-  
+
 private:
   substrate::PerThreadStorage<QueueTy> local;
 
@@ -233,7 +233,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
   }
-  
+
   void delChunk(Chunk* C) {
     C->~Chunk();
     heap.deallocate(C);
@@ -265,7 +265,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
 
     for (int i = id + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
-      if (r) 
+      if (r)
 	return r;
     }
 
@@ -308,7 +308,7 @@ public:
       pushChunk(n.next);
     n.next = 0;
   }
-  
+
   //! Most worklists have void return value for push. This push returns address
   //! of placed item to facilitate some internal runtime uses. The address is
   //! generally not safe to use in the presence of concurrent pops.

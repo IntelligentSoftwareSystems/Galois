@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -60,7 +60,7 @@ class BindSegmentGraph: private boost::noncopyable {
 public:
   explicit BindSegmentGraph(Graph& g): graph(g) { }
   BindSegmentGraph(Graph& g, segment_type s): graph(g), segment(s) { }
-  
+
   void setSegment(const segment_type& s) {
     segment = s;
   }
@@ -152,7 +152,7 @@ public:
   typedef uint64_t* edge_offset_iterator;
 
   template<typename EdgeTy>
-  struct EdgeReference { 
+  struct EdgeReference {
     typedef typename LazyObject<EdgeTy>::reference type;
   };
 
@@ -174,11 +174,11 @@ private:
     size_t m_sizeof_data;
 
     void unload();
-    void load(int fd, offset_t offset, size_t begin, size_t len, size_t sizeof_data); 
+    void load(int fd, offset_t offset, size_t begin, size_t len, size_t sizeof_data);
 
   public:
     Block(): m_mapping(0) { }
-    
+
     char* get(size_t index) const {
       char* p = m_data + (m_sizeof_data * (index - m_begin));
       assert(p < reinterpret_cast<char*>(m_mapping) + m_length);
@@ -191,7 +191,7 @@ private:
     Block outs;
     Block edgeData;
     bool loaded;
-    
+
     Segment(): loaded(false) { }
 
     void unload() {
@@ -284,7 +284,7 @@ public:
   };
 
   template<bool _use_numa_alloc>
-  struct with_numa_alloc { 
+  struct with_numa_alloc {
     typedef OCImmutableEdgeGraph type;
   };
 
@@ -415,7 +415,7 @@ public:
     if (memorySegment)
       return *memorySegment;
     else
-      return computeSegment(0, edges); 
+      return computeSegment(0, edges);
   }
 
   /**
@@ -519,7 +519,7 @@ public:
   }
 
   //! Assumes that the graph is symmetric
-  void createFrom(const std::string& fname) { 
+  void createFrom(const std::string& fname) {
     outGraph.fromFile(fname);
     numNodes = outGraph.size();
     numEdges = outGraph.sizeEdges();
@@ -529,7 +529,7 @@ public:
     for (size_t i = 0; i < numNodes; ++i)
       this->outOfLineConstructAt(i);
   }
-  
+
   void createFrom(const std::string& fname, const std::string& transpose) {
     outGraph.fromFile(fname);
     inGraphStorage.fromFile(transpose);
@@ -546,7 +546,7 @@ public:
 };
 
 template<typename GraphTy,typename... Args>
-void readGraphDispatch(GraphTy& graph, read_oc_immutable_edge_graph_tag, Args&&... args) { 
+void readGraphDispatch(GraphTy& graph, read_oc_immutable_edge_graph_tag, Args&&... args) {
   graph.createFrom(std::forward<Args>(args)...);
 }
 

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -58,9 +58,9 @@ private:
   uintptr_t numFirstLevel;
 
 private:
-  uintptr_t index(const value_type& val) const 
+  uintptr_t index(const value_type& val) const
   {
-    return (uintptr_t)val % numFirstLevel; 
+    return (uintptr_t)val % numFirstLevel;
   }
 
 public:
@@ -79,7 +79,7 @@ public:
 
   template <typename Iter>
   ThreadSafeTwoLevelSetMaster(Iter b, Iter e, uintptr_t nFL = 0x1000)
-    :numFirstLevel(nFL) 
+    :numFirstLevel(nFL)
   {
     set = new Set[numFirstLevel];
     for (; b != e; ++b)

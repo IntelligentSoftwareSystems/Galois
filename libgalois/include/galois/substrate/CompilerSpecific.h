@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -40,7 +40,7 @@ namespace substrate {
 inline static void asmPause() {
 #if defined(__i386__) || defined(__amd64__)
   //  __builtin_ia32_pause();
-  asm volatile ("pause"); 
+  asm volatile ("pause");
 #endif
 }
 

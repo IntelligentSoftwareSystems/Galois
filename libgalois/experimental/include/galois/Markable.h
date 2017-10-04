@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -24,7 +24,7 @@
  * Copyright (C) 2015, The University of Texas at Austin. All rights
  * reserved.
  *
- * @section e.g. Mark for removal, 
+ * @section e.g. Mark for removal,
  *
  * Billiards Simulation Finding Partial Order
  *
@@ -55,7 +55,7 @@ struct Markable {
   public:
 
     explicit Markable (T val)
-      : m_val (val), m_ver (MAX_VAL) 
+      : m_val (val), m_ver (MAX_VAL)
     {}
 
     void mark (unsigned v) {
@@ -115,7 +115,7 @@ void removeMarked (WL& wl) {
       galois::iterate(0, wl.numRows()),
       RemoveMarked<WL> (wl),
       "remove_marked");
-      
+
 }
 
 template <typename WL>
@@ -129,12 +129,12 @@ struct RemoveMarkedStable: public RemoveMarked<WL> {
     assert (r < Super_ty::wl.numRows ());
 
     using T = typename WL::value_type;
-    
+
     typename WL::local_iterator new_end =
       std::stable_partition (Super_ty::wl[r].begin (), Super_ty::wl[r].end (), IsNotMarked<T> ());
 
     Super_ty::wl[r].erase (new_end, Super_ty::wl[r].end ());
-    
+
   }
 };
 
@@ -145,7 +145,7 @@ void removeMarkedStable (WL& wl) {
       galois::iterate(0, wl.numRows()),
       RemoveMarkedStable<WL> (wl),
       "remove_marked_stable");
-      
+
 }
 
 
@@ -154,4 +154,3 @@ void removeMarkedStable (WL& wl) {
 
 
 #endif // GALOIS_UTIL_MARKED_H
-

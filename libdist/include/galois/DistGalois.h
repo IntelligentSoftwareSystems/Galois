@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -81,7 +81,7 @@ public:
 
 /**
  * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T
  * is the type of item.
  *
  * @tparam WLTy Worklist policy {@link galois::worklists}

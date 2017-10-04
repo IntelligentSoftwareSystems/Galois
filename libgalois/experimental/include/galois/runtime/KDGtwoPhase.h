@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -108,7 +108,7 @@ protected:
 
 public:
   IKDGtwoPhaseExecutor (
-      const Cmp& cmp, 
+      const Cmp& cmp,
       const NhFunc& nhFunc,
       const ExFunc& exFunc,
       const OpFunc& opFunc,
@@ -145,7 +145,7 @@ public:
       galois::runtime::do_all_gen (range,
           [this] (const T& x) {
             ThisClass::getNextWL ().push_back (ctxtMaker (x));
-          }, 
+          },
           std::make_tuple (
             galois::loopname ("init-fill"),
             chunk_size<NhFunc::CHUNK_SIZE> ()));
@@ -153,7 +153,7 @@ public:
 
     } else {
       winWL.initfill (range);
-          
+
     }
   }
 
@@ -219,9 +219,9 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
-    // using ptr to exFunc to choose the right impl. 
-    // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
-    expandNhoodImpl (&this->exFunc); 
+    // using ptr to exFunc to choose the right impl.
+    // relying on the fact that for stable case, the exFunc is DummyExecFunc.
+    expandNhoodImpl (&this->exFunc);
   }
 
   inline void executeSourcesImpl (internal::DummyExecFunc*) {
@@ -248,8 +248,8 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
-    // using ptr to exFunc to choose the right impl. 
-    // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
+    // using ptr to exFunc to choose the right impl.
+    // relying on the fact that for stable case, the exFunc is DummyExecFunc.
     executeSourcesImpl (&this->exFunc);
   }
 
@@ -288,7 +288,7 @@ protected:
 
           if (commit) {
             ThisClass::roundCommits += 1;
-            if (ThisClass::NEEDS_PUSH) { 
+            if (ThisClass::NEEDS_PUSH) {
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
@@ -297,7 +297,7 @@ protected:
                   ThisClass::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
                   winWL.push (*i);
-                } 
+                }
               }
             } else {
               assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
@@ -347,32 +347,32 @@ protected:
       ThisClass::t_applyOperator.stop();
 
       endRound ();
-      
+
     }
 
     t.stop();
   }
-  
+
 };
 
 
 } // end anonymous namespace
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
+void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc,
     const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
-  auto argsT = std::tuple_cat (argsTuple, 
+  auto argsT = std::tuple_cat (argsTuple,
       get_default_trait_values (argsTuple,
         std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
         std::make_tuple (default_loopname {}, enable_parameter<false> {})));
   using ArgsT = decltype (argsT);
 
   using T = typename R::value_type;
-  
+
 
   using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
-  
+
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
   const bool wakeupThreadPool = true;
@@ -391,7 +391,7 @@ void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& n
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
+void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc,
     const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
   auto tplParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<true> ()));

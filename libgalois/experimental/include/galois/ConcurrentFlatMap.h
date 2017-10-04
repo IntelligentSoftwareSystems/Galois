@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -116,8 +116,8 @@ protected:
 
   void applyOperation(PerThread& pt, Operation& op) {
     switch (op.type) {
-      case Op::INSERT: 
-        pt.localMap.emplace(std::piecewise_construct, std::forward_as_tuple(op.value->first), std::forward_as_tuple(op.value)); 
+      case Op::INSERT:
+        pt.localMap.emplace(std::piecewise_construct, std::forward_as_tuple(op.value->first), std::forward_as_tuple(op.value));
         break;
       case Op::ERASE:
         pt.localMap.erase(op.value->first);
@@ -170,7 +170,7 @@ protected:
 
   //! Quick and dirty synchronization with log; returns true if something
   //! changed
-  bool fastSync(PerThread& pt) { 
+  bool fastSync(PerThread& pt) {
     size_t ll = logVersion.load();
     if (pt.lastVersion == ll)
       return false;
@@ -185,7 +185,7 @@ protected:
 
   bool fastSync(PerThread& pt) const { return false; }
 
-  void slowSync() { 
+  void slowSync() {
     std::unique_lock<LockTy> ll(logLock, std::defer_lock);
     PerThread& pt = *pts.getLocal();
     do {
@@ -302,7 +302,7 @@ public:
     }
     bool inserted;
     ii = slowInsert(pt, inserted, std::forward<PairTy>(x));
-    return std::make_pair(iterator { ii }, inserted); 
+    return std::make_pair(iterator { ii }, inserted);
   }
 
   template<typename InputIteratorTy>

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -66,10 +66,10 @@ public:
 
   /**
    * @param f the binary functor acting as the reduction operator
-   * @param identity is the identity value for the functor f, 
+   * @param identity is the identity value for the functor f,
    * i.e., f(x,identity) == x
    */
-  explicit GReducible(const BinFunc& f, const T& identity): m_func(f), m_identity(identity) { 
+  explicit GReducible(const BinFunc& f, const T& identity): m_func(f), m_identity(identity) {
     initialize ();
   }
 
@@ -119,7 +119,7 @@ public:
   }
 
   /**
-   * reset value 
+   * reset value
    */
   void reset() {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
@@ -225,7 +225,7 @@ class GSimpleReducible: public GReducible<T, ReduceAssignWrap<BinFunc> >  {
 public:
   explicit GSimpleReducible(const BinFunc& func = BinFunc(), const T& identity=T()): base_type(func, identity) { }
 
-  //! read-only reduction on values computed by each thread, 
+  //! read-only reduction on values computed by each thread,
   //! valid outside parallel section
   //! use inside parallel section at your own risk
   T reduceRO () const {

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -25,7 +25,7 @@
  * reserved.
  *
  * @section Description
- * 
+ *
  * Implements something close to std::array, but which does not initialize its
  * elements.  It is the user's responsibility to make sure memory is properly
  * initialized before using.
@@ -107,7 +107,7 @@ public:
     if (__n >= _Size)
       throw std::out_of_range("lazyArray::at");
     return get(__n);
-  }  
+  }
 
   reference front() { return *get(0); }
   const_reference front() const { return *get(0); }

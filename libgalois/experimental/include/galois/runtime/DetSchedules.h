@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -97,7 +97,7 @@ template <typename R, typename C, typename F, typename N>
 void for_each_det_choice (const R&  range, const C& cmp, const N& nhoodVisitor, const F& func, const char* loopname, const DetExecType& detExec=detExecTypeArg) {
 
   switch (detExec) {
-    case kdg_i: 
+    case kdg_i:
       galois::runtime::for_each_ordered_2p_win (range, cmp, nhoodVisitor, func, loopname);
       break;
 
@@ -160,7 +160,7 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
 }
 
 
-template <typename T, typename G, typename M, typename F, typename N, typename C> 
+template <typename T, typename G, typename M, typename F, typename N, typename C>
 struct ReuseableExecutorWrapper {
 
   typedef galois::runtime::ChromaticReuseExecutor<G, M, F> Chrom;
@@ -180,7 +180,7 @@ struct ReuseableExecutorWrapper {
       M& dagManager,
       const F& func,
       const N& nhVisitor,
-      const C& cmp, 
+      const C& cmp,
       const char* loopname)
     :
       detExec {detExec},
@@ -233,7 +233,7 @@ struct ReuseableExecutorWrapper {
         GALOIS_DIE ("det exec type not supported");
         break;
     }
-    
+
   }
 
   void resetDAG (void) {

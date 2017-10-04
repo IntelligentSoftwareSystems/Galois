@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -43,13 +43,13 @@ namespace runtime {
  * Have a pre-instantiated barrier available for use.
  * This is initialized to the current activeThreads. This barrier
  * is designed to be fast and should be used in the common
- * case. 
+ * case.
  *
  * However, there is a race if the number of active threads
  * is modified after using this barrier: some threads may still
  * be in the barrier while the main thread reinitializes this
  * barrier to the new number of active threads. If that may
- * happen, use {@link createSimpleBarrier()} instead. 
+ * happen, use {@link createSimpleBarrier()} instead.
  */
 substrate::Barrier& getBarrier(unsigned activeThreads);
 

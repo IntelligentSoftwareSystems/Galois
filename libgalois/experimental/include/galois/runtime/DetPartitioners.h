@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -258,7 +258,7 @@ struct GreedyPartitioner {
           }
 
           // GALOIS_ASSERT (sd.isBoundary == boundary);
-         
+
         },
         "check_partitions");
 
@@ -270,7 +270,7 @@ struct GreedyPartitioner {
       std::printf ("partition %zd, size =%zd, boundary=%zd, inner=%zd\n"
           , i, total, boundary, inner);
     }
-    
+
     t.stop ();
   }
 
@@ -338,7 +338,7 @@ struct BFSpartitioner {
           GALOIS_ASSERT (sd.partition != -1);
           size_t psize = partSizes[sd.partition].reduceRO ();
 
-          // bool addMore = (psize < partSizeLim); 
+          // bool addMore = (psize < partSizeLim);
           bool addMore = true;
 
           if (addMore) {
@@ -355,7 +355,7 @@ struct BFSpartitioner {
             dagManager.applyToAdj (src, addMoreClosure, galois::MethodFlag::UNPROTECTED);
           }
 
-          
+
         },
         galois::loopname ("partition_bfs"),
         galois::wl<WL> ());
@@ -430,7 +430,7 @@ struct BFSpartitioner {
     cctime.start ();
 
     std::vector<unsigned> componentIDs (graph.size (), 0);
-    
+
     auto nextSource = graph.begin ();
 
     unsigned numComp = 0;
@@ -442,7 +442,7 @@ struct BFSpartitioner {
 
       componentIDs[*nextSource] = numComp;
 
-      galois::for_each ( galois::iterate( {*nextSource}), 
+      galois::for_each ( galois::iterate( {*nextSource}),
           [this, &componentIDs, &numComp] (GNode n, galois::UserContext<GNode>& ctxt) {
 
             assert (componentIDs[n] != 0);
@@ -459,7 +459,7 @@ struct BFSpartitioner {
           },
           galois::loopname ("find_component_bfs"),
           galois::wl<galois::worklists::dChunkedFIFO<32> > ());
-      
+
 
       // find next Source
       for (auto end = graph.end (); nextSource != end; ++nextSource) {
@@ -467,7 +467,7 @@ struct BFSpartitioner {
           break;
         }
       }
-      
+
     } // end while
 
     cctime.stop ();
@@ -481,12 +481,12 @@ struct BFSpartitioner {
 template <typename G, typename M>
 struct BlockPartitioner: public GreedyPartitioner<G, M> {
   using Base = GreedyPartitioner<G, M>;;
-  
+
   BlockPartitioner (
       G& graph,
       M& dagManager,
       const unsigned numPart)
-    : 
+    :
       Base (graph, dagManager, numPart)
   {}
 
@@ -500,12 +500,12 @@ template <typename G, typename M>
 struct CyclicPartitioner: public GreedyPartitioner<G, M> {
 
   using Base = GreedyPartitioner<G, M>;;
-  
+
   CyclicPartitioner (
       G& graph,
       M& dagManager,
       const unsigned numPart)
-    : 
+    :
       Base (graph, dagManager, numPart)
   {}
 

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -147,7 +147,7 @@ public:
   bool pop_back() {
     return pop_front();
   }
-  
+
   reference front() {
     assert(precondition());
     assert(!empty());
@@ -200,7 +200,7 @@ public:
   const_iterator begin() const { return const_iterator(rend()); }
   const_iterator end() const { return const_iterator(rbegin()); }
 };
- 
+
 //! Unordered collection of bounded size
 template<typename T, unsigned ChunkSize = 64>
 using FixedSizeBag = FixedSizeBagBase<T, ChunkSize, false>;
@@ -238,7 +238,7 @@ class FixedSizeRing {
     }
 
     U& dereference() const {
-      return base[cur]; 
+      return base[cur];
     }
 
     void increment() {
@@ -266,10 +266,10 @@ class FixedSizeRing {
 
   public:
     Iterator(): base(0), cur(0), count(0) { }
-    
+
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): base(o.base), cur(o.cur), count(o.count) { }
-    
+
     Iterator(U* b, unsigned c, unsigned co): base(b), cur(c), count(co) { }
   };
 
@@ -293,7 +293,7 @@ public:
     }
   }
 
-  FixedSizeRing(const FixedSizeRing& o) = delete; 
+  FixedSizeRing(const FixedSizeRing& o) = delete;
   FixedSizeRing& operator=(const FixedSizeRing& o) = delete;
 
   ~FixedSizeRing() {
@@ -411,7 +411,7 @@ public:
     start = (start + 1) % ChunkSize;
     --count;
   }
-  
+
   reference back() {
     assert(precondition());
     assert(!empty());
@@ -421,7 +421,7 @@ public:
   const_reference back() const {
     assert(precondition());
     assert(!empty());
-    return *at((start + count - 1) % ChunkSize); 
+    return *at((start + count - 1) % ChunkSize);
   }
 
   galois::optional<value_type> extract_back() {
@@ -450,6 +450,6 @@ public:
   const_iterator rbegin() const { const_reverse_iterator(this->end()); }
   const_iterator rend() const { const_reverse_iterator(this->begin()); }
 };
- 
+
 }
 #endif

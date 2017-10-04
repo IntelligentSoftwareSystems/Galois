@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -59,7 +59,7 @@ struct machineTopoInfo {
 std::pair<machineTopoInfo,std::vector<threadTopoInfo>> getHWTopo();
 //bind a thread to a hwContext (returned by getHWTopo)
 bool bindThreadSelf(unsigned osContext);
-  
+
 
 } // end namespace substrate
 } // end namespace galois

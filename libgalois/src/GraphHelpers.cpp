@@ -2,7 +2,7 @@
  * @file GraphHelpers.h
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ namespace galois {
 namespace graphs {
 namespace internal {
 
-uint32_t determine_block_division(uint32_t numDivisions, 
+uint32_t determine_block_division(uint32_t numDivisions,
                                          std::vector<unsigned>& scaleFactor) {
   uint32_t numBlocks = 0;
 

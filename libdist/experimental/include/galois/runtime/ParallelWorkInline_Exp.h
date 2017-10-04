@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ class dChunkedMaster : private boost::noncopyable {
     alloc.construct(ptr);
     return ptr;
   }
-  
+
   void delChunk(Chunk* ptr) {
     alloc.destroy(ptr);
     alloc.deallocate(ptr, 1);
@@ -127,10 +127,10 @@ class dChunkedMaster : private boost::noncopyable {
     Chunk* r = popChunkByID(id.pid);
     if (r)
       return r;
-    
+
     for (unsigned int i = id.pid + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
-      if (r) 
+      if (r)
 	return r;
     }
 
@@ -320,7 +320,7 @@ class BSInlineExecutor {
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-    //FIXME: clearReleasable(); 
+    //FIXME: clearReleasable();
     switch (result) {
     case 0: break;
     case galois::runtime::CONFLICT:
@@ -353,7 +353,7 @@ class BSInlineExecutor {
       function(val, *next);
 
       // function(val, tld.facing);
-// 
+//
       // if (ForEachTraits<FunctionTy>::NeedsPush) {
         // next->push(wid,
             // tld.facing.getPushBuffer().begin(),
@@ -415,7 +415,7 @@ class BSInlineExecutor {
         if (empty(cur))
           done.get() = true;
       }
-      
+
       barrier.wait();
 
       if (done.get())
@@ -434,13 +434,13 @@ public:
   }
 
   BSInlineExecutor (const FunctionTy& f, const PreFunc& preFunc, const char* ln)
-    : 
-      function(f), 
+    :
+      function(f),
       preFunc (preFunc),
-      loopname(ln), 
+      loopname(ln),
       barrier(runtime::getBarrier (activeThreads)),
       done (false)
-  { 
+  {
     if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -471,7 +471,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   Executor e (opFunc, preFunc, loopname);
   substrate::Barrier& barrier = runtime::getBarrier (activeThreads);
 
-  substrate::getThreadPool ().run (activeThreads, 
+  substrate::getThreadPool ().run (activeThreads,
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));

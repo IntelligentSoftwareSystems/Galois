@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -129,7 +129,7 @@ public:
     ChunkHeader* C = victim.head.getValue();
     ChunkHeader* ntail = C;
     bool count = false;
-    while (C) { 
+    while (C) {
       C = C->next;
       if (count)
 	ntail = ntail->next;
@@ -216,7 +216,7 @@ public:
     ChunkHeader* C = victim.head.getValue();
     ChunkHeader* ntail = C;
     bool count = false;
-    while (C) { 
+    while (C) {
       C = C->next;
       if (count)
 	ntail = ntail->next;
@@ -313,7 +313,7 @@ private:
     alloc.construct(ptr);
     return ptr;
   }
-  
+
   void delChunk(Chunk* ptr) {
     alloc.destroy(ptr);
     alloc.deallocate(ptr, 1);

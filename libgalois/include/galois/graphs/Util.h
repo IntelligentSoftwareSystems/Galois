@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -167,7 +167,7 @@ void readGraphDispatch(GraphTy& graph, read_with_aux_first_graph_tag tag, const 
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1, const std::string& f2) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1, const std::string& f2) {
   graph.createAsymmetric();
 
   typename GraphTy::out_graph_type::read_tag tag1;
@@ -178,7 +178,7 @@ void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::strin
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1, FileGraph& f2) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1, FileGraph& f2) {
   graph.createAsymmetric();
 
   typename GraphTy::out_graph_type::read_tag tag1;
@@ -189,13 +189,13 @@ void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1, F
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1) {
   typename GraphTy::out_graph_type::read_tag tag1;
   readGraphDispatch(graph, tag1, f1);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1) { 
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1) {
   typename GraphTy::out_graph_type::read_tag tag1;
   readGraphDispatch(graph, tag1, f1);
 }

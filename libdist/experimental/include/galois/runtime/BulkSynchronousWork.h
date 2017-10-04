@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -99,7 +99,7 @@ struct Bag: public galois::gdeque<T, ChunkSize, RingAdaptor<T, ChunkSize> > {
   void push(const T& item) {
     this->push_front(item);
 #if 0
-    if (toFront) 
+    if (toFront)
       this->push_front(item);
     else
       this->push_back(item);
@@ -108,7 +108,7 @@ struct Bag: public galois::gdeque<T, ChunkSize, RingAdaptor<T, ChunkSize> > {
       toFront = !toFront;
       chunkCount = 0;
     }
-    
+
     if (this->size() == 1) {
       middle = this->first;
     }
@@ -180,7 +180,7 @@ struct BagMaster: boost::noncopyable {
   }
 
   template<typename FnTy>
-  size_t map(const WIDb& id, FnTy fn, int mark) { 
+  size_t map(const WIDb& id, FnTy fn, int mark) {
     size_t iterations = bags.getLocal()->map(fn, mark);
 
     return iterations + mapSlow(id, fn, mark);
@@ -188,7 +188,7 @@ struct BagMaster: boost::noncopyable {
 
   template<typename FnTy>
   GALOIS_ATTRIBUTE_NOINLINE
-  size_t mapSlow(const WIDb& id, FnTy fn, int mark) { 
+  size_t mapSlow(const WIDb& id, FnTy fn, int mark) {
     size_t iterations = 0;
     auto& tp = substrate::getThreadPool();
     while (true) {
@@ -198,7 +198,7 @@ struct BagMaster: boost::noncopyable {
         unsigned idx = id.tid + 1 + i;
         if (idx >= bags.size())
           idx -= bags.size();
-        
+
         unsigned opid = tp.getPackage(idx);
 
         if (opid == id.pid) {
@@ -317,7 +317,7 @@ class Executor {
 
     ExecuteFn(Executor* s, ThreadLocalData& t, FirstWL* c, FirstWL* n):
       self(s), tld(t), cur(c), next(n) { }
-    
+
     template<typename InWL, typename WL>
     void rebalance(InWL& in, WL& self) const {
       // XXX
@@ -372,17 +372,17 @@ class Executor {
       typedef typename mpl::plus<InIndex, One>::type OutIndex;
       typedef typename mpl::equal_to<OutIndex, Size>::type IsLast;
       typedef typename mpl::if_<IsLast, Zero, OutIndex>::type SafeOutIndex;
-      
+
       typedef typename fusion::result_of::value_at<WLS, InIndex>::type InWL;
       typedef typename fusion::result_of::value_at<WLS, SafeOutIndex>::type OutWL;
       typedef fusion::vector<FirstWL*, InWL*> InWLPtrs;
       typedef fusion::vector<FirstWL*, OutWL*> OutWLPtrs;
-      
+
       typedef typename mpl::if_<mpl::equal_to<InIndex, Zero>, Zero, One>::type InWLIndex;
       typedef typename mpl::if_<mpl::equal_to<OutIndex, Size>, Zero, One>::type OutWLIndex;
 
-      InWLPtrs inWlPtrs(cur, &fusion::at<InIndex>(self->wls)); 
-      OutWLPtrs outWlPtrs(next, &fusion::at<SafeOutIndex>(self->wls)); 
+      InWLPtrs inWlPtrs(cur, &fusion::at<InIndex>(self->wls));
+      OutWLPtrs outWlPtrs(next, &fusion::at<SafeOutIndex>(self->wls));
 
       int mark = boost::fusion::result_of::size<FnsTy>::value * tld.rounds + FnIndex::value + 1;
 
@@ -418,7 +418,7 @@ class Executor {
     // N + 1 element int vector, [0] + [<prefix sum of NeedsPush>]
     typedef typename mpl::fold<
       NeedsPush,
-      mpl::vector_c<int, 0>, 
+      mpl::vector_c<int, 0>,
       mpl::if_<
         mpl::_2,
         mpl::push_back<mpl::_1, mpl::plus<mpl::back<mpl::_1>, mpl::int_<1> > >,
@@ -429,7 +429,7 @@ class Executor {
 
     typedef mpl::range_c<int, 0, fusion::result_of::size<FnsTy>::type::value> FnIndices;
     typedef fusion::vector<FnsTy&, FnIndices&, InputIndices&> Tuple;
- 
+
     //std::cout << "begin\n";
     //mpl::for_each<InputIndices>(value_printer());
     //std::cout << "end\n";
@@ -459,7 +459,7 @@ class Executor {
   }
 
 public:
-  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l), barrier(getBarrier(activeThreads)) 
+  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l), barrier(getBarrier(activeThreads))
   { }
 
   void operator()() {

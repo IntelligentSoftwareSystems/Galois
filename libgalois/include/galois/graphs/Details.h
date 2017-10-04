@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -98,7 +98,7 @@ public:
     return std::min(localIterators.getLocal()->second, numNodes);
   }
 
-  void setLocalRange(uint64_t begin, uint64_t end) { 
+  void setLocalRange(uint64_t begin, uint64_t end) {
     Range& r = *localIterators.getLocal();
     r.first = begin;
     r.second = end;
@@ -204,7 +204,7 @@ public:
     at(x), edgeDst(dsts), edgeData(data) { }
 private:
   friend class boost::iterator_core_access;
-  
+
   bool equal(const Self& other) const { return at == other.at; }
   Reference dereference() const { return Reference(at, edgeDst, edgeData); }
   ptrdiff_t distance_to(const Self& other) const { return other.at - (ptrdiff_t) at; }
@@ -246,20 +246,20 @@ struct NodeInfoBaseTypes<void, HasLockable> {
 template<typename NodeTy, bool HasLockable>
 class NodeInfoBase:
   public boost::mpl::if_c<HasLockable,galois::runtime::Lockable,NoLockable>::type,
-  public NodeInfoBaseTypes<NodeTy, HasLockable> 
+  public NodeInfoBaseTypes<NodeTy, HasLockable>
 {
   NodeTy data;
 public:
   template<typename... Args>
   NodeInfoBase(Args&&... args): data(std::forward<Args>(args)...) { }
 
-  typename NodeInfoBase::reference getData() { return data; } 
+  typename NodeInfoBase::reference getData() { return data; }
 };
 
 template<bool HasLockable>
 struct NodeInfoBase<void, HasLockable>:
   public boost::mpl::if_c<HasLockable,galois::runtime::Lockable,NoLockable>::type,
-  public NodeInfoBaseTypes<void, HasLockable> 
+  public NodeInfoBaseTypes<void, HasLockable>
 {
   typename NodeInfoBase::reference getData() { return 0; }
 };
@@ -318,7 +318,7 @@ public:
 
 //! Edge specialization for void edge data
 template<typename NodeInfoPtrTy,typename EdgeTy>
-struct EdgeInfoBase: public LazyObject<EdgeTy> 
+struct EdgeInfoBase: public LazyObject<EdgeTy>
 {
   NodeInfoPtrTy dst;
 };

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -38,7 +38,7 @@ namespace galois {
     struct integer_sequence
     {
       typedef T value_type;
-      
+
       static constexpr std::size_t size() noexcept;
     };
 
@@ -48,17 +48,17 @@ namespace galois {
 	typedef integer_sequence<T, S...> type;
       };
     }
-	
+
     template<std::size_t... I>
     using index_sequence = integer_sequence<std::size_t, I...>;
-    
+
     template<class T, T N>
     using make_integer_sequence = typename internal::gens<T, N, std::integral_constant<T, 0>::value>::type;
     template<std::size_t N>
     using make_index_sequence = make_integer_sequence<std::size_t, N>;
-    
+
     template<class... T>
     using index_sequence_for = make_index_sequence<sizeof...(T)>;
-    
+
   }
 }

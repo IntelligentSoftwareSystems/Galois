@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -58,20 +58,20 @@ struct DetKDGexecutorAddRem {
   Cmp cmp;
   NhoodFunc nhoodVisitor;
   OpFunc opFunc;
-  G& graph; 
+  G& graph;
   const char* loopname;
-  unsigned rounds = 0; 
-  
+  unsigned rounds = 0;
+
 
   Bag_ty* currWL;
   Bag_ty* nextWL;
-  
+
 
   DetKDGexecutorAddRem (
       const Cmp& cmp,
-      const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc, 
-      G& graph, 
+      const NhoodFunc& nhoodVisitor,
+      const OpFunc& opFunc,
+      G& graph,
       const char* loopname)
     :
       cmp (cmp),
@@ -123,7 +123,7 @@ struct DetKDGexecutorAddRem {
         range,
         [this] (const T& elem) {
           push (elem);
-        }, 
+        },
         "push_initial",
         galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
@@ -178,7 +178,7 @@ struct DetKDGexecutorAddRem {
       } // end switch
       t_exec.stop ();
 
-      if (rounds >= 2) { 
+      if (rounds >= 2) {
         // break; // TODO: remove
       }
       // std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds, t_exec.get ());
@@ -194,7 +194,7 @@ struct DetKDGexecutorAddRem {
 
 
 template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
+void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor,
     const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
 
   galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
@@ -219,17 +219,17 @@ struct DetKDG_AddRem_reuseDAG {
   Cmp cmp;
   NhoodFunc nhoodVisitor;
   OpFunc opFunc;
-  G& graph; 
+  G& graph;
   const char* loopname;
-  unsigned rounds = 0; 
+  unsigned rounds = 0;
   galois::GAccumulator<size_t> numPushes;
-  
+
 
   DetKDG_AddRem_reuseDAG (
       const Cmp& cmp,
-      const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc, 
-      G& graph, 
+      const NhoodFunc& nhoodVisitor,
+      const OpFunc& opFunc,
+      G& graph,
       const char* loopname)
     :
       cmp (cmp),
@@ -272,7 +272,7 @@ struct DetKDG_AddRem_reuseDAG {
         initRange,
         [this] (T node) {
           push (node);
-        }, 
+        },
         "push_initial",
         galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
@@ -290,7 +290,7 @@ struct DetKDG_AddRem_reuseDAG {
       dagExec->execute ();
       t_exec.stop ();
 
-      if (numPushes.reduceRO () == 0) { 
+      if (numPushes.reduceRO () == 0) {
         break;
       }
       // std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
@@ -311,7 +311,7 @@ struct DetKDG_AddRem_reuseDAG {
 
 
 template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
+void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor,
     const OpFunc& opFunc, G& graph, const char* loopname) {
 
   galois::substrate::getThreadPool().burnPower (galois::getActiveThreads ());

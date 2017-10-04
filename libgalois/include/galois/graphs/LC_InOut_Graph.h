@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -101,7 +101,7 @@ public:
     LC_InOut_Graph* self;
     int type;
 
-    void increment() { 
+    void increment() {
       if (type == 0)
         ++boost::fusion::at_c<0>(its);
       else
@@ -115,7 +115,7 @@ public:
         boost::fusion::at_c<1>(its) += n;
     }
 
-    bool equal(const in_edge_iterator& o) const { 
+    bool equal(const in_edge_iterator& o) const {
       if (type != o.type)
         return false;
       if (type == 0) {
@@ -139,10 +139,10 @@ public:
     in_edge_iterator(Iterator0 it): type(0) { boost::fusion::at_c<0>(its) = it; }
     in_edge_iterator(Iterator1 it, int): type(1) { boost::fusion::at_c<1>(its) = it; }
   };
-  
+
   LC_InOut_Graph(): asymmetric(false) { }
 
-  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) { 
+  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
@@ -240,11 +240,11 @@ public:
     this->acquireNode(N, mflag);
     if(!asymmetric) {
       typedef EdgeSortValue<GraphNode, edge_data_type> EdgeSortVal;
-      std::sort(this->edge_sort_begin(N), this->edge_sort_end(N), 
+      std::sort(this->edge_sort_begin(N), this->edge_sort_end(N),
         [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
     } else {
       typedef EdgeSortValue<typename InGraph::GraphNode, typename InGraph::edge_data_type> InEdgeSortVal;
-      std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)), 
+      std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)),
         [=] (const InEdgeSortVal& e1, const InEdgeSortVal& e2) { return e1.dst < e2.dst; });
     }
   }

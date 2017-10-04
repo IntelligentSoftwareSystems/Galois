@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -88,7 +88,7 @@ size_t galois::substrate::allocSize() {
 
 void* galois::substrate::allocPages(unsigned num, bool preFault) {
   if (num > 0) {
-    void* ptr = trymmap(num * hugePageSize, 
+    void* ptr = trymmap(num * hugePageSize,
                         preFault ? _MAP_HUGE_POP : _MAP_HUGE);
     if (!ptr) {
       gWarn("Huge page alloc failed, falling back");
@@ -122,7 +122,7 @@ class PageSizeConf {
   void checkHuge() {
     std::ifstream f("/proc/meminfo");
 
-    if (!f) 
+    if (!f)
       return;
 
     char line[2048];
@@ -155,4 +155,3 @@ public:
   }
 };
 */
-

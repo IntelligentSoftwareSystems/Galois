@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -41,7 +41,7 @@
  * Important pitfalls to handle
  * <ol>
  *  <li>If Outer and Inner have different categories, which category to choose?. The
- *  category of Inner can be chosen after (expensively) supporting moving backwards for 
+ *  category of Inner can be chosen after (expensively) supporting moving backwards for
  *  outer iterators of forward category. Note: Lowest category currently supported
  *  is forward iterators.</li>
  *
@@ -58,7 +58,7 @@
  *
  *  <li>When incrementing (++), the inner iterator should initially be at a valid
  *  begin position, but after incrementing may end up at end of an Inner range.
- *  So the next valid local begin must be found, else the end of 
+ *  So the next valid local begin must be found, else the end of
  *  outer should be reached</li>
  *
  *  <ol>
@@ -71,7 +71,7 @@
  *  due to outer being at end (See 3 above).
  *  Inner iterator must be brought to a valid location after decrementing, or, else
  *  the begin of outer must be reached (and not exceeded).</li>
- *  
+ *
  *  <ol>
  *    <li>When jumping backward, inner iterator may be uninitialized due to
  *    outer being at end.</li>
@@ -112,7 +112,7 @@ namespace internal {
       assert (next != end);
       ++next;
     }
-    
+
     assert (next == it);
     assert (curr != it);
 
@@ -164,7 +164,7 @@ protected:
     return m_beg_outer == m_end_outer;
   }
 
-  inline const Inner& getInnerBegin () const { 
+  inline const Inner& getInnerBegin () const {
     return m_beg_inner;
   }
 
@@ -194,10 +194,10 @@ protected:
     return m_inner == m_end_inner;
   }
 
-  TwoLevelIterBase (): 
-    m_beg_outer (), 
-    m_end_outer (), 
-    m_outer (), 
+  TwoLevelIterBase ():
+    m_beg_outer (),
+    m_end_outer (),
+    m_outer (),
     m_beg_inner (),
     m_end_inner (),
     m_inner (),
@@ -206,14 +206,14 @@ protected:
   {}
 
   TwoLevelIterBase (
-      Outer beg_outer, 
+      Outer beg_outer,
       Outer end_outer,
       Outer outer_pos,
       InnerBegFn innerBegFn,
       InnerEndFn innerEndFn)
-    : 
-      m_beg_outer (beg_outer), 
-      m_end_outer (end_outer), 
+    :
+      m_beg_outer (beg_outer),
+      m_end_outer (end_outer),
       m_outer (outer_pos),
       m_beg_inner (),
       m_end_inner (),
@@ -227,7 +227,7 @@ protected:
 
 //! Two-Level forward iterator
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
-class TwoLevelFwdIter: 
+class TwoLevelFwdIter:
   public std::iterator_traits<Inner>,
   public TwoLevelIterBase<Outer, Inner, InnerBegFn, InnerEndFn> {
 
@@ -251,7 +251,7 @@ protected:
   void seekValidBegin () {
     while (!Base::outerAtEnd () && Base::innerAtEnd ()) {
       nextOuter ();
-    } 
+    }
   }
 
 
@@ -265,13 +265,13 @@ protected:
   }
 
   bool is_equal (const TwoLevelFwdIter& that) const {
-    // the outer iterators of 'this' and 'that' have been initialized 
+    // the outer iterators of 'this' and 'that' have been initialized
     // with either (beg,end), or, (end, end)
     //  - for two level begin, outer is initialized to (beg,end)
     //  - for two level end, outer is initialized to (end, end)
     assert (this->m_end_outer == that.m_end_outer);
 
-    return (this->m_outer == that.m_outer) 
+    return (this->m_outer == that.m_outer)
       && (Base::outerAtEnd () || (this->m_inner == that.m_inner));
   }
 
@@ -281,13 +281,13 @@ public:
   TwoLevelFwdIter (): Base () {}
 
   TwoLevelFwdIter (
-      Outer beg_outer, 
+      Outer beg_outer,
       Outer end_outer,
       Outer outer_pos,
       InnerBegFn innerBegFn,
       InnerEndFn innerEndFn)
-    : 
-      Base (beg_outer, end_outer, outer_pos, innerBegFn, innerEndFn) 
+    :
+      Base (beg_outer, end_outer, outer_pos, innerBegFn, innerEndFn)
   {
 
     if (!Base::outerAtEnd ()) {
@@ -297,7 +297,7 @@ public:
     }
   }
 
-  typename Traits::reference operator * () const { 
+  typename Traits::reference operator * () const {
     return *Base::m_inner;
   }
 
@@ -315,7 +315,7 @@ public:
     step_forward ();
     return tmp;
   }
-    
+
   friend bool operator == (const TwoLevelFwdIter& left, const TwoLevelFwdIter& right) {
     return left.is_equal (right);
   }
@@ -374,12 +374,12 @@ public:
   TwoLevelBiDirIter (): FwdBase () {}
 
   TwoLevelBiDirIter (
-      Outer beg_outer, 
+      Outer beg_outer,
       Outer end_outer,
       Outer outer_pos,
       InnerBegFn innerBegFn,
       InnerEndFn innerEndFn)
-    : 
+    :
       FwdBase (beg_outer, end_outer, outer_pos, innerBegFn, innerEndFn)
   {}
 
@@ -449,7 +449,7 @@ protected:
 
       if ((rem > 0) && BiDirBase::outerAtEnd ()) {
         BiDirBase::prevOuter ();
-        
+
       }
 
       while (rem > 0) {
@@ -460,7 +460,7 @@ protected:
           rem -= avail;
           assert (!BiDirBase::outerAtBegin ());
           BiDirBase::prevOuter ();
-          
+
         } else {
 
           BiDirBase::m_inner -= rem;
@@ -477,14 +477,14 @@ protected:
       return -(that.compute_dist (*this));
 
     } else if (this->m_outer == that.m_outer) {
-      if (!BiDirBase::outerAtEnd ()) { 
+      if (!BiDirBase::outerAtEnd ()) {
         return std::distance (this->m_inner, that.m_inner);
 
-      } else { 
+      } else {
         return 0;
       }
 
-    } else { 
+    } else {
 
       assert (std::distance (this->m_outer, that.m_outer) > 0); // this->m_outer < that.m_outer;
       assert (!BiDirBase::outerAtEnd ());
@@ -516,9 +516,9 @@ public:
   TwoLevelRandIter (): BiDirBase () {}
 
   TwoLevelRandIter (
-      Outer beg_outer, 
+      Outer beg_outer,
       Outer end_outer,
-      Outer outer_pos, 
+      Outer outer_pos,
       InnerBegFn innerBegFn,
       InnerEndFn innerEndFn)
     : BiDirBase (beg_outer, end_outer, outer_pos, innerBegFn, innerEndFn) {}
@@ -581,46 +581,46 @@ namespace internal {
 template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn, typename Cat>
 struct ByCategory {};
 
-template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
+template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::forward_iterator_tag> {
   typedef TwoLevelFwdIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
-template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
+template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::bidirectional_iterator_tag> {
   typedef TwoLevelBiDirIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
-template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn> 
+template <typename Outer, typename Inner, typename InnerBegFn, typename InnerEndFn>
 struct ByCategory<Outer, Inner, InnerBegFn, InnerEndFn, std::random_access_iterator_tag> {
   typedef TwoLevelRandIter<Outer, Inner, InnerBegFn, InnerEndFn> type;
 };
 
 // template <typename Outer, typename Inner>
 // struct IsRvrsIter {
-// 
+//
   // template <typename O, typename I>
   // struct IsRev {
     // static const bool VAL = false;
   // };
-// 
+//
   // template <typename O>
   // struct IsRev<O, typename O::value_type::reverse_iterator> {
     // static const bool VAL = true;
   // };
-// 
+//
   // template <typename O, typename I>
   // struct IsConstRev {
     // static const bool VAL = false;
   // };
-// 
+//
   // template <typename O>
   // struct IsConstRev<O, typename O::value_type::const_reverse_iterator> {
     // static const bool VAL = true;
   // };
-// 
-// 
-  // static const bool VAL = 
+//
+//
+  // static const bool VAL =
     // IsRev<Outer, Inner>::VAL || IsConstRev<Outer, Inner>::VAL;
 // };
 
@@ -724,22 +724,22 @@ namespace internal {
 
   enum StlIterKind { NORMAL, CONST, REVERSE, CONST_REVERSE };
 
-  template <typename C, typename I> struct IsConstIter 
+  template <typename C, typename I> struct IsConstIter
   { static const bool value = false; };
 
-  template <typename C> struct IsConstIter<C, typename C::const_iterator> 
+  template <typename C> struct IsConstIter<C, typename C::const_iterator>
   { static const bool value = true; };
 
-  template <typename C, typename I> struct IsRvrsIter 
+  template <typename C, typename I> struct IsRvrsIter
   { static const bool value = false; };
 
-  template <typename C> struct IsRvrsIter<C, typename C::reverse_iterator> 
+  template <typename C> struct IsRvrsIter<C, typename C::reverse_iterator>
   { static const bool value = true; };
 
-  template <typename C, typename I> struct IsRvrsConstIter 
+  template <typename C, typename I> struct IsRvrsConstIter
   { static const bool value = false; };
 
-  template <typename C> struct IsRvrsConstIter<C, typename C::const_reverse_iterator> 
+  template <typename C> struct IsRvrsConstIter<C, typename C::const_reverse_iterator>
   { static const bool value = true; };
 
   template <typename C, typename I>
@@ -747,18 +747,18 @@ namespace internal {
     static const bool isRvrs = IsRvrsIter<C, I>::value || IsRvrsConstIter<C, I>::value;
     static const bool isConst = IsConstIter<C, I>::value || IsRvrsConstIter<C, I>::value;
 
-    static const StlIterKind value = 
+    static const StlIterKind value =
       isRvrs ? (isConst ? CONST_REVERSE: REVERSE)
         : (isConst ? CONST : NORMAL);
   };
 
-  template <typename C, typename I, enum StlIterKind> 
-  struct ChooseStlIter { 
-    typedef void Inner; 
+  template <typename C, typename I, enum StlIterKind>
+  struct ChooseStlIter {
+    typedef void Inner;
   };
 
-  template <typename C, typename I> 
-  struct ChooseStlIter<C, I, NORMAL> { 
+  template <typename C, typename I>
+  struct ChooseStlIter<C, I, NORMAL> {
 
     typedef typename C::iterator Inner;
     typedef GetBegin<C> InnerBegFn;
@@ -766,26 +766,26 @@ namespace internal {
 
   };
 
-  template <typename C, typename I> 
-  struct ChooseStlIter<C, I, CONST> { 
+  template <typename C, typename I>
+  struct ChooseStlIter<C, I, CONST> {
 
-    typedef typename C::const_iterator Inner; 
+    typedef typename C::const_iterator Inner;
     typedef GetCbegin<C> InnerBegFn;
     typedef GetCend<C> InnerEndFn;
   };
 
-  template <typename C, typename I> 
-  struct ChooseStlIter<C, I, REVERSE> { 
+  template <typename C, typename I>
+  struct ChooseStlIter<C, I, REVERSE> {
 
-    typedef typename C::reverse_iterator Inner; 
+    typedef typename C::reverse_iterator Inner;
     typedef GetRbegin<C> InnerBegFn;
     typedef GetRend<C> InnerEndFn;
   };
 
-  template <typename C, typename I> 
-  struct ChooseStlIter<C, I, CONST_REVERSE> { 
+  template <typename C, typename I>
+  struct ChooseStlIter<C, I, CONST_REVERSE> {
 
-    typedef typename C::const_reverse_iterator Inner; 
+    typedef typename C::const_reverse_iterator Inner;
     typedef GetCRbegin<C> InnerBegFn;
     typedef GetCRend<C> InnerEndFn;
   };
@@ -826,7 +826,7 @@ struct ChooseStlTwoLevelIterator {
 };
 
 template <typename Outer>
-typename internal::StlInnerIsIterator<Outer>::type 
+typename internal::StlInnerIsIterator<Outer>::type
 stl_two_level_begin (Outer beg, Outer end) {
   return internal::StlInnerIsIterator<Outer>::make (beg, end, beg);
 }
@@ -844,7 +844,7 @@ stl_two_level_cbegin (Outer beg, Outer end) {
 }
 
 template <typename Outer>
-typename internal::StlInnerIsConstIterator<Outer>::type 
+typename internal::StlInnerIsConstIterator<Outer>::type
 stl_two_level_cend (Outer beg, Outer end) {
   return internal::StlInnerIsConstIterator<Outer>::make (beg, end, end);
 }

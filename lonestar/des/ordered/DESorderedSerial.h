@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -45,7 +45,7 @@
 
 namespace des_ord {
 
-class DESorderedSerial: 
+class DESorderedSerial:
   public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   typedef std::priority_queue<Event_ty, std::vector<Event_ty>, des::EventRecvTimeLocalTieBrkCmp<Event_ty>::RevCmp> MinHeap;

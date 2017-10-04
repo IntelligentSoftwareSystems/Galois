@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -103,10 +103,10 @@ void gFlush();
 #define GALOIS_SYS_DIE(...)   do { galois::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
 #define GALOIS_DIE(...)       do { galois::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 //! Like assert but unconditionally executed
-#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
+#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0)
 
 
-template <unsigned ENABLE> 
+template <unsigned ENABLE>
 struct debug {
   template <typename... Args>
   static void print (const Args&... args) {
@@ -114,7 +114,7 @@ struct debug {
   }
 };
 
-template <> 
+template <>
 struct debug<0> {
   template <typename... Args>
   inline static void print (const Args&... args) {}

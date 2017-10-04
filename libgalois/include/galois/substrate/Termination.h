@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -137,7 +137,7 @@ public:
     globalTerm = false;
     if (isSysMaster())
       th.hasToken = true;
-    else 
+    else
       th.hasToken = false;
   }
 
@@ -252,7 +252,7 @@ public:
   virtual void initializeThread() {
     TokenHolder& th = *data.getLocal();
     th.down_token = false;
-    for (int i = 0; i < num; ++i) 
+    for (int i = 0; i < num; ++i)
       th.up_token[i] = false;
     th.processIsBlack = true;
     th.hasToken = false;

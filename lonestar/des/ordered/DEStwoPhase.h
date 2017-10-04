@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -101,7 +101,7 @@ struct SimObjInfo: public TypeHelper<> {
 
   bool isReady (const Event_ty& event) const {
     // not ready if event has a timestamp greater than the latest event received
-    // on any input. 
+    // on any input.
     // an input with INFINITY_SIM_TIME is dead and will not receive more non-null events
     // in the future
     bool notReady = false;
@@ -115,7 +115,7 @@ struct SimObjInfo: public TypeHelper<> {
       for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
           , ende = lastInputEvents.end (); e != ende; ++e) {
 
-        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
+        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) &&
             (Cmp_ty::compare (event, *e) > 0)) {
           notReady = true;
           // break;
@@ -135,7 +135,7 @@ struct SimObjInfo: public TypeHelper<> {
 };
 
 
-class DEStwoPhase: 
+class DEStwoPhase:
   public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct NhoodVisitor {
@@ -147,9 +147,9 @@ class DEStwoPhase:
     static const int CHUNK_SIZE = 16;
 
     NhoodVisitor (Graph& graph, VecSobjInfo& sobjInfoVec)
-      : graph (graph), sobjInfoVec (sobjInfoVec) 
+      : graph (graph), sobjInfoVec (sobjInfoVec)
     {}
-    
+
     template <typename C>
     void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
@@ -164,9 +164,9 @@ class DEStwoPhase:
 
   // struct ReadyTest {
     // VecSobjInfo& sobjInfoVec;
-// 
+//
     // explicit ReadyTest (VecSobjInfo& sobjInfoVec): sobjInfoVec (sobjInfoVec) {}
-// 
+//
     // bool operator () (const Event_ty& event) const {
       // size_t id = event.getRecvObj ()->getID ();
       // SimObjInfo& sinfo = sobjInfoVec[id];
@@ -225,11 +225,11 @@ class DEStwoPhase:
 
       // for (AddList_ty::local_iterator a = newEvents.get ().begin ()
           // , enda = newEvents.get ().end (); a != enda; ++a) {
-// 
+//
         // SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj()->getID ()];
         // sinfo.recv (*a);
         // lwl.push (*a);
-// 
+//
         // // std::cout << "### Adding: " << a->detailedString () << std::endl;
       // }
 
@@ -270,13 +270,13 @@ protected:
     galois::runtime::for_each_ordered_ikdg (
         galois::runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
-        Cmp_ty (), 
+        Cmp_ty (),
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
         std::make_tuple (galois::loopname("des-ikdg")));
         // ReadyTest (sobjInfoVec));
 
-    std::cout << "Number of events processed= " << 
+    std::cout << "Number of events processed= " <<
       nevents.reduce () << std::endl;
   }
 };

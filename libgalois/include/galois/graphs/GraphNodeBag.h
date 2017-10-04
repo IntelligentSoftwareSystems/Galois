@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ public:
 
   size_t getSize() { return numNodes.reduce(); }
 
-  void clear() { 
+  void clear() {
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
         InitializeSmall fn = { this };
@@ -158,7 +158,7 @@ public:
   GraphNodeBag<BlockSize>& cur() { return (*this)[curp]; }
   GraphNodeBag<BlockSize>& next() { return (*this)[(curp+1) & 1]; }
   void swap() {
-    curp = (curp + 1) & 1; 
+    curp = (curp + 1) & 1;
     next().clear();
   }
   GraphNodeBag<BlockSize>& operator[](int i) {

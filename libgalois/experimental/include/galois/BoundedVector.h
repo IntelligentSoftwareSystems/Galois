@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -100,7 +100,7 @@ public:
     ++m_size;
   }
 
-  const_reference front () const { 
+  const_reference front () const {
     return (*this)[0];
   }
 
@@ -279,4 +279,3 @@ public:
 } // end namespace galois
 
 #endif // GALOIS_BOUNDED_VECTOR_H
-

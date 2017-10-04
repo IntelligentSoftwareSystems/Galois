@@ -4,7 +4,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -37,7 +37,7 @@
 
 #else
 #define cilk_for for
-#define cilk_spawn 
+#define cilk_spawn
 #define cilk_sync
 #endif
 

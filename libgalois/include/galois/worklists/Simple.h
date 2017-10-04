@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -54,12 +54,12 @@ public:
   using rethread = Wrapper;
 
   typedef T value_type;
-  
+
   void push(const value_type& val) {
     std::lock_guard<substrate::PaddedLock<true> > lg(lock);
     wl.push_back(val);
   }
-  
+
   template<typename Iter>
   void push(Iter b, Iter e) {
     std::lock_guard<substrate::PaddedLock<true> > lg(lock);

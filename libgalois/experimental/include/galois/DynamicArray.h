@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -49,7 +49,7 @@ protected:
   T* m_array;
   T* m_size;
 
-  
+
 public:
 
   using value_type = T;
@@ -65,7 +65,7 @@ public:
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 
-  explicit LazyDynamicArray (size_t length, const A& alloc=A()): 
+  explicit LazyDynamicArray (size_t length, const A& alloc=A()):
     m_alloc (alloc),
     m_array (nullptr),
     m_size (nullptr)
@@ -84,9 +84,9 @@ public:
   }
 
 
-  size_type size () const { 
+  size_type size () const {
     assert (m_size >= m_array);
-    return m_size - m_array; 
+    return m_size - m_array;
   }
 
   template <typename... Args>

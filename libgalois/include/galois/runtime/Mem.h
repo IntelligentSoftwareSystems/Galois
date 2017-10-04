@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -86,7 +86,7 @@ public:
   void* allocate(size_t size) {
     return malloc(size);
   }
-  
+
   void deallocate(void* ptr) {
     free(ptr);
   }
@@ -136,7 +136,7 @@ public:
     lock.unlock();
     return retval;
   }
-  
+
   inline void deallocate(void* ptr) {
     lock.lock();
     SourceHeap::deallocate(ptr);
@@ -172,7 +172,7 @@ public:
     //Now return the offseted pointer
     return (char*)ptr + offset;
   }
-  
+
   inline void deallocate(void* ptr) {
     SourceHeap::deallocate(getHeader(ptr));
   }
@@ -230,7 +230,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    if (head) { 
+    if (head) {
       void* ptr = head;
       head = head->next;
       dbg::print (this, " picking from free list, ptr = ", ptr);
@@ -568,7 +568,7 @@ public:
       // assert (f == instance.get ());
       return f;
     }
-    
+
     ptr.lock();
     f = ptr.getValue();
     if (f) {
@@ -699,7 +699,7 @@ public:
   inline bool operator!=(const FixedSizeHeap& rhs) const {
     return heap != rhs.heap;
   }
-  
+
   inline bool operator==(const FixedSizeHeap& rhs) const {
     return heap == rhs.heap;
   }
@@ -761,7 +761,7 @@ public:
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
-  
+
   template<class Other>
   struct rebind { typedef FixedSizeAllocator<Other> other; };
 
@@ -776,17 +776,17 @@ public:
       throw std::bad_alloc();
     return static_cast<pointer>(heap.allocate(sizeof(Ty)));
   }
-  
+
   void deallocate(pointer ptr, size_type len) {
     assert(len == 1);
     heap.deallocate(ptr);
   }
-  
+
   template<class U, class... Args>
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
-  
+
   inline void destroy(pointer ptr) const {
     destruct(ptr);
   }
@@ -892,10 +892,10 @@ template <typename Ty>
 class Pow_2_BlockAllocator {
 
 
-  template<typename T> 
-  static inline void destruct(T* t) { 
+  template<typename T>
+  static inline void destruct(T* t) {
     if (!std::is_scalar<T>::value) {
-      t->~T(); 
+      t->~T();
     }
   }
 
@@ -908,7 +908,7 @@ public:
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
-  
+
   template<class Other>
   struct rebind { typedef Pow_2_BlockAllocator<Other> other; };
 
@@ -920,7 +920,7 @@ public:
   // template <typename U>
   // friend class Pow_2_BlockAllocator<U>;
 
-  template <typename U> 
+  template <typename U>
   Pow_2_BlockAllocator(const Pow_2_BlockAllocator<U>& that) throw()
   : heap (that.heap) {}
 
@@ -931,16 +931,16 @@ public:
   pointer allocate(size_type size) {
     return static_cast<pointer>(heap->allocateBlock (size * sizeof (Ty)));
   }
-  
+
   void deallocate(pointer ptr, size_type len) {
     heap->deallocateBlock(ptr, len * sizeof(Ty));
   }
-  
+
   template<class U, class... Args>
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
-  
+
   inline void destroy(pointer ptr) const {
     destruct (ptr);
   }
@@ -1004,7 +1004,7 @@ public:
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
-  
+
   template<class Other>
   struct rebind {
     typedef ExternalHeapAllocator<Other, HeapTy> other;
@@ -1016,21 +1016,21 @@ public:
   ExternalHeapAllocator(const ExternalHeapAllocator<T1,HeapTy>& rhs) throw() {
     heap = rhs.heap;
   }
-  
+
   inline pointer address(reference val) const { return &val; }
 
   inline const_pointer address(const_reference val) const { return &val; }
-  
+
   pointer allocate(size_type size) {
     if (size > max_size())
       throw std::bad_alloc();
     return static_cast<pointer>(heap->allocate(size*sizeof(Ty)));
   }
-  
+
   void deallocate(pointer ptr, size_type len) {
     heap->deallocate(ptr);
   }
-  
+
   inline void construct(pointer ptr, const_reference val) const {
     new (ptr) Ty(val);
   }
@@ -1039,11 +1039,11 @@ public:
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
-  
+
   void destroy(pointer ptr) const {
     destruct(ptr);
   }
-  
+
   size_type max_size() const throw() { return (HeapTy::AllocSize == 0) ? size_t(-1)/sizeof(Ty) : HeapTy::AllocSize/sizeof(Ty); }
 
   template<typename T1,typename A1>

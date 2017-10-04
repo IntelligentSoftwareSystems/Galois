@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,9 +26,9 @@
  *
  * @section Description
  *
- * Implementation of the do all loop. Includes various 
+ * Implementation of the do all loop. Includes various
  * specializations to operators to reduce runtime overhead.
- * Doesn't do Galoisish things
+ * Doesn't do Galois ish things
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
@@ -135,8 +135,8 @@ class DoAllExecutor {
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const ArgsTy& args)
     :
-      F(_F), 
-      range(r), 
+      F(_F),
+      range(r),
       loopname(get_by_supertype<loopname_tag>(args).getValue())
   {
   }
@@ -173,7 +173,7 @@ void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& ar
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 // void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
-// 
+//
   // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
   // substrate::getThreadPool().run(activeThreads, std::ref(W));
 

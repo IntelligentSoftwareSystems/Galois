@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -54,7 +54,7 @@ class DESunordered: public DESunorderedBase {
 
 
   /**
-   * contains the loop body, called 
+   * contains the loop body, called
    * by @see for_each
    */
   struct Process {
@@ -71,12 +71,12 @@ class DESunordered: public DESunorderedBase {
         Accumulator& numEvents,
         Accumulator& numIter,
         ReduceMax& maxPending)
-      : 
-        graph (graph), 
-        onWLflags (onWLflags), 
-        numEvents (numEvents), 
-        numIter (numIter), 
-        maxPending (maxPending) 
+      :
+        graph (graph),
+        onWLflags (onWLflags),
+        numEvents (numEvents),
+        numIter (numIter),
+        maxPending (maxPending)
     {}
 
 
@@ -125,11 +125,11 @@ class DESunordered: public DESunorderedBase {
           const GNode dst = graph.getEdgeDst(i);
           SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, galois::MethodFlag::UNPROTECTED));
 
-          if (dstObj->isActive () 
+          if (dstObj->isActive ()
               && !bool (onWLflags [dstObj->getID ()])
               && onWLflags[dstObj->getID ()].cas (false, true)) {
             if (DEBUG) {
-              galois::gDebug ("Added %d neighbor: ", 
+              galois::gDebug ("Added %d neighbor: ",
                   bool (onWLflags[dstObj->getID ()]), dstObj->str ().c_str ());
             }
 
@@ -139,13 +139,13 @@ class DESunordered: public DESunorderedBase {
 
 
         }
-        
+
 
         if (srcObj->isActive()) {
           lwl.push (activeNode);
-          
+
           if (DEBUG) {
-            galois::gDebug ("Added %d self: " 
+            galois::gDebug ("Added %d self: "
                 , bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
 
@@ -153,11 +153,11 @@ class DESunordered: public DESunorderedBase {
           onWLflags[srcObj->getID ()] = false;
 
           if (DEBUG) {
-            galois::gDebug ("not adding %d self: ", 
+            galois::gDebug ("not adding %d self: ",
                 bool (onWLflags[srcObj->getID ()]), srcObj->str ().c_str ());
           }
         }
-        
+
 
         numIter += 1;
 
@@ -168,7 +168,7 @@ class DESunordered: public DESunorderedBase {
   /**
    * Run loop.
    *
-   * Galois worklists, currently, do not support set semantics, therefore, duplicates can be present on the workset. 
+   * Galois worklists, currently, do not support set semantics, therefore, duplicates can be present on the workset.
    * To ensure uniqueness of items on the worklist, we keep a list of boolean flags for each node,
    * which indicate whether the node is on the worklist. When adding a node to the worklist, the
    * flag corresponding to a node is set to True if it was previously False. The flag reset to False
@@ -209,7 +209,7 @@ class DESunordered: public DESunorderedBase {
       SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, galois::MethodFlag::UNPROTECTED));
       if (so->isActive ()) {
         std::cout << "ERROR: Found Active: " << so->str () << std::endl
-          << "onWLflags = " << onWLflags[so->getID ()] << ", numPendingEvents = " << so->numPendingEvents () 
+          << "onWLflags = " << onWLflags[so->getID ()] << ", numPendingEvents = " << so->numPendingEvents ()
           << std::endl;
       }
     }
@@ -222,4 +222,3 @@ class DESunordered: public DESunorderedBase {
 
 
 #endif // _DES_UNORDERED_H_
-

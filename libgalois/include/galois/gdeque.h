@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -47,14 +47,14 @@ namespace galois {
 //#define _NEW_ITERATOR
 
 //! Like std::deque but use Galois memory management functionality
-template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> > 
+template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> >
 class gdeque {
 
 protected:
   struct Block: ContainerTy {
     Block* next;
     Block* prev;
-    
+
     Block(): next(), prev() { }
 
     template<typename InputIterator>
@@ -79,7 +79,7 @@ protected:
 
   public:
     outer_iterator(Block* b = 0, Block* l = 0): cur(b), last(l) { }
-    
+
     template<typename OtherTy>
     outer_iterator(const outer_iterator<OtherTy>& o): cur(o.cur), last(o.last) { }
   };
@@ -96,7 +96,7 @@ private:
 
   //! [Example Fixed Size Allocator]
   galois::FixedSizeAllocator<Block> heap;
-  
+
   template<typename... Args>
   Block* alloc_block(Args&&... args) {
     Block* b = heap.allocate(1);
@@ -149,7 +149,7 @@ private:
   }
 
   template<typename... Args>
-  std::pair<Block*, typename Block::iterator> 
+  std::pair<Block*, typename Block::iterator>
   emplace(Block* b, typename Block::iterator ii, Args&&... args) {
     ++num;
     if (!b) {
@@ -184,9 +184,9 @@ private:
 public:
 #ifdef _NEW_ITERATOR
   typedef galois::TwoLevelIteratorA<
-    outer_iterator<Block>, 
-    inner_iterator, 
-    std::random_access_iterator_tag, 
+    outer_iterator<Block>,
+    inner_iterator,
+    std::random_access_iterator_tag,
     GetBegin<Block>,
     GetEnd<Block> > iterator;
   typedef galois::TwoLevelIteratorA<
@@ -234,7 +234,7 @@ public:
 
   public:
     Iterator(Block* _b = 0, Block* _l = 0, unsigned _off = 0) :b(_b), last(_l), offset(_off) { }
-    
+
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): b(o.b), last(o.last), offset(o.offset) { }
   };
@@ -271,7 +271,7 @@ public:
 
   ~gdeque() { clear(); }
 
-  iterator begin() { 
+  iterator begin() {
     assert(precondition());
 
 #ifdef _NEW_ITERATOR
@@ -287,7 +287,7 @@ public:
 #endif
   }
 
-  iterator end() { 
+  iterator end() {
     assert(precondition());
 #ifdef _NEW_ITERATOR
     return iterator {
@@ -318,7 +318,7 @@ public:
 #endif
   }
 
-  const_iterator end() const { 
+  const_iterator end() const {
 #ifdef _NEW_ITERATOR
     return const_iterator {
       outer_iterator<const Block> { first, last },
@@ -462,7 +462,7 @@ public:
     return *ii;
   }
 #endif
-  
+
   template<typename... Args>
   void emplace_back(Args&&... args) {
     assert(precondition());

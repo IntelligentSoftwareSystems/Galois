@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -37,9 +37,9 @@
 
 using namespace galois::substrate;
 
-/* Access pages on each thread so each thread has some pages already loaded 
+/* Access pages on each thread so each thread has some pages already loaded
  * (preferably ones it will use) */
-static void pageIn(void* _ptr, size_t len, size_t pageSize, 
+static void pageIn(void* _ptr, size_t len, size_t pageSize,
                    unsigned numThreads, bool finegrained) {
   char* ptr = static_cast<char*>(_ptr);
 
@@ -47,22 +47,22 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize,
     for (size_t x = 0; x < len; x += pageSize / 2)
       ptr[x] = 0;
   } else {
-    getThreadPool().run(numThreads, 
-     [ptr, len, pageSize, numThreads, finegrained] () 
+    getThreadPool().run(numThreads,
+     [ptr, len, pageSize, numThreads, finegrained] ()
       {
         auto myID = ThreadPool::getTID();
 
         if (finegrained) {
           // round robin page distribution among threads (e.g. thread 0 gets
-          // a page, then thread 1, then thread n, then back to thread 0 and 
+          // a page, then thread 1, then thread n, then back to thread 0 and
           // so on until the end of the region)
           for (size_t x  = pageSize * myID; x < len; x += pageSize * numThreads)
             ptr[x] = 0;
         } else {
           // sectioned page distribution (e.g. thread 0 gets first chunk, thread
           // 1 gets next chunk, ... last thread gets last chunk)
-          for (size_t x = myID * len / numThreads; 
-               x < len && x < (myID + 1) * len / numThreads; 
+          for (size_t x = myID * len / numThreads;
+               x < len && x < (myID + 1) * len / numThreads;
                x += pageSize)
             ptr[x] = 0;
         }
@@ -81,13 +81,13 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize,
  * @param len Length of the memory passed in
  * @param pageSize Size of a page
  * @param numThreads Number of threads to split work amongst
- * @param threadRanges Array that specifies distribution of elements among 
+ * @param threadRanges Array that specifies distribution of elements among
  * threads
- * @param elementSize Size of an element that is to be distributed among 
+ * @param elementSize Size of an element that is to be distributed among
  * threads
  */
 template<typename RangeArrayTy>
-static void pageInSpecified(void* _ptr, size_t len, size_t pageSize, 
+static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
                    unsigned numThreads, RangeArrayTy threadRanges,
                    size_t elementSize) {
   assert(numThreads > 0);
@@ -96,7 +96,7 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
   char* ptr = static_cast<char*>(_ptr);
 
   if (numThreads > 1) {
-    getThreadPool().run(numThreads, 
+    getThreadPool().run(numThreads,
       [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
         auto myID = ThreadPool::getTID();
 
@@ -169,9 +169,9 @@ LAptr galois::substrate::largeMallocInterleaved(size_t bytes, unsigned numThread
   bytes = roundup(bytes, allocSize());
 
 #ifdef GALOIS_USE_NUMA
-  // We don't use numa_alloc_interleaved_subset because we really want huge 
+  // We don't use numa_alloc_interleaved_subset because we really want huge
   // pages
-  // yes this is a comment in a ifdef, but if libnuma improves, this is where 
+  // yes this is a comment in a ifdef, but if libnuma improves, this is where
   // the alloc would go
 #endif
   // Get a non-prefaulted allocation
@@ -210,7 +210,7 @@ LAptr galois::substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
   return LAptr{data, internal::largeFreer{bytes}};
 }
 
-/** 
+/**
  * Allocates pages for some specified number of bytes, then does NUMA page
  * faulting based on a specified distribution of elements among threads.
  *
@@ -219,13 +219,13 @@ LAptr galois::substrate::largeMallocBlocked(size_t bytes, unsigned numThreads) {
  * @param bytes Number of bytes to allocate
  * @param numThreads Number of threads to page in regions for
  * @param threadRanges Array specifying distribution of elements among threads
- * @param elementSize Size of a data element that will be stored in the 
+ * @param elementSize Size of a data element that will be stored in the
  * allocated memory
  * @returns The allocated memory along with a freer object
  */
 template<typename RangeArrayTy>
-LAptr galois::substrate::largeMallocSpecified(size_t bytes, 
-          uint32_t numThreads, RangeArrayTy& threadRanges, 
+LAptr galois::substrate::largeMallocSpecified(size_t bytes,
+          uint32_t numThreads, RangeArrayTy& threadRanges,
           size_t elementSize) {
   // ceiling to nearest page
   bytes = roundup(bytes, allocSize());
@@ -233,8 +233,8 @@ LAptr galois::substrate::largeMallocSpecified(size_t bytes,
   void* data = allocPages(bytes / allocSize(), false);
 
   // NUMA aware page in based on element distribution specified in threadRanges
-  if (data) 
-    pageInSpecified(data, bytes, allocSize(), numThreads, threadRanges, 
+  if (data)
+    pageInSpecified(data, bytes, allocSize(), numThreads, threadRanges,
                     elementSize);
 
   return LAptr{data, internal::largeFreer{bytes}};
@@ -242,10 +242,10 @@ LAptr galois::substrate::largeMallocSpecified(size_t bytes,
 // Explicit template declarations since the template is defined in the .h
 // file
 template
-LAptr galois::substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes, 
-          uint32_t numThreads, std::vector<uint32_t>& threadRanges, 
+LAptr galois::substrate::largeMallocSpecified<std::vector<uint32_t> >(size_t bytes,
+          uint32_t numThreads, std::vector<uint32_t>& threadRanges,
           size_t elementSize);
 template
-LAptr galois::substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes, 
-          uint32_t numThreads, std::vector<uint64_t>& threadRanges, 
+LAptr galois::substrate::largeMallocSpecified<std::vector<uint64_t> >(size_t bytes,
+          uint32_t numThreads, std::vector<uint64_t>& threadRanges,
           size_t elementSize);

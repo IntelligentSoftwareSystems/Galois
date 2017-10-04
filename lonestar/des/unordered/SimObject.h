@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -107,7 +107,7 @@ public:
 
     // GALOIS_DEBUG ("%s, Received : %s\n", this->str ().c_str (), e.str ().c_str ());
 
-    if (inputTimes[inIdx] > e.getRecvTime () 
+    if (inputTimes[inIdx] > e.getRecvTime ()
         && e.getRecvTime () < des::INFINITY_SIM_TIME ) {
 
       galois::gDebug ("Non-FIFO order on input[",inIdx,"], last msg time=",inputTimes[inIdx],", current message =", e.str ().c_str ());
@@ -126,7 +126,7 @@ public:
   /**
    * Simulate.
    *
-   * @param graph: the graph composed of simulation objects/stations and communication links 
+   * @param graph: the graph composed of simulation objects/stations and communication links
    * @param myNode the node in the graph that has this SimObject as its node data
    * @return number of events that were processed during the call
    */
@@ -190,8 +190,8 @@ public:
    */
   bool isActive() const {
     // not active if pendingEvents is empty
-    // not active if earliest pending event has a time stamp less than 
-    // the latest time on an input i.e. possibly waiting for an earlier 
+    // not active if earliest pending event has a time stamp less than
+    // the latest time on an input i.e. possibly waiting for an earlier
     // event on some input
     bool notActive = true;
 
@@ -265,7 +265,7 @@ protected:
     for (std::vector<des::SimTime>::const_iterator i = inputTimes.begin ()
         , endi = inputTimes.end (); i != endi; ++i) {
 
-      if (*i < des::INFINITY_SIM_TIME) { // 
+      if (*i < des::INFINITY_SIM_TIME) { //
         min_t = std::min (*i, min_t);
       }
     }
@@ -276,7 +276,7 @@ protected:
     // return *min_pos;
   }
 
-  
+
 
 
 }; // end class

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -45,8 +45,8 @@ namespace worklists {
 namespace internal {
 
 template<typename T,
-	 typename Scheduler = dChunkedFIFO<64, T>, 
-         typename Set = galois::ThreadSafeOrderedSet<T> > 
+	 typename Scheduler = dChunkedFIFO<64, T>,
+         typename Set = galois::ThreadSafeOrderedSet<T> >
 struct WorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;

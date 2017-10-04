@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -67,7 +67,7 @@ class SpatialTree2d {
 
     Node* children[4];
     //needs c++11: Node(const T& v) :val(v), children({0,0,0,0}) {}
-    Node(const T& v, double _x, double _y) :val(v), x(_x), y(_y) { 
+    Node(const T& v, double _x, double _y) :val(v), x(_x), y(_y) {
       children[0] = children[1] = children[2] = children[3] = 0;
     }
 
@@ -85,7 +85,7 @@ class SpatialTree2d {
   };
 
   galois::runtime::FixedSizeAllocator<Node> nodeAlloc;
-  
+
   Node* root;
   Box2d bounds;
 

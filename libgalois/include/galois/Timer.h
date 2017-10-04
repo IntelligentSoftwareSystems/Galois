@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -69,13 +69,13 @@ public:
   TimeAccumulator();
   void start();
   //!adds the current timed interval to the total
-  void stop(); 
+  void stop();
   unsigned long get() const;
   TimeAccumulator& operator+=(const TimeAccumulator& rhs);
   TimeAccumulator& operator+=(const Timer& rhs);
 };
 
-template <bool enabled> 
+template <bool enabled>
 class ThreadTimer: private boost::noncopyable {
   timespec m_start;
   timespec m_stop;
@@ -99,7 +99,7 @@ public:
   int64_t get_sec(void) const { return (m_nsec >> 30); }
 
   int64_t get_msec(void) const { return (m_nsec >> 20); }
-    
+
 };
 
 template <>
@@ -161,7 +161,7 @@ public:
   }
 };
 
-template <bool Enable> 
+template <bool Enable>
 class CondStatTimer: public StatTimer {
 public:
   CondStatTimer(const char* region): StatTimer("Time", region) {}
@@ -226,11 +226,11 @@ protected:
         });
 
     // for (unsigned i = 0; i < timers.size(); ++i) {
-// 
+//
       // auto ns = timers.getRemote(i)->get_nsec();
       // auto lag = ns - minTime;
       // assert(lag > 0 && "negative time lag from min is impossible");
-// 
+//
       // galois::runtime::reportStat(region, lagCat.c_str(), lag, i);
       // galois::runtime::reportStat(region, timeCat.c_str(), ns, i);
     // }
@@ -271,4 +271,3 @@ public:
 
 } // end namespace galois
 #endif
-

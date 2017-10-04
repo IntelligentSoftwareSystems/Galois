@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -82,7 +82,7 @@ struct ConcurrentSkipListMapHelper {
  * order</i> for the key's class (see {@link Comparable}), or by the
  * {@link Comparator} provided at creation time, depending on which constructor
  * is used.
- * 
+ *
  * <p>
  * This class implements a concurrent variant of <a
  * href="http://www.cs.umd.edu/~pugh/">SkipLists</a> providing expected average
@@ -95,7 +95,7 @@ struct ConcurrentSkipListMapHelper {
  * ConcurrentModificationException}, and may proceed concurrently with other
  * operations. Ascending key ordered views and their iterators are faster than
  * descending ones.
- * 
+ *
  * <p>
  * All <tt>Map.Entry</tt> pairs returned by methods in this class and its
  * views represent snapshots of mappings at the time they were produced. They do
@@ -103,7 +103,7 @@ struct ConcurrentSkipListMapHelper {
  * that it is possible to change mappings in the associated map using
  * <tt>put</tt>, <tt>putIfAbsent</tt>, or <tt>replace</tt>, depending
  * on exactly which effect you need.)
- * 
+ *
  * <p>
  * Beware that, unlike in most collections, the <tt>size</tt> method is
  * <em>not</em> a constant-time operation. Because of the asynchronous nature
@@ -112,14 +112,14 @@ struct ConcurrentSkipListMapHelper {
  * <tt>equals</tt>, and <tt>clear</tt> are <em>not</em> guaranteed to be
  * performed atomically. For example, an iterator operating concurrently with a
  * <tt>putAll</tt> operation might view only some of the added elements.
- * 
+ *
  * <p>
  * This class and its views and iterators implement all of the <em>optional</em>
  * methods of the {@link Map} and {@link Iterator} interfaces. Like most other
  * concurrent collections, this class does not permit the use of <tt>null</tt>
  * keys or values because some null return values cannot be reliably
  * distinguished from the absence of elements.
- * 
+ *
  * @author Doug Lea
  * @param <K>
  *          the type of keys maintained by this map
@@ -137,7 +137,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * the heavily-traversed index lists than can be used for the base lists.
    * Here's a picture of some of the basics for a possible list with 2 levels of
    * index:
-   * 
+   *
    * Head nodes Index nodes +-+ right +-+ +-+ |2|---------------->|
    * |--------------------->| |->null +-+ +-+ +-+ | down | | v v v +-+ +-+ +-+
    * +-+ +-+ +-+ |1|----------->| |->| |------>| |----------->| |------>|
@@ -145,7 +145,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ |
    * |->|A|->|B|->|C|->|D|->|E|->|F|->|G|->|H|->|I|->|J|->|K|->null +-+ +-+ +-+
    * +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+ +-+
-   * 
+   *
    * The base lists use a variant of the HM linked ordered set algorithm. See
    * Tim Harris, "A pragmatic implementation of non-blocking linked lists"
    * http://www.cl.cam.ac.uk/~tlh20/publications.html and Maged Michael "High
@@ -155,7 +155,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * to avoid conflicts with concurrent insertions, and when traversing to keep
    * track of triples (predecessor, node, successor) in order to detect when and
    * how to unlink these deleted nodes.
-   * 
+   *
    * Rather than using mark-bits to mark list deletions (which can be slow and
    * space-intensive using AtomicMarkedReference), nodes use direct CAS'able
    * next pointers. On deletion, instead of marking a pointer, they splice in
@@ -168,7 +168,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * might still be faster because any search need only read ahead one more node
    * than otherwise required (to check for trailing marker) rather than
    * unmasking mark bits or whatever on each read.
-   * 
+   *
    * This approach maintains the essential property needed in the HM algorithm
    * of changing the next-pointer of a deleted node so that any other CAS of it
    * will fail, but implements the idea by changing the pointer to point to a
@@ -178,7 +178,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * rarely encountered during traversal and are normally quickly garbage
    * collected. (Note that this technique would not work well in systems without
    * garbage collection.)
-   * 
+   *
    * In addition to using deletion markers, the lists also use nullness of value
    * fields to indicate deletion, in a style similar to typical lazy-deletion
    * schemes. If a node's value is null, then it is considered logically deleted
@@ -190,29 +190,29 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * mesh with the Map API requirement that method get returns null if there is
    * no mapping, which allows nodes to remain concurrently readable even when
    * deleted. Using any other marker value here would be messy at best.)
-   * 
+   *
    * Here's the sequence of events for a deletion of node n with predecessor b
    * and successor f, initially:
-   * 
+   *
    * +------+ +------+ +------+ ... | b |------>| n |----->| f | ... +------+
    * +------+ +------+
-   * 
+   *
    * 1. CAS n's value field from non-null to null. From this point on, no public
    * operations encountering the node consider this mapping to exist. However,
    * other ongoing insertions and deletions might still modify n's next pointer.
-   * 
+   *
    * 2. CAS n's next pointer to point to a new marker node. From this point on,
    * no other nodes can be appended to n. which avoids deletion errors in
    * CAS-based linked lists.
-   * 
+   *
    * +------+ +------+ +------+ +------+ ... | b |------>| n
    * |----->|marker|------>| f | ... +------+ +------+ +------+ +------+
-   * 
+   *
    * 3. CAS b's next pointer over both n and its marker. From this point on, no
    * new traversals will encounter n, and it can eventually be GCed. +------+
    * +------+ ... | b |----------------------------------->| f | ... +------+
    * +------+
-   * 
+   *
    * A failure at step 1 leads to simple retry due to a lost race with another
    * operation. Steps 2-3 can fail because some other thread noticed during a
    * traversal a node with null value and helped out by marking and/or
@@ -222,14 +222,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * of up to four nodes (b, n, marker, f), not just (b, n, f), although the
    * next field of a marker is immutable, and once a next field is CAS'ed to
    * point to a marker, it never again changes, so this requires less care.
-   * 
+   *
    * Skip lists add indexing to this scheme, so that the base-level traversals
    * start close to the locations being found, inserted or deleted -- usually
    * base level traversals only traverse a few nodes. This doesn't change the
    * basic algorithm except for the need to make sure base traversals start at
    * predecessors (here, b) that are not (structurally) deleted, otherwise
    * retrying after processing the deletion.
-   * 
+   *
    * Index levels are maintained as lists with volatile next fields, using CAS
    * to link and unlink. Races are allowed in index-list operations that can
    * (rarely) fail to link in a new index node or delete one. (We can't do this
@@ -239,14 +239,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * contention, the effective "p" value may be lower than its nominal value.
    * And race windows are kept small enough that in practice these failures are
    * rare, even under a lot of contention.
-   * 
+   *
    * The fact that retries (for both base and index lists) are relatively cheap
    * due to indexing allows some minor simplifications of retry logic. Traversal
    * restarts are performed after most "helping-out" CASes. This isn't always
    * strictly necessary, but the implicit backoffs tend to help reduce other
    * downstream failed CAS's enough to outweigh restart cost. This worsens the
    * worst case, but seems to improve even highly contended cases.
-   * 
+   *
    * Unlike most skip-list implementations, index insertion and deletion here
    * require a separate traversal pass occuring after the base-level action, to
    * add or remove index nodes. This adds to single-threaded overhead, but
@@ -256,7 +256,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * unwanted garbage retention. This is more important here than in some other
    * data structures because we cannot null out node fields referencing user
    * keys since they might still be read by other ongoing traversals.
-   * 
+   *
    * Indexing uses skip list parameters that maintain good search performance
    * while using sparser-than-usual indices: The hardwired parameters k=1, p=0.5
    * (see method randomLevel) mean that about one-quarter of the nodes have
@@ -264,7 +264,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * on (see Pugh's Skip List Cookbook, sec 3.4). The expected total space
    * requirement for a map is slightly less than for the current implementation
    * of java.util.TreeMap.
-   * 
+   *
    * Changing the level of the index (i.e, the height of the tree-like
    * structure) also uses CAS. The head index has initial level/height of one.
    * Creation of an index with height greater than the current level adds a
@@ -275,7 +275,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * level just as it is about to contain an index (that will then never be
    * encountered). This does no structural harm, and in practice appears to be a
    * better option than allowing unrestrained growth of levels.
-   * 
+   *
    * The code for all this is more verbose than you'd like. Most operations
    * entail locating an element (or position to insert an element). The code to
    * do this can't be nicely factored out because subsequent uses require a
@@ -290,13 +290,13 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * returning a base-level predecessor of the key. findNode() finishes out the
    * base-level search. Even with this factoring, there is a fair amount of
    * near-duplication of code to handle variants.
-   * 
+   *
    * For explanation of algorithms sharing at least a couple of features with
    * this one, see Mikhail Fomitchev's thesis
    * (http://www.cs.yorku.ca/~mikhail/), Keir Fraser's thesis
    * (http://www.cl.cam.ac.uk/users/kaf24/), and Hakan Sundell's thesis
    * (http://www.cs.chalmers.se/~phs/).
-   * 
+   *
    * Given the use of tree-like index nodes, you might wonder why this doesn't
    * use some kind of search tree instead, which would support somewhat faster
    * search operations. The reason is that there are no known efficient
@@ -304,7 +304,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * immutability of the "down" links of index nodes (as opposed to mutable
    * "left" fields in true trees) makes this tractable using only CAS
    * operations.
-   * 
+   *
    * Notation guide for local variables Node: b, n, f for predecessor, node,
    * successor Index: q, r, d for index node, right, down. t for another index
    * node Head: h Levels: j Keys: k, key Values: v, value Comparisons: c
@@ -345,7 +345,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       *randomSeed.getRemote(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
     }
 
-    Node *node = new (node_heap.allocate(sizeof(Node))) 
+    Node *node = new (node_heap.allocate(sizeof(Node)))
       Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL);
     head = new (head_index_heap.allocate(sizeof(HeadIndex)))
       HeadIndex(node, NULL, NULL, 1);
@@ -396,10 +396,10 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     bool isBaseHeader() {
       return value == &ConcurrentSkipListMapHelper::BASE_HEADER;
     }
-    
+
     /**
      * Tries to append a deletion marker to this node.
-     * 
+     *
      * @param f
      *          the assumed current successor of this node
      * @return true if successful
@@ -412,7 +412,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     /**
      * Helps out a deletion by appending marker or unlinking from predecessor.
      * This is called during traversals when value field seen to be null.
-     * 
+     *
      * @param b
      *          predecessor
      * @param f
@@ -433,7 +433,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
     /**
      * Return value if this node contains a valid key-value pair, else null.
-     * 
+     *
      * @return this node's value if it isn't a marker or header or is deleted,
      *         else null.
      */
@@ -447,7 +447,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     /**
      * Create and return a new SnapshotEntry holding current mapping if this
      * node holds a valid value, else null
-     * 
+     *
      * @return new entry or null
      */
     SnapshotEntry createSnapshot() {
@@ -495,13 +495,13 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * compareAndSet right field
      */
     bool casRight(Index* cmp, Index* val) {
-      //return __sync_bool_compare_and_swap((uintptr_t*)&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val)); 
+      //return __sync_bool_compare_and_swap((uintptr_t*)&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
       return right.compare_exchange_strong(cmp, val);
     }
 
     /**
      * Returns true if the node this indexes has been deleted.
-     * 
+     *
      * @return true if indexed node is known to be deleted
      */
     bool indexesDeletedNode() {
@@ -512,7 +512,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * Tries to CAS newSucc as successor. To minimize races with unlink that may
      * lose this index node, if the node being indexed is known to be deleted,
      * it doesn't try to link in.
-     * 
+     *
      * @param succ
      *          the expected current successor
      * @param newSucc
@@ -528,7 +528,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     /**
      * Tries to CAS right field to skip over apparent successor succ. Fails
      * (forcing a retraversal by caller) if this node is known to be deleted.
-     * 
+     *
      * @param succ
      *          the expected current successor
      * @return true if successful
@@ -563,7 +563,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
     /**
      * Creates a new entry representing the given key and value.
-     * 
+     *
      * @param key
      *          the key
      * @param value
@@ -580,7 +580,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * base-level header if there is no such node. Also unlinks indexes to deleted
    * nodes found along the way. Callers rely on this side-effect of clearing
    * indices to deleted nodes.
-   * 
+   *
    * @param key
    *          the key
    * @return a predecessor of key
@@ -616,18 +616,18 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * starting at predecessor returned from findPredecessor, processing
    * base-level deletions as encountered. Some callers rely on this side-effect
    * of clearing deleted nodes.
-   * 
+   *
    * Restarts occur, at traversal step centered on node n, if:
-   * 
+   *
    * (1) After reading n's next field, n is no longer assumed predecessor b's
    * current successor, which means that we don't have a consistent 3-node
    * snapshot and so cannot unlink any subsequent deleted nodes encountered.
-   * 
+   *
    * (2) n's value field is null, indicating n is deleted, in which case we help
    * out an ongoing structural deletion before retrying. Even though there are
    * cases where such unlinking doesn't require restart, they aren't sorted out
    * here because doing so would not usually outweigh cost of restarting.
-   * 
+   *
    * (3) n is a marker or n's predecessor's value field is null, indicating
    * (among other possibilities) that findPredecessor returned a deleted node.
    * We can't unlink the node because we don't know its predecessor, so rely on
@@ -637,13 +637,13 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * is done each iteration to help avoid contention with other threads by
    * callers that will fail to be able to change links, and so will retry
    * anyway.
-   * 
+   *
    * The traversal loops in doPut, doRemove, and findNear all include the same
    * three kinds of checks. And specialized versions appear in doRemoveFirst,
    * doRemoveLast, findFirst, and findLast. They can't easily share code because
    * each uses the reads of fields held in locals occurring in the orders they
    * were performed.
-   * 
+   *
    * @param key
    *          the key
    * @return node holding key, or null if no such.
@@ -713,7 +713,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 	    bound = n;
 	}
       }
-      
+
       // Traverse down
       if ((d = q->down) != 0) {
 	q = d;
@@ -721,7 +721,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       } else
 	break;
     }
-    
+
     // Traverse nexts
     for (n = q->node->next;  n != 0; n = n->next) {
       k = n->key;
@@ -735,7 +735,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     }
     return 0;
   }
-  
+
   /**
    * Perform map.get via findNode.  Used as a backup if doGet
    * encounters an in-progress deletion.
@@ -766,7 +766,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * deletion. Also uses "bound" to eliminate need for some comparisons (see
    * Pugh Cookbook). Also folds uses of null checks and node-skipping because
    * markers have null keys.
-   * 
+   *
    * @param okey
    *          the key
    * @return the value, or null if absent
@@ -788,7 +788,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           V* v = static_cast<V*>(r->node->value.load());
           return v ? v : getUsingFindNode(key);
         }
-        bound = r->node; 
+        bound = r->node;
       }
       if ((d = q->down))
         q = d;
@@ -812,7 +812,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   /**
    * Perform map.get via findNode. Used as a backup if doGet encounters an
    * in-progress deletion.
-   * 
+   *
    * @param key
    *          the key
    * @return the value, or null if absent
@@ -838,7 +838,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   /**
    * Main insertion method. Adds element if not present, or replaces value if
    * present and onlyIfAbsent is false.
-   * 
+   *
    * @param kkey
    *          the key
    * @param value
@@ -893,7 +893,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   /**
    * Return a random level for inserting a new node. Hardwired to k=1, p=0.5,
    * max 31.
-   * 
+   *
    * This uses a cheap pseudo-random function that according to
    * http://home1.gte.net/deleyd/random/random4.html was used in Turbo Pascal.
    * It seems the fastest usable one here. The low bits are apparently not very
@@ -914,7 +914,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
   /**
    * Create and add index nodes for given node.
-   * 
+   *
    * @param z
    *          the node
    * @param level
@@ -957,7 +957,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         HeadIndex* newh = oldh;
         Node* oldbase = oldh->node;
         for (int j = oldLevel + 1; j <= level; ++j)
-          newh = new (head_index_heap.allocate(sizeof(HeadIndex))) 
+          newh = new (head_index_heap.allocate(sizeof(HeadIndex)))
             HeadIndex(oldbase, newh, idxs[j], j);
         if (casHead(oldh, newh)) {
           k = oldLevel;
@@ -970,7 +970,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
   /**
    * Add given index nodes from given level down to 1.
-   * 
+   *
    * @param idx
    *          the topmost index node being inserted
    * @param h
@@ -1043,7 +1043,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * practically never make mistakes unless current thread stalls immediately
    * before first CAS, in which case it is very unlikely to stall again
    * immediately afterwards, so will recover.)
-   * 
+   *
    * We put up with all this rather than just let levels grow because otherwise,
    * even a small map that has undergone a large number of insertions and
    * removals will have a lot of levels, slowing down access more than would an
@@ -1054,7 +1054,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     HeadIndex* d;
     HeadIndex* e;
     if (h->level > 3 && (d = static_cast<HeadIndex*>(h->down)) != NULL
-        && (e = static_cast<HeadIndex*>(d->down)) != NULL 
+        && (e = static_cast<HeadIndex*>(d->down)) != NULL
         && e->right.load() == NULL && d->right.load() == NULL
         && h->right.load() == NULL && casHead(h, d) && // try to set
         h->right.load() != NULL) // recheck
@@ -1065,7 +1065,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
   /**
    * Specialized variant of findNode to get first valid node
-   * 
+   *
    * @return first node or null if empty
    */
   Node* findFirst() const {
@@ -1082,7 +1082,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
 
   /**
    * Remove first entry; return either its key or a snapshot.
-   * 
+   *
    * @param keyOnly
    *          if true return key, else return SnapshotEntry (This is a little
    *          ugly, but avoids code duplication.)
@@ -1148,7 +1148,7 @@ public:
   /**
    * Constructs a new map containing the same mappings as the given
    * <tt>SortedMap</tt>, sorted according to the same ordering.
-   * 
+   *
    * @param m
    *          the sorted map whose mappings are to be placed in this map, and
    *          whose comparator is to be used to sort this map.
@@ -1239,12 +1239,12 @@ public:
   /**
    * Associates the specified value with the specified key in this map. If the
    * map previously contained a mapping for this key, the old value is replaced.
-   * 
+   *
    * @param key
    *          key with which the specified value is to be associated.
    * @param value
    *          value to be associated with the specified key.
-   * 
+   *
    * @return previous value associated with specified key, or <tt>null</tt> if
    *         there was no mapping for key.
    * @throws ClassCastException
@@ -1261,7 +1261,7 @@ public:
    * Returns the number of elements in this map. If this map contains more than
    * <tt>Integer.MAX_VALUE</tt> elements, it returns
    * <tt>Integer.MAX_VALUE</tt>.
-   * 
+   *
    * <p>
    * Beware that, unlike in most collections, this method is <em>NOT</em> a
    * constant-time operation. Because of the asynchronous nature of these maps,
@@ -1270,7 +1270,7 @@ public:
    * execution of this method, in which case the returned result will be
    * inaccurate. Thus, this method is typically not very useful in concurrent
    * applications.
-   * 
+   *
    * @return the number of elements in this map.
    */
   int size() {
@@ -1284,7 +1284,7 @@ public:
 
   /**
    * Returns <tt>true</tt> if this map contains no key-value mappings.
-   * 
+   *
    * @return <tt>true</tt> if this map contains no key-value mappings.
    */
   bool isEmpty() const {
@@ -1296,23 +1296,23 @@ public:
   /**
    * If the specified key is not already associated with a value, associate it
    * with the given value. This is equivalent to
-   * 
+   *
    * <pre>
    * if (!map.containsKey(key))
    *   return map.put(key, value);
    * else
    *   return map.get(key);
    * </pre>
-   * 
+   *
    * except that the action is performed atomically.
-   * 
+   *
    * @param key
    *          key with which the specified value is to be associated.
    * @param value
    *          value to be associated with the specified key.
    * @return previous value associated with specified key, or <tt>null</tt> if
    *         there was no mapping for key.
-   * 
+   *
    * @throws ClassCastException
    *           if the key cannot be compared with the keys currently in the map.
    * @throws NullPointerException
@@ -1327,7 +1327,7 @@ public:
    * Returns a key-value mapping associated with the least key in this map, or
    * <tt>null</tt> if the map is empty. The returned entry does <em>not</em>
    * support the <tt>Entry.setValue</tt> method.
-   * 
+   *
    * @return an Entry with least key, or <tt>null</tt> if the map is empty.
    */
   SnapshotEntry firstEntry() {
@@ -1365,7 +1365,7 @@ public:
    * Removes and returns a key-value mapping associated with the least key in
    * this map, or <tt>null</tt> if the map is empty. The returned entry does
    * <em>not</em> support the <tt>Entry.setValue</tt> method.
-   * 
+   *
    * @return the removed first entry of this map, or <tt>null</tt> if the map
    *         is empty.
    */
@@ -1668,7 +1668,7 @@ class FCPairingHeap: private boost::noncopyable {
             heap.add(op->item);
           }
           cur->req = op->response;
-        } 
+        }
 
         cur = cur->next;
       }
@@ -1732,10 +1732,10 @@ class FCPairingHeap: private boost::noncopyable {
   }
 
 public:
-  FCPairingHeap(): maxTries(1) { 
+  FCPairingHeap(): maxTries(1) {
     slots = new Slot();
   }
-  
+
   ~FCPairingHeap() {
     Slot* cur = slots;
     while (cur) {

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -67,7 +67,7 @@ class PerBackend {
    * PerBackend object, which may have be destroyed before the PerThread
    * object itself.
    */
-  bool invalid; 
+  bool invalid;
 
   void initCommon(unsigned maxT);
   static unsigned nextLog2(unsigned size);
@@ -119,7 +119,7 @@ protected:
   void destruct() {
     if (offset == ~0U)
       return;
-    
+
     for (unsigned n = 0; n < getThreadPool().getMaxThreads(); ++n)
       reinterpret_cast<T*>(b->getRemote(n, offset))->~T();
     b->deallocOffset(offset, sizeof(T));
@@ -208,7 +208,7 @@ protected:
   }
 
 public:
-  
+
   template<typename... Args>
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool

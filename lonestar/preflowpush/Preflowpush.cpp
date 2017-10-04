@@ -114,7 +114,7 @@ struct PreflowPush {
   GNode sink;
   GNode source;
   int global_relabel_interval;
-  bool should_global_relabel = false;;
+  bool should_global_relabel = false;
 
   void checkSorting(void) {
     for (auto n : graph) {
@@ -274,7 +274,7 @@ struct PreflowPush {
   Graph::edge_iterator findEdgeLog2(GNode dst, Graph::edge_iterator i, Graph::edge_iterator end_i) {
 
     struct EdgeDstIter
-      : public boost::iterator_facade< EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode> {
+      : public boost::iterator_facade<EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode> {
 
       using Base = boost::iterator_facade<EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode>;
 
@@ -357,7 +357,7 @@ struct PreflowPush {
     }
   }
 
-  
+
   template <typename C>
   bool discharge(const GNode& src, C& ctx) {
     // Node& node = graph.getData(src, galois::MethodFlag::WRITE);
@@ -528,13 +528,13 @@ struct PreflowPush {
             galois::wl<galois::worklists::BulkSynchronous<>>());
         break;
       case detBase:
-        galois::for_each(galois::iterate( { sink } ), UpdateHeights<detBase>(*this), 
+        galois::for_each(galois::iterate( { sink } ), UpdateHeights<detBase>(*this),
             galois::wl<DWL>(),
             galois::loopname("UpdateHeights"));
         break;
       case detDisjoint:
         galois::for_each(galois::iterate( { sink } ), UpdateHeights<detDisjoint>(*this),
-            galois::wl<DWL>(), 
+            galois::wl<DWL>(),
             galois::loopname("UpdateHeights"));
         break;
       default:

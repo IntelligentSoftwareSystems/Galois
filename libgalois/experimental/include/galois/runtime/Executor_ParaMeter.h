@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -262,7 +262,7 @@ class ParaMeterExecutor {
 
     finishLoop();
   }
-    
+
   void beginLoop() { }
 
   void finishStep(const StepStats& stat) {
@@ -278,7 +278,7 @@ class ParaMeterExecutor {
 
   IterationContext& newIteration() const {
     IterationContext* it = new IterationContext();
-    
+
     it->resetUserCtx();
     setThreadContext(&(it->ctx));
 
@@ -321,7 +321,7 @@ class ParaMeterExecutor {
 public:
   static_assert(!needsBreak, "not supported by this executor");
 
-  ParaMeterExecutor(FunctionTy& f, const ArgsTy& args): function(f), 
+  ParaMeterExecutor(FunctionTy& f, const ArgsTy& args): function(f),
     loopname(get_by_supertype<loopname_tag>(args).value) { }
 
   template<typename RangeTy>
@@ -392,7 +392,7 @@ namespace runtime {
 
 template<class T, class FunctionTy, class ArgsTy>
 class ForEachExecutor<galois::worklists::ParaMeter<T>, FunctionTy, ArgsTy>:
-  public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> 
+  public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy>
 {
   typedef ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> SuperTy;
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
@@ -404,7 +404,7 @@ class ForEachExecutor<galois::worklists::ParaMeter<T>, FunctionTy, ArgsTy>:
 
 } // end Runtime;
 
-template <typename I, typename F, typename... Args> 
+template <typename I, typename F, typename... Args>
 void for_each_exp (const I& beg, const I& end, const F& func, const Args&... args) {
 
   auto range = runtime::makeStandardRange (beg, end);
@@ -418,7 +418,7 @@ void for_each_exp (const I& beg, const I& end, const F& func, const Args&... arg
 }
 
 
-template <typename C, typename F, typename... Args> 
+template <typename C, typename F, typename... Args>
 void for_each_local_exp (C& cont, const F& func, const Args&... args) {
 
   auto range = runtime::makeLocalRange(cont);

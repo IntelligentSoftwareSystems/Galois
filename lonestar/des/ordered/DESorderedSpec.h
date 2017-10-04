@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -62,7 +62,7 @@ typedef galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 
 
-class DESorderedSpec: 
+class DESorderedSpec:
   public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   using VecGNode = std::vector<GNode>;
@@ -77,10 +77,10 @@ class DESorderedSpec:
     Graph& graph;
     VecGNode& nodes;
 
-    NhoodVisitor (Graph& graph, VecGNode& nodes) 
-      : graph (graph), nodes (nodes) 
+    NhoodVisitor (Graph& graph, VecGNode& nodes)
+      : graph (graph), nodes (nodes)
     {}
-    
+
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
@@ -178,13 +178,13 @@ protected:
     galois::runtime::for_each_ordered_spec (
         galois::runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
-        Cmp_ty (), 
+        Cmp_ty (),
         NhoodVisitor (graph, nodes),
         OpFunc (graph, nodes, nevents),
         std::make_tuple (
           galois::loopname("des_ordered_spec")));
 
-    std::cout << "Number of events processed= " << 
+    std::cout << "Number of events processed= " <<
       nevents.reduce () << std::endl;
   }
 };

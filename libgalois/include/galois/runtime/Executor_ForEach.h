@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,7 +26,7 @@
  *
  * @section Description
  *
- * Implementation of the Galois foreach iterator. Includes various 
+ * Implementation of the Galois foreach iterator. Includes various
  * specializations to operators to reduce runtime overhead.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
@@ -70,7 +70,7 @@ class AbortHandler {
   typedef worklists::GFIFO<Item> AbortedList;
   substrate::PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
-  
+
   /**
    * Policy: serialize via tree over packages.
    */
@@ -89,8 +89,8 @@ class AbortHandler {
     if ((retries & 1) == 1) {
       queues.getLocal()->push(item);
       return;
-    } 
-    
+    }
+
     unsigned tid = substrate::ThreadPool::getTID();
     auto& tp = substrate::getThreadPool();
     unsigned package = substrate::ThreadPool::getPackage();
@@ -112,8 +112,8 @@ class AbortHandler {
     if (retries < 2) {
       queues.getLocal()->push(item);
       return;
-    } 
-    
+    }
+
     unsigned tid = substrate::ThreadPool::getTID();
     auto& tp = substrate::getThreadPool();
     unsigned package = substrate::ThreadPool::getPackage();
@@ -160,7 +160,7 @@ public:
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
-//TODO: implement more_stats instead of does_not_need_stats which show aborts/pushes etc. 
+//TODO: implement more_stats instead of does_not_need_stats which show aborts/pushes etc.
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
@@ -172,7 +172,7 @@ public:
   static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
-  typedef typename WorkListTy::value_type value_type; 
+  typedef typename WorkListTy::value_type value_type;
 
   struct ThreadLocalData {
     FunctionTy function;
@@ -183,7 +183,7 @@ protected:
     unsigned long stat_pushes;
     const char* loopname;
     ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : function(fn), stat_conflicts(0), stat_iterations(0), stat_pushes(0), 
+      : function(fn), stat_conflicts(0), stat_iterations(0), stat_pushes(0),
         loopname(ln)
     {}
     ~ThreadLocalData() {
@@ -199,7 +199,7 @@ protected:
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
 
-  AbortHandler<value_type> aborted; 
+  AbortHandler<value_type> aborted;
   substrate::TerminationDetection& term;
   substrate::Barrier& barrier;
 
@@ -373,21 +373,21 @@ protected:
   }
 
   template<typename WArgsTy, int... Is>
-  ForEachExecutor(T1, const FunctionTy& f, 
+  ForEachExecutor(T1, const FunctionTy& f,
                   const ArgsTy& args, const WArgsTy& wlargs, int_seq<Is...>):
     ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
   template<typename WArgsTy>
-  ForEachExecutor(T1, const FunctionTy& f, 
+  ForEachExecutor(T1, const FunctionTy& f,
                   const ArgsTy& args, const WArgsTy& wlargs, int_seq<>):
     ForEachExecutor(T2{}, f, args) {}
 
 public:
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args):
-    ForEachExecutor(T1{}, f, args, 
-                    get_by_supertype<wl_tag>(args).args, 
+    ForEachExecutor(T1{}, f, args,
+                    get_by_supertype<wl_tag>(args).args,
                     typename make_int_seq<std::tuple_size<decltype(get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
-  
+
   template<typename RangeTy>
   void init(const RangeTy&) { }
 
@@ -418,7 +418,7 @@ public:
 
 template<typename WLTy>
 constexpr auto has_with_iterator(int)
-  -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool()) 
+  -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool())
 {
   return true;
 }
@@ -435,13 +435,13 @@ struct reiterator {
 
 template<typename WLTy, typename IterTy>
 struct reiterator<WLTy, IterTy,
-  typename std::enable_if<has_with_iterator<WLTy>(0)>::type> 
+  typename std::enable_if<has_with_iterator<WLTy>(0)>::type>
 {
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
 // template<typename Fn, typename T>
-// constexpr auto takes_context(int) 
+// constexpr auto takes_context(int)
 //   -> decltype(std::declval<typename std::result_of<Fn(T&, UserContext<T>&)>::type>(), bool())
 // {
 //   return true;
@@ -474,7 +474,7 @@ struct reiterator<WLTy, IterTy,
 // };
 
 // template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
+// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args)
 //   -> typename std::enable_if<takes_context<FunctionTy, T>(0)>::type
 // {
 //   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
@@ -488,7 +488,7 @@ struct reiterator<WLTy, IterTy,
 // }
 
 // template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
+// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args)
 //   -> typename std::enable_if<!takes_context<FunctionTy, T>(0)>::type
 // {
 //   typedef MakeTakeContext<FunctionTy, T> WrappedFunction;
@@ -509,7 +509,7 @@ struct reiterator<WLTy, IterTy,
 //TODO(ddn): Think about folding in range into args too
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
-  typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
+  typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type;
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
@@ -547,7 +547,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     // TODO: not needed any more? Remove once sure
     auto ftpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
 
-    auto xtpl = std::tuple_cat(ftpl, 
+    auto xtpl = std::tuple_cat(ftpl,
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>())));
@@ -568,7 +568,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto ftpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
 
-    auto xtpl = std::tuple_cat(ftpl, 
+    auto xtpl = std::tuple_cat(ftpl,
           get_default_trait_values(tpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>())));

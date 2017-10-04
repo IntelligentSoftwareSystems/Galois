@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -59,7 +59,7 @@ LAptr largeMallocBlocked(size_t bytes, unsigned numThreads);
 
 // fault in specified regions for each thread (threadRanges)
 template<typename RangeArrayTy>
-LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads, 
+LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads,
                            RangeArrayTy& threadRanges, size_t elementSize);
 
 

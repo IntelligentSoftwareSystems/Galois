@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -53,11 +53,11 @@ public:
 
   //! atomic add and fetch
   T operator+=(const T& rhs) {
-    return __sync_add_and_fetch(&val.data, rhs); 
+    return __sync_add_and_fetch(&val.data, rhs);
   }
   //! atomic sub and fetch
   T operator-=(const T& rhs) {
-    return __sync_sub_and_fetch(&(val.data), rhs); 
+    return __sync_sub_and_fetch(&(val.data), rhs);
   }
   //! atomic increment and fetch
   T operator++() {
@@ -68,14 +68,14 @@ public:
     return __sync_fetch_and_add(&(val.data), 1);
   }
   //! atomic decrement and fetch
-  T operator--() { 
-    return __sync_sub_and_fetch(&(val.data), 1); 
+  T operator--() {
+    return __sync_sub_and_fetch(&(val.data), 1);
   }
   //! atomic fetch and decrement
   T operator--(int) {
     return __sync_fetch_and_sub(&(val.data), 1);
   }
-  //! conversion operator to base data type 
+  //! conversion operator to base data type
   operator T() const {
     return val.data;
   }
@@ -92,16 +92,16 @@ public:
     if (val.data != expected) { return false; }
 #if defined(__INTEL_COMPILER)
     return __sync_bool_compare_and_swap(
-        &val.data, 
-        *reinterpret_cast<const ptrdiff_t*>(&expected), 
+        &val.data,
+        *reinterpret_cast<const ptrdiff_t*>(&expected),
         *reinterpret_cast<const ptrdiff_t*>(&updated));
-#else 
+#else
     return __sync_bool_compare_and_swap (&val.data, expected, updated);
 #endif
   }
 };
 
-// non-current version 
+// non-current version
 template<typename T, template <typename _> class W>
 class GAtomicImpl<T, W, false> {
   // galois::runtime::LL::CacheLineStorage<T> val;
@@ -130,14 +130,14 @@ public:
     return (val.data)++;
   }
   //! atomic decrement and fetch
-  T operator--() { 
+  T operator--() {
     return --(val.data);
   }
   //! atomic fetch and decrement
   T operator--(int) {
     return (val.data)--;
   }
-  //! conversion operator to base data type 
+  //! conversion operator to base data type
   operator T() const {
     return val.data;
   }
@@ -151,7 +151,7 @@ public:
   }
   //! direct compare and swap
   bool cas (const T& expected, const T& updated) {
-    if (val.data != expected) { 
+    if (val.data != expected) {
       return false;
     } else {
       val.data = updated;
@@ -205,7 +205,7 @@ public:
 
   T* operator+=(const difference_type& rhs) {
     if (CONCURRENT) {
-      return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+      return __sync_add_and_fetch(&Super_ty::val.data, rhs);
     } else {
       return (Super_ty::val.data += rhs);
     }
@@ -236,13 +236,13 @@ public:
     return Super_ty::operator=(that);
   }
 
-  const T*& operator=(const T* that) { 
+  const T*& operator=(const T* that) {
     return Super_ty::operator=(that);
   }
 
   const T* operator+=(const difference_type& rhs) {
     if (CONCURRENT) {
-      return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+      return __sync_add_and_fetch(&Super_ty::val.data, rhs);
     } else {
       return (Super_ty::val.data += rhs);
     }
@@ -268,7 +268,7 @@ public:
 
   GAtomicBase(): Super_ty() {}
 
-  //! conversion operator to base data type 
+  //! conversion operator to base data type
   operator bool() const {
     return Super_ty::operator bool ();
   }
@@ -325,7 +325,7 @@ public:
  * Cache-line padded version of {@link GAtomic}.
  */
 template <typename T, bool CONCURRENT=true>
-class GAtomicPadded: 
+class GAtomicPadded:
     public internal::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> {
 
   typedef internal::GAtomicBase<T, galois::substrate::CacheLineStorage, CONCURRENT> Super_ty;

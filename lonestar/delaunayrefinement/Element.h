@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -52,8 +52,8 @@ class Element {
 public:
   //! Constructor for Triangles
   Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
-   :obtuse(0), bDim(true), id(_id) 
-  { 
+   :obtuse(0), bDim(true), id(_id)
+  {
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
@@ -111,7 +111,7 @@ public:
       return tmpval + (c * wp);
     }
   }
-  
+
   double get_radius_squared() const {
     return get_radius_squared(getCenter());
   }
@@ -149,19 +149,19 @@ public:
 
   void angleCheck(int i, bool& ob, bool& sm, double M) const {
     int j = (i + 1) % dim();
-    int k = (i + 2) % dim(); 
+    int k = (i + 2) % dim();
     Tuple::angleCheck(coords[j], coords[i], coords[k], ob, sm, M);
   }
 
   bool angleGTCheck(int i, double M) const {
     int j = (i + 1) % dim();
-    int k = (i + 2) % dim(); 
+    int k = (i + 2) % dim();
     return Tuple::angleGTCheck(coords[j], coords[i], coords[k], M);
   }
-  
+
   bool angleOBCheck(int i) const {
     int j = (i + 1) % dim();
-    int k = (i + 2) % dim(); 
+    int k = (i + 2) % dim();
     return Tuple::angleOBCheck(coords[j], coords[i], coords[k]);
   }
 

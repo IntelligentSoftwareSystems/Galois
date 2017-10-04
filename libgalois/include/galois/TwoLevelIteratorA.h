@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -47,13 +47,13 @@ namespace galois {
  * Alternate implementation of {@link ChooseTwoLevelIterator}.
  */
 template<class OuterIter, class InnerIter, class CategoryOrTraversal, class InnerBeginFn, class InnerEndFn>
-class TwoLevelIteratorA : 
+class TwoLevelIteratorA :
   public boost::iterator_adaptor<
     TwoLevelIteratorA<OuterIter, InnerIter, CategoryOrTraversal, InnerBeginFn, InnerEndFn>,
     InnerIter,
     boost::use_default,
     CategoryOrTraversal
-    > 
+    >
 {
 public:
   typedef typename TwoLevelIteratorA::iterator_adaptor_::difference_type difference_type;
@@ -163,7 +163,7 @@ private:
   /**
    * Update base iterator to end of first non-empty inner range before current
    * one. Also update outer iterators appropriately.
-   */ 
+   */
   void seek_backward() {
     InnerIter end;
 
@@ -266,7 +266,7 @@ private:
   }
 
   template<class Other>
-  difference_type distance_to_dispatch(Other it2, std::input_iterator_tag) const { 
+  difference_type distance_to_dispatch(Other it2, std::input_iterator_tag) const {
     // Inline safe_distance here otherwise there is a cyclic dependency:
     // std::distance -> iterator_adaptor -> distance_to -> safe_distance -> std::distance
     if (*this == it2)
@@ -293,7 +293,7 @@ private:
   }
 
   template<class Other>
-  difference_type distance_to_dispatch(const Other& x, std::random_access_iterator_tag) const { 
+  difference_type distance_to_dispatch(const Other& x, std::random_access_iterator_tag) const {
     if (*this == x)
       return 0;
     else if (m_outer == x.m_outer)
@@ -323,7 +323,7 @@ private:
 
   template<class OtherOuterIter, class OtherInnerIter, class C, class BF, class EF>
   difference_type distance_to(const TwoLevelIteratorA<OtherOuterIter, OtherInnerIter, C, BF, EF>& x) const {
-    return distance_to_dispatch(x, typename std::iterator_traits<InnerIter>::iterator_category()); 
+    return distance_to_dispatch(x, typename std::iterator_traits<InnerIter>::iterator_category());
   }
 
   template<class OtherOuterIter, class OtherInnerIter, class C, class BF, class EF>
@@ -348,7 +348,7 @@ public:
     m_outer(outer),
     m_inner_begin_fn(inner_begin_fn),
     m_inner_end_fn(inner_end_fn)
-  { 
+  {
     if (m_outer != m_outer_end) {
       this->base_reference() = m_inner_begin_fn(*m_outer);
       seek_forward();
@@ -367,7 +367,7 @@ public:
     m_outer(outer),
     m_inner_begin_fn(inner_begin_fn),
     m_inner_end_fn(inner_end_fn)
-  { 
+  {
     this->base_reference() = inner;
   }
 
@@ -378,13 +378,13 @@ public:
 
 //! Helper functor, returns <code>t.end()</code>
 struct GetBegin {
-  template<class T> 
+  template<class T>
   auto operator()(T&& x) const -> decltype(std::forward<T>(x).begin()) { return std::forward<T>(x).begin(); }
 };
 
 //! Helper functor, returns <code>t.end()</code>
 struct GetEnd {
-  template<class T> 
+  template<class T>
   auto operator()(T&& x) const -> decltype(std::forward<T>(x).end()) { return std::forward<T>(x).end(); }
 };
 

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -82,7 +82,7 @@ protected:
   typedef internal::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
   typedef galois::InsertBag<NodeInfo> Nodes;
   typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
-  
+
   struct EdgeHolder {
     EdgeInfo* begin;
     EdgeInfo* end;
@@ -107,7 +107,7 @@ protected:
   struct makeGraphNode: public std::unary_function<NodeInfo&, NodeInfo*> {
     NodeInfo* operator()(NodeInfo& data) const { return &data; }
   };
-  
+
   struct dst_equals {
     NodeInfo* dst;
     dst_equals(NodeInfo* d): dst(d) { }
@@ -216,7 +216,7 @@ public:
   local_iterator local_begin() {
     return boost::make_transform_iterator(nodes.local_begin(), makeGraphNode());
   }
-  
+
   local_iterator local_end() {
     return boost::make_transform_iterator(nodes.local_end(), makeGraphNode());
   }
@@ -246,7 +246,7 @@ public:
   internal::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return internal::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
   }
-  
+
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
     // galois::runtime::checkWrite(MethodFlag::WRITE, true);
@@ -319,16 +319,16 @@ public:
     std::swap(*dst, *src->edgeEnd);
     src->edgeEnd->destroy();
   }
-  
+
   edge_iterator findEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE) {
     // galois::runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
-    return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
+    return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst));
   }
-  
+
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
-    
+
     if (UseNumaAlloc) {
       aux.allocateLocal(numNodes);
       this->outOfLineAllocateLocal(numNodes);
@@ -349,7 +349,7 @@ public:
       aux[id] = createNode(std::distance(graph.edge_begin(*ii), graph.edge_end(*ii)));
     }
   }
-  
+
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename EdgeInfo::value_type value_type;
     typedef LargeArray<FileEdgeTy> FED;

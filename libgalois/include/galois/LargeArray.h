@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -136,7 +136,7 @@ public:
     std::swap(lhs.allocated, rhs.allocated);
   }
 
-  
+
   const_reference at(difference_type x) const { return m_data[x]; }
   reference at(difference_type x) { return m_data[x]; }
   const_reference operator[](size_type x) const { return m_data[x]; }
@@ -147,14 +147,14 @@ public:
   const_iterator begin() const { return m_data; }
   iterator end() { return m_data + m_size; }
   const_iterator end() const { return m_data + m_size; }
-  
+
   //! Allocates interleaved across NUMA (memory) nodes.
   void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
 
   /**
-   * Allocates using default memory policy (usually first-touch) 
+   * Allocates using default memory policy (usually first-touch)
    *
-   * @param  n         number of elements to allocate 
+   * @param  n         number of elements to allocate
    * @param  prefault  Prefault/touch memory to place it local to the currently executing
    *                   thread. By default, true because concurrent page-faulting can be a
    *                   scalability bottleneck.
@@ -164,19 +164,19 @@ public:
   /**
    * Allocates using Thread Local memory policy
    *
-   * @param  n         number of elements to allocate 
+   * @param  n         number of elements to allocate
    */
   void allocateLocal(size_type n) { allocate(n, Local); }
 
   /**
    * Allocates using no memory policy (no pre alloc)
    *
-   * @param  n         number of elements to allocate 
+   * @param  n         number of elements to allocate
    */
   void allocateFloating(size_type n) { allocate(n, Floating); }
 
 
-  /** 
+  /**
    * Allocate memory to threads based on a provided array specifying which
    * threads receive which elements of data.
    *
@@ -187,7 +187,7 @@ public:
    * among threads
    */
   template<typename RangeArrayTy>
-  void allocateSpecified(size_type numberOfElements, 
+  void allocateSpecified(size_type numberOfElements,
                          RangeArrayTy& threadRanges) {
     assert(!m_data);
 
@@ -280,7 +280,7 @@ public:
   void allocateLocal(size_type n, bool prefault = true) { }
   void allocateFloating(size_type n) { }
   template<typename RangeArrayTy>
-  void allocateSpecified(size_type number_of_elements, 
+  void allocateSpecified(size_type number_of_elements,
                          RangeArrayTy threadRanges) { }
 
 
@@ -298,4 +298,3 @@ public:
 
 }
 #endif
-

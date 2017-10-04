@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -119,7 +119,7 @@ struct SimObjInfo: public TypeHelper {
     return ret;
   }
 
-  Event_ty getMin () const { 
+  Event_ty getMin () const {
     mutex.lock ();
        Event_ty ret = *pendingEvents.begin ();
     mutex.unlock ();
@@ -156,7 +156,7 @@ struct SimObjInfo: public TypeHelper {
 
   bool isReady (const Event_ty& event) const {
     // not ready if event has a timestamp greater than the latest event received
-    // on any input. 
+    // on any input.
     // an input with INFINITY_SIM_TIME is dead and will not receive more non-null events
     // in the future
     bool notReady = false;
@@ -197,7 +197,7 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
   return minPos;
 }
 
-class DESorderedHand: 
+class DESorderedHand:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
     typedef galois::PerThreadVector<Event_ty> WL_ty;
@@ -229,7 +229,7 @@ class DESorderedHand:
 
     typedef int tt_does_not_need_aborts;
     typedef char tt_does_not_need_push;
-    
+
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
@@ -350,7 +350,7 @@ protected:
     }
 
     std::cout << "Number of rounds = " << round << std::endl;
-    std::cout << "Number of iterations spent in finding ready events = " << 
+    std::cout << "Number of iterations spent in finding ready events = " <<
       findIter.reduce () << std::endl;
     std::cout << "Number of events processed = " << nevents.reduce () << std::endl;
     std::cout << "Average parallelism: " << double (nevents.reduce ())/ double (round) << std::endl;
@@ -364,7 +364,7 @@ protected:
 };
 
 
-class DESorderedHandNB: 
+class DESorderedHandNB:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   struct OpFuncEagerAdd {
@@ -399,9 +399,9 @@ class DESorderedHandNB:
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       SimObjInfo& recvInfo = sobjInfoVec[recvObj->getID ()];
 
-      graph.getData (recvInfo.node, galois::MethodFlag::WRITE); 
+      graph.getData (recvInfo.node, galois::MethodFlag::WRITE);
 
-      if (recvInfo.isReady (event) 
+      if (recvInfo.isReady (event)
           && recvInfo.isMin (event)) {
         nevents += 1;
         newEvents.get ().clear ();
@@ -486,7 +486,7 @@ protected:
 
       typedef galois::worklists::dChunkedFIFO<16> WL_ty;
 
-      galois::for_each(initWL.begin (), initWL.end (), 
+      galois::for_each(initWL.begin (), initWL.end (),
                        OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents),
                        galois::wl<WL_ty>());
 
@@ -500,13 +500,13 @@ protected:
       } else {
         initWL.push_back (minPos->getMin ());
       }
-          
+
     }
 
     std::cout << "Number of rounds = " << round << std::endl;
-    std::cout << "Number of iterations or attempts = " << 
+    std::cout << "Number of iterations or attempts = " <<
       niter.reduce () << std::endl;
-    std::cout << "Number of events processed= " << 
+    std::cout << "Number of events processed= " <<
       nevents.reduce () << std::endl;
   }
 

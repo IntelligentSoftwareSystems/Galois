@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -73,13 +73,13 @@ namespace internal {
 struct FreeNode {
   FreeNode* next;
 };
- 
+
 typedef galois::substrate::PtrLock<FreeNode> HeadPtr;
 typedef galois::substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
 template <typename _UNUSED=void>
-class PageAllocState {  
+class PageAllocState {
   std::deque<std::atomic<int>> counts;
   std::vector<HeadPtrStorage> pool;
   std::unordered_map<void*, int> ownerMap;
@@ -96,7 +96,7 @@ class PageAllocState {
   }
 
 public:
-  PageAllocState() { 
+  PageAllocState() {
     auto num = galois::substrate::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
@@ -115,7 +115,7 @@ public:
     HeadPtr& hp = pool[tid].data;
     if (hp.getValue()) {
       hp.lock();
-      FreeNode* h = hp.getValue(); 
+      FreeNode* h = hp.getValue();
       if (h) {
         hp.unlock_and_set(h->next);
         return h;

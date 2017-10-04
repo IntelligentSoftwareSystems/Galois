@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -62,10 +62,10 @@ class ConExtIterator: public boost::iterator_facade<
 
 public:
   ConExtIterator(): at(0) { }
-  
+
   template<typename OtherTy>
   ConExtIterator(const ConExtIterator<OtherTy>& o): at(o.at) { }
-  
+
   explicit ConExtIterator(T* x): at(x) { }
 };
 
@@ -73,7 +73,7 @@ template<typename T, bool concurrent>
 class ConExtLinkedStack {
   //fixme: deal with concurrent
   substrate::PtrLock<T> head;
-  
+
 public:
   typedef ConExtListNode<T> ListNode;
 
@@ -92,7 +92,7 @@ public:
   T* pop() {
     //lock free Fast path (empty)
     if (empty()) return 0;
-    
+
     //Disable CAS
     head.lock();
     T* C = head.getValue();
@@ -123,10 +123,10 @@ class ConExtLinkedQueue {
   //Fixme: deal with concurrent
   substrate::PtrLock<T> head;
   T* tail;
-  
+
 public:
   typedef ConExtListNode<T> ListNode;
-  
+
   ConExtLinkedQueue() :tail(0) { }
 
   bool empty() const {

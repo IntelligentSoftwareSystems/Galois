@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,11 +26,11 @@
  *
  * @section Description
  *
- * TODO 
+ * TODO
  *
  * @author <ahassaan@ices.utexas.edu>
  */
- 
+
 #ifndef GALOIS_RUNTIME_DAGEXEC_ALT_H
 #define GALOIS_RUNTIME_DAGEXEC_ALT_H
 
@@ -133,7 +133,7 @@ struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt, SharerWrapper>, Ctxt, 
     }
   }
 
-  template <typename CtxtCmp> 
+  template <typename CtxtCmp>
   void sortSharerSet (const CtxtCmp& cmp) {
     std::sort (wrapper.sharers.begin (), wrapper.sharers.end (), cmp);
     head = wrapper.sharers.begin ();
@@ -180,7 +180,7 @@ struct DAGcontext: public OrderedContextBase<T> {
   NhoodSet nhood;
 
 
-  explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
+  explicit DAGcontext (const T& t, NhoodMgr& nhmgr):
     OrderedContextBase<T> {t},
     onWL {false},
     nhmgr {nhmgr}
@@ -208,7 +208,7 @@ struct DAGcontext: public OrderedContextBase<T> {
   }
 
   bool isSrc (void) const {
-    
+
     if (nhood.empty ()) {
       // std::fprintf(stderr, "WARNING: isSrc() called with empty nhood\n");
       return true;
@@ -232,7 +232,7 @@ struct DAGcontext: public OrderedContextBase<T> {
 
       DAGcontext* min = (*i)->getMin ();
 
-      if (min != nullptr && 
+      if (min != nullptr &&
           !bool (min->onWL) &&
           min->isSrc () &&
           min->onWL.cas (false, true)) {
@@ -275,10 +275,10 @@ protected:
   AdjList outNeighbors;
 
 public:
-  explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
+  explicit DAGcontext (const T& t, NhoodMgr& nhmgr):
     SimpleRuntimeContext (true), // true to call subAcquire
     inDeg (0),
-    origInDeg (0), 
+    origInDeg (0),
     nhmgr (nhmgr),
     elem (t)
   {}
@@ -292,7 +292,7 @@ public:
     assert (NItem::getOwner (l) == &nitem);
 
     nitem.addSharer (this);
-    
+
   }
 
   //! returns true on success
@@ -307,7 +307,7 @@ public:
   }
 
   void finalizeAdj (void) {
-    for (auto i = adjSet.begin (), i_end = adjSet.end (); 
+    for (auto i = adjSet.begin (), i_end = adjSet.end ();
         i != i_end; ++i) {
 
       outNeighbors.push_back (*i);
@@ -392,8 +392,8 @@ protected:
 public:
 
   DAGexecutor (
-      const Cmp& cmp, 
-      const NhoodFunc& nhVisitor, 
+      const Cmp& cmp,
+      const NhoodFunc& nhVisitor,
       const OpFunc& opFunc)
     :
       cmp (cmp),
@@ -409,14 +409,14 @@ public:
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
-        }, 
+        },
         "free_ctx", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
 
   template <typename R>
   void initialize (const R& range) {
-    // 
+    //
     // 1. create contexts and expand neighborhoods and create graph nodes
     // 2. go over nhood items and create edges
     // 3. Find initial sources and run for_each
@@ -449,7 +449,7 @@ public:
         [this] (NItem* nitem) {
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
-        }, 
+        },
         "sort_sharers", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     galois::runtime::do_all_gen (galois::runtime::makeLocalRange (allCtxts),
@@ -458,7 +458,7 @@ public:
             ctxt->onWL = true;
             initSources.get ().push_back (ctxt);
           }
-        }, 
+        },
         "find-init-sources", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
@@ -480,9 +480,9 @@ public:
     galois::for_each(galois::iterate(initSources),
         ApplyOperator {*this}, galois::loopname {"apply_operator"}, galois::wl<SrcWL_ty>());
 
-    std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
+    std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n",
         numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
-    
+
     t_exec.stop ();
   }
 
@@ -495,7 +495,7 @@ public:
           nitem->reset();
         },
         "reset_dag", galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
-        
+
     t_reset.stop ();
   }
 
@@ -519,7 +519,7 @@ void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& 
 
   typedef typename R::value_type T;
   typedef Exp::DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
-  
+
   Exec_ty exec (cmp, nhVisitor, opFunc);
 
   exec.initialize (range);
@@ -535,4 +535,3 @@ void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& 
 
 
 #endif // GALOIS_RUNTIME_DAGEXEC_ALT_H
-

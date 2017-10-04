@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -74,8 +74,8 @@ enum GlobalPos {
 #ifdef ADAPTOR_BASED_OUTER_ITER
 
 template<typename PerThrdCont>
-struct WLindexer: 
-  public std::unary_function<unsigned, typename PerThrdCont::container_type&> 
+struct WLindexer:
+  public std::unary_function<unsigned, typename PerThrdCont::container_type&>
 {
   typedef typename PerThrdCont::container_type Ret_ty;
 
@@ -125,8 +125,8 @@ typename TypeFactory<PerThrdCont>::RvrsOuterIter make_outer_rend(PerThrdCont& wl
 
 template<typename PerThrdCont>
 class OuterPerThreadWLIter: public boost::iterator_facade<
-  OuterPerThreadWLIter<PerThrdCont>, 
-  typename PerThrdCont::container_type, 
+  OuterPerThreadWLIter<PerThrdCont>,
+  typename PerThrdCont::container_type,
   boost::random_access_traversal_tag> {
 
 
@@ -138,7 +138,7 @@ class OuterPerThreadWLIter: public boost::iterator_facade<
   friend class boost::iterator_core_access;
 
   PerThrdCont* workList;
-  // using Diff_ty due to reverse iterator, whose 
+  // using Diff_ty due to reverse iterator, whose
   // end is -1, and,  begin is numRows - 1
   Diff_ty row;
 
@@ -175,7 +175,7 @@ public:
     }
   }
 
-  container_type& dereference (void) const { 
+  container_type& dereference (void) const {
     return getWL ();
   }
 
@@ -218,14 +218,14 @@ OuterPerThreadWLIter<PerThrdCont> make_outer_end(PerThrdCont& wl) {
 }
 
 template<typename PerThrdCont>
-std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > 
+std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> >
 make_outer_rbegin(PerThrdCont& wl) {
   typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > Ret_ty;
   return Ret_ty(make_outer_end(wl));
 }
 
 template<typename PerThrdCont>
-std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > 
+std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> >
 make_outer_rend(PerThrdCont& wl) {
   typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > Ret_ty;
   return Ret_ty(make_outer_begin(wl));
@@ -233,10 +233,10 @@ make_outer_rend(PerThrdCont& wl) {
 
 #endif
 
-} // end namespace 
+} // end namespace
 
 
-template<typename Cont_tp> 
+template<typename Cont_tp>
 class PerThreadContainer {
 public:
   typedef Cont_tp container_type;
@@ -276,7 +276,7 @@ private:
   struct FakePTS {
     std::vector<container_type*> v;
 
-    FakePTS () { 
+    FakePTS () {
       v.resize (size ());
     }
 
@@ -318,7 +318,7 @@ protected:
     }
   }
 
-  ~PerThreadContainer() { 
+  ~PerThreadContainer() {
     clear_all_parallel ();
     destroy();
   }
@@ -339,21 +339,21 @@ public:
   const container_type& operator [](unsigned i) const { return get(i); }
 
 
-  global_iterator begin_all() { 
+  global_iterator begin_all() {
     return galois::stl_two_level_begin(
-        make_outer_begin(*this), make_outer_end(*this)); 
+        make_outer_begin(*this), make_outer_end(*this));
   }
 
-  global_iterator end_all() { 
+  global_iterator end_all() {
     return galois::stl_two_level_end(
-        make_outer_begin(*this), make_outer_end(*this)); 
+        make_outer_begin(*this), make_outer_end(*this));
   }
 
-  global_const_iterator begin_all() const { 
+  global_const_iterator begin_all() const {
     return cbegin_all ();
   }
 
-  global_const_iterator end_all() const { 
+  global_const_iterator end_all() const {
     return cend_all ();
   }
 
@@ -370,40 +370,40 @@ public:
 
   global_const_iterator cend () const { return cend_all (); }
 
-  global_const_iterator cbegin_all() const { 
+  global_const_iterator cbegin_all() const {
     return galois::stl_two_level_cbegin(
         make_outer_begin(*this), make_outer_end(*this));
   }
 
-  global_const_iterator cend_all() const { 
+  global_const_iterator cend_all() const {
     return galois::stl_two_level_cend(
         make_outer_begin(*this), make_outer_end(*this));
   }
 
-  global_reverse_iterator rbegin_all() { 
+  global_reverse_iterator rbegin_all() {
     return galois::stl_two_level_rbegin(
-        make_outer_rbegin(*this), make_outer_rend(*this)); 
+        make_outer_rbegin(*this), make_outer_rend(*this));
   }
 
-  global_reverse_iterator rend_all() { 
+  global_reverse_iterator rend_all() {
     return galois::stl_two_level_rend(
-        make_outer_rbegin(*this), make_outer_rend(*this)); 
+        make_outer_rbegin(*this), make_outer_rend(*this));
   }
 
-  global_const_reverse_iterator rbegin_all() const { 
+  global_const_reverse_iterator rbegin_all() const {
     return crbegin_all ();
   }
 
-  global_const_reverse_iterator rend_all() const { 
+  global_const_reverse_iterator rend_all() const {
     return crend_all ();
   }
 
-  global_const_reverse_iterator crbegin_all() const { 
+  global_const_reverse_iterator crbegin_all() const {
     return galois::stl_two_level_crbegin(
         make_outer_rbegin(*this), make_outer_rend(*this));
   }
 
-  global_const_reverse_iterator crend_all() const { 
+  global_const_reverse_iterator crend_all() const {
     return galois::stl_two_level_crend(
         make_outer_rbegin(*this), make_outer_rend(*this));
   }
@@ -434,7 +434,7 @@ public:
     return sz;
   }
 
-  // XXX: disabling because of per thread memory allocators 
+  // XXX: disabling because of per thread memory allocators
   // void clear_all() {
     // for (unsigned i = 0; i < perThrdCont.size(); ++i) {
       // get(i).clear();
@@ -502,7 +502,7 @@ public:
 
 
 template<typename T>
-class PerThreadDeque: 
+class PerThreadDeque:
   public PerThreadContainer<typename gstl::template Deque<T> > {
 
 public:
@@ -524,7 +524,7 @@ template <typename T, unsigned ChunkSize=64>
 class PerThreadGdeque: public PerThreadContainer<galois::gdeque<T, ChunkSize> > {
 
   using Super_ty = PerThreadContainer<galois::gdeque<T, ChunkSize> >;
-  
+
 public:
 
   PerThreadGdeque (): Super_ty () {
@@ -582,7 +582,7 @@ public:
 };
 
 template<typename T, typename C=std::less<T> >
-class PerThreadSet: 
+class PerThreadSet:
   public PerThreadContainer<typename gstl::template Set<T, C> > {
 
 public:

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -99,7 +99,7 @@ public:
       }
     }
   }
-    
+
   //! push a value onto the queue
   void push(value_type val) {
     wl.push(val);
@@ -214,7 +214,7 @@ public:
       file << "\n";
     }
   }
-    
+
   //! push a value onto the queue
   void push(value_type val) {
     wl.push(val);
@@ -251,7 +251,7 @@ class NoInlineFilter {
 
 public:
   typedef typename iWL::value_type value_type;
-  
+
   template<bool concurrent>
   using rethread = NoInlineFilter<typename iWL::template rethread<concurrent> >;
 

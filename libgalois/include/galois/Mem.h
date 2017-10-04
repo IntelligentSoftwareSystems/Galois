@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -49,7 +49,7 @@ using FixedSizeAllocator = galois::runtime::FixedSizeAllocator<Ty>;
 //! Scalable variable-sized allocator for T that allocates blocks of sizes in powers of 2
 //! Useful for small and medium sized allocations, e.g. small or medium vectors, strings, deques
 template<typename T>
-using Pow_2_VarSizeAlloc = typename runtime::Pow_2_BlockAllocator<T>; 
+using Pow_2_VarSizeAlloc = typename runtime::Pow_2_BlockAllocator<T>;
 
 }
 #endif

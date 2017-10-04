@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -47,7 +47,7 @@ namespace worklists {
 namespace internal {
 
 template<typename T, typename Index, bool UseBarrier>
-class OrderedByIntegerMetricData { 
+class OrderedByIntegerMetricData {
 protected:
   struct ThreadData { };
   bool hasStored(ThreadData&, Index) { return false; }
@@ -207,7 +207,7 @@ private:
     unsigned int numPops;
 
     ThreadData(Index initial) :
-      curIndex(initial), 
+      curIndex(initial),
       scanStart(initial),
       current(0), lastMasterVersion(0), numPops(0) { }
   };
@@ -245,7 +245,7 @@ private:
   galois::optional<T> slowPop(ThreadData& p) {
     bool localLeader = substrate::ThreadPool::isLeader();
     Index msS = this->identity;
-    
+
     updateLocal(p);
 
     if (BSP && !UseMonotonic) {
@@ -308,7 +308,7 @@ private:
   }
 
 public:
-  OrderedByIntegerMetric(const Indexer& x = Indexer()): 
+  OrderedByIntegerMetric(const Indexer& x = Indexer()):
     data(this->identity),
     masterVersion(0), indexer(x) { }
 
@@ -373,7 +373,7 @@ public:
 
     if (UseBarrier)
       return item;
-    
+
     // Slow path
     return slowPop(p);
   }
@@ -404,7 +404,7 @@ public:
     }
 
     this->barrier.wait();
-    
+
     p.current = C;
     p.curIndex = curIndex;
 

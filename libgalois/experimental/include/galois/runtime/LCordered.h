@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,7 +26,7 @@
  *
  * @section Description
  *
- * TODO 
+ * TODO
  *
  * @author <ahassaan@ices.utexas.edu>
  */
@@ -86,7 +86,7 @@ public:
   }
 
   Ctxt* getHighestPriority () const {
-    if (sharers.empty ()) { 
+    if (sharers.empty ()) {
       return NULL;
 
     } else {
@@ -100,7 +100,7 @@ public:
     assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
   }
 
-  void print () const { 
+  void print () const {
     // TODO
   }
 };
@@ -112,7 +112,7 @@ class LCorderedContext: public SimpleRuntimeContext {
 public:
   typedef T value_type;
   typedef LCorderedContext MyType;
-  typedef ContextComparator<MyType, Cmp> CtxtCmp; 
+  typedef ContextComparator<MyType, Cmp> CtxtCmp;
   typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef galois::GAtomic<bool> AtomicBool;
@@ -132,12 +132,12 @@ public:
 public:
 
   LCorderedContext (const T& active, NhoodMgr& nhmgr)
-    : 
+    :
       SimpleRuntimeContext (true), // to make acquire call virtual function sub_acquire
-      active (active), 
-      nhood (), 
-      nhmgr (nhmgr), 
-      onWL (false) 
+      active (active),
+      nhood (),
+      nhmgr (nhmgr),
+      onWL (false)
   {}
 
   const T& getActive () const { return active; }
@@ -152,7 +152,7 @@ public:
       nhood.push_back (&nitem);
       nitem.add (this);
     }
-    
+
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
@@ -186,7 +186,7 @@ public:
     std::stringstream ss;
 #if 0
     ss << "[" << this << ": " << active << "]";
-#endif 
+#endif
     return ss.str ();
   }
 
@@ -197,9 +197,9 @@ public:
         , endn = nhood.end (); n != endn; ++n) {
 
       LCorderedContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL) 
+      if ((highest != NULL)
           && !bool (highest->onWL)
-          && srcTest (highest) 
+          && srcTest (highest)
           && highest->onWL.cas (false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
@@ -216,9 +216,9 @@ public:
         , endn = nhood.end (); n != endn; ++n) {
 
       LCorderedContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL) 
+      if ((highest != NULL)
           && !bool (highest->onWL)
-          && srcTest (highest) 
+          && srcTest (highest)
           && highest->onWL.cas (false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
@@ -317,9 +317,9 @@ class LCorderedExec {
 
       galois::runtime::setThreadContext (ctxt);
       int tmp=0;
-      // TODO: nhoodVisitor should take only one arg, 
+      // TODO: nhoodVisitor should take only one arg,
       // 2nd arg being passed due to compatibility with Deterministic executor
-      nhoodVisitor (ctxt->active, tmp); 
+      nhoodVisitor (ctxt->active, tmp);
       galois::runtime::setThreadContext (NULL);
     }
 
@@ -331,11 +331,11 @@ class LCorderedExec {
     Accumulator& nsrc;
 
     FindInitSources (
-        const SourceTest& sourceTest, 
+        const SourceTest& sourceTest,
         CtxtWL& initSrc,
         Accumulator& nsrc)
-      : 
-        sourceTest (sourceTest), 
+      :
+        sourceTest (sourceTest),
         initSrc (initSrc),
         nsrc (nsrc)
     {}
@@ -394,7 +394,7 @@ class LCorderedExec {
         ctxtLocalQ (ctxtLocalQ),
         ctxtDelQ (ctxtDelQ),
         perThUserCtx (perThUserCtx),
-        niter (niter) 
+        niter (niter)
     {}
 
 
@@ -431,7 +431,7 @@ class LCorderedExec {
           userCtx.resetAlloc ();
         }
 
-        op (src->active, userCtx.data ()); 
+        op (src->active, userCtx.data ());
 
 
         if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
@@ -482,7 +482,7 @@ class LCorderedExec {
 
         Ctxt* c = ctxtDelQ.get ().front (); ctxtDelQ.get ().pop_front ();
         ctxtAlloc.destroy (c);
-        ctxtAlloc.deallocate (c, 1); 
+        ctxtAlloc.deallocate (c, 1);
       }
     }
 
@@ -538,7 +538,7 @@ public:
 
     t_create.start ();
     galois::runtime::do_all_gen(
-        range, 
+        range,
 				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt)
         std::make_tuple(
           galois::timeit(),
@@ -554,7 +554,7 @@ public:
     //       "find_initial_sources");
     t_find.stop ();
 
-    std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
+    std::cout << "Number of initial sources found: " << nInitSrc.reduce ()
       << std::endl;
 
     // AddWL addWL;
@@ -580,7 +580,7 @@ public:
           ctxtDelQ,
           perThUserCtx,
           niter),
-        galois::loopname("apply_operator"), 
+        galois::loopname("apply_operator"),
         galois::timeit(),
         galois::wl<SrcWL_ty>());
     t_for.stop ();

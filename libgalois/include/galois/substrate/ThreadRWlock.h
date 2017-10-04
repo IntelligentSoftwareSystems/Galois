@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,7 +26,7 @@
  *
  * @section Description
  *
- * TODO 
+ * TODO
  *
  * @author <ahassaan@ices.utexas.edu>
  */
@@ -76,9 +76,9 @@ public:
 
 //! readOrUpdate is a generic function to perform reads or writes using a rwmutex
 //! \param rwmutex is a read/write lock that implements readLock/readUnlock, writeLoack/writeUnlock
-//! \param readAndCheck is function object to execute when reading. It returns true only if read was successful. 
+//! \param readAndCheck is function object to execute when reading. It returns true only if read was successful.
 //! Should update state to store read result. Shouldn't use rwmutex internally
-//! \param write is function object to perform the write. It should update state to store result after writing. 
+//! \param write is function object to perform the write. It should update state to store result after writing.
 //! Shouldn't use rwmutex internally
 template <typename L, typename R, typename W>
 void readUpdateProtected(L& rwmutex, R& readAndCheck, W& write) {
@@ -95,7 +95,7 @@ void readUpdateProtected(L& rwmutex, R& readAndCheck, W& write) {
     rwmutex.readUnlock();
 
     rwmutex.writeLock(); {
-      // check again in case another thread made the write 
+      // check again in case another thread made the write
       if (!readAndCheck()) {
         write();
       }

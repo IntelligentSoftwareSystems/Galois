@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -86,8 +86,8 @@ protected:
   int type;
   bool deferred;
   volatile int incount;
-  
-  RuntimeTask(int t): type(t), deferred(false), incount(0) { 
+
+  RuntimeTask(int t): type(t), deferred(false), incount(0) {
     std::fill_n(out.begin(), out.size(), (RuntimeTask*) 0);
   }
 
@@ -97,13 +97,13 @@ public:
   void markDone() { --incount; assert(isDone()); }
   void incrementCount() { __sync_add_and_fetch(&incount, 1); }
   void markDeferred() { deferred = true; }
-  bool decrementCount() { 
+  bool decrementCount() {
     return __sync_sub_and_fetch(&incount, 1) == 0;
   }
 
   void abort() {
     // NB: only called on unpublished tasks
-    incount = -1; 
+    incount = -1;
   }
 
   template<typename HeapTy>
@@ -137,7 +137,7 @@ public:
       default: abort();
     }
   }
-  
+
   template<typename WorklistPipelineTy>
   void updateSuccessors(WorklistPipelineTy& wls) {
     for (OutType::iterator ii = out.begin(), ei = out.end(); ii != ei; ++ii) {
@@ -230,13 +230,13 @@ protected:
   galois::gdeque<GTask5Type,64> task5;
 
   BufType buf;
-  
+
   galois::IterAllocBaseTy IterationAllocatorBase;
   galois::PerIterAllocTy PerIterationAllocator;
   galois::runtime::FixedSizeHeap heap;
 
   UserTaskContext():
-    PerIterationAllocator(&IterationAllocatorBase), 
+    PerIterationAllocator(&IterationAllocatorBase),
     heap(sizeof(typename RuntimeTask::OutExtraType::block_type)) { }
 
 public:
@@ -257,7 +257,7 @@ public:
     buf.push_back(t);
     return t;
   }
-  
+
   void addDependence(UserTask* src, UserTask* dst) {
     // NB(ddn): only safe if rsrc is thread-local
     RuntimeTask* rsrc = static_cast<RuntimeTask*>(src);
@@ -295,7 +295,7 @@ class RuntimeTaskContext: public galois::TaskContext<PipelineTy> {
   template<typename TaskTy,typename DequeTy>
   void gc(DequeTy& deque) {
     if (!TaskTraits<TaskTy>::hasTask) return;
-    
+
     while (!deque.empty()) {
       RuntimeTask* t = &deque.back();
       if (!t->isDone()) break;
@@ -305,7 +305,7 @@ class RuntimeTaskContext: public galois::TaskContext<PipelineTy> {
 
     while (!deque.empty()) {
       RuntimeTask* t = &deque.front();
-      if (!t->isDone()) break; 
+      if (!t->isDone()) break;
       t->clear(this->heap);
       deque.pop_front();
     }
@@ -355,7 +355,7 @@ public:
   void commit(RuntimeTask* t, WorklistPipelineTy& wls) {
     t->markDone();
     t->updateSuccessors(wls);
-    
+
     for (typename SuperType::BufType::iterator ii = this->buf.begin(), ei = this->buf.end(); ii != ei; ++ii) {
       if ((*ii)->isReady())
         (*ii)->schedule(wls);
@@ -403,7 +403,7 @@ class Executor {
   typedef typename TaskTraits<typename PipelineTy::Task3Type>::GTaskType GTask3Type;
   typedef typename TaskTraits<typename PipelineTy::Task4Type>::GTaskType GTask4Type;
   typedef typename TaskTraits<typename PipelineTy::Task5Type>::GTaskType GTask5Type;
-  
+
   static const int chunkSize = 32;
   static const int workSize = chunkSize * 2;
 
@@ -412,7 +412,7 @@ class Executor {
     WorklistPipeline<PipelineTy> ins;
     SimpleRuntimeContext ctx;
     LoopStatistics<true> stat;
-    
+
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
@@ -457,7 +457,7 @@ class Executor {
 #else
     } catch (ConflictFlag const& flag) { clearConflictLock(); result = flag; }
 #endif
-    //FIXME:    clearReleasable(); 
+    //FIXME:    clearReleasable();
     switch (result) {
       case 0: break;
       case galois::runtime::CONFLICT:
@@ -499,7 +499,7 @@ class Executor {
   template<typename TaskTy,typename WLTy>
   void process(ThreadLocalData& tld, WLTy& wl, bool& didWork) {
     if (!TaskTraits<TaskTy>::hasTask) return;
-    if (TaskTraits<TaskTy>::needsAbort) { 
+    if (TaskTraits<TaskTy>::needsAbort) {
       processWithAborts<TaskTy>(tld, wl, didWork);
     } else {
       processSimple<TaskTy>(tld, wl, didWork);
@@ -507,7 +507,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(substrate::getSystemTermination(galois::getActiveThreads())), barrier(runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(substrate::getSystemTermination(galois::getActiveThreads())), barrier(runtime::getBarrier(galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) {
     barrier.reinit(galois::getActiveThreads());
   }
 
@@ -529,7 +529,7 @@ public:
       bool didWork;
       do {
         didWork = false;
-        
+
         // XXX FIFO versus LIFO etc scheduling measure in/out degrees
         for (int count = 0; count < 5; ++count) {
           switch (index) {
@@ -563,15 +563,15 @@ public:
         }
 
         //term.localTermination(didWork);
-        
+
         if ((++rounds & 7) == 0)
           tld.facing.gc();
 
       } while (didWork);
-      
+
       term.localTermination(didWork);
     } while (!term.globalTermination());
-    
+
     barrier.wait(); // XXX: certainly will need this if we have multiple wls
     tld.facing.clear();
   }
@@ -589,7 +589,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   typedef galois::runtime::Task::Executor<PipelineTy,IterTy> WorkTy;
 
   WorkTy W(b, e, loopname);
-  
+
   using namespace galois::runtime;
   substrate::getThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }

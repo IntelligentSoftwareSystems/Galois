@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -78,7 +78,7 @@ class DoAllStealingExec {
 
     // Stats
 
-    ThreadContext () 
+    ThreadContext ()
       :
         work_mutex (),
         id (substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
@@ -90,12 +90,12 @@ class DoAllStealingExec {
 
 
     ThreadContext (
-        unsigned id, 
+        unsigned id,
         Iter beg,
-        Iter end) 
-      : 
+        Iter end)
+      :
         work_mutex (),
-        id (id), 
+        id (id),
         shared_beg (beg),
         shared_end (end),
         m_size (std::distance (beg, end)),
@@ -268,7 +268,7 @@ public:
 
 
 private:
- 
+
   GALOIS_ATTRIBUTE_NOINLINE bool transferWork (ThreadContext& rich, ThreadContext& poor, StealAmt amount) {
 
     assert (rich.id != poor.id);
@@ -310,22 +310,22 @@ private:
     for (unsigned i = 1; i < pack_end; ++i) {
 
       // go around the package in circle starting from the next thread
-      unsigned t = (poor.id + i) % per_pack + pack_beg; 
+      unsigned t = (poor.id + i) % per_pack + pack_beg;
       assert ( (t >= pack_beg) && (t < pack_end));
 
-      if (t < maxT) { 
+      if (t < maxT) {
         if (workers.getRemote (t)->hasWorkWeak ()) {
           sawWork = true;
 
           stoleWork = transferWork (*workers.getRemote (t), poor, HALF);
 
-          if (stoleWork) { 
+          if (stoleWork) {
             break;
           }
         }
       }
     }
-    
+
     return sawWork || stoleWork;
   }
 
@@ -421,7 +421,7 @@ private:
     }
 
     ret = stealOutsidePackage (poor, HALF);
-    if (ret) { return true; } 
+    if (ret) { return true; }
     substrate::asmPause ();
 
 
@@ -429,16 +429,16 @@ private:
 
     // if (stealWithinPackage (poor)) {
       // return true;
-    // } else if (LL::isPackageLeader(poor.id) 
+    // } else if (LL::isPackageLeader(poor.id)
         // && stealOutsidePackage (poor)) {
       // return true;
     // } else if (stealOutsidePackage (poor)) {
       // return true;
-// 
+//
     // } else {
       // return false;
     // }
- 
+
 
     // if (stealWithinPackage (poor)) {
       // return true;
@@ -476,11 +476,11 @@ public:
 
   DoAllStealingExec (
       const R& _range,
-      const F& _func, 
+      const F& _func,
       const ArgsTuple& argsTuple)
-    : 
+    :
       range (_range),
-      func (_func), 
+      func (_func),
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
       chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
       term(substrate::getSystemTermination(activeThreads)),
@@ -526,7 +526,7 @@ public:
 
   void operator () (void) {
 
-    
+
     ThreadContext& ctx = *workers.getLocal ();
     totalTime.start ();
 
@@ -594,7 +594,7 @@ struct ChooseDoAllImpl {
 
     substrate::Barrier& barrier = getBarrier(activeThreads);
 
-    substrate::getThreadPool().run(activeThreads, 
+    substrate::getThreadPool().run(activeThreads,
         [&exec] (void) { exec.initThread (); },
         std::ref(barrier),
         std::ref(exec));
@@ -659,9 +659,9 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
   static_assert(!exists_by_supertype<char const *, ArgsTuple>::value, "old loopname");
   static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
 
-  auto argsT = std::tuple_cat (argsTuple, 
+  auto argsT = std::tuple_cat (argsTuple,
       get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, steal_tag{}), 
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}, steal_tag{}),
         std::make_tuple (loopname {}, chunk_size<> {}, steal<>{} )));
 
   using ArgsT = decltype(argsT);

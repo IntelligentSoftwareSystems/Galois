@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -36,7 +36,7 @@
 
 namespace galois {
 
-template <typename T, typename C=typename gstl::Vector<T> > 
+template <typename T, typename C=typename gstl::Vector<T> >
 class FlatSet {
 
   C vec;
@@ -49,14 +49,14 @@ public:
 
   using const_iterator = typename C::const_iterator;
 
-  FlatSet (const C& cont=C()): vec (cont) 
+  FlatSet (const C& cont=C()): vec (cont)
   {}
 
-  bool empty (void) const { 
+  bool empty (void) const {
     return vec.empty ();
   }
 
-  typename C::size_type size (void) const { 
+  typename C::size_type size (void) const {
     return vec.size ();
   }
 
@@ -90,7 +90,7 @@ public:
     assert (pos != vec.end ());
 
     if (pos != vec.end ()) {
-      auto last = vec.end (); 
+      auto last = vec.end ();
       --last;
 
       std::swap (*pos, *last);
@@ -100,7 +100,7 @@ public:
 
   }
 
-  typename C::const_iterator cbegin () const { 
+  typename C::const_iterator cbegin () const {
     return vec.cbegin ();
   }
 
@@ -112,7 +112,7 @@ public:
     return cbegin ();
   }
 
-  typename C::const_iterator end () const { 
+  typename C::const_iterator end () const {
     return cend ();
   }
 

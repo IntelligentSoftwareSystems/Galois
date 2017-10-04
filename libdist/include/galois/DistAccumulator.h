@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -164,12 +164,12 @@ public:
     galois::opencl::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
 #endif
   }
-   
+
   Ty read_local() {
     if (local_mdata == 0) local_mdata = mdata.reduce();
-    return local_mdata; 
+    return local_mdata;
   }
-   
+
   Ty read() {
     return global_mdata;
   }
@@ -182,7 +182,7 @@ public:
    * Reduce with a timer
    */
   Ty reduce(std::string runID = std::string()) {
-    std::string timer_str("REDUCE_DGACCUM_" + runID); 
+    std::string timer_str("REDUCE_DGACCUM_" + runID);
     galois::StatTimer reduceTimer(timer_str.c_str(), "DGReducible");
     reduceTimer.start();
 

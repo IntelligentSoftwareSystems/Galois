@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -227,7 +227,7 @@ public:
   iterator end() { return iterator(&heads, heads.size()); }
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
-  
+
   local_iterator local_begin() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID()); }
   local_iterator local_end() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1); }
 
@@ -260,7 +260,7 @@ public:
 
   /**
    * Pop the last element pushed by this thread. The number of consecutive
-   * pops supported without intevening pushes is implementation dependent. 
+   * pops supported without intevening pushes is implementation dependent.
    */
   void pop() {
     header* H = heads.getLocal()->second;

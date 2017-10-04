@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -40,7 +40,7 @@ template<typename NodeTy, typename EdgeTy, typename DerivedTy,
   typename GraphNodeTy, typename IteratorTy, typename EdgeIteratorTy,
   bool HasNoLockable = false>
 class LC_Adaptor_Graph:
-  private internal::OutOfLineLockableFeature<HasNoLockable>, 
+  private internal::OutOfLineLockableFeature<HasNoLockable>,
   private internal::LocalIteratorFeature<false> {
 public:
   //! If true, do not use abstract locks in graph
@@ -73,7 +73,7 @@ protected:
   size_t getId(GraphNode n) {
     return derived().get_id(n);
   }
-  
+
 public:
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     // galois::runtime::checkWrite(mflag, false);

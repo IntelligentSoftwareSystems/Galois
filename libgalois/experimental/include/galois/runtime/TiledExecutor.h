@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ class Fixed2DGraphTiledExecutor {
       return;
 
     p[dim] += delta;
-    
+
     while (p[dim] >= locks[dim].size())
       p[dim] -= locks[dim].size();
   }
@@ -159,7 +159,7 @@ class Fixed2DGraphTiledExecutor {
           edge_iterator edge = *jj.base();
           if (*jj > task.end1)
             break;
-            
+
           fn(*ii, *jj, edge);
           ++jj;
         }
@@ -196,7 +196,7 @@ class Fixed2DGraphTiledExecutor {
       executeLoopOrig<UseDense>(fn, tid, total);
   }
 
-  // bulk synchronous diagonals: static work assignment 
+  // bulk synchronous diagonals: static work assignment
   template<bool UseDense, typename Function>
   void executeLoopExp(Function fn, unsigned tid, unsigned total) {
     Point numBlocks { locks[0].size(), locks[1].size() };
@@ -261,7 +261,7 @@ class Fixed2DGraphTiledExecutor {
         nextPoint(p, dim, round);
         nextPoint(p, odim, index);
         nextPoint(p, dim, index);
-        
+
         Task *t = probeBlock(p, 0, 1);
         if (!t)
           continue;
@@ -291,7 +291,7 @@ class Fixed2DGraphTiledExecutor {
     if (useLocks)
       start = { { start[0], std::min(block[1] * LL::getPackageForThread(tid) * coresPerPackage, numBlocks[1] - 1) } };
 
-    Point p = start; 
+    Point p = start;
 
     for (int i = 0; ; ++i) {
       Task *t = nextBlock(p, i == 0);

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -80,14 +80,14 @@ struct InputGraphPartDAGexecutor {
     LocalWL* nextInnerWL = new LocalWL ();
     LocalWL* currBoundaryWL = new LocalWL ();
     LocalWL* nextBoundaryWL = new LocalWL ();
-    
+
     unsigned flips = 0;
 
-    PartMetaData (const unsigned id, const unsigned numPart) 
+    PartMetaData (const unsigned id, const unsigned numPart)
       : id (id), indegree (0), incomingWLs (numPart) {
 
     }
-    
+
     ~PartMetaData (void) {
       delete currInnerWL; currInnerWL = nullptr;
       delete nextInnerWL; nextInnerWL = nullptr;
@@ -167,7 +167,7 @@ struct InputGraphPartDAGexecutor {
     void push (GNode n) {
       exec.push (n, pusher);
     }
-    
+
   };
 
 
@@ -192,7 +192,7 @@ struct InputGraphPartDAGexecutor {
       func (func),
       dagManager (dagManager),
       loopname (loopname),
-      term(substrate::getSystemTermination(galois::getActiveThreads())), 
+      term(substrate::getSystemTermination(galois::getActiveThreads())),
       numPart (PARTITION_MULT_FACTOR * galois::getActiveThreads ())
   {
 
@@ -225,7 +225,7 @@ struct InputGraphPartDAGexecutor {
       }
     }
 
-   
+
 
     for (unsigned i = 0; i < numPart; ++i) {
       PartMetaData& p = partitions[i];
@@ -289,35 +289,35 @@ struct InputGraphPartDAGexecutor {
 
   // void push (GNode n, PartMetaData& pusher) {
     // auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
-// 
+//
     // assert (nd.partition != -1);
     // PartMetaData& owner = partitions[nd.partition];
-// 
+//
     // int expected = 0;
     // if (nd.onWL.cas (expected, 1)) {
-// 
+//
       // if (owner.id != pusher.id) {
         // // push remote
-        // 
+        //
         // GALOIS_ASSERT (nd.isBoundary);
-// 
+//
         // assert (pusher.id < owner.incomingWLs.size ());
         // owner.incomingWLs[pusher.id].push_back (n);
-// 
-// 
+//
+//
       // } else {
         // // push local
-// 
+//
         // if (nd.isBoundary) {
           // owner.currBoundaryWL.push_back (n);
-// 
+//
         // } else {
           // owner.currInnerWL.push_back (n);
         // }
       // }
-// 
+//
     // } // end if cas
-// 
+//
   // }
 
   template <typename R>
@@ -342,7 +342,7 @@ struct InputGraphPartDAGexecutor {
             } else {
               localContribInner [nd.partition].push_back (*i);
             }
-            
+
           }
 
           for (size_t i = 0; i < numPart; ++i) {
@@ -361,7 +361,7 @@ struct InputGraphPartDAGexecutor {
               for (const auto& n: localContribBoundary [i]) {
                 partitions [i].currBoundaryWL->push_back (n);
               }
-              
+
               partitions [i].mutex.unlock ();
             }
           }
@@ -379,7 +379,7 @@ struct InputGraphPartDAGexecutor {
 
     while (!workList.empty ()) {
       ++iter;
-      
+
       GNode n = workList.front ();
       workList.pop_front ();
 
@@ -393,7 +393,7 @@ struct InputGraphPartDAGexecutor {
 
   template <typename R>
   void execute (const R& range) {
-    // 1. partition 
+    // 1. partition
     // 2. create coarsened graph
     // 3. initialize the worklists for partitions
     // 4. work item is a partition, upon choosing a partition, a thread
@@ -417,7 +417,7 @@ struct InputGraphPartDAGexecutor {
     partitioner.initCoarseAdj (adjMatrix);
 
     initCoarseDAG ();
-    
+
     StatTimer texec ("InputGraphPartDAGexecutor execution time");
     texec.start ();
     fill_initial (range);
@@ -431,7 +431,7 @@ struct InputGraphPartDAGexecutor {
           // // block assignment
           // size_t beg = tid * PARTITION_MULT_FACTOR;
           // size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
-// 
+//
           // for (; beg < end; ++beg) {
             // w.myPartitions.push_back (&partitions[beg]);
           // }
@@ -443,14 +443,14 @@ struct InputGraphPartDAGexecutor {
 
 
 
-            
+
           term.initializeThread ();
         });
-    
+
 
     // TODO: (a) upon picking a partition, either process all worklists
-    // and then put it back or process them one at a time, by repeatedly picking the partition. 
-    // TODO: order of processing worklists? currInnerWL, local-boundary, external-boundary 
+    // and then put it back or process them one at a time, by repeatedly picking the partition.
+    // TODO: order of processing worklists? currInnerWL, local-boundary, external-boundary
     //
     // TODO: stealing candidates? none, within package only, first within package
     // and then outside
@@ -464,7 +464,7 @@ struct InputGraphPartDAGexecutor {
 
           while (true) {
 
-            bool workHappened = false; 
+            bool workHappened = false;
             PartMetaData* p = worker.takeOne ();
 
             if (p != nullptr) {
@@ -499,7 +499,7 @@ struct InputGraphPartDAGexecutor {
             if (quit) {
               break;
             }
-            
+
           }
 
           for (auto i = worker.myPartitions.begin ()
@@ -541,12 +541,12 @@ void for_each_det_input_part (const R& range, const F& func, G& graph, const cha
   typedef typename DAGmanagerInOut<G>::Manager  M;
   M dagManager {graph};
 
-  for_each_det_input_part (range, func, graph, 
+  for_each_det_input_part (range, func, graph,
       dagManager, loopname);
 
 }
 
-template <> 
+template <>
 struct ForEachDet_InputDAG<InputDAG_ExecTy::PART> {
 
   template <typename R, typename F, typename G>

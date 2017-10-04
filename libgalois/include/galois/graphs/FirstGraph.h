@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -94,7 +94,7 @@ struct UEdgeInfoBase<NTy, ETy, true> {
 template<typename NTy, typename ETy>
 struct UEdgeInfoBase<NTy, ETy, false> {
   typedef ETy& reference;
-  
+
   NTy* N;
   ETy* Ea;
 
@@ -168,14 +168,14 @@ struct EdgeFactory<void> {
  * A Graph.
  *
  * An example of use:
- * 
+ *
  * \code
  * struct Node {
  *   ... // Definition of node data
  * };
  *
  * typedef galois::graphs::FirstGraph<Node,int,true> Graph;
- * 
+ *
  * // Create graph
  * Graph g;
  * Node n1, n2;
@@ -250,7 +250,7 @@ private:
     T N2;
     first_eq_and_valid(T& n) :N2(n) {}
     template <typename T2>
-    bool operator()(const T2& ii) const { 
+    bool operator()(const T2& ii) const {
       return ii.first() == N2 && ii.first() && ii.first()->active;
     }
   };
@@ -273,15 +273,15 @@ private:
       return ii.first() < N2;
     }
   };
-  
+
   class gNode;
   struct gNodeTypes: public internal::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
     typedef internal::UEdgeInfoBase<gNode, EdgeTy, Directional&!InOut> EdgeInfo;
-    
+
     //! The storage type for edges
     typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
-    
+
     typedef typename EdgesTy::iterator iterator;
   };
 
@@ -296,10 +296,10 @@ private:
     typedef typename gNode::EdgeInfo EdgeInfo;
 
     bool active;
-    
+
     iterator begin() { return edges.begin(); }
     iterator end() { return edges.end();  }
-    
+
     void erase(iterator ii) {
       if (SortedNeighbors) {
         // For sorted case remove the element, moving following
@@ -313,17 +313,17 @@ private:
       }
     }
 
-    void erase(gNode* N, bool inEdge = false) { 
+    void erase(gNode* N, bool inEdge = false) {
       iterator ii = find(N, inEdge);
       if (ii != end())
-        edges.erase(ii); 
+        edges.erase(ii);
     }
 
     iterator find(gNode* N, bool inEdge = false) {
       iterator ii, ei = edges.end();
       if (SortedNeighbors) {
-        assert(std::is_sorted(edges.begin(), edges.end(), 
-                              [=] (const EdgeInfo& e1, const EdgeInfo& e2) 
+        assert(std::is_sorted(edges.begin(), edges.end(),
+                              [=] (const EdgeInfo& e1, const EdgeInfo& e2)
                                   { return e1.first() < e2.first(); }
                              )
               );
@@ -627,8 +627,8 @@ public:
     src->resizeEdges(size);
    }
 
-  /** 
-   * Adds an edge to graph, replacing existing value if edge already exists. 
+  /**
+   * Adds an edge to graph, replacing existing value if edge already exists.
    *
    * Ignore the edge data, let the caller use the returned iterator to set the
    * value if desired.  This frees us from dealing with the void edge data
@@ -683,8 +683,8 @@ public:
     assert(src);
     assert(dst);
     src->acquire(mflag);
-    assert(std::is_sorted(src->begin(), src->end(), 
-                          [=] (const typename gNode::EdgeInfo& e1, const typename gNode::EdgeInfo& e2) 
+    assert(std::is_sorted(src->begin(), src->end(),
+                          [=] (const typename gNode::EdgeInfo& e1, const typename gNode::EdgeInfo& e2)
                               { return e1.first() < e2.first(); }
                          )
           );
@@ -711,7 +711,7 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE, 
+  edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE,
                            typename std::enable_if<_Undirected>::type* = 0)
   {
     // incoming neighbors are the same as outgoing neighbors in undirected graphs
@@ -720,8 +720,8 @@ public:
 
   // Find if an incoming edge between src and dst exists for directed in-out graphs
   template<bool _DirectedInOut = (Directional && InOut)>
-  in_edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE, 
-                              typename std::enable_if<_DirectedInOut>::type* = 0) 
+  in_edge_iterator findInEdge(GraphNode src, GraphNode dst, galois::MethodFlag mflag = MethodFlag::WRITE,
+                              typename std::enable_if<_DirectedInOut>::type* = 0)
   {
     assert(src);
     assert(dst);
@@ -772,7 +772,7 @@ public:
     return GraphNode(ii->first());
   }
 
-  void sortEdgesByDst(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) { 
+  void sortEdgesByDst(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     acquire(N, mflag);
     typedef typename gNode::EdgeInfo EdgeInfo;
     std::sort(N->begin(), N->end(), [=] (const EdgeInfo& e1, const EdgeInfo& e2) { return e1.first() < e2.first(); } );
@@ -784,7 +784,7 @@ public:
 
   //// General Things ////
 
-  //! Returns an iterator to the neighbors of a node 
+  //! Returns an iterator to the neighbors of a node
   edge_iterator edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     N->acquire(mflag);
@@ -799,8 +799,8 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  in_edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
-                                 typename std::enable_if<!_Undirected>::type* = 0) 
+  in_edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+                                 typename std::enable_if<!_Undirected>::type* = 0)
   {
     assert(N);
     N->acquire(mflag);
@@ -815,13 +815,13 @@ public:
   }
 
   template<bool _Undirected = !Directional>
-  edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
-                              typename std::enable_if<_Undirected>::type* = 0) 
+  edge_iterator in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+                              typename std::enable_if<_Undirected>::type* = 0)
   {
     return edge_begin(N, mflag);
   }
 
-  //! Returns the end of the neighbor iterator 
+  //! Returns the end of the neighbor iterator
   edge_iterator edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
@@ -846,22 +846,22 @@ public:
                             typename std::enable_if<_Undirected>::type* = 0)
   {
     return edge_end(N, mflag);
-  } 
+  }
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
-                                                                typename std::enable_if<!_Undirected>::type* = 0) 
+  runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+                                                                typename std::enable_if<!_Undirected>::type* = 0)
   {
     return internal::make_no_deref_range(in_edge_begin(N, mflag), in_edge_end(N, mflag));
   }
 
   template<bool _Undirected = !Directional>
-  runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE, 
-                                                                typename std::enable_if<_Undirected>::type* = 0) 
+  runtime::iterable<NoDerefIterator<edge_iterator>> in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
+                                                                typename std::enable_if<_Undirected>::type* = 0)
   {
     return edges(N, mflag);
   }
@@ -888,7 +888,7 @@ public:
   iterator end() {
     return boost::make_transform_iterator(
            boost::make_filter_iterator(is_node(),
-				       nodes.end(), nodes.end()), 
+				       nodes.end(), nodes.end()),
 	   makeGraphNode());
   }
 
@@ -904,7 +904,7 @@ public:
   local_iterator local_end() {
     return boost::make_transform_iterator(
            boost::make_filter_iterator(is_node(),
-				       nodes.local_end(), nodes.local_end()), 
+				       nodes.local_end(), nodes.local_end()),
 	   makeGraphNode());
   }
 
@@ -921,7 +921,7 @@ public:
   }
 
 #ifdef AUX_MAP
-  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) { 
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
     aux.nodes.allocateInterleaved(numNodes);
   }

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -61,10 +61,10 @@ namespace graphs {
  * most robust way to specify them is through the with_XXX nested templates.
  *
  * An example of use:
- * 
+ *
  * \code
  * typedef galois::graphs::LC_CSR_Graph<int,int> Graph;
- * 
+ *
  * // Create graph
  * Graph g;
  * galois::graphs::readGraph(g, inputfile);
@@ -207,7 +207,7 @@ protected:
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
 
   template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn, 
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       typename std::enable_if<!_A1 || _A2>::type* = 0) {
     typedef LargeArray<FileEdgeTy> FED;
     if (EdgeData::has_value)
@@ -277,7 +277,7 @@ public:
         }
       }
     } else { // pftch_kind == _MM_HINT_T0
-      
+
       const unsigned l1_pftch_count = 4;
       // const unsigned prev_pftch_count = l1_pftch_count;
       // const unsigned l2_pftch_count = 4;
@@ -328,7 +328,7 @@ public:
           _mm_prefetch ((const char*) &nodeData[next], _MM_HINT_T0);
           ++p;
 
-        } 
+        }
       }
 
       GraphNode dst = edgeDst[i];
@@ -409,7 +409,7 @@ public:
       GraphNode dst = edgeDst[i];
       func (dst);
     }
-#endif // 
+#endif //
 
 
   }

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -95,7 +95,7 @@ private:
     alloc.construct(ptr);
     return ptr;
   }
-  
+
   void delChunk(Chunk* ptr) {
     alloc.destroy(ptr);
     alloc.deallocate(ptr, 1);
@@ -119,7 +119,7 @@ private:
 
     for (int i = id + 1; i < (int) Q.size(); ++i) {
       r = popChunkByID(i);
-      if (r) 
+      if (r)
 	return r;
     }
 
@@ -156,7 +156,7 @@ public:
       pushChunk(n.next);
     n.next = 0;
   }
-  
+
   /**
    * Construct an item on the worklist and return a pointer to its value.
    *
@@ -203,7 +203,7 @@ public:
   }
 
   /**
-   * Remove the value returned from peek() from the worklist. 
+   * Remove the value returned from peek() from the worklist.
    *
    * For internal runtime use.
    */

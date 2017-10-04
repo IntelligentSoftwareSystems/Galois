@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -26,11 +26,11 @@
  *
  * @section Description
  *
- * TODO 
+ * TODO
  *
  * @author <ahassaan@ices.utexas.edu>
  */
- 
+
 #ifndef GALOIS_RUNTIME_DAGEXEC_H
 #define GALOIS_RUNTIME_DAGEXEC_H
 
@@ -96,7 +96,7 @@ public:
     readers.push (ctxt);
   }
 
-  void addWriter (Ctxt* ctxt) { 
+  void addWriter (Ctxt* ctxt) {
     writers.push (ctxt);
   }
 
@@ -128,10 +128,10 @@ public:
   AdjSet adjSet;
 
 public:
-  explicit DAGcontextBase (const T& t, NhoodMgr& nhmgr): 
-    Base (t), 
+  explicit DAGcontextBase (const T& t, NhoodMgr& nhmgr):
+    Base (t),
     inDeg (0),
-    origInDeg (0), 
+    origInDeg (0),
     nhmgr (nhmgr),
     outDeg (0),
     outNeighbors (nullptr)
@@ -159,7 +159,7 @@ public:
       outNeighbors = allocator.allocate (outDeg);
 
       unsigned j = 0;
-      for (auto i = adjSet.begin (), i_end = adjSet.end (); 
+      for (auto i = adjSet.begin (), i_end = adjSet.end ();
           i != i_end; ++i) {
 
         outNeighbors[j++] = *i;
@@ -209,7 +209,7 @@ struct DAGcontext: public DAGcontextBase<T, DAGcontext<T>, DAGnhoodItem<DAGconte
   typedef typename Base::NhoodMgr NhoodMgr;
 
   explicit DAGcontext (const T& t, typename Base::NhoodMgr& nhmgr)
-    : Base (t, nhmgr) 
+    : Base (t, nhmgr)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -219,7 +219,7 @@ struct DAGcontext: public DAGcontextBase<T, DAGcontext<T>, DAGnhoodItem<DAGconte
     assert (NItem::getOwner (l) == &nitem);
 
     nitem.addSharer (this);
-    
+
   }
 };
 
@@ -232,7 +232,7 @@ struct DAGcontextRW: public DAGcontextBase<T, DAGcontextRW<T>, DAGnhoodItemRW<DA
   typedef typename Base::NhoodMgr NhoodMgr;
 
   explicit DAGcontextRW (const T& t, NhoodMgr& nhmgr)
-    : Base (t, nhmgr) 
+    : Base (t, nhmgr)
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -324,8 +324,8 @@ protected:
 public:
 
   DAGexecutorBase (
-      const Cmp& cmp, 
-      const NhoodFunc& nhVisitor, 
+      const Cmp& cmp,
+      const NhoodFunc& nhVisitor,
       const OpFunc& opFunc,
       const char* loopname)
     :
@@ -343,9 +343,9 @@ public:
           ctxt->reclaimAlloc (ctxtAdjAlloc);
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
-        }, 
+        },
         std::make_tuple (
-          galois::loopname ("free_ctx"), 
+          galois::loopname ("free_ctx"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
   }
 
@@ -353,9 +353,9 @@ public:
     assert (a != nullptr);
     assert (b != nullptr);
 
-    if (a == b) { 
+    if (a == b) {
       // no self edges
-      return; 
+      return;
     }
 
     // a < b ? a : b
@@ -372,7 +372,7 @@ public:
 
   template <typename R>
   void initialize (const R& range) {
-    // 
+    //
     // 1. create contexts and expand neighborhoods and create graph nodes
     // 2. go over nhood items and create edges
     // 3. Find initial sources and run for_each
@@ -399,7 +399,7 @@ public:
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
 
-        }, 
+        },
         std::make_tuple (
           galois::loopname ("create_ctxt"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
@@ -415,9 +415,9 @@ public:
           if (ctxt->isSrc ()) {
             initSources.get ().push_back (ctxt);
           }
-        }, 
+        },
         std::make_tuple (
-          galois::loopname ("finalize"), 
+          galois::loopname ("finalize"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
@@ -438,7 +438,7 @@ public:
     galois::for_each (galois::iterate(initSources),
         ApplyOperator {*this}, galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
 
-    // std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
+    // std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n",
         // numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
     t_exec.stop ();
   }
@@ -452,7 +452,7 @@ public:
           ctxt->reset();
         },
         std::make_tuple (
-          galois::loopname ("resetDAG"), 
+          galois::loopname ("resetDAG"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
     t_reset.stop ();
   }
@@ -469,28 +469,28 @@ public:
           numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
         },
         std::make_tuple (
-          galois::loopname ("dag_stats"), 
+          galois::loopname ("dag_stats"),
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
-    printf ("DAG created with %zd nodes, %zd edges\n", 
+    printf ("DAG created with %zd nodes, %zd edges\n",
         numNodes.reduceRO (), numEdges.reduceRO ());
   }
 
 };
 
-template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc> 
+template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
 struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext<T> > {
 
   typedef DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext<T> > Base;
   typedef typename Base::NItem NItem;
 
   DAGexecutor(
-      const Cmp& cmp, 
-      const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc, 
+      const Cmp& cmp,
+      const NhoodFunc& nhoodVisitor,
+      const OpFunc& opFunc,
       const char* loopname)
-    : 
-      Base (cmp, nhoodVisitor, opFunc, loopname) 
+    :
+      Base (cmp, nhoodVisitor, opFunc, loopname)
   {}
 
   virtual void createAllEdges (void) {
@@ -507,26 +507,26 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
               Base::createEdge (*i, *j);
             }
           }
-        }, 
+        },
         std::make_tuple (
-          galois::loopname ("create_ctxt_edges"), 
+          galois::loopname ("create_ctxt_edges"),
           galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 };
 
-template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc> 
+template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
 struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontextRW<T> > {
 
   typedef DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontextRW<T> > Base;
   typedef typename Base::NItem NItem;
 
   DAGexecutorRW (
-      const Cmp& cmp, 
-      const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc, 
+      const Cmp& cmp,
+      const NhoodFunc& nhoodVisitor,
+      const OpFunc& opFunc,
       const char* loopname)
-    : 
-      Base (cmp, nhoodVisitor, opFunc, loopname) 
+    :
+      Base (cmp, nhoodVisitor, opFunc, loopname)
   {}
 
   virtual void createAllEdges (void) {
@@ -549,9 +549,9 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
               Base::createEdge (*w, *r);
             }
           }
-        }, 
+        },
         std::make_tuple (
-          galois::loopname ("create_ctxt_edges"), 
+          galois::loopname ("create_ctxt_edges"),
           galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
   }
 
@@ -574,7 +574,7 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
   typedef typename R::value_type T;
   typedef DAGexecutorRW<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
   // typedef DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
-  
+
   Exec_ty exec (cmp, nhVisitor, opFunc, loopname);
 
   exec.initialize (range);
@@ -590,4 +590,3 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 
 
 #endif // GALOIS_RUNTIME_DAG_H
-

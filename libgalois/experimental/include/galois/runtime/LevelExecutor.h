@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -76,9 +76,9 @@ private:
   substrate::PerThreadStorage<CachedLevel> cachedLevels;
 
 public:
-  LevelMap (const KeyCmp& kcmp): 
-    rwmutex (), 
-    levelMap (kcmp) 
+  LevelMap (const KeyCmp& kcmp):
+    rwmutex (),
+    levelMap (kcmp)
   {
   }
 
@@ -116,7 +116,7 @@ public:
     if (currLevel == levelMap.end ()) {
       rwmutex.readUnlock (); // give up read lock to acquire write lock
 
-      rwmutex.writeLock (); 
+      rwmutex.writeLock ();
       // check again after locking
       if (levelMap.find (k) == levelMap.end ()) {
         WL_ty* wl = wlAlloc.allocate (1); // new WL_ty ();
@@ -250,10 +250,10 @@ public:
 #ifdef USE_LEVEL_CACHING
       *cachedLevels.getLocal() = currLevel;
 #endif
-      
+
     }
   }
-  
+
   void freeRemovedLevels () {
     while (!removedLevels.empty ()) {
       WL_ty* wl = removedLevels.front ();
@@ -268,19 +268,19 @@ public:
 
 #endif // USE_DENSE_LEVELS
 
-template <bool CanAbort> 
+template <bool CanAbort>
 struct InheritTraits {
   typedef char tt_does_not_need_push;
 };
 
-template <> 
+template <>
 struct InheritTraits<false> {
   typedef int tt_does_not_need_aborts;
   typedef char tt_does_not_need_push;
 };
 
 
-template <typename T, typename Key, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>   
+template <typename T, typename Key, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>
 class LevelExecutor {
 
   static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
@@ -316,7 +316,7 @@ class LevelExecutor {
         level_map (level_map),
         userHandles (userHandles)
     {}
-    
+
     template <typename C>
     void operator () (T& x, C&) {
 
@@ -329,7 +329,7 @@ class LevelExecutor {
       nhVisit (x, uhand);
       opFunc (x, uhand);
 
-      if (ForEachTraits<OpFunc>::NeedsPush) { 
+      if (ForEachTraits<OpFunc>::NeedsPush) {
         for (auto i = uhand.getPushBuffer ().begin ()
             , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
@@ -409,7 +409,7 @@ public:
     size_t totalWork = 0;
 
     while (true) {
-      
+
       if (isMasterThread ()) {
         level_map.freeRemovedLevels ();
         if (level_map.empty ()) {
@@ -484,13 +484,13 @@ namespace runtime {
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
 auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
-  -> decltype(std::declval<typename R::container_type>(), void()) 
+  -> decltype(std::declval<typename R::container_type>(), void())
 {
   for_each(range.get_container(), opFn, std::get<Is>(tpl)...);
 }
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
-auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...) 
+auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...)
   -> void
 {
   for_each(range.begin(), range.end(), opFn, std::get<Is>(tpl)...);
@@ -508,7 +508,7 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
   typedef typename worklists::OrderedByIntegerMetric<>
     ::template with_container<worklists::dChunkedFIFO<chunk_size>>::type
     ::template with_indexer<KeyFn>::type
-    ::template with_barrier<true>::type 
+    ::template with_barrier<true>::type
     ::template with_descending<is_greater>::type
     ::template with_monotonic<true>::type WL;
   auto args = std::tuple_cat(
@@ -518,12 +518,12 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
               galois::wl<WL>(keyFn)));
   for_each_ordered_level_(
       make_int_seq<std::tuple_size<decltype(args)>::value>(),
-      range, 
+      range,
       [&](value_type& x, UserContext<value_type>& ctx) {
         nhoodFn(x, ctx);
         opFn(x, ctx);
-      }, 
-      args, 
+      },
+      args,
       0);
 }
 

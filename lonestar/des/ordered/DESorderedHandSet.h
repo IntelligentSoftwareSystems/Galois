@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -62,7 +62,7 @@ typedef galois::GAtomicPadded<bool> AtomicBool_ty;
 static const bool DEBUG = false;
 
 struct SimObjInfo: public TypeHelper<> {
-  
+
 
   struct MarkedEvent {
     Event_ty event;
@@ -70,15 +70,15 @@ struct SimObjInfo: public TypeHelper<> {
     mutable bool flag;
 
     explicit MarkedEvent (const Event_ty& _event)
-      : event (_event), flag (false) 
+      : event (_event), flag (false)
     {}
 
     bool isMarked () const { return flag; }
 
     bool mark () const {
       // return flag.cas (false, true);
-      if (flag == false) { 
-        flag = true; 
+      if (flag == false) {
+        flag = true;
         return true;
 
       } else {
@@ -143,11 +143,11 @@ struct SimObjInfo: public TypeHelper<> {
 
   bool isReady (const Event_ty& event) const {
     // not ready if event has a timestamp greater than the latest event received
-    // on any input. 
+    // on any input.
     // an input with INFINITY_SIM_TIME is dead and will not receive more non-null events
     // in the future
     bool notReady = false;
-    if (event.getRecvTime () < clock) { 
+    if (event.getRecvTime () < clock) {
       return true;
 
     } else {
@@ -157,7 +157,7 @@ struct SimObjInfo: public TypeHelper<> {
       for (std::vector<Event_ty>::const_iterator e = lastInputEvents.begin ()
           , ende = lastInputEvents.end (); e != ende; ++e) {
 
-        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) && 
+        if ((e->getRecvTime () < des::INFINITY_SIM_TIME) &&
             (Cmp_ty::compare (event, *e) > 0)) {
           notReady = true;
           // break;
@@ -215,7 +215,7 @@ struct SimObjInfo: public TypeHelper<> {
 
 
   bool isSrc (const Event_ty& event) const {
-    return isReady(event)  
+    return isReady(event)
       && (event.getRecvTime() < des::INFINITY_SIM_TIME ? isMin (event) : true);
   }
 
@@ -256,13 +256,13 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 
 }
 
-class DESorderedHandSet: 
+class DESorderedHandSet:
   public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct OpFuncSet {
 
     typedef int tt_does_not_need_aborts;
-    
+
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
@@ -412,7 +412,7 @@ protected:
 
       typedef galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
-      galois::for_each(initWL.begin (), initWL.end (), 
+      galois::for_each(initWL.begin (), initWL.end (),
                        OpFuncSet (graph, sobjInfoVec, newEvents,  nevents),
                        galois::wl<WL_ty>());
 
@@ -426,11 +426,11 @@ protected:
       } else {
         initWL.push_back (p->getMin ());
       }
-          
+
     }
 
     std::cout << "Number of rounds = " << round << std::endl;
-    std::cout << "Number of events processed= " << 
+    std::cout << "Number of events processed= " <<
       nevents.reduce () << std::endl;
   }
 

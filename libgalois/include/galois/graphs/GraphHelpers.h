@@ -2,7 +2,7 @@
  * @file GraphHelpers.h
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -68,8 +68,8 @@ namespace internal {
 // Note: "inline" may be required if PrefixSumType is exactly the same type
 // in 2 different translation units; otherwise it should be fine
 template <typename PrefixSumType>
-size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight, 
-                          size_t targetWeight, uint64_t lb, uint64_t ub, 
+size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
+                          size_t targetWeight, uint64_t lb, uint64_t ub,
                           PrefixSumType& edgePrefixSum,
                           uint64_t edgeOffset, uint64_t nodeOffset) {
   assert(nodeWeight != 0 || edgeWeight != 0);
@@ -97,7 +97,7 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
 }
 
 /**
- * Given a number of divisions and a scale factor specifying how much of a 
+ * Given a number of divisions and a scale factor specifying how much of a
  * chunk of blocks each division should get, determine the total number
  * of blocks to split among all divisions + calculate the prefix sum and
  * save it in-place to the scaleFactor variable.
@@ -108,11 +108,11 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  * @returns The total number of blocks to split among all divisions
  */
 // inline required as GraphHelpers is included in multiple translation units
-uint32_t determine_block_division(uint32_t numDivisions, 
+uint32_t determine_block_division(uint32_t numDivisions,
                                   std::vector<unsigned>& scaleFactor);
 } // end namespace internal
 
-/** 
+/**
  * Returns 2 ranges (one for nodes, one for edges) for a particular division.
  * The ranges specify the nodes/edges that a division is responsible for. The
  * function attempts to split them evenly among threads given some kind of
@@ -130,7 +130,7 @@ uint32_t determine_block_division(uint32_t numDivisions,
  * @param id Division number you want the range for
  * @param total Total number of divisions to divide nodes among
  * @param edgePrefixSum Prefix sum of the edges in the graph
- * @param scaleFactor Vector specifying if certain divisions should get more 
+ * @param scaleFactor Vector specifying if certain divisions should get more
  * than other divisions
  * @param edgeOffset number of edges to subtract from numbers in edgePrefixSum
  * @param nodeOffset number of nodes to skip over when looking in the
@@ -146,7 +146,7 @@ uint32_t determine_block_division(uint32_t numDivisions,
 // in 2 different translation units; otherwise it should be fine
 // If inline is used, then apparently you cannot use typedefs, so get rid
 // of those if the need arises.
-template <typename PrefixSumType, typename NodeType = uint64_t> 
+template <typename PrefixSumType, typename NodeType = uint64_t>
 auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
                    size_t nodeWeight, size_t edgeWeight, size_t id,
                    size_t total, PrefixSumType& edgePrefixSum,
@@ -160,9 +160,9 @@ auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
 
   // numNodes = 0 corner case
   if (numNodes == 0) {
-    return GraphRange(NodeRange(iterator(0), 
-                                iterator(0)), 
-                      EdgeRange(edge_iterator(0), 
+    return GraphRange(NodeRange(iterator(0),
+                                iterator(0)),
+                      EdgeRange(edge_iterator(0),
                                 edge_iterator(0)));
   }
 
@@ -197,15 +197,15 @@ auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
   if (blockLower == 0) {
     nodesLower = 0;
   } else {
-    nodesLower = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                    blockWeight * blockLower, 0, numNodes, 
+    nodesLower = internal::findIndexPrefixSum(nodeWeight, edgeWeight,
+                                    blockWeight * blockLower, 0, numNodes,
                                     edgePrefixSum, edgeOffset, nodeOffset);
   }
 
   uint64_t nodesUpper;
-  nodesUpper = internal::findIndexPrefixSum(nodeWeight, edgeWeight, 
-                                  blockWeight * blockUpper, nodesLower, 
-                                  numNodes, edgePrefixSum, edgeOffset, 
+  nodesUpper = internal::findIndexPrefixSum(nodeWeight, edgeWeight,
+                                  blockWeight * blockUpper, nodesLower,
+                                  numNodes, edgePrefixSum, edgeOffset,
                                   nodeOffset);
 
   // get the edges bounds using node lower/upper bounds
@@ -222,9 +222,9 @@ auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
     edgesUpper = edgePrefixSum[nodesUpper - 1 + nodeOffset] - edgeOffset;
   }
 
-  return GraphRange(NodeRange(iterator(nodesLower), 
-                              iterator(nodesUpper)), 
-                    EdgeRange(edge_iterator(edgesLower), 
+  return GraphRange(NodeRange(iterator(nodesLower),
+                              iterator(nodesUpper)),
+                    EdgeRange(edge_iterator(edgesLower),
                               edge_iterator(edgesUpper)));
 }
 

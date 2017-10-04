@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -122,7 +122,7 @@ void do_all_coupled_bs (const R& initRange, const F& func, const char* loopname=
     case DOALL_EXPLICIT:
     default:
       std::abort();
-  } 
+  }
 }
 
 #if 0
@@ -181,7 +181,7 @@ void for_each_coupled_wake (const R& initRange, const F& func, const char* loopn
 
   substrate::getThreadPool ().beKind ();
 
-  delete curr; 
+  delete curr;
   delete next;
 }
 
@@ -219,7 +219,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
         std::swap (curr, next);
         exec.initThread( );
 
-        if (curr->size () == 0) { 
+        if (curr->size () == 0) {
           done = true;
         }
       }
@@ -242,7 +242,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   exec.init();
   galois::substrate::getThreadPool ().run (galois::getActiveThreads (), loop);
-  
+
   delete curr;
   delete next;
 }
@@ -263,7 +263,7 @@ void for_each_coupled_bs (const R& initRange, const F& func, const char* loopnam
 
     default:
       std::abort ();
-  } 
+  }
 }
 #endif
 

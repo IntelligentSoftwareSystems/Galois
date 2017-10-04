@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -47,9 +47,9 @@ namespace galois {
 namespace runtime {
 
 namespace internal {
-template <typename FunctionTy, typename ArgsTy> 
+template <typename FunctionTy, typename ArgsTy>
 inline void on_each_exec(FunctionTy& fn, const ArgsTy& argsTuple) {
-  
+
   static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
   const char* const loopname = get_by_supertype<loopname_tag>(argsTuple).value;

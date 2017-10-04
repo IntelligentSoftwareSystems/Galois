@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -40,7 +40,7 @@
 
 
 namespace galois {
-namespace runtime { 
+namespace runtime {
 
 template <typename T, typename Cmp>
 class SortedRangeWindowWL: private boost::noncopyable {
@@ -69,7 +69,7 @@ public:
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
-        }, 
+        },
         std::make_tuple (
         galois::loopname ("initfill"),
         galois::chunk_size<16> ()));
@@ -89,7 +89,7 @@ public:
 
   size_t initSize () const { return init_sz; }
 
-  bool empty () const { 
+  bool empty () const {
     bool e = true;
 
     for (unsigned i = 0; i < wlRange.size (); ++i) {
@@ -130,7 +130,7 @@ public:
   template <typename WL, typename Wrap>
   void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
-    if (origSize >= newSize) { 
+    if (origSize >= newSize) {
       return;
     }
 
@@ -174,7 +174,7 @@ public:
           [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal ());
 
-            for (size_t i = 0; (i < numPerThrd) 
+            for (size_t i = 0; (i < numPerThrd)
               && (r.first != r.second); ++r.first) {
 
               workList.get ().push_back (wrap (*(r.first)) );
@@ -182,7 +182,7 @@ public:
 
             }
 
-            for (; r.first != r.second 
+            for (; r.first != r.second
               && cmp (*(r.first), *windowLim); ++r.first) {
 
                 workList.get ().push_back (wrap (*(r.first)));
@@ -200,7 +200,7 @@ public:
 
 
   }
-    
+
 
   void push (const T& x) {
     GALOIS_DIE("not implemented for range based WindowWL");
@@ -209,7 +209,7 @@ public:
 
 };
 
-// TODO: add functionality to spill complete bag or range efficiently 
+// TODO: add functionality to spill complete bag or range efficiently
 //
 template <typename T, typename Cmp, typename PerThrdWL, typename Derived>
 class WindowWLbase: private boost::noncopyable {
@@ -235,7 +235,7 @@ public:
     galois::do_all_choice (range,
         [this] (const T& x) {
           push (x);
-        }, 
+        },
         std::make_tuple (
           galois::loopname ("initfill"),
           galois::chunk_size<16> ()));
@@ -283,7 +283,7 @@ public:
   template <typename WL, typename Wrap>
   void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
-    if (origSize >= newSize) { 
+    if (origSize >= newSize) {
       return;
     }
 
@@ -293,7 +293,7 @@ public:
 
     // part 1 of poll
     // windowLim is calculated by computing the max of max element pushed by each
-    // thread. In this case, the max element is the one pushed in last 
+    // thread. In this case, the max element is the one pushed in last
 
     substrate::PerThreadStorage<galois::optional<T> > perThrdLastPop;
 
@@ -336,12 +336,12 @@ public:
         }
       }
     }
- 
+
     // for (unsigned i = 0; i < numT; ++i) {
       // if (!workList[i].empty ()) {
         // const T& last = unwrap (workList[i].back ());
         // assert (&last != nullptr);
-// 
+//
         // if (windowLim == nullptr || cmp (*windowLim, last)) {
           // windowLim = &last;
         // }
@@ -352,10 +352,10 @@ public:
     // windowLim is the max of the min of each thread's
     // container,
     // every thread must select elements lesser than windowLim
-    // for processing, 
-    // in order to ensure that an element B from Thread i is not scheduled ahead 
+    // for processing,
+    // in order to ensure that an element B from Thread i is not scheduled ahead
     // of elment A from Thread j, such that A and B have a dependence
-    // and A < B. 
+    // and A < B.
 
     if (windowLim) {
 
@@ -392,7 +392,7 @@ public:
         }
       }
 
-      
+
     }
 
   }
@@ -407,7 +407,7 @@ class PQwindowWL: public WindowWLbase<T, Cmp, PerThreadMinHeap<T, Cmp>, PQwindow
   using PerThrdWL = galois::PerThreadMinHeap<T, Cmp>;
   using Base = WindowWLbase<T, Cmp, PerThrdWL, PQwindowWL>;
 
-  template <typename, typename, typename, typename> 
+  template <typename, typename, typename, typename>
   friend class WindowWLbase;
 
   const T& getTop (void) const {
@@ -448,7 +448,7 @@ class SetWindowWL: public WindowWLbase<T, Cmp, PerThreadSet<T, Cmp>, SetWindowWL
   using PerThrdWL = galois::PerThreadSet<T, Cmp>;
   using Base = WindowWLbase<T, Cmp, PerThrdWL, SetWindowWL>;
 
-  template <typename, typename, typename, typename> 
+  template <typename, typename, typename, typename>
   friend class WindowWLbase;
 
   const T& getTop (void) const {
@@ -480,7 +480,7 @@ public:
 
 };
 
-template <typename T, typename Cmp> 
+template <typename T, typename Cmp>
 class PartialPQbasedWindowWL {
 
   using PerThrdWL = substrate::PerThreadStorage<TreeBasedPartialPQ<T, Cmp> >;
@@ -540,13 +540,13 @@ public:
         }
       }
     }
-    
+
   }
 
   void push (const T& x) {
     assert (false && "not implemented yet");
   }
-  
+
 };
 
 
@@ -555,4 +555,3 @@ public:
 
 
 #endif // GALOIS_RUNTIME_WINDOW_WORKLIST_H
-

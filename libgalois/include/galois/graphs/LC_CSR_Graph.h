@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -45,7 +45,7 @@
 namespace galois {
 namespace graphs {
 /**
- * Local computation graph (i.e., graph structure does not change). The data 
+ * Local computation graph (i.e., graph structure does not change). The data
  * representation is the traditional compressed-sparse-row (CSR) format.
  *
  * The position of template parameters may change between Galois releases; the
@@ -78,13 +78,13 @@ class LC_CSR_Graph :
   struct with_id { typedef LC_CSR_Graph type; };
 
   template<typename _node_data>
-  struct with_node_data { 
+  struct with_node_data {
     typedef LC_CSR_Graph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type;
   };
 
   template<typename _edge_data>
-  struct with_edge_data { 
-    typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; 
+  struct with_edge_data {
+    typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type;
   };
 
   template<typename _file_edge_data>
@@ -141,12 +141,12 @@ class LC_CSR_Graph :
   // used to track division of nodes among threads; for numa aware allocation
   // + division of work among threads during do_all
   std::vector<uint32_t> threadRanges;
-  // used to track division of edges among threads; mainly for numa aware 
+  // used to track division of edges among threads; mainly for numa aware
   // allocation of edges
   std::vector<uint64_t> threadRangesEdge;
 
   typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
- 
+
   edge_iterator raw_begin(GraphNode N) const {
     return edge_iterator((N == 0) ? 0 : edgeIndData[N-1]);
   }
@@ -177,7 +177,7 @@ class LC_CSR_Graph :
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
 
   template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn, 
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
       typename std::enable_if<!_A1 || _A2>::type* = 0) {
     typedef LargeArray<FileEdgeTy> FED;
     if (EdgeData::has_value)
@@ -211,10 +211,10 @@ class LC_CSR_Graph :
    * ONLY USE IF GRAPH HAS BEEN LOADED
    *
    * @param n Index into edge prefix sum
-   * @returns The value that would be located at index n in an edge prefix sum 
+   * @returns The value that would be located at index n in an edge prefix sum
    * array
    */
-  uint64_t operator[](uint64_t n) { 
+  uint64_t operator[](uint64_t n) {
     return *(edge_end(n));
   }
 
@@ -278,8 +278,8 @@ class LC_CSR_Graph :
     std::swap(lhs.numNodes, rhs.numNodes);
     std::swap(lhs.numEdges, rhs.numEdges);
   }
-  
-  node_data_reference getData(GraphNode N, 
+
+  node_data_reference getData(GraphNode N,
                               MethodFlag mflag = MethodFlag::WRITE) {
     // galois::runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
@@ -287,7 +287,7 @@ class LC_CSR_Graph :
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, 
+  edge_data_reference getEdgeData(edge_iterator ni,
                                   MethodFlag mflag = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return edgeData[*ni];
@@ -303,20 +303,20 @@ class LC_CSR_Graph :
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }
 
-  const_local_iterator local_begin() const { 
+  const_local_iterator local_begin() const {
     return const_local_iterator(this->localBegin(numNodes));
   }
 
-  const_local_iterator local_end() const { 
+  const_local_iterator local_end() const {
     return const_local_iterator(this->localEnd(numNodes));
   }
 
-  local_iterator local_begin() { 
+  local_iterator local_begin() {
     return local_iterator(this->localBegin(numNodes));
   }
 
-  local_iterator local_end() { 
-    return local_iterator(this->localEnd(numNodes)); 
+  local_iterator local_end() {
+    return local_iterator(this->localEnd(numNodes));
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
@@ -335,25 +335,25 @@ class LC_CSR_Graph :
   }
 
   edge_iterator findEdge(GraphNode N1, GraphNode N2) {
-    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) { 
-      return getEdgeDst(e) == N2; 
+    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) {
+      return getEdgeDst(e) == N2;
     });
   }
 
   edge_iterator findEdgeSortedByDst(GraphNode N1, GraphNode N2) {
-    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2, 
-                [=] (edge_iterator e, GraphNode N) { 
-                  return getEdgeDst(e) < N; 
+    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2,
+                [=] (edge_iterator e, GraphNode N) {
+                  return getEdgeDst(e) < N;
                 });
     return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, 
+  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N,
       MethodFlag mflag = MethodFlag::WRITE) {
     return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, 
+  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N,
       MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
@@ -362,20 +362,20 @@ class LC_CSR_Graph :
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
   template<typename CompTy>
-  void sortEdgesByEdgeData(GraphNode N, 
-                           const CompTy& comp = std::less<EdgeTy>(), 
+  void sortEdgesByEdgeData(GraphNode N,
+                           const CompTy& comp = std::less<EdgeTy>(),
                            MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), 
+    std::sort(edge_sort_begin(N), edge_sort_end(N),
               internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
 
   /**
-   * Sorts outgoing edges of a node. 
+   * Sorts outgoing edges of a node.
    * Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp, 
+  void sortEdges(GraphNode N, const CompTy& comp,
                  MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
@@ -387,15 +387,15 @@ class LC_CSR_Graph :
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
-    std::sort(edge_sort_begin(N), edge_sort_end(N), 
-      [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { 
-        return e1.dst < e2.dst; 
+    std::sort(edge_sort_begin(N), edge_sort_end(N),
+      [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) {
+        return e1.dst < e2.dst;
       }
     );
   }
 
   /**
-   * Sorts all outgoing edges of all nodes in parallel. Comparison is over 
+   * Sorts all outgoing edges of all nodes in parallel. Comparison is over
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
@@ -410,7 +410,7 @@ class LC_CSR_Graph :
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
 
-  /** 
+  /**
    * Returns 2 ranges (one for nodes, one for edges) for a particular division.
    * The ranges specify the nodes/edges that a division is responsible for. The
    * function attempts to split them evenly among threads given some kind of
@@ -423,15 +423,15 @@ class LC_CSR_Graph :
    * @param edgePrefixSum a prefix sum of edges of the graph
    */
   template <typename VectorTy>
-  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
+  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id,
                     size_t total, VectorTy& edgePrefixSum)
       -> GraphRange {
-    return 
+    return
       galois::graphs::divideNodesBinarySearch<VectorTy, uint32_t>(
         numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
   }
 
-  /** 
+  /**
    * Returns 2 ranges (one for nodes, one for edges) for a particular division.
    * The ranges specify the nodes/edges that a division is responsible for. The
    * function attempts to split them evenly among threads given some kind of
@@ -456,12 +456,12 @@ class LC_CSR_Graph :
    * @param edgeOffset Offset to the first edge in the range you want
    * to divide up
    */
-  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id, 
+  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id,
                     size_t total, uint32_t nodesInRange, uint64_t edgesInRange,
                     uint32_t nodeOffset, uint64_t edgeOffset)
       -> GraphRange {
     std::vector<unsigned int> dummyScaleFactor;
-    return 
+    return
       galois::graphs::divideNodesBinarySearch<LC_CSR_Graph, uint32_t>(
         nodesInRange, edgesInRange, nodeWeight, edgeWeight, id, total, *this,
         dummyScaleFactor, edgeOffset, nodeOffset);
@@ -469,8 +469,8 @@ class LC_CSR_Graph :
 
   /**
    * Returns the thread ranges array that specifies division of nodes among
-   * threads 
-   * 
+   * threads
+   *
    * @returns An array of uint32_t that specifies which thread gets which nodes.
    */
   const uint32_t* getThreadRanges() const {
@@ -480,9 +480,9 @@ class LC_CSR_Graph :
 
   /**
    * Returns the thread ranges vector that specifies division of nodes among
-   * threads 
-   * 
-   * @returns An vector of uint32_t that specifies which thread gets which 
+   * threads
+   *
+   * @returns An vector of uint32_t that specifies which thread gets which
    * nodes.
    */
   std::vector<uint32_t>& getThreadRangesVector() {
@@ -491,7 +491,7 @@ class LC_CSR_Graph :
 
   /**
    * Helper function used by determineThreadRanges that consists of the main
-   * loop over all threads and calls to divide by node to determine the 
+   * loop over all threads and calls to divide by node to determine the
    * division of nodes to threads.
    *
    * Saves the ranges to an argument vector provided by the caller.
@@ -502,8 +502,8 @@ class LC_CSR_Graph :
    * @param nodeAlpha The higher the number, the more weight nodes have in
    * determining division of nodes (edges have weight 1).
    */
-  void determineThreadRangesThreadLoop(uint32_t beginNode, uint32_t endNode, 
-                                     std::vector<uint32_t>& returnRanges, 
+  void determineThreadRangesThreadLoop(uint32_t beginNode, uint32_t endNode,
+                                     std::vector<uint32_t>& returnRanges,
                                      uint32_t nodeAlpha) {
     uint32_t numNodesInRange = endNode - beginNode;
     uint64_t numEdgesInRange = edge_begin(endNode) - edge_begin(beginNode);
@@ -531,9 +531,9 @@ class LC_CSR_Graph :
         returnRanges[i + 1] = returnRanges[i];
       }
 
-      galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i], 
+      galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i],
                      " to ", returnRanges[i+1], ", num edges is ",
-                     edge_begin(returnRanges[i + 1]) - 
+                     edge_begin(returnRanges[i + 1]) -
                          edge_begin(returnRanges[i]));
     }
   }
@@ -547,15 +547,15 @@ class LC_CSR_Graph :
    *
    * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
    * the graph is already constructed.
-   * 
+   *
    * @param beginNode Beginning of range
    * @param endNode End of range, non-inclusive
    * @param returnRanges Vector to store thread offsets for ranges in
    * @param nodeAlpha The higher the number, the more weight nodes have in
    * determining division of nodes (edges have weight 1).
    */
-  void determineThreadRanges(uint32_t beginNode, uint32_t endNode, 
-                             std::vector<uint32_t>& returnRanges, 
+  void determineThreadRanges(uint32_t beginNode, uint32_t endNode,
+                             std::vector<uint32_t>& returnRanges,
                              uint32_t nodeAlpha=0) {
     uint32_t numThreads = galois::runtime::activeThreads;
     uint32_t total_nodes = endNode - beginNode;
@@ -598,9 +598,9 @@ class LC_CSR_Graph :
 
     #ifndef NDEBUG
     // sanity checks
-    assert(returnRanges[0] == beginNode && 
+    assert(returnRanges[0] == beginNode &&
            "return ranges begin not the begin node");
-    assert(returnRanges[numThreads] == endNode && 
+    assert(returnRanges[numThreads] == endNode &&
            "return ranges end not end node");
 
     for (uint32_t i = 1; i < numThreads; i++) {
@@ -611,7 +611,7 @@ class LC_CSR_Graph :
   }
 
   /**
-   * Uses the divideByNode function (which is binary search based) to 
+   * Uses the divideByNode function (which is binary search based) to
    * divide nodes/edges among threads.
    *
    * @param edgePrefixSum A prefix sum of edges
@@ -662,9 +662,9 @@ class LC_CSR_Graph :
         threadRangesEdge[i + 1] = threadRangesEdge[i];
       }
 
-      galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ", 
+      galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ",
                      threadRanges[i+1]);
-      galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ", 
+      galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ",
                      threadRangesEdge[i+1]);
     }
   }
@@ -724,7 +724,7 @@ class LC_CSR_Graph :
    * @param nEdges Number to allocate for edge data
    * @param edgePrefixSum Vector with prefix sum of edges.
    */
-  void allocateFromByNode(uint32_t nNodes, uint64_t nEdges, 
+  void allocateFromByNode(uint32_t nNodes, uint64_t nEdges,
                           std::vector<uint64_t> edgePrefixSum) {
     numNodes = nNodes;
     numEdges = nEdges;
@@ -753,13 +753,13 @@ class LC_CSR_Graph :
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
-                   }, 
-                   galois::loopname("CONSTRUCT_NODES"), 
+                   },
+                   galois::loopname("CONSTRUCT_NODES"),
                    galois::no_stats());
 #endif
   }
 
-  void constructEdge(uint64_t e, uint32_t dst, 
+  void constructEdge(uint64_t e, uint32_t dst,
                      const typename EdgeData::value_type& val) {
     edgeData.set(e, val);
     edgeDst[e] = dst;
@@ -773,7 +773,7 @@ class LC_CSR_Graph :
     edgeIndData[n] = e;
   }
 
-  /** 
+  /**
    * Perform an in-memory transpose of the graph, replacing the original
    * CSR to CSC
    */
@@ -794,13 +794,13 @@ class LC_CSR_Graph :
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData_old[n] = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
-                   }, 
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"), 
+                   },
+                   galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"),
                    galois::no_stats());
 
     // parallelization makes this slower
-    // get destination of edge, copy to array, and  
-    for (uint64_t e = 0; e < numEdges; ++e) { 
+    // get destination of edge, copy to array, and
+    for (uint64_t e = 0; e < numEdges; ++e) {
         auto dst = edgeDst[e];
         edgeDst_old[e] = dst;
         // counting outgoing edges in the tranpose graph by
@@ -832,8 +832,8 @@ class LC_CSR_Graph :
     // copy over the new tranposed edge index data
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
-                   }, 
-                   galois::loopname("TRANSPOSE_EDGEINTDATA_SET"), 
+                   },
+                   galois::loopname("TRANSPOSE_EDGEINTDATA_SET"),
                    galois::no_stats());
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
@@ -842,8 +842,8 @@ class LC_CSR_Graph :
       edgeIndData_temp[0] = 0;
       galois::do_all(galois::iterate(1ul, numNodes), [&](uint32_t n) {
                        edgeIndData_temp[n] = edgeIndData[n-1];
-                     }, 
-                     galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"), 
+                     },
+                     galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"),
                      galois::no_stats());
     }
 
@@ -854,12 +854,12 @@ class LC_CSR_Graph :
     }
 
     // parallelization makes this slower
-    for (uint32_t src = 0; src < numNodes; ++src) { 
+    for (uint32_t src = 0; src < numNodes; ++src) {
       // e = start index into edge array for a particular node
       uint64_t e;
-      if (src == 0) 
+      if (src == 0)
         e = 0;
-      else 
+      else
         e = edgeIndData_old[src - 1];
 
       // get all outgoing edges of a particular node in the non-transpose and
@@ -888,8 +888,8 @@ class LC_CSR_Graph :
       galois::do_all(galois::iterate(0ul, numEdges),
                      [&](uint32_t e){
                        edgeDataCopy(edgeData, edgeData_new, e, e);
-                     }, 
-                     galois::loopname("TRANSPOSE_EDGEDATA_SET"), 
+                     },
+                     galois::loopname("TRANSPOSE_EDGEDATA_SET"),
                      galois::no_stats());
     }
 
@@ -897,15 +897,15 @@ class LC_CSR_Graph :
   }
 
   template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, 
-                    uint64_t e_new, uint64_t e, 
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData,
+                    uint64_t e_new, uint64_t e,
                     typename std::enable_if<is_non_void>::type* = 0) {
     edgeData_new[e_new] = edgeData[e];
   }
 
   template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData, 
-                    uint64_t e_new, uint64_t e, 
+  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData,
+                    uint64_t e_new, uint64_t e,
                     typename std::enable_if<!is_non_void>::type* = 0) {
     // does nothing
   }
@@ -914,7 +914,7 @@ class LC_CSR_Graph :
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     // at this point memory should already be allocated
     auto r = graph.divideByNode(
-        NodeData::size_of::value + EdgeIndData::size_of::value + 
+        NodeData::size_of::value + EdgeIndData::size_of::value +
         LC_CSR_Graph::size_of_out_of_line::value,
         EdgeDst::size_of::value + EdgeData::size_of::value,
         tid, total).first;
@@ -927,8 +927,8 @@ class LC_CSR_Graph :
 
       this->outOfLineConstructAt(*ii);
 
-      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), 
-                                    en = graph.edge_end(*ii); 
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii),
+                                    en = graph.edge_end(*ii);
            nn != en;
            ++nn) {
         constructEdgeValue(graph, nn);

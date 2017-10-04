@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a framework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -191,7 +191,7 @@ protected:
     assert(!container.empty());
     return container.front();
   }
-  
+
   value_type pop_internal() {
     assert(!container.empty());
     std::pop_heap(container.begin(), container.end(), revCmp);
@@ -213,7 +213,7 @@ public:
   {
     std::make_heap(container.begin(), container.end());
   }
-  
+
   bool empty() const {
     return container.empty();
   }
@@ -222,7 +222,7 @@ public:
    return container.size();
   }
 
-  const_reference top() const { 
+  const_reference top() const {
     return container.front();
   }
 
@@ -248,7 +248,7 @@ public:
       pop();
       ret = true;
     } else {
-      typename container_type::iterator nend = 
+      typename container_type::iterator nend =
         std::remove(container.begin(), container.end(), x);
 
       ret = (nend != container.end());
@@ -264,7 +264,7 @@ public:
     return (std::find(begin(), end(), x) != end());
   }
 
-  void clear () { 
+  void clear () {
     container.clear ();
   }
 
@@ -309,8 +309,8 @@ public:
   ThreadSafeMinHeap(Iter b, Iter e, const Cmp& cmp=Cmp())
     : heap(b, e, cmp)
   {}
-  
-  
+
+
   bool empty() const {
     mutex.lock();
     bool ret = heap.empty();
@@ -328,7 +328,7 @@ public:
   }
 
   // can't return a reference, because the reference may not be pointing
-  // to a valid location due to vector doubling in size and moving to 
+  // to a valid location due to vector doubling in size and moving to
   // another memory location
   value_type top() const {
     mutex.lock();
@@ -368,7 +368,7 @@ public:
     return ret;
   }
 
-  void clear () { 
+  void clear () {
     mutex.lock ();
     heap.clear ();
     mutex.unlock ();
