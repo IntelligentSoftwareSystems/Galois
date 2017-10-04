@@ -740,6 +740,18 @@ public:
   }
 
   /**
+   * Returns an iterable object over the edges of a particular node in the
+   * graph.
+   *
+   * @param N node to get edges iterator over
+   */
+  inline galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>> 
+      edges(GraphNode N) {
+    return galois::graphs::internal::make_no_deref_range(edge_begin(N), 
+                                                         edge_end(N));
+  }
+
+  /**
    * Gets number of nodes on this (local) graph.
    *
    * @returns number of nodes present in this (local) graph
