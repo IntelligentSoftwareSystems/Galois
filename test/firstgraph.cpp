@@ -12,6 +12,7 @@ using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
 
 std::string filename;
 std::string statfile;
+std::string graphtype;
 
 template<typename Graph>
 void initGraph(Graph& g) {
@@ -43,9 +44,21 @@ void traverseGraph(Graph& g) {
 template<typename Graph>
 void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
   std::cout << prompt << std::endl;
+
+  galois::graphs::FileGraph f;
+  f.fromFileInterleaved<typename Graph::file_edge_data_type>(filename);
+
+  size_t approxGraphSize = 120 * f.sizeEdges() * sizeof(typename Graph::edge_data_type); // 120*|E|*sizeof(E)
+  size_t numThreads = galois::getActiveThreads();
+  galois::preAlloc(numThreads + approxGraphSize / galois::runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
+
   timer.start();
-  galois::graphs::readGraph(g, filename);
+  galois::graphs::readGraphDispatch(g, typename Graph::read_tag(), f);
   timer.stop();
+
+  galois::reportPageAlloc("MeminfoPost");
+
   initGraph(g);
   traverseGraph(g);
 }
@@ -53,30 +66,36 @@ void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
-  if (argc < 3) {
-    std::cout << "Usage: ./test-firstgraph <input> <num_threads> [stat_file]" << std::endl;
+  if (argc < 4) {
+    std::cout << "Usage: ./test-firstgraph <input> <num_threads> <out|in-out|symmetric> [stat_file]" << std::endl;
     return 0;
-  } 
+  }
+
   filename = argv[1];
+  graphtype = argv[3];
 
   auto numThreads = galois::setActiveThreads(std::stoul(argv[2]));
   std::cout << "Loading " << filename << " with " << numThreads << " threads." << std::endl;
 
-  if (argc >= 4) {
-    galois::runtime::setStatFile(argv[3]);
+  if (argc >= 5) {
+    galois::runtime::setStatFile(argv[4]);
   }
 
-  galois::StatTimer outT("OutGraphTime");
-  OutGraph outG;
-  run(outG, outT, "out graph");
-
-  galois::StatTimer inoutT("InOutGraphTime");
-  InOutGraph inoutG;
-  run(inoutG, inoutT, "in-out graph");
-
-  galois::StatTimer symT("SymGraphTime");
-  SymGraph symG;
-  run(symG, symT, "symmetric graph");
+  if ("out" == graphtype) {
+    galois::StatTimer outT("OutGraphTime");
+    OutGraph outG;
+    run(outG, outT, "out graph");
+  }
+  else if ("in-out" == graphtype) {
+    galois::StatTimer inoutT("InOutGraphTime");
+    InOutGraph inoutG;
+    run(inoutG, inoutT, "in-out graph");
+  }
+  else if ("symmetric" == graphtype) {
+    galois::StatTimer symT("SymGraphTime");
+    SymGraph symG;
+    run(symG, symT, "symmetric graph");
+  }
 
   galois::runtime::reportParam("Load FirstGraph", "Threads", numThreads);
   galois::runtime::reportParam("Load FirstGraph", "File", filename);
