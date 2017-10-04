@@ -175,7 +175,7 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), InitializeGraph {&_graph}, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
     	_graph.reduce<Reduce_0>("InitializeGraph");
     }
@@ -305,8 +305,8 @@ struct ConnectedComp {
     		galois::StatTimer StatTimer_cuda(impl_str.c_str());
     		_graph.set_num_iter(0);
     		StatTimer_cuda.start();
-    		cuda_wl.num_in_items = (*(_graph.end())-*(_graph.begin()));
-    		for (int __i = *(_graph.begin()); __i < *(_graph.end()); ++__i) cuda_wl.in_items[__i] = __i;
+    		cuda_wl.num_in_items = (*(_graph.allNodesRange().end())-*(_graph.allNodesRange().begin()));
+    		for (int __i = *(_graph.allNodesRange().begin()); __i < *(_graph.allNodesRange().end()); ++__i) cuda_wl.in_items[__i] = __i;
     		cuda_wl.num_out_items = 0;
     		if (cuda_wl.num_in_items > 0)
     			ConnectedComp_cuda(cuda_ctx);
@@ -345,7 +345,7 @@ struct ConnectedComp {
     		galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)_num_iterations, 0);
     	} else if (personality == CPU)
     #endif
-    galois::for_each(_graph.begin(), _graph.end(), ConnectedComp (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("ConnectedComp"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));
+    galois::for_each(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), ConnectedComp (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("ConnectedComp"), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(GNode src, galois::UserContext<GNode>& ctx) const {
@@ -447,7 +447,7 @@ int main(int argc, char** argv) {
 
       if((run + 1) != numRuns){
         galois::runtime::getHostBarrier().wait();
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         InitializeGraph::go((*hg));
       }
     }

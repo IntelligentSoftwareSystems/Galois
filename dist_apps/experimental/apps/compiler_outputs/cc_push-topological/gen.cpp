@@ -188,7 +188,7 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), InitializeGraph {&_graph}, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int" , "set",  ""));
     if(_graph.is_vertex_cut()) {
     	_graph.reduce<Reduce_0>("InitializeGraph");
     }
@@ -302,7 +302,7 @@ struct ConnectedComp {
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, galois::loopname("ConnectedComp"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
+      galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), ConnectedComp { &_graph }, galois::loopname("ConnectedComp"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "min",  ""));
       _graph.reduce<Reduce_0>("ConnectedComp");
       
       if(_graph.is_vertex_cut()) {
@@ -413,7 +413,7 @@ int main(int argc, char** argv) {
 
       if((run + 1) != numRuns){
         galois::runtime::getHostBarrier().wait();
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         InitializeGraph::go((*hg));
       }
     }

@@ -196,7 +196,7 @@ struct ResetGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, galois::loopname("ResetGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float" , "set",  ""));
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), ResetGraph{ &_graph }, galois::loopname("ResetGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("broadcast", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float" , "set",  ""));
     if(_graph.is_vertex_cut()) {
     	_graph.reduce<Reduce_0>("ResetGraph");
     }
@@ -311,7 +311,7 @@ struct InitializeGraph {
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
     #endif
-    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), InitializeGraph{ alpha, &_graph }, galois::loopname("InitializeGraph"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
     _graph.reduce<Reduce_0>("InitializeGraph");
     
     if(_graph.is_vertex_cut()) {
@@ -442,7 +442,7 @@ struct PageRank {
       		StatTimer_cuda.stop();
       	} else if (personality == CPU)
       #endif
-      galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, galois::loopname("PageRank"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
+      galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), PageRank { tolerance, alpha, &_graph }, galois::loopname("PageRank"), galois::numrun(_graph.get_run_identifier()), galois::write_set("reduce", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"));
       _graph.reduce<Reduce_0>("PageRank");
       
       if(_graph.is_vertex_cut()) {
@@ -560,7 +560,7 @@ int main(int argc, char** argv) {
 
       if((run + 1) != numRuns){
         galois::runtime::getHostBarrier().wait();
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         ResetGraph::go((*hg));
         InitializeGraph::go((*hg));
       }

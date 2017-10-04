@@ -50,7 +50,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     uint64_t globalOffset;
     uint32_t numNodes;
-    uint32_t numOwned_withEdges;
 
     // Return the local offsets for the nodes to host.
     std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -84,7 +83,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     // Return if gid is Owned by local host.
     bool isOwned(uint64_t gid) const {
-      return gid >= globalOffset && gid < globalOffset + numOwned_withEdges;
+      return gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned;
       if (isBipartite) {
         if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
           return true;
@@ -138,9 +137,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
 
-      numOwned_withEdges = base_hGraph::totalOwnedNodes = 
-                           base_hGraph::numOwned = 
-                           (nodeEnd - nodeBegin);
+      base_hGraph::numOwned = (nodeEnd - nodeBegin);
       
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
@@ -169,8 +166,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         numOwned_withoutEdges = (gid2host_withoutEdges[base_hGraph::id].second - 
                                  gid2host_withoutEdges[base_hGraph::id].first);
-        base_hGraph::totalOwnedNodes = base_hGraph::numOwned = 
-                                   (nodeEnd - nodeBegin) + 
+        base_hGraph::numOwned = (nodeEnd - nodeBegin) + 
                                    (gid2host_withoutEdges[base_hGraph::id].second - 
                                     gid2host_withoutEdges[base_hGraph::id].first);
       }
@@ -257,9 +253,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      base_hGraph::numNodes = numNodes = 
-                              _numNodes = 
-                              base_hGraph::numOwned + ghostMap.size();
+      numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
 
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
@@ -269,13 +263,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // so you consider ghosts as having edges as well (since in IEC ghosts
       // have outgoing edges)
       if (transpose) {
-        base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+        base_hGraph::numNodesWithEdges = numNodes;
       } else {
         base_hGraph::numNodesWithEdges = base_hGraph::numOwned;
       }
 
       base_hGraph::beginMaster = 0;
-      base_hGraph::endMaster = base_hGraph::numOwned;
 
       //std::cerr << "[" << base_hGraph::id << "] Beginning memory allocation" <<
       //             "\n";
@@ -337,12 +330,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
   uint32_t G2L(uint64_t gid) const {
-    if (gid >= globalOffset && gid < globalOffset + numOwned_withEdges)
+    if (gid >= globalOffset && gid < globalOffset + base_hGraph::numOwned)
       return gid - globalOffset;
 
     if(isBipartite){
       if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
-            return gid - globalOffset_bipartite + numOwned_withEdges;
+            return gid - globalOffset_bipartite + base_hGraph::numOwned;
     }
 
     return GlobalToLocalGhostMap.at(gid);
@@ -355,10 +348,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
   uint64_t L2G(uint32_t lid) const {
     assert(lid < numNodes);
-    if (lid < numOwned_withEdges)
+    if (lid < base_hGraph::numOwned)
       return lid + globalOffset;
     if(isBipartite){
-      if(lid >= numOwned_withEdges && lid < base_hGraph::numOwned)
+      if(lid >= base_hGraph::numOwned && lid < base_hGraph::numOwned)
         return lid + globalOffset_bipartite;
     }
     return ghostMap[lid - base_hGraph::numOwned];
@@ -454,22 +447,15 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     return false;
   }
 
-  /*
-   * Returns the total nodes : master + slaves created on the local host.
-   */
-  uint64_t get_local_total_nodes() const {
-    return (base_hGraph::numOwned + base_hGraph::totalMirrorNodes);
-  }
-
   void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
     if (syncType == base_hGraph::syncBroadcast) { // reset masters
-      if (numOwned_withEdges > 0) {
-        bitset_reset_range(0, numOwned_withEdges - 1);
+      if (base_hGraph::numOwned > 0) {
+        bitset_reset_range(0, base_hGraph::numOwned - 1);
       }
     } else { // reset mirrors
       assert(syncType == base_hGraph::syncReduce);
-      if (numOwned_withEdges < numNodes) {
-        bitset_reset_range(numOwned_withEdges, numNodes - 1);
+      if (base_hGraph::numOwned < numNodes) {
+        bitset_reset_range(base_hGraph::numOwned, numNodes - 1);
       }
     }
   }

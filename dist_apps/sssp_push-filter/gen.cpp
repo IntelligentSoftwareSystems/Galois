@@ -286,7 +286,7 @@ struct SSSPSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("SSSPSanityCheck"),
                    galois::no_stats());
@@ -297,7 +297,7 @@ struct SSSPSanityCheck {
     uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
     }
@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, unsigned int>();
   #endif
 
-  bitset_dist_current.resize(hg->get_local_total_nodes());
+  bitset_dist_current.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -388,7 +388,7 @@ int main(int argc, char** argv) {
       #endif
       bitset_dist_current.reset();
 
-      (*hg).reset_num_iter(run+1);
+      (*hg).set_num_run(run+1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }

@@ -846,7 +846,7 @@ struct BC {
       //galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
-      if (_graph.id == 0) {
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         if (i % 5000 == 0) {
           galois::gPrint("SSSP source node #", i, "\n");
         }
@@ -964,7 +964,7 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()),
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
                    Sanity(
                      &_graph,
                      DGA_max,
@@ -981,7 +981,7 @@ struct Sanity {
     double bc_sum = DGA_sum.reduce();
 
     // Only node 0 will print data
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Max BC is %f\n", max_bc);
       printf("Min BC is %f\n", min_bc);
       printf("BC sum is %f\n", bc_sum);
@@ -1073,15 +1073,15 @@ int main(int argc, char** argv) {
   }
   #endif
 
-  bitset_to_add.resize(h_graph->get_local_total_nodes());
-  bitset_to_add_float.resize(h_graph->get_local_total_nodes());
-  bitset_num_shortest_paths.resize(h_graph->get_local_total_nodes());
-  bitset_num_successors.resize(h_graph->get_local_total_nodes());
-  bitset_num_predecessors.resize(h_graph->get_local_total_nodes());
-  bitset_trim.resize(h_graph->get_local_total_nodes());
-  bitset_current_length.resize(h_graph->get_local_total_nodes());
-  bitset_propogation_flag.resize(h_graph->get_local_total_nodes());
-  bitset_dependency.resize(h_graph->get_local_total_nodes());
+  bitset_to_add.resize(h_graph->size());
+  bitset_to_add_float.resize(h_graph->size());
+  bitset_num_shortest_paths.resize(h_graph->size());
+  bitset_num_successors.resize(h_graph->size());
+  bitset_num_predecessors.resize(h_graph->size());
+  bitset_trim.resize(h_graph->size());
+  bitset_current_length.resize(h_graph->size());
+  bitset_propogation_flag.resize(h_graph->size());
+  bitset_dependency.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -1121,7 +1121,7 @@ int main(int argc, char** argv) {
     // re-init graph for next run
     if ((run + 1) != numRuns) {
       galois::runtime::getHostBarrier().wait();
-      (*h_graph).reset_num_iter(run + 1);
+      (*h_graph).set_num_run(run + 1);
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 

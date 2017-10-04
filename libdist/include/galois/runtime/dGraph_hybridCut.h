@@ -320,19 +320,13 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 #endif
       
-      base_hGraph::numOwned = numNodes;
-      //base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
-      base_hGraph::numNodes = numNodes;
-      base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+      base_hGraph::numNodesWithEdges = numNodes;
 
-      if (base_hGraph::totalOwnedNodes > 0) {
+      if (base_hGraph::numOwned > 0) {
         base_hGraph::beginMaster = 
           G2L(base_hGraph::gid2host[base_hGraph::id].first);
-        base_hGraph::endMaster = 
-          G2L(base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
       } else {
         base_hGraph::beginMaster = 0;
-        base_hGraph::endMaster = 0;
       }
 
       //ss_cout << base_hGraph::id << " : numNodes : " << numNodes << " , numEdges : " << numEdges << "\n";
@@ -465,7 +459,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::vector<galois::GAccumulator<uint64_t>> num_assigned_edges_perhost(base_hGraph::numHosts);
       num_total_edges_to_receive = 0; 
 
-      base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
+      base_hGraph::numOwned = base_hGraph::gid2host[base_hGraph::id].second - 
                                      base_hGraph::gid2host[base_hGraph::id].first;
 #if 0
       /***Finding maximum owned nodes across hosts, for padding numOutgoingEdges****/
@@ -477,7 +471,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 #endif
       for(uint32_t i = 0; i < base_hGraph::numHosts; ++i){
-        numOutgoingEdges[i].assign(base_hGraph::totalOwnedNodes, 0);
+        numOutgoingEdges[i].assign(base_hGraph::numOwned, 0);
       }
 
       auto activeThreads = galois::runtime::activeThreads;
@@ -487,8 +481,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       timer.start();
       fileGraph.reset_byte_counters();
 
-      //base_hGraph::totalOwnedNodes = base_hGraph::gid2host[base_hGraph::id].second - 
-                                     //base_hGraph::gid2host[base_hGraph::id].first;
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
       auto& id = base_hGraph::id;
 
@@ -900,7 +892,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         std::sort(OwnerVec_perHost[i].begin(), OwnerVec_perHost[i].end());
       }
 
-      base_hGraph::totalOwnedNodes = GlobalVec_perHost[base_hGraph::id].size();
+      base_hGraph::numOwned = GlobalVec_perHost[base_hGraph::id].size();
       auto iter_insert = GlobalVec.begin();
       for(auto v : GlobalVec_perHost){
         for(auto j : v){
@@ -932,43 +924,18 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return true;
     }
 
-    /*
-   * Returns the total nodes : master + slaves created on the local host.
-   */
-    uint64_t get_local_total_nodes() const {
-      return (base_hGraph::numOwned);
-    }
-
     void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
-      size_t first_owned = 0;
-      size_t last_owned = 0;
-
-      if (base_hGraph::totalOwnedNodes > 0) {
-        first_owned = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-        last_owned = G2L(base_hGraph::gid2host[base_hGraph::id].second - 1);
-        assert(first_owned <= last_owned);
-        assert((last_owned - first_owned + 1) == base_hGraph::totalOwnedNodes);
-      } 
-
-      if (syncType == base_hGraph::syncBroadcast) { // reset masters
-        // only reset if we actually own something
-        if (base_hGraph::totalOwnedNodes > 0)
-          bitset_reset_range(first_owned, last_owned);
-      } else { // reset mirrors
-        assert(syncType == base_hGraph::syncReduce);
-
-        if (base_hGraph::totalOwnedNodes > 0) {
-          if (first_owned > 0) {
-            bitset_reset_range(0, first_owned - 1);
+      if (base_hGraph::numOwned != 0) {
+        auto endMaster = base_hGraph::beginMaster + base_hGraph::numOwned;
+        if (syncType == base_hGraph::syncBroadcast) { // reset masters
+          bitset_reset_range(base_hGraph::beginMaster, endMaster-1);
+        } else { // reset mirrors
+          assert(syncType == base_hGraph::syncReduce);
+          if (base_hGraph::beginMaster > 0) {
+            bitset_reset_range(0, base_hGraph::beginMaster - 1);
           }
-          if (last_owned < (numNodes - 1)) {
-            bitset_reset_range(last_owned + 1, numNodes - 1);
-          }
-        } else {
-          // only time we care is if we have ghost nodes, i.e. 
-          // numNodes is non-zero
-          if (numNodes > 0) {
-            bitset_reset_range(0, numNodes - 1);
+          if (endMaster < numNodes) {
+            bitset_reset_range(endMaster, numNodes - 1);
           }
         }
       }

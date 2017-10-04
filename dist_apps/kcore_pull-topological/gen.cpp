@@ -335,7 +335,7 @@ struct GetAliveDead {
     dga1.reset();
     dga2.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()),
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
                    GetAliveDead(&_graph, dga1, dga2), 
                    galois::loopname("GetAliveDead"),
                    galois::numrun(_graph.get_run_identifier()),
@@ -345,7 +345,7 @@ struct GetAliveDead {
     uint32_t num_dead = dga2.reduce();
 
     // Only node 0 will print data
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes alive is %u, dead is %u\n", num_alive,
              num_dead);
     }
@@ -394,8 +394,8 @@ int main(int argc, char** argv) {
   Graph* h_graph = symmetricDistGraphInitialization<NodeData, void>();
   #endif
 
-  bitset_current_degree.resize(h_graph->get_local_total_nodes());
-  bitset_trim.resize(h_graph->get_local_total_nodes());
+  bitset_current_degree.resize(h_graph->size());
+  bitset_trim.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go functions called\n");
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
@@ -423,7 +423,7 @@ int main(int argc, char** argv) {
 
     // re-init graph for next run
     if ((run + 1) != numRuns) {
-      (*h_graph).reset_num_iter(run+1);
+      (*h_graph).set_num_run(run+1);
 
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 

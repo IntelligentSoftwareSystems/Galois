@@ -267,8 +267,8 @@ struct PageRank {
           (unsigned long)dga.read_local());
 
       //reduced = dga.reduce();
-      //printf("[%d] iter %u local is %u\n", _graph.id, _num_iterations, dga.read_local());
-      //printf("[%d] iter %u reduced is %u\n", _graph.id, _num_iterations, reduced);
+      //printf("[%d] iter %u local is %u\n", galois::runtime::getSystemNetworkInterface().ID, _num_iterations, dga.read_local());
+      //printf("[%d] iter %u reduced is %u\n", galois::runtime::getSystemNetworkInterface().ID, _num_iterations, reduced);
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
@@ -363,7 +363,7 @@ struct PageRankSanity {
     DGA_max_residual.reset();
     DGA_min_residual.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()),
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
                    PageRankSanity(
                      tolerance, 
                      &_graph,
@@ -392,7 +392,7 @@ struct PageRankSanity {
     float min_residual = DGA_min_residual.reduce_min();
 
     // Only node 0 will print data
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Max rank is %f\n", max_rank);
       printf("Min rank is %f\n", min_rank);
       printf("Rank sum is %f\n", rank_sum);
@@ -473,8 +473,8 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, void, false>();
   #endif
 
-  bitset_residual.resize(hg->get_local_total_nodes());
-  bitset_nout.resize(hg->get_local_total_nodes());
+  bitset_residual.resize(hg->size());
+  bitset_nout.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
@@ -525,7 +525,7 @@ int main(int argc, char** argv) {
         bitset_nout.reset(); 
       }
 
-      (*hg).reset_num_iter(run+1);
+      (*hg).set_num_run(run+1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }

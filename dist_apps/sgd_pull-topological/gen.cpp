@@ -592,7 +592,7 @@ int main(int argc, char** argv) {
         std::string timer_str("TIMER_" + std::to_string(run));
         Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-        (*hg).reset_num_iter(run);
+        (*hg).set_num_run(run);
 
         StatTimer_main.start();
         SGD2::go((*hg), DGAccumulator_accum);
@@ -600,7 +600,7 @@ int main(int argc, char** argv) {
 
         if((run + 1) != numRuns){
           Galois::Runtime::getHostBarrier().wait();
-          (*hg).reset_num_iter(run);
+          (*hg).set_num_run(run);
           InitializeGraph::go((*hg));
         }
       }

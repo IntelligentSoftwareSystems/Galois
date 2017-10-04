@@ -211,7 +211,7 @@ struct FirstItr_SSSP {
 #endif
     {
     // one node, doesn't matter which do_all you use, so regular one suffices
-    galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
+    galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
                 FirstItr_SSSP{&_graph}, 
                 galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
                 galois::timeit(),
@@ -411,7 +411,7 @@ struct SSSPSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("SSSPSanityCheck"));
 
@@ -421,7 +421,7 @@ struct SSSPSanityCheck {
     uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
     }
@@ -533,7 +533,7 @@ int main(int argc, char** argv) {
     }
 #endif
     #if __OPT_VERSION__ >= 3
-    bitset_dist_current.resize(hg->get_local_total_nodes());
+    bitset_dist_current.resize(hg->size());
     #endif
 
     StatTimer_hg_init.stop();
@@ -577,7 +577,7 @@ int main(int argc, char** argv) {
         Flags_dist_current.clear_all();
         #endif
 
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         InitializeGraph::go(*hg);
         galois::runtime::getHostBarrier().wait();
       }

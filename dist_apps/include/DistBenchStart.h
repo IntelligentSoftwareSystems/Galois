@@ -117,7 +117,8 @@ static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
       GALOIS_DIE("Failed to initialize CUDA context");
     }
 
-    MarshalGraph m = (*loadedGraph).getMarshalGraph(my_host_id);
+    MarshalGraph m;
+    (*loadedGraph).getMarshalGraph(m);
     load_graph_CUDA(*cuda_ctx, m, net.Num);
   } else if (personality == GPU_OPENCL) {
     //galois::opencl::cl_env.init(cldevice.Value);

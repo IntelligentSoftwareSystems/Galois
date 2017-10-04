@@ -354,7 +354,7 @@ struct PageRankSanity {
     DGA_max_residual.reset();
     DGA_min_residual.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
                    PageRankSanity(
                      tolerance, 
                      &_graph,
@@ -383,7 +383,7 @@ struct PageRankSanity {
     float min_residual = DGA_min_residual.reduce_min();
 
     // Only node 0 will print data
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Max rank is %f\n", max_rank);
       printf("Min rank is %f\n", min_rank);
       printf("Rank sum is %f\n", rank_sum);
@@ -463,8 +463,8 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, void>();
   #endif
 
-  bitset_residual.resize(hg->get_local_total_nodes());
-  bitset_nout.resize(hg->get_local_total_nodes());
+  bitset_residual.resize(hg->size());
+  bitset_nout.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
@@ -514,7 +514,7 @@ int main(int argc, char** argv) {
       { bitset_residual.reset();
       bitset_nout.reset(); }
 
-      (*hg).reset_num_iter(run+1);
+      (*hg).set_num_run(run+1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }

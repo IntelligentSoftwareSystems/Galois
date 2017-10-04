@@ -317,7 +317,7 @@ struct BFSSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("BFSSanityCheck"));
 
@@ -327,7 +327,7 @@ struct BFSSanityCheck {
     uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
     }
@@ -437,7 +437,7 @@ int main(int argc, char** argv) {
     }
 #endif
     #if __OPT_VERSION__ >= 3
-    bitset_dist_current.resize(hg->get_local_total_nodes());
+    bitset_dist_current.resize(hg->size());
     #endif
     StatTimer_hg_init.stop();
 
@@ -481,7 +481,7 @@ int main(int argc, char** argv) {
         Flags_dist_current.clear_all();
         #endif
 
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         InitializeGraph::go((*hg));
         galois::runtime::getHostBarrier().wait();
       }

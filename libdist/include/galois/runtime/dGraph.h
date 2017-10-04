@@ -60,17 +60,11 @@
 
 #include "galois/runtime/bare_mpi.h"
 
-#include "llvm/Support/CommandLine.h"
-
 namespace cll = llvm::cl;
 
 enum MASTERS_DISTRIBUTION {
   BALANCED_MASTERS, BALANCED_EDGES_OF_MASTERS, BALANCED_MASTERS_AND_EDGES
 };
-
-#ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
-extern cll::opt<unsigned> buffSize;
-#endif
 
 extern cll::opt<bool> useGidMetadata;
 extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
@@ -98,9 +92,9 @@ enum ReadLocation { readSource, readDestination, readAny };
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
          bool BSPEdge = false>
 class hGraph: public GlobalObject {
+private:
   constexpr static const char* const GRNAME = "dGraph";
 
-public:
   typedef typename std::conditional<
     BSPNode, std::pair<NodeTy, NodeTy>, NodeTy
   >::type realNodeTy;
@@ -110,37 +104,48 @@ public:
   >::type realEdgeTy;
 
   typedef typename galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy, true>
-    GraphTy;
+    GraphTy; // do not use locks, use default interleaved numa allocation
 
+  bool round;
+
+protected:
+  GraphTy graph;
   enum SyncType { syncReduce, syncBroadcast };
 
-  GraphTy graph;
   bool transposed;
-  bool round;
-  uint64_t totalNodes; // Total nodes in the complete graph.
-  uint64_t totalEdges; // Total edges in the complete graph.
-  uint64_t totalMirrorNodes; // Total mirror nodes from others.
-  uint64_t totalOwnedNodes; // Total owned nodes in accordance with graphlab.
-  uint32_t numOwned; // [0, numOwned) = global nodes owned, thus
-                     // [numOwned, numNodes are replicas
-  uint64_t numOwned_edges; // [0, numOwned) = global nodes owned, thus
-                           // [numOwned, numNodes are replicas
-  uint32_t total_isolatedNodes; // Calculate the total isolated nodes
-  uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
-  const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
-  const uint32_t numHosts;
-  //ghost cell ID translation
 
-  uint32_t numNodes; // Total nodes created on a host (masters + mirrors)
-  uint32_t numNodesWithEdges; // Total nodes that need to be executed in an
-                              // operator
+  // global graph
+  uint64_t totalNodes; // Total nodes in the global unpartitioned graph.
+  uint64_t totalEdges; // Total edges in the global unpartitioned graph.
+
+  const unsigned id; // copy of net.ID
+  const uint32_t numHosts; // copy of net.Num 
+
+  // local graph
+  // size() = Number of nodes created on this host (masters + mirrors)
+  uint32_t numOwned; // Number of nodes owned (masters) by this host
+                     // size() - numOwned = mirrors on this host
   uint32_t beginMaster; // local id of the beginning of master nodes
-  uint32_t endMaster; // local id of the end of master nodes
+                        // beginMaster + numOwned = local id of the end of master nodes
+  uint32_t numNodesWithEdges; // Number of nodes (masters + mirrors) that have outgoing edges 
 
   // Master nodes on each host.
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
-  uint64_t last_nodeID_withEdges_bipartite;
 
+  uint64_t last_nodeID_withEdges_bipartite; // used only for bipartite graphs
+
+  // memoization optimization
+  // mirror nodes from different hosts. For reduce
+  std::vector<std::vector<size_t>> mirrorNodes;
+  // master nodes on different hosts. For broadcast
+  std::vector<std::vector<size_t>> masterNodes;
+
+  // FIXME: pass the flag as function paramater instead
+  // a pointer set during sync_on_demand calls that points to the status
+  // of a bitvector with regard to where data has been synchronized
+  BITVECTOR_STATUS* currentBVFlag;
+
+private:
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
   std::vector<uint32_t> masterRanges;
@@ -151,20 +156,11 @@ public:
   std::vector<galois::runtime::SpecificRange<boost::counting_iterator<size_t>>>
     specificRanges;
 
-  // memoization optimization metadata
-  // mirror nodes from different hosts. For reduce
-  std::vector<std::vector<size_t>> mirrorNodes;
-  // master nodes on different hosts. For broadcast
-  std::vector<std::vector<size_t>> masterNodes;
-
-  // a pointer set during sync_on_demand calls that points to the status
-  // of a bitvector with regard to where data has been synchronized
-  BITVECTOR_STATUS* currentBVFlag;
-
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
 
+public:
   /****** VIRTUAL FUNCTIONS *********/
   virtual uint32_t G2L(uint64_t) const = 0 ;
   virtual uint64_t L2G(uint32_t) const = 0;
@@ -176,13 +172,6 @@ public:
   }
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
-  virtual uint64_t get_local_total_nodes() const = 0;
-
-  #if 0
-  virtual void save_meta_file(std::string name) const {
-    std::cout << "Base implementation doesn't do anything\n";
-  }
-  #endif
 
   // Requirement: For all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
@@ -230,15 +219,12 @@ public:
                             void (*bitset_reset_range)(size_t,
                                                        size_t)) const = 0;
 
-  uint32_t num_recv_expected; // Number of receives expected for local completion.
+private:
   uint32_t num_run; //Keep track of number of runs.
   uint32_t num_iteration; //Keep track of number of iterations.
 
   // Stats: for rough estimate of sendBytes.
 
-  /****** checkpointing **********/
-  galois::runtime::RecvBuffer checkpoint_recvBuffer;
-
   /**
    * Get the node data for a particular node in the graph.
    *
@@ -252,8 +238,8 @@ public:
    * @returns A node data object
    */
   template<bool en, typename std::enable_if<en>::type* = nullptr>
-  NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                      galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+  inline NodeTy& getDataImpl(typename GraphTy::GraphNode N,
+                      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getData(N, mflag);
     return round ? r.first : r.second;
   }
@@ -270,47 +256,8 @@ public:
    * @returns A node data object
    */
   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-  NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                      galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
-    auto& r = graph.getData(N, mflag);
-    return r;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   *
-   * This function is called if we have BSP style nodes (i.e. return
-   * "new" or "old" depending on round number).
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be true.
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A constant node data object
-   */
-  template<bool en, typename std::enable_if<en>::type* = nullptr>
-  const NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                            galois::MethodFlag mflag =
-                              galois::MethodFlag::WRITE) const {
-    auto& r = graph.getData(N, mflag);
-    return round ? r.first : r.second;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   *
-   * This function is called if do NOT have BSP style nodes.
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be false.
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A constant node data object
-   */
-  template<bool en, typename std::enable_if<!en>::type* = nullptr>
-  const NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                            galois::MethodFlag mflag =
-                              galois::MethodFlag::WRITE) const {
+  inline NodeTy& getDataImpl(typename GraphTy::GraphNode N,
+                      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getData(N, mflag);
     return r;
   }
@@ -327,9 +274,9 @@ public:
    * @returns The edge data for the requested edge
    */
   template<bool en, typename std::enable_if<en>::type* = nullptr>
-  typename GraphTy::edge_data_reference getEdgeDataImpl(
+  inline typename GraphTy::edge_data_reference getEdgeDataImpl(
       typename GraphTy::edge_iterator ni,
-      galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getEdgeData(ni, mflag);
     return round ? r.first : r.second;
   }
@@ -346,14 +293,13 @@ public:
    * @returns The edge data for the requested edge
    */
   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-  typename GraphTy::edge_data_reference getEdgeDataImpl(
+  inline typename GraphTy::edge_data_reference getEdgeDataImpl(
       typename GraphTy::edge_iterator ni,
-      galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getEdgeData(ni, mflag);
     return r;
   }
 
-private:
   /**
    * Given an OfflineGraph, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
@@ -371,7 +317,7 @@ private:
    * out of 1 block had the decompose factor been set to 1.
    */
   void computeMastersBlockedNodes(galois::graphs::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
+      uint64_t numNodes_to_divide, const std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (scalefactor.empty() || (numHosts * DecomposeFactor == 1)) {
       for (unsigned i = 0; i < numHosts * DecomposeFactor; ++i)
@@ -430,7 +376,7 @@ private:
    * out of 1 block had the decompose factor been set to 1.
    */
   void computeMastersBalancedEdges(galois::graphs::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
+      uint64_t numNodes_to_divide, const std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (edgeWeightOfMaster == 0) {
       edgeWeightOfMaster = 1;
@@ -499,7 +445,7 @@ private:
    * out of 1 block had the decompose factor been set to 1.
    */
   void computeMastersBalancedNodesAndEdges(galois::graphs::OfflineGraph& g,
-      uint64_t numNodes_to_divide, std::vector<unsigned>& scalefactor,
+      uint64_t numNodes_to_divide, const std::vector<unsigned>& scalefactor,
       unsigned DecomposeFactor = 1) {
     if (nodeWeightOfMaster == 0) {
       nodeWeightOfMaster = g.sizeEdges() / g.size(); // average degree
@@ -550,7 +496,7 @@ protected:
    * out of 1 block had the decompose factor been set to 1.
    */
   uint64_t computeMasters(galois::graphs::OfflineGraph& g,
-      std::vector<unsigned>& scalefactor,
+      const std::vector<unsigned>& scalefactor,
       bool isBipartite = false, unsigned DecomposeFactor = 1) {
     galois::Timer timer;
     timer.start();
@@ -594,71 +540,7 @@ protected:
     return numNodes_to_divide;
   }
 
-public:
-  /**
-   * Returns the underlying graph object dGraph is using
-   *
-   * @returns the underlying graph object used by dGraph
-   */
-  GraphTy& getGraph() {
-    return graph;
-  }
-
-  static void syncRecv(uint32_t src, galois::runtime::RecvBuffer& buf) {
-    uint32_t oid;
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&);
-    galois::runtime::gDeserialize(buf, oid, fn);
-    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
-    (obj->*fn)(buf);
-  }
-
-  void exchange_info_landingPad(galois::runtime::RecvBuffer& buf) {
-    uint32_t hostID;
-    uint64_t numItems;
-    std::vector<uint64_t> items;
-    galois::runtime::gDeserialize(buf, hostID, numItems);
-    galois::runtime::gDeserialize(buf, masterNodes[hostID]);
-    //std::cout << "from : " << hostID << " -> " << numItems << " --> " 
-    //          << masterNodes[hostID].size() << "\n";
-  }
-
-  template<typename FnTy>
-  void syncRecvApply_ck(uint32_t from_id, galois::runtime::RecvBuffer& buf,
-                        std::string loopName) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    std::string set_timer_str("SYNC_SET_" + get_run_identifier(loopName));
-    std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
-    StatTimer_set.start();
-
-    uint32_t num = masterNodes[from_id].size();
-    std::vector<typename FnTy::ValTy> val_vec(num);
-    galois::runtime::gDeserialize(buf, val_vec);
-
-    if (num > 0) {
-      if (!FnTy::reduce_batch(from_id, val_vec.data())) {
-        galois::do_all(galois::iterate(0u, num),
-                       [&](uint32_t n) {
-                         uint32_t lid = masterNodes[from_id][n];
-                         #ifdef __GALOIS_HET_OPENCL__
-                         CLNodeDataWrapper d = clGraph.getDataW(lid);
-                         FnTy::reduce(lid, d, val_vec[n]);
-                         #else
-                         FnTy::reduce(lid, getData(lid), val_vec[n]);
-                         #endif
-                       },
-                       galois::loopname(get_run_identifier(doall_str).c_str()),
-                       galois::no_stats());
-      }
-    }
-
-    if (net.ID == (from_id + 1) % net.Num) {
-      checkpoint_recvBuffer = std::move(buf);
-    }
-
-    StatTimer_set.stop();
-  }
-
+private:
   void initBareMPI() {
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
     if (bare_mpi == noBareMPI) return;
@@ -683,14 +565,13 @@ public:
     int numTasks;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    if (numTasks != net.Num) GALOIS_DIE("Mismatch in MPI rank");
+    if (numTasks != numHosts) GALOIS_DIE("Mismatch in MPI rank");
 #endif
 
-    auto& net = galois::runtime::getSystemNetworkInterface();
     MPI_Group world_group;
     MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-    mpi_identity_groups.resize(net.Num);
-    for (unsigned x = 0; x < net.Num; ++x) {
+    mpi_identity_groups.resize(numHosts);
+    for (unsigned x = 0; x < numHosts; ++x) {
       const int g[1] = {(int)x};
       MPI_Group_incl(world_group, 1, g, &mpi_identity_groups[x]);
     }
@@ -727,7 +608,7 @@ public:
    * @param numHosts total number of hosts in the currently executing program
    */
   hGraph(unsigned host, unsigned numHosts) :
-      GlobalObject(this), transposed(false), round(false), id(host),
+      GlobalObject(this), round(false), transposed(false), id(host),
       numHosts(numHosts) {
     if (useGidMetadata) {
       if (enforce_data_mode != offsetsData) {
@@ -735,11 +616,9 @@ public:
       }
     }
 
-    total_isolatedNodes = 0;
     masterNodes.resize(numHosts);
     mirrorNodes.resize(numHosts);
 
-    num_recv_expected = 0;
     num_run = 0;
     num_iteration = 0;
     totalEdges = 0;
@@ -752,6 +631,7 @@ public:
     finalizeBareMPI();
   }
 
+protected:
   /**
    * Sets up the communication between the different hosts that contain
    * different parts of the graph by exchanging master/mirror information.
@@ -796,18 +676,17 @@ public:
                                        masterNodes[x].size());
     }
 
-    totalMirrorNodes = 0;
     for (auto x = 0U; x < mirrorNodes.size(); ++x) {
       std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
       if (x == id) continue;
       galois::runtime::reportStat_Tsum(GRNAME, mirror_nodes_str, 
                                        mirrorNodes[x].size());
-      totalMirrorNodes += mirrorNodes[x].size();
     }
 
     send_info_to_host();
   }
 
+public:
   /**
    * Wrapper getData that calls into the get data that distinguishes between
    * a BSP node and a non BSP node.
@@ -816,22 +695,8 @@ public:
    * @param mflag access flag for node data
    * @returns A node data object
    */
-  NodeTy& getData(GraphNode N, 
-                  galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
-    auto& r = getDataImpl<BSPNode>(N, mflag);
-    return r;
-  }
-
-  /**
-   * Wrapper getData that calls into the get data that distinguishes between
-   * a BSP node and a non BSP node.
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A constant node data object
-   */
-  const NodeTy& getData(GraphNode N, 
-                 galois::MethodFlag mflag = galois::MethodFlag::WRITE) const {
+  inline NodeTy& getData(GraphNode N, 
+                  galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = getDataImpl<BSPNode>(N, mflag);
     return r;
   }
@@ -844,8 +709,8 @@ public:
    * @param mflag access flag for edge data
    * @returns The edge data for the requested edge
    */
-  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, 
-                        galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+  inline typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, 
+                        galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     return getEdgeDataImpl<BSPEdge>(ni, mflag);
   }
 
@@ -859,7 +724,7 @@ public:
    * @param N node to get the edge of
    * @returns iterator to first edge of N
    */
-  edge_iterator edge_begin(GraphNode N) {
+  inline edge_iterator edge_begin(GraphNode N) {
     return graph.edge_begin(N, galois::MethodFlag::UNPROTECTED);
   }
 
@@ -870,7 +735,7 @@ public:
    * @returns iterator to the end of the edges of node N, i.e. the first edge 
    * of the next node (or an "end" iterator if there is no next node)
    */
-  edge_iterator edge_end(GraphNode N) {
+  inline edge_iterator edge_end(GraphNode N) {
     return graph.edge_end(N);
   }
 
@@ -879,7 +744,7 @@ public:
    *
    * @returns number of nodes present in this graph
    */
-  size_t size() const {
+  inline size_t size() const {
     return graph.size();
   }
 
@@ -888,78 +753,8 @@ public:
    *
    * @returns number of edges present in this graph
    */
-  size_t sizeEdges() const {
+  inline size_t sizeEdges() const {
     return graph.sizeEdges();
-  }
-
-  /**
-   * Gets first node of the graph.
-   *
-   * @returns constant iterator to first node of the graph.
-   */
-  const_iterator begin() const {
-    return graph.begin();
-  }
-
-  /**
-   * Gets first node of the graph.
-   *
-   * @returns iterator to first node of the graph.
-   */
-  iterator begin() {
-    return graph.begin();
-  }
-
-  /**
-   * Gets end iterator of the master nodes in the graph.
-   *
-   * @returns iterator to the end of the master nodes of the graph 
-   */
-  const_iterator end() const {
-    if (transposed) return graph.end();
-    return graph.begin() + numOwned;
-  }
-
-  /**
-   * Gets end iterator of the master nodes in the graph.
-   *
-   * @returns iterator to the end of the master nodes of the graph 
-   */
-  iterator end() {
-    if (transposed) return graph.end();
-    return graph.begin() + numOwned;
-  }
-
-  /**
-   * TODO why does this function exist
-   */
-  const_iterator ghost_begin() const {
-    return end();
-  }
-
-  /**
-   * TODO why does this function exist
-   */
-  iterator ghost_begin() {
-    return end();
-  }
-
-  /**
-   * Gets end iterator of all nodes in the graph.
-   *
-   * @returns const iterator to the end of all nodes of the graph 
-   */
-  const_iterator ghost_end() const {
-    return graph.end();
-  }
-
-  /**
-   * Gets end iterator of all nodes in the graph.
-   *
-   * @returns iterator to the end of all nodes of the graph 
-   */
-  iterator ghost_end() {
-    return graph.end();
   }
 
   /**
@@ -967,7 +762,7 @@ public:
    *
    * @returns A range object that contains all the nodes in this graph
    */
-  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
   allNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[0];
@@ -979,7 +774,7 @@ public:
    *
    * @returns A range object that contains the master nodes in this graph
    */
-  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
   masterNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[1];
@@ -992,12 +787,13 @@ public:
    * @returns A range object that contains the master nodes and the nodes
    * with outgoing edges in this graph
    */
-  const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
+  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
   allNodesWithEdgesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[2];
   }
 
+protected:
   /**
    * A version of determine_thread_ranges that computes the range offsets
    * for a specific range of the graph.
@@ -1009,7 +805,7 @@ public:
    * @param endNode End of range, non-inclusive
    * @param returnRanges Vector to store thread offsets for ranges in
    */
-  void determine_thread_ranges(uint32_t beginNode, uint32_t endNode,
+  inline void determine_thread_ranges(uint32_t beginNode, uint32_t endNode,
                                std::vector<uint32_t>& returnRanges) {
     graph.determineThreadRanges(beginNode, endNode, returnRanges,
                                 nodeAlphaRanges);
@@ -1025,7 +821,7 @@ public:
    * partition.
    * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
    */
-  void determine_thread_ranges(uint32_t total_nodes,
+  inline void determine_thread_ranges(uint32_t total_nodes,
                                std::vector<uint64_t> edge_prefix_sum) {
     graph.determineThreadRangesByNode(edge_prefix_sum);
   }
@@ -1036,20 +832,20 @@ public:
    *
    * Only call after graph is constructed + only call once
    */
-  void determine_thread_ranges_master() {
+  inline void determine_thread_ranges_master() {
     // make sure this hasn't been called before
     assert(masterRanges.size() == 0);
 
     // first check if we even need to do any work; if already calculated,
     // use already calculated vector
-    if (beginMaster == 0 && endMaster == numNodes) {
+    if (beginMaster == 0 && (beginMaster + numOwned) == size()) {
       masterRanges = graph.getThreadRangesVector();
-    } else if (beginMaster == 0 && endMaster == numNodesWithEdges &&
+    } else if (beginMaster == 0 && (beginMaster + numOwned) == numNodesWithEdges &&
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
       galois::gDebug("Manually det. master thread ranges\n");
-      graph.determineThreadRanges(beginMaster, endMaster, masterRanges,
+      graph.determineThreadRanges(beginMaster, beginMaster + numOwned, masterRanges,
                                   nodeAlphaRanges);
     }
   }
@@ -1060,15 +856,15 @@ public:
    *
    * Only call after graph is constructed + only call once
    */
-  void determine_thread_ranges_with_edges() {
+  inline void determine_thread_ranges_with_edges() {
     // make sure not called before
     assert(withEdgeRanges.size() == 0);
 
     // first check if we even need to do any work; if already calculated,
     // use already calculated vector
-    if (numNodesWithEdges == numNodes) {
+    if (numNodesWithEdges == size()) {
       withEdgeRanges = graph.getThreadRangesVector();
-    } else if (beginMaster == 0 && endMaster == numNodesWithEdges &&
+    } else if (beginMaster == 0 && (beginMaster + numOwned) == numNodesWithEdges &&
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
@@ -1095,7 +891,7 @@ public:
     specificRanges.push_back(
       galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
-        boost::counting_iterator<size_t>(numNodes),
+        boost::counting_iterator<size_t>(size()),
         graph.getThreadRanges()
       )
     );
@@ -1104,7 +900,7 @@ public:
     specificRanges.push_back(
       galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(beginMaster),
-        boost::counting_iterator<size_t>(endMaster),
+        boost::counting_iterator<size_t>(beginMaster + numOwned),
         masterRanges.data()
       )
     );
@@ -1121,6 +917,7 @@ public:
     assert(specificRanges.size() == 3);
   }
 
+private:
   /**
    * TODO
    */
@@ -1128,7 +925,7 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // send off the mirror nodes 
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if (x == id) continue;
 
       galois::runtime::SendBuffer b;
@@ -1137,7 +934,7 @@ public:
     }
 
     // receive the mirror nodes 
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if(x == id) continue;
 
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
@@ -1167,10 +964,8 @@ public:
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
     float replication_factor_new = (float)(global_total_mirror_nodes + 
-                                           global_total_owned_nodes - 
-                                           total_isolatedNodes) /
-                                   (float)(global_total_owned_nodes - 
-                                           total_isolatedNodes);
+                                           global_total_owned_nodes) /
+                                   (float)(global_total_owned_nodes);
 
     galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
@@ -1183,8 +978,6 @@ public:
     galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
         global_total_mirror_nodes);
-    galois::runtime::reportStat_Single(GRNAME, 
-        "TOTAL_ISOLATED_NODES_" + get_run_identifier(), total_isolatedNodes);
   }
 
   /**
@@ -1195,19 +988,19 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // send info to host
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if(x == id) continue;
 
       galois::runtime::SendBuffer b;
-      gSerialize(b, totalMirrorNodes, totalOwnedNodes);
+      gSerialize(b, size() - numOwned, numOwned);
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
 
     // receive
-    uint64_t global_total_mirror_nodes = totalMirrorNodes;
-    uint64_t global_total_owned_nodes = totalOwnedNodes;
+    uint64_t global_total_mirror_nodes = size() - numOwned;
+    uint64_t global_total_owned_nodes = numOwned;
 
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if (x == id) continue;
 
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
@@ -1232,7 +1025,6 @@ public:
     }
   }
 
-private:
   /**
    * Given a bitset, determine the indices of the bitset that are currently
    * set.
@@ -1249,7 +1041,7 @@ private:
   void get_offsets_from_bitset(const std::string &loopName, 
                                const galois::DynamicBitSet &bitset_comm, 
                                std::vector<unsigned int> &offsets, 
-                               size_t &bit_set_count) {
+                               size_t &bit_set_count) const {
     // timer creation
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + 
@@ -1352,7 +1144,7 @@ private:
                               const galois::DynamicBitSet &bitset_compute,
                               galois::DynamicBitSet &bitset_comm,
                               std::vector<unsigned int> &offsets,
-                              size_t &bit_set_count, DataCommMode &data_mode) {
+                              size_t &bit_set_count, DataCommMode &data_mode) const {
     if (enforce_data_mode != onlyData) {
       bitset_comm.reset();
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
@@ -1384,7 +1176,7 @@ private:
   /* Reduction extract resets the value afterwards */
   template<typename FnTy, SyncType syncType,
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  typename FnTy::ValTy extract_wrapper(size_t lid) {
+  inline typename FnTy::ValTy extract_wrapper(size_t lid) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     auto val = FnTy::extract(lid, getData(lid, d));
@@ -1402,7 +1194,7 @@ private:
   /* Broadcast extract doesn't reset the value */
   template<typename FnTy, SyncType syncType,
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  typename FnTy::ValTy extract_wrapper(size_t lid) {
+  inline typename FnTy::ValTy extract_wrapper(size_t lid) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     return FnTy::extract(lid, getData(lid, d));
@@ -1490,7 +1282,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
+  inline bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
     return FnTy::extract_reset_batch(x, v.data());
   }
 
@@ -1499,7 +1291,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
+  inline bool extract_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
     return FnTy::extract_batch(x, v.data());
   }
 
@@ -1508,7 +1300,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
+  inline bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
                              std::vector<unsigned int> &o, 
                              std::vector<typename FnTy::ValTy> &v, 
                              size_t &s, DataCommMode& data_mode) {
@@ -1522,10 +1314,10 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
+  inline bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
                              std::vector<unsigned int> &o, 
                              std::vector<typename FnTy::ValTy> &v, 
-                             size_t &s, DataCommMode& data_mode) {
+                             size_t &s, DataCommMode& data_mode) const {
     return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), 
                                o.data(), v.data(), &s, &data_mode);
   }
@@ -1535,7 +1327,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  void set_wrapper(size_t lid, typename FnTy::ValTy val, 
+  inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
                    galois::DynamicBitSet& bit_set_compute) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1552,7 +1344,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  void set_wrapper(size_t lid, typename FnTy::ValTy val, 
+  inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
                    galois::DynamicBitSet& bit_set_compute) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
@@ -1608,7 +1400,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
+  inline bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
     return FnTy::reduce_batch(x, v.data());
   }
 
@@ -1617,7 +1409,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
+  inline bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
     return FnTy::setVal_batch(x, v.data());
   }
   /**
@@ -1625,7 +1417,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  bool set_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
+  inline bool set_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
@@ -1638,7 +1430,7 @@ private:
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  bool set_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
+  inline bool set_batch_wrapper(unsigned x, galois::DynamicBitSet &b, 
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
@@ -1851,15 +1643,13 @@ private:
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_mpi_send(std::string loopName) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
     static std::vector<galois::runtime::SendBuffer> b;
     static std::vector<MPI_Request> request;
-    b.resize(net.Num);
-    request.resize(net.Num, MPI_REQUEST_NULL);
+    b.resize(numHosts);
+    request.resize(numHosts, MPI_REQUEST_NULL);
 
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + h) % numHosts;
 
       if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
@@ -1891,10 +1681,8 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_mpi_put(std::string loopName,
       const std::vector<MPI_Win>& window) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + h) % numHosts;
 
       if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
@@ -1927,8 +1715,8 @@ private:
   void sync_net_send(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + h) % numHosts;
 
       if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
@@ -2059,10 +1847,8 @@ private:
   void sync_mpi_recv_post(std::string loopName,
       std::vector<MPI_Request>& request,
       const std::vector<std::vector<uint8_t>>& rb) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + net.Num - h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + numHosts - h) % numHosts;
       if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
       MPI_Irecv((uint8_t *)rb[x].data(), rb[x].size(), MPI_BYTE, x, 32767, 
@@ -2078,10 +1864,8 @@ private:
   void sync_mpi_recv_wait(std::string loopName,
       std::vector<MPI_Request>& request,
       const std::vector<std::vector<uint8_t>>& rb) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + net.Num - h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + numHosts - h) % numHosts;
       if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
       MPI_Status status;
@@ -2105,10 +1889,8 @@ private:
   void sync_mpi_get(std::string loopName,
       const std::vector<MPI_Win>& window,
       const std::vector<std::vector<uint8_t>>& rb) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + net.Num - h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + numHosts - h) % numHosts;
       if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
       MPI_Win_wait(window[x]);
@@ -2134,7 +1916,7 @@ private:
   void sync_net_recv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if (x == id) continue;
       if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
@@ -2172,7 +1954,6 @@ private:
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_nonblocking_mpi(std::string loopName, bool use_bitset_to_send = true) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
@@ -2185,11 +1966,11 @@ private:
     if (rb.size() == 0) { // create the receive buffers
       StatTimer_RecvTime.start();
       auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-      rb.resize(net.Num);
-      request.resize(net.Num, MPI_REQUEST_NULL);
+      rb.resize(numHosts);
+      request.resize(numHosts, MPI_REQUEST_NULL);
 
-      for (unsigned h = 1; h < net.Num; ++h) {
-        unsigned x = (id + net.Num - h) % net.Num;
+      for (unsigned h = 1; h < numHosts; ++h) {
+        unsigned x = (id + numHosts - h) % numHosts;
         if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
 
         size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
@@ -2228,7 +2009,6 @@ private:
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_onesided_mpi(std::string loopName, bool use_bitset_to_send = true) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
@@ -2241,10 +2021,10 @@ private:
     if (window.size() == 0) { // create the windows
       StatTimer_RecvTime.start();
       auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
-      window.resize(net.Num);
-      rb.resize(net.Num);
+      window.resize(numHosts);
+      rb.resize(numHosts);
 
-      for (unsigned x = 0; x < net.Num; ++x) {
+      for (unsigned x = 0; x < numHosts; ++x) {
         size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
         size += sizeof(size_t); // vector size
         size += sizeof(DataCommMode); // data mode
@@ -2256,8 +2036,8 @@ private:
         MPI_Win_create(rb[x].data(), size, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &window[x]);
       }
 
-      for (unsigned h = 1; h < net.Num; ++h) {
-        unsigned x = (id + net.Num - h) % net.Num;
+      for (unsigned h = 1; h < numHosts; ++h) {
+        unsigned x = (id + numHosts - h) % numHosts;
         if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
         MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
       }
@@ -2287,7 +2067,7 @@ private:
   // reduce from mirrors to master
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename ReduceFnTy, typename BitsetFnTy>
-  void reduce(std::string loopName) {
+  inline void reduce(std::string loopName) {
     std::string timer_str("REDUCE_" + get_run_identifier(loopName));
     galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
     StatTimer_syncReduce.start();
@@ -2324,7 +2104,7 @@ private:
   // broadcast from master to mirrors
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename BroadcastFnTy, typename BitsetFnTy>
-  void broadcast(std::string loopName) {
+  inline void broadcast(std::string loopName) {
     std::string timer_str("BROADCAST_" + get_run_identifier(loopName));
     galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str(), GRNAME);
 
@@ -2396,7 +2176,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_src_to_src(std::string loopName) {
+  inline void sync_src_to_src(std::string loopName) {
     // do nothing for OEC
     // reduce and broadcast for IEC, CVC, UVC
     if (transposed || is_vertex_cut()) {
@@ -2409,7 +2189,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_src_to_dst(std::string loopName) {
+  inline void sync_src_to_dst(std::string loopName) {
     // only broadcast for OEC
     // only reduce for IEC
     // reduce and broadcast for CVC, UVC
@@ -2432,7 +2212,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_src_to_any(std::string loopName) {
+  inline void sync_src_to_any(std::string loopName) {
     // only broadcast for OEC
     // reduce and broadcast for IEC, CVC, UVC
     if (transposed || is_vertex_cut()) {
@@ -2445,7 +2225,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_dst_to_src(std::string loopName) {
+  inline void sync_dst_to_src(std::string loopName) {
     // only reduce for OEC
     // only broadcast for IEC
     // reduce and broadcast for CVC, UVC
@@ -2468,7 +2248,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_dst_to_dst(std::string loopName) {
+  inline void sync_dst_to_dst(std::string loopName) {
     // do nothing for IEC
     // reduce and broadcast for OEC, CVC, UVC
     if (!transposed || is_vertex_cut()) {
@@ -2483,7 +2263,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_dst_to_any(std::string loopName) {
+  inline void sync_dst_to_any(std::string loopName) {
     // only broadcast for IEC
     // reduce and broadcast for OEC, CVC, UVC
     if (!transposed || is_vertex_cut()) {
@@ -2496,7 +2276,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_any_to_src(std::string loopName) {
+  inline void sync_any_to_src(std::string loopName) {
     // only reduce for OEC
     // reduce and broadcast for IEC, CVC, UVC
     reduce<writeAny, readSource, ReduceFnTy, BitsetFnTy>(loopName);
@@ -2509,7 +2289,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_any_to_dst(std::string loopName) {
+  inline void sync_any_to_dst(std::string loopName) {
     // only reduce for IEC
     // reduce and broadcast for OEC, CVC, UVC
     reduce<writeAny, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
@@ -2523,7 +2303,7 @@ private:
    * TODO
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
-  void sync_any_to_any(std::string loopName) {
+  inline void sync_any_to_any(std::string loopName) {
     // reduce and broadcast for OEC, IEC, CVC, UVC
     reduce<writeAny, readAny, ReduceFnTy, BitsetFnTy>(loopName);
     broadcast<writeAny, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2536,7 +2316,7 @@ public:
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename ReduceFnTy, typename BroadcastFnTy,
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
-  void sync(std::string loopName) {
+  inline void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
     galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
     StatTimer_sync.start();
@@ -2570,6 +2350,7 @@ public:
     StatTimer_sync.stop();
   }
 
+private:
   /**
    * Generic Sync on demand handler. Should NEVER get to this (hence
    * the galois die).
@@ -2607,7 +2388,7 @@ public:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
         g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2643,7 +2424,7 @@ public:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
         g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2679,7 +2460,7 @@ public:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
       bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
@@ -2766,6 +2547,7 @@ public:
     }
   };
 
+public:
   /**
    * Given a structure that contains flags signifying what needs to be
    * synchronized, sync_on_demand will synchronize what is necessary based 
@@ -2782,7 +2564,7 @@ public:
   template<ReadLocation readLocation,
            typename ReduceFnTy, typename BroadcastFnTy,
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
-  void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
+  inline void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
     galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
     StatTimer_sync.start();
@@ -2796,6 +2578,65 @@ public:
     currentBVFlag = nullptr;
 
     StatTimer_sync.stop();
+  }
+
+#ifdef __GALOIS_CHECKPOINT__
+private:
+  /****** checkpointing **********/
+  galois::runtime::RecvBuffer checkpoint_recvBuffer;
+
+  static void syncRecv(uint32_t src, galois::runtime::RecvBuffer& buf) {
+    uint32_t oid;
+    void (hGraph::*fn)(galois::runtime::RecvBuffer&);
+    galois::runtime::gDeserialize(buf, oid, fn);
+    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    (obj->*fn)(buf);
+  }
+
+  void exchange_info_landingPad(galois::runtime::RecvBuffer& buf) {
+    uint32_t hostID;
+    uint64_t numItems;
+    std::vector<uint64_t> items;
+    galois::runtime::gDeserialize(buf, hostID, numItems);
+    galois::runtime::gDeserialize(buf, masterNodes[hostID]);
+    //std::cout << "from : " << hostID << " -> " << numItems << " --> " 
+    //          << masterNodes[hostID].size() << "\n";
+  }
+
+  template<typename FnTy>
+  void syncRecvApply_ck(uint32_t from_id, galois::runtime::RecvBuffer& buf,
+                        std::string loopName) {
+    std::string set_timer_str("SYNC_SET_" + get_run_identifier(loopName));
+    std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + get_run_identifier(loopName));
+    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
+    StatTimer_set.start();
+
+    uint32_t num = masterNodes[from_id].size();
+    std::vector<typename FnTy::ValTy> val_vec(num);
+    galois::runtime::gDeserialize(buf, val_vec);
+
+    if (num > 0) {
+      if (!FnTy::reduce_batch(from_id, val_vec.data())) {
+        galois::do_all(galois::iterate(0u, num),
+                       [&](uint32_t n) {
+                         uint32_t lid = masterNodes[from_id][n];
+                         #ifdef __GALOIS_HET_OPENCL__
+                         CLNodeDataWrapper d = clGraph.getDataW(lid);
+                         FnTy::reduce(lid, d, val_vec[n]);
+                         #else
+                         FnTy::reduce(lid, getData(lid), val_vec[n]);
+                         #endif
+                       },
+                       galois::loopname(get_run_identifier(doall_str).c_str()),
+                       galois::no_stats());
+      }
+    }
+
+    if (id == (from_id + 1) % numHosts) {
+      checkpoint_recvBuffer = std::move(buf);
+    }
+
+    StatTimer_set.stop();
   }
 
   template<typename FnTy>
@@ -2827,8 +2668,8 @@ public:
 
     size_t SyncReduce_send_bytes = 0;
     size_t checkpoint_bytes = 0;
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (id + h) % net.Num;
+    for (unsigned h = 1; h < numHosts; ++h) {
+      unsigned x = (id + h) % numHosts;
       uint32_t num = mirrorNodes[x].size();
 
       galois::runtime::SendBuffer b;
@@ -2862,7 +2703,7 @@ public:
       auto send_bytes = b.size();
 
       StatTimer_checkpoint.start();
-      if (x == (net.ID + 1) % net.Num) {
+      if (x == (id + 1) % numHosts) {
         // checkpoint owned nodes.
         std::vector<typename FnTy::ValTy> checkpoint_val_vec(numOwned);
         galois::do_all(galois::iterate(0u, numOwned), 
@@ -2892,7 +2733,7 @@ public:
         checkpoint_bytes);
 
     // receive
-    for (unsigned x = 0; x < net.Num; ++x) {
+    for (unsigned x = 0; x < numHosts; ++x) {
       if ((x == id)) continue;
 
       decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
@@ -2913,6 +2754,7 @@ public:
   * Fault Tolerance
   * 1. CheckPointing
   ***************************************/
+public:
   template <typename FnTy>
   void checkpoint(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -2953,18 +2795,18 @@ public:
 
     //std::string chkPt_fileName = "/scratch/02982/ggill0/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
     //std::string chkPt_fileName = "Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
-    //std::string chkPt_fileName = "CheckPointFiles_" + std::to_string(net.Num) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
+    //std::string chkPt_fileName = "CheckPointFiles_" + std::to_string(numHosts) + "/Checkpoint_" + loopName + "_" + FnTy::field_name() + "_" + std::to_string(net.ID);
 
     #ifdef __TMPFS__
     #ifdef __CHECKPOINT_NO_FSYNC__
     std::string chkPt_fileName = "/dev/shm/CheckPointFiles_no_fsync_" + 
-                                 std::to_string(net.Num) + "/Checkpoint_" + 
+                                 std::to_string(numHosts) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
     galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #else
     std::string chkPt_fileName = "/dev/shm/CheckPointFiles_fsync_" + 
-                                 std::to_string(net.Num) + "/Checkpoint_" + 
+                                 std::to_string(numHosts) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
     galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
@@ -2974,13 +2816,13 @@ public:
 
     #ifdef __CHECKPOINT_NO_FSYNC__
     std::string chkPt_fileName = "CheckPointFiles_no_fsync_" + 
-                                 std::to_string(net.Num) + "/Checkpoint_" + 
+                                 std::to_string(numHosts) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
     galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
     #else
     std::string chkPt_fileName = "CheckPointFiles_fsync_" + 
-                                 std::to_string(net.Num) + "/Checkpoint_" + 
+                                 std::to_string(numHosts) + "/Checkpoint_" + 
                                  loopName + "_" + FnTy::field_name() + "_" + 
                                  std::to_string(net.ID);
     galois::runtime::reportParam(GRNAME, "CHECKPOINT_FILE_LOC_", chkPt_fileName);
@@ -3105,7 +2947,7 @@ public:
 
     galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, b.size());
     // send to your neighbor on your left.
-    net.sendTagged((net.ID + 1) % net.Num, galois::runtime::evilPhase, b);
+    net.sendTagged((net.ID + 1) % numHosts, galois::runtime::evilPhase, b);
 
     StatTimer_checkpoint_send.stop();
 
@@ -3166,7 +3008,7 @@ public:
         galois::no_stats());
   }
 
-
+private:
   template<typename FnTy>
   void recovery_help_landingPad(galois::runtime::RecvBuffer& buff) {
     void (hGraph::*fn)(galois::runtime::RecvBuffer&) = 
@@ -3195,7 +3037,7 @@ public:
     gSerialize(b, idForSelf(), fn, net.ID, help_str);
 
     // jsend help message to the host that is keeping checkpoint for you.
-    net.sendMsg((net.ID + 1) % net.Num, syncRecv, b);
+    net.sendMsg((net.ID + 1) % numHosts, syncRecv, b);
   }
 
 
@@ -3224,21 +3066,23 @@ public:
 
     gSerialize(b, idForSelf(), help_str);
 
-    for(auto i = 0; i < net.Num; ++i){
+    for(auto i = 0; i < numHosts; ++i){
       net.sendMsg(i, syncRecv, b);
     }
   }
   #endif
 
   /*************************************/
+#endif
 
+public:
   /**
    * Converts a local node id into a global node id
    *
    * @param nodeID local node id
    * @returns global node id corresponding to the local one
    */
-  uint64_t getGID(uint32_t nodeID) const {
+  inline uint64_t getGID(const uint32_t nodeID) const {
      return L2G(nodeID);
   }
 
@@ -3248,54 +3092,30 @@ public:
    * @param nodeID global node id
    * @returns local node id corresponding to the global one
    */
-  uint32_t getLID(uint64_t nodeID) const {
+  inline uint32_t getLID(const uint64_t nodeID) const {
      return G2L(nodeID);
   }
 
-  #if 0
-  unsigned getHostID(uint64_t gid) {
-    getHostID(gid);
-  }
-  #endif
-
-  /**
-   * Get the number of nodes with edges.
-   * TODO verify this; might not be the case for all graphs
-   *
-   * @returns the number of nodes with edges
-   */
-  uint32_t getNumOwned() const {
-     return numOwned;
-  }
-
-  /**
-   * TODO get exact def. of global offset to write good documentation
-   */
-  uint64_t getGlobalOffset() const {
-     return globalOffset;
-  }
-
+#ifdef __GALOIS_HET_CUDA__
+private:
   // Code that handles getting the graph onto the GPU
-  #ifdef __GALOIS_HET_CUDA__
   template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-  void setMarshalEdge(MarshalGraph &m, size_t index, edge_iterator &e) {
+  inline void setMarshalEdge(MarshalGraph &m, const size_t index, const edge_iterator &e) {
      // do nothing
   }
 
   template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-  void setMarshalEdge(MarshalGraph &m, size_t index, edge_iterator &e) {
+  inline void setMarshalEdge(MarshalGraph &m, const size_t index, const edge_iterator &e) {
      m.edge_data[index] = getEdgeData(e);
   }
 
-  MarshalGraph getMarshalGraph(unsigned host_id) {
-    assert(host_id == id);
-    MarshalGraph m;
-
+public:
+  void getMarshalGraph(MarshalGraph& m) {
     m.nnodes = size();
     m.nedges = sizeEdges();
-    m.nowned = std::distance(begin(), end());
+    m.nowned = numOwned;
     assert(m.nowned > 0);
-    m.id = host_id;
+    m.id = id;
     m.row_start = (index_type*) calloc(m.nnodes + 1, sizeof(index_type));
     m.edge_dst = (index_type*) calloc(m.nedges, sizeof(index_type));
 
@@ -3318,8 +3138,8 @@ public:
 
     // pinched from Rashid's LC_LinearArray_Graph.h
     size_t edge_counter = 0, node_counter = 0;
-    for (auto n = begin(); 
-         n != ghost_end() && *n != m.nnodes; 
+    for (auto n = graph.begin(); 
+         n != graph.end() && *n != m.nnodes; 
          n++, node_counter++) {
       m.row_start[node_counter] = edge_counter;
       if (*n < m.nowned) {
@@ -3368,10 +3188,8 @@ public:
         m.mirror_nodes[h] = NULL;
       }
     }
-
-    return m;
   }
-  #endif
+#endif
 
 #ifdef __GALOIS_HET_OPENCL__
   typedef galois::opencl::Graphs::CL_LC_Graph<NodeTy, EdgeTy> CLGraphType;
@@ -3379,27 +3197,18 @@ public:
   typedef typename CLGraphType::NodeIterator CLNodeIterator;
   CLGraphType clGraph;
 
-  const cl_mem & device_ptr() {
+  const cl_mem & device_ptr() const {
     return clGraph.device_ptr();
   }
   CLNodeDataWrapper getDataW(GraphNode N, 
-      galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     return clGraph.getDataW(N);
   }
   const CLNodeDataWrapper getDataR(GraphNode N,
-      galois::MethodFlag mflag = galois::MethodFlag::READ) {
+      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     return clGraph.getDataR(N);
   }
 #endif
-
-  /**
-   * Get the total number of edges in the complete graph.
-   *
-   * @returns The total number of edges in the complete, non-partitioned graph
-   */
-  uint64_t get_totalEdges() const {
-    return totalEdges;
-  }
 
   /**
    * Set the run number. (contrary to what the function name is)
@@ -3408,7 +3217,7 @@ public:
    *
    * @param runNum Number to set the run to
    */
-  void reset_num_iter(uint32_t runNum){
+  inline void set_num_run(const uint32_t runNum) {
      num_run = runNum;
   }
 
@@ -3417,7 +3226,7 @@ public:
    *
    * @returns The set run number saved in the graph
    */
-  uint32_t get_run_num() {
+  inline uint32_t get_run_num() const {
     return num_run;
   }
 
@@ -3426,7 +3235,7 @@ public:
    *
    * @param iteration Iteration number to set to
    */
-  void set_num_iter(uint32_t iteration){
+  inline void set_num_iter(const uint32_t iteration) {
     num_iteration = iteration;
   }
 
@@ -3436,7 +3245,7 @@ public:
    *
    * @returns a string run identifier
    */
-  std::string get_run_identifier() {
+  inline std::string get_run_identifier() const {
     return std::string(std::to_string(num_run) + "_" +
                        std::to_string(num_iteration));
   }
@@ -3448,161 +3257,11 @@ public:
    * @param loop_name String to append the run identifier
    * @returns String with run identifier appended to passed in loop name
    */
-  std::string get_run_identifier(std::string loop_name) {
+  inline std::string get_run_identifier(std::string loop_name) const {
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
                        "_" + std::to_string(num_iteration));
   }
 
-  /**
-   * Returns the thread ranges array that specifies division of nodes among
-   * threads
-   *
-   * @returns An array of unsigned ints which spcifies which thread gets which
-   * nodes.
-   */
-  const uint32_t* get_thread_ranges() {
-    return graph.getThreadRanges();
-  }
-
-  /**
-   * Returns the thread ranges array that specifies division of nodes among
-   * threads for only master nodes
-   *
-   * @returns An array of unsigned ints which spcifies which thread gets which
-   * nodes.
-   */
-  const uint32_t* get_thread_ranges_master() {
-    return masterRanges.data();
-  }
-
-  /**
-   * Returns the thread ranges array that specifies division of nodes among
-   * threads for only nodes with edges
-   *
-   * @returns An array of unsigned ints which spcifies which thread gets which
-   * nodes.
-   */
-  const uint32_t* get_thread_ranges_with_edges() {
-    return withEdgeRanges.data();
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Calls for the container object for do_all + other things that need
-  // this container interface
-  //////////////////////////////////////////////////////////////////////////////
-
-  /**
-   * Returns an iterator to the first node assigned to the thread that calls
-   * this function
-   *
-   * @returns An iterator to the first node that a thread is to do work on.
-   */
-  local_iterator local_begin() const {
-    const uint32_t* thread_ranges = graph.getThreadRanges();
-
-    if (thread_ranges) {
-      uint32_t my_thread_id = galois::substrate::ThreadPool::getTID();
-      return begin() + thread_ranges[my_thread_id];
-    } else {
-      return galois::block_range(begin(), end(),
-                                 galois::substrate::ThreadPool::getTID(),
-                                 galois::runtime::activeThreads).first;
-    }
-  }
-
-  /**
-   * Returns an iterator to the node after the last node that the thread
-   * that calls this function is assigned to work on.
-   *
-   * @returns An iterator to the node after the last node the thread is
-   * to work on.
-   */
-  local_iterator local_end() const {
-    const uint32_t* thread_ranges = graph.getThreadRanges();
-
-    if (thread_ranges) {
-      uint32_t my_thread_id = galois::substrate::ThreadPool::getTID();
-      local_iterator to_return = begin() +
-                                 thread_ranges[my_thread_id + 1];
-
-      // quick safety check to make sure it doesn't go past the end of the
-      // graph
-      if (to_return > end()) {
-        fprintf(stderr, "WARNING: local end iterator goes past the end of the "
-                        "graph\n");
-      }
-
-      return to_return;
-    } else {
-      return galois::block_range(begin(), end(),
-                                 galois::substrate::ThreadPool::getTID(),
-                                 galois::runtime::activeThreads).second;
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-
-  void save_local_graph(std::string folder_name, std::string local_file_name) {
-    std::string graph_GID_file_name_str = folder_name + "/graph_GID_" + 
-        local_file_name + ".edgelist.PART." + std::to_string(id) + ".OF." + 
-        std::to_string(numHosts);
-
-    std::string graph_LID_DIMACS_file_name_str = folder_name + "/graph_LID_" + 
-        local_file_name + ".dimacs.PART." + std::to_string(id) + ".OF." + 
-        std::to_string(numHosts);
-
-    std::cerr << "SAVING LOCAL GRAPH TO FILE : " 
-              << graph_GID_file_name_str << "\n";
-
-    std::ofstream graph_GID_edgelist, graph_LID_dimacs;
-    graph_GID_edgelist.open(graph_GID_file_name_str.c_str());
-    graph_LID_dimacs.open(graph_LID_DIMACS_file_name_str.c_str());
-
-    std::string meta_file_str = folder_name + "/" + local_file_name + 
-        ".gr.META." + std::to_string(id) + ".OF." + std::to_string(numHosts);
-
-    //std::string tmp_meta_file_str = folder_name + "/" + local_file_name +".gr.TMP." + std::to_string(id) + ".OF." + std::to_string(numHosts);
-    std::ofstream meta_file(meta_file_str.c_str());
-    //std::ofstream tmp_file;
-    //tmp_file.open(tmp_meta_file_str.c_str());
-
-    size_t num_nodes = (size_t)numOwned;
-    std::cerr << id << "  NUMNODES  : " <<  num_nodes << "\n";
-    meta_file.write(reinterpret_cast<char*>(&num_nodes), sizeof(num_nodes));
-
-    graph_LID_dimacs << "p " << num_nodes << " " << numOwned_edges<<"\n";
-
-    for (size_t lid = 0; lid < numOwned; ++lid) {
-      //for(auto src = graph.begin(), src_end = graph.end(); src != src_end; ++src)
-      size_t src_GID = L2G(lid);
-      //size_t lid = (size_t)(*src);
-      //size_t gid = (size_t)L2G(*src);
-      size_t owner = getOwner_lid(lid);
-      for (auto e = graph.edge_begin(lid, galois::MethodFlag::UNPROTECTED), 
-                    e_end = graph.edge_end(lid); 
-           e != e_end; 
-           ++e) {
-        auto dst = graph.getEdgeDst(e);
-        auto edge_wt = graph.getEdgeData(e);
-        auto dst_GID = L2G(dst);
-
-        graph_GID_edgelist << src_GID << " " << dst_GID << " " << id <<  "\n";
-        graph_LID_dimacs << lid + 1 << " " << dst + 1 << " " <<  edge_wt <<  "\n";
-      }
-
-      meta_file.write(reinterpret_cast<char*>(&src_GID), sizeof(src_GID));
-      meta_file.write(reinterpret_cast<char*>(&lid), sizeof(lid));
-      meta_file.write(reinterpret_cast<char*>(&owner), sizeof(owner));
-
-      //tmp_file << src_GID << " " << lid << " " << owner << "\n";
-    }
-
-    //save_meta_file(local_file_name);
-    meta_file.close();
-    //tmp_file.close();
-    graph_GID_edgelist.close();
-    graph_LID_dimacs.close();
-  }
 };
 template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>
 constexpr const char* const hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge>::GRNAME;

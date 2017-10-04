@@ -215,7 +215,7 @@ struct FirstItr_BFS{
   #endif
     {
     // one node, doesn't matter which do_all you use, so regular one suffices
-    galois::do_all(_graph.begin() + __begin, _graph.begin() + __end,
+    galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
                 FirstItr_BFS{&_graph}, 
                 galois::loopname(_graph.get_run_identifier("BFS").c_str()),
                 galois::timeit());
@@ -359,7 +359,7 @@ struct BFSSanityCheck {
     dgas.reset();
     dgam.reset();
 
-    galois::do_all(_graph.begin(), _graph.end(), 
+    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
                    galois::loopname("BFSSanityCheck"));
 
@@ -369,7 +369,7 @@ struct BFSSanityCheck {
     uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
     }
@@ -465,7 +465,7 @@ int main(int argc, char** argv) {
       //galois::opencl::cl_env.init(cldevice.Value);
     }
 #endif
-    bitset_dist_current.resize(hg->get_local_total_nodes());
+    bitset_dist_current.resize(hg->size());
     StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
@@ -500,7 +500,7 @@ int main(int argc, char** argv) {
         bitset_dist_current.reset();
 
         //galois::runtime::getHostBarrier().wait();
-        (*hg).reset_num_iter(run+1);
+        (*hg).set_num_run(run+1);
         InitializeGraph::go((*hg));
       }
     }

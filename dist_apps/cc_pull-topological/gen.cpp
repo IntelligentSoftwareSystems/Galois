@@ -212,7 +212,7 @@ struct SourceComponentSize {
 
     dga.reset();
 
-    galois::do_all(galois::iterate(_graph.begin(), _graph.end()), 
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
                    SourceComponentSize(src_comp, &_graph, dga), 
                    galois::loopname("SourceComponentSize"),
                    galois::no_stats());
@@ -220,7 +220,7 @@ struct SourceComponentSize {
     uint64_t num_in_component = dga.reduce();
 
     // Only node 0 will print the number visited
-    if (_graph.id == 0) {
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes in node %lu's component is %lu\n", (uint64_t)src_node, 
              num_in_component);
     }
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
   Graph* hg = symmetricDistGraphInitialization<NodeData, void>();
   #endif
 
-  bitset_comp_current.resize(hg->get_local_total_nodes());
+  bitset_comp_current.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
@@ -300,7 +300,7 @@ int main(int argc, char** argv) {
       #endif
       bitset_comp_current.reset();
 
-      (*hg).reset_num_iter(run + 1);
+      (*hg).set_num_run(run + 1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
     }

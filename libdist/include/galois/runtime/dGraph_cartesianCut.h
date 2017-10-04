@@ -329,19 +329,16 @@ public:
     loadStatistics(g, fileGraph, prefixSumOfEdges); // first pass of the graph file
 
     std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
-                 base_hGraph::totalOwnedNodes << "\n";
+                 base_hGraph::numOwned << "\n";
 
     std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
-                 numNodes - base_hGraph::totalOwnedNodes << "\n";
+                 numNodes - base_hGraph::numOwned << "\n";
 
     std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << 
                  base_hGraph::numOwned << "\n";
 
     std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
                  numEdges << "\n";
-
-    base_hGraph::numNodes = numNodes;
-    base_hGraph::numNodesWithEdges = base_hGraph::numOwned; // numOwned = #nodeswithedges
 
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
     base_hGraph::graph.allocateFrom(numNodes, numEdges);
@@ -368,19 +365,12 @@ public:
 
     } 
 
-    if (base_hGraph::totalOwnedNodes != 0) {
+    if (base_hGraph::numOwned != 0) {
       base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
-      base_hGraph::endMaster = G2L(base_hGraph::gid2host[
-                                     base_hGraph::id + (DecomposeFactor-1)*
-                                     base_hGraph::numHosts].second - 1) + 1;
     } else {
       // no owned nodes, therefore empty masters
       base_hGraph::beginMaster = 0; 
-      base_hGraph::endMaster = 0;
     }
-
-    //printf("[%d] begin master and end master are %u and %u\n", base_hGraph::id,
-    //       base_hGraph::beginMaster, base_hGraph::endMaster);
 
 
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
@@ -415,9 +405,9 @@ public:
   void loadStatistics(galois::graphs::OfflineGraph& g, 
                       std::vector<galois::graphs::FileGraph>& fileGraph, 
                       std::vector<uint64_t>& prefixSumOfEdges) {
-    base_hGraph::totalOwnedNodes = 0;
+    base_hGraph::numOwned = 0;
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      base_hGraph::totalOwnedNodes += 
+      base_hGraph::numOwned += 
         base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - 
         base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
     }
@@ -582,7 +572,8 @@ public:
       }
     }
 
-    base_hGraph::numOwned = numNodes; // number of nodes for which there are outgoing edges
+    base_hGraph::numNodesWithEdges = numNodes;
+
     for (unsigned i = 0; i < numRowHosts; ++i) {
       //unsigned hostID;
       unsigned hostID_virtual;
@@ -635,7 +626,7 @@ public:
     }
 
     uint32_t numNodesWithEdges;
-    numNodesWithEdges = base_hGraph::totalOwnedNodes + dummyOutgoingNodes;
+    numNodesWithEdges = base_hGraph::numOwned + dummyOutgoingNodes;
     // TODO: try to parallelize this better
     galois::on_each([&](unsigned tid, unsigned nthreads){
       if (tid == 0) loadEdgesFromFile(graph, g, fileGraph);
@@ -771,7 +762,7 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // receive edges for all ghost nodes
-    while (numNodesWithEdges < base_hGraph::numOwned) {
+    while (numNodesWithEdges < base_hGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       net.handleReceives();
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
@@ -878,30 +869,19 @@ public:
     return true;
   }
 
-  /**
-   * Returns the start and end of master nodes in local graph.
-   */
-  uint64_t get_local_total_nodes() const {
-    return numNodes;
-  }
-
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    uint32_t numMasters = base_hGraph::endMaster - base_hGraph::beginMaster;
-
-    assert(base_hGraph::beginMaster <= base_hGraph::endMaster);
-    assert(numMasters == base_hGraph::totalOwnedNodes);
-
-    if (numMasters != 0) {
+    if (base_hGraph::numOwned != 0) {
+      auto endMaster = base_hGraph::beginMaster + base_hGraph::numOwned;
       if (syncType == base_hGraph::syncBroadcast) { // reset masters
-        bitset_reset_range(base_hGraph::beginMaster, base_hGraph::endMaster-1);
+        bitset_reset_range(base_hGraph::beginMaster, endMaster-1);
       } else { // reset mirrors
         assert(syncType == base_hGraph::syncReduce);
         if (base_hGraph::beginMaster > 0) {
           bitset_reset_range(0, base_hGraph::beginMaster - 1);
         }
-        if (base_hGraph::endMaster < numNodes) {
-          bitset_reset_range(base_hGraph::endMaster, numNodes - 1);
+        if (endMaster < numNodes) {
+          bitset_reset_range(endMaster, numNodes - 1);
         }
       }
     }
