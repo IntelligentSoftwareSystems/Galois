@@ -3,6 +3,9 @@ from bmkprops import GraphBMKSharedMem
 import os
 
 class SharedMemApp(GraphBMKSharedMem):
+    """Base class that has default run spec construction behavior for
+    most if not all shared memory apps.
+    """
     def filter_inputs(self, inputs):
         """Ignore inputs that aren't currently supported."""
         def finput(x):
@@ -105,6 +108,20 @@ class BarnesHut(SharedMemApp):
         
         return specs
 
+class BCOuter(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
+    benchmark = "bc-outer"
+    startThread = 80
+    endThread = 80
+    step = 10
+
+class BCInner(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
+    benchmark = "bc-inner"
+    startThread = 80
+    endThread = 80
+    step = 10
+
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [BarnesHut(),]
+BINARIES = [BCOuter(), BCInner()]
