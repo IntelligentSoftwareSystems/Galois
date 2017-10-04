@@ -446,13 +446,12 @@ int main(int argc, char** argv) {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) { 
     #endif
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
-          // prints the flag (alive/dead)
-          galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                       (bool)(*h_graph).getData(*ii).flag);
-        }
-
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
+        // prints the flag (alive/dead)
+        galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                     (bool)(*h_graph).getData(*ii).flag);
 
         // does a sanity check as well: 
         // degree higher than kcore if node is alive
@@ -462,11 +461,11 @@ int main(int argc, char** argv) {
       }
     #ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
-          galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
-                                     (bool)get_node_flag_cuda(cuda_ctx, *ii));
-        }
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
+        galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii), 
+                                    (bool)get_node_flag_cuda(cuda_ctx, *ii));
       }
     }
     #endif
