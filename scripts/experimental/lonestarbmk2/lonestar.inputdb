@@ -1,0 +1,21 @@
+[bmktest2]
+version = 2
+basepath = /net/ohm/export/cdgc/inputs
+
+[random/r4-2e26.gr]
+flags = 
+name = r4-2e26
+file = random/r4-2e26.gr
+format = bin/galois
+
+[meshes/r5M]
+flags = 
+name = r5M
+file = meshes/r5M
+format = mesh
+
+[nothing]
+flags = 
+name = nothing
+file = 
+format = nothing
