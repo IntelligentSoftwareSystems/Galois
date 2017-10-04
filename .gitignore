@@ -1,6 +1,7 @@
 *.orig
 *.patch
 .*.swo
+*.pyc
 
 # no temp files
 *~
