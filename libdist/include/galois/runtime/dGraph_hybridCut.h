@@ -158,7 +158,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
       size_t num_entries;
       meta_file.read(reinterpret_cast<char*>(&num_entries), sizeof(num_entries));
-      std::cout << "Partition :: " << " Number of nodes :: " << num_entries << "\n";
+      galois::gPrint("Partition :: ", " Number of nodes :: ", num_entries, "\n");
       for (size_t i = 0; i < num_entries; ++i) {
         std::pair<size_t, size_t> entry;
         size_t owner;
@@ -200,7 +200,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                bool bipartite = false) : base_hGraph(host, _numHosts) {
       if (!scalefactor.empty()) {
         if (base_hGraph::id == 0) {
-          std::cerr << "WARNING: scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n";
+          galois::gWarn("Scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n");
         }
         scalefactor.clear();
       }
@@ -229,17 +229,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         "TIMER_DISTRIBUTE_EDGES_NEXT_SRC", GRNAME);
 
       StatTimer_graph_construct.start();
-      //std::stringstream ss_cout;
 
       galois::graphs::OfflineGraph g(filename);
       isBipartite = bipartite;
 
-      //std::cout << "Nodes to divide : " <<  numNodes_to_divide << "\n";
       base_hGraph::numGlobalNodes = g.size();
       base_hGraph::numGlobalEdges = g.sizeEdges();
-      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
-                          base_hGraph::numGlobalNodes << " , Total edges : " << 
-                          base_hGraph::numGlobalEdges << "\n";
 
       uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
 
@@ -292,34 +287,23 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     	    auto p = galois::block_range(0U, 
                      (unsigned)numNodes_without_edges, 
                      i, base_hGraph::numHosts);
-    	    //std::cout << " last node : " << base_hGraph::last_nodeID_withEdges_bipartite << ", " << p.first << " , " << p.second << "\n";
     	    gid2host_withoutEdges.push_back(
             std::make_pair(base_hGraph::last_nodeID_withEdges_bipartite + p.first + 1, base_hGraph::last_nodeID_withEdges_bipartite + p.second + 1));
         }
       }
 
       uint64_t numEdges_distribute = edgeEnd - edgeBegin; 
-      std::cerr << "[" << base_hGraph::id << "] Total edges to distribute : " << 
-                   numEdges_distribute << "\n";
 
       /********************************************
        * Assign edges to the hosts using heuristics
        * and send/recv from other hosts.
        * ******************************************/
-      //print_string(" : assign_send_receive_edges started");
       StatTimer_exchange_edges.start();
 
       std::vector<uint64_t> prefixSumOfEdges;
       assign_edges_phase1(g, fileGraph, numEdges_distribute, VCutThreshold, 
                           prefixSumOfEdges, base_hGraph::mirrorNodes);
 
-#if 0
-      if(base_hGraph::id == 0)
-      for(auto i = 0; i < base_hGraph::numHosts; ++i){
-        std::cerr << "MIRROR : " << base_hGraph::mirrorNodes[i].size() <<"\n";
-      }
-#endif
-      
       base_hGraph::numNodesWithEdges = numNodes;
 
       if (base_hGraph::numOwned > 0) {
@@ -329,12 +313,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::beginMaster = 0;
       }
 
-      //ss_cout << base_hGraph::id << " : numNodes : " << numNodes << " , numEdges : " << numEdges << "\n";
+      base_hGraph::printStatistics();
+
 
       /******************************************
        * Allocate and construct the graph
        *****************************************/
-      //print_string(" : Allocate local graph DS : start");
 
       StatTimer_allocate_local_DS.start();
 
@@ -354,16 +338,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       StatTimer_allocate_local_DS.stop();
 
-      //print_string(" : Allocate local graph DS : Done");
-
-      //print_string(" : loadEdges : start");
-
       loadEdges(base_hGraph::graph, fileGraph, numEdges_distribute, VCutThreshold);
       StatTimer_exchange_edges.stop();
-
-      //print_string(" : loadEdges : done");
-
-      //ss_cout << base_hGraph::id << " : assign_send_receive_edges done\n";
 
       /*******************************************/
 
@@ -392,14 +368,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
        * Exchange mirrors and master nodes among
        * hosts
        ****************************************/
-      //print_string(" : Setup communication start");
-
       StatTimer_graph_construct_comm.start();
-
       base_hGraph::setup_communication();
-
       StatTimer_graph_construct_comm.stop();
-      //print_string(" : Setup communication done");
     }
 
     template<typename GraphTy>
@@ -407,9 +378,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    uint64_t numEdges_distribute, uint32_t VCutThreshold){
       if (base_hGraph::id == 0) {
         if (std::is_void<typename GraphTy::edge_data_type>::value) {
-          fprintf(stderr, "Loading void edge-data while creating edges.\n");
+          galois::gPrint("Loading void edge-data while creating edges\n");
         } else {
-          fprintf(stderr, "Loading edge-data while creating edges.\n");
+          galois::gPrint("Loading edge-data while creating edges\n");
         }
       }
 
@@ -439,8 +410,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       ++galois::runtime::evilPhase;
 
       timer.stop();
-      fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+      galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+          " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+          fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
     }
 
     // Just calculating the number of edges to send to other hosts
@@ -516,14 +488,14 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       );
 
       timer.stop();
-      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+      galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
+          " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+          fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
 
       galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
-        //std::cout << "from : " << base_hGraph::id << " to : " << h << " : edges assigned : " << num_assigned_edges_perhost[h].reduce() << "\n";
         check_numEdges += num_assigned_edges_perhost[h].reduce();
       }
 
@@ -537,10 +509,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
         galois::runtime::gSerialize(b, numOutgoingEdges[x]);
         net.sendTagged(x, galois::runtime::evilPhase, b);
-        //std::cerr << "sending size  : " <<  numOutgoingEdges[x].size() << "\n";
       }
 
-        //std::cerr << " SENT \n";
       net.flush();
 
       //receive
@@ -556,7 +526,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         uint64_t num_edges_from_host = 0;
         galois::runtime::gDeserialize(p->second, num_edges_from_host);
         galois::runtime::gDeserialize(p->second, numOutgoingEdges[p->first]);
-        //std::cerr << "num_edges_from_host : " << num_edges_from_host << " Size : " << numOutgoingEdges[p->first].size()<<"\n";
         num_total_edges_to_receive += num_edges_from_host;
       }
       ++galois::runtime::evilPhase;
@@ -596,7 +565,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           mirrorNodes[h].push_back(x);
         }
       }
-      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_hGraph::id, numNodes, numEdges);
     }
 
 
@@ -941,12 +909,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
     }
 
-    void print_string(std::string s) {
-      std::stringstream ss_cout;
-      ss_cout << base_hGraph::id << s << "\n";
-      std::cerr << ss_cout.str();
-    }
-
 #if 0
     void save_meta_file(std::string file_name_prefix) const {
       std::string meta_file_str = file_name_prefix +".gr.META." + std::to_string(base_hGraph::id) + ".OF." + std::to_string(base_hGraph::numHosts);
@@ -956,7 +918,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       tmp_file.open(tmp_meta_file_str.c_str());
 
       size_t num_nodes = (size_t)base_hGraph::numOwned;
-      std::cerr << base_hGraph::id << "  NUMNODES  : " <<  num_nodes << "\n";
       meta_file.write(reinterpret_cast<char*>(&num_nodes), sizeof(num_nodes));
       for(size_t lid = 0; lid < base_hGraph::numOwned; ++lid){
 

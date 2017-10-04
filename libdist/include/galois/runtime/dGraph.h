@@ -162,6 +162,18 @@ private:
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
 
+protected:
+  void printStatistics() {
+    if (id == 0) {
+      galois::gPrint("Total nodes: ", numGlobalNodes, "\n");
+      galois::gPrint("Total edges: ", numGlobalEdges, "\n");
+    }
+    galois::gPrint("[", id, "] Master nodes: ", numOwned, "\n");
+    galois::gPrint("[", id, "] Mirror nodes: ", size() - numOwned, "\n");
+    galois::gPrint("[", id, "] Nodes with edges: ", numNodesWithEdges, "\n");
+    galois::gPrint("[", id, "] Edges: ", sizeEdges(), "\n");
+  }
+
 public:
   /****** VIRTUAL FUNCTIONS *********/
   virtual uint32_t G2L(uint64_t) const = 0 ;
@@ -394,10 +406,6 @@ private:
       gid2host[id + d*numHosts].second = *(r.first.second);
     }
 
-    //printf("[%d] first is %lu, second is %lu\n", id, gid2host[id].first, gid2host[id].second);
-    //printf("[%d] first edge is %lu, second edge is %lu\n", id, *(r.second.first), *(r.second.second));
-    //std::cout << "id " << id << " " << gid2host[id].first << " " << gid2host[id].second << "\n";
-
     for (unsigned h = 0; h < numHosts; ++h) {
       if (h == id) continue;
       galois::runtime::SendBuffer b;
@@ -422,11 +430,6 @@ private:
       ++received;
     }
     ++galois::runtime::evilPhase;
-    //for(auto i = 0; i < numHosts*DecomposeFactor; ++i){
-      //std::stringstream ss;
-       //ss << i << "  : " << gid2host[i].first << " , " << gid2host[i].second << "\n";
-       //std::cerr << ss.str();
-    //}
   }
 
   //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
@@ -535,10 +538,9 @@ protected:
     }
 
     timer.stop();
-    fprintf(stderr, "[%u] Master distribution time : %f seconds to read %lu "
-                    "bytes in %lu seeks (%f MBPS)\n",
-            id, timer.get_usec()/1000000.0f, g.num_bytes_read(), g.num_seeks(),
-            g.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", id, "] Master distribution time : ", timer.get_usec()/1000000.0f,
+        " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
+        " seeks (", g.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
     return numNodes_to_divide;
   }
 
@@ -554,11 +556,7 @@ private:
       MPI_Abort(MPI_COMM_WORLD, rv);
     }
     if(!(provided >= MPI_THREAD_FUNNELED)){
-      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
-      abort();
-    }
-    else{
-      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
+      GALOIS_DIE("MPI_THREAD_FUNNELED not supported\n");
     }
     assert(provided >= MPI_THREAD_FUNNELED);
     int taskRank;
@@ -738,7 +736,7 @@ public:
    * of the next node (or an "end" iterator if there is no next node)
    */
   inline edge_iterator edge_end(GraphNode N) {
-    return graph.edge_end(N);
+    return graph.edge_end(N, galois::MethodFlag::UNPROTECTED);
   }
 
   /**
@@ -1155,7 +1153,7 @@ private:
    * @param bitset_comm OUTPUT: bitset that marks which indices in the passed
    * in indices array need to be synchronized
    * @param offsets OUTPUT: contains indices into bitset_comm that are set 
-   * @param bit_set_cout OUTPUT: contains number of bits set in bitset_comm
+   * @param bit_set_count OUTPUT: contains number of bits set in bitset_comm
    * @param data_mode TODO
    */
   template<typename FnTy, SyncType syncType>
@@ -2619,8 +2617,6 @@ private:
     std::vector<uint64_t> items;
     galois::runtime::gDeserialize(buf, hostID, numItems);
     galois::runtime::gDeserialize(buf, masterNodes[hostID]);
-    //std::cout << "from : " << hostID << " -> " << numItems << " --> " 
-    //          << masterNodes[hostID].size() << "\n";
   }
 
   template<typename FnTy>
@@ -2800,16 +2796,6 @@ public:
         galois::loopname(get_run_identifier(doall_str).c_str()), 
         galois::no_stats());
 
-    #if 0
-    // Write val_vec to disk.
-    if (id == 0) {
-      for (auto k = 0; k < 10; ++k) {
-        std::cout << "BEFORE : val_vec[" << k <<"] :" << val_vec[k] << "\n";
-      }
-    }
-    #endif
-
-
     galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, 
         val_vec.size() * sizeof(typename FnTy::ValTy));
 
@@ -2856,9 +2842,7 @@ public:
     int fd = open(chkPt_fileName.c_str(),O_CREAT|O_RDWR|O_TRUNC, 0666);
     #endif
     if (fd == -1) {
-      std::cerr << "file could not be created. file name : " 
-                << chkPt_fileName << " fd : " << fd << "\n";
-      abort();
+      GALOIS_DIE("File could not be created. file name : ", chkPt_fileName, " fd : ", fd, "\n");
     }
 
     write(fd, reinterpret_cast<char*>(val_vec.data()), 
@@ -2890,16 +2874,14 @@ public:
     std::ifstream chkPt_file(chkPt_fileName, std::ios::in | std::ofstream::binary);
 
     if (!chkPt_file.is_open()) {
-      std::cout << "Unable to open checkpoint file " << chkPt_fileName 
-                << " ! Exiting!\n";
-      exit(1);
+      GALOIS_DIE("Unable to open checkpoint file ", chkPt_fileName, " ! Exiting!\n");
     }
 
     chkPt_file.read(reinterpret_cast<char*>(val_vec.data()), numOwned * sizeof(uint32_t));
 
     if (id == 0) {
       for (auto k = 0; k < 10; ++k) {
-        std::cout << "AFTER : val_vec[" << k << "] : " << val_vec[k] << "\n";
+        galois::gPrint("AFTER : val_vec[", k, "] : ", val_vec[k], "\n");
       }
     }
 
@@ -2957,14 +2939,6 @@ public:
     galois::runtime::SendBuffer b;
     gSerialize(b, val_vec);
 
-    #if 0
-    if (net.ID == 0) {
-      for (auto k = 0; k < 10; ++k) {
-        std::cout << "before : val_vec[" << k << "] : " << val_vec[k] << "\n";
-      }
-    }
-    #endif
-
     galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, b.size());
     // send to your neighbor on your left.
     net.sendTagged((net.ID + 1) % numHosts, galois::runtime::evilPhase, b);
@@ -2983,9 +2957,6 @@ public:
     } while (!p);
 
     checkpoint_recvBuffer = std::move(p->second);
-
-    std::cerr << net.ID << " recvBuffer SIZE ::::: " 
-              << checkpoint_recvBuffer.size() << "\n";
 
     ++galois::runtime::evilPhase;
     StatTimer_checkpoint_recv.stop();
@@ -3007,7 +2978,6 @@ public:
     galois::runtime::RecvBuffer recv_checkpoint_buf;
     gDeserialize(b, from_id);
     recv_checkpoint_buf = std::move(b);
-    std::cerr << net.ID << " : " << recv_checkpoint_buf.size() << "\n";
 
     //gDeserialize(b, recv_checkpoint_buf);
 
@@ -3016,7 +2986,7 @@ public:
 
     if (net.ID == 0) {
       for (auto k = 0; k < 10; ++k) {
-        std::cout << "After : val_vec[" << k << "] : " << val_vec[k] << "\n";
+        galois::gPrint("AFTER : val_vec[", k, "] : ", val_vec[k], "\n");
       }
     }
 
@@ -3150,7 +3120,7 @@ public:
       m.edge_data = NULL;
     } else {
       if (!std::is_same<EdgeTy, edge_data_type>::value) {
-         fprintf(stderr, "WARNING: Edge data type mismatch between CPU and GPU\n");
+        galois::gWarn("Edge data type mismatch between CPU and GPU\n");
       }
 
       m.edge_data = (edge_data_type *) calloc(m.nedges, sizeof(edge_data_type));

@@ -56,7 +56,7 @@ private:
       std::swap(numRowHosts, numColumnHosts);
     }
     if (base_hGraph::id == 0) {
-      std::cerr << "Cartesian grid: " << numRowHosts << " x " << numColumnHosts << "\n";
+      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
     }
   }
 #endif
@@ -73,7 +73,8 @@ private:
 
     numRowHosts = numRowHosts*DecomposeFactor;
     if (base_hGraph::id == 0) {
-      std::cerr << "Cartesian grid: " << numRowHosts << " x " << numColumnHosts << " ,  using over decomposition by factor : " << DecomposeFactor << "\n";
+      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
+      galois::gPrint("Decomposition factor: ", DecomposeFactor, "\n");
     }
   }
 
@@ -276,7 +277,7 @@ public:
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false) : base_hGraph(host, _numHosts) {
     if (transpose) {
-      GALOIS_DIE("ERROR: transpose not supported for cartesian vertex-cuts");
+      GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
     }
 
     galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
@@ -290,9 +291,6 @@ public:
 
     base_hGraph::numGlobalNodes = g.size();
     base_hGraph::numGlobalEdges = g.sizeEdges();
-    if (base_hGraph::id == 0) {
-      std::cerr << "Total nodes : " << base_hGraph::numGlobalNodes << "\n";
-    }
     factorize_hosts();
 
     base_hGraph::computeMasters(g, scalefactor, false, DecomposeFactor);
@@ -303,7 +301,6 @@ public:
     std::vector<uint64_t> nodeEnd(DecomposeFactor);
     std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
     std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
-    std::cerr << " SIZE : " << base_hGraph::gid2host.size() << "\n";
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       nodeBegin[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
       edgeBegin[d] = g.edge_begin(nodeBegin[d]);
@@ -318,7 +315,6 @@ public:
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       std::stringstream ss;
       ss <<"Host : " << base_hGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
-      std::cout << ss.str();
       fileGraph[d].partFromFile(filename,
         std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin[d]), 
                      boost::make_counting_iterator<uint64_t>(nodeEnd[d])),
@@ -329,22 +325,10 @@ public:
     std::vector<uint64_t> prefixSumOfEdges;
     loadStatistics(g, fileGraph, prefixSumOfEdges); // first pass of the graph file
 
-    std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
-                 base_hGraph::numOwned << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
-                 numNodes - base_hGraph::numOwned << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << 
-                 base_hGraph::numOwned << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
-                 numEdges << "\n";
+    base_hGraph::printStatistics();
 
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
     base_hGraph::graph.allocateFrom(numNodes, numEdges);
-
-    //std::cerr << "Allocate done\n";
 
     assert(prefixSumOfEdges.size() == numNodes);
 
@@ -352,7 +336,6 @@ public:
       //assert(numEdges > 0);
       base_hGraph::graph.constructNodes();
 
-      //std::cerr << "Construct nodes done\n";
       auto& base_graph = base_hGraph::graph;
       galois::do_all(
         galois::iterate((uint32_t)0, numNodes),
@@ -375,24 +358,16 @@ public:
 
 
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
-    fprintf(stderr, "[%d] Edges loaded\n", base_hGraph::id);
-    //std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
-
-
-    //printf("[%d] about to thread range\n", base_hGraph::id);
 
     galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", GRNAME);
     StatTimer_thread_ranges.start();
     base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
     StatTimer_thread_ranges.stop();
 
-    //printf("[%d] about to master thread range\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_master();
-    //printf("[%d] about to with edges\n", base_hGraph::id);
     base_hGraph::determine_thread_ranges_with_edges();
-    //printf("[%d] about to init spec ranges\n", base_hGraph::id);
     base_hGraph::initialize_specific_ranges();
 
     StatTimer_graph_construct.stop();
@@ -400,7 +375,6 @@ public:
     StatTimer_graph_construct_comm.start();
     base_hGraph::setup_communication();
     StatTimer_graph_construct_comm.stop();
-    //fprintf(stderr, "[%d] Cartisian graph setup done\n", base_hGraph::id);
   }
 
   void loadStatistics(galois::graphs::OfflineGraph& g, 
@@ -468,11 +442,9 @@ public:
       );
 
       timer.stop();
-      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu "
-                      "bytes (%f MBPS)\n", 
-              base_hGraph::id, timer.get_usec()/1000000.0f, 
-              fileGraph[d].num_bytes_read(), 
-              fileGraph[d].num_bytes_read()/(float)timer.get_usec());
+      galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
+          " seconds to read ", fileGraph[d].num_bytes_read(), " bytes (",
+          fileGraph[d].num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
     }
 
     galois::setActiveThreads(activeThreads); // revert to prior active threads
@@ -554,9 +526,7 @@ public:
             if (columnBlocked) {
               ++dummyOutgoingNodes;
             } else {
-              //std::cerr << leaderHostID <<  " : SOURCE : " <<  src << "\n";
-              fprintf(stderr, "WARNING: Partitioning of vertices resulted in "
-                              "some inconsistency");
+              galois::gWarn("Partitioning of vertices resulted in some inconsistency");
               assert(false); // should be owned
             }
             createNode = true;
@@ -614,9 +584,9 @@ public:
                  std::vector<galois::graphs::FileGraph>& fileGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
-        fprintf(stderr, "Loading void edge-data while creating edges.\n");
+        galois::gPrint("Loading void edge-data while creating edges\n");
       } else {
-        fprintf(stderr, "Loading edge-data while creating edges.\n");
+        galois::gPrint("Loading edge-data while creating edges\n");
       }
     }
 
@@ -638,11 +608,9 @@ public:
 
     timer.stop();
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes "
-                      "(%f MBPS)\n", 
-              base_hGraph::id, timer.get_usec()/1000000.0f,
-              fileGraph[d].num_bytes_read(),
-              fileGraph[d].num_bytes_read()/(float)timer.get_usec());
+      galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+          " seconds to read ", fileGraph[d].num_bytes_read(), " bytes (",
+          fileGraph[d].num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
     }
   }
 

@@ -51,7 +51,7 @@ private:
       std::swap(numRowHosts, numColumnHosts);
     }
     if (base_hGraph::id == 0) {
-      std::cerr << "Cartesian grid: " << numRowHosts << " x " << numColumnHosts << "\n";
+      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
     }
   }
 
@@ -218,7 +218,7 @@ public:
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false) : base_hGraph(host, _numHosts) {
     if (transpose) {
-      GALOIS_DIE("ERROR: transpose not supported for jagged vertex-cuts");
+      GALOIS_DIE("Transpose not supported for jagged vertex-cuts");
     }
 
     galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
@@ -232,9 +232,6 @@ public:
 
     base_hGraph::numGlobalNodes = g.size();
     base_hGraph::numGlobalEdges = g.sizeEdges();
-    if (base_hGraph::id == 0) {
-      std::cerr << "Total nodes : " << base_hGraph::numGlobalNodes << "\n";
-    }
     factorize_hosts();
 
     base_hGraph::computeMasters(g, scalefactor, false);
@@ -264,17 +261,7 @@ public:
     std::vector<uint64_t> prefixSumOfEdges; // TODO use LargeArray
     loadStatistics(g, fileGraph, prefixSumOfEdges); // second pass of the graph file
 
-    std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
-                 base_hGraph::numOwned << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
-                 numNodes - base_hGraph::numOwned << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Nodes which have edges: " << 
-                 base_hGraph::numNodesWithEdges << "\n";
-
-    std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
-                 numEdges << "\n";
+    base_hGraph::printStatistics();
 
     assert(prefixSumOfEdges.size() == numNodes);
 
@@ -282,11 +269,9 @@ public:
 
     if (numNodes > 0) {
       //assert(numEdges > 0);
-      //std::cerr << "Allocate done\n";
 
       base_hGraph::graph.constructNodes();
 
-      //std::cerr << "Construct nodes done\n";
       auto& base_graph = base_hGraph::graph;
       galois::do_all(
         galois::iterate((uint32_t)0, numNodes),
@@ -308,7 +293,6 @@ public:
     }
 
     loadEdges(base_hGraph::graph, g, fileGraph); // third pass of the graph file
-    std::cerr << "[" << base_hGraph::id << "] Edges loaded \n";
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
@@ -358,8 +342,9 @@ private:
     );
 
     timer.stop();
-    fprintf(stderr, "[%u] In-degree calculation time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", base_hGraph::id, "] In-degree calculation time: ", timer.get_usec()/1000000.0f,
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
 
     galois::setActiveThreads(activeThreads); // revert to prior active threads
 
@@ -484,8 +469,9 @@ private:
     );
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -589,9 +575,9 @@ private:
                  galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
-        fprintf(stderr, "Loading void edge-data while creating edges.\n");
+        galois::gPrint("Loading void edge-data while creating edges\n");
       } else {
-        fprintf(stderr, "Loading edge-data while creating edges.\n");
+        galois::gPrint("Loading edge-data while creating edges\n");
       }
     }
 
@@ -610,8 +596,9 @@ private:
     ++galois::runtime::evilPhase;
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>

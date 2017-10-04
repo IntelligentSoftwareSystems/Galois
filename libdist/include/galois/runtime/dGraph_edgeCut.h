@@ -106,8 +106,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    std::vector<unsigned>& scalefactor, 
                    bool transpose = false) : 
                     base_hGraph(host, _numHosts) {
-      /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
-       *  uint64_t& _numGlobalNodes, unsigned _id )*/
       galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", 
                                                   GRNAME);
       StatTimer_graph_construct.start();
@@ -122,8 +120,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::numGlobalNodes = g.size();
       base_hGraph::numGlobalEdges = g.sizeEdges();
-      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
-                   base_hGraph::numGlobalNodes << "\n";
 
       uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
 
@@ -157,9 +153,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                      0U, (unsigned)numNodes_without_edges, i, 
                      base_hGraph::numHosts);
 
-          std::cout << " last node : " << base_hGraph::last_nodeID_withEdges_bipartite << 
-                       ", " << p.first << " , " << p.second << "\n";
-
           gid2host_withoutEdges.push_back(std::make_pair(base_hGraph::last_nodeID_withEdges_bipartite + p.first + 1, base_hGraph::last_nodeID_withEdges_bipartite + p.second + 1));
           globalOffset_bipartite = gid2host_withoutEdges[base_hGraph::id].first;
         }
@@ -172,14 +165,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       globalOffset = nodeBegin;
-
-      std::cerr << "[" << base_hGraph::id << "] Owned nodes: " << 
-                   base_hGraph::numOwned << "\n";
-
       _numEdges = edgeEnd - edgeBegin;
-      std::cerr << "[" << base_hGraph::id << "] Total edges : " << 
-                          _numEdges << "\n";
-
+            
       galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
 
@@ -214,8 +201,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       );
 
       timer.stop();
-      fprintf(stderr, "[%u] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-          base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+      galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
+          " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+          fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
 
       galois::setActiveThreads(activeThreads); // revert to prior active threads
 
@@ -224,8 +212,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for (uint64_t x = 0; x < g.size(); ++x)
         if (ghosts.test(x) && !isOwned(x))
           ghostMap.push_back(x);
-      std::cerr << "[" << base_hGraph::id << "] Ghost nodes: " << 
-                   ghostMap.size() << "\n";
 
       hostNodes.resize(base_hGraph::numHosts, std::make_pair(~0, ~0));
 
@@ -255,6 +241,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
 
+      base_hGraph::printStatistics();
+
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
       prefixSumOfEdges.resize(_numNodes, prefixSumOfEdges.back());
@@ -270,15 +258,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::beginMaster = 0;
 
-      //std::cerr << "[" << base_hGraph::id << "] Beginning memory allocation" <<
-      //             "\n";
-
       base_hGraph::graph.allocateFrom(_numNodes, _numEdges);
 
-      //std::cerr << "[" << base_hGraph::id << "] Allocate done" << "\n";
-
       base_hGraph::graph.constructNodes();
-      //std::cerr << "[" << base_hGraph::id << "] Construct nodes done" << "\n";
 
       auto& base_graph = base_hGraph::graph;
       galois::do_all(galois::iterate((uint32_t)0, numNodes),
@@ -292,7 +274,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
       loadEdges(base_hGraph::graph, fileGraph);
-      std::cerr << "[" << base_hGraph::id << "] Edges loaded" << "\n";
       
       if (transpose) {
         base_hGraph::graph.transpose();
@@ -360,7 +341,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
-      fprintf(stderr, "Loading edge-data while creating edges.\n");
+      galois::gPrint("Loading edge-data while creating edges\n");
     }
 
     galois::Timer timer;
@@ -389,14 +370,15 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     );
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
-      fprintf(stderr, "Loading void edge-data while creating edges.\n");
+      galois::gPrint("Loading void edge-data while creating edges\n");
     }
 
     galois::Timer timer;
@@ -425,8 +407,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
 
     timer.stop();
-    fprintf(stderr, "[%u] Edge loading time : %f seconds to read %lu bytes (%f MBPS)\n", 
-        base_hGraph::id, timer.get_usec()/1000000.0f, fileGraph.num_bytes_read(), fileGraph.num_bytes_read()/(float)timer.get_usec());
+    galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
