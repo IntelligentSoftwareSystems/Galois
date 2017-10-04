@@ -21,9 +21,10 @@ int main(int argc, char** argv) {
 
   char dummyBuf[1];
 
-  MPI_File mpiFile;
-  MPI_Status mpiStat;
+  int numRuns = 1;
 
+  for (int i = 0; i < numRuns; i++) {
+  MPI_File mpiFile;
   MPI_File_open(MPI_COMM_WORLD, argv[1], MPI_MODE_RDONLY, 
                 MPI_INFO_NULL, &mpiFile);
 
@@ -37,17 +38,29 @@ int main(int argc, char** argv) {
   fileReadTimer.start();
 
   while (true) {
+    MPI_Status mpiStat;
     MPI_File_read_at(mpiFile, mpiBytesRead, (void*)dummyBuf, 1, MPI_BYTE, &mpiStat); 
 
-    if (mpiStat.MPI_ERROR != MPI_SUCCESS) {
-      printf("MPI Err is %d\n", mpiStat.MPI_ERROR);
-      break;
-    } else {
+    //if (mpiStat.MPI_ERROR != MPI_SUCCESS) {
+    //  //char dumBuf[1000];
+    //  //int ka = 0;
+    //  //MPI_Error_string(mpiStat.MPI_ERROR, dumBuf, &ka);
+    //  //printf("MPI Err is %s\n", dumBuf);
+    //  printf("MPI Err code is %d\n", mpiStat.MPI_ERROR);
+    //  printf("%c", dummyBuf[0]);
+    //  mpiBytesRead++;
+    //  //break;
+    //  if (mpiBytesRead == (unsigned)fileSize) {
+    //    break;
+    //  }
+
+    //} else {
       mpiBytesRead++;
+      //printf("%c", dummyBuf[0]);
       if (mpiBytesRead == (unsigned)fileSize) {
         break;
       }
-    }
+    //}
   }
 
   fileReadTimer.stop();
@@ -82,7 +95,7 @@ int main(int argc, char** argv) {
          fileReadTimer2.get_usec()/1000000.0f, 
          bytesRead / (float)fileReadTimer2.get_usec()) ;
 
-
+  }
   return 0;
 
 }
