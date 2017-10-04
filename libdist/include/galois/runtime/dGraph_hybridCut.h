@@ -125,7 +125,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 #endif
 
   virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     if (isOwned(gid))
       return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
@@ -235,11 +235,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       isBipartite = bipartite;
 
       //std::cout << "Nodes to divide : " <<  numNodes_to_divide << "\n";
-      base_hGraph::totalNodes = g.size();
-      base_hGraph::totalEdges = g.sizeEdges();
+      base_hGraph::numGlobalNodes = g.size();
+      base_hGraph::numGlobalEdges = g.sizeEdges();
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
-                          base_hGraph::totalNodes << " , Total edges : " << 
-                          base_hGraph::totalEdges << "\n";
+                          base_hGraph::numGlobalNodes << " , Total edges : " << 
+                          base_hGraph::numGlobalEdges << "\n";
 
       uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
 

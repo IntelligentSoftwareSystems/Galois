@@ -117,8 +117,8 @@ protected:
   bool transposed;
 
   // global graph
-  uint64_t totalNodes; // Total nodes in the global unpartitioned graph.
-  uint64_t totalEdges; // Total edges in the global unpartitioned graph.
+  uint64_t numGlobalNodes; // Total nodes in the global unpartitioned graph.
+  uint64_t numGlobalEdges; // Total edges in the global unpartitioned graph.
 
   const unsigned id; // copy of net.ID
   const uint32_t numHosts; // copy of net.Num 
@@ -623,7 +623,7 @@ public:
 
     num_run = 0;
     num_iteration = 0;
-    totalEdges = 0;
+    numGlobalEdges = 0;
     currentBVFlag = nullptr;
 
     initBareMPI();
@@ -742,21 +742,39 @@ public:
   }
 
   /**
-   * Gets number of nodes on this graph.
+   * Gets number of nodes on this (local) graph.
    *
-   * @returns number of nodes present in this graph
+   * @returns number of nodes present in this (local) graph
    */
   inline size_t size() const {
     return graph.size();
   }
 
   /**
-   * Gets number of edges on this graph.
+   * Gets number of edges on this (local) graph.
    *
-   * @returns number of edges present in this graph
+   * @returns number of edges present in this (local) graph
    */
   inline size_t sizeEdges() const {
     return graph.sizeEdges();
+  }
+
+  /**
+   * Gets number of nodes on the global unpartitioned graph.
+   *
+   * @returns number of nodes present in the global unpartitioned graph
+   */
+  inline size_t globalSize() const {
+    return numGlobalNodes;
+  }
+
+  /**
+   * Gets number of edges on the global unpartitioned graph.
+   *
+   * @returns number of edges present in the global unpartitioned graph
+   */
+  inline size_t globalSizeEdges() const {
+    return numGlobalEdges;
   }
 
   /**
@@ -960,8 +978,8 @@ private:
    */
   void report_master_mirror_stats(uint64_t global_total_mirror_nodes,
                                   uint64_t global_total_owned_nodes) {
-    float replication_factor = (float)(global_total_mirror_nodes + totalNodes) /
-                               (float)totalNodes;
+    float replication_factor = (float)(global_total_mirror_nodes + numGlobalNodes) /
+                               (float)numGlobalNodes;
     galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
@@ -974,7 +992,7 @@ private:
         replication_factor_new);
 
     galois::runtime::reportStat_Single(GRNAME, 
-        "TOTAL_NODES_" + get_run_identifier(), totalNodes);
+        "TOTAL_NODES_" + get_run_identifier(), numGlobalNodes);
     galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
     galois::runtime::reportStat_Single(GRNAME, 

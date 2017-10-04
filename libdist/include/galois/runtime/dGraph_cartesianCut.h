@@ -123,13 +123,13 @@ private:
   }
 
   unsigned getColumnHostID(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     uint32_t blockID = getBlockID(gid);
     return getColumnHostIDOfBlock(blockID);
   }
 
   uint32_t getColumnIndex(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     auto blockID = getBlockID(gid);
     auto h = getColumnHostIDOfBlock(blockID);
     uint32_t columnIndex = 0;
@@ -200,7 +200,7 @@ public:
 
   // Return the ID to which gid belongs after patition.
   unsigned getHostID(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     //for (auto h = 0U; h < base_hGraph::numHosts; ++h) {
     for (auto h = 0U; h < numVirtualHosts; ++h) {
       uint64_t start, end;
@@ -226,7 +226,7 @@ public:
 
   // Return is gid is present locally (owned or mirror).
   virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
@@ -288,9 +288,10 @@ public:
     // for the FileGraph which mmaps appropriate regions of memory
     galois::graphs::OfflineGraph g(filename);
 
-    base_hGraph::totalNodes = g.size();
+    base_hGraph::numGlobalNodes = g.size();
+    base_hGraph::numGlobalEdges = g.sizeEdges();
     if (base_hGraph::id == 0) {
-      std::cerr << "Total nodes : " << base_hGraph::totalNodes << "\n";
+      std::cerr << "Total nodes : " << base_hGraph::numGlobalNodes << "\n";
     }
     factorize_hosts();
 

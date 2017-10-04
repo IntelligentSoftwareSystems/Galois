@@ -1053,7 +1053,7 @@ struct BC {
         loop_end = numberOfSources;
         use_random = true;
       } else {
-        loop_end = _graph.totalNodes;
+        loop_end = _graph.globalSize();
       }
     }
 
@@ -1281,7 +1281,7 @@ int main(int argc, char** argv) {
   // random num generate for sources
   std::minstd_rand0 r_generator;
   r_generator.seed(100);
-  std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->totalNodes - 1);
+  std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->globalSize() - 1);
 
   if (numberOfSources != 0) {
     // uncomment this to have srcnodeid included as well

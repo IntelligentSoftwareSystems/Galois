@@ -107,7 +107,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    bool transpose = false) : 
                     base_hGraph(host, _numHosts) {
       /*, uint32_t& _numNodes, uint32_t& _numOwned,uint64_t& _numEdges, 
-       *  uint64_t& _totalNodes, unsigned _id )*/
+       *  uint64_t& _numGlobalNodes, unsigned _id )*/
       galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", 
                                                   GRNAME);
       StatTimer_graph_construct.start();
@@ -120,10 +120,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // for the FileGraph which mmaps appropriate regions of memory
       galois::graphs::OfflineGraph g(filename);
 
-      base_hGraph::totalNodes = g.size();
-      base_hGraph::totalEdges = g.sizeEdges();
+      base_hGraph::numGlobalNodes = g.size();
+      base_hGraph::numGlobalEdges = g.sizeEdges();
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
-                   base_hGraph::totalNodes << "\n";
+                   base_hGraph::numGlobalNodes << "\n";
 
       uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
 

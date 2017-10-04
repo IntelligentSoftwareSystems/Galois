@@ -72,7 +72,7 @@ private:
   }
 
   unsigned getBlockID(unsigned rowID, uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     for (auto h = 0U; h < base_hGraph::numHosts; ++h) {
       uint64_t start, end;
       std::tie(start, end) = jaggedColumnMap[rowID][h];
@@ -93,13 +93,13 @@ private:
   }
 
   unsigned getColumnHostID(unsigned rowID, uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     uint32_t blockID = getBlockID(rowID, gid);
     return getColumnHostIDOfBlock(blockID);
   }
 
   uint32_t getColumnIndex(unsigned rowID, uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     auto blockID = getBlockID(rowID, gid);
     auto h = getColumnHostIDOfBlock(blockID);
     uint32_t columnIndex = 0;
@@ -157,7 +157,7 @@ public:
 
   // Return the ID to which gid belongs after patition.
   unsigned getHostID(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     for (auto h = 0U; h < base_hGraph::numHosts; ++h) {
       uint64_t start, end;
       std::tie(start, end) = base_hGraph::gid2host[h];
@@ -178,7 +178,7 @@ public:
 
   // Return if gid is present locally (owned or mirror).
   virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_hGraph::totalNodes);
+    assert(gid < base_hGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
@@ -230,9 +230,10 @@ public:
     // for the FileGraph which mmaps appropriate regions of memory
     galois::graphs::OfflineGraph g(filename);
 
-    base_hGraph::totalNodes = g.size();
+    base_hGraph::numGlobalNodes = g.size();
+    base_hGraph::numGlobalEdges = g.sizeEdges();
     if (base_hGraph::id == 0) {
-      std::cerr << "Total nodes : " << base_hGraph::totalNodes << "\n";
+      std::cerr << "Total nodes : " << base_hGraph::numGlobalNodes << "\n";
     }
     factorize_hosts();
 
@@ -338,7 +339,7 @@ private:
     galois::Timer timer;
     timer.start();
     fileGraph.reset_byte_counters();
-    size_t numColumnChunks = (base_hGraph::totalNodes + columnChunkSize - 1)/columnChunkSize;
+    size_t numColumnChunks = (base_hGraph::numGlobalNodes + columnChunkSize - 1)/columnChunkSize;
     std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -408,8 +409,8 @@ private:
       
       i_pair.first *= columnChunkSize;
       i_pair.second *= columnChunkSize; 
-      if (i_pair.first > base_hGraph::totalNodes) i_pair.first = base_hGraph::totalNodes;
-      if (i_pair.second > base_hGraph::totalNodes) i_pair.second = base_hGraph::totalNodes;
+      if (i_pair.first > base_hGraph::numGlobalNodes) i_pair.first = base_hGraph::numGlobalNodes;
+      if (i_pair.second > base_hGraph::numGlobalNodes) i_pair.second = base_hGraph::numGlobalNodes;
       jaggedColumnMap[gridColumnID()].push_back(i_pair);
     }
 
@@ -556,7 +557,7 @@ private:
     base_hGraph::numNodesWithEdges = numNodes;
 
     src = base_hGraph::gid2host[leaderHostID].first;
-    for (uint64_t dst = 0; dst < base_hGraph::totalNodes; ++dst) {
+    for (uint64_t dst = 0; dst < base_hGraph::numGlobalNodes; ++dst) {
       if (src != src_end) {
         if (dst == src) { // skip nodes which have been allocated above
           dst = src_end - 1;
