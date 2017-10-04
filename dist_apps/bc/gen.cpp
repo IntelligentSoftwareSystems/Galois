@@ -148,7 +148,8 @@ struct InitializeGraph {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      galois::iterate(*allNodes.begin(), *allNodes.end()), 
+      // pass in begin/end to not use local thread ranges
+      galois::iterate(allNodes.begin(), allNodes.end()), 
       InitializeGraph{&_graph}, 
       galois::loopname("InitializeGraph"), 
       //galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
@@ -209,7 +210,7 @@ struct InitializeIteration {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      galois::iterate(*allNodes.begin(), *allNodes.end()), 
+      galois::iterate(allNodes.begin(), allNodes.end()), 
       InitializeIteration{infinity, current_src_node, &_graph},
       galois::loopname("InitializeIteration"), 
       //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
@@ -555,7 +556,7 @@ struct NumShortestPathsChanges {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
+      galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       NumShortestPathsChanges{infinity, &_graph}, 
       galois::loopname("NumShortestPathsChanges"), 
       //galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
@@ -770,7 +771,7 @@ struct PropagationFlagUpdate {
     // TODO gpu code
 
     galois::do_all(
-      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
+      galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       PropagationFlagUpdate(infinity, &_graph), 
       galois::loopname("PropagationFlagUpdate"),
       galois::timeit(),
@@ -787,12 +788,6 @@ struct PropagationFlagUpdate {
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-
-    // this shouldn't print 
-    if (src_data.num_predecessors != 0) {
-      printf("[%d] WARNING node %lu with length %u, short paths %u\n", graph->id,
-             graph->L2G(src), src_data.current_length.load(), src_data.num_shortest_paths);
-    }
 
     assert(src_data.num_predecessors == 0);
 
@@ -838,7 +833,7 @@ struct DependencyPropChanges {
       } else if (personality == CPU)
     #endif
     galois::do_all(
-      galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
+      galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       DependencyPropChanges{infinity, &_graph}, 
       galois::loopname("DependencyPropChanges"),
       //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
@@ -1132,7 +1127,7 @@ struct BC {
       } else if (personality == CPU)
     #endif
       galois::do_all(
-        galois::iterate(*nodesWithEdges.begin(), *nodesWithEdges.end()),
+        galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         BC(&_graph), 
         galois::loopname("BC"),
         //galois::loopname(_graph.get_run_identifier("BC").c_str()),
@@ -1194,7 +1189,8 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
+    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), 
+                                   _graph.allNodesRange().end()),
                    Sanity(
                      &_graph,
                      DGA_max,
@@ -1393,23 +1389,23 @@ int main(int argc, char** argv) {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) { 
     #endif
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
-          // outputs betweenness centrality
-          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                  (*h_graph).getData(*ii).betweeness_centrality);
-          galois::runtime::printOutput(v_out);
-        }
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
+        // outputs betweenness centrality
+        sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                (*h_graph).getData(*ii).betweeness_centrality);
+        galois::runtime::printOutput(v_out);
       }
     #ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                  get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
-
-          galois::runtime::printOutput(v_out);
-          memset(v_out, '\0', 40);
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
+        sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
+        galois::runtime::printOutput(v_out);
+        memset(v_out, '\0', 40);
       }
     }
     #endif

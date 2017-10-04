@@ -1162,23 +1162,21 @@ int main(int argc, char** argv) {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) { 
     #endif
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
           // outputs betweenness centrality
-          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                  (*h_graph).getData(*ii).betweeness_centrality);
-          galois::runtime::printOutput(v_out);
-        }
+        sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
+                (*h_graph).getData(*ii).betweeness_centrality);
+        galois::runtime::printOutput(v_out);
       }
     #ifdef __GALOIS_HET_CUDA__
     } else if (personality == GPU_CUDA) {
-      for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
-        if ((*h_graph).isOwned((*h_graph).getGID(*ii))) 
-          sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-                  get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
-
-          galois::runtime::printOutput(v_out);
-          memset(v_out, '\0', 40);
+      for (auto ii = (*h_graph).masterNodesRange().begin(); 
+                ii != (*h_graph).masterNodesRange().end(); 
+                ++ii) {
+        galois::runtime::printOutput(v_out);
+        memset(v_out, '\0', 40);
       }
     }
     #endif
