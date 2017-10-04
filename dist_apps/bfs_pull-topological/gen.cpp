@@ -330,14 +330,17 @@ int main(int argc, char** argv) {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == CPU) { 
     #endif
-      for (auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-        if ((*hg).isOwned((*hg).getGID(*ii))) 
+      for (auto ii = (*hg).masterNodesRange().begin(); 
+                ii != (*hg).masterNodesRange().end(); 
+                ++ii) {
           galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                        (*hg).getData(*ii).dist_current);
       }
     #ifdef __GALOIS_HET_CUDA__
     } else if(personality == GPU_CUDA)  {
-      for (auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
+      for (auto ii = (*hg).masterNodesRange().begin(); 
+                ii != (*hg).masterNodesRange().end(); 
+                ++ii) {
         if ((*hg).isOwned((*hg).getGID(*ii))) 
           galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                    get_node_dist_current_cuda(cuda_ctx, *ii));
